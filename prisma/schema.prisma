@@ -240,11 +240,11 @@ model Ride {
   customerId       String
   driverId         String?
   pickupAddress    String
-  pickupLat        Float
-  pickupLng        Float
+  pickupLat        Float?    // Optional - for future GPS-based matching
+  pickupLng        Float?    // Optional - for future GPS-based matching
   dropoffAddress   String
-  dropoffLat       Float
-  dropoffLng       Float
+  dropoffLat       Float?    // Optional - for future GPS-based matching
+  dropoffLng       Float?    // Optional - for future GPS-based matching
   serviceFare      Decimal   @db.Decimal(10, 2)
   safegoCommission Decimal   @db.Decimal(10, 2)
   driverPayout     Decimal   @db.Decimal(10, 2)
@@ -276,8 +276,8 @@ model FoodOrder {
   restaurantId     String
   driverId         String?
   deliveryAddress  String
-  deliveryLat      Float
-  deliveryLng      Float
+  deliveryLat      Float?    // Optional - for future GPS-based matching
+  deliveryLng      Float?    // Optional - for future GPS-based matching
   serviceFare      Decimal   @db.Decimal(10, 2)
   safegoCommission Decimal   @db.Decimal(10, 2)
   restaurantPayout Decimal   @db.Decimal(10, 2)
@@ -308,11 +308,11 @@ model Delivery {
   customerId       String
   driverId         String?
   pickupAddress    String
-  pickupLat        Float
-  pickupLng        Float
+  pickupLat        Float?    // Optional - for future GPS-based matching
+  pickupLng        Float?    // Optional - for future GPS-based matching
   dropoffAddress   String
-  dropoffLat       Float
-  dropoffLng       Float
+  dropoffLat       Float?    // Optional - for future GPS-based matching
+  dropoffLng       Float?    // Optional - for future GPS-based matching
   serviceFare      Decimal   @db.Decimal(10, 2)
   safegoCommission Decimal   @db.Decimal(10, 2)
   driverPayout     Decimal   @db.Decimal(10, 2)

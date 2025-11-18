@@ -32,9 +32,9 @@ router.post("/", async (req: AuthRequest, res) => {
       paymentMethod,
     } = req.body;
 
-    // Validation
-    if (!pickupAddress || !pickupLat || !pickupLng || !dropoffAddress || !dropoffLat || !dropoffLng || !serviceFare || !paymentMethod) {
-      return res.status(400).json({ error: "All ride details are required" });
+    // Validation - GPS coordinates are now optional
+    if (!pickupAddress || !dropoffAddress || !serviceFare || !paymentMethod) {
+      return res.status(400).json({ error: "Pickup address, dropoff address, fare, and payment method are required" });
     }
 
     if (!["cash", "online"].includes(paymentMethod)) {
@@ -59,16 +59,16 @@ router.post("/", async (req: AuthRequest, res) => {
     const safegoCommission = parseFloat(serviceFare) * commissionRate;
     const driverPayout = parseFloat(serviceFare) - safegoCommission;
 
-    // Create ride
+    // Create ride - GPS coordinates are optional for future use
     const ride = await prisma.ride.create({
       data: {
         customerId: customerProfile.id,
         pickupAddress,
-        pickupLat: parseFloat(pickupLat.toString()),
-        pickupLng: parseFloat(pickupLng.toString()),
+        pickupLat: pickupLat ? parseFloat(pickupLat.toString()) : null,
+        pickupLng: pickupLng ? parseFloat(pickupLng.toString()) : null,
         dropoffAddress,
-        dropoffLat: parseFloat(dropoffLat.toString()),
-        dropoffLng: parseFloat(dropoffLng.toString()),
+        dropoffLat: dropoffLat ? parseFloat(dropoffLat.toString()) : null,
+        dropoffLng: dropoffLng ? parseFloat(dropoffLng.toString()) : null,
         serviceFare: parseFloat(serviceFare),
         safegoCommission,
         driverPayout,
