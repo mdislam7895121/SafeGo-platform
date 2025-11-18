@@ -866,30 +866,42 @@ Complete delivery with rating (customer and driver both rate).
 
 ### Food Delivery
 
-**Commission Rates:**
-- Restaurant: 15%
-- Delivery: 5%
-- Total: 20%
+**Commission Structure:**
+- Total SafeGo commission: 20% of service fare
+- Driver delivery fee: 5% of service fare
+- Restaurant payout: 75% of service fare (100% - 20% - 5%)
 
-**Online Payment Example ($200 order):**
-1. Customer pays $200 via online payment
-2. System calculates:
-   - Restaurant payout: $170 (85%)
-   - Delivery payout: $10 (5%)
-   - SafeGo commission: $40 (20%)
-3. Wallet updates:
-   - Restaurant `balance` increases by $170
-   - Driver `balance` increases by $10
+For a $100 food order:
+- SafeGo commission: $20
+- Driver delivery fee: $5
+- Restaurant payout: $75
+- **Math check: $75 + $5 + $20 = $100 ✓**
 
-**Cash Payment Example ($200 order):**
-1. Customer pays restaurant $200 in cash
+**Online Payment Example ($100 order):**
+1. Customer pays $100 via online payment (to SafeGo platform)
 2. System calculates:
-   - Restaurant commission: $30 (15%)
-   - Delivery payout: $10 (5%)
+   - SafeGo commission: $20 (20%)
+   - Driver delivery fee: $5 (5%)
+   - Restaurant payout: $75 (75%)
 3. Wallet updates:
-   - Restaurant `negativeBalance` increases by $30
-   - Driver `balance` increases by $10
-4. Restaurant owes SafeGo $30
+   - Restaurant `balance` increases by $75
+   - Driver `balance` increases by $5
+4. SafeGo keeps $20 commission
+
+**Cash Payment Example ($100 order):**
+1. Customer pays restaurant $100 in cash (for food + delivery)
+2. System calculates:
+   - SafeGo commission: $20 (20%)
+   - Driver delivery fee: $5 (5%)
+   - Restaurant payout: $75 (75%)
+3. Wallet updates:
+   - Restaurant `negativeBalance` increases by $20 (owes full commission)
+   - Driver wallet: **NO CHANGE** (driver collects delivery fee in cash)
+4. **Cash settlement responsibilities:**
+   - Restaurant received $100 cash from customer
+   - Restaurant must pay driver $5 delivery fee in cash (or driver collects from customer)
+   - Restaurant owes SafeGo $20 commission
+   - **Net:** Restaurant keeps $75 ($100 cash - $5 to driver - $20 to SafeGo)
 
 ### Wallet Settlement
 
