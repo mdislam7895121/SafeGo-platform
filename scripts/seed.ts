@@ -13,7 +13,7 @@ const demoUsers = [
   { email: "admin@demo.com", password: "demo123", role: "admin", countryCode: "US" },
 ];
 
-async function seedDemoUsers() {
+async function seed() {
   console.log("\n🌱 Seeding demo users...\n");
   console.log("┌─────────────┬─────────┬─────────────────────────┬──────────┐");
   console.log("│ Role        │ Country │ Email                   │ Password │");
@@ -41,9 +41,18 @@ async function seedDemoUsers() {
       if (userData.role === "customer") {
         await prisma.customerProfile.create({ data: { userId: user.id } });
       } else if (userData.role === "driver") {
-        await prisma.driverProfile.create({ data: { userId: user.id } });
+        const driverProfile = await prisma.driverProfile.create({ data: { userId: user.id } });
+        await prisma.driverStats.create({ data: { driverId: driverProfile.id } });
+        await prisma.driverWallet.create({ data: { driverId: driverProfile.id } });
       } else if (userData.role === "restaurant") {
-        await prisma.restaurantProfile.create({ data: { userId: user.id } });
+        const restaurantProfile = await prisma.restaurantProfile.create({
+          data: {
+            userId: user.id,
+            restaurantName: `Demo Restaurant ${userData.countryCode}`,
+            address: "Sample Address",
+          },
+        });
+        await prisma.restaurantWallet.create({ data: { restaurantId: restaurantProfile.id } });
       } else if (userData.role === "admin") {
         await prisma.adminProfile.create({ data: { userId: user.id } });
       }
@@ -51,6 +60,7 @@ async function seedDemoUsers() {
       console.log(`│ ${userData.role.padEnd(11)} │ ${userData.countryCode.padEnd(7)} │ ${userData.email.padEnd(23)} │ ${userData.password.padEnd(8)} │`);
     } catch (error: any) {
       console.log(`│ ${userData.role.padEnd(11)} │ ${userData.countryCode.padEnd(7)} │ ${userData.email.padEnd(23)} │ ERROR    │`);
+      console.error(`  ${error.message}`);
     }
   }
 
@@ -58,6 +68,11 @@ async function seedDemoUsers() {
   console.log("\n✅ Demo users seeded successfully!\n");
 }
 
-seedDemoUsers()
-  .catch((error) => { console.error("Failed:", error); process.exit(1); })
-  .finally(() => { prisma.$disconnect(); });
+seed()
+  .catch((error) => {
+    console.error("Seed failed:", error);
+    process.exit(1);
+  })
+  .finally(() => {
+    prisma.$disconnect();
+  });

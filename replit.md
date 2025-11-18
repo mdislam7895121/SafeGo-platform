@@ -2,152 +2,120 @@
 
 ## Overview
 
-SafeGo is a global multi-service super-app platform that provides ride-hailing, food delivery, and parcel delivery services across multiple countries. The application supports four distinct user roles (customer, driver, restaurant, admin) with country-specific KYC requirements for Bangladesh and the United States. Built as a full-stack TypeScript application, it features a React frontend with shadcn/ui components and an Express backend with Prisma ORM for database management.
+SafeGo is a production-ready, full-stack multi-service super-app platform offering ride-hailing, food delivery, and parcel delivery across multiple countries. Its purpose is to provide a comprehensive, scalable, and secure platform for on-demand services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, and full service lifecycle management. The business vision is to become a leading global super-app, capitalizing on the growing demand for integrated urban services.
 
 ## User Preferences
 
-Preferred communication style: Simple, everyday language.
+**Preferred communication style**: Simple, everyday language.
+
+**Development approach**: Full-stack TypeScript with modern tooling, emphasizing code quality, security, and scalability.
 
 ## System Architecture
 
 ### Frontend Architecture
 
 **Technology Stack:**
-- **Framework:** React with TypeScript, using Vite as the build tool
-- **UI Library:** shadcn/ui components built on Radix UI primitives
-- **Styling:** Tailwind CSS with custom design system based on "new-york" style
-- **State Management:** TanStack Query (React Query) for server state
-- **Routing:** wouter for lightweight client-side routing
-- **Form Handling:** React Hook Form with Zod validation via @hookform/resolvers
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite 5
+- **UI Library**: shadcn/ui components (Radix UI primitives)
+- **Styling**: Tailwind CSS 3
+- **State Management**: TanStack Query v5
+- **Routing**: wouter
+- **Form Handling**: React Hook Form with Zod validation
 
 **Design System:**
-- Custom color palette with HSL-based theming supporting light/dark modes
-- Typography system using Inter (primary) and Manrope (secondary) fonts
-- Spacing scale following Tailwind convention (2, 3, 4, 6, 8, 12, 16, 24)
-- Component variants for buttons, cards, badges with elevation effects
-- Mobile-first responsive design with specific breakpoints
+- Custom HSL-based color palette with light/dark mode
+- Typography: Inter (primary), Manrope (secondary)
+- Mobile-first responsive design
 
 **Architecture Pattern:**
-- Component-based architecture with reusable UI primitives
-- Centralized API client with credential-based authentication
-- Role-specific interfaces (customer app, driver panel, restaurant panel, admin dashboard)
-- Reference-based design drawing from Uber, DoorDash, and Material Design patterns
+- Component-based, role-specific page directories (`customer/`, `driver/`, `restaurant/`, `admin/`)
+- Centralized API client with JWT authentication
+- AuthContext for global authentication state
+
+**Key Features:**
+- Auto-redirect after login based on user role
+- Protected routes with role-based access control
+- Toast notifications, skeleton loading, error boundaries
 
 ### Backend Architecture
 
 **Technology Stack:**
-- **Runtime:** Node.js with TypeScript (ESM modules)
-- **Framework:** Express.js for REST API
-- **ORM:** Prisma Client (with migration to Drizzle ORM in progress via drizzle.config.ts)
-- **Authentication:** JWT-based with bcrypt for password hashing
-- **Database:** PostgreSQL via Neon serverless driver
+- **Runtime**: Node.js 20+ with TypeScript (ESM modules)
+- **Framework**: Express.js 4 for REST API
+- **ORM**: Prisma Client 6 with PostgreSQL
+- **Authentication**: JWT tokens with bcrypt password hashing
+- **Database**: PostgreSQL 14+
 
 **Core Features:**
-1. **Multi-Role Authentication System**
-   - Four distinct roles: customer, driver, restaurant, admin
-   - JWT token-based authentication with role-based access control (RBAC)
-   - Custom middleware for token verification and role checking
-   - Country-specific registration flows (BD vs US)
 
-2. **Country-Specific KYC System**
-   - Bangladesh: Requires NID (National ID), father's name, addresses, emergency contacts
-   - United States: Requires government ID, SSN last 4 digits, driver's license for drivers
-   - Verification status tracking (pending, approved, rejected)
-   - Admin approval workflow for KYC documents
+1.  **Multi-Role Authentication System**
+    -   Four distinct roles: customer, driver, restaurant, admin
+    -   JWT token-based authentication with role-based middleware
+    -   Country-specific registration and automatic profile creation
 
-3. **Service Management**
-   - Ride-hailing service with vehicle management and driver stats
-   - Food delivery with restaurant profiles and order management
-   - Parcel delivery system
-   - Status flow tracking for all service types
+2.  **Country-Specific KYC System**
+    -   Custom verification requirements for Bangladesh and United States
+    -   Admin approval workflow with verification status tracking
 
-4. **Wallet & Commission System**
-   - Separate wallets for drivers and restaurants
-   - Commission tracking and balance management
-   - Support for negative balances
+3.  **Service Management**
+    -   Lifecycle management for Ride-hailing, Food delivery, and Parcel delivery
+    -   Status flow validation for each service
 
-5. **Notification System**
-   - User notifications for service updates
-   - Event-driven notification creation
+4.  **Commission & Wallet System**
+    -   Defined commission structures for rides, food orders, and deliveries
+    -   Supports cash payment model with negative balance tracking for commissions owed
+    -   Online payment model with automatic commission deduction
+    -   Admin wallet settlement functionality
 
-**API Structure:**
-- `/api/auth/*` - Authentication endpoints (signup, login)
-- `/api/driver/*` - Driver-specific operations (dashboard, profile)
-- `/api/admin/*` - Admin operations (KYC approval, user management)
-- RESTful conventions with JSON request/response bodies
+5.  **Notification System**
+    -   User notifications for service updates and KYC status changes
 
 **Security Architecture:**
-- JWT secret stored in environment variables (defaults provided for development)
-- Password hashing using bcrypt with salt rounds
-- Request body parsing with raw body preservation for webhook verification
-- Role-based middleware chain for protected routes
+- JWT secret in environment variables, bcrypt password hashing
+- Input validation using Zod schemas
+- Role-based middleware, CSRF protection, SQL injection prevention (Prisma)
 
 **Database Schema Design:**
-- User management tables with role-based profiles (DriverProfile, CustomerProfile, RestaurantProfile, AdminProfile)
-- Service tables (Ride, FoodOrder, Delivery) with status tracking
-- Supporting tables for vehicles, wallets, statistics, and notifications
-- Country-code based data separation within profiles
+- User table with role and linked role-specific profiles
+- UUID primary keys, indexed foreign keys, decimal fields for monetary values
+- Country-code based data separation
 
-### Build & Development
-
-**Development Workflow:**
-- `npm run dev` - Development server with tsx for TypeScript execution
-- `npm run build` - Production build using Vite for frontend and esbuild for backend
-- `npm run db:push` - Database schema synchronization via Drizzle Kit
-- Hot module replacement enabled via Vite for frontend development
-
-**Project Structure:**
-- `/client` - Frontend React application
-  - `/src/components/ui` - shadcn/ui component library
-  - `/src/pages` - Route components
-  - `/src/lib` - Utilities and query client
-  - `/src/hooks` - Custom React hooks
-- `/server` - Backend Express application
-  - `/routes` - API route handlers
-  - `/middleware` - Authentication and authorization
-- `/shared` - Shared types and schemas (Drizzle schema definitions)
-- `/migrations` - Database migration files (Drizzle)
-
-**Migration Status:**
-The project is transitioning from Prisma to Drizzle ORM:
-- Prisma Client still in dependencies and used in route handlers
-- Drizzle configuration present with schema in `/shared/schema.ts`
-- Current schema only contains basic user table; full schema migration pending
+### Project Structure:
+- `client/`: React frontend
+- `server/`: Express backend with routes and middleware
+- `prisma/`: Database schema
+- `scripts/`: Seed data
+- `attached_assets/`: Static assets
+- `Documentation/`: Project documentation
 
 ## External Dependencies
 
-### Database
-- **PostgreSQL** via Neon serverless (@neondatabase/serverless)
-- Connection managed through DATABASE_URL environment variable
-- ORM: Transitioning from Prisma (@prisma/client v6.19.0) to Drizzle ORM
+### Production Dependencies
 
-### Authentication & Security
-- **jsonwebtoken** - JWT token generation and verification
-- **bcrypt** v6.0.0 - Password hashing and comparison
+**Backend Core:**
+- `@prisma/client`: Type-safe database client
+- `express`: Web framework
+- `bcrypt`: Password hashing
+- `jsonwebtoken`: JWT authentication
+- `@neondatabase/serverless`: PostgreSQL driver
 
-### UI Component Libraries
-- **Radix UI** - Headless component primitives for all interactive components
-- **shadcn/ui** - Pre-built accessible components (accordion, dialog, dropdown, etc.)
-- **Lucide React** - Icon library
-- **class-variance-authority** - Component variant management
-- **tailwind-merge** & **clsx** - CSS class merging utilities
+**Frontend Core:**
+- `react`, `react-dom`: UI library
+- `wouter`: Client-side routing
+- `@tanstack/react-query`: Server state management
+- `react-hook-form`: Form management
+- `zod`: Schema validation
 
-### Form & Validation
-- **React Hook Form** - Form state management
-- **Zod** - Schema validation
-- **@hookform/resolvers** - Integration between React Hook Form and Zod
+**UI Components (shadcn/ui):**
+- `@radix-ui/*`: Headless component primitives
+- `lucide-react`: Icon library
+- `class-variance-authority`: Component variants
+- `tailwind-merge`, `clsx`: CSS utilities
 
-### Development Tools
-- **Vite** - Frontend build tool with React plugin
-- **tsx** - TypeScript execution for development
-- **esbuild** - Backend bundling for production
-- **TypeScript** - Type checking and compilation
-- **Replit-specific plugins** - Runtime error overlay, cartographer, dev banner
+### Environment Variables
 
-### Fonts
-- **Google Fonts** - Inter and Manrope font families loaded via CDN
-
-### Environment Variables Required
-- `DATABASE_URL` - PostgreSQL connection string (required)
-- `JWT_SECRET` - Secret key for JWT signing (defaults to "safego-secret-key-change-in-production")
-- `NODE_ENV` - Environment designation (development/production)
+**Required:**
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: JWT signing secret
+- `NODE_ENV`: Environment mode (development/production)
