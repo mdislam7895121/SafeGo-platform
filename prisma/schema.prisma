@@ -65,16 +65,24 @@ model DriverProfile {
   verificationStatus     String    @default("pending") // "pending" | "approved" | "rejected"
   rejectionReason        String?
   isVerified             Boolean   @default(false)
+  
+  // Moderation fields
+  isSuspended            Boolean   @default(false)  // Temporary suspension (can't receive rides)
+  suspensionReason       String?
+  suspendedAt            DateTime?
+  lastActive             DateTime?  // Last time driver was online/active
+  
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   vehicle      Vehicle?
   stats        DriverStats?
   driverWallet DriverWallet?
   rides        Ride[]
   foodOrders   FoodOrder[]
   deliveries   Delivery[]
+  complaints   DriverComplaint[]
 
   @@map("driver_profiles")
 }
@@ -110,10 +118,11 @@ model CustomerProfile {
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rides      Ride[]
-  foodOrders FoodOrder[]
-  deliveries Delivery[]
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rides             Ride[]
+  foodOrders        FoodOrder[]
+  deliveries        Delivery[]
+  driverComplaints  DriverComplaint[]
 
   @@map("customer_profiles")
 }
@@ -258,8 +267,9 @@ model Ride {
   updatedAt        DateTime  @updatedAt
   completedAt      DateTime?
 
-  customer CustomerProfile @relation(fields: [customerId], references: [id])
-  driver   DriverProfile?  @relation(fields: [driverId], references: [id])
+  customer   CustomerProfile   @relation(fields: [customerId], references: [id])
+  driver     DriverProfile?    @relation(fields: [driverId], references: [id])
+  complaints DriverComplaint[]
 
   @@map("rides")
 }
@@ -328,6 +338,30 @@ model Delivery {
   driver   DriverProfile?  @relation(fields: [driverId], references: [id])
 
   @@map("deliveries")
+}
+
+// ====================================================
+// DRIVER COMPLAINTS
+// ====================================================
+
+model DriverComplaint {
+  id          String    @id @default(uuid())
+  driverId    String
+  customerId  String?
+  rideId      String?
+  reason      String
+  description String?
+  status      String    @default("open") // "open" | "resolved"
+  resolvedAt  DateTime?
+  resolvedBy  String?   // Admin userId who resolved it
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  driver   DriverProfile    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  customer CustomerProfile? @relation(fields: [customerId], references: [id])
+  ride     Ride?            @relation(fields: [rideId], references: [id])
+
+  @@map("driver_complaints")
 }
 
 // ====================================================
