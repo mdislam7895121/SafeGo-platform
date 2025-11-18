@@ -178,7 +178,7 @@ export default function DriverHome() {
                 <div>
                   <p className="text-sm text-muted-foreground">Rating</p>
                   <p className="text-2xl font-bold" data-testid="text-rating">
-                    {stats?.rating?.toFixed(1) || "N/A"}
+                    {stats?.rating != null ? Number(stats.rating).toFixed(1) : "N/A"}
                   </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-yellow-600 opacity-50" />
@@ -211,7 +211,7 @@ export default function DriverHome() {
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Total Earnings</span>
-                <span className="font-bold">${vehicle.totalEarnings?.toFixed(2) || "0.00"}</span>
+                <span className="font-bold">${vehicle.totalEarnings != null ? Number(vehicle.totalEarnings).toFixed(2) : "0.00"}</span>
               </div>
               <Link href="/driver/vehicle">
                 <Button variant="outline" className="w-full mt-2" data-testid="button-edit-vehicle">

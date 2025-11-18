@@ -56,14 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("safego_token", data.token);
     localStorage.setItem("safego_user", JSON.stringify(data.user));
 
-    // Redirect based on role
+    // Redirect based on role (defer to next tick to ensure state updates complete)
     const roleRoutes: Record<string, string> = {
       customer: "/customer",
       driver: "/driver",
       restaurant: "/restaurant",
       admin: "/admin",
     };
-    setLocation(roleRoutes[data.user.role] || "/customer");
+    setTimeout(() => {
+      setLocation(roleRoutes[data.user.role] || "/customer");
+    }, 0);
   };
 
   const signup = async (email: string, password: string, role: string, countryCode: string) => {
