@@ -1,12 +1,22 @@
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Car, Package, UtensilsCrossed, User, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CustomerHome() {
   const { user, logout } = useAuth();
+
+  // Fetch fresh customer data including verification status
+  const { data: customerData, isLoading } = useQuery({
+    queryKey: ["/api/customer/home"],
+    refetchInterval: 5000, // Refresh every 5 seconds to pick up verification changes
+  });
+
+  const profile = customerData?.profile || user?.profile;
 
   const services = [
     {
@@ -57,10 +67,14 @@ export default function CustomerHome() {
             <User className="h-6 w-6" />
           </div>
           <div>
-            <p className="font-medium">{user?.email}</p>
-            <Badge variant="secondary" className="mt-1" data-testid="badge-verification">
-              {user?.profile?.isVerified ? "✓ Verified" : "Pending Verification"}
-            </Badge>
+            <p className="font-medium">{profile?.email || user?.email}</p>
+            {isLoading ? (
+              <Skeleton className="h-6 w-32 mt-1" />
+            ) : (
+              <Badge variant="secondary" className="mt-1" data-testid="badge-verification">
+                {profile?.isVerified ? "✓ Verified" : "Pending Verification"}
+              </Badge>
+            )}
           </div>
         </div>
       </div>

@@ -10,6 +10,64 @@ router.use(authenticateToken);
 router.use(requireRole(["customer"]));
 
 // ====================================================
+// GET /api/customer/profile
+// Get customer profile
+// ====================================================
+router.get("/profile", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            countryCode: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    res.json({
+      id: customerProfile.id,
+      userId: customerProfile.userId,
+      email: customerProfile.user.email,
+      countryCode: customerProfile.user.countryCode,
+      verificationStatus: customerProfile.verificationStatus,
+      isVerified: customerProfile.isVerified,
+      rejectionReason: customerProfile.rejectionReason,
+      dateOfBirth: customerProfile.dateOfBirth,
+      emergencyContactName: customerProfile.emergencyContactName,
+      emergencyContactPhone: customerProfile.emergencyContactPhone,
+      // Bangladesh fields
+      fatherName: customerProfile.fatherName,
+      presentAddress: customerProfile.presentAddress,
+      permanentAddress: customerProfile.permanentAddress,
+      nidNumber: customerProfile.nidNumber,
+      nidFrontImageUrl: customerProfile.nidFrontImageUrl,
+      nidBackImageUrl: customerProfile.nidBackImageUrl,
+      // US fields
+      homeAddress: customerProfile.homeAddress,
+      governmentIdType: customerProfile.governmentIdType,
+      governmentIdLast4: customerProfile.governmentIdLast4,
+      createdAt: customerProfile.createdAt,
+      updatedAt: customerProfile.updatedAt,
+    });
+  } catch (error) {
+    console.error("Get profile error:", error);
+    res.status(500).json({ error: "Failed to get profile" });
+  }
+});
+
+// ====================================================
 // PATCH /api/customer/profile
 // Update customer profile (KYC data)
 // ====================================================
