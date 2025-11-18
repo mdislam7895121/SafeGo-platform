@@ -18,15 +18,13 @@ router.get("/stats", async (req: AuthRequest, res) => {
     // Count total users
     const totalUsers = await prisma.user.count();
 
-    // Count total drivers (users with role = driver)
-    const totalDrivers = await prisma.user.count({
-      where: { role: "driver" },
-    });
-
-    // Count active drivers (drivers with isOnline = true in vehicles table)
-    const activeDrivers = await prisma.vehicle.count({
+    // Count active drivers (distinct drivers with at least one online vehicle)
+    // Using groupBy to get distinct driverIds where isOnline = true
+    const activeDriversList = await prisma.vehicle.groupBy({
+      by: ['driverId'],
       where: { isOnline: true },
     });
+    const activeDrivers = activeDriversList.length;
 
     // Count total restaurants (users with role = restaurant)
     const restaurants = await prisma.user.count({
@@ -35,7 +33,6 @@ router.get("/stats", async (req: AuthRequest, res) => {
 
     res.json({
       totalUsers,
-      totalDrivers,
       activeDrivers,
       restaurants,
     });

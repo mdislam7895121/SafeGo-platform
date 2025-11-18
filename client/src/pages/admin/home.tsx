@@ -8,7 +8,6 @@ import { useQuery } from "@tanstack/react-query";
 
 interface AdminStats {
   totalUsers: number;
-  totalDrivers: number;
   activeDrivers: number;
   restaurants: number;
 }
