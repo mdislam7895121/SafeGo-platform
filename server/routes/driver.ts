@@ -71,6 +71,80 @@ router.get("/home", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/driver/available-rides
+// Get available rides in driver's country (no GPS matching)
+// ====================================================
+router.get("/available-rides", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const driverCountryCode = req.user!.countryCode;
+
+    // Get driver profile to check verification status
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { vehicle: true },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (!driverProfile.isVerified) {
+      return res.status(403).json({ error: "Driver must be verified to view available rides" });
+    }
+
+    // Get all available rides in the driver's country
+    // Match by country only - no GPS dependency
+    const availableRides = await prisma.ride.findMany({
+      where: {
+        driverId: null, // No driver assigned yet
+        status: {
+          in: ["requested", "searching_driver"], // Available for acceptance
+        },
+        customer: {
+          user: {
+            countryCode: driverCountryCode, // Same country as driver
+          },
+        },
+      },
+      include: {
+        customer: {
+          include: {
+            user: {
+              select: {
+                email: true,
+                countryCode: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "asc", // FIFO - oldest requests first
+      },
+    });
+
+    res.json({
+      rides: availableRides.map(ride => ({
+        id: ride.id,
+        pickupAddress: ride.pickupAddress,
+        dropoffAddress: ride.dropoffAddress,
+        serviceFare: ride.serviceFare,
+        driverPayout: ride.driverPayout,
+        paymentMethod: ride.paymentMethod,
+        status: ride.status,
+        createdAt: ride.createdAt,
+        customerEmail: ride.customer.user.email,
+        customerCountry: ride.customer.user.countryCode,
+      })),
+    });
+  } catch (error) {
+    console.error("Get available rides error:", error);
+    res.status(500).json({ error: "Failed to fetch available rides" });
+  }
+});
+
+// ====================================================
 // POST /api/driver/vehicle
 // Register vehicle for driver
 // ====================================================

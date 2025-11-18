@@ -27,20 +27,25 @@ export default function RideRequest() {
     setIsLoading(true);
 
     try {
-      await apiRequest("POST", "/api/rides", {
+      // Build request body - GPS coordinates are optional
+      const requestBody: any = {
         pickupAddress,
-        pickupLat: parseFloat(pickupLat),
-        pickupLng: parseFloat(pickupLng),
         dropoffAddress,
-        dropoffLat: parseFloat(dropoffLat),
-        dropoffLng: parseFloat(dropoffLng),
         serviceFare: parseFloat(serviceFare),
         paymentMethod,
-      });
+      };
+
+      // Include GPS coordinates only if provided
+      if (pickupLat) requestBody.pickupLat = parseFloat(pickupLat);
+      if (pickupLng) requestBody.pickupLng = parseFloat(pickupLng);
+      if (dropoffLat) requestBody.dropoffLat = parseFloat(dropoffLat);
+      if (dropoffLng) requestBody.dropoffLng = parseFloat(dropoffLng);
+
+      await apiRequest("POST", "/api/rides", requestBody);
 
       toast({
         title: "Ride requested!",
-        description: "Searching for a nearby driver...",
+        description: "Finding an available driver in your area...",
       });
       setLocation("/customer");
     } catch (error: any) {
@@ -95,7 +100,7 @@ export default function RideRequest() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor="pickupLat">Latitude</Label>
+                      <Label htmlFor="pickupLat" className="text-muted-foreground">Latitude (optional)</Label>
                       <Input
                         id="pickupLat"
                         type="number"
@@ -103,12 +108,11 @@ export default function RideRequest() {
                         placeholder="23.8103"
                         value={pickupLat}
                         onChange={(e) => setPickupLat(e.target.value)}
-                        required
                         data-testid="input-pickup-lat"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="pickupLng">Longitude</Label>
+                      <Label htmlFor="pickupLng" className="text-muted-foreground">Longitude (optional)</Label>
                       <Input
                         id="pickupLng"
                         type="number"
@@ -116,7 +120,6 @@ export default function RideRequest() {
                         placeholder="90.4125"
                         value={pickupLng}
                         onChange={(e) => setPickupLng(e.target.value)}
-                        required
                         data-testid="input-pickup-lng"
                       />
                     </div>
@@ -144,7 +147,7 @@ export default function RideRequest() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label htmlFor="dropoffLat">Latitude</Label>
+                      <Label htmlFor="dropoffLat" className="text-muted-foreground">Latitude (optional)</Label>
                       <Input
                         id="dropoffLat"
                         type="number"
@@ -152,12 +155,11 @@ export default function RideRequest() {
                         placeholder="23.7900"
                         value={dropoffLat}
                         onChange={(e) => setDropoffLat(e.target.value)}
-                        required
                         data-testid="input-dropoff-lat"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="dropoffLng">Longitude</Label>
+                      <Label htmlFor="dropoffLng" className="text-muted-foreground">Longitude (optional)</Label>
                       <Input
                         id="dropoffLng"
                         type="number"
@@ -165,7 +167,6 @@ export default function RideRequest() {
                         placeholder="90.4000"
                         value={dropoffLng}
                         onChange={(e) => setDropoffLng(e.target.value)}
-                        required
                         data-testid="input-dropoff-lng"
                       />
                     </div>
