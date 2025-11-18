@@ -67,11 +67,18 @@ router.post("/", async (req: AuthRequest, res) => {
     }
 
     // Calculate commission (15% for restaurant, 5% for driver delivery = 20% total)
-    const restaurantCommissionRate = 0.15;
-    const deliveryCommissionRate = 0.05;
-    const safegoCommission = parseFloat(serviceFare) * (restaurantCommissionRate + deliveryCommissionRate);
-    const restaurantPayout = parseFloat(serviceFare) * (1 - restaurantCommissionRate - deliveryCommissionRate);
-    const deliveryPayout = parseFloat(serviceFare) * deliveryCommissionRate;
+    // Total fare = 100%
+    // SafeGo commission = 20% (15% from restaurant + 5% from delivery)
+    // Restaurant gets = 80% of fare minus delivery fee (5%)
+    // Driver delivery fee = 5% of fare
+    const fare = parseFloat(serviceFare);
+    const totalCommissionRate = 0.20; // 20% total to SafeGo
+    const restaurantCommissionRate = 0.15; // 15% from restaurant
+    const deliveryFeeRate = 0.05; // 5% delivery fee
+    
+    const safegoCommission = fare * totalCommissionRate; // $20 on $100
+    const deliveryPayout = fare * deliveryFeeRate; // $5 on $100
+    const restaurantPayout = fare - safegoCommission - deliveryPayout; // $75 on $100 ($100 - $20 - $5)
 
     // Create food order
     const foodOrder = await prisma.foodOrder.create({
@@ -566,14 +573,20 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
             },
           });
 
-          // Driver always gets delivery payout regardless of payment method
-          // (restaurant handles the food payment, driver handles delivery)
-          await prisma.driverWallet.update({
-            where: { id: driver.driverWallet!.id },
-            data: {
-              balance: { increment: parseFloat(foodOrder.deliveryPayout.toString()) },
-            },
-          });
+          // Driver delivery fee handling
+          if (foodOrder.paymentMethod === "cash") {
+            // Cash: Driver collects delivery fee directly from customer or restaurant
+            // No wallet credit needed - driver already has cash
+            // Driver should collect $5 delivery fee in cash
+          } else {
+            // Online payment: SafeGo credits driver the delivery fee
+            await prisma.driverWallet.update({
+              where: { id: driver.driverWallet!.id },
+              data: {
+                balance: { increment: parseFloat(foodOrder.deliveryPayout.toString()) },
+              },
+            });
+          }
         }
       }
     }
