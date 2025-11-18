@@ -104,8 +104,12 @@ router.get("/available-rides", async (req: AuthRequest, res) => {
           in: ["requested", "searching_driver"], // Available for acceptance
         },
         customer: {
-          user: {
-            countryCode: driverCountryCode, // Same country as driver
+          is: {
+            user: {
+              is: {
+                countryCode: driverCountryCode, // Same country as driver
+              },
+            },
           },
         },
       },
