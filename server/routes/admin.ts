@@ -18,6 +18,9 @@ router.get("/stats", async (req: AuthRequest, res) => {
     // Count total users
     const totalUsers = await prisma.user.count();
 
+    // Total drivers (all driver profiles)
+    const totalDrivers = await prisma.driverProfile.count();
+
     // Count active drivers (distinct drivers with at least one online vehicle)
     // Using groupBy to get distinct driverIds where isOnline = true
     const activeDriversList = await prisma.vehicle.groupBy({
@@ -26,15 +29,43 @@ router.get("/stats", async (req: AuthRequest, res) => {
     });
     const activeDrivers = activeDriversList.length;
 
+    // Pending drivers (not yet approved)
+    const pendingDrivers = await prisma.driverProfile.count({
+      where: { verificationStatus: "pending" },
+    });
+
+    // Suspended drivers
+    const suspendedDrivers = await prisma.driverProfile.count({
+      where: { isSuspended: true },
+    });
+
+    // Blocked drivers (users with isBlocked = true and role = driver)
+    const blockedDrivers = await prisma.user.count({
+      where: {
+        role: "driver",
+        isBlocked: true,
+      },
+    });
+
     // Count total restaurants (users with role = restaurant)
     const restaurants = await prisma.user.count({
       where: { role: "restaurant" },
     });
 
+    // Total complaints (open complaints)
+    const openComplaints = await prisma.driverComplaint.count({
+      where: { status: "open" },
+    });
+
     res.json({
       totalUsers,
+      totalDrivers,
       activeDrivers,
+      pendingDrivers,
+      suspendedDrivers,
+      blockedDrivers,
       restaurants,
+      openComplaints,
     });
   } catch (error) {
     console.error("Admin stats error:", error);
@@ -684,6 +715,769 @@ router.post("/settle-wallet", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Settle wallet error:", error);
     res.status(500).json({ error: "Failed to settle wallet" });
+  }
+});
+
+// ====================================================
+// DRIVER MANAGEMENT ENDPOINTS
+// ====================================================
+
+// ====================================================
+// GET /api/admin/drivers
+// List all drivers with search, filters, and pagination
+// ====================================================
+router.get("/drivers", async (req: AuthRequest, res) => {
+  try {
+    const {
+      search,
+      country,
+      verificationStatus,
+      isSuspended,
+      isOnline,
+      page = "1",
+      limit = "20",
+    } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+
+    // Search by email
+    if (search) {
+      where.user = {
+        email: { contains: search as string, mode: "insensitive" },
+      };
+    }
+
+    // Filter by country
+    if (country) {
+      where.user = { ...where.user, countryCode: country as string };
+    }
+
+    // Filter by verification status
+    if (verificationStatus) {
+      where.verificationStatus = verificationStatus as string;
+    }
+
+    // Filter by suspension status
+    if (isSuspended !== undefined) {
+      where.isSuspended = isSuspended === "true";
+    }
+
+    // Filter by online status (requires vehicle check)
+    let onlineFilter: any = undefined;
+    if (isOnline !== undefined) {
+      onlineFilter = { isOnline: isOnline === "true" };
+    }
+
+    // Fetch drivers with full details
+    const [drivers, total] = await Promise.all([
+      prisma.driverProfile.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              countryCode: true,
+              isBlocked: true,
+              createdAt: true,
+            },
+          },
+          vehicle: onlineFilter ? { where: onlineFilter } : true,
+          stats: true,
+          driverWallet: true,
+        },
+        skip,
+        take: limitNum,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.driverProfile.count({ where }),
+    ]);
+
+    // Format response
+    const formattedDrivers = drivers.map((driver) => ({
+      id: driver.id,
+      userId: driver.user.id,
+      email: driver.user.email,
+      countryCode: driver.user.countryCode,
+      verificationStatus: driver.verificationStatus,
+      isVerified: driver.isVerified,
+      isSuspended: driver.isSuspended,
+      suspensionReason: driver.suspensionReason,
+      isBlocked: driver.user.isBlocked,
+      isOnline: driver.vehicle?.isOnline || false,
+      lastActive: driver.lastActive,
+      totalTrips: driver.stats?.totalTrips || 0,
+      totalEarnings: driver.stats?.totalEarnings || 0,
+      averageRating: driver.stats?.averageRating || 0,
+      walletBalance: driver.driverWallet?.balance || 0,
+      negativeBalance: driver.driverWallet?.negativeBalance || 0,
+      vehicleType: driver.vehicle?.vehicleType,
+      vehicleModel: driver.vehicle?.vehicleModel,
+      vehiclePlate: driver.vehicle?.vehiclePlate,
+      createdAt: driver.user.createdAt,
+    }));
+
+    res.json({
+      drivers: formattedDrivers,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("List drivers error:", error);
+    res.status(500).json({ error: "Failed to fetch drivers" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/drivers/pending
+// List drivers with pending verification
+// ====================================================
+router.get("/drivers/pending", async (req: AuthRequest, res) => {
+  try {
+    const pendingDrivers = await prisma.driverProfile.findMany({
+      where: { verificationStatus: "pending" },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            createdAt: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" }, // FIFO order
+    });
+
+    const formatted = pendingDrivers.map((driver) => ({
+      id: driver.id,
+      userId: driver.user.id,
+      email: driver.user.email,
+      countryCode: driver.user.countryCode,
+      verificationStatus: driver.verificationStatus,
+      dateOfBirth: driver.dateOfBirth,
+      nidNumber: driver.nidNumber,
+      governmentIdLast4: driver.governmentIdLast4,
+      createdAt: driver.user.createdAt,
+    }));
+
+    res.json({ drivers: formatted });
+  } catch (error) {
+    console.error("Pending drivers error:", error);
+    res.status(500).json({ error: "Failed to fetch pending drivers" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/drivers/:id
+// Get detailed driver information
+// ====================================================
+router.get("/drivers/:id", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        vehicle: true,
+        stats: true,
+        driverWallet: true,
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    res.json({
+      driver: {
+        id: driver.id,
+        userId: driver.user.id,
+        email: driver.user.email,
+        countryCode: driver.user.countryCode,
+        isBlocked: driver.user.isBlocked,
+        verificationStatus: driver.verificationStatus,
+        isVerified: driver.isVerified,
+        rejectionReason: driver.rejectionReason,
+        isSuspended: driver.isSuspended,
+        suspensionReason: driver.suspensionReason,
+        suspendedAt: driver.suspendedAt,
+        lastActive: driver.lastActive,
+        dateOfBirth: driver.dateOfBirth,
+        emergencyContactName: driver.emergencyContactName,
+        emergencyContactPhone: driver.emergencyContactPhone,
+        // Bangladesh fields
+        fatherName: driver.fatherName,
+        presentAddress: driver.presentAddress,
+        permanentAddress: driver.permanentAddress,
+        nidNumber: driver.nidNumber,
+        nidFrontImageUrl: driver.nidFrontImageUrl,
+        nidBackImageUrl: driver.nidBackImageUrl,
+        // US fields
+        homeAddress: driver.homeAddress,
+        governmentIdType: driver.governmentIdType,
+        governmentIdLast4: driver.governmentIdLast4,
+        driverLicenseNumber: driver.driverLicenseNumber,
+        driverLicenseImageUrl: driver.driverLicenseImageUrl,
+        driverLicenseExpiry: driver.driverLicenseExpiry,
+        ssnLast4: driver.ssnLast4,
+        // Vehicle info
+        vehicle: driver.vehicle
+          ? {
+              id: driver.vehicle.id,
+              vehicleType: driver.vehicle.vehicleType,
+              vehicleModel: driver.vehicle.vehicleModel,
+              vehiclePlate: driver.vehicle.vehiclePlate,
+              isOnline: driver.vehicle.isOnline,
+              totalEarnings: driver.vehicle.totalEarnings,
+            }
+          : null,
+        // Stats
+        totalTrips: driver.stats?.totalTrips || 0,
+        totalEarnings: driver.stats?.totalEarnings || 0,
+        averageRating: driver.stats?.averageRating || 0,
+        completionRate: driver.stats?.completionRate || 0,
+        // Wallet
+        walletBalance: driver.driverWallet?.balance || 0,
+        negativeBalance: driver.driverWallet?.negativeBalance || 0,
+        createdAt: driver.user.createdAt,
+        updatedAt: driver.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Get driver details error:", error);
+    res.status(500).json({ error: "Failed to fetch driver details" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/drivers/:id/trips
+// Get driver trip history with filters
+// ====================================================
+router.get("/drivers/:id/trips", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status, startDate, endDate, page = "1", limit = "20" } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = { driverId: id };
+
+    if (status) {
+      where.status = status as string;
+    }
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        where.createdAt.lte = new Date(endDate as string);
+      }
+    }
+
+    const [trips, total] = await Promise.all([
+      prisma.ride.findMany({
+        where,
+        include: {
+          customer: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+        skip,
+        take: limitNum,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.ride.count({ where }),
+    ]);
+
+    const formattedTrips = trips.map((trip) => ({
+      id: trip.id,
+      customerEmail: trip.customer.user.email,
+      pickupAddress: trip.pickupAddress,
+      dropoffAddress: trip.dropoffAddress,
+      serviceFare: trip.serviceFare,
+      driverPayout: trip.driverPayout,
+      paymentMethod: trip.paymentMethod,
+      status: trip.status,
+      customerRating: trip.customerRating,
+      createdAt: trip.createdAt,
+      completedAt: trip.completedAt,
+    }));
+
+    res.json({
+      trips: formattedTrips,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("Get driver trips error:", error);
+    res.status(500).json({ error: "Failed to fetch driver trips" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/drivers/:id/suspend
+// Suspend a driver (temporary)
+// ====================================================
+router.patch("/drivers/:id/suspend", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || typeof reason !== "string") {
+      return res.status(400).json({ error: "Suspension reason is required" });
+    }
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    if (driver.isSuspended) {
+      return res.status(400).json({ error: "Driver is already suspended" });
+    }
+
+    // Update driver profile
+    const updated = await prisma.driverProfile.update({
+      where: { id },
+      data: {
+        isSuspended: true,
+        suspensionReason: reason,
+        suspendedAt: new Date(),
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: driver.userId,
+        type: "admin",
+        title: "Account Suspended",
+        body: `Your driver account has been temporarily suspended. Reason: ${reason}`,
+      },
+    });
+
+    res.json({
+      message: "Driver suspended successfully",
+      driver: {
+        id: updated.id,
+        isSuspended: updated.isSuspended,
+        suspensionReason: updated.suspensionReason,
+        suspendedAt: updated.suspendedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Suspend driver error:", error);
+    res.status(500).json({ error: "Failed to suspend driver" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/drivers/:id/unsuspend
+// Unsuspend a driver
+// ====================================================
+router.patch("/drivers/:id/unsuspend", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    if (!driver.isSuspended) {
+      return res.status(400).json({ error: "Driver is not suspended" });
+    }
+
+    // Update driver profile
+    const updated = await prisma.driverProfile.update({
+      where: { id },
+      data: {
+        isSuspended: false,
+        suspensionReason: null,
+        suspendedAt: null,
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: driver.userId,
+        type: "admin",
+        title: "Account Unsuspended",
+        body: "Your driver account suspension has been lifted. You can now accept ride requests.",
+      },
+    });
+
+    res.json({
+      message: "Driver unsuspended successfully",
+      driver: {
+        id: updated.id,
+        isSuspended: updated.isSuspended,
+      },
+    });
+  } catch (error) {
+    console.error("Unsuspend driver error:", error);
+    res.status(500).json({ error: "Failed to unsuspend driver" });
+  }
+});
+
+// ====================================================
+// DELETE /api/admin/drivers/:id
+// Delete a driver (only if no active trips/wallet issues)
+// ====================================================
+router.delete("/drivers/:id", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      include: {
+        user: true,
+        driverWallet: true,
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Check for active trips
+    const activeTrips = await prisma.ride.count({
+      where: {
+        driverId: id,
+        status: {
+          in: ["accepted", "driver_arriving", "in_progress"],
+        },
+      },
+    });
+
+    if (activeTrips > 0) {
+      return res.status(400).json({
+        error: "Cannot delete driver with active trips. Please wait for trips to complete.",
+      });
+    }
+
+    // Check for negative balance
+    if (driver.driverWallet && driver.driverWallet.negativeBalance > 0) {
+      return res.status(400).json({
+        error: "Cannot delete driver with unresolved negative balance. Settle wallet first.",
+      });
+    }
+
+    // Delete driver (cascade will handle related records)
+    await prisma.user.delete({
+      where: { id: driver.userId },
+    });
+
+    res.json({
+      message: "Driver deleted successfully",
+      driverId: id,
+    });
+  } catch (error) {
+    console.error("Delete driver error:", error);
+    res.status(500).json({ error: "Failed to delete driver" });
+  }
+});
+
+// ====================================================
+// DRIVER COMPLAINTS ENDPOINTS
+// ====================================================
+
+// ====================================================
+// GET /api/admin/complaints
+// List all driver complaints with filters
+// ====================================================
+router.get("/complaints", async (req: AuthRequest, res) => {
+  try {
+    const { status, driverId, page = "1", limit = "20" } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+
+    if (status) {
+      where.status = status as string;
+    }
+
+    if (driverId) {
+      where.driverId = driverId as string;
+    }
+
+    const [complaints, total] = await Promise.all([
+      prisma.driverComplaint.findMany({
+        where,
+        include: {
+          driver: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+          customer: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                },
+              },
+            },
+          },
+          ride: {
+            select: {
+              id: true,
+              pickupAddress: true,
+              dropoffAddress: true,
+              status: true,
+              createdAt: true,
+            },
+          },
+        },
+        skip,
+        take: limitNum,
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.driverComplaint.count({ where }),
+    ]);
+
+    const formattedComplaints = complaints.map((complaint) => ({
+      id: complaint.id,
+      driverId: complaint.driverId,
+      driverEmail: complaint.driver.user.email,
+      customerId: complaint.customerId,
+      customerEmail: complaint.customer?.user.email || null,
+      rideId: complaint.rideId,
+      ride: complaint.ride || null,
+      reason: complaint.reason,
+      description: complaint.description,
+      status: complaint.status,
+      resolvedAt: complaint.resolvedAt,
+      resolvedBy: complaint.resolvedBy,
+      createdAt: complaint.createdAt,
+      updatedAt: complaint.updatedAt,
+    }));
+
+    res.json({
+      complaints: formattedComplaints,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("List complaints error:", error);
+    res.status(500).json({ error: "Failed to fetch complaints" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/complaints/:id
+// Get complaint details
+// ====================================================
+router.get("/complaints/:id", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const complaint = await prisma.driverComplaint.findUnique({
+      where: { id },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                countryCode: true,
+                isBlocked: true,
+              },
+            },
+          },
+        },
+        customer: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+              },
+            },
+          },
+        },
+        ride: true,
+      },
+    });
+
+    if (!complaint) {
+      return res.status(404).json({ error: "Complaint not found" });
+    }
+
+    res.json({
+      complaint: {
+        id: complaint.id,
+        driverId: complaint.driverId,
+        driver: {
+          id: complaint.driver.id,
+          email: complaint.driver.user.email,
+          countryCode: complaint.driver.user.countryCode,
+          isBlocked: complaint.driver.user.isBlocked,
+          isSuspended: complaint.driver.isSuspended,
+          verificationStatus: complaint.driver.verificationStatus,
+        },
+        customerId: complaint.customerId,
+        customer: complaint.customer
+          ? {
+              id: complaint.customer.id,
+              email: complaint.customer.user.email,
+            }
+          : null,
+        rideId: complaint.rideId,
+        ride: complaint.ride || null,
+        reason: complaint.reason,
+        description: complaint.description,
+        status: complaint.status,
+        resolvedAt: complaint.resolvedAt,
+        resolvedBy: complaint.resolvedBy,
+        createdAt: complaint.createdAt,
+        updatedAt: complaint.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Get complaint details error:", error);
+    res.status(500).json({ error: "Failed to fetch complaint details" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/complaints
+// Create a new complaint (admin can create manually)
+// ====================================================
+router.post("/complaints", async (req: AuthRequest, res) => {
+  try {
+    const { driverId, customerId, rideId, reason, description } = req.body;
+
+    if (!driverId || !reason) {
+      return res.status(400).json({ error: "driverId and reason are required" });
+    }
+
+    // Verify driver exists
+    const driver = await prisma.driverProfile.findUnique({ where: { id: driverId } });
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Verify customer if provided
+    if (customerId) {
+      const customer = await prisma.customerProfile.findUnique({ where: { id: customerId } });
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+    }
+
+    // Verify ride if provided
+    if (rideId) {
+      const ride = await prisma.ride.findUnique({ where: { id: rideId } });
+      if (!ride) {
+        return res.status(404).json({ error: "Ride not found" });
+      }
+    }
+
+    const complaint = await prisma.driverComplaint.create({
+      data: {
+        driverId,
+        customerId: customerId || null,
+        rideId: rideId || null,
+        reason,
+        description: description || null,
+      },
+    });
+
+    res.json({
+      message: "Complaint created successfully",
+      complaint,
+    });
+  } catch (error) {
+    console.error("Create complaint error:", error);
+    res.status(500).json({ error: "Failed to create complaint" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/complaints/:id/resolve
+// Resolve a complaint
+// ====================================================
+router.patch("/complaints/:id/resolve", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const adminUserId = req.user?.userId;
+
+    const complaint = await prisma.driverComplaint.findUnique({ where: { id } });
+
+    if (!complaint) {
+      return res.status(404).json({ error: "Complaint not found" });
+    }
+
+    if (complaint.status === "resolved") {
+      return res.status(400).json({ error: "Complaint is already resolved" });
+    }
+
+    const updated = await prisma.driverComplaint.update({
+      where: { id },
+      data: {
+        status: "resolved",
+        resolvedAt: new Date(),
+        resolvedBy: adminUserId,
+      },
+    });
+
+    res.json({
+      message: "Complaint resolved successfully",
+      complaint: updated,
+    });
+  } catch (error) {
+    console.error("Resolve complaint error:", error);
+    res.status(500).json({ error: "Failed to resolve complaint" });
   }
 });
 

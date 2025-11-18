@@ -84,7 +84,10 @@ router.get("/available-rides", async (req: AuthRequest, res) => {
     // Get driver profile to check verification status
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
-      include: { vehicle: true },
+      include: {
+        user: true,
+        vehicle: true,
+      },
     });
 
     if (!driverProfile) {
@@ -93,6 +96,19 @@ router.get("/available-rides", async (req: AuthRequest, res) => {
 
     if (!driverProfile.isVerified) {
       return res.status(403).json({ error: "Driver must be verified to view available rides" });
+    }
+
+    // Check if driver is suspended
+    if (driverProfile.isSuspended) {
+      return res.status(403).json({
+        error: "Your account is suspended. You cannot view or accept ride requests.",
+        reason: driverProfile.suspensionReason,
+      });
+    }
+
+    // Check if driver's account is blocked
+    if (driverProfile.user.isBlocked) {
+      return res.status(403).json({ error: "Your account is blocked. Please contact support." });
     }
 
     // Get all available rides in the driver's country
