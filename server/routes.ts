@@ -6,6 +6,8 @@ import customerRoutes from "./routes/customer";
 import restaurantRoutes from "./routes/restaurant";
 import adminRoutes from "./routes/admin";
 import rideRoutes from "./routes/rides";
+import foodOrderRoutes from "./routes/food-orders";
+import deliveryRoutes from "./routes/deliveries";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register all API routes
@@ -15,6 +17,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/restaurant", restaurantRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/rides", rideRoutes);
+  app.use("/api/food-orders", foodOrderRoutes);
+  app.use("/api/deliveries", deliveryRoutes);
 
   const httpServer = createServer(app);
 

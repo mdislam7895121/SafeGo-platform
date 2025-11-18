@@ -293,4 +293,86 @@ router.get("/users", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// POST /api/admin/settle-wallet
+// Settle negative balance for driver or restaurant
+// ====================================================
+router.post("/settle-wallet", async (req: AuthRequest, res) => {
+  try {
+    const { walletType, walletId, settlementAmount } = req.body;
+
+    if (!["driver", "restaurant"].includes(walletType)) {
+      return res.status(400).json({ error: "walletType must be 'driver' or 'restaurant'" });
+    }
+
+    if (!walletId || !settlementAmount) {
+      return res.status(400).json({ error: "walletId and settlementAmount are required" });
+    }
+
+    const amount = parseFloat(settlementAmount);
+    if (amount <= 0) {
+      return res.status(400).json({ error: "settlementAmount must be positive" });
+    }
+
+    if (walletType === "driver") {
+      const wallet = await prisma.driverWallet.findUnique({ where: { id: walletId } });
+
+      if (!wallet) {
+        return res.status(404).json({ error: "Driver wallet not found" });
+      }
+
+      if (wallet.negativeBalance < amount) {
+        return res.status(400).json({ error: "Settlement amount exceeds negative balance" });
+      }
+
+      // Settle the amount
+      const updatedWallet = await prisma.driverWallet.update({
+        where: { id: walletId },
+        data: {
+          negativeBalance: { decrement: amount },
+        },
+      });
+
+      res.json({
+        message: "Driver wallet settled successfully",
+        wallet: {
+          id: updatedWallet.id,
+          balance: updatedWallet.balance,
+          negativeBalance: updatedWallet.negativeBalance,
+        },
+      });
+    } else {
+      const wallet = await prisma.restaurantWallet.findUnique({ where: { id: walletId } });
+
+      if (!wallet) {
+        return res.status(404).json({ error: "Restaurant wallet not found" });
+      }
+
+      if (wallet.negativeBalance < amount) {
+        return res.status(400).json({ error: "Settlement amount exceeds negative balance" });
+      }
+
+      // Settle the amount
+      const updatedWallet = await prisma.restaurantWallet.update({
+        where: { id: walletId },
+        data: {
+          negativeBalance: { decrement: amount },
+        },
+      });
+
+      res.json({
+        message: "Restaurant wallet settled successfully",
+        wallet: {
+          id: updatedWallet.id,
+          balance: updatedWallet.balance,
+          negativeBalance: updatedWallet.negativeBalance,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Settle wallet error:", error);
+    res.status(500).json({ error: "Failed to settle wallet" });
+  }
+});
+
 export default router;
