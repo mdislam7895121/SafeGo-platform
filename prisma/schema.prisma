@@ -1,0 +1,349 @@
+// SafeGo Super-App Prisma Schema
+// PostgreSQL database with country-specific KYC fields (BD vs US)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================================================
+// USER & AUTHENTICATION
+// ====================================================
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  role          String   // "customer" | "driver" | "restaurant" | "admin"
+  countryCode   String   // "BD" | "US" | others for future expansion
+  isBlocked     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  driverProfile     DriverProfile?
+  customerProfile   CustomerProfile?
+  restaurantProfile RestaurantProfile?
+  adminProfile      AdminProfile?
+  notifications     Notification[]
+
+  @@map("users")
+}
+
+// ====================================================
+// DRIVER PROFILE (BD + US KYC)
+// ====================================================
+
+model DriverProfile {
+  id                     String    @id @default(uuid())
+  userId                 String    @unique
+  
+  // Bangladesh-specific fields
+  fatherName             String?
+  presentAddress         String?
+  permanentAddress       String?
+  nidNumber              String?
+  nidFrontImageUrl       String?
+  nidBackImageUrl        String?
+  
+  // US-specific fields
+  homeAddress            String?
+  governmentIdType       String?   // "passport" | "state_id"
+  governmentIdLast4      String?
+  driverLicenseNumber    String?
+  driverLicenseImageUrl  String?
+  driverLicenseExpiry    DateTime?
+  ssnLast4               String?
+  
+  // Common fields
+  dateOfBirth            DateTime?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  verificationStatus     String    @default("pending") // "pending" | "approved" | "rejected"
+  rejectionReason        String?
+  isVerified             Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?
+  stats        DriverStats?
+  driverWallet DriverWallet?
+  rides        Ride[]
+  foodOrders   FoodOrder[]
+  deliveries   Delivery[]
+
+  @@map("driver_profiles")
+}
+
+// ====================================================
+// CUSTOMER PROFILE (BD + US KYC)
+// ====================================================
+
+model CustomerProfile {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  
+  // Bangladesh-specific fields
+  fatherName            String?
+  presentAddress        String?
+  permanentAddress      String?
+  nidNumber             String?
+  nidFrontImageUrl      String?
+  nidBackImageUrl       String?
+  
+  // US-specific fields
+  homeAddress           String?
+  governmentIdType      String?
+  governmentIdLast4     String?
+  
+  // Common fields
+  dateOfBirth           DateTime?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  verificationStatus    String    @default("pending")
+  rejectionReason       String?
+  isVerified            Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rides      Ride[]
+  foodOrders FoodOrder[]
+  deliveries Delivery[]
+
+  @@map("customer_profiles")
+}
+
+// ====================================================
+// RESTAURANT PROFILE
+// ====================================================
+
+model RestaurantProfile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  restaurantName     String
+  address            String
+  verificationStatus String   @default("pending")
+  rejectionReason    String?
+  isVerified         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantWallet RestaurantWallet?
+  foodOrders       FoodOrder[]
+
+  @@map("restaurant_profiles")
+}
+
+// ====================================================
+// ADMIN PROFILE
+// ====================================================
+
+model AdminProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admin_profiles")
+}
+
+// ====================================================
+// VEHICLE
+// ====================================================
+
+model Vehicle {
+  id            String   @id @default(uuid())
+  driverId      String   @unique
+  vehicleType   String   // "SafeGo X" | "SafeGo Comfort" | "SafeGo XL"
+  vehicleModel  String
+  vehiclePlate  String
+  isOnline      Boolean  @default(false)
+  totalEarnings Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("vehicles")
+}
+
+// ====================================================
+// DRIVER STATS
+// ====================================================
+
+model DriverStats {
+  id         String   @id @default(uuid())
+  driverId   String   @unique
+  rating     Decimal  @default(5.0) @db.Decimal(3, 2)
+  totalTrips Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("driver_stats")
+}
+
+// ====================================================
+// DRIVER WALLET
+// Commission logic:
+// - CASH payment: driver gets full amount, SafeGo commission becomes negative balance
+// - ONLINE payment: SafeGo keeps commission, no negative balance
+// ====================================================
+
+model DriverWallet {
+  id              String   @id @default(uuid())
+  driverId        String   @unique
+  balance         Decimal  @default(0) @db.Decimal(10, 2)   // Positive = SafeGo owes driver
+  negativeBalance Decimal  @default(0) @db.Decimal(10, 2)   // SafeGo commission to be settled
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("driver_wallets")
+}
+
+// ====================================================
+// RESTAURANT WALLET
+// Commission logic same as driver wallet
+// ====================================================
+
+model RestaurantWallet {
+  id              String   @id @default(uuid())
+  restaurantId    String   @unique
+  balance         Decimal  @default(0) @db.Decimal(10, 2)
+  negativeBalance Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  restaurant RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("restaurant_wallets")
+}
+
+// ====================================================
+// RIDES
+// Status flow: requested → searching_driver → accepted → driver_arriving 
+//              → in_progress → completed OR cancelled_*
+// ====================================================
+
+model Ride {
+  id               String    @id @default(uuid())
+  customerId       String
+  driverId         String?
+  pickupAddress    String
+  pickupLat        Float
+  pickupLng        Float
+  dropoffAddress   String
+  dropoffLat       Float
+  dropoffLng       Float
+  serviceFare      Decimal   @db.Decimal(10, 2)
+  safegoCommission Decimal   @db.Decimal(10, 2)
+  driverPayout     Decimal   @db.Decimal(10, 2)
+  paymentMethod    String    // "cash" | "online"
+  status           String    // ride status flow
+  customerRating   Int?
+  customerFeedback String?
+  driverRating     Int?
+  driverFeedback   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  completedAt      DateTime?
+
+  customer CustomerProfile @relation(fields: [customerId], references: [id])
+  driver   DriverProfile?  @relation(fields: [driverId], references: [id])
+
+  @@map("rides")
+}
+
+// ====================================================
+// FOOD ORDERS
+// Status flow: placed → accepted → preparing → ready_for_pickup 
+//              → picked_up → on_the_way → delivered OR cancelled_*
+// ====================================================
+
+model FoodOrder {
+  id               String    @id @default(uuid())
+  customerId       String
+  restaurantId     String
+  driverId         String?
+  deliveryAddress  String
+  deliveryLat      Float
+  deliveryLng      Float
+  serviceFare      Decimal   @db.Decimal(10, 2)
+  safegoCommission Decimal   @db.Decimal(10, 2)
+  restaurantPayout Decimal   @db.Decimal(10, 2)
+  driverPayout     Decimal   @db.Decimal(10, 2)
+  paymentMethod    String    // "cash" | "online"
+  status           String    // food order status flow
+  customerRating   Int?
+  customerFeedback String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deliveredAt      DateTime?
+
+  customer   CustomerProfile   @relation(fields: [customerId], references: [id])
+  restaurant RestaurantProfile @relation(fields: [restaurantId], references: [id])
+  driver     DriverProfile?    @relation(fields: [driverId], references: [id])
+
+  @@map("food_orders")
+}
+
+// ====================================================
+// PARCEL DELIVERIES
+// Status flow: requested → searching_driver → accepted → picked_up 
+//              → on_the_way → delivered OR cancelled_*
+// ====================================================
+
+model Delivery {
+  id               String    @id @default(uuid())
+  customerId       String
+  driverId         String?
+  pickupAddress    String
+  pickupLat        Float
+  pickupLng        Float
+  dropoffAddress   String
+  dropoffLat       Float
+  dropoffLng       Float
+  serviceFare      Decimal   @db.Decimal(10, 2)
+  safegoCommission Decimal   @db.Decimal(10, 2)
+  driverPayout     Decimal   @db.Decimal(10, 2)
+  paymentMethod    String    // "cash" | "online"
+  status           String    // parcel status flow
+  customerRating   Int?
+  customerFeedback String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deliveredAt      DateTime?
+
+  customer CustomerProfile @relation(fields: [customerId], references: [id])
+  driver   DriverProfile?  @relation(fields: [driverId], references: [id])
+
+  @@map("deliveries")
+}
+
+// ====================================================
+// NOTIFICATIONS
+// ====================================================
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // "ride_update" | "food_update" | "parcel_update" | "verification" | "admin"
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
