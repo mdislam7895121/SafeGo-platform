@@ -128,6 +128,74 @@ router.patch("/profile", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/customer/rides
+// Get customer's ride history
+// ====================================================
+router.get("/rides", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get customer profile
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Get all rides for this customer
+    const rides = await prisma.ride.findMany({
+      where: {
+        customerId: customerProfile.id,
+      },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                email: true,
+              },
+            },
+            vehicle: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc", // Most recent first
+      },
+    });
+
+    res.json({
+      rides: rides.map(ride => ({
+        id: ride.id,
+        pickupAddress: ride.pickupAddress,
+        dropoffAddress: ride.dropoffAddress,
+        serviceFare: ride.serviceFare,
+        driverPayout: ride.driverPayout,
+        paymentMethod: ride.paymentMethod,
+        status: ride.status,
+        driver: ride.driver ? {
+          email: ride.driver.user.email,
+          vehicle: ride.driver.vehicle ? {
+            vehicleType: ride.driver.vehicle.vehicleType,
+            vehicleModel: ride.driver.vehicle.vehicleModel,
+            vehiclePlate: ride.driver.vehicle.vehiclePlate,
+          } : null,
+        } : null,
+        customerRating: ride.customerRating,
+        driverRating: ride.driverRating,
+        createdAt: ride.createdAt,
+        completedAt: ride.completedAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get customer rides error:", error);
+    res.status(500).json({ error: "Failed to fetch ride history" });
+  }
+});
+
+// ====================================================
 // GET /api/customer/home
 // Get customer dashboard data
 // ====================================================

@@ -79,6 +79,8 @@ router.get("/available-rides", async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const driverCountryCode = req.user!.countryCode;
 
+    console.log(`[DEBUG] Driver ${userId} requesting available rides. Country: ${driverCountryCode}`);
+
     // Get driver profile to check verification status
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
@@ -122,6 +124,11 @@ router.get("/available-rides", async (req: AuthRequest, res) => {
       orderBy: {
         createdAt: "asc", // FIFO - oldest requests first
       },
+    });
+
+    console.log(`[DEBUG] Found ${availableRides.length} available rides for driver in country ${driverCountryCode}`);
+    availableRides.forEach(ride => {
+      console.log(`[DEBUG] Ride ${ride.id}: Customer country = ${ride.customer.user.countryCode}, Pickup = ${ride.pickupAddress}`);
     });
 
     res.json({
