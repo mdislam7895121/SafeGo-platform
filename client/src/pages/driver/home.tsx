@@ -136,7 +136,7 @@ export default function DriverHome() {
                 <div>
                   <p className="text-sm text-muted-foreground">Balance</p>
                   <p className="text-2xl font-bold" data-testid="text-balance">
-                    ${wallet?.balance?.toFixed(2) || "0.00"}
+                    ${wallet?.balance != null ? Number(wallet.balance).toFixed(2) : "0.00"}
                   </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-green-600 opacity-50" />
@@ -150,7 +150,7 @@ export default function DriverHome() {
                 <div>
                   <p className="text-sm text-muted-foreground">Owed</p>
                   <p className="text-2xl font-bold text-red-600" data-testid="text-negative-balance">
-                    ${wallet?.negativeBalance?.toFixed(2) || "0.00"}
+                    ${wallet?.negativeBalance != null ? Number(wallet.negativeBalance).toFixed(2) : "0.00"}
                   </p>
                 </div>
                 <DollarSign className="h-8 w-8 text-red-600 opacity-50" />
