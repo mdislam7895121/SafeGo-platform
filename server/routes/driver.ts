@@ -71,6 +71,176 @@ router.get("/home", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// POST /api/driver/vehicle
+// Register vehicle for driver
+// ====================================================
+router.post("/vehicle", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { vehicleType, vehicleModel, vehiclePlate } = req.body;
+
+    if (!vehicleType || !vehicleModel || !vehiclePlate) {
+      return res.status(400).json({ error: "vehicleType, vehicleModel, and vehiclePlate are required" });
+    }
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { vehicle: true },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Check if vehicle already exists
+    if (driverProfile.vehicle) {
+      return res.status(400).json({ error: "Vehicle already registered. Use PATCH to update." });
+    }
+
+    // Create vehicle
+    const vehicle = await prisma.vehicle.create({
+      data: {
+        driverId: driverProfile.id,
+        vehicleType,
+        vehicleModel,
+        vehiclePlate,
+      },
+    });
+
+    res.status(201).json({
+      message: "Vehicle registered successfully",
+      vehicle: {
+        id: vehicle.id,
+        vehicleType: vehicle.vehicleType,
+        vehicleModel: vehicle.vehicleModel,
+        vehiclePlate: vehicle.vehiclePlate,
+        isOnline: vehicle.isOnline,
+        totalEarnings: vehicle.totalEarnings,
+      },
+    });
+  } catch (error) {
+    console.error("Vehicle registration error:", error);
+    res.status(500).json({ error: "Failed to register vehicle" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/vehicle
+// Update vehicle information
+// ====================================================
+router.patch("/vehicle", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { vehicleType, vehicleModel, vehiclePlate } = req.body;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { vehicle: true },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (!driverProfile.vehicle) {
+      return res.status(404).json({ error: "No vehicle registered. Use POST to register." });
+    }
+
+    // Update vehicle
+    const updateData: any = {};
+    if (vehicleType) updateData.vehicleType = vehicleType;
+    if (vehicleModel) updateData.vehicleModel = vehicleModel;
+    if (vehiclePlate) updateData.vehiclePlate = vehiclePlate;
+
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: driverProfile.vehicle.id },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Vehicle updated successfully",
+      vehicle: {
+        id: updatedVehicle.id,
+        vehicleType: updatedVehicle.vehicleType,
+        vehicleModel: updatedVehicle.vehicleModel,
+        vehiclePlate: updatedVehicle.vehiclePlate,
+        isOnline: updatedVehicle.isOnline,
+        totalEarnings: updatedVehicle.totalEarnings,
+      },
+    });
+  } catch (error) {
+    console.error("Vehicle update error:", error);
+    res.status(500).json({ error: "Failed to update vehicle" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/profile
+// Update driver profile (KYC data)
+// ====================================================
+router.patch("/profile", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const profileData = req.body;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Prepare update data based on country
+    const updateData: any = {};
+    
+    // Common fields
+    if (profileData.dateOfBirth) updateData.dateOfBirth = new Date(profileData.dateOfBirth);
+    if (profileData.emergencyContactName) updateData.emergencyContactName = profileData.emergencyContactName;
+    if (profileData.emergencyContactPhone) updateData.emergencyContactPhone = profileData.emergencyContactPhone;
+
+    // Bangladesh-specific fields
+    if (driverProfile.user.countryCode === "BD") {
+      if (profileData.fatherName) updateData.fatherName = profileData.fatherName;
+      if (profileData.presentAddress) updateData.presentAddress = profileData.presentAddress;
+      if (profileData.permanentAddress) updateData.permanentAddress = profileData.permanentAddress;
+      if (profileData.nidNumber) updateData.nidNumber = profileData.nidNumber;
+      if (profileData.nidFrontImageUrl) updateData.nidFrontImageUrl = profileData.nidFrontImageUrl;
+      if (profileData.nidBackImageUrl) updateData.nidBackImageUrl = profileData.nidBackImageUrl;
+    }
+
+    // US-specific fields
+    if (driverProfile.user.countryCode === "US") {
+      if (profileData.homeAddress) updateData.homeAddress = profileData.homeAddress;
+      if (profileData.governmentIdType) updateData.governmentIdType = profileData.governmentIdType;
+      if (profileData.governmentIdLast4) updateData.governmentIdLast4 = profileData.governmentIdLast4;
+      if (profileData.driverLicenseNumber) updateData.driverLicenseNumber = profileData.driverLicenseNumber;
+      if (profileData.driverLicenseImageUrl) updateData.driverLicenseImageUrl = profileData.driverLicenseImageUrl;
+      if (profileData.driverLicenseExpiry) updateData.driverLicenseExpiry = new Date(profileData.driverLicenseExpiry);
+      if (profileData.ssnLast4) updateData.ssnLast4 = profileData.ssnLast4;
+    }
+
+    // Update profile
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Profile updated successfully",
+      profile: updatedProfile,
+    });
+  } catch (error) {
+    console.error("Profile update error:", error);
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// ====================================================
 // PATCH /api/driver/status
 // Update driver online/offline status
 // ====================================================
