@@ -47,13 +47,12 @@ prisma/*.db
 prisma/*.db-journal
 
 # Environment variables - CRITICAL: No secrets!
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env*.local
-.envrc.local
+# Catch-all for all .env files
+.env*
+!.env.example
+
+# Explicit additional patterns
+.envrc*
 
 # IDE / Editor
 .vscode/*
