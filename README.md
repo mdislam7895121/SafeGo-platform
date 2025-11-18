@@ -102,7 +102,8 @@ Complete lifecycle tracking for:
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/safego.git
+# Replace YOUR_USERNAME with your GitHub username
+git clone https://github.com/YOUR_USERNAME/safego.git
 cd safego
 ```
 
