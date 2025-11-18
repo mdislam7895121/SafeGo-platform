@@ -4,6 +4,30 @@
 
 SafeGo is a production-ready, full-stack multi-service super-app platform offering ride-hailing, food delivery, and parcel delivery across multiple countries. Its purpose is to provide a comprehensive, scalable, and secure platform for on-demand services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, and full service lifecycle management. The business vision is to become a leading global super-app, capitalizing on the growing demand for integrated urban services.
 
+## Recent Changes (November 18, 2025)
+
+### Critical KYC Bug Fix - End-to-End Verification Flow
+**Status:** ✅ Fully Tested & Working
+
+**Issue:** Customer verification status wasn't updating in real-time after admin approval, preventing verified customers from requesting rides.
+
+**Root Cause:**
+1. Frontend relied solely on stale AuthContext data set during login
+2. Customer dashboard didn't fetch fresh verification status from backend
+
+**Solution Implemented:**
+1. **Frontend Fix:** Updated `client/src/pages/customer/home.tsx` to fetch fresh data from `/api/customer/home` endpoint with 5-second polling
+2. **Data Source:** Changed from `user?.profile?.isVerified` (AuthContext) to `customerData?.profile?.isVerified` (fresh API data)
+3. **User Experience:** Added skeleton loading state while fetching, smooth transition when verification status updates
+
+**Verified Working:**
+- ✅ New customer registration creates profile with `verificationStatus="pending"`, `isVerified=false`
+- ✅ Admin sees customer in pending KYC list at `/admin/kyc`
+- ✅ Admin approval updates database: `verificationStatus="approved"`, `isVerified=true`
+- ✅ Customer dashboard automatically refreshes and shows "✓ Verified" badge
+- ✅ Verified customers can successfully request rides without 403 errors
+- ✅ End-to-end test passed (registration → approval → verification → ride request)
+
 ## User Preferences
 
 **Preferred communication style**: Simple, everyday language.
