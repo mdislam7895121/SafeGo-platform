@@ -32,6 +32,7 @@ import AdminHome from "@/pages/admin/home";
 import AdminKYC from "@/pages/admin/kyc";
 import AdminSettlement from "@/pages/admin/settlement";
 import AdminDrivers from "@/pages/admin/drivers";
+import AdminDriverDetails from "@/pages/admin/driver-details";
 
 import NotFound from "@/pages/not-found";
 
@@ -140,6 +141,11 @@ function Router() {
       <Route path="/admin/drivers">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminDrivers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/drivers/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminDriverDetails />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/settlement">
