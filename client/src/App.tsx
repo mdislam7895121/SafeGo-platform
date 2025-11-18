@@ -1,30 +1,162 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+
+// Auth pages
+import Login from "@/pages/login";
+import Signup from "@/pages/signup";
+
+// Customer pages
+import CustomerHome from "@/pages/customer/home";
+import CustomerProfile from "@/pages/customer/profile";
+import CustomerActivity from "@/pages/customer/activity";
+import RideRequest from "@/pages/customer/ride-request";
+import FoodOrder from "@/pages/customer/food-order";
+import ParcelRequest from "@/pages/customer/parcel-request";
+
+// Driver pages
+import DriverHome from "@/pages/driver/home";
+import DriverVehicle from "@/pages/driver/vehicle";
+import DriverProfile from "@/pages/driver/profile";
+
+// Restaurant pages
+import RestaurantHome from "@/pages/restaurant/home";
+import RestaurantProfile from "@/pages/restaurant/profile";
+
+// Admin pages
+import AdminHome from "@/pages/admin/home";
+import AdminKYC from "@/pages/admin/kyc";
+import AdminSettlement from "@/pages/admin/settlement";
+
 import NotFound from "@/pages/not-found";
+
+function HomeRedirect() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>;
+  }
+
+  if (user) {
+    const roleRoutes: Record<string, string> = {
+      customer: "/customer",
+      driver: "/driver",
+      restaurant: "/restaurant",
+      admin: "/admin",
+    };
+    return <Redirect to={roleRoutes[user.role] || "/customer"} />;
+  }
+
+  return <Redirect to="/login" />;
+}
 
 function Router() {
   return (
     <Switch>
-      {/* Add pages below */}
-      {/* <Route path="/" component={Home}/> */}
-      {/* Fallback to 404 */}
+      {/* Public routes */}
+      <Route path="/" component={HomeRedirect} />
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
+
+      {/* Customer routes */}
+      <Route path="/customer">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerHome />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/profile">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerProfile />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/activity">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerActivity />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/ride">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RideRequest />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/food">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <FoodOrder />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/parcel">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ParcelRequest />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Driver routes */}
+      <Route path="/driver">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverHome />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/vehicle">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverVehicle />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/profile">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverProfile />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Restaurant routes */}
+      <Route path="/restaurant">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantHome />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/profile">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantProfile />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Admin routes */}
+      <Route path="/admin">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminHome />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/kyc">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminKYC />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/settlement">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSettlement />
+        </ProtectedRoute>
+      </Route>
+
+      {/* 404 */}
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-function App() {
+export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
-
-export default App;
