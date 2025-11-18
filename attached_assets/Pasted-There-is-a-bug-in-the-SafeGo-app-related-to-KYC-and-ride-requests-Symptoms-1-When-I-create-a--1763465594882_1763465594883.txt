@@ -1,0 +1,37 @@
+There is a bug in the SafeGo app related to KYC and ride requests.
+
+Symptoms:
+1. When I create a new customer account (for example with my own Gmail address), the customer dashboard shows "Pending verification".
+2. However, in the Admin Dashboard → KYC Approvals, there are NO pending verification requests for this new customer (Drivers / Customers / Restaurants tabs are all empty).
+3. When I try to request a ride as this customer, the API returns:
+   403: {"error": "Customer must be verified to request rides"}
+
+So the customer is stuck in "pending" forever: the admin never sees the KYC request, and the customer never becomes verified.
+
+Your job:
+1. Find and fix the backend logic that should create a KYC request (or verification record) when a new user signs up.
+   - Check the signup/auth routes (for example server/routes/auth.ts or similar).
+   - Check any KYC-related services/helpers and Prisma models (for example prisma/schema.prisma, KYC tables).
+   - Make sure that when a new user is created (customer, driver, restaurant), a corresponding pending KYC record is inserted in the database with the correct userId, role, and country.
+2. Fix the admin KYC listing endpoint so that it returns ALL pending KYC requests, including newly registered users.
+   - Check the admin routes (for example server/routes/admin.ts) and the endpoint used by the Admin Dashboard KYC Approvals page.
+   - Remove any incorrect filters (for example wrong country value comparisons like 'US' vs 'us United States') that might hide real users.
+3. Ensure that when the admin approves a KYC request:
+   - The KYC record is updated to "approved".
+   - The corresponding user/profile record is updated so that the customer becomes verified (for example isVerified = true or verificationStatus = 'approved').
+4. Make sure the driver/restaurant verification flow continues to work as before and do NOT break existing demo accounts or other roles.
+5. Do NOT recreate the whole project or reset the Neon database. Only update the necessary backend files (auth/kyc/admin routes, services, and Prisma schema if needed), and keep all other functionality the same.
+
+After you implement the fix, do this test end-to-end:
+1. Register a NEW customer account with a fresh email.
+2. Log in as that customer and confirm the profile shows "Pending verification".
+3. Log in as admin, open the KYC Approvals page, and confirm the new customer appears there as a pending request.
+4. Approve the customer's KYC from the admin panel.
+5. Log back in as the customer and:
+   - Confirm the profile now shows "Verified" (or equivalent).
+   - Request a ride and verify that it succeeds and NO longer returns the 403 "Customer must be verified to request rides" error.
+
+Report back with:
+- Which files you changed.
+- A short explanation of the root cause and how you fixed it.
+- The result of the final manual test.

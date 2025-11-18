@@ -193,6 +193,285 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/admin/kyc/pending
+// Frontend-compatible endpoint for pending KYC requests
+// ====================================================
+router.get("/kyc/pending", async (req: AuthRequest, res) => {
+  try {
+    const { role } = req.query;
+
+    // If no role specified, return empty array
+    if (!role || typeof role !== "string") {
+      return res.json([]);
+    }
+
+    let pendingUsers: any[] = [];
+
+    if (role === "driver") {
+      const profiles = await prisma.driverProfile.findMany({
+        where: { verificationStatus: "pending" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              countryCode: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+      pendingUsers = profiles.map((p) => ({
+        id: p.id, // profileId
+        userId: p.user.id,
+        email: p.user.email,
+        role: p.user.role,
+        countryCode: p.user.countryCode,
+        verificationStatus: p.verificationStatus,
+        dateOfBirth: p.dateOfBirth,
+        nid: p.nidNumber,
+        governmentId: p.governmentIdLast4,
+        createdAt: p.user.createdAt,
+      }));
+    } else if (role === "customer") {
+      const profiles = await prisma.customerProfile.findMany({
+        where: { verificationStatus: "pending" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              countryCode: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+      pendingUsers = profiles.map((p) => ({
+        id: p.id, // profileId
+        userId: p.user.id,
+        email: p.user.email,
+        role: p.user.role,
+        countryCode: p.user.countryCode,
+        verificationStatus: p.verificationStatus,
+        dateOfBirth: p.dateOfBirth,
+        nid: p.nidNumber,
+        governmentId: p.governmentIdLast4,
+        createdAt: p.user.createdAt,
+      }));
+    } else if (role === "restaurant") {
+      const profiles = await prisma.restaurantProfile.findMany({
+        where: { verificationStatus: "pending" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              countryCode: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+      pendingUsers = profiles.map((p) => ({
+        id: p.id, // profileId
+        userId: p.user.id,
+        email: p.user.email,
+        role: p.user.role,
+        countryCode: p.user.countryCode,
+        restaurantName: p.restaurantName,
+        verificationStatus: p.verificationStatus,
+        createdAt: p.user.createdAt,
+      }));
+    }
+
+    res.json(pendingUsers);
+  } catch (error) {
+    console.error("KYC pending fetch error:", error);
+    res.status(500).json({ error: "Failed to fetch pending KYC requests" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/kyc/approve
+// Frontend-compatible endpoint for approving KYC
+// ====================================================
+router.post("/kyc/approve", async (req: AuthRequest, res) => {
+  try {
+    const { role, profileId } = req.body;
+
+    if (!role || !profileId) {
+      return res.status(400).json({ error: "role and profileId are required" });
+    }
+
+    // Get the userId from the profile
+    let userId: string | null = null;
+    if (role === "driver") {
+      const profile = await prisma.driverProfile.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.driverProfile.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "approved",
+          isVerified: true,
+          rejectionReason: null,
+        },
+      });
+    } else if (role === "customer") {
+      const profile = await prisma.customerProfile.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Customer profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.customerProfile.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "approved",
+          isVerified: true,
+          rejectionReason: null,
+        },
+      });
+    } else if (role === "restaurant") {
+      const profile = await prisma.restaurantProfile.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Restaurant profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.restaurantProfile.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "approved",
+          isVerified: true,
+          rejectionReason: null,
+        },
+      });
+    } else {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    // Create notification
+    if (userId) {
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: "verification",
+          title: "KYC Approved",
+          body: "Your KYC has been approved. You can now use SafeGo services.",
+        },
+      });
+    }
+
+    res.json({
+      message: "KYC approved successfully",
+      profileId,
+    });
+  } catch (error) {
+    console.error("KYC approval error:", error);
+    res.status(500).json({ error: "Failed to approve KYC" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/kyc/reject
+// Frontend-compatible endpoint for rejecting KYC
+// ====================================================
+router.post("/kyc/reject", async (req: AuthRequest, res) => {
+  try {
+    const { role, profileId, reason } = req.body;
+
+    if (!role || !profileId || !reason) {
+      return res.status(400).json({ error: "role, profileId, and reason are required" });
+    }
+
+    // Get the userId from the profile
+    let userId: string | null = null;
+    if (role === "driver") {
+      const profile = await prisma.driverProfile.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.driverProfile.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "rejected",
+          isVerified: false,
+          rejectionReason: reason,
+        },
+      });
+    } else if (role === "customer") {
+      const profile = await prisma.customerProfile.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Customer profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.customerProfile.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "rejected",
+          isVerified: false,
+          rejectionReason: reason,
+        },
+      });
+    } else if (role === "restaurant") {
+      const profile = await prisma.restaurantProfile.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Restaurant profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.restaurantProfile.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "rejected",
+          isVerified: false,
+          rejectionReason: reason,
+        },
+      });
+    } else {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    // Create notification
+    if (userId) {
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: "verification",
+          title: "KYC Rejected",
+          body: `Your KYC has been rejected. Reason: ${reason}`,
+        },
+      });
+    }
+
+    res.json({
+      message: "KYC rejected successfully",
+      profileId,
+    });
+  } catch (error) {
+    console.error("KYC rejection error:", error);
+    res.status(500).json({ error: "Failed to reject KYC" });
+  }
+});
+
+// ====================================================
 // PATCH /api/admin/block/:userId
 // Block or unblock a user
 // ====================================================
