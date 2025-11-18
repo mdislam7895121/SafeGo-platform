@@ -6,6 +6,37 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes (November 18, 2025)
 
+### GPS Optional & Country-Based Ride Matching - Latest Update
+**Status:** ✅ Fully Tested & Working
+
+**Features Implemented:**
+1. **GPS Coordinates Made Optional**
+   - Updated Prisma schema: `pickupLat`, `pickupLng`, `dropoffLat`, `dropoffLng` are now nullable
+   - Backend validates addresses but not coordinates
+   - Frontend ride request form no longer requires GPS input
+   - Enables ride matching without browser geolocation prompts
+
+2. **Country-Based Ride Matching**
+   - Added `GET /api/driver/available-rides` endpoint
+   - Returns rides filtered by driver's country from JWT token
+   - Only shows rides with `status="requested"` or `"searching_driver"` and no driver assigned
+   - Implements FIFO ordering (oldest requests first)
+
+3. **Customer Ride History**
+   - Added `GET /api/customer/rides` endpoint
+   - Updated Activity page to display ride history with TanStack Query
+   - Shows service fare, status, timestamps, and pickup/dropoff addresses
+
+**Critical Bug Fix:**
+- **Issue:** US drivers could see Bangladesh rides despite country filtering attempt
+- **Root Cause:** Prisma to-one relation filters require explicit `is` syntax; without it, the filter was silently ignored
+- **Solution:** Changed from `customer: { user: { countryCode } }` to `customer: { is: { user: { is: { countryCode } } } }`
+- **Verification:** End-to-end test confirmed US drivers now see zero BD rides ✅
+
+**Database Notes:**
+- Mixed case convention: `users.country_code` (snake_case) vs `driver_profiles.userId` (camelCase)
+- Always quote column names in raw SQL: `"userId"` not `userId`
+
 ### Critical KYC Bug Fix - End-to-End Verification Flow
 **Status:** ✅ Fully Tested & Working
 
