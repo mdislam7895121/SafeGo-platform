@@ -76,7 +76,7 @@ router.get("/pending-kyc", async (req: AuthRequest, res) => {
 
     res.json({
       pending: {
-        drivers: pendingDrivers.map(d => ({
+        drivers: pendingDrivers.map((d: any) => ({
           userId: d.user.id,
           profileId: d.id,
           email: d.user.email,
@@ -85,7 +85,7 @@ router.get("/pending-kyc", async (req: AuthRequest, res) => {
           verificationStatus: d.verificationStatus,
           createdAt: d.user.createdAt,
         })),
-        customers: pendingCustomers.map(c => ({
+        customers: pendingCustomers.map((c: any) => ({
           userId: c.user.id,
           profileId: c.id,
           email: c.user.email,
@@ -94,7 +94,7 @@ router.get("/pending-kyc", async (req: AuthRequest, res) => {
           verificationStatus: c.verificationStatus,
           createdAt: c.user.createdAt,
         })),
-        restaurants: pendingRestaurants.map(r => ({
+        restaurants: pendingRestaurants.map((r: any) => ({
           userId: r.user.id,
           profileId: r.id,
           email: r.user.email,
