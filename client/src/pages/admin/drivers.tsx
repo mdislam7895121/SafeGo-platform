@@ -63,9 +63,11 @@ export default function AdminDrivers() {
   queryParams.append("limit", "20");
 
   const queryString = queryParams.toString();
+  const fullUrl = `/api/admin/drivers${queryString ? `?${queryString}` : ''}`;
 
   const { data, isLoading } = useQuery<DriversResponse>({
-    queryKey: ["/api/admin/drivers", queryString],
+    queryKey: [fullUrl],
+    refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 
   const getStatusBadge = (driver: Driver) => {

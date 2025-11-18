@@ -58,9 +58,10 @@ export default function AdminComplaints() {
   queryParams.append("limit", "20");
 
   const queryString = queryParams.toString();
+  const fullUrl = `/api/admin/complaints${queryString ? `?${queryString}` : ''}`;
 
   const { data, isLoading } = useQuery<ComplaintsResponse>({
-    queryKey: ["/api/admin/complaints", queryString],
+    queryKey: [fullUrl],
     refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 
