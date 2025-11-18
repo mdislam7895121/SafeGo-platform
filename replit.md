@@ -6,7 +6,40 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes (November 18, 2025)
 
-### GPS Optional & Country-Based Ride Matching - Latest Update
+### Admin Dashboard Statistics Fix - Latest Update
+**Status:** ✅ Fully Tested & Working
+
+**Issue:** Admin Dashboard was showing all counters as 0 (Total Users, Active Drivers, Restaurants) even though multiple users existed and were approved.
+
+**Root Cause:**
+1. Missing `/api/admin/stats` endpoint in backend
+2. Frontend displaying hardcoded "-" instead of fetching real data
+
+**Solution Implemented:**
+1. **Backend:** Created `GET /api/admin/stats` endpoint in `server/routes/admin.ts`:
+   - `totalUsers`: Count all users from database
+   - `activeDrivers`: Count DISTINCT drivers with at least one online vehicle using `prisma.vehicle.groupBy()`
+   - `restaurants`: Count users where role = 'restaurant'
+   - Removed unused `totalDrivers` field
+
+2. **Frontend:** Updated `client/src/pages/admin/home.tsx`:
+   - Added TanStack Query to fetch stats from `/api/admin/stats`
+   - Implemented 5-second auto-refresh polling
+   - Shows skeleton loading state while fetching
+   - Displays real statistics with proper data-testid attributes
+
+**Verified Working:**
+- ✅ Admin dashboard displays real statistics (Total Users: 54, Active Drivers: 6, Restaurants: 6)
+- ✅ Stats auto-refresh every 5 seconds without manual page reload
+- ✅ ActiveDrivers correctly counts distinct drivers (not just vehicle count)
+- ✅ Stats update after new user registrations and KYC approvals
+- ✅ End-to-end test passed (admin signup → view stats → verify counts → auto-refresh)
+
+**Technical Notes:**
+- Uses `prisma.vehicle.groupBy({ by: ['driverId'], where: { isOnline: true } })` to avoid over-counting drivers with multiple vehicles
+- TanStack Query handles caching, loading states, and auto-refresh automatically
+
+### GPS Optional & Country-Based Ride Matching
 **Status:** ✅ Fully Tested & Working
 
 **Features Implemented:**
