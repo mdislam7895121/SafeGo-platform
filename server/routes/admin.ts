@@ -10,6 +10,42 @@ router.use(authenticateToken);
 router.use(requireRole(["admin"]));
 
 // ====================================================
+// GET /api/admin/stats
+// Get platform statistics for admin dashboard
+// ====================================================
+router.get("/stats", async (req: AuthRequest, res) => {
+  try {
+    // Count total users
+    const totalUsers = await prisma.user.count();
+
+    // Count total drivers (users with role = driver)
+    const totalDrivers = await prisma.user.count({
+      where: { role: "driver" },
+    });
+
+    // Count active drivers (drivers with isOnline = true in vehicles table)
+    const activeDrivers = await prisma.vehicle.count({
+      where: { isOnline: true },
+    });
+
+    // Count total restaurants (users with role = restaurant)
+    const restaurants = await prisma.user.count({
+      where: { role: "restaurant" },
+    });
+
+    res.json({
+      totalUsers,
+      totalDrivers,
+      activeDrivers,
+      restaurants,
+    });
+  } catch (error) {
+    console.error("Admin stats error:", error);
+    res.status(500).json({ error: "Failed to fetch admin stats" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/pending-kyc
 // List all users with pending verification
 // ====================================================

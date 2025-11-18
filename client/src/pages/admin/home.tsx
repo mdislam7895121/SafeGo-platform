@@ -2,10 +2,25 @@ import { Link } from "wouter";
 import { Shield, Users, Car, UtensilsCrossed, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+
+interface AdminStats {
+  totalUsers: number;
+  totalDrivers: number;
+  activeDrivers: number;
+  restaurants: number;
+}
 
 export default function AdminHome() {
   const { user, logout } = useAuth();
+
+  // Fetch admin statistics
+  const { data: stats, isLoading } = useQuery<AdminStats>({
+    queryKey: ["/api/admin/stats"],
+    refetchInterval: 5000, // Auto-refresh every 5 seconds
+  });
 
   const adminSections = [
     {
@@ -66,7 +81,13 @@ export default function AdminHome() {
             <CardContent className="p-4">
               <div className="flex flex-col items-center text-center">
                 <Users className="h-8 w-8 text-blue-600 mb-2" />
-                <p className="text-2xl font-bold">-</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12 mb-1" />
+                ) : (
+                  <p className="text-2xl font-bold" data-testid="stat-total-users">
+                    {stats?.totalUsers ?? 0}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">Total Users</p>
               </div>
             </CardContent>
@@ -76,7 +97,13 @@ export default function AdminHome() {
             <CardContent className="p-4">
               <div className="flex flex-col items-center text-center">
                 <Car className="h-8 w-8 text-green-600 mb-2" />
-                <p className="text-2xl font-bold">-</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12 mb-1" />
+                ) : (
+                  <p className="text-2xl font-bold" data-testid="stat-active-drivers">
+                    {stats?.activeDrivers ?? 0}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">Active Drivers</p>
               </div>
             </CardContent>
@@ -86,7 +113,13 @@ export default function AdminHome() {
             <CardContent className="p-4">
               <div className="flex flex-col items-center text-center">
                 <UtensilsCrossed className="h-8 w-8 text-orange-600 mb-2" />
-                <p className="text-2xl font-bold">-</p>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-12 mb-1" />
+                ) : (
+                  <p className="text-2xl font-bold" data-testid="stat-restaurants">
+                    {stats?.restaurants ?? 0}
+                  </p>
+                )}
                 <p className="text-xs text-muted-foreground">Restaurants</p>
               </div>
             </CardContent>
