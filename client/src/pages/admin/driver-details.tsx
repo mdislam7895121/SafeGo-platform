@@ -229,6 +229,10 @@ export default function AdminDriverDetails() {
     registrationExpiry: "",
     insuranceDocumentUrl: "",
     insuranceExpiry: "",
+    dmvInspectionType: "",
+    dmvInspectionDate: "",
+    dmvInspectionExpiry: "",
+    dmvInspectionImageUrl: "",
   });
 
   // Fetch driver details
@@ -578,6 +582,10 @@ export default function AdminDriverDetails() {
       if (data.registrationExpiry) payload.registrationExpiry = data.registrationExpiry;
       if (data.insuranceDocumentUrl) payload.insuranceDocumentUrl = data.insuranceDocumentUrl;
       if (data.insuranceExpiry) payload.insuranceExpiry = data.insuranceExpiry;
+      if (data.dmvInspectionType) payload.dmvInspectionType = data.dmvInspectionType;
+      if (data.dmvInspectionDate) payload.dmvInspectionDate = data.dmvInspectionDate;
+      if (data.dmvInspectionExpiry) payload.dmvInspectionExpiry = data.dmvInspectionExpiry;
+      if (data.dmvInspectionImageUrl) payload.dmvInspectionImageUrl = data.dmvInspectionImageUrl;
 
       const response = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/vehicle`, payload);
       if (!response.ok) {
@@ -602,6 +610,10 @@ export default function AdminDriverDetails() {
         registrationExpiry: "",
         insuranceDocumentUrl: "",
         insuranceExpiry: "",
+        dmvInspectionType: "",
+        dmvInspectionDate: "",
+        dmvInspectionExpiry: "",
+        dmvInspectionImageUrl: "",
       });
     },
     onError: (error: Error) => {
@@ -623,6 +635,10 @@ export default function AdminDriverDetails() {
         registrationExpiry: driver.vehicle.registrationExpiry ? driver.vehicle.registrationExpiry.split('T')[0] : "",
         insuranceDocumentUrl: driver.vehicle.insuranceDocumentUrl || "",
         insuranceExpiry: driver.vehicle.insuranceExpiry ? driver.vehicle.insuranceExpiry.split('T')[0] : "",
+        dmvInspectionType: driver.vehicle.dmvInspectionType || "",
+        dmvInspectionDate: driver.vehicle.dmvInspectionDate ? driver.vehicle.dmvInspectionDate.split('T')[0] : "",
+        dmvInspectionExpiry: driver.vehicle.dmvInspectionExpiry ? driver.vehicle.dmvInspectionExpiry.split('T')[0] : "",
+        dmvInspectionImageUrl: driver.vehicle.dmvInspectionImageUrl || "",
       });
     }
     setShowEditVehicleDialog(true);
@@ -1475,6 +1491,83 @@ export default function AdminDriverDetails() {
                         </div>
                       </div>
 
+                      {/* DMV Inspection */}
+                      <div className="mt-6 pt-6 border-t space-y-3">
+                        <p className="text-sm font-semibold text-foreground">DMV Inspection</p>
+                        
+                        {/* Status Badge */}
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-muted-foreground">Status:</p>
+                          {driver.vehicle.dmvInspectionStatus === "VALID" && (
+                            <Badge variant="default" className="bg-green-600" data-testid="badge-dmv-status">Valid</Badge>
+                          )}
+                          {driver.vehicle.dmvInspectionStatus === "EXPIRED" && (
+                            <Badge variant="destructive" data-testid="badge-dmv-status">Expired</Badge>
+                          )}
+                          {(!driver.vehicle.dmvInspectionStatus || driver.vehicle.dmvInspectionStatus === "MISSING") && (
+                            <Badge variant="secondary" data-testid="badge-dmv-status">Missing</Badge>
+                          )}
+                        </div>
+
+                        {/* Warning Banners */}
+                        {(!driver.vehicle.dmvInspectionImageUrl || driver.vehicle.dmvInspectionStatus === "MISSING") && (
+                          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                            <p className="text-sm text-destructive font-medium">
+                              DMV inspection document is missing. Please request the driver to upload a valid inspection document.
+                            </p>
+                          </div>
+                        )}
+                        {driver.vehicle.dmvInspectionStatus === "EXPIRED" && (
+                          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                            <p className="text-sm text-destructive font-medium">
+                              DMV inspection has expired. Please verify and request updated inspection documents.
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Inspection Details */}
+                        <div className="grid gap-4 md:grid-cols-2">
+                          {driver.vehicle.dmvInspectionType && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Inspection Type</p>
+                              <p className="text-sm" data-testid="text-dmv-type">{driver.vehicle.dmvInspectionType}</p>
+                            </div>
+                          )}
+                          {driver.vehicle.dmvInspectionDate && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Inspection Date</p>
+                              <p className="text-sm" data-testid="text-dmv-date">
+                                {format(new Date(driver.vehicle.dmvInspectionDate), "PPP")}
+                              </p>
+                            </div>
+                          )}
+                          {driver.vehicle.dmvInspectionExpiry && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
+                              <p className="text-sm" data-testid="text-dmv-expiry">
+                                {format(new Date(driver.vehicle.dmvInspectionExpiry), "PPP")}
+                              </p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Document</p>
+                            {driver.vehicle.dmvInspectionImageUrl ? (
+                              <a
+                                href={driver.vehicle.dmvInspectionImageUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                data-testid="link-dmv-doc"
+                              >
+                                View Document
+                              </a>
+                            ) : (
+                              <p className="text-sm text-destructive" data-testid="text-dmv-doc-missing">Missing</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Warning if documents are missing */}
                       {(!driver.vehicle.registrationDocumentUrl || !driver.vehicle.insuranceDocumentUrl) && (
                         <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
@@ -2081,6 +2174,58 @@ export default function AdminDriverDetails() {
                 onChange={(e) => setEditVehicleForm({ ...editVehicleForm, insuranceExpiry: e.target.value })}
                 data-testid="input-vehicle-insurance-expiry"
               />
+            </div>
+
+            {/* DMV Inspection Fields */}
+            <div className="col-span-2 border-t pt-4 mt-2">
+              <h3 className="text-sm font-semibold mb-3">DMV Inspection</h3>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dmv-inspection-type">Inspection Type</Label>
+              <select
+                id="dmv-inspection-type"
+                value={editVehicleForm.dmvInspectionType}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, dmvInspectionType: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                data-testid="select-dmv-inspection-type"
+              >
+                <option value="">Select Type</option>
+                <option value="Safety">Safety</option>
+                <option value="Emissions">Emissions</option>
+                <option value="Safety + Emissions">Safety + Emissions</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dmv-inspection-date">Inspection Date</Label>
+              <Input
+                id="dmv-inspection-date"
+                type="date"
+                value={editVehicleForm.dmvInspectionDate}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, dmvInspectionDate: e.target.value })}
+                data-testid="input-dmv-inspection-date"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dmv-inspection-expiry">Inspection Expiry</Label>
+              <Input
+                id="dmv-inspection-expiry"
+                type="date"
+                value={editVehicleForm.dmvInspectionExpiry}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, dmvInspectionExpiry: e.target.value })}
+                data-testid="input-dmv-inspection-expiry"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="dmv-inspection-url">Inspection Document URL</Label>
+              <Input
+                id="dmv-inspection-url"
+                value={editVehicleForm.dmvInspectionImageUrl}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, dmvInspectionImageUrl: e.target.value })}
+                placeholder="https://"
+                data-testid="input-dmv-inspection-url"
+              />
+              <p className="text-xs text-muted-foreground">Paste the URL of the uploaded DMV inspection document</p>
             </div>
           </div>
           <DialogFooter>
