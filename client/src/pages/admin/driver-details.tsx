@@ -92,6 +92,12 @@ interface DriverDetails {
   governmentIdType?: string;
   governmentIdLast4?: string;
   ssnLast4?: string;
+  user: {
+    id: string;
+    email: string;
+    countryCode: string;
+    isBlocked: boolean;
+  };
   vehicle: {
     id: string;
     vehicleType: string;
@@ -99,6 +105,16 @@ interface DriverDetails {
     vehiclePlate: string;
     isOnline: boolean;
     totalEarnings: string;
+    // USA vehicle fields
+    make?: string;
+    model?: string;
+    year?: number;
+    color?: string;
+    licensePlate?: string;
+    registrationDocumentUrl?: string;
+    registrationExpiry?: string;
+    insuranceDocumentUrl?: string;
+    insuranceExpiry?: string;
   } | null;
   stats: {
     rating: string;
@@ -198,6 +214,21 @@ export default function AdminDriverDetails() {
     emergencyContactName: "",
     emergencyContactPhone: "",
     backgroundCheckStatus: "pending",
+  });
+
+  // Edit Vehicle dialog state (USA drivers)
+  const [showEditVehicleDialog, setShowEditVehicleDialog] = useState(false);
+  const [editVehicleForm, setEditVehicleForm] = useState({
+    vehicleType: "",
+    make: "",
+    model: "",
+    year: "",
+    color: "",
+    licensePlate: "",
+    registrationDocumentUrl: "",
+    registrationExpiry: "",
+    insuranceDocumentUrl: "",
+    insuranceExpiry: "",
   });
 
   // Fetch driver details
@@ -530,6 +561,71 @@ export default function AdminDriverDetails() {
       });
     }
     setShowEditUsaDialog(true);
+  };
+
+  // Update vehicle mutation  
+  const updateVehicleMutation = useMutation({
+    mutationFn: async (data: typeof editVehicleForm) => {
+      // Convert year string to number
+      const payload: any = {};
+      if (data.vehicleType) payload.vehicleType = data.vehicleType;
+      if (data.make) payload.make = data.make;
+      if (data.model) payload.model = data.model;
+      if (data.year) payload.year = parseInt(data.year);
+      if (data.color) payload.color = data.color;
+      if (data.licensePlate) payload.licensePlate = data.licensePlate;
+      if (data.registrationDocumentUrl) payload.registrationDocumentUrl = data.registrationDocumentUrl;
+      if (data.registrationExpiry) payload.registrationExpiry = data.registrationExpiry;
+      if (data.insuranceDocumentUrl) payload.insuranceDocumentUrl = data.insuranceDocumentUrl;
+      if (data.insuranceExpiry) payload.insuranceExpiry = data.insuranceExpiry;
+
+      const response = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/vehicle`, payload);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update vehicle");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Vehicle information updated successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/drivers"] });
+      setShowEditVehicleDialog(false);
+      setEditVehicleForm({
+        vehicleType: "",
+        make: "",
+        model: "",
+        year: "",
+        color: "",
+        licensePlate: "",
+        registrationDocumentUrl: "",
+        registrationExpiry: "",
+        insuranceDocumentUrl: "",
+        insuranceExpiry: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Handler to open vehicle edit dialog with existing data
+  const handleOpenEditVehicleDialog = () => {
+    if (driver && driver.vehicle) {
+      setEditVehicleForm({
+        vehicleType: driver.vehicle.vehicleType || "",
+        make: driver.vehicle.make || "",
+        model: driver.vehicle.model || driver.vehicle.vehicleModel || "",
+        year: driver.vehicle.year?.toString() || "",
+        color: driver.vehicle.color || "",
+        licensePlate: driver.vehicle.licensePlate || driver.vehicle.vehiclePlate || "",
+        registrationDocumentUrl: driver.vehicle.registrationDocumentUrl || "",
+        registrationExpiry: driver.vehicle.registrationExpiry ? driver.vehicle.registrationExpiry.split('T')[0] : "",
+        insuranceDocumentUrl: driver.vehicle.insuranceDocumentUrl || "",
+        insuranceExpiry: driver.vehicle.insuranceExpiry ? driver.vehicle.insuranceExpiry.split('T')[0] : "",
+      });
+    }
+    setShowEditVehicleDialog(true);
   };
 
   const getStatusBadge = () => {
@@ -1257,6 +1353,153 @@ export default function AdminDriverDetails() {
               </Card>
             )}
 
+            {/* Vehicle Information (USA drivers only) */}
+            {driver && driver.user.countryCode === "US" && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Car className="h-5 w-5" />
+                    Vehicle Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {!driver.vehicle && (
+                    <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                      <p className="text-sm text-destructive font-medium">
+                        Vehicle information is incomplete. Please add vehicle details.
+                      </p>
+                    </div>
+                  )}
+                  {driver.vehicle && (
+                    <>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">Vehicle Type</p>
+                          <p className="text-sm" data-testid="text-vehicle-type">{driver.vehicle.vehicleType || "—"}</p>
+                        </div>
+                        {driver.vehicle.make && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Make</p>
+                            <p className="text-sm" data-testid="text-vehicle-make">{driver.vehicle.make}</p>
+                          </div>
+                        )}
+                        {(driver.vehicle.model || driver.vehicle.vehicleModel) && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Model</p>
+                            <p className="text-sm" data-testid="text-vehicle-model">{driver.vehicle.model || driver.vehicle.vehicleModel}</p>
+                          </div>
+                        )}
+                        {driver.vehicle.year && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Year</p>
+                            <p className="text-sm" data-testid="text-vehicle-year">{driver.vehicle.year}</p>
+                          </div>
+                        )}
+                        {driver.vehicle.color && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Color</p>
+                            <p className="text-sm" data-testid="text-vehicle-color">{driver.vehicle.color}</p>
+                          </div>
+                        )}
+                        {(driver.vehicle.licensePlate || driver.vehicle.vehiclePlate) && (
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">License Plate</p>
+                            <p className="text-sm font-mono" data-testid="text-vehicle-plate">{driver.vehicle.licensePlate || driver.vehicle.vehiclePlate}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Registration Document */}
+                      <div className="mt-6 pt-6 border-t space-y-3">
+                        <p className="text-sm font-semibold text-foreground">Registration Document</p>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Status</p>
+                            {driver.vehicle.registrationDocumentUrl ? (
+                              <a
+                                href={driver.vehicle.registrationDocumentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                data-testid="link-registration-doc"
+                              >
+                                View Document
+                              </a>
+                            ) : (
+                              <p className="text-sm text-destructive" data-testid="text-registration-missing">Missing</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
+                            {driver.vehicle.registrationExpiry ? (
+                              <p className="text-sm" data-testid="text-registration-expiry">
+                                {format(new Date(driver.vehicle.registrationExpiry), "PPP")}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Not provided</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Insurance Document */}
+                      <div className="mt-6 pt-6 border-t space-y-3">
+                        <p className="text-sm font-semibold text-foreground">Insurance Document</p>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Status</p>
+                            {driver.vehicle.insuranceDocumentUrl ? (
+                              <a
+                                href={driver.vehicle.insuranceDocumentUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                data-testid="link-insurance-doc"
+                              >
+                                View Document
+                              </a>
+                            ) : (
+                              <p className="text-sm text-destructive" data-testid="text-insurance-missing">Missing</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
+                            {driver.vehicle.insuranceExpiry ? (
+                              <p className="text-sm" data-testid="text-insurance-expiry">
+                                {format(new Date(driver.vehicle.insuranceExpiry), "PPP")}
+                              </p>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">Not provided</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Warning if documents are missing */}
+                      {(!driver.vehicle.registrationDocumentUrl || !driver.vehicle.insuranceDocumentUrl) && (
+                        <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                          <p className="text-sm text-destructive font-medium">
+                            Vehicle information is incomplete. Please review registration and insurance documents.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* Edit Button */}
+                  <div className="mt-6 flex justify-end">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleOpenEditVehicleDialog}
+                      data-testid="button-edit-vehicle"
+                    >
+                      Edit Vehicle
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Trip History */}
             {trips && trips.length > 0 && (
               <Card>
@@ -1711,6 +1954,150 @@ export default function AdminDriverDetails() {
               data-testid="button-save-usa-edit"
             >
               {updateUsaProfileMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Vehicle Dialog */}
+      <Dialog open={showEditVehicleDialog} onOpenChange={setShowEditVehicleDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Vehicle Information</DialogTitle>
+            <DialogDescription>
+              Update driver vehicle details and registration/insurance documents.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-type">Vehicle Type</Label>
+              <select
+                id="vehicle-type"
+                value={editVehicleForm.vehicleType}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, vehicleType: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                data-testid="select-vehicle-type"
+              >
+                <option value="">Select type</option>
+                <option value="sedan">Sedan</option>
+                <option value="suv">SUV</option>
+                <option value="van">Van</option>
+                <option value="truck">Truck</option>
+                <option value="motorcycle">Motorcycle</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-make">Make</Label>
+              <Input
+                id="vehicle-make"
+                value={editVehicleForm.make}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, make: e.target.value })}
+                placeholder="e.g., Toyota, Honda"
+                data-testid="input-vehicle-make"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-model">Model</Label>
+              <Input
+                id="vehicle-model"
+                value={editVehicleForm.model}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, model: e.target.value })}
+                placeholder="e.g., Camry, Accord"
+                data-testid="input-vehicle-model"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-year">Year</Label>
+              <Input
+                id="vehicle-year"
+                type="number"
+                min="1900"
+                max="2100"
+                value={editVehicleForm.year}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, year: e.target.value })}
+                placeholder="e.g., 2020"
+                data-testid="input-vehicle-year"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-color">Color</Label>
+              <Input
+                id="vehicle-color"
+                value={editVehicleForm.color}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, color: e.target.value })}
+                placeholder="e.g., Black, White"
+                data-testid="input-vehicle-color"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-plate">License Plate</Label>
+              <Input
+                id="vehicle-plate"
+                value={editVehicleForm.licensePlate}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, licensePlate: e.target.value })}
+                placeholder="e.g., ABC-1234"
+                data-testid="input-vehicle-plate"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-registration-url">Registration Document URL</Label>
+              <Input
+                id="vehicle-registration-url"
+                value={editVehicleForm.registrationDocumentUrl}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, registrationDocumentUrl: e.target.value })}
+                placeholder="https://"
+                data-testid="input-vehicle-registration-url"
+              />
+              <p className="text-xs text-muted-foreground">Paste the URL of the uploaded registration document</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-registration-expiry">Registration Expiry</Label>
+              <Input
+                id="vehicle-registration-expiry"
+                type="date"
+                value={editVehicleForm.registrationExpiry}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, registrationExpiry: e.target.value })}
+                data-testid="input-vehicle-registration-expiry"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-insurance-url">Insurance Document URL</Label>
+              <Input
+                id="vehicle-insurance-url"
+                value={editVehicleForm.insuranceDocumentUrl}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, insuranceDocumentUrl: e.target.value })}
+                placeholder="https://"
+                data-testid="input-vehicle-insurance-url"
+              />
+              <p className="text-xs text-muted-foreground">Paste the URL of the uploaded insurance document</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="vehicle-insurance-expiry">Insurance Expiry</Label>
+              <Input
+                id="vehicle-insurance-expiry"
+                type="date"
+                value={editVehicleForm.insuranceExpiry}
+                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, insuranceExpiry: e.target.value })}
+                data-testid="input-vehicle-insurance-expiry"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditVehicleDialog(false)}
+              disabled={updateVehicleMutation.isPending}
+              data-testid="button-cancel-vehicle-edit"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateVehicleMutation.mutate(editVehicleForm)}
+              disabled={updateVehicleMutation.isPending}
+              data-testid="button-save-vehicle-edit"
+            >
+              {updateVehicleMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
