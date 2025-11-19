@@ -65,6 +65,25 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
   * Edit form backward-compatible with old `vehicleModel`/`vehiclePlate` fields
 - **Impact**: NON-BREAKING - Schema extension with nullable fields, new admin UI module, maintains full backward compatibility
 
+### HOTFIX: Driver Details Page Runtime Error Fix (November 19, 2025)
+- **Issue**: Runtime error "undefined is not an object (evaluating 'driver.user.countryCode')" occurring after Step 35 updates
+- **Root Cause**: Backend API response had flattened user properties (userId, email, countryCode) but frontend TypeScript interface expected nested user object
+- **Backend Fixes** (`server/routes/admin.ts`):
+  * Updated GET `/api/admin/drivers/:id` endpoint to include nested `user` object: `{ id, email, countryCode, isBlocked }`
+  * Maintained backward compatibility by keeping flattened properties alongside nested object
+  * Removed duplicate properties (dateOfBirth, emergencyContactName, emergencyContactPhone) from response
+  * Added missing USA driver fields to response:
+    - Profile photo: `profilePhotoUrl`
+    - Name fields: `firstName`, `middleName`, `lastName`
+    - DMV license: `dmvLicenseFrontUrl`, `dmvLicenseBackUrl`, `dmvLicenseExpiry`, `dmvLicenseNumber`
+    - TLC license: `tlcLicenseFrontUrl`, `tlcLicenseBackUrl`, `tlcLicenseExpiry`, `tlcLicenseNumber`
+    - Vehicle fields: `make`, `model`, `year`, `color`, `licensePlate`, `registrationDocumentUrl`, `registrationExpiry`, `insuranceDocumentUrl`, `insuranceExpiry`
+- **Frontend Fixes** (`client/src/pages/admin/driver-details.tsx`):
+  * Added defensive optional chaining: changed `driver.user.countryCode` to `driver.user?.countryCode` (line 1357)
+  * Prevents runtime crash when user object is missing or undefined
+- **Backward Compatibility**: Both flattened and nested user properties included in response, ensuring compatibility with all frontend consumers
+- **Impact**: CRITICAL FIX - Resolves runtime crash in Driver Details page, adds missing fields, improves data consistency
+
 ### Step 34e: USA Driver Name Fields and Emergency Contact Layout Update (November 19, 2025)
 - **Frontend Updates - Driver Details Page** (`/admin/drivers/:id` for USA drivers):
   - **Name Display Restructured**:
