@@ -84,6 +84,26 @@ function validateDriverKYC(
     if (!hasNewVehicleReg && !hasLegacyVehicleReg) {
       missing.push("Vehicle registration document");
     }
+
+    // Check for DMV Inspection (type, date, expiry, and document)
+    if (!driver.vehicle?.dmvInspectionType) {
+      missing.push("DMV inspection type");
+    }
+    if (!driver.vehicle?.dmvInspectionDate) {
+      missing.push("DMV inspection date");
+    }
+    if (!driver.vehicle?.dmvInspectionExpiry) {
+      missing.push("DMV inspection expiry date");
+    }
+    if (!driver.vehicle?.dmvInspectionImageUrl) {
+      missing.push("DMV inspection document");
+    }
+    // Check if inspection status is not VALID (i.e., MISSING or EXPIRED)
+    if (driver.vehicle?.dmvInspectionStatus && driver.vehicle.dmvInspectionStatus !== 'VALID') {
+      if (driver.vehicle.dmvInspectionStatus === 'EXPIRED') {
+        missing.push("DMV inspection has expired");
+      }
+    }
   }
 
   return {

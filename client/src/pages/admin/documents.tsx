@@ -157,6 +157,11 @@ interface DocumentDetails {
     registrationExpiry: string | null;
     insuranceDocumentUrl: string | null;
     insuranceExpiry: string | null;
+    dmvInspectionType: string | null;
+    dmvInspectionDate: string | null;
+    dmvInspectionExpiry: string | null;
+    dmvInspectionImageUrl: string | null;
+    dmvInspectionStatus: string | null;
   } | null;
   restaurantName?: string;
   address?: string;
