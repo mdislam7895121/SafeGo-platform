@@ -1,0 +1,99 @@
+You are the lead architect and senior full-stack engineer for my SafeGo global super-app. The codebase is already production-ready. Do NOT rewrite existing logic or break any working flows. Make only minimal, incremental changes.
+
+Context:
+- Stack: Node.js + Express, Prisma + PostgreSQL (Neon), React + TypeScript + Vite, TanStack Query, shadcn/ui.
+- Roles: customer, driver, restaurant, admin.
+- Status:
+  - Auth, KYC, ride matching, driver management, admin dashboard overview are working.
+  - Driver Management page is complete.
+  - Restaurant side is basic/incomplete. There will NOT be a huge number of restaurants, so we just need a simple but reliable admin UI.
+
+Goal:
+Implement a simple Restaurant Management area for the admin, reusing the driver management patterns but without over-engineering (no complex pagination or heavy filtering). Keep it safe and non-breaking.
+
+Requirements:
+
+1) Admin Restaurant List (simple table)
+- Add an admin page, e.g. `/admin/restaurants`, protected by the existing admin ProtectedRoute.
+- The “Restaurants” card on the admin dashboard should navigate to this page on click.
+- On this page, show a simple table of all restaurants:
+  - email
+  - country
+  - KYC status (pending / verified / rejected)
+  - account status (active / suspended / blocked)
+  - current wallet balance (if available)
+- Since the number of restaurants is small, you can:
+  - load all restaurants in one request (no pagination required),
+  - add a basic search by email (optional),
+  - add simple filter buttons for status (All / Active / Suspended / Blocked) if it is easy to reuse from the driver list.
+
+2) Restaurant Details & Basic Actions
+- Each row can have a “View” or “Manage” button opening a details view (page or drawer).
+- In details view, show:
+  - restaurant profile info (email, country, address/name if present),
+  - KYC info + status,
+  - wallet info (balance / owed amounts) if modeled,
+  - basic stats like total completed orders if this data already exists.
+- Add two admin actions:
+  - Suspend / Unsuspend restaurant
+  - Block / Unblock restaurant
+- Reuse the same backend patterns used for driver suspend/block:
+  - dedicated PATCH endpoints,
+  - updates to Prisma models on RestaurantProfile (or equivalent),
+  - return updated restaurant object so the UI stays in sync.
+
+3) Pending Restaurant KYC (simple integration)
+- On the KYC Approvals page, ensure restaurant KYC entries are visible:
+  - Either via a small tab or a filter (e.g. “Drivers / Customers / Restaurants”).
+- The admin dashboard “Pending KYC” tile should include restaurant KYC count in the total.
+- When admin approves a restaurant KYC:
+  - restaurant status becomes “verified”,
+  - restaurant appears as verified in the restaurant list,
+  - dashboard auto-refresh (existing 5-second refresh) shows updated numbers.
+
+4) Complaints (minimal support)
+- If a complaint model already exists for drivers, extend it minimally to support restaurants as well (for example, a `type` field: driver/restaurant + a restaurantId).
+- For now, it is enough that:
+  - restaurant-related complaints are counted in the “Open Complaints” metric on the admin dashboard,
+  - the existing admin complaints page can show which complaints are for restaurants (one extra column).
+
+5) Dashboard Integration
+- Keep the dashboard simple:
+  - “Restaurants” count = total number of restaurant profiles.
+  - “Pending KYC” = all pending KYC across drivers, customers, restaurants.
+  - “Open Complaints” = driver + restaurant complaints.
+- All tiles must be clickable and navigate to:
+  - Restaurants → `/admin/restaurants`
+  - Pending KYC → `/admin/kyc`
+  - Open Complaints → `/admin/complaints`
+
+6) Security Phase – RBAC and Safety
+- Apply strict admin-only access for all new routes and endpoints:
+  - Use existing auth middleware to ensure only admin can:
+    - view restaurant list,
+    - see restaurant details,
+    - call suspend/block endpoints.
+- Validate IDs and payloads on all new PATCH/GET endpoints.
+- Do NOT leak sensitive KYC data to non-admin roles.
+- Keep error messages generic on the client; no stack traces.
+
+7) Non-breaking changes
+- Do NOT modify or break:
+  - customer flows,
+  - driver flows,
+  - existing driver management.
+- Reuse existing helper functions, components, and hooks where possible.
+- If a shared component must be changed, do it in a backward-compatible way and document the change in comments.
+
+8) Testing
+- After implementation, run and summarize end-to-end tests:
+  - restaurant signup + KYC submission + admin approval,
+  - admin viewing restaurant list and details,
+  - admin suspending and re-activating a restaurant,
+  - dashboard tiles navigating correctly and updating numbers,
+  - no regression in driver/customer/admin flows.
+
+Finally, provide a summary:
+- files changed (backend + frontend),
+- new API endpoints,
+- how an admin can use the Restaurant Management page in normal operation.
