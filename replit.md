@@ -31,6 +31,36 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
+### Step 34: USA Driver Identity & License Documents (DMV + NY TLC) (November 19, 2025)
+- **Schema Changes**:
+  - Added DMV license fields to `DriverProfile` (nullable for backward compatibility): `dmvLicenseFrontUrl`, `dmvLicenseBackUrl`, `dmvLicenseExpiry`, `dmvLicenseNumber`
+  - Added TLC license fields to `DriverProfile` for NY drivers (nullable): `tlcLicenseFrontUrl`, `tlcLicenseBackUrl`, `tlcLicenseExpiry`, `tlcLicenseNumber`
+  - Added `emergencyContactRelationship` field to `DriverProfile`
+  - Successfully pushed schema changes to database using `npx prisma db push`
+- **Backend Updates**:
+  - Updated `updateUsaDriverProfileSchema` with all new fields: firstName, middleName, lastName, DMV license fields, TLC license fields, emergencyContactRelationship, profilePhotoUrl
+  - Updated PATCH `/api/admin/drivers/:id/usa-profile` endpoint to process all new DMV/TLC license fields
+  - Updated GET `/api/admin/documents/drivers/:id/details` to return comprehensive USA driver identity including masked SSN, residential address, emergency contact, DMV license, and TLC license
+  - **Critical Fix**: Updated `validateDriverKYC` function to use new front/back fields instead of legacy single-image fields for proper KYC validation
+  - DMV license (front, back, expiry) now required for all USA drivers
+  - TLC license (front, back, expiry) now required only for NY state drivers
+  - SSN masking using existing `maskSSN` utility (###-##-XXXX format)
+- **Frontend Updates**:
+  - Expanded `DocumentDetails` interface to include all USA driver identity fields
+  - Comprehensive Document Review modal (`/admin/documents`) with organized sections for USA drivers:
+    * Identity section (SSN masked, DOB, phone, background check status)
+    * Residential Address section (street, city, state, ZIP)
+    * Emergency Contact section (name, relationship, phone)
+    * DMV License section (required for all USA drivers) - front/back images, expiry date, license number, with warning for missing documents
+    * TLC License section (conditional rendering for NY state only) - front/back images, expiry date, license number, with warning for missing documents
+  - Added data-testid attributes for all USA driver fields for automated testing
+- **Validation Rules**:
+  - DMV License: Front image, back image, and expiry date required for all USA drivers (license number optional)
+  - TLC License: Front image, back image, and expiry date required for NY state drivers only (license number optional)
+  - SSN: Validated format (XXX-XX-XXXX or XXXXXXXXX), encrypted on storage, masked in UI display
+- **Impact**: NON-BREAKING - All new fields nullable, legacy data supported, enhanced KYC validation for USA drivers
+- **Security**: SSN encrypted using AES-256-GCM, masked display (###-##-XXXX), admin-only access to driver documents, no logging of sensitive data
+
 ### Step 33: Mandatory Postal Code for Bangladesh Driver Identity (November 19, 2025)
 - **Schema Changes**:
   - Added `postalCode` field to both `DriverProfile` and `CustomerProfile` models (nullable for backward compatibility)

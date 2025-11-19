@@ -58,14 +58,28 @@ async function validateDriverKYC(
       missing.push("Last name");
     }
 
-    // DMV License required for ALL US drivers
-    if (!driver.dmvLicenseImageUrl) {
-      missing.push("DMV driver license image");
+    // DMV License required for ALL US drivers (front & back images + expiry)
+    if (!driver.dmvLicenseFrontUrl) {
+      missing.push("DMV license front image");
+    }
+    if (!driver.dmvLicenseBackUrl) {
+      missing.push("DMV license back image");
+    }
+    if (!driver.dmvLicenseExpiry) {
+      missing.push("DMV license expiry date");
     }
 
-    // TLC License required ONLY for NY state drivers
-    if (driver.usaState === "NY" && !driver.tlcLicenseImageUrl) {
-      missing.push("TLC license image (required for NY drivers)");
+    // TLC License required ONLY for NY state drivers (front & back images + expiry)
+    if (driver.usaState === "NY") {
+      if (!driver.tlcLicenseFrontUrl) {
+        missing.push("TLC license front image (required for NY drivers)");
+      }
+      if (!driver.tlcLicenseBackUrl) {
+        missing.push("TLC license back image (required for NY drivers)");
+      }
+      if (!driver.tlcLicenseExpiry) {
+        missing.push("TLC license expiry date (required for NY drivers)");
+      }
     }
 
     // Check for at least one vehicle registration document
