@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
+import { z } from "zod";
+import { encrypt, decrypt, isValidBdNid, isValidBdPhone } from "../utils/encryption";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -389,6 +391,233 @@ router.patch("/status", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Update status error:", error);
     res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/bd-identity
+// Get driver's own Bangladesh identity profile
+// ====================================================
+router.get("/bd-identity", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Check if driver is from Bangladesh
+    if (driverProfile.user.countryCode !== "BD") {
+      return res.status(400).json({ 
+        error: "Bangladesh identity information is only available for Bangladesh drivers" 
+      });
+    }
+
+    // Return BD identity fields (exclude nidEncrypted)
+    res.json({
+      fullName: driverProfile.fullName || "",
+      fatherName: driverProfile.fatherName || "",
+      phoneNumber: driverProfile.phoneNumber || "",
+      village: driverProfile.village || "",
+      postOffice: driverProfile.postOffice || "",
+      thana: driverProfile.thana || "",
+      district: driverProfile.district || "",
+      presentAddress: driverProfile.presentAddress || "",
+      permanentAddress: driverProfile.permanentAddress || "",
+      nidFrontImageUrl: driverProfile.nidFrontImageUrl || "",
+      nidBackImageUrl: driverProfile.nidBackImageUrl || "",
+      // NID is fetched separately via /nid endpoint for security
+    });
+  } catch (error) {
+    console.error("Get BD identity error:", error);
+    res.status(500).json({ error: "Failed to fetch Bangladesh identity" });
+  }
+});
+
+// ====================================================
+// PUT /api/driver/bd-identity
+// Update driver's own Bangladesh identity profile
+// NID is REQUIRED for Bangladesh drivers
+// ====================================================
+const bdIdentitySchema = z.object({
+  fullName: z.string().min(2, "Full name must be at least 2 characters").max(100),
+  fatherName: z.string().min(2, "Father's name must be at least 2 characters").max(100),
+  phoneNumber: z.string().refine(isValidBdPhone, {
+    message: "Invalid Bangladesh phone number format (must be 01XXXXXXXXX)",
+  }),
+  village: z.string().min(2).max(100),
+  postOffice: z.string().min(2).max(100),
+  thana: z.string().min(2).max(100),
+  district: z.string().min(2).max(100),
+  presentAddress: z.string().min(5).max(500),
+  permanentAddress: z.string().min(5).max(500),
+  // NID is optional - only update if provided (allows editing other fields without re-entering NID)
+  nid: z.string().refine((val) => !val || isValidBdNid(val), {
+    message: "Invalid Bangladesh NID format (must be 10, 13, or 17 digits)",
+  }).optional(),
+  nidFrontImageUrl: z.string().url().optional(),
+  nidBackImageUrl: z.string().url().optional(),
+});
+
+router.put("/bd-identity", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Check if driver is from Bangladesh
+    if (driverProfile.user.countryCode !== "BD") {
+      return res.status(400).json({ 
+        error: "Bangladesh identity information is only available for Bangladesh drivers" 
+      });
+    }
+
+    // Validate request body
+    const validation = bdIdentitySchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+
+    // Prepare update data
+    const updateData: any = {
+      fullName: data.fullName.trim(),
+      fatherName: data.fatherName.trim(),
+      phoneNumber: data.phoneNumber.trim(),
+      village: data.village.trim(),
+      postOffice: data.postOffice.trim(),
+      thana: data.thana.trim(),
+      district: data.district.trim(),
+      presentAddress: data.presentAddress.trim(),
+      permanentAddress: data.permanentAddress.trim(),
+    };
+
+    // Only encrypt and update NID if provided (allows editing other fields without re-entering NID)
+    if (data.nid && data.nid.trim()) {
+      updateData.nidEncrypted = encrypt(data.nid.trim());
+      // Also update legacy nidNumber field for backward compatibility
+      updateData.nidNumber = data.nid.trim();
+    }
+
+    // Add image URLs if provided
+    if (data.nidFrontImageUrl) {
+      updateData.nidFrontImageUrl = data.nidFrontImageUrl;
+    }
+    if (data.nidBackImageUrl) {
+      updateData.nidBackImageUrl = data.nidBackImageUrl;
+    }
+
+    // Update driver profile
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Bangladesh identity updated successfully",
+      identity: {
+        fullName: updatedProfile.fullName,
+        fatherName: updatedProfile.fatherName,
+        phoneNumber: updatedProfile.phoneNumber,
+        village: updatedProfile.village,
+        postOffice: updatedProfile.postOffice,
+        thana: updatedProfile.thana,
+        district: updatedProfile.district,
+        presentAddress: updatedProfile.presentAddress,
+        permanentAddress: updatedProfile.permanentAddress,
+        nidFrontImageUrl: updatedProfile.nidFrontImageUrl,
+        nidBackImageUrl: updatedProfile.nidBackImageUrl,
+      },
+    });
+  } catch (error) {
+    console.error("Update BD identity error:", error);
+    res.status(500).json({ error: "Failed to update Bangladesh identity" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/nid
+// Decrypt and return driver's own NID
+// ====================================================
+router.get("/nid", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Check if driver is from Bangladesh
+    if (driverProfile.user.countryCode !== "BD") {
+      return res.status(400).json({ 
+        error: "NID information is only available for Bangladesh drivers" 
+      });
+    }
+
+    // Decrypt NID if exists
+    let nid = "";
+    if (driverProfile.nidEncrypted) {
+      try {
+        nid = decrypt(driverProfile.nidEncrypted);
+      } catch (decryptError) {
+        console.error("NID decryption failed:", decryptError);
+        return res.status(500).json({ error: "Failed to decrypt NID" });
+      }
+    } else if (driverProfile.nidNumber) {
+      // Fallback to legacy plaintext NID
+      nid = driverProfile.nidNumber;
+    }
+
+    if (!nid) {
+      return res.status(404).json({ error: "NID not found" });
+    }
+
+    res.json({ nid });
+  } catch (error) {
+    console.error("Get NID error:", error);
+    res.status(500).json({ error: "Failed to fetch NID" });
   }
 });
 
