@@ -1,0 +1,131 @@
+Step 34 – GLOBAL Document Expiry System + USA DMV Inspection Module
+
+You must treat this step as a fully backward-compatible update, extending Step 26–33 without breaking any Bangladesh or USA features.
+
+This step has TWO major requirements:
+
+--------------------------------------------
+A) GLOBAL DOCUMENT EXPIRY WARNING SYSTEM
+--------------------------------------------
+
+Implement a universal expiry warning system for ALL documents across ALL countries.
+
+This applies to:
+- BD: NID (if expiry exists), Driver license, Vehicle registration, Insurance
+- US: DMV License, Registration, Insurance, TLC License, DMV Inspection
+- Any future country documents
+- Any document that has an expiry date field
+
+GLOBAL RULES:
+1. If (expiry_date < today):
+      status = "expired"
+      show RED warning: "Document expired"
+
+2. If (expiry_date within next 30 days):
+      status = "expiring_soon"
+      show YELLOW warning: "Document expires in X days"
+
+3. If (expiry_date ≥ 31 days away):
+      status = "valid"
+
+4. If expiry_date is null:
+      status = "unknown"
+      show gray tag or "No expiry provided"
+
+These rules must automatically apply everywhere a document is shown:
+- Admin Driver Details pages
+- Admin Restaurant Identity
+- Admin Customer Identity (if applicable)
+- Document Review Center
+- KYC screens
+- Vehicle Information screens
+- USA Inspection module
+
+There must be NO country-specific logic here.
+All documents with expiry date use the same universal rule.
+
+--------------------------------------------
+B) USA DMV INSPECTION MODULE (as earlier defined)
+--------------------------------------------
+
+(Keep all Step 34 DMV Inspection rules exactly the same as earlier.)
+
+Add these fields (nullable):
+- dmvInspectionStatus: “missing”, “pending_review”, “approved”, “rejected”
+- dmvInspectionFrontUrl: string|null
+- dmvInspectionBackUrl: string|null
+- dmvInspectionExpiry: date|null
+- rejectionReason: string|null
+
+Document expiry color system must apply HERE ALSO:
+- If expired: red “Inspection Expired”
+- If ≤30 days left: yellow “Expiring Soon”
+
+Place the DMV Inspection block in this order:
+1. USA Identity Information
+2. DMV License
+3. TLC License (NY only)
+4. **DMV Inspection (NEW)**
+5. Emergency Contact
+6. Divider
+7. Vehicle Information
+
+Admin actions:
+- Approve (requires both documents + valid expiry)
+- Reject (requires rejectionReason)
+- Request Re-upload (status → pending_review)
+
+All documents must use existing secure upload + encrypted storage.
+
+--------------------------------------------
+C) SECURITY REQUIREMENTS
+--------------------------------------------
+
+Apply Step 26–33 security globally:
+
+- Admin-only access to all document files.
+- Encrypted file storage (AES-256) for all documents.
+- No plaintext URLs in logs.
+- Full audit logging:
+  - Viewed by adminID
+  - Timestamp
+  - Action (approved/rejected)
+- Expired documents DO NOT auto-block drivers in this step
+  → only visual warnings (non-breaking).
+
+--------------------------------------------
+D) BACKWARD COMPATIBILITY
+--------------------------------------------
+
+- No existing BD or US driver should break.
+- If expiry is missing in old records:
+  - status = “unknown”
+  - NO errors
+- Drivers without inspection must load cleanly.
+- Restaurant identity pages must remain unchanged except expiry warnings.
+
+--------------------------------------------
+E) TEST CASES
+--------------------------------------------
+
+1. BD Driver → license expiring in 10 days → Yellow warning  
+2. BD Driver → insurance expired → Red warning  
+3. US Driver → DMV license expired → Red warning  
+4. US Driver → TLC license valid → No warning  
+5. US Driver → DMV Inspection pending → Orange “Pending Review”  
+6. US Driver → DMV Inspection expired → Red  
+7. Restaurant → food permit expiring soon  
+8. Customer → document missing → gray “No expiry”  
+9. Old driver with no expiry → no crash  
+10. Document Review Center → new expiry badges visible  
+
+--------------------------------------------
+F) FINAL REQUIREMENT
+--------------------------------------------
+
+Return a summary showing:
+- Updated schema fields
+- Updated frontend components
+- Updated admin pages
+- Warning colors and logic
+- Confirmation that all steps remain non-breaking and production safe.
