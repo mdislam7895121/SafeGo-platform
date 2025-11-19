@@ -952,11 +952,18 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
         dateOfBirth: driver.dateOfBirth,
         emergencyContactName: driver.emergencyContactName,
         emergencyContactPhone: driver.emergencyContactPhone,
-        // Bangladesh fields
+        // Bangladesh fields (NEW - exclude nidEncrypted for security)
+        fullName: driver.fullName,
         fatherName: driver.fatherName,
+        phoneNumber: driver.phoneNumber,
+        village: driver.village,
+        postOffice: driver.postOffice,
+        thana: driver.thana,
+        district: driver.district,
         presentAddress: driver.presentAddress,
         permanentAddress: driver.permanentAddress,
-        nidNumber: driver.nidNumber,
+        nidNumber: driver.nidNumber, // Legacy field
+        // nidEncrypted: EXCLUDED - only accessible via dedicated endpoint
         nidFrontImageUrl: driver.nidFrontImageUrl,
         nidBackImageUrl: driver.nidBackImageUrl,
         // US fields
@@ -2015,7 +2022,39 @@ router.get("/customers/:id", async (req: AuthRequest, res) => {
 
     const customer = await prisma.customerProfile.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        // Bangladesh-specific fields (NEW - exclude nidEncrypted for security)
+        fullName: true,
+        fatherName: true,
+        phoneNumber: true,
+        village: true,
+        postOffice: true,
+        thana: true,
+        district: true,
+        presentAddress: true,
+        permanentAddress: true,
+        nidNumber: true, // Legacy field
+        // nidEncrypted: EXCLUDED - only accessible via dedicated endpoint
+        nidFrontImageUrl: true,
+        nidBackImageUrl: true,
+        // US-specific fields
+        homeAddress: true,
+        governmentIdType: true,
+        governmentIdLast4: true,
+        // Common fields
+        dateOfBirth: true,
+        emergencyContactName: true,
+        emergencyContactPhone: true,
+        verificationStatus: true,
+        rejectionReason: true,
+        isVerified: true,
+        isSuspended: true,
+        suspensionReason: true,
+        suspendedAt: true,
+        createdAt: true,
+        updatedAt: true,
         user: {
           select: {
             id: true,
@@ -2337,6 +2376,84 @@ router.patch("/customers/:id/unblock", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Unblock customer error:", error);
     res.status(500).json({ error: "Failed to unblock customer" });
+  }
+});
+
+// ====================================================
+// NID DECRYPTION ENDPOINTS (ADMIN ONLY - SECURE)
+// ====================================================
+
+// ====================================================
+// GET /api/admin/customers/:id/nid
+// Decrypt and return customer NID (admin only)
+// ====================================================
+router.get("/customers/:id/nid", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { decrypt } = await import("../utils/encryption.js");
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        nidEncrypted: true,
+        nidNumber: true, // Legacy fallback
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Try encrypted NID first, fallback to legacy nidNumber
+    let nid = "";
+    if (customer.nidEncrypted) {
+      nid = decrypt(customer.nidEncrypted);
+    } else if (customer.nidNumber) {
+      nid = customer.nidNumber; // Legacy unencrypted data
+    }
+
+    res.json({ nid });
+  } catch (error) {
+    console.error("Fetch customer NID error:", error);
+    res.status(500).json({ error: "Failed to fetch customer NID" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/drivers/:id/nid
+// Decrypt and return driver NID (admin only)
+// ====================================================
+router.get("/drivers/:id/nid", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { decrypt } = await import("../utils/encryption.js");
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        nidEncrypted: true,
+        nidNumber: true, // Legacy fallback
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Try encrypted NID first, fallback to legacy nidNumber
+    let nid = "";
+    if (driver.nidEncrypted) {
+      nid = decrypt(driver.nidEncrypted);
+    } else if (driver.nidNumber) {
+      nid = driver.nidNumber; // Legacy unencrypted data
+    }
+
+    res.json({ nid });
+  } catch (error) {
+    console.error("Fetch driver NID error:", error);
+    res.status(500).json({ error: "Failed to fetch driver NID" });
   }
 });
 
