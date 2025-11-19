@@ -958,6 +958,44 @@ export default function AdminDocumentCenter() {
                               </Button>
                             </div>
                           )}
+                          {documentDetails.vehicle.dmvInspectionImageUrl && (
+                            <div className="flex items-center justify-between p-3 border rounded-lg" data-testid="dmv-inspection-doc">
+                              <div>
+                                <p className="font-medium">DMV Inspection Document</p>
+                                {documentDetails.vehicle.dmvInspectionType && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Type: {documentDetails.vehicle.dmvInspectionType}
+                                  </p>
+                                )}
+                                {documentDetails.vehicle.dmvInspectionExpiry && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Expires: {format(new Date(documentDetails.vehicle.dmvInspectionExpiry), "PP")}
+                                  </p>
+                                )}
+                                {documentDetails.vehicle.dmvInspectionStatus && (
+                                  <div className="mt-1">
+                                    {documentDetails.vehicle.dmvInspectionStatus === 'VALID' && (
+                                      <Badge variant="default" className="bg-green-500">Valid</Badge>
+                                    )}
+                                    {documentDetails.vehicle.dmvInspectionStatus === 'EXPIRED' && (
+                                      <Badge variant="destructive">Expired</Badge>
+                                    )}
+                                    {documentDetails.vehicle.dmvInspectionStatus === 'MISSING' && (
+                                      <Badge variant="secondary">Missing</Badge>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(documentDetails.vehicle!.dmvInspectionImageUrl!, "_blank")}
+                                data-testid="button-view-dmv-inspection-doc"
+                              >
+                                View
+                              </Button>
+                            </div>
+                          )}
                         </>
                       )}
                       {/* Legacy Vehicle Documents */}
