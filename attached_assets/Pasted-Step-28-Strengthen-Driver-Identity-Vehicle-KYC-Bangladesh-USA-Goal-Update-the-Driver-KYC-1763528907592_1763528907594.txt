@@ -1,0 +1,125 @@
+Step 28 – Strengthen Driver Identity & Vehicle KYC (Bangladesh + USA)
+
+Goal
+Update the Driver KYC and profile system for Bangladesh and USA so that:
+- Identity data matches each country’s real-world rules.
+- Profile photo and key documents are enforced where required.
+- No breaking change occurs for existing drivers or rides.
+
+This step must be NON-BREAKING and follow all existing security patterns.
+
+1. General Requirements (All Drivers – BD + US)
+- Every driver must have:
+  - A required profile photo (face clearly visible).
+  - A “Vehicle Information” section attached to their driver profile.
+- Vehicle Information fields (common):
+  - Vehicle type (car, bike, etc. – reuse existing field if present).
+  - Number plate (license plate text only – NO VIN field).
+  - Optional free-text notes (e.g., “Uber-style sedan, white”).
+- Vehicle Documents:
+  - Allow uploading multiple files (images or PDF) for:
+    - Vehicle registration document.
+    - Insurance document (if available).
+  - For now, treat as “supporting documents” – KYC can require at least 1 registration doc per country rule (see below).
+
+2. Bangladesh Driver Identity (BD)
+- Keep the existing Bangladesh KYC fields you already implemented:
+  - Full Name
+  - Father’s Name
+  - Phone number
+  - Village
+  - Post Office
+  - Thana
+  - District
+  - NID Number (REQUIRED, not optional)
+- Add / ensure:
+  - Driver profile photo is REQUIRED for BD drivers.
+  - At least one vehicle registration document is REQUIRED before KYC can be marked Verified.
+- Store NID and all identity data using the existing encryption and security model, NO schema weakening.
+
+3. USA Driver Identity – Name & Photo
+- For USA drivers, adjust identity fields to:
+  - firstName (required)
+  - middleName (optional)
+  - lastName (required)
+- Keep existing country = US logic intact.
+- Require a driver profile photo for all US drivers:
+  - No “verified” KYC without a profile photo.
+  - If a US driver has no profile photo yet, show a clear warning in Admin KYC and Driver app UI.
+
+4. USA License Documents – General US
+- For all US drivers:
+  - Add a required DMV Driver License photo field:
+    - Single primary image field (front, or front+back combined as per current upload pattern).
+    - This MUST be present before KYC can be approved.
+- DO NOT add a VIN field.
+- Keep everything non-breaking for existing drivers:
+  - Existing US drivers without documents must not crash the app.
+  - They should show as “Incomplete / Pending” until license is uploaded.
+
+5. Special Rule – New York (NY) Drivers
+- For drivers operating in New York (state = NY):
+  - They MUST have BOTH:
+    - DMV Driver License image, AND
+    - TLC License image
+- Implementation:
+  - If driver.country = US AND driver.state = "NY":
+    - Enforce that DMV license photo is required.
+    - Enforce that TLC license photo is required.
+    - Do not allow KYC status = Verified unless both are present.
+  - For US drivers in other states:
+    - DMV license photo is required.
+    - TLC license can be optional or hidden (do not enforce it).
+- Make sure this logic is enforced consistently in:
+  - Driver KYC workflow (backend validation).
+  - Admin KYC Approval page (clear status of missing docs).
+
+6. UI/UX Updates
+- Driver app (or driver-facing UI):
+  - Show clear sections for:
+    - Personal Info
+    - Identity Documents (NID or DMV/TLC)
+    - Vehicle Info & Documents
+  - Mark required fields with visual indicators.
+- Admin Dashboard:
+  - On Driver Details page, add a “KYC Documents” section with:
+    - Profile Photo
+    - Identity docs (NID or DMV/TLC)
+    - Vehicle docs
+  - For BD drivers, clearly show NID as a required, encrypted field (mask actual number where appropriate).
+  - For NY US drivers, clearly show both DMV and TLC license statuses.
+
+7. Security & Storage (KYC Security Phase)
+- Treat all uploaded identity and vehicle documents as highly sensitive:
+  - Continue to use existing secure file storage mechanism.
+  - Access must be restricted to:
+    - Admin users.
+    - The driver themselves (own documents only).
+  - No public URLs; use signed/expiring URLs or existing protected route pattern.
+- Do NOT log raw NID or license numbers in application logs.
+- Ensure any encryption for BD NID remains active and is not modified.
+- Ensure new fields follow the same RBAC and validation rules as existing KYC fields.
+
+8. Non-Breaking Constraints
+- No destructive schema changes to existing columns.
+- Existing drivers and rides must continue to work:
+  - If older drivers are missing new fields, treat them as “incomplete KYC” but do not crash.
+- Do NOT change ride/food/parcel matching logic in this step.
+- Do NOT change commission, wallet, or settlement logic.
+
+9. Testing & Verification
+- Test the following flows:
+  - New BD driver completes KYC with NID + vehicle doc + profile photo.
+  - New US driver (non-NY state) completes KYC with First/Middle/Last + profile photo + DMV license + vehicle doc.
+  - New US driver in NY state cannot be verified until BOTH DMV and TLC license images are uploaded.
+  - Admin can view all docs but regular users cannot access someone else’s KYC docs.
+- Confirm that existing drivers without new fields still load without errors, and are marked as incomplete until updated.
+
+10. Documentation
+- Update replit.md with:
+  - New BD and US driver identity fields.
+  - New KYC requirements (BD NID mandatory, US DMV mandatory, NY TLC mandatory, profile photo required for all drivers).
+  - How admins can view these documents and verify drivers.
+  - Any migration/compatibility notes.
+
+Please implement Step 28 exactly as above, keeping all security guarantees and ensuring zero breaking changes. Step 29 (Driver Commission Visibility) will be done later, so do NOT add any finance/commission logic in this step.
