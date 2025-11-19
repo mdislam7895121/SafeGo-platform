@@ -56,12 +56,25 @@ interface DriverDetails {
   nidFrontImageUrl?: string;
   nidBackImageUrl?: string;
   // US fields
+  usaFullLegalName?: string;
+  dateOfBirth?: string;
+  usaPhoneNumber?: string;
+  driverLicenseNumber?: string;
+  licenseStateIssued?: string;
+  driverLicenseExpiry?: string;
+  driverLicenseImageUrl?: string;
+  usaStreet?: string;
+  usaCity?: string;
+  usaState?: string;
+  usaZipCode?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  backgroundCheckStatus?: string;
+  backgroundCheckDate?: string;
+  // Legacy US fields
   homeAddress?: string;
   governmentIdType?: string;
   governmentIdLast4?: string;
-  driverLicenseNumber?: string;
-  driverLicenseImageUrl?: string;
-  driverLicenseExpiry?: string;
   ssnLast4?: string;
   vehicle: {
     id: string;
@@ -107,8 +120,10 @@ export default function AdminDriverDetails() {
   const [suspensionReason, setSuspensionReason] = useState("");
   const [showNid, setShowNid] = useState(false);
   const [nid, setNid] = useState<string>("");
+  const [showSSN, setShowSSN] = useState(false);
+  const [maskedSSN, setMaskedSSN] = useState<string>("");
   
-  // Edit profile dialog state
+  // Edit profile dialog state (Bangladesh)
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editForm, setEditForm] = useState({
     fullName: "",
@@ -121,6 +136,25 @@ export default function AdminDriverDetails() {
     presentAddress: "",
     permanentAddress: "",
     nid: "",
+  });
+
+  // Edit USA profile dialog state
+  const [showEditUsaDialog, setShowEditUsaDialog] = useState(false);
+  const [editUsaForm, setEditUsaForm] = useState({
+    usaFullLegalName: "",
+    dateOfBirth: "",
+    ssn: "",
+    driverLicenseNumber: "",
+    licenseStateIssued: "",
+    driverLicenseExpiry: "",
+    usaPhoneNumber: "",
+    usaStreet: "",
+    usaCity: "",
+    usaState: "",
+    usaZipCode: "",
+    emergencyContactName: "",
+    emergencyContactPhone: "",
+    backgroundCheckStatus: "pending",
   });
 
   // Fetch driver details
@@ -324,7 +358,74 @@ export default function AdminDriverDetails() {
     },
   });
 
-  // Handler to open edit dialog with existing data
+  // Fetch SSN (admin-only, secure endpoint)
+  const fetchSSNMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("GET", `/api/admin/drivers/${driverId}/ssn`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to fetch SSN");
+      }
+      const data = await response.json();
+      return data.maskedSSN;
+    },
+    onSuccess: (data) => {
+      setMaskedSSN(data);
+      setShowSSN(true);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Update USA profile mutation
+  const updateUsaProfileMutation = useMutation({
+    mutationFn: async (data: typeof editUsaForm) => {
+      // Only send non-empty fields
+      const payload: any = {};
+      Object.entries(data).forEach(([key, value]) => {
+        if (value && String(value).trim()) {
+          payload[key] = key === 'ssn' || key === 'dateOfBirth' || key === 'driverLicenseExpiry' 
+            ? value 
+            : String(value).trim();
+        }
+      });
+
+      const response = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/usa-profile`, payload);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update USA profile");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "USA profile updated successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/drivers"] });
+      setShowEditUsaDialog(false);
+      setEditUsaForm({
+        usaFullLegalName: "",
+        dateOfBirth: "",
+        ssn: "",
+        driverLicenseNumber: "",
+        licenseStateIssued: "",
+        driverLicenseExpiry: "",
+        usaPhoneNumber: "",
+        usaStreet: "",
+        usaCity: "",
+        usaState: "",
+        usaZipCode: "",
+        emergencyContactName: "",
+        emergencyContactPhone: "",
+        backgroundCheckStatus: "pending",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Handler to open edit dialog with existing data (Bangladesh)
   const handleOpenEditDialog = () => {
     if (driver) {
       setEditForm({
@@ -341,6 +442,29 @@ export default function AdminDriverDetails() {
       });
     }
     setShowEditDialog(true);
+  };
+
+  // Handler to open USA edit dialog with existing data
+  const handleOpenEditUsaDialog = () => {
+    if (driver) {
+      setEditUsaForm({
+        usaFullLegalName: driver.usaFullLegalName || "",
+        dateOfBirth: driver.dateOfBirth ? driver.dateOfBirth.split('T')[0] : "",
+        ssn: "", // Never pre-populate SSN for security
+        driverLicenseNumber: driver.driverLicenseNumber || "",
+        licenseStateIssued: driver.licenseStateIssued || "",
+        driverLicenseExpiry: driver.driverLicenseExpiry ? driver.driverLicenseExpiry.split('T')[0] : "",
+        usaPhoneNumber: driver.usaPhoneNumber || "",
+        usaStreet: driver.usaStreet || "",
+        usaCity: driver.usaCity || "",
+        usaState: driver.usaState || "",
+        usaZipCode: driver.usaZipCode || "",
+        emergencyContactName: driver.emergencyContactName || "",
+        emergencyContactPhone: driver.emergencyContactPhone || "",
+        backgroundCheckStatus: driver.backgroundCheckStatus || "pending",
+      });
+    }
+    setShowEditUsaDialog(true);
   };
 
   const getStatusBadge = () => {
@@ -723,6 +847,158 @@ export default function AdminDriverDetails() {
               </Card>
             )}
 
+            {/* USA Info - Only shown for US drivers */}
+            {driver.countryCode === "US" && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      USA Identity Information
+                    </CardTitle>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleOpenEditUsaDialog}
+                      data-testid="button-edit-usa-profile"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit USA Profile
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {driver.usaFullLegalName && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Full Legal Name</p>
+                        <p className="text-sm" data-testid="text-usa-legal-name">{driver.usaFullLegalName}</p>
+                      </div>
+                    )}
+                    {driver.dateOfBirth && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
+                        <p className="text-sm" data-testid="text-dob">{format(new Date(driver.dateOfBirth), "PPP")}</p>
+                      </div>
+                    )}
+                    {driver.usaPhoneNumber && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Phone Number</p>
+                        <p className="text-sm" data-testid="text-usa-phone">{driver.usaPhoneNumber}</p>
+                      </div>
+                    )}
+                    {driver.driverLicenseNumber && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Driver License Number</p>
+                        <p className="text-sm font-mono" data-testid="text-license-number">{driver.driverLicenseNumber}</p>
+                      </div>
+                    )}
+                    {driver.licenseStateIssued && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">License State</p>
+                        <p className="text-sm" data-testid="text-license-state">{driver.licenseStateIssued}</p>
+                      </div>
+                    )}
+                    {driver.driverLicenseExpiry && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">License Expiry</p>
+                        <p className="text-sm" data-testid="text-license-expiry">{format(new Date(driver.driverLicenseExpiry), "PPP")}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">SSN</p>
+                      {showSSN ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-mono" data-testid="text-ssn">{maskedSSN || "Not available"}</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowSSN(false)}
+                            data-testid="button-hide-ssn"
+                          >
+                            Hide
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchSSNMutation.mutate()}
+                          disabled={fetchSSNMutation.isPending}
+                          data-testid="button-show-ssn"
+                        >
+                          {fetchSSNMutation.isPending ? "Loading..." : "Show SSN"}
+                        </Button>
+                      )}
+                    </div>
+                    {driver.backgroundCheckStatus && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Background Check</p>
+                        <Badge 
+                          variant={driver.backgroundCheckStatus === "cleared" ? "default" : driver.backgroundCheckStatus === "failed" ? "destructive" : "secondary"}
+                          data-testid="badge-background-check"
+                        >
+                          {driver.backgroundCheckStatus}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  {/* Address Section */}
+                  {(driver.usaStreet || driver.usaCity || driver.usaState || driver.usaZipCode) && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Residential Address</p>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {driver.usaStreet && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Street</p>
+                            <p className="text-sm" data-testid="text-usa-street">{driver.usaStreet}</p>
+                          </div>
+                        )}
+                        {driver.usaCity && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">City</p>
+                            <p className="text-sm" data-testid="text-usa-city">{driver.usaCity}</p>
+                          </div>
+                        )}
+                        {driver.usaState && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">State</p>
+                            <p className="text-sm" data-testid="text-usa-state">{driver.usaState}</p>
+                          </div>
+                        )}
+                        {driver.usaZipCode && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">ZIP Code</p>
+                            <p className="text-sm" data-testid="text-usa-zip">{driver.usaZipCode}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {/* Emergency Contact Section */}
+                  {(driver.emergencyContactName || driver.emergencyContactPhone) && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Emergency Contact</p>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {driver.emergencyContactName && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Name</p>
+                            <p className="text-sm" data-testid="text-emergency-name">{driver.emergencyContactName}</p>
+                          </div>
+                        )}
+                        {driver.emergencyContactPhone && (
+                          <div>
+                            <p className="text-xs text-muted-foreground">Phone</p>
+                            <p className="text-sm" data-testid="text-emergency-phone">{driver.emergencyContactPhone}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Trip History */}
             {trips && trips.length > 0 && (
               <Card>
@@ -965,6 +1241,185 @@ export default function AdminDriverDetails() {
               data-testid="button-save-edit"
             >
               {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit USA Profile Dialog */}
+      <Dialog open={showEditUsaDialog} onOpenChange={setShowEditUsaDialog}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit USA Profile</DialogTitle>
+            <DialogDescription>
+              Update driver USA identity information. SSN will be encrypted securely.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="usa-fullName">Full Legal Name</Label>
+              <Input
+                id="usa-fullName"
+                value={editUsaForm.usaFullLegalName}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, usaFullLegalName: e.target.value })}
+                placeholder="Enter full legal name"
+                data-testid="input-usa-fullName"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-dob">Date of Birth</Label>
+              <Input
+                id="usa-dob"
+                type="date"
+                value={editUsaForm.dateOfBirth}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, dateOfBirth: e.target.value })}
+                data-testid="input-usa-dob"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-ssn">SSN (###-##-####)</Label>
+              <Input
+                id="usa-ssn"
+                type="password"
+                value={editUsaForm.ssn}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, ssn: e.target.value })}
+                placeholder="Leave blank to keep existing"
+                data-testid="input-usa-ssn"
+              />
+              <p className="text-xs text-muted-foreground">Will be encrypted. Leave blank to keep existing.</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-phone">Phone Number</Label>
+              <Input
+                id="usa-phone"
+                value={editUsaForm.usaPhoneNumber}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, usaPhoneNumber: e.target.value })}
+                placeholder="(123) 456-7890"
+                data-testid="input-usa-phone"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-license">Driver License Number</Label>
+              <Input
+                id="usa-license"
+                value={editUsaForm.driverLicenseNumber}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, driverLicenseNumber: e.target.value })}
+                placeholder="Enter license number"
+                data-testid="input-usa-license"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-license-state">License State</Label>
+              <Input
+                id="usa-license-state"
+                value={editUsaForm.licenseStateIssued}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, licenseStateIssued: e.target.value.toUpperCase() })}
+                placeholder="NY, CA, TX, etc."
+                maxLength={2}
+                data-testid="input-usa-license-state"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-license-expiry">License Expiry</Label>
+              <Input
+                id="usa-license-expiry"
+                type="date"
+                value={editUsaForm.driverLicenseExpiry}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, driverLicenseExpiry: e.target.value })}
+                data-testid="input-usa-license-expiry"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-street">Street Address</Label>
+              <Input
+                id="usa-street"
+                value={editUsaForm.usaStreet}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, usaStreet: e.target.value })}
+                placeholder="123 Main St"
+                data-testid="input-usa-street"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-city">City</Label>
+              <Input
+                id="usa-city"
+                value={editUsaForm.usaCity}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, usaCity: e.target.value })}
+                placeholder="New York"
+                data-testid="input-usa-city"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-state">State</Label>
+              <Input
+                id="usa-state"
+                value={editUsaForm.usaState}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, usaState: e.target.value.toUpperCase() })}
+                placeholder="NY"
+                maxLength={2}
+                data-testid="input-usa-state"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-zip">ZIP Code</Label>
+              <Input
+                id="usa-zip"
+                value={editUsaForm.usaZipCode}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, usaZipCode: e.target.value })}
+                placeholder="10001"
+                data-testid="input-usa-zip"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-emergency-name">Emergency Contact Name</Label>
+              <Input
+                id="usa-emergency-name"
+                value={editUsaForm.emergencyContactName}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, emergencyContactName: e.target.value })}
+                placeholder="Enter emergency contact"
+                data-testid="input-usa-emergency-name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-emergency-phone">Emergency Contact Phone</Label>
+              <Input
+                id="usa-emergency-phone"
+                value={editUsaForm.emergencyContactPhone}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, emergencyContactPhone: e.target.value })}
+                placeholder="(123) 456-7890"
+                data-testid="input-usa-emergency-phone"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-background-check">Background Check Status</Label>
+              <select
+                id="usa-background-check"
+                value={editUsaForm.backgroundCheckStatus}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, backgroundCheckStatus: e.target.value })}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors"
+                data-testid="select-usa-background-check"
+              >
+                <option value="pending">Pending</option>
+                <option value="cleared">Cleared</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditUsaDialog(false)}
+              disabled={updateUsaProfileMutation.isPending}
+              data-testid="button-cancel-usa-edit"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateUsaProfileMutation.mutate(editUsaForm)}
+              disabled={updateUsaProfileMutation.isPending}
+              data-testid="button-save-usa-edit"
+            >
+              {updateUsaProfileMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
