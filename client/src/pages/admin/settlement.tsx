@@ -121,7 +121,6 @@ export default function AdminSettlement() {
 
   // Fetch pending settlements
   const { data: pendingData, isLoading: pendingLoading } = useQuery({
-    queryKey: ["/api/admin/settlement/pending", filterType],
     queryKey: filterType === "all" 
       ? ["/api/admin/settlement/pending"]
       : ["/api/admin/settlement/pending", { walletType: filterType }],
@@ -152,7 +151,9 @@ export default function AdminSettlement() {
       setSettleDialogOpen(false);
       setSelectedWallet(null);
       setSettlementAmount("");
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement"] });
+      // Invalidate all settlement-related queries to refresh dashboard immediately
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/pending"] });
     },
     onError: (error: any) => {
       toast({
@@ -243,7 +244,7 @@ export default function AdminSettlement() {
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="text-total-pending">
-                  ${overview?.overall.totalPendingSettlement.toFixed(2) || "0.00"}
+                  ${overview?.overall?.totalPendingSettlement?.toFixed(2) || "0.00"}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
@@ -264,7 +265,7 @@ export default function AdminSettlement() {
                 <Skeleton className="h-8 w-16" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="text-wallets-pending">
-                  {overview?.overall.totalWalletsNeedingSettlement || 0}
+                  {overview?.overall?.totalWalletsNeedingSettlement || 0}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
@@ -285,11 +286,11 @@ export default function AdminSettlement() {
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="text-driver-pending">
-                  ${overview?.driver.totalPendingSettlement.toFixed(2) || "0.00"}
+                  ${overview?.driver?.totalPendingSettlement?.toFixed(2) || "0.00"}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                {overview?.driver.walletsNeedingSettlement || 0} wallets
+                {overview?.driver?.walletsNeedingSettlement || 0} wallets
               </p>
             </CardContent>
           </Card>
@@ -306,11 +307,11 @@ export default function AdminSettlement() {
                 <Skeleton className="h-8 w-24" />
               ) : (
                 <div className="text-2xl font-bold" data-testid="text-restaurant-pending">
-                  ${overview?.restaurant.totalPendingSettlement.toFixed(2) || "0.00"}
+                  ${overview?.restaurant?.totalPendingSettlement?.toFixed(2) || "0.00"}
                 </div>
               )}
               <p className="text-xs text-muted-foreground mt-1">
-                {overview?.restaurant.walletsNeedingSettlement || 0} wallets
+                {overview?.restaurant?.walletsNeedingSettlement || 0} wallets
               </p>
             </CardContent>
           </Card>
