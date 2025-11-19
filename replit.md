@@ -31,6 +31,21 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
+### Step 31 Fix: Driver Management Regression (November 19, 2025)
+- **Problem**: Driver Management page at `/admin/drivers` showed "No drivers found" despite 23 drivers in database
+- **Root Cause**: Incorrect Prisma relation field name `stats` used instead of `driverStats` in 4 endpoints
+  - GET /api/admin/drivers (list endpoint)
+  - GET /api/admin/drivers/:id (detail endpoint)
+  - PATCH /api/admin/drivers/:id/profile (Bangladesh profile update)
+  - PATCH /api/admin/drivers/:id/usa-profile (USA profile update)
+- **Fix**: Changed all `stats: true` includes to `driverStats: true` and updated all `driver.stats` accessors to `driver.driverStats`
+- **Impact**: NON-BREAKING - Only field reference name changed, no schema changes, no logic changes
+- **Verification**: 
+  - Server logs clean (no more "Unknown field `stats`" Prisma validation errors)
+  - No LSP/TypeScript errors
+  - Admin dashboard stats endpoint working (shows 23 total drivers correctly)
+- **Commission & Wallet**: No changes to commission calculation or wallet settlement logic (as required)
+
 ### Step 31: Enhanced Wallet Settlement System (November 2025)
 - **Backend Enhancements**:
   - Added `/api/admin/settlement/overview` endpoint for platform-wide settlement statistics
