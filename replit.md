@@ -192,30 +192,73 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
   5. TLC license image (`tlcLicenseImageUrl`)
 
 **Backend Implementation:**
-- **KYC Validation Helper:** `validateDriverKYC(driver, countryCode)` function in `server/routes/admin.ts`
+- **File Upload Middleware:** `server/middleware/upload.ts`
+  - Multer configuration with file size limits (2MB for images, 10MB for PDFs)
+  - File type validation (JPEG, PNG, WebP, PDF)
+  - Secure storage in /uploads directory with static serving
+  
+- **Upload Endpoints:** `server/routes/driver.ts`
+  - POST /api/driver/upload/profile-photo - Profile photo upload
+  - POST /api/driver/upload/dmv-license - DMV license image upload
+  - POST /api/driver/upload/tlc-license - TLC license image upload (NY drivers)
+  - PUT /api/driver/usa-name - Update structured name fields
+  - POST /api/driver/upload/vehicle-document - Vehicle document upload with type
+  - GET /api/driver/vehicle-documents - List uploaded vehicle documents
+  - DELETE /api/driver/vehicle-documents/:id - Delete vehicle document
+  
+- **KYC Validation Helper:** `validateDriverKYC(driver, countryCode)` in `server/routes/admin.ts`
   - Returns `{ isComplete: boolean, missingFields: string[] }`
   - Country-specific validation rules
   - State-specific logic for NY drivers
   
 - **Updated KYC Approval Endpoint:** `PATCH /api/admin/kyc/:userId`
-  - Now validates driver KYC completeness before approval
+  - Validates driver KYC completeness before approval
   - Returns error with missing fields list if incomplete
   - Prevents approval until all required documents uploaded
   
-- **File Upload Security:**
-  - Secure file storage paths
-  - Admin-only access to sensitive documents
-  - Document type validation
+- **Updated Driver Home Endpoint:** `GET /api/driver/home`
+  - Returns all new KYC fields: profilePhotoUrl, firstName, middleName, lastName
+  - Returns license images: dmvLicenseImageUrl, tlcLicenseImageUrl
+  - Includes usaState for TLC requirement determination
 
-**Pending Frontend Implementation:**
-- File upload endpoints for profile photos and vehicle documents
-- Updated driver KYC forms (BD and US) with document upload fields
-- Vehicle information section in driver profile
-- Admin driver details page KYC Documents section
-- E2E testing for all KYC flows
+**Frontend Implementation:**
+- **Enhanced apiRequest:** `client/src/lib/queryClient.ts`
+  - Extended to support FormData for file uploads
+  - Auto-detects FormData and skips Content-Type header (browser sets boundary)
+  - Robust empty response handling with try-catch for 204 and empty bodies
+  
+- **Reusable FileUpload Component:** `client/src/components/file-upload.tsx`
+  - Supports image preview and non-image file displays
+  - Replace and delete functionality
+  - File size/type validation with user feedback
+  - All interactive elements have data-testid attributes
+  
+- **Driver KYC Documents Page:** `client/src/pages/driver/kyc-documents.tsx`
+  - Profile photo upload section (all drivers)
+  - USA structured name form (firstName, middleName, lastName) with validation
+  - DMV license upload section (all US drivers)
+  - TLC license upload section (NY drivers only, conditional rendering)
+  - Vehicle document uploads (registration & insurance)
+  - Uploaded documents list with view links
+  - Real-time KYC completeness status indicator
+  - Form initialization with guarded useEffect (prevents re-initialization)
+  - All mutations use centralized apiRequest with robust error handling
+  
+- **Navigation & Routing:** `client/src/App.tsx`, `client/src/pages/driver/profile.tsx`
+  - Added /driver/kyc-documents route
+  - Navigation link from driver profile page
+  - Protected route with driver role requirement
+
+**Security:**
+- AES-256-GCM encryption for sensitive data (NID, SSN)
+- File upload validation: size limits, type restrictions
+- Admin-only access to sensitive documents
+- Secure file storage paths
+- No plain-text sensitive data in any response
 
 **Backward Compatibility:**
 - All new fields nullable in schema
 - Existing drivers marked incomplete until documents uploaded
 - No breaking changes to existing KYC flows
-- Legacy `usaFullLegalName` maintained alongside new name structure
+- Legacy `usaFullLegalName` maintained alongside structured names
+- Zero impact on existing ride-hailing, food delivery, or parcel features
