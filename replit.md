@@ -12,7 +12,40 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Updates (November 2025)
 
-### Restaurant Management System (Latest)
+### Customer Management System (Latest)
+**Complete admin-side customer management capabilities:**
+- **Customer List** (`/admin/customers`): Comprehensive table showing all customers with email, country, KYC status, account status, and usage statistics (rides, food orders, parcels)
+- **Search & Filters**: Search by email, filter by status (All/Active/Suspended/Blocked)
+- **Customer Details** (`/admin/customers/:id`): Detailed view with profile info, KYC status, usage statistics, recent activity (rides, food orders, deliveries), and complaints
+- **Admin Actions**:
+  - **Suspend/Unsuspend**: Temporary suspension preventing order placement (requires reason)
+  - **Block/Unblock**: Permanent account disablement (affects user.isBlocked)
+- **Usage Statistics**: Real-time tracking of customer activity:
+  - Total and completed rides
+  - Total and completed food orders
+  - Total and completed parcel deliveries
+  - Open complaints count
+- **Dashboard Integration**: 
+  - Customers card is clickable → `/admin/customers`
+  - Customer Management section in main management area
+  - Total customers count displayed in Platform Overview
+- **Auto-refresh**: 5-second polling on all customer management pages
+- **Security**: All routes protected with admin-only middleware
+
+**Database Schema Changes:**
+- `CustomerProfile` table: Added `isSuspended`, `suspensionReason`, `suspendedAt` fields
+- All changes backward-compatible with existing data
+
+**API Endpoints:**
+- `GET /api/admin/customers` - List with filters and usage stats
+- `GET /api/admin/customers/:id` - Details with full activity history
+- `PATCH /api/admin/customers/:id/suspend` - Suspend with reason
+- `PATCH /api/admin/customers/:id/unsuspend` - Remove suspension
+- `PATCH /api/admin/customers/:id/block` - Block account
+- `PATCH /api/admin/customers/:id/unblock` - Unblock account
+- `GET /api/admin/stats` - Now includes `totalCustomers` count
+
+### Restaurant Management System
 **Complete admin-side restaurant management capabilities:**
 - **Restaurant List** (`/admin/restaurants`): Simple table showing all restaurants with email, name, country, KYC status, account status, wallet balance, and total orders
 - **Search & Filters**: Search by email, filter by status (All/Active/Suspended/Blocked)

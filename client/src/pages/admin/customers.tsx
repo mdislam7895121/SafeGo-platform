@@ -50,7 +50,7 @@ export default function AdminCustomers() {
 
   // Fetch customers
   const { data: customers, isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/admin/customers", { search: searchEmail, status: statusFilter === "all" ? undefined : statusFilter }],
+    queryKey: ["/api/admin/customers", "list", { search: searchEmail, status: statusFilter === "all" ? undefined : statusFilter }],
     refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 

@@ -16,6 +16,7 @@ interface AdminStats {
   pendingRestaurants: number;
   suspendedDrivers: number;
   blockedDrivers: number;
+  totalCustomers: number;
   restaurants: number;
   openComplaints: number;
 }
@@ -45,6 +46,14 @@ export default function AdminHome() {
       description: "View, suspend, and manage all drivers",
       color: "text-purple-600",
       bgColor: "bg-purple-50 dark:bg-purple-950",
+    },
+    {
+      name: "Customer Management",
+      icon: Users,
+      href: "/admin/customers",
+      description: "View, block, and manage all customers",
+      color: "text-cyan-600",
+      bgColor: "bg-cyan-50 dark:bg-cyan-950",
     },
     {
       name: "Complaints",
@@ -152,6 +161,24 @@ export default function AdminHome() {
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">Active Drivers</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/admin/customers">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-customers">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <Users className="h-8 w-8 text-cyan-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-customers">
+                        {stats?.totalCustomers ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Customers</p>
                   </div>
                 </CardContent>
               </Card>
