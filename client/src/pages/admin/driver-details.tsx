@@ -140,6 +140,61 @@ interface Trip {
   completedAt: string | null;
 }
 
+interface WalletSummary {
+  driverId: string;
+  driverCountry: string;
+  totalTrips: number;
+  totalEarnings: string;
+  totalCommission: string;
+  currentBalance: string;
+  balanceStatus: 'positive' | 'negative' | 'zero';
+  byService: {
+    rides: {
+      count: number;
+      earnings: string;
+      commission: string;
+    };
+    food: {
+      count: number;
+      earnings: string;
+      commission: string;
+    };
+    parcels: {
+      count: number;
+      earnings: string;
+      commission: string;
+    };
+  };
+  byCountry: Record<string, {
+    trips: number;
+    earnings: number;
+    commission: number;
+  }>;
+  recentTransactions: Array<{
+    id: string;
+    service: 'ride' | 'food' | 'parcel';
+    type: 'trip_earning';
+    amount: string;
+    commission: string;
+    netAmount: string;
+    dateTime: string;
+  }>;
+}
+
+// Helper function for currency formatting based on country
+function formatCurrency(amount: string | number, countryCode: string): string {
+  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  if (isNaN(numAmount)) return '—';
+  
+  if (countryCode === 'BD') {
+    return `৳${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } else if (countryCode === 'US') {
+    return `$${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  } else {
+    return `${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+}
+
 // Helper functions for USA name handling (backward compatibility)
 function splitFullName(fullName: string): { firstName: string; middleName: string; lastName: string } {
   if (!fullName) return { firstName: "", middleName: "", lastName: "" };
@@ -246,6 +301,12 @@ export default function AdminDriverDetails() {
   // Fetch trip history
   const { data: trips } = useQuery<Trip[]>({
     queryKey: [`/api/admin/drivers/${driverId}/trips`],
+    enabled: !!driverId,
+  });
+
+  // Fetch wallet summary
+  const { data: walletSummary, isLoading: isLoadingWallet } = useQuery<WalletSummary>({
+    queryKey: [`/api/admin/drivers/${driverId}/wallet-summary`],
     enabled: !!driverId,
   });
 
@@ -1589,6 +1650,206 @@ export default function AdminDriverDetails() {
                       Edit Vehicle
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Commission & Wallet Summary */}
+            {walletSummary && !isLoadingWallet && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-5 w-5" />
+                    Commission & Wallet Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* At-a-glance Stats */}
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Total Trips</p>
+                      <p className="text-2xl font-bold" data-testid="text-total-trips">{walletSummary.totalTrips}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Total Earnings</p>
+                      <p className="text-2xl font-bold text-green-600" data-testid="text-total-earnings">
+                        {formatCurrency(walletSummary.totalEarnings, walletSummary.driverCountry)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Total Commission</p>
+                      <p className="text-2xl font-bold text-blue-600" data-testid="text-total-commission">
+                        {formatCurrency(walletSummary.totalCommission, walletSummary.driverCountry)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Current Balance</p>
+                      <p 
+                        className={`text-2xl font-bold ${
+                          walletSummary.balanceStatus === 'positive' ? 'text-green-600' :
+                          walletSummary.balanceStatus === 'negative' ? 'text-red-600' :
+                          'text-gray-600'
+                        }`}
+                        data-testid="text-current-balance"
+                      >
+                        {formatCurrency(walletSummary.currentBalance, walletSummary.driverCountry)}
+                      </p>
+                      {walletSummary.balanceStatus === 'negative' && (
+                        <p className="text-xs text-destructive mt-1">Driver owes SafeGo</p>
+                      )}
+                      {walletSummary.balanceStatus === 'positive' && (
+                        <p className="text-xs text-green-600 mt-1">SafeGo owes driver</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Service Breakdown */}
+                  <div className="border-t pt-4">
+                    <h3 className="text-sm font-semibold mb-3">Service Breakdown</h3>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      {/* Rides */}
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                          <Car className="h-3 w-3" />
+                          Rides
+                        </p>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Trips:</span>
+                            <span className="font-medium" data-testid="text-rides-count">{walletSummary.byService.rides.count}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Earnings:</span>
+                            <span className="font-medium text-green-600" data-testid="text-rides-earnings">
+                              {formatCurrency(walletSummary.byService.rides.earnings, walletSummary.driverCountry)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Commission:</span>
+                            <span className="font-medium text-blue-600" data-testid="text-rides-commission">
+                              {formatCurrency(walletSummary.byService.rides.commission, walletSummary.driverCountry)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Food Orders */}
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Food Orders</p>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Orders:</span>
+                            <span className="font-medium" data-testid="text-food-count">{walletSummary.byService.food.count}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Earnings:</span>
+                            <span className="font-medium text-green-600" data-testid="text-food-earnings">
+                              {formatCurrency(walletSummary.byService.food.earnings, walletSummary.driverCountry)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Commission:</span>
+                            <span className="font-medium text-blue-600" data-testid="text-food-commission">
+                              {formatCurrency(walletSummary.byService.food.commission, walletSummary.driverCountry)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Parcel Deliveries */}
+                      <div className="p-3 border rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-2">Parcel Deliveries</p>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Deliveries:</span>
+                            <span className="font-medium" data-testid="text-parcels-count">{walletSummary.byService.parcels.count}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Earnings:</span>
+                            <span className="font-medium text-green-600" data-testid="text-parcels-earnings">
+                              {formatCurrency(walletSummary.byService.parcels.earnings, walletSummary.driverCountry)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Commission:</span>
+                            <span className="font-medium text-blue-600" data-testid="text-parcels-commission">
+                              {formatCurrency(walletSummary.byService.parcels.commission, walletSummary.driverCountry)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Country Breakdown */}
+                  {Object.keys(walletSummary.byCountry).length > 0 && (
+                    <div className="border-t pt-4">
+                      <h3 className="text-sm font-semibold mb-3">Country Breakdown</h3>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {Object.entries(walletSummary.byCountry).map(([country, stats]) => (
+                          <div key={country} className="p-3 border rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-2 font-medium">
+                              {country === 'BD' ? '🇧🇩 Bangladesh' : country === 'US' ? '🇺🇸 USA' : country}
+                            </p>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-sm">
+                                <span>Trips:</span>
+                                <span className="font-medium">{stats.trips}</span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span>Earnings:</span>
+                                <span className="font-medium text-green-600">
+                                  {formatCurrency(stats.earnings, country)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-sm">
+                                <span>Commission:</span>
+                                <span className="font-medium text-blue-600">
+                                  {formatCurrency(stats.commission, country)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent Transactions */}
+                  {walletSummary.recentTransactions.length > 0 && (
+                    <div className="border-t pt-4">
+                      <h3 className="text-sm font-semibold mb-3">Recent Transactions</h3>
+                      <div className="space-y-2">
+                        {walletSummary.recentTransactions.map((txn) => (
+                          <div 
+                            key={txn.id} 
+                            className="flex items-center justify-between p-3 border rounded-lg hover-elevate"
+                            data-testid={`transaction-${txn.id}`}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  {txn.service === 'ride' ? 'Ride' : txn.service === 'food' ? 'Food' : 'Parcel'}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(txn.dateTime), "PPp")}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-1">Trip Earning</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-medium text-green-600">
+                                +{formatCurrency(txn.amount, walletSummary.driverCountry)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Commission: {formatCurrency(txn.commission, walletSummary.driverCountry)}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

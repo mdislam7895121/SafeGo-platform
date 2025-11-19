@@ -3690,6 +3690,381 @@ router.get("/drivers/:id/commission", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/admin/drivers/:id/wallet-summary
+// Get comprehensive commission & wallet summary for a specific driver
+// Includes earnings, commission, balance, country/service breakdown, and recent transactions
+// ====================================================
+router.get("/drivers/:id/wallet-summary", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify driver exists and get wallet info
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        userId: true,
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+        driverWallet: {
+          select: {
+            balance: true,
+            negativeBalance: true,
+          },
+        },
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Calculate current balance (balance - negativeBalance)
+    const walletBalance = Number(driver.driverWallet?.balance || 0);
+    const negativeBalance = Number(driver.driverWallet?.negativeBalance || 0);
+    const currentBalance = walletBalance - negativeBalance;
+
+    // === RIDES AGGREGATION ===
+    const rideStats = await prisma.ride.aggregate({
+      where: {
+        driverId: id,
+        status: "completed",
+      },
+      _sum: {
+        driverPayout: true,
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // === DELIVERIES AGGREGATION ===
+    const deliveryStats = await prisma.delivery.aggregate({
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      _sum: {
+        driverPayout: true,
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // === FOOD ORDERS AGGREGATION ===
+    const foodStats = await prisma.foodOrder.aggregate({
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      _sum: {
+        driverPayout: true,
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Calculate totals
+    const totalTrips = rideStats._count.id + deliveryStats._count.id + foodStats._count.id;
+    const totalEarnings = 
+      Number(rideStats._sum.driverPayout || 0) +
+      Number(deliveryStats._sum.driverPayout || 0) +
+      Number(foodStats._sum.driverPayout || 0);
+    const totalCommission = 
+      Number(rideStats._sum.safegoCommission || 0) +
+      Number(deliveryStats._sum.safegoCommission || 0) +
+      Number(foodStats._sum.safegoCommission || 0);
+
+    // === COUNTRY BREAKDOWN ===
+    // Get rides by customer country
+    const ridesByCountry = await prisma.ride.groupBy({
+      by: ['customerId'],
+      where: {
+        driverId: id,
+        status: "completed",
+      },
+      _sum: {
+        driverPayout: true,
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Fetch customer country codes
+    const customerIds = ridesByCountry.map(r => r.customerId);
+    const customers = await prisma.customerProfile.findMany({
+      where: {
+        id: {
+          in: customerIds,
+        },
+      },
+      select: {
+        id: true,
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    const customerCountryMap = new Map(
+      customers.map(c => [c.id, c.user?.countryCode || 'UNKNOWN'])
+    );
+
+    // Similarly for deliveries
+    const deliveriesByCountry = await prisma.delivery.groupBy({
+      by: ['customerId'],
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      _sum: {
+        driverPayout: true,
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const deliveryCustomerIds = deliveriesByCountry.map(d => d.customerId);
+    const deliveryCustomers = await prisma.customerProfile.findMany({
+      where: {
+        id: {
+          in: deliveryCustomerIds,
+        },
+      },
+      select: {
+        id: true,
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    const deliveryCountryMap = new Map(
+      deliveryCustomers.map(c => [c.id, c.user?.countryCode || 'UNKNOWN'])
+    );
+
+    // Similarly for food orders
+    const foodByCountry = await prisma.foodOrder.groupBy({
+      by: ['customerId'],
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      _sum: {
+        driverPayout: true,
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const foodCustomerIds = foodByCountry.map(f => f.customerId);
+    const foodCustomers = await prisma.customerProfile.findMany({
+      where: {
+        id: {
+          in: foodCustomerIds,
+        },
+      },
+      select: {
+        id: true,
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    const foodCountryMap = new Map(
+      foodCustomers.map(c => [c.id, c.user?.countryCode || 'UNKNOWN'])
+    );
+
+    // Aggregate by country
+    const countryBreakdown: Record<string, { trips: number; earnings: number; commission: number }> = {};
+
+    ridesByCountry.forEach(r => {
+      const country = customerCountryMap.get(r.customerId) || 'UNKNOWN';
+      if (!countryBreakdown[country]) {
+        countryBreakdown[country] = { trips: 0, earnings: 0, commission: 0 };
+      }
+      countryBreakdown[country].trips += r._count.id;
+      countryBreakdown[country].earnings += Number(r._sum.driverPayout || 0);
+      countryBreakdown[country].commission += Number(r._sum.safegoCommission || 0);
+    });
+
+    deliveriesByCountry.forEach(d => {
+      const country = deliveryCountryMap.get(d.customerId) || 'UNKNOWN';
+      if (!countryBreakdown[country]) {
+        countryBreakdown[country] = { trips: 0, earnings: 0, commission: 0 };
+      }
+      countryBreakdown[country].trips += d._count.id;
+      countryBreakdown[country].earnings += Number(d._sum.driverPayout || 0);
+      countryBreakdown[country].commission += Number(d._sum.safegoCommission || 0);
+    });
+
+    foodByCountry.forEach(f => {
+      const country = foodCountryMap.get(f.customerId) || 'UNKNOWN';
+      if (!countryBreakdown[country]) {
+        countryBreakdown[country] = { trips: 0, earnings: 0, commission: 0 };
+      }
+      countryBreakdown[country].trips += f._count.id;
+      countryBreakdown[country].earnings += Number(f._sum.driverPayout || 0);
+      countryBreakdown[country].commission += Number(f._sum.safegoCommission || 0);
+    });
+
+    // === RECENT TRANSACTIONS ===
+    // Fetch last 10 completed trips/orders as "transactions"
+    const recentRides = await prisma.ride.findMany({
+      where: {
+        driverId: id,
+        status: "completed",
+      },
+      select: {
+        id: true,
+        driverPayout: true,
+        safegoCommission: true,
+        completedAt: true,
+        createdAt: true,
+      },
+      orderBy: {
+        completedAt: 'desc',
+      },
+      take: 10,
+    });
+
+    const recentDeliveries = await prisma.delivery.findMany({
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      select: {
+        id: true,
+        driverPayout: true,
+        safegoCommission: true,
+        deliveredAt: true,
+        createdAt: true,
+      },
+      orderBy: {
+        deliveredAt: 'desc',
+      },
+      take: 10,
+    });
+
+    const recentFood = await prisma.foodOrder.findMany({
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      select: {
+        id: true,
+        driverPayout: true,
+        safegoCommission: true,
+        deliveredAt: true,
+        createdAt: true,
+      },
+      orderBy: {
+        deliveredAt: 'desc',
+      },
+      take: 10,
+    });
+
+    // Combine and sort all transactions
+    const allTransactions = [
+      ...recentRides.map(r => ({
+        id: r.id,
+        service: 'ride' as const,
+        type: 'trip_earning' as const,
+        amount: Number(r.driverPayout),
+        commission: Number(r.safegoCommission),
+        dateTime: r.completedAt || r.createdAt,
+      })),
+      ...recentDeliveries.map(d => ({
+        id: d.id,
+        service: 'parcel' as const,
+        type: 'trip_earning' as const,
+        amount: Number(d.driverPayout),
+        commission: Number(d.safegoCommission),
+        dateTime: d.deliveredAt || d.createdAt,
+      })),
+      ...recentFood.map(f => ({
+        id: f.id,
+        service: 'food' as const,
+        type: 'trip_earning' as const,
+        amount: Number(f.driverPayout),
+        commission: Number(f.safegoCommission),
+        dateTime: f.deliveredAt || f.createdAt,
+      })),
+    ].sort((a, b) => b.dateTime.getTime() - a.dateTime.getTime()).slice(0, 10);
+
+    // === RESPONSE ===
+    res.json({
+      driverId: id,
+      driverCountry: driver.user?.countryCode || 'UNKNOWN',
+      
+      // At-a-glance stats
+      totalTrips,
+      totalEarnings: totalEarnings.toFixed(2),
+      totalCommission: totalCommission.toFixed(2),
+      currentBalance: currentBalance.toFixed(2),
+      balanceStatus: currentBalance > 0 ? 'positive' : currentBalance < 0 ? 'negative' : 'zero',
+
+      // Service breakdown
+      byService: {
+        rides: {
+          count: rideStats._count.id,
+          earnings: Number(rideStats._sum.driverPayout || 0).toFixed(2),
+          commission: Number(rideStats._sum.safegoCommission || 0).toFixed(2),
+        },
+        food: {
+          count: foodStats._count.id,
+          earnings: Number(foodStats._sum.driverPayout || 0).toFixed(2),
+          commission: Number(foodStats._sum.safegoCommission || 0).toFixed(2),
+        },
+        parcels: {
+          count: deliveryStats._count.id,
+          earnings: Number(deliveryStats._sum.driverPayout || 0).toFixed(2),
+          commission: Number(deliveryStats._sum.safegoCommission || 0).toFixed(2),
+        },
+      },
+
+      // Country breakdown
+      byCountry: countryBreakdown,
+
+      // Recent transactions
+      recentTransactions: allTransactions.map(t => ({
+        id: t.id,
+        service: t.service,
+        type: t.type,
+        amount: t.amount.toFixed(2),
+        commission: t.commission.toFixed(2),
+        netAmount: (t.amount - t.commission).toFixed(2),
+        dateTime: t.dateTime,
+      })),
+    });
+  } catch (error) {
+    console.error("Get driver wallet summary error:", error);
+    res.status(500).json({ error: "Failed to fetch driver wallet summary" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/commission/summary
 // Get platform-wide commission summary with filters
 // ====================================================
