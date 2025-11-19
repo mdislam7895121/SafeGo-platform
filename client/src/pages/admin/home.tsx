@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +51,14 @@ export default function AdminHome() {
       description: "Review and approve user verification requests",
       color: "text-blue-600",
       bgColor: "bg-blue-50 dark:bg-blue-950",
+    },
+    {
+      name: "Document Center",
+      icon: FileText,
+      href: "/admin/documents",
+      description: "Review all driver, customer, and restaurant documents",
+      color: "text-orange-600",
+      bgColor: "bg-orange-50 dark:bg-orange-950",
     },
     {
       name: "Driver Management",
