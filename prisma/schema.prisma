@@ -57,18 +57,31 @@ model DriverProfile {
   nidBackImageUrl        String?
   
   // US-specific fields
-  homeAddress            String?
-  governmentIdType       String?   // "passport" | "state_id"
-  governmentIdLast4      String?
+  usaFullLegalName       String?   // Full legal name for US drivers
+  ssnEncrypted           String?   // Encrypted full SSN for secure storage
+  ssnLast4               String?   // Last 4 digits for display (deprecated, use masked SSN)
   driverLicenseNumber    String?
-  driverLicenseImageUrl  String?
+  licenseStateIssued     String?   // e.g., "NY", "CA", "TX"
   driverLicenseExpiry    DateTime?
-  ssnLast4               String?
+  driverLicenseImageUrl  String?
+  // US Residential Address (structured)
+  usaStreet              String?
+  usaCity                String?
+  usaState               String?
+  usaZipCode             String?
+  // Legacy US fields (kept for backward compatibility)
+  homeAddress            String?   // Deprecated: use structured address fields
+  governmentIdType       String?   // Deprecated: "passport" | "state_id"
+  governmentIdLast4      String?   // Deprecated
+  // Background Check
+  backgroundCheckStatus  String?   @default("pending") // "pending" | "cleared" | "failed"
+  backgroundCheckDate    DateTime?
   
   // Common fields
   dateOfBirth            DateTime?
   emergencyContactName   String?
   emergencyContactPhone  String?
+  usaPhoneNumber         String?   // Phone number for US drivers
   verificationStatus     String    @default("pending") // "pending" | "approved" | "rejected"
   rejectionReason        String?
   isVerified             Boolean   @default(false)
