@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
+import { z } from "zod";
+import { encrypt, isValidBdNid, isValidBdPhone } from "../utils/encryption";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -996,6 +998,114 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Get driver details error:", error);
     res.status(500).json({ error: "Failed to fetch driver details" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/drivers/:id/profile
+// Update driver Bangladesh profile fields (admin only)
+// ====================================================
+const updateDriverProfileSchema = z.object({
+  fullName: z.string().min(1).optional(),
+  fatherName: z.string().min(1).optional(),
+  phoneNumber: z.string().refine((val) => !val || isValidBdPhone(val), {
+    message: "Invalid Bangladesh phone number format (must be 01XXXXXXXXX)",
+  }).optional(),
+  village: z.string().min(1).optional(),
+  postOffice: z.string().min(1).optional(),
+  thana: z.string().min(1).optional(),
+  district: z.string().min(1).optional(),
+  presentAddress: z.string().min(1).optional(),
+  permanentAddress: z.string().min(1).optional(),
+  nid: z.string().refine((val) => !val || isValidBdNid(val), {
+    message: "Invalid Bangladesh NID format (must be 10-17 digits)",
+  }).optional(),
+});
+
+router.patch("/drivers/:id/profile", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate request body
+    const validation = updateDriverProfileSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+
+    // Check if driver exists
+    const driver = await prisma.driverProfile.findUnique({ where: { id } });
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    
+    if (data.fullName !== undefined) updateData.fullName = data.fullName;
+    if (data.fatherName !== undefined) updateData.fatherName = data.fatherName;
+    if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
+    if (data.village !== undefined) updateData.village = data.village;
+    if (data.postOffice !== undefined) updateData.postOffice = data.postOffice;
+    if (data.thana !== undefined) updateData.thana = data.thana;
+    if (data.district !== undefined) updateData.district = data.district;
+    if (data.presentAddress !== undefined) updateData.presentAddress = data.presentAddress;
+    if (data.permanentAddress !== undefined) updateData.permanentAddress = data.permanentAddress;
+    
+    // Encrypt NID if provided
+    if (data.nid !== undefined && data.nid) {
+      updateData.nidEncrypted = encrypt(data.nid);
+      // Also update legacy nidNumber field for backward compatibility
+      updateData.nidNumber = data.nid;
+    }
+
+    // Update driver profile
+    const updatedDriver = await prisma.driverProfile.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+        vehicle: true,
+        stats: true,
+        driverWallet: true,
+      },
+    });
+
+    // Return updated profile (exclude nidEncrypted)
+    const { nidEncrypted, ...driverProfile } = updatedDriver as any;
+    
+    res.json({
+      message: "Driver profile updated successfully",
+      driver: {
+        ...driverProfile,
+        // Format vehicle totalEarnings as number
+        vehicle: driverProfile.vehicle ? {
+          ...driverProfile.vehicle,
+          totalEarnings: Number(driverProfile.vehicle.totalEarnings),
+        } : null,
+        // Add computed fields
+        totalTrips: driverProfile.stats?.totalTrips || 0,
+        totalEarnings: driverProfile.vehicle?.totalEarnings ? Number(driverProfile.vehicle.totalEarnings) : 0,
+        averageRating: driverProfile.stats?.rating ? Number(driverProfile.stats.rating) : 0,
+        walletBalance: driverProfile.driverWallet?.balance ? Number(driverProfile.driverWallet.balance) : 0,
+        negativeBalance: driverProfile.driverWallet?.negativeBalance ? Number(driverProfile.driverWallet.negativeBalance) : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Update driver profile error:", error);
+    res.status(500).json({ error: "Failed to update driver profile" });
   }
 });
 
@@ -2129,6 +2239,98 @@ router.get("/customers/:id", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Fetch customer details error:", error);
     res.status(500).json({ error: "Failed to fetch customer details" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/customers/:id/profile
+// Update customer Bangladesh profile fields (admin only)
+// ====================================================
+const updateCustomerProfileSchema = z.object({
+  fullName: z.string().min(1).optional(),
+  fatherName: z.string().min(1).optional(),
+  phoneNumber: z.string().refine((val) => !val || isValidBdPhone(val), {
+    message: "Invalid Bangladesh phone number format (must be 01XXXXXXXXX)",
+  }).optional(),
+  village: z.string().min(1).optional(),
+  postOffice: z.string().min(1).optional(),
+  thana: z.string().min(1).optional(),
+  district: z.string().min(1).optional(),
+  presentAddress: z.string().min(1).optional(),
+  permanentAddress: z.string().min(1).optional(),
+  nid: z.string().refine((val) => !val || isValidBdNid(val), {
+    message: "Invalid Bangladesh NID format (must be 10-17 digits)",
+  }).optional(),
+});
+
+router.patch("/customers/:id/profile", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate request body
+    const validation = updateCustomerProfileSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+
+    // Check if customer exists
+    const customer = await prisma.customerProfile.findUnique({ where: { id } });
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    
+    if (data.fullName !== undefined) updateData.fullName = data.fullName;
+    if (data.fatherName !== undefined) updateData.fatherName = data.fatherName;
+    if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
+    if (data.village !== undefined) updateData.village = data.village;
+    if (data.postOffice !== undefined) updateData.postOffice = data.postOffice;
+    if (data.thana !== undefined) updateData.thana = data.thana;
+    if (data.district !== undefined) updateData.district = data.district;
+    if (data.presentAddress !== undefined) updateData.presentAddress = data.presentAddress;
+    if (data.permanentAddress !== undefined) updateData.permanentAddress = data.permanentAddress;
+    
+    // Encrypt NID if provided
+    if (data.nid !== undefined && data.nid) {
+      updateData.nidEncrypted = encrypt(data.nid);
+      // Also update legacy nidNumber field for backward compatibility
+      updateData.nidNumber = data.nid;
+    }
+
+    // Update customer profile
+    const updatedCustomer = await prisma.customerProfile.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    // Return updated profile (exclude nidEncrypted)
+    const { nidEncrypted, ...customerProfile } = updatedCustomer as any;
+    
+    res.json({
+      message: "Customer profile updated successfully",
+      customer: customerProfile,
+    });
+  } catch (error) {
+    console.error("Update customer profile error:", error);
+    res.status(500).json({ error: "Failed to update customer profile" });
   }
 });
 
