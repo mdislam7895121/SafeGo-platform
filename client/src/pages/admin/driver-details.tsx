@@ -124,10 +124,12 @@ export default function AdminDriverDetails() {
   });
 
   // Fetch driver details
-  const { data: driver, isLoading } = useQuery<DriverDetails>({
+  const { data, isLoading } = useQuery<{ driver: DriverDetails }>({
     queryKey: [`/api/admin/drivers/${driverId}`],
     enabled: !!driverId,
   });
+  
+  const driver = data?.driver;
 
   // Fetch trip history
   const { data: trips } = useQuery<Trip[]>({
