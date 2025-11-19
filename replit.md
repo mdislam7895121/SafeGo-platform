@@ -30,6 +30,46 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
+### Step 37: Driver Commission & Wallet Summary Analytics (November 19, 2025)
+- **Objective**: Read-only analytics dashboard showing commission breakdown, wallet balance, and transaction history for drivers without modifying commission calculation or payout logic
+- **Backend API** (`server/routes/admin.ts`):
+  * **GET `/api/admin/drivers/:id/wallet-summary`** - New endpoint providing comprehensive driver financial analytics
+    - Aggregates total trips, earnings, commission across Rides, FoodOrders, Deliveries using efficient Prisma aggregations
+    - Computes current wallet balance (balance - negativeBalance) with status indicator (positive/negative/zero)
+    - **Country Breakdown** - Groups stats by customer country (BD vs US) via customer profile joins for accurate attribution
+    - **Service Breakdown** - Separate stats for rides, food orders, parcel deliveries with counts/earnings/commission
+    - **Recent Transactions** - Returns last 10 completed trips/orders merged and sorted by timestamp
+    - Admin-only access via role-based middleware
+- **Frontend UI** (`client/src/pages/admin/driver-details.tsx`):
+  * **Commission & Wallet Summary Card** - New analytics card on Driver Details page displaying:
+    - **At-a-glance Stats**: Total Trips, Total Earnings, Total Commission, Current Balance (4-column grid)
+    - **Service Breakdown**: Rides, Food Orders, Parcel Deliveries sections showing trips/earnings/commission per service
+    - **Country Breakdown**: BD vs US statistics with proper currency symbols (৳ for Bangladesh, $ for USA)
+    - **Recent Transactions**: List of last 10 transactions with service type, amounts, commission, timestamps
+  * **Currency Formatting** - New `formatCurrency()` helper function:
+    - ৳ symbol for Bangladesh (BDT) amounts
+    - $ symbol for USA (USD) amounts
+    - Locale-aware number formatting with 2 decimal places
+    - Graceful handling of invalid/null amounts (displays "—")
+  * **Balance Status Indicators**: 
+    - Green color for positive balance (SafeGo owes driver)
+    - Red color for negative balance (Driver owes SafeGo)
+    - Gray for zero balance
+- **Performance Optimization**:
+  * Uses Prisma `_count`, `_sum` aggregations instead of fetching all records
+  * Customer joins optimize country attribution without N+1 queries
+  * Transaction list limited to last 10 for efficient rendering
+- **Data Integrity & Edge Cases**:
+  * Handles drivers with no trips gracefully (shows zeros, no crashes)
+  * Decimal precision maintained for financial calculations
+  * Country breakdown only displays countries with actual transactions
+  * Recent transactions conditionally rendered (only if data exists)
+- **Security**: Admin-only endpoint, no sensitive data exposure, read-only operations
+- **Backward Compatibility**: NON-BREAKING - New endpoint and UI component, no schema changes
+- **Deferred Enhancements**: Optional Driver Management list page columns/filters (balance status) deferred for future iteration
+- **Architect Review**: PASS - Confirmed read-only compliance, efficient aggregations, correct country breakdown, proper currency formatting, graceful degradation, no security issues
+- **Impact**: PRODUCTION-READY - Read-only analytics feature providing comprehensive driver financial overview for admin decision-making
+
 ### Step 36: USA Driver DMV Inspection Module (November 19, 2025)
 - **Database Schema Updates** - Extended Vehicle model with DMV inspection tracking:
   * Added `dmvInspectionType` (String, nullable) - Type of inspection (Safety, Emissions, Safety + Emissions, Other)
