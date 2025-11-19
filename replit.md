@@ -34,6 +34,7 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 - Customer ride history display.
 - GPS coordinates for ride requests are optional, enabling address-based matching.
 - Bangladesh-specific identity fields for customers and drivers with secure NID encryption and admin-only decryption.
+- USA-specific driver identity management with SSN encryption, license verification, structured address, emergency contacts, and background check tracking.
 
 ### Backend Architecture
 **Technology Stack:**
@@ -55,7 +56,8 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 **Security Architecture:**
 - Environment variable-based JWT secret, bcrypt hashing for passwords.
-- AES-256-GCM encryption for sensitive data (NID numbers) with 32-byte ENCRYPTION_KEY.
+- AES-256-GCM encryption for sensitive data (NID and SSN) with 32-byte ENCRYPTION_KEY.
+- SSN encryption using ssnEncrypted field, never exposed in plain text, admin-only masked SSN access (###-##-1234).
 - Zod schema for input validation, role-based middleware, CSRF protection, and SQL injection prevention via Prisma.
 - Admin-only endpoints for decrypting sensitive data with authentication tag verification.
 
@@ -65,6 +67,7 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 - `isSuspended`, `suspensionReason`, `suspendedAt` fields for drivers, customers, and restaurants.
 - `DriverComplaint` model extended to handle restaurant complaints, linking relevant IDs.
 - Bangladesh-specific identity fields (fullName, fatherName, phoneNumber, village, postOffice, thana, district, addresses, nidEncrypted) for customers and drivers.
+- USA-specific driver identity fields (usaFullLegalName, dateOfBirth, ssnEncrypted, usaPhoneNumber, driverLicenseNumber, licenseStateIssued, driverLicenseExpiry, usaStreet, usaCity, usaState, usaZipCode, emergencyContactName, emergencyContactPhone, backgroundCheckStatus, backgroundCheckDate) - all nullable for backward compatibility.
 
 ### Project Structure:
 - `client/`: React frontend
@@ -102,4 +105,42 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 - `DATABASE_URL`: PostgreSQL connection string
 - `JWT_SECRET`: JWT signing secret
 - `NODE_ENV`: Environment mode (development/production)
-- `ENCRYPTION_KEY`: 32-byte encryption key for NID protection
+- `ENCRYPTION_KEY`: 32-byte encryption key for NID and SSN protection
+
+## Recent Updates
+
+### USA Driver Identity System (November 2025)
+**Objective:** Extended driver management with comprehensive USA-specific identity fields while maintaining full backward compatibility with existing Bangladesh driver system.
+
+**Implementation:**
+- **Schema Extension:** Added 14 USA-specific fields to DriverProfile model (all nullable)
+  - Personal: usaFullLegalName, dateOfBirth, usaPhoneNumber
+  - License: driverLicenseNumber, licenseStateIssued, driverLicenseExpiry
+  - Address: usaStreet, usaCity, usaState, usaZipCode (structured)
+  - Emergency: emergencyContactName, emergencyContactPhone
+  - Verification: backgroundCheckStatus, backgroundCheckDate
+  - Security: ssnEncrypted (AES-256-GCM, never plain text)
+
+- **API Endpoints:**
+  - `PATCH /api/admin/drivers/:id/usa-profile` - Update USA driver profile (admin only, Zod validation)
+  - `GET /api/admin/drivers/:id/ssn` - Fetch masked SSN (admin only, returns ###-##-1234 format)
+
+- **Frontend Components:**
+  - USA Identity Information Card (conditional rendering for US drivers)
+  - Edit USA Profile Dialog (14 fields, matching BD pattern)
+  - SSN masking and secure viewing
+  - State management with React Query mutations
+
+- **Security:**
+  - SSN encryption with maskSSN utility (shows only last 4 digits)
+  - SSN validation: 9-digit format enforced
+  - State code validation: 2-character uppercase
+  - Admin-only access with role-based middleware
+  - No plain-text SSN in any response
+
+- **Backward Compatibility:**
+  - All existing BD driver fields unchanged
+  - Customer and restaurant models unaffected
+  - Parcel delivery flows remain intact
+  - Ride-hailing matching logic unchanged
+  - Zero breaking changes to existing features
