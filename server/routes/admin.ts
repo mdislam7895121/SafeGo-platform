@@ -1305,7 +1305,54 @@ router.get("/drivers", async (req: AuthRequest, res) => {
       prisma.driverProfile.count({ where }),
     ]);
 
-    // Format response
+    // Get driver IDs for commission aggregation
+    const driverIds = drivers.map((d) => d.id);
+
+    // Aggregate commissions efficiently for all drivers in this page
+    const [rideCommissions, parcelCommissions, foodCommissions] = await Promise.all([
+      prisma.ride.groupBy({
+        by: ["driverId"],
+        where: {
+          driverId: { in: driverIds },
+          status: "completed",
+        },
+        _sum: {
+          safegoCommission: true,
+        },
+      }),
+      prisma.delivery.groupBy({
+        by: ["driverId"],
+        where: {
+          driverId: { in: driverIds },
+          status: "delivered",
+        },
+        _sum: {
+          safegoCommission: true,
+        },
+      }),
+      prisma.foodOrder.groupBy({
+        by: ["driverId"],
+        where: {
+          driverId: { in: driverIds },
+          status: "delivered",
+        },
+        _sum: {
+          safegoCommission: true,
+        },
+      }),
+    ]);
+
+    // Build commission lookup map
+    const commissionMap = new Map<string, number>();
+    driverIds.forEach((id) => {
+      const ride = rideCommissions.find((r) => r.driverId === id)?._sum.safegoCommission || 0;
+      const parcel = parcelCommissions.find((p) => p.driverId === id)?._sum.safegoCommission || 0;
+      const food = foodCommissions.find((f) => f.driverId === id)?._sum.safegoCommission || 0;
+      const total = Number(ride) + Number(parcel) + Number(food);
+      commissionMap.set(id, total);
+    });
+
+    // Format response with commission data
     const formattedDrivers = drivers.map((driver) => ({
       id: driver.id,
       userId: driver.user.id,
@@ -1322,6 +1369,7 @@ router.get("/drivers", async (req: AuthRequest, res) => {
       averageRating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 0,
       walletBalance: driver.driverWallet?.balance ? Number(driver.driverWallet.balance) : 0,
       negativeBalance: driver.driverWallet?.negativeBalance ? Number(driver.driverWallet.negativeBalance) : 0,
+      commissionPaid: Number(commissionMap.get(driver.id) || 0).toFixed(2),
       vehicleType: driver.vehicle?.vehicleType,
       vehicleModel: driver.vehicle?.vehicleModel,
       vehiclePlate: driver.vehicle?.vehiclePlate,
@@ -3303,6 +3351,217 @@ router.get("/drivers/:id/nid", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Fetch driver NID error:", error);
     res.status(500).json({ error: "Failed to fetch driver NID" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/drivers/:id/commission
+// Get commission breakdown for a specific driver (all-time and by service)
+// ====================================================
+router.get("/drivers/:id/commission", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    // Verify driver exists
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Aggregate commission from completed rides
+    const rideCommission = await prisma.ride.aggregate({
+      where: {
+        driverId: id,
+        status: "completed",
+      },
+      _sum: {
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Aggregate commission from delivered parcels
+    const parcelCommission = await prisma.delivery.aggregate({
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      _sum: {
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Aggregate commission from delivered food orders
+    const foodCommission = await prisma.foodOrder.aggregate({
+      where: {
+        driverId: id,
+        status: "delivered",
+      },
+      _sum: {
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const totalCommission = 
+      Number(rideCommission._sum.safegoCommission || 0) +
+      Number(parcelCommission._sum.safegoCommission || 0) +
+      Number(foodCommission._sum.safegoCommission || 0);
+
+    res.json({
+      driverId: id,
+      totalCommission: totalCommission.toFixed(2),
+      breakdown: {
+        rides: {
+          commission: Number(rideCommission._sum.safegoCommission || 0).toFixed(2),
+          count: rideCommission._count.id,
+        },
+        parcels: {
+          commission: Number(parcelCommission._sum.safegoCommission || 0).toFixed(2),
+          count: parcelCommission._count.id,
+        },
+        food: {
+          commission: Number(foodCommission._sum.safegoCommission || 0).toFixed(2),
+          count: foodCommission._count.id,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get driver commission error:", error);
+    res.status(500).json({ error: "Failed to fetch driver commission" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/commission/summary
+// Get platform-wide commission summary with filters
+// ====================================================
+router.get("/commission/summary", async (req: AuthRequest, res) => {
+  try {
+    const { country, startDate, endDate } = req.query;
+
+    // Build date filter
+    const dateFilter: any = {};
+    if (startDate || endDate) {
+      if (startDate) {
+        dateFilter.gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        dateFilter.lte = new Date(endDate as string);
+      }
+    }
+
+    // Get completed rides with optional filters
+    const rideWhere: any = { status: "completed" };
+    if (Object.keys(dateFilter).length > 0) {
+      rideWhere.completedAt = dateFilter;
+    }
+    if (country) {
+      // Join through driver to filter by country
+      rideWhere.driver = {
+        user: {
+          countryCode: country as string,
+        },
+      };
+    }
+
+    const rideCommission = await prisma.ride.aggregate({
+      where: rideWhere,
+      _sum: {
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Get delivered parcels with optional filters
+    const parcelWhere: any = { status: "delivered" };
+    if (Object.keys(dateFilter).length > 0) {
+      parcelWhere.deliveredAt = dateFilter;
+    }
+    if (country) {
+      parcelWhere.driver = {
+        user: {
+          countryCode: country as string,
+        },
+      };
+    }
+
+    const parcelCommission = await prisma.delivery.aggregate({
+      where: parcelWhere,
+      _sum: {
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Get delivered food orders with optional filters
+    const foodWhere: any = { status: "delivered" };
+    if (Object.keys(dateFilter).length > 0) {
+      foodWhere.deliveredAt = dateFilter;
+    }
+    if (country) {
+      foodWhere.driver = {
+        user: {
+          countryCode: country as string,
+        },
+      };
+    }
+
+    const foodCommission = await prisma.foodOrder.aggregate({
+      where: foodWhere,
+      _sum: {
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    const totalCommission = 
+      Number(rideCommission._sum.safegoCommission || 0) +
+      Number(parcelCommission._sum.safegoCommission || 0) +
+      Number(foodCommission._sum.safegoCommission || 0);
+
+    res.json({
+      totalCommission: totalCommission.toFixed(2),
+      byService: {
+        rides: {
+          commission: Number(rideCommission._sum.safegoCommission || 0).toFixed(2),
+          count: rideCommission._count.id,
+        },
+        parcels: {
+          commission: Number(parcelCommission._sum.safegoCommission || 0).toFixed(2),
+          count: parcelCommission._count.id,
+        },
+        food: {
+          commission: Number(foodCommission._sum.safegoCommission || 0).toFixed(2),
+          count: foodCommission._count.id,
+        },
+      },
+      filters: {
+        country: country || "all",
+        startDate: startDate || null,
+        endDate: endDate || null,
+      },
+    });
+  } catch (error) {
+    console.error("Get commission summary error:", error);
+    res.status(500).json({ error: "Failed to fetch commission summary" });
   }
 });
 

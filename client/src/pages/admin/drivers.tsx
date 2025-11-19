@@ -33,6 +33,7 @@ interface Driver {
   totalEarnings: string;
   averageRating: string;
   totalTrips: number;
+  commissionPaid: string;
 }
 
 interface DriversResponse {
@@ -228,7 +229,7 @@ export default function AdminDrivers() {
                             {getStatusBadge(driver)}
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                             <div>
                               <p className="text-muted-foreground">Vehicle</p>
                               <p className="font-medium" data-testid={`text-vehicle-${driver.id}`}>
@@ -250,7 +251,13 @@ export default function AdminDrivers() {
                             <div>
                               <p className="text-muted-foreground">Earnings</p>
                               <p className="font-medium" data-testid={`text-earnings-${driver.id}`}>
-                                ${driver.totalEarnings}
+                                {driver.countryCode === "BD" ? "৳" : "$"}{driver.totalEarnings}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Commission Paid</p>
+                              <p className="font-medium text-primary" data-testid={`text-commission-${driver.id}`}>
+                                {driver.countryCode === "BD" ? "৳" : "$"}{driver.commissionPaid}
                               </p>
                             </div>
                           </div>
