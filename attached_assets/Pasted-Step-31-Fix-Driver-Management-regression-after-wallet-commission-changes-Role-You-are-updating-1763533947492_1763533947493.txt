@@ -1,0 +1,82 @@
+Step 31 – Fix Driver Management regression after wallet/commission changes  
+Role: You are updating an already-working, production-ready SafeGo admin panel.  
+Goal: Fix the Driver Management list so that all drivers are visible again, WITHOUT breaking any existing logic for KYC, commissions, or wallet settlement.
+
+Context:
+- Admin dashboard at `/admin` shows correct counts (e.g., Total Drivers = 23, Active Drivers = 6).  
+- But the Driver Management page at `/admin/drivers` now shows **“No drivers found”** even when:
+  - Filters are set to “All Countries”, “All Statuses”, “All Verification”.
+  - Page is refreshed or opened in a new tab.
+- This regression started after we introduced wallet settlement / commission work.
+
+Requirements (NON-BREAKING FIX):
+1. **Do NOT change schemas or delete any data**
+   - No destructive migrations.
+   - No changes to existing Prisma models or enums unless absolutely necessary.
+   - If you must change anything, it must be backward-compatible.
+
+2. **Fix the driver list query only**
+   - Inspect the backend query used for `/admin/drivers` list.
+   - Make sure it returns all drivers by default (BD + US) when:
+     - `country` filter is empty or “All Countries”.
+     - `status` filter is “All Statuses”.
+     - `verification` filter is “All Verification”.
+   - Confirm that no hidden filter (e.g., `status = 'active'` or `earnings > 0`) is accidentally excluding all drivers.
+   - If the URL uses query parameters like `?status=active` or `?country=US`, make sure these are parsed correctly and passed to the backend in a safe way.
+
+3. **Keep all filters working**
+   - Country filter must still support:
+     - Bangladesh only
+     - United States only
+     - All Countries
+   - Status filter must still support:
+     - Active / Suspended / Blocked / Pending / All
+   - Verification filter must still support:
+     - Verified / Pending KYC / Rejected / All
+   - Combining filters (country + status + verification) should still work and must never result in “No drivers found” when matching records exist.
+
+4. **No changes yet to commission logic**
+   - Do NOT change commission calculation or wallet settlement distribution in this step.
+   - This step is ONLY to restore the Driver Management list visibility.
+   - Future steps will add:
+     - Per-driver “Total Commission Paid” (by country)
+     - Wallet settlement summaries
+   - Make sure your changes today will not block those future features.
+
+5. **Security requirements**
+   - Driver Management pages must remain **admin-only** (RBAC enforced, ProtectedRoute still in place).
+   - Validate all incoming query parameters (country, status, verification) to avoid injection or invalid values.
+   - No sensitive data (like internal IDs or secrets) should be exposed in the API response.
+
+6. **UX and behaviour**
+   - Default behaviour: when an admin goes to `/admin/drivers` with no query parameters, they should see all drivers (paginated) just like before.
+   - Keep search by email working exactly as before.
+   - Keep pagination and sorting behaviour unchanged.
+   - Country badges (BD flag / US flag) must still show correctly.
+
+7. **Testing checklist (must describe in the output)**
+   - Seed or use existing test data with:
+     - Multiple BD drivers (active, suspended, pending KYC).
+     - Multiple US drivers (NY and non-NY) with different statuses.
+   - Verify:
+     1. `/admin` shows correct driver counts.
+     2. `/admin/drivers` shows drivers with all filters = “All”.
+     3. Filter by Bangladesh only → BD drivers appear.
+     4. Filter by United States only → US drivers appear.
+     5. Filter by status = Active → only active drivers.
+     6. Filter by status = Pending KYC → only pending KYC drivers.
+     7. Search by a known driver email → that driver appears.
+   - Confirm that:
+     - KYC approval flow still works.
+     - Driver details page still loads.
+     - Wallet Settlement pages and existing commission logic still work as before.
+
+8. **Documentation**
+   - Update `replit.md` briefly:
+     - Explain what was broken (driver list returning empty).
+     - Explain the exact fix to the query/filter logic.
+     - Confirm no schema changes and no commission/wallet logic changes were made in this step.
+
+VERY IMPORTANT:
+- Keep this step as a **minimal, safe, non-breaking regression fix**.
+- Do NOT start implementing new commission totals or wallet features here. That will be done in the next numbered step after this is fully verified.
