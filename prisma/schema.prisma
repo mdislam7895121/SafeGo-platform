@@ -136,6 +136,7 @@ model DriverProfile {
   nidEncrypted          String?
   phoneNumber           String?
   postOffice            String?
+  postalCode            String?
   thana                 String?
   village               String?
   backgroundCheckDate   DateTime?

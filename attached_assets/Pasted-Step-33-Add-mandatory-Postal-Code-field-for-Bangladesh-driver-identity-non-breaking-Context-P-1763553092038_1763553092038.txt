@@ -1,0 +1,185 @@
+Step 33 — Add mandatory Postal Code field for Bangladesh driver identity (non-breaking)
+
+Context
+- Platform: SafeGo admin + driver KYC system.
+- Country-specific identity already implemented for Bangladesh drivers (name, phone, village, post office, thana, district, NID, etc.).
+- In the Admin "Document Review" modal for Bangladesh drivers, there is currently NO Postal Code field, and admins cannot edit or see it.
+- Business requirement: For Bangladesh drivers, Postal Code must be a mandatory part of the identity profile and visible in the admin review UI.
+- Very important: This step must NOT break any previous steps (26: Parcel, 27: BD & USA identity fields, 28: document uploads, 29: driver country filters, 31: wallet/commission, 32: doc review dashboard, etc.).
+
+Goal of Step 33
+Add a mandatory Postal Code field for Bangladesh driver identity, end-to-end:
+1) Data model
+2) KYC input/validation
+3) Admin document review + edit modal
+4) Backward compatibility and security
+
+Keep everything safe, minimal, and non-breaking.
+
+--------------------
+Requirements
+--------------------
+
+1. Data model (backend)
+
+- Locate the existing model/schema used for Bangladesh driver identity (for example: `BangladeshDriverIdentity`, `bdIdentity`, or similar).
+- Add a new field for postal code:
+
+  - Name suggestion: `postalCode` or `postal_code`
+  - Type: string/varchar
+  - Length: ideally 4–10 chars (supporting BD postal codes, but don’t over-restrict). For validation we will use 4–6 numeric characters.
+  - Nullable at database level ONLY to keep backward compatibility with existing rows.
+  - No destructive changes (do NOT remove or rename existing columns).
+
+- If the same identity model is reused for customers or other BD roles:
+  - Reuse this same field, but keep behaviour consistent and non-breaking.
+  - Do NOT change any non-BD logic.
+
+Security phase for this step
+- Input validation for new field.
+- No schema downgrade / no data loss.
+- All access still behind existing RBAC (admin-only where applicable).
+
+2. KYC submission & update flows (driver side)
+
+- Update the Bangladesh driver KYC forms (wherever BD-specific identity is captured) to include a Postal Code field.
+- This field must be REQUIRED when:
+  - country == Bangladesh AND
+  - the driver is creating or updating their BD identity.
+
+Validation rules:
+- Required when `countryCode === "BD"`.
+- Accept 4–6 digits only: `/^[0-9]{4,6}$/`.
+- Show a clear error message on invalid input (e.g. "Postal Code must be 4–6 digits").
+
+Important:
+- This must NOT make the APIs break for other countries.
+- For non-BD drivers, this field is ignored/not required.
+
+3. Admin Document Review UI for Bangladesh drivers
+
+- Go to the Admin "Document Review" workflow (the modal that shows:
+  - Email
+  - Country
+  - Status
+  - Full Name
+  - Father’s Name
+  - Phone
+  - Village
+  - Post Office
+  - Thana
+  - District
+  - etc.
+
+- Extend the Identity Information section to also display Postal Code for BD drivers.
+
+Layout suggestion:
+- Keep the same two-column layout.
+- Add Postal Code next to, or under, Post Office, in a logical address grouping.
+
+Example:
+
+  Identity Information
+  - Full Name
+  - Father’s Name
+  - Phone
+  - Village
+  - Post Office
+  - Postal Code (NEW)
+  - Thana
+  - District
+
+- If no postal code exists yet (legacy data), show a clear placeholder:
+  - e.g. "Not provided" or "Pending update"
+  - But do NOT crash or block the page.
+
+4. Admin "Edit Bangladesh Profile" modal
+
+- In the "Edit Bangladesh Profile" modal (where admin can edit BD identity for a driver):
+  - Add a Postal Code input field.
+  - It must be required when saving updates (for BD drivers).
+  - Apply the same 4–6 digit validation.
+
+- Behaviour:
+  - If existing BD identity has no postal code (old records), allow admin to add it the first time.
+  - Do not silently discard invalid input; show inline error and prevent save.
+
+5. API behaviour & backward compatibility
+
+- For API responses that include BD identity:
+  - Include the new `postalCode` field as nullable/optional.
+  - Do NOT make it required in JSON for existing consumers.
+  - For new create/update requests:
+    - Require `postalCode` when BD.
+    - Reject invalid or missing values with a clear error message.
+
+- No breaking changes:
+  - No existing route signatures should change in a way that would break clients.
+  - Only additive changes and stricter validation for BD driver KYC.
+
+6. Logging & security
+
+- Treat postal code as low-sensitivity address metadata:
+  - It can be logged as part of normal admin audit if you already log BD identity fields.
+  - Make sure NO new endpoint bypasses existing auth/role checks:
+    - Only authenticated admins can read/update BD identity via admin routes.
+    - Normal drivers can only see/edit their own identity via existing protected endpoints.
+
+- Do not introduce any open endpoints that expose driver identity without auth.
+
+7. UI/UX details
+
+- Ensure the Document Review modal scroll + layout still work correctly on mobile and desktop.
+- Postal Code label should be clear:
+  - Use "Postal Code" (not "ZIP").
+- Make sure the new field appears only where it makes sense:
+  - BD specific identity blocks.
+  - Do NOT show Postal Code for non-BD identity sections.
+
+--------------------
+Tests & Acceptance Criteria
+--------------------
+
+1) Migration / data layer
+- App starts without migration errors.
+- Existing BD driver records load correctly, even if postalCode is null.
+- No schema or runtime errors in logs.
+
+2) BD driver KYC form
+- When country = BD:
+  - Leaving Postal Code blank should show validation error and block submission.
+  - Entering non-numeric or wrong length value should show error.
+  - Valid 4–6 digit code should allow submission.
+
+3) Admin Document Review
+- For a BD driver with postal code set:
+  - Document Review modal shows Postal Code alongside other identity fields.
+  - Approve / Reject flows still work with no errors.
+- For legacy BD driver without postal code:
+  - Document Review modal loads.
+  - Postal Code shows “Not provided” or similar.
+  - No crashes.
+
+4) Admin Edit Bangladesh Profile
+- When editing a BD driver with no postal code:
+  - Admin can enter a valid code and save successfully.
+  - After save, subsequent views show the saved postal code.
+- When entering invalid code (e.g. “123”, “abcd”):
+  - Save is blocked with validation message.
+
+5) Non-BD drivers
+- USA / other country drivers remain unaffected:
+  - No new required fields.
+  - Their KYC flows, document review, and edit screens still work as before.
+
+6) Security checks
+- All new/updated routes are still behind existing RBAC (admin-only where appropriate).
+- No sensitive data leakage in logs beyond existing behaviour.
+- No console errors in frontend.
+
+If any part of this step conflicts with earlier SafeGo steps (26–32), prioritise:
+- NO breaking changes,
+- Country-specific BD rules only,
+- Strong validation and admin-only access for identity data.
+
+Please implement Step 33 exactly with this scope, and then summarise what changed (files/tables, endpoints, and UI components) once done.
