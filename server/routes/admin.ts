@@ -1564,9 +1564,9 @@ const updateDriverProfileSchema = z.object({
   }).optional(),
   village: z.string().min(1).optional(),
   postOffice: z.string().min(1).optional(),
-  postalCode: z.string().regex(/^[0-9]{4,6}$/, {
+  postalCode: z.string().min(1, "Postal Code is required").regex(/^[0-9]{4,6}$/, {
     message: "Postal Code must be 4-6 digits",
-  }).optional(),
+  }),
   thana: z.string().min(1).optional(),
   district: z.string().min(1).optional(),
   presentAddress: z.string().min(1).optional(),

@@ -743,6 +743,37 @@ export default function AdminDriverDetails() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Profile Photo Section */}
+                  {driver.profilePhotoUrl ? (
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Profile Photo</p>
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={driver.profilePhotoUrl} 
+                          alt="Profile" 
+                          className="w-16 h-16 rounded-md object-cover"
+                          data-testid="img-profile-photo"
+                        />
+                        <a
+                          href={driver.profilePhotoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline"
+                          data-testid="link-profile-photo-full"
+                        >
+                          View Full Size
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Profile Photo</p>
+                      <p className="text-sm text-yellow-600" data-testid="text-profile-photo-missing">
+                        Profile photo not uploaded
+                      </p>
+                    </div>
+                  )}
+
                   <div className="grid gap-4 md:grid-cols-2">
                     {driver.fullName && (
                       <div>
@@ -774,6 +805,12 @@ export default function AdminDriverDetails() {
                         <p className="text-sm" data-testid="text-post-office">{driver.postOffice}</p>
                       </div>
                     )}
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Postal Code</p>
+                      <p className="text-sm" data-testid="text-postal-code">
+                        {driver.postalCode || <span className="text-muted-foreground">Not provided</span>}
+                      </p>
+                    </div>
                     {driver.thana && (
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Thana</p>
