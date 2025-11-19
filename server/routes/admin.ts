@@ -1544,6 +1544,9 @@ const updateDriverProfileSchema = z.object({
   }).optional(),
   village: z.string().min(1).optional(),
   postOffice: z.string().min(1).optional(),
+  postalCode: z.string().regex(/^[0-9]{4,6}$/, {
+    message: "Postal Code must be 4-6 digits",
+  }).optional(),
   thana: z.string().min(1).optional(),
   district: z.string().min(1).optional(),
   presentAddress: z.string().min(1).optional(),
@@ -1582,6 +1585,7 @@ router.patch("/drivers/:id/profile", async (req: AuthRequest, res) => {
     if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
     if (data.village !== undefined) updateData.village = data.village;
     if (data.postOffice !== undefined) updateData.postOffice = data.postOffice;
+    if (data.postalCode !== undefined) updateData.postalCode = data.postalCode;
     if (data.thana !== undefined) updateData.thana = data.thana;
     if (data.district !== undefined) updateData.district = data.district;
     if (data.presentAddress !== undefined) updateData.presentAddress = data.presentAddress;
@@ -2953,6 +2957,9 @@ const updateCustomerProfileSchema = z.object({
   }).optional(),
   village: z.string().min(1).optional(),
   postOffice: z.string().min(1).optional(),
+  postalCode: z.string().regex(/^[0-9]{4,6}$/, {
+    message: "Postal Code must be 4-6 digits",
+  }).optional(),
   thana: z.string().min(1).optional(),
   district: z.string().min(1).optional(),
   presentAddress: z.string().min(1).optional(),
@@ -2991,6 +2998,7 @@ router.patch("/customers/:id/profile", async (req: AuthRequest, res) => {
     if (data.phoneNumber !== undefined) updateData.phoneNumber = data.phoneNumber;
     if (data.village !== undefined) updateData.village = data.village;
     if (data.postOffice !== undefined) updateData.postOffice = data.postOffice;
+    if (data.postalCode !== undefined) updateData.postalCode = data.postalCode;
     if (data.thana !== undefined) updateData.thana = data.thana;
     if (data.district !== undefined) updateData.district = data.district;
     if (data.presentAddress !== undefined) updateData.presentAddress = data.presentAddress;
@@ -4182,6 +4190,7 @@ router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
       phoneNumber: driver.phoneNumber,
       village: driver.village,
       postOffice: driver.postOffice,
+      postalCode: driver.postalCode,
       thana: driver.thana,
       district: driver.district,
       nidFrontImageUrl: driver.nidFrontImageUrl,
@@ -4257,6 +4266,7 @@ router.get("/documents/customers/:id/details", async (req: AuthRequest, res) => 
       phoneNumber: customer.phoneNumber,
       village: customer.village,
       postOffice: customer.postOffice,
+      postalCode: customer.postalCode,
       thana: customer.thana,
       district: customer.district,
       nidFrontImageUrl: customer.nidFrontImageUrl,
