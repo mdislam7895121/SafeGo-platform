@@ -144,3 +144,78 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
   - Parcel delivery flows remain intact
   - Ride-hailing matching logic unchanged
   - Zero breaking changes to existing features
+
+### Enhanced Driver KYC with Documents & Vehicle Info (November 2025 - Step 28)
+**Objective:** Strengthen driver identity verification and vehicle tracking with mandatory profile photos, government-issued license images, vehicle documents, and improved name structure for US drivers while maintaining full backward compatibility.
+
+**Schema Changes:**
+- **Profile Photo (all drivers):**
+  - `profilePhotoUrl` (String, nullable) - Required for KYC approval
+  
+- **US Driver Name Structure:**
+  - `firstName` (String, nullable) - Legal first name (required for US drivers)
+  - `middleName` (String, nullable) - Optional middle name
+  - `lastName` (String, nullable) - Legal last name (required for US drivers)
+  - Note: `usaFullLegalName` kept for backward compatibility but deprecated in favor of structured names
+  
+- **Government License Images:**
+  - `dmvLicenseImageUrl` (String, nullable) - DMV license photo (required for all US drivers)
+  - `tlcLicenseImageUrl` (String, nullable) - TLC license photo (required ONLY for NY state drivers)
+  
+- **Vehicle Model Extension:**
+  - `notes` (String, nullable) - Additional vehicle information or admin notes
+  
+- **VehicleDocument Model (new):**
+  - `id` (String, UUID primary key)
+  - `driverId` (String, foreign key to DriverProfile)
+  - `vehicleId` (String, nullable, foreign key to Vehicle)
+  - `documentType` (enum: "registration", "insurance")
+  - `fileUrl` (String) - Secure document storage path
+  - `description` (String, nullable) - Document notes
+  - `uploadedAt` (DateTime, default now)
+  - `expiresAt` (DateTime, nullable) - Document expiry date
+  - Indexes: driverId, vehicleId
+
+**KYC Validation Logic:**
+- **Bangladesh drivers require:**
+  1. Profile photo (`profilePhotoUrl`)
+  2. NID (`nidEncrypted` or `nidNumber`)
+  3. At least one vehicle registration document
+  
+- **USA drivers (all states) require:**
+  1. Profile photo (`profilePhotoUrl`)
+  2. First and last name (`firstName`, `lastName`)
+  3. DMV license image (`dmvLicenseImageUrl`)
+  4. At least one vehicle registration document
+  
+- **USA drivers (NY state specifically) additionally require:**
+  5. TLC license image (`tlcLicenseImageUrl`)
+
+**Backend Implementation:**
+- **KYC Validation Helper:** `validateDriverKYC(driver, countryCode)` function in `server/routes/admin.ts`
+  - Returns `{ isComplete: boolean, missingFields: string[] }`
+  - Country-specific validation rules
+  - State-specific logic for NY drivers
+  
+- **Updated KYC Approval Endpoint:** `PATCH /api/admin/kyc/:userId`
+  - Now validates driver KYC completeness before approval
+  - Returns error with missing fields list if incomplete
+  - Prevents approval until all required documents uploaded
+  
+- **File Upload Security:**
+  - Secure file storage paths
+  - Admin-only access to sensitive documents
+  - Document type validation
+
+**Pending Frontend Implementation:**
+- File upload endpoints for profile photos and vehicle documents
+- Updated driver KYC forms (BD and US) with document upload fields
+- Vehicle information section in driver profile
+- Admin driver details page KYC Documents section
+- E2E testing for all KYC flows
+
+**Backward Compatibility:**
+- All new fields nullable in schema
+- Existing drivers marked incomplete until documents uploaded
+- No breaking changes to existing KYC flows
+- Legacy `usaFullLegalName` maintained alongside new name structure
