@@ -10,10 +10,13 @@ async function throwIfResNotOk(res: Response) {
 export async function apiRequest(
   method: string,
   url: string,
-  data?: unknown | undefined,
+  data?: unknown | FormData | undefined,
 ): Promise<Response> {
   const token = localStorage.getItem("safego_token");
-  const headers: HeadersInit = data ? { "Content-Type": "application/json" } : {};
+  const isFormData = data instanceof FormData;
+  
+  // Don't set Content-Type for FormData - browser will set it with boundary
+  const headers: HeadersInit = data && !isFormData ? { "Content-Type": "application/json" } : {};
   
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -22,7 +25,7 @@ export async function apiRequest(
   const res = await fetch(url, {
     method,
     headers,
-    body: data ? JSON.stringify(data) : undefined,
+    body: isFormData ? data : (data ? JSON.stringify(data) : undefined),
     credentials: "include",
   });
 

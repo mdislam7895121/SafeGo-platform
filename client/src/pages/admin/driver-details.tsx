@@ -55,7 +55,12 @@ interface DriverDetails {
   nidNumber?: string;
   nidFrontImageUrl?: string;
   nidBackImageUrl?: string;
+  // Common KYC fields
+  profilePhotoUrl?: string;
   // US fields
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
   usaFullLegalName?: string;
   dateOfBirth?: string;
   usaPhoneNumber?: string;
@@ -63,6 +68,8 @@ interface DriverDetails {
   licenseStateIssued?: string;
   driverLicenseExpiry?: string;
   driverLicenseImageUrl?: string;
+  dmvLicenseImageUrl?: string;
+  tlcLicenseImageUrl?: string;
   usaStreet?: string;
   usaCity?: string;
   usaState?: string;

@@ -231,7 +231,8 @@ model Vehicle {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driver    DriverProfile      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  documents VehicleDocument[]
 
   @@map("vehicles")
 }
@@ -241,17 +242,22 @@ model Vehicle {
 // ====================================================
 
 model VehicleDocument {
-  id           String   @id @default(uuid())
-  driverId     String   // Links to DriverProfile (one driver can have multiple docs)
-  documentType String   // "registration" | "insurance" | "other"
-  documentUrl  String   // Secure file path/URL
-  uploadedAt   DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id           String    @id @default(uuid())
+  driverId     String    // Links to DriverProfile (one driver can have multiple docs)
+  vehicleId    String?   // Optional link to specific Vehicle
+  documentType String    // "registration" | "insurance"
+  fileUrl      String    // Secure file path/URL
+  description  String?   // Optional document description
+  uploadedAt   DateTime  @default(now())
+  expiresAt    DateTime? // Optional expiry date for document
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driver  DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicle Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
   @@index([driverId])
+  @@index([vehicleId])
   @@map("vehicle_documents")
 }
 

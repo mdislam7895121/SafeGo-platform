@@ -22,6 +22,7 @@ import ParcelRequest from "@/pages/customer/parcel-request";
 import DriverHome from "@/pages/driver/home";
 import DriverVehicle from "@/pages/driver/vehicle";
 import DriverProfile from "@/pages/driver/profile";
+import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 
 // Restaurant pages
 import RestaurantHome from "@/pages/restaurant/home";
@@ -121,6 +122,11 @@ function Router() {
       <Route path="/driver/profile">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverProfile />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/kyc-documents">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverKYCDocuments />
         </ProtectedRoute>
       </Route>
 

@@ -54,6 +54,17 @@ router.get("/home", async (req: AuthRequest, res) => {
         verificationStatus: driverProfile.verificationStatus,
         isVerified: driverProfile.isVerified,
         rejectionReason: driverProfile.rejectionReason,
+        // Common KYC fields
+        profilePhotoUrl: driverProfile.profilePhotoUrl,
+        // USA structured name fields
+        firstName: driverProfile.firstName,
+        middleName: driverProfile.middleName,
+        lastName: driverProfile.lastName,
+        // License images
+        dmvLicenseImageUrl: driverProfile.dmvLicenseImageUrl,
+        tlcLicenseImageUrl: driverProfile.tlcLicenseImageUrl,
+        // USA state (for TLC requirement check)
+        usaState: driverProfile.usaState,
       },
       vehicle: driverProfile.vehicle ? {
         id: driverProfile.vehicle.id,

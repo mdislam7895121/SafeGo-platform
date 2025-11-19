@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, User, Shield, Edit, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { ArrowLeft, User, Shield, Edit, Eye, EyeOff, ExternalLink, FileText, Upload } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -167,6 +167,20 @@ export default function DriverProfile() {
                 <p className="text-sm">{profile.rejectionReason}</p>
               </div>
             )}
+            
+            {/* KYC Documents Link */}
+            <Link href="/driver/kyc-documents">
+              <Button variant="outline" className="w-full" data-testid="button-kyc-documents">
+                <FileText className="h-4 w-4 mr-2" />
+                Manage KYC Documents
+                {profile?.verificationStatus === "pending" && (
+                  <Badge variant="secondary" className="ml-auto">
+                    <Upload className="h-3 w-3 mr-1" />
+                    Action Required
+                  </Badge>
+                )}
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
