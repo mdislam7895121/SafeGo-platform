@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, MapPin, Calendar, AlertCircle, Car, ShoppingBag, Package, Shield } from "lucide-react";
+import { ArrowLeft, User, MapPin, Calendar, AlertCircle, Car, ShoppingBag, Package, Shield, Edit } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
@@ -92,6 +102,21 @@ export default function CustomerDetails() {
   const [showUnblockDialog, setShowUnblockDialog] = useState(false);
   const [showNid, setShowNid] = useState(false);
   const [nid, setNid] = useState<string>("");
+  
+  // Edit profile dialog state
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    fatherName: "",
+    phoneNumber: "",
+    village: "",
+    postOffice: "",
+    thana: "",
+    district: "",
+    presentAddress: "",
+    permanentAddress: "",
+    nid: "",
+  });
 
   // Fetch customer details
   const { data: customer, isLoading } = useQuery<Customer>({
@@ -207,6 +232,66 @@ export default function CustomerDetails() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: typeof editForm) => {
+      // Only send non-empty fields
+      const payload: any = {};
+      Object.entries(data).forEach(([key, value]) => {
+        if (value && value.trim()) {
+          payload[key] = value.trim();
+        }
+      });
+
+      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/profile`, payload);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update profile");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Profile updated successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/customers/${customerId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
+      setShowEditDialog(false);
+      setEditForm({
+        fullName: "",
+        fatherName: "",
+        phoneNumber: "",
+        village: "",
+        postOffice: "",
+        thana: "",
+        district: "",
+        presentAddress: "",
+        permanentAddress: "",
+        nid: "",
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Handler to open edit dialog with existing data
+  const handleOpenEditDialog = () => {
+    if (customer) {
+      setEditForm({
+        fullName: customer.fullName || "",
+        fatherName: customer.fatherName || "",
+        phoneNumber: customer.phoneNumber || "",
+        village: customer.village || "",
+        postOffice: customer.postOffice || "",
+        thana: customer.thana || "",
+        district: customer.district || "",
+        presentAddress: customer.presentAddress || "",
+        permanentAddress: customer.permanentAddress || "",
+        nid: customer.nidNumber || "",
+      });
+    }
+    setShowEditDialog(true);
+  };
 
   if (isLoading) {
     return (
@@ -423,11 +508,24 @@ export default function CustomerDetails() {
       {customer.user.countryCode === "BD" && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Bangladesh Identity Information
-            </CardTitle>
-            <CardDescription>Verified identity details for Bangladesh</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Bangladesh Identity Information
+                </CardTitle>
+                <CardDescription>Verified identity details for Bangladesh</CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenEditDialog}
+                data-testid="button-edit-profile"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Edit Profile
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
@@ -723,6 +821,138 @@ export default function CustomerDetails() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Bangladesh Profile</DialogTitle>
+            <DialogDescription>
+              Update customer Bangladesh identity information. Leave NID blank to keep existing value.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-fullName">Full Name</Label>
+              <Input
+                id="edit-fullName"
+                value={editForm.fullName}
+                onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })}
+                placeholder="Enter full name"
+                data-testid="input-edit-fullName"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-fatherName">Father's Name</Label>
+              <Input
+                id="edit-fatherName"
+                value={editForm.fatherName}
+                onChange={(e) => setEditForm({ ...editForm, fatherName: e.target.value })}
+                placeholder="Enter father's name"
+                data-testid="input-edit-fatherName"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-phoneNumber">Phone Number</Label>
+              <Input
+                id="edit-phoneNumber"
+                value={editForm.phoneNumber}
+                onChange={(e) => setEditForm({ ...editForm, phoneNumber: e.target.value })}
+                placeholder="01XXXXXXXXX"
+                data-testid="input-edit-phoneNumber"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-village">Village</Label>
+              <Input
+                id="edit-village"
+                value={editForm.village}
+                onChange={(e) => setEditForm({ ...editForm, village: e.target.value })}
+                placeholder="Enter village name"
+                data-testid="input-edit-village"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-postOffice">Post Office</Label>
+              <Input
+                id="edit-postOffice"
+                value={editForm.postOffice}
+                onChange={(e) => setEditForm({ ...editForm, postOffice: e.target.value })}
+                placeholder="Enter post office"
+                data-testid="input-edit-postOffice"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-thana">Thana</Label>
+              <Input
+                id="edit-thana"
+                value={editForm.thana}
+                onChange={(e) => setEditForm({ ...editForm, thana: e.target.value })}
+                placeholder="Enter thana/upazila"
+                data-testid="input-edit-thana"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-district">District</Label>
+              <Input
+                id="edit-district"
+                value={editForm.district}
+                onChange={(e) => setEditForm({ ...editForm, district: e.target.value })}
+                placeholder="Enter district"
+                data-testid="input-edit-district"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-presentAddress">Present Address</Label>
+              <Textarea
+                id="edit-presentAddress"
+                value={editForm.presentAddress}
+                onChange={(e) => setEditForm({ ...editForm, presentAddress: e.target.value })}
+                placeholder="Enter current address"
+                data-testid="input-edit-presentAddress"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-permanentAddress">Permanent Address</Label>
+              <Textarea
+                id="edit-permanentAddress"
+                value={editForm.permanentAddress}
+                onChange={(e) => setEditForm({ ...editForm, permanentAddress: e.target.value })}
+                placeholder="Enter permanent address"
+                data-testid="input-edit-permanentAddress"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-nid">NID Number (10-17 digits)</Label>
+              <Input
+                id="edit-nid"
+                value={editForm.nid}
+                onChange={(e) => setEditForm({ ...editForm, nid: e.target.value })}
+                placeholder="Enter NID (will be encrypted)"
+                data-testid="input-edit-nid"
+              />
+              <p className="text-xs text-muted-foreground">Leave blank to keep existing NID. Will be encrypted securely.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              disabled={updateProfileMutation.isPending}
+              data-testid="button-cancel-edit"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => updateProfileMutation.mutate(editForm)}
+              disabled={updateProfileMutation.isPending}
+              data-testid="button-save-edit"
+            >
+              {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
