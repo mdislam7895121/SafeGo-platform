@@ -101,55 +101,61 @@ export default function AdminHome() {
         <div>
           <h2 className="text-lg font-semibold mb-3">Platform Overview</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <Users className="h-8 w-8 text-blue-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-total-users">
-                      {stats?.totalUsers ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Total Users</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/users">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-total-users">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <Users className="h-8 w-8 text-blue-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-total-users">
+                        {stats?.totalUsers ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Total Users</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <Car className="h-8 w-8 text-purple-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-total-drivers">
-                      {stats?.totalDrivers ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Total Drivers</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/drivers">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-total-drivers">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <Car className="h-8 w-8 text-purple-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-total-drivers">
+                        {stats?.totalDrivers ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Total Drivers</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <UserCheck className="h-8 w-8 text-green-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-active-drivers">
-                      {stats?.activeDrivers ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Active Drivers</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/drivers?status=active">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-active-drivers">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <UserCheck className="h-8 w-8 text-green-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-active-drivers">
+                        {stats?.activeDrivers ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Active Drivers</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card>
+            <Card data-testid="card-restaurants">
               <CardContent className="p-4">
                 <div className="flex flex-col items-center text-center">
                   <UtensilsCrossed className="h-8 w-8 text-orange-600 mb-2" />
@@ -171,69 +177,77 @@ export default function AdminHome() {
         <div>
           <h2 className="text-lg font-semibold mb-3">Driver Statistics</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <Clock className="h-8 w-8 text-yellow-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-pending-drivers">
-                      {stats?.pendingDrivers ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Pending KYC</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/kyc">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-pending-kyc">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <Clock className="h-8 w-8 text-yellow-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-pending-drivers">
+                        {stats?.pendingDrivers ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Pending KYC</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <Shield className="h-8 w-8 text-orange-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-suspended-drivers">
-                      {stats?.suspendedDrivers ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Suspended</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/drivers?status=suspended">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-suspended">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <Shield className="h-8 w-8 text-orange-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-suspended-drivers">
+                        {stats?.suspendedDrivers ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Suspended</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <UserX className="h-8 w-8 text-red-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-blocked-drivers">
-                      {stats?.blockedDrivers ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Blocked</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/drivers?status=blocked">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-blocked">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <UserX className="h-8 w-8 text-red-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-blocked-drivers">
+                        {stats?.blockedDrivers ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Blocked</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
 
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <AlertTriangle className="h-8 w-8 text-red-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-open-complaints">
-                      {stats?.openComplaints ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Open Complaints</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/complaints">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-open-complaints">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <AlertTriangle className="h-8 w-8 text-red-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-open-complaints">
+                        {stats?.openComplaints ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Open Complaints</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
 

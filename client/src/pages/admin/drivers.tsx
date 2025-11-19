@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, Search, Filter, Car, Shield, UserX, Clock, Eye, Ban, Unlock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,12 +53,28 @@ export default function AdminDrivers() {
   const [verificationFilter, setVerificationFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Parse URL query parameters on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const statusParam = urlParams.get("status");
+    const countryParam = urlParams.get("country");
+    const verificationParam = urlParams.get("verificationStatus");
+    const searchParam = urlParams.get("search");
+    const pageParam = urlParams.get("page");
+    
+    if (statusParam) setStatusFilter(statusParam);
+    if (countryParam) setCountryFilter(countryParam);
+    if (verificationParam) setVerificationFilter(verificationParam);
+    if (searchParam) setSearchQuery(searchParam);
+    if (pageParam) setCurrentPage(parseInt(pageParam));
+  }, []);
+
   // Build query params
   const queryParams = new URLSearchParams();
   if (searchQuery) queryParams.append("search", searchQuery);
   if (countryFilter !== "all") queryParams.append("country", countryFilter);
   if (statusFilter !== "all") queryParams.append("status", statusFilter);
-  if (verificationFilter !== "all") queryParams.append("verification", verificationFilter);
+  if (verificationFilter !== "all") queryParams.append("verificationStatus", verificationFilter);
   queryParams.append("page", currentPage.toString());
   queryParams.append("limit", "20");
 

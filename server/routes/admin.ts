@@ -734,6 +734,7 @@ router.get("/drivers", async (req: AuthRequest, res) => {
       verificationStatus,
       isSuspended,
       isOnline,
+      status,
       page = "1",
       limit = "20",
     } = req.query;
@@ -744,17 +745,16 @@ router.get("/drivers", async (req: AuthRequest, res) => {
 
     // Build where clause
     const where: any = {};
+    const userFilters: any = {};
 
     // Search by email
     if (search) {
-      where.user = {
-        email: { contains: search as string, mode: "insensitive" },
-      };
+      userFilters.email = { contains: search as string, mode: "insensitive" };
     }
 
     // Filter by country
     if (country) {
-      where.user = { ...where.user, countryCode: country as string };
+      userFilters.countryCode = country as string;
     }
 
     // Filter by verification status
@@ -767,10 +767,28 @@ router.get("/drivers", async (req: AuthRequest, res) => {
       where.isSuspended = isSuspended === "true";
     }
 
+    // Filter by status (active, suspended, blocked)
+    if (status === "suspended") {
+      where.isSuspended = true;
+    } else if (status === "blocked") {
+      userFilters.isBlocked = true;
+    } else if (status === "active") {
+      userFilters.isBlocked = false;
+      where.isSuspended = false;
+      where.isVerified = true;
+    }
+
+    // Apply user filters if any exist
+    if (Object.keys(userFilters).length > 0) {
+      where.user = userFilters;
+    }
+
     // Filter by online status (requires vehicle check)
     let onlineFilter: any = undefined;
     if (isOnline !== undefined) {
       onlineFilter = { isOnline: isOnline === "true" };
+    } else if (status === "active") {
+      onlineFilter = { isOnline: true };
     }
 
     // Fetch drivers with full details

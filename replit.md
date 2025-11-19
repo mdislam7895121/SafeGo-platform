@@ -10,6 +10,26 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 **Development approach**: Full-stack TypeScript with modern tooling, emphasizing code quality, security, and scalability.
 
+## Recent Updates (November 2025)
+
+### Interactive Admin Dashboard
+**All statistic cards are now fully interactive** with proper navigation, hover effects, and security:
+- Total Users → /admin/users (with role filtering)
+- Total Drivers → /admin/drivers (with full search and filters)
+- Active Drivers → /admin/drivers?status=active (filtered view)
+- Pending KYC → /admin/kyc
+- Suspended Drivers → /admin/drivers?status=suspended
+- Blocked Drivers → /admin/drivers?status=blocked
+- Open Complaints → /admin/complaints
+
+**Implementation Details:**
+- All cards use `hover-elevate` class for interactive feedback
+- Frontend reads query params from URL on mount for proper filtering
+- Backend supports `status` query parameter for active/suspended/blocked filtering
+- New /admin/users page with user listing, role filtering, and auto-refresh
+- All routes protected with ProtectedRoute (admin-only access)
+- Auto-refresh every 5 seconds on dashboard and all admin list pages
+
 ## System Architecture
 
 ### Frontend Architecture
