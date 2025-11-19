@@ -20,10 +20,10 @@ interface KYCValidationResult {
   missingFields: string[];
 }
 
-async function validateDriverKYC(
+function validateDriverKYC(
   driver: any,
   countryCode: string
-): Promise<KYCValidationResult> {
+): KYCValidationResult {
   const missing: string[] = [];
 
   // Profile photo required for ALL drivers
@@ -38,13 +38,8 @@ async function validateDriverKYC(
     }
     // Check for vehicle registration document (new Vehicle field OR legacy vehicleDocuments)
     const hasNewVehicleReg = driver.vehicle?.registrationDocumentUrl;
-    const legacyVehicleDocs = hasNewVehicleReg ? 1 : await prisma.vehicleDocument.count({
-      where: {
-        driverId: driver.id,
-        documentType: "registration",
-      },
-    });
-    if (!hasNewVehicleReg && legacyVehicleDocs === 0) {
+    const hasLegacyVehicleReg = driver.vehicleDocuments?.some((doc: any) => doc.documentType === "registration");
+    if (!hasNewVehicleReg && !hasLegacyVehicleReg) {
       missing.push("Vehicle registration document");
     }
   }
@@ -85,13 +80,8 @@ async function validateDriverKYC(
 
     // Check for vehicle registration document (new Vehicle field OR legacy vehicleDocuments)
     const hasNewVehicleReg = driver.vehicle?.registrationDocumentUrl;
-    const legacyVehicleDocs = hasNewVehicleReg ? 1 : await prisma.vehicleDocument.count({
-      where: {
-        driverId: driver.id,
-        documentType: "registration",
-      },
-    });
-    if (!hasNewVehicleReg && legacyVehicleDocs === 0) {
+    const hasLegacyVehicleReg = driver.vehicleDocuments?.some((doc: any) => doc.documentType === "registration");
+    if (!hasNewVehicleReg && !hasLegacyVehicleReg) {
       missing.push("Vehicle registration document");
     }
   }
@@ -320,6 +310,7 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
           where: { userId },
           include: {
             vehicle: true,
+            vehicleDocuments: true,
           },
         });
         
@@ -4545,6 +4536,7 @@ router.post("/documents/drivers/:id/approve", async (req: AuthRequest, res) => {
           },
         },
         vehicle: true,
+        vehicleDocuments: true,
       },
     });
 
