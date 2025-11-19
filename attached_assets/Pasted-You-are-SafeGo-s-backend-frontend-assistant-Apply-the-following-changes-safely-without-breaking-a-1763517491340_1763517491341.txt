@@ -1,0 +1,124 @@
+You are SafeGo’s backend + frontend assistant. Apply the following changes safely without breaking any existing routes, schemas, or flows.
+
+TASK GOAL:
+Add Bangladesh-specific identity and address fields for CUSTOMERS and DRIVERS.  
+Apply these fields in:
+1. Database schema (Prisma)
+2. Input validation
+3. Admin Customer Details Page
+4. Admin Driver Details Page
+5. Keep ALL existing features and flows working (non-breaking update)
+
+--------------------------------------
+NEW FIELDS TO ADD (Bangladesh Profile)
+--------------------------------------
+FullName
+FatherName
+Email
+PhoneNumber
+Village
+PostOffice
+Thana
+District
+NID_Number   (SECURED FIELD)
+
+--------------------------------------
+SECURITY REQUIREMENTS
+--------------------------------------
+1. NID_Number must be stored encrypted at rest.
+2. NID_Number must NEVER appear in:
+   – customer/driver public API  
+   – mobile app responses  
+   – non-admin dashboards
+3. Only admin routes may access NID_Number and only after role check.
+4. Input validation must be added for:
+   – district, thana, post office (string length > 1)
+   – phone number (BD format: 01XXXXXXXXX)
+   – NID (10–17 digits)
+5. Ensure all admin pages are behind ProtectedRoute.
+
+--------------------------------------
+DATABASE UPDATE (NON-BREAKING)
+--------------------------------------
+Add new optional fields using Prisma with NO migration breaking existing data:
+
+Example:
+model Customer {
+  id           String   @id @default(cuid())
+  fullName     String?
+  fatherName   String?
+  email        String   @unique
+  phoneNumber  String?
+  village      String?
+  postOffice   String?
+  thana        String?
+  district     String?
+  nidEncrypted String?   // store encrypted form only
+}
+
+model Driver {
+  id           String   @id @default(cuid())
+  fullName     String?
+  fatherName   String?
+  email        String   @unique
+  phoneNumber  String?
+  village      String?
+  postOffice   String?
+  thana        String?
+  district     String?
+  nidEncrypted String? 
+  ...existing fields...
+}
+
+--------------------------------------
+FRONTEND UPDATE (ADMIN ONLY)
+--------------------------------------
+Update these pages:
+
+1. /admin/customer-details.tsx
+2. /admin/driver-details.tsx
+
+Add a new “Bangladesh Info” section with:
+
+Full Name
+Father’s Name
+Phone Number
+Village
+Post Office
+Thana
+District
+(NID – hidden under “Show NID” button, admin-only)
+
+Do NOT show NID directly.  
+Use a secure toggle:
+- "Show NID" → fetches decrypted NID through admin-only route.
+
+--------------------------------------
+ROUTE & VALIDATION UPDATE
+--------------------------------------
+Update backend admin routes:
+
+GET /admin/customers/:id
+GET /admin/drivers/:id
+PATCH /admin/customers/:id
+PATCH /admin/drivers/:id
+
+Rules:
+- Only ADMIN role may read or update new fields.
+- NID must be encrypted before storing.
+- NID must be decrypted only for admin view.
+
+--------------------------------------
+NON-BREAKING REQUIREMENTS
+--------------------------------------
+✔ No changes to login/signup flows  
+✔ No breaking changes to existing driver/restaurant/customer features  
+✔ All old customers/drivers remain valid  
+✔ All stats pages keep working  
+✔ No impact on current match-making, GPS, or KYC flows  
+✔ Follows SafeGo security roadmap: Phase-1 (Data Hardening)
+
+--------------------------------------
+FINAL GOAL
+--------------------------------------
+After execution, Admin should see full Bangladesh identity info for any user without any system breakage.
