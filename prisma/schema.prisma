@@ -123,6 +123,7 @@ model DriverProfile {
   dateOfBirth           DateTime?
   emergencyContactName  String?
   emergencyContactPhone String?
+  emergencyContactRelationship String?
   verificationStatus    String             @default("pending")
   rejectionReason       String?
   isVerified            Boolean            @default(false)
@@ -151,11 +152,19 @@ model DriverProfile {
   usaStreet             String?
   usaZipCode            String?
   dmvLicenseImageUrl    String?
+  dmvLicenseFrontUrl    String?
+  dmvLicenseBackUrl     String?
+  dmvLicenseExpiry      DateTime?
+  dmvLicenseNumber      String?
   firstName             String?
   lastName              String?
   middleName            String?
   profilePhotoUrl       String?
   tlcLicenseImageUrl    String?
+  tlcLicenseFrontUrl    String?
+  tlcLicenseBackUrl     String?
+  tlcLicenseExpiry      DateTime?
+  tlcLicenseNumber      String?
   deliveries            Delivery[]
   driverComplaints      DriverComplaint[]
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
