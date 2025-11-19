@@ -57,7 +57,20 @@ export default function DriverKYCDocuments() {
       });
     }
     const response = await apiRequest("POST", endpoint, formData);
-    return response.json();
+    // Handle empty responses (204 No Content or no body)
+    if (response.status === 204) {
+      return { success: true };
+    }
+    // Try to parse JSON, return success object if empty
+    try {
+      const text = await response.text();
+      if (!text) {
+        return { success: true };
+      }
+      return JSON.parse(text);
+    } catch (error) {
+      return { success: true };
+    }
   };
 
   // Upload mutations
@@ -97,12 +110,19 @@ export default function DriverKYCDocuments() {
         throw new Error("First name and last name are required");
       }
       const response = await apiRequest("PUT", "/api/driver/usa-name", data);
-      // Handle empty responses (204 No Content)
-      const contentLength = response.headers.get("content-length");
-      if (contentLength === "0" || response.status === 204) {
+      // Handle empty responses (204 No Content or no body)
+      if (response.status === 204) {
         return { success: true };
       }
-      return response.json();
+      try {
+        const text = await response.text();
+        if (!text) {
+          return { success: true };
+        }
+        return JSON.parse(text);
+      } catch (error) {
+        return { success: true };
+      }
     },
     onSuccess: () => {
       toast({
