@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, Car, Shield, Ban, Unlock, Trash2, Clock, DollarSign, Star, TrendingUp, AlertCircle } from "lucide-react";
+import { ArrowLeft, Car, Shield, Ban, Unlock, Trash2, Clock, DollarSign, Star, TrendingUp, AlertCircle, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,27 @@ interface DriverDetails {
   suspendedAt: string | null;
   lastActive: string | null;
   isBlocked: boolean;
+  // Bangladesh fields
+  fullName?: string;
+  fatherName?: string;
+  phoneNumber?: string;
+  village?: string;
+  postOffice?: string;
+  thana?: string;
+  district?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
+  nidNumber?: string;
+  nidFrontImageUrl?: string;
+  nidBackImageUrl?: string;
+  // US fields
+  homeAddress?: string;
+  governmentIdType?: string;
+  governmentIdLast4?: string;
+  driverLicenseNumber?: string;
+  driverLicenseImageUrl?: string;
+  driverLicenseExpiry?: string;
+  ssnLast4?: string;
   vehicle: {
     id: string;
     vehicleType: string;
@@ -74,6 +95,8 @@ export default function AdminDriverDetails() {
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState("");
+  const [showNid, setShowNid] = useState(false);
+  const [nid, setNid] = useState<string>("");
 
   // Fetch driver details
   const { data: driver, isLoading } = useQuery<DriverDetails>({
@@ -210,6 +233,28 @@ export default function AdminDriverDetails() {
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
       setShowDeleteDialog(false);
+    },
+  });
+
+  // Fetch NID (admin-only, secure endpoint)
+  const fetchNidMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/admin/drivers/${driverId}/nid`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to fetch NID");
+      }
+      const data = await response.json();
+      return data.nid;
+    },
+    onSuccess: (data) => {
+      setNid(data);
+      setShowNid(true);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -456,6 +501,131 @@ export default function AdminDriverDetails() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Bangladesh Info - Only shown for Bangladesh drivers */}
+            {driver.countryCode === "BD" && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Bangladesh Identity Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {driver.fullName && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Full Name</p>
+                        <p className="text-sm" data-testid="text-full-name">{driver.fullName}</p>
+                      </div>
+                    )}
+                    {driver.fatherName && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Father's Name</p>
+                        <p className="text-sm" data-testid="text-father-name">{driver.fatherName}</p>
+                      </div>
+                    )}
+                    {driver.phoneNumber && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Phone Number</p>
+                        <p className="text-sm" data-testid="text-phone">{driver.phoneNumber}</p>
+                      </div>
+                    )}
+                    {driver.village && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Village</p>
+                        <p className="text-sm" data-testid="text-village">{driver.village}</p>
+                      </div>
+                    )}
+                    {driver.postOffice && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Post Office</p>
+                        <p className="text-sm" data-testid="text-post-office">{driver.postOffice}</p>
+                      </div>
+                    )}
+                    {driver.thana && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Thana</p>
+                        <p className="text-sm" data-testid="text-thana">{driver.thana}</p>
+                      </div>
+                    )}
+                    {driver.district && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">District</p>
+                        <p className="text-sm" data-testid="text-district">{driver.district}</p>
+                      </div>
+                    )}
+                    {driver.presentAddress && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Present Address</p>
+                        <p className="text-sm" data-testid="text-present-address">{driver.presentAddress}</p>
+                      </div>
+                    )}
+                    {driver.permanentAddress && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Permanent Address</p>
+                        <p className="text-sm" data-testid="text-permanent-address">{driver.permanentAddress}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">NID Number</p>
+                      {showNid ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-mono" data-testid="text-nid">{nid || driver.nidNumber || "Not available"}</p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowNid(false)}
+                            data-testid="button-hide-nid"
+                          >
+                            Hide
+                          </Button>
+                        </div>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchNidMutation.mutate()}
+                          disabled={fetchNidMutation.isPending}
+                          data-testid="button-show-nid"
+                        >
+                          {fetchNidMutation.isPending ? "Loading..." : "Show NID"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {(driver.nidFrontImageUrl || driver.nidBackImageUrl) && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">NID Images</p>
+                      <div className="flex gap-2">
+                        {driver.nidFrontImageUrl && (
+                          <a
+                            href={driver.nidFrontImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                            data-testid="link-nid-front"
+                          >
+                            View Front
+                          </a>
+                        )}
+                        {driver.nidBackImageUrl && (
+                          <a
+                            href={driver.nidBackImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                            data-testid="link-nid-back"
+                          >
+                            View Back
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Trip History */}
             {trips && trips.length > 0 && (
