@@ -31,7 +31,30 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
-### Step 34: USA Driver Identity & License Documents (DMV + NY TLC) (November 19, 2025)
+### Step 34b: USA State Filter (New York Focus) for Driver Management (November 19, 2025)
+- **Backend Updates**:
+  - Added `state` query parameter to GET `/api/admin/drivers` endpoint
+  - State filter only applies when country = "US"
+  - Filters on `usaState` field in DriverProfile (e.g., "NY" for New York)
+  - Non-breaking implementation - no schema changes required
+- **Frontend Updates**:
+  - Added conditional "State" filter dropdown on `/admin/drivers` page
+  - Dropdown visible only when Country filter = "United States"
+  - Options: "All States" (default), "New York (NY)"
+  - Future-proof design allows easy addition of more US states
+  - Automatic state filter reset when country changes away from US
+- **URL & Deep Linking**:
+  - State filter synced to URL query parameters (`?state=NY`)
+  - Filters restored from URL on page load (bookmarkable links)
+  - URL pattern: `/admin/drivers?country=US&state=NY&status=online&page=1`
+- **Filter Behavior**:
+  - Country = "All Countries" or "Bangladesh" → State filter hidden
+  - Country = "United States" + State = "All States" → Show all US drivers
+  - Country = "United States" + State = "New York (NY)" → Show only NY drivers
+  - Drivers without state set: Appear in "All States", excluded from specific state filters
+- **Impact**: NON-BREAKING - Extends existing filter system, no database changes, backward compatible
+
+### Step 34a: USA Driver Identity & License Documents (DMV + NY TLC) (November 19, 2025)
 - **Schema Changes**:
   - Added DMV license fields to `DriverProfile` (nullable for backward compatibility): `dmvLicenseFrontUrl`, `dmvLicenseBackUrl`, `dmvLicenseExpiry`, `dmvLicenseNumber`
   - Added TLC license fields to `DriverProfile` for NY drivers (nullable): `tlcLicenseFrontUrl`, `tlcLicenseBackUrl`, `tlcLicenseExpiry`, `tlcLicenseNumber`
