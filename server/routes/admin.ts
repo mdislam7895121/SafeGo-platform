@@ -2076,7 +2076,7 @@ router.get("/customers/:id", async (req: AuthRequest, res) => {
           select: {
             id: true,
             status: true,
-            totalAmount: true,
+            serviceFare: true,
             createdAt: true,
           },
           orderBy: { createdAt: "desc" },

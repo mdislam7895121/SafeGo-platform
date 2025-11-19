@@ -239,9 +239,7 @@ export default function AdminDriverDetails() {
   // Fetch NID (admin-only, secure endpoint)
   const fetchNidMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/admin/drivers/${driverId}/nid`, {
-        credentials: "include",
-      });
+      const response = await apiRequest("GET", `/api/admin/drivers/${driverId}/nid`);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to fetch NID");

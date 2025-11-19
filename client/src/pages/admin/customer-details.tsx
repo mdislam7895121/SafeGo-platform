@@ -191,9 +191,7 @@ export default function CustomerDetails() {
   // Fetch NID (admin-only, secure endpoint)
   const fetchNidMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/admin/customers/${customerId}/nid`, {
-        credentials: "include",
-      });
+      const response = await apiRequest("GET", `/api/admin/customers/${customerId}/nid`);
       if (!response.ok) {
         const error = await response.json();
         throw new Error(error.error || "Failed to fetch NID");
