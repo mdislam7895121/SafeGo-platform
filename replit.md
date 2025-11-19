@@ -30,6 +30,62 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
+### Step 36: USA Driver DMV Inspection Module (November 19, 2025)
+- **Database Schema Updates** - Extended Vehicle model with DMV inspection tracking:
+  * Added `dmvInspectionType` (String, nullable) - Type of inspection (Safety, Emissions, Safety + Emissions, Other)
+  * Added `dmvInspectionDate` (DateTime, nullable) - Date when inspection was performed
+  * Added `dmvInspectionExpiry` (DateTime, nullable) - When inspection expires
+  * Added `dmvInspectionImageUrl` (String, nullable) - URL to inspection certificate/document image
+  * Added `dmvInspectionStatus` enum (MISSING, EXPIRED, VALID) - Server-computed status for validation
+  * All fields nullable for backward compatibility with existing vehicles
+- **Backend API** (`server/routes/admin.ts`):
+  * **PATCH `/api/admin/drivers/:id/vehicle`** - Extended to accept DMV inspection fields
+    - Accepts type, date, expiry, and imageUrl
+    - Automatically computes `dmvInspectionStatus`: MISSING (no data), EXPIRED (past expiry), VALID (all fields present and not expired)
+    - Server-side status computation prevents client-server divergence
+  * **GET `/api/admin/drivers/:id`** - Returns all DMV inspection fields including computed status
+  * **validateDriverKYC** - Extended for USA drivers to require:
+    - DMV inspection type, date, expiry date, and document image
+    - Only `dmvInspectionStatus === "VALID"` passes validation
+    - Rejects MISSING, EXPIRED, null, undefined, or any unexpected status values
+    - Provides specific error messages: "DMV inspection has expired", "DMV inspection is missing", "DMV inspection status is not valid"
+- **Frontend Updates** - Driver Details Page (`/admin/drivers/:id` for USA drivers):
+  * **DMV Inspection Section** - New card displayed below Vehicle Information card
+    - Shows inspection type, date performed, expiry date
+    - Status badge: Green "Valid", Red "Expired", Gray "Missing"
+    - Warning banner for missing/expired inspections with clear messaging
+    - Document link to view/download inspection certificate
+    - Defensive coding: optional chaining (`driver.vehicle?.dmvInspectionStatus`) throughout
+  * **Edit Vehicle Dialog** - Extended with DMV Inspection fields
+    - Inspection Type dropdown: Safety, Emissions, Safety + Emissions, Other
+    - Inspection Date picker
+    - Inspection Expiry Date picker
+    - Inspection Document URL input with helper text
+    - Separator and section heading for visual clarity
+    - All fields pre-populated when editing, handles missing data with empty defaults
+- **Document Review Page Integration** (`client/src/pages/admin/documents.tsx`):
+  * DMV Inspection document displayed in Vehicle Documents section for USA drivers
+  * Shows inspection type, expiry date, and status badge (Valid/Expired/Missing)
+  * View button to open inspection document in new tab
+  * TypeScript interface updated: added 5 DMV inspection fields to `DocumentDetails.vehicle`
+- **Validation & Error Handling**:
+  * Robust edge case handling: null/undefined/unexpected status values treated as invalid
+  * Only explicit "VALID" status passes KYC validation for USA drivers
+  * Missing or expired inspections prevent driver verification approval
+  * Clear error messages guide admins to complete missing data
+- **Backward Compatibility**:
+  * All DMV inspection fields nullable - existing vehicles work seamlessly
+  * Bangladesh drivers unaffected (validation scoped to countryCode === "US")
+  * USA drivers without inspection data display "No DMV inspection information" gracefully
+  * Frontend TypeScript interfaces use `string | null` for all inspection fields
+  * Legacy vehicle registration fallback does not bypass inspection requirement
+- **Security & Architecture**:
+  * Admin-only access via role-based middleware
+  * URL validation for inspection document (same pattern as registration/insurance)
+  * Server-side status computation ensures data integrity
+  * No security vulnerabilities introduced (architect-verified)
+- **Impact**: NON-BREAKING - Schema extension with nullable fields, enhanced KYC validation for USA drivers, production-ready with comprehensive edge case handling
+
 ### Step 35: USA Driver Vehicle Information Module (November 19, 2025)
 - **Database Schema Updates** - Extended Vehicle model:
   * Added USA-specific fields to Vehicle model: `make`, `model`, `year` (Int), `color`, `licensePlate`
