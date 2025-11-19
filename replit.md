@@ -12,7 +12,54 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Updates (November 2025)
 
-### Customer Management System (Latest)
+### Bangladesh Identity Fields with Encrypted NID Storage (Latest - Nov 19, 2025)
+**Comprehensive Bangladesh-specific identity fields for customers and drivers with secure NID encryption:**
+
+**Security Implementation:**
+- **AES-256-GCM Encryption**: NID numbers encrypted at rest using authenticated encryption
+- **Secure Key Management**: 32-byte ENCRYPTION_KEY required via environment variable (fails fast if missing)
+- **Admin-Only Decryption**: Dedicated endpoints for NID decryption accessible only to admins
+- **Data Integrity**: Authentication tags prevent tampering, legacy CBC fallback for existing data
+- **No Data Exposure**: nidEncrypted explicitly excluded from all detail API responses
+
+**Database Schema Changes:**
+- `CustomerProfile` and `DriverProfile` tables extended with Bangladesh fields:
+  - `fullName` (String, optional) - Complete legal name
+  - `fatherName` (String, optional) - Father's name
+  - `phoneNumber` (String, optional) - Bangladesh mobile number
+  - `village` (String, optional) - Village name
+  - `postOffice` (String, optional) - Post office
+  - `thana` (String, optional) - Thana/Upazila
+  - `district` (String, optional) - District
+  - `presentAddress` (String, optional) - Current address
+  - `permanentAddress` (String, optional) - Permanent address
+  - `nidEncrypted` (String, optional) - Encrypted National ID (AES-256-GCM)
+- All fields optional for backward compatibility with existing US/other country data
+- Legacy `nidNumber` field preserved for fallback
+
+**API Endpoints:**
+- `GET /api/admin/customers/:id` - Returns all Bangladesh fields except nidEncrypted
+- `GET /api/admin/drivers/:id` - Returns all Bangladesh fields except nidEncrypted
+- `GET /api/admin/customers/:id/nid` - Decrypt and return customer NID (admin-only, secure)
+- `GET /api/admin/drivers/:id/nid` - Decrypt and return driver NID (admin-only, secure)
+
+**Frontend Features:**
+- **Customer Details Page**: Bangladesh Identity Information card (BD users only) with Show/Hide NID button
+- **Driver Details Page**: Bangladesh Identity Information card (BD users only) with Show/Hide NID button
+- **Secure NID Display**: Click "Show NID" to decrypt and display, "Hide" to conceal
+- **Conditional Rendering**: Bangladesh section only visible for countryCode === "BD"
+- **NID Image Links**: View NID front/back images if available
+
+**Encryption Utility (`server/utils/encryption.ts`):**
+- `encrypt(text)`: AES-256-GCM encryption returning `iv:authTag:ciphertext`
+- `decrypt(encryptedText)`: Verifies auth tag and decrypts, throws on tampering
+- Legacy CBC fallback for migrating old data
+- Validation helpers: `isValidBdNid()`, `isValidBdPhone()`
+
+**Environment Variables:**
+- `ENCRYPTION_KEY` (required): 32-byte encryption key for NID protection
+
+### Customer Management System
 **Complete admin-side customer management capabilities:**
 - **Customer List** (`/admin/customers`): Comprehensive table showing all customers with email, country, KYC status, account status, and usage statistics (rides, food orders, parcels)
 - **Search & Filters**: Search by email, filter by status (All/Active/Suspended/Blocked)
@@ -151,13 +198,16 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 **Security Architecture:**
 - Environment variable-based JWT secret, bcrypt hashing for passwords.
+- AES-256-GCM encryption for sensitive data (NID numbers) with 32-byte ENCRYPTION_KEY.
 - Zod schema for input validation, role-based middleware, CSRF protection, and SQL injection prevention via Prisma.
+- Admin-only endpoints for decrypting sensitive data with authentication tag verification.
 
 **Database Schema Design:**
 - User table linked to role-specific profiles.
 - UUID primary keys, indexed foreign keys, decimal types for monetary values.
-- `isSuspended`, `suspensionReason`, `suspendedAt` fields for drivers.
+- `isSuspended`, `suspensionReason`, `suspendedAt` fields for drivers, customers, and restaurants.
 - `DriverComplaint` model linking driver, customer, and ride.
+- Bangladesh-specific identity fields (fullName, fatherName, phoneNumber, village, postOffice, thana, district, addresses, nidEncrypted) for customers and drivers.
 
 ### Project Structure:
 - `client/`: React frontend
