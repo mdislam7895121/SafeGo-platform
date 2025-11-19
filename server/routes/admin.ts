@@ -1650,6 +1650,9 @@ router.patch("/drivers/:id/profile", async (req: AuthRequest, res) => {
 // ====================================================
 const updateUsaDriverProfileSchema = z.object({
   usaFullLegalName: z.string().min(1).max(200).optional(),
+  firstName: z.string().min(1).max(100).optional(),
+  middleName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
   dateOfBirth: z.string().optional(), // ISO date string
   ssn: z.string().refine((val) => !val || isValidSSN(val), {
     message: "Invalid SSN format (must be XXX-XX-XXXX or XXXXXXXXX)",
@@ -1664,7 +1667,19 @@ const updateUsaDriverProfileSchema = z.object({
   usaZipCode: z.string().min(5).max(10).optional(),
   emergencyContactName: z.string().min(1).max(200).optional(),
   emergencyContactPhone: z.string().min(10).max(15).optional(),
+  emergencyContactRelationship: z.string().min(1).max(100).optional(),
   backgroundCheckStatus: z.enum(["pending", "cleared", "failed"]).optional(),
+  profilePhotoUrl: z.string().url().optional(),
+  // DMV License fields (required for all USA drivers)
+  dmvLicenseFrontUrl: z.string().url().optional(),
+  dmvLicenseBackUrl: z.string().url().optional(),
+  dmvLicenseExpiry: z.string().optional(), // ISO date string
+  dmvLicenseNumber: z.string().min(1).max(50).optional(),
+  // TLC License fields (required for NY state only)
+  tlcLicenseFrontUrl: z.string().url().optional(),
+  tlcLicenseBackUrl: z.string().url().optional(),
+  tlcLicenseExpiry: z.string().optional(), // ISO date string
+  tlcLicenseNumber: z.string().min(1).max(50).optional(),
 });
 
 router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
@@ -1702,6 +1717,9 @@ router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
     const updateData: any = {};
     
     if (data.usaFullLegalName !== undefined) updateData.usaFullLegalName = data.usaFullLegalName;
+    if (data.firstName !== undefined) updateData.firstName = data.firstName;
+    if (data.middleName !== undefined) updateData.middleName = data.middleName;
+    if (data.lastName !== undefined) updateData.lastName = data.lastName;
     if (data.dateOfBirth !== undefined) updateData.dateOfBirth = new Date(data.dateOfBirth);
     if (data.driverLicenseNumber !== undefined) updateData.driverLicenseNumber = data.driverLicenseNumber;
     if (data.licenseStateIssued !== undefined) updateData.licenseStateIssued = data.licenseStateIssued;
@@ -1713,12 +1731,26 @@ router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
     if (data.usaZipCode !== undefined) updateData.usaZipCode = data.usaZipCode;
     if (data.emergencyContactName !== undefined) updateData.emergencyContactName = data.emergencyContactName;
     if (data.emergencyContactPhone !== undefined) updateData.emergencyContactPhone = data.emergencyContactPhone;
+    if (data.emergencyContactRelationship !== undefined) updateData.emergencyContactRelationship = data.emergencyContactRelationship;
+    if (data.profilePhotoUrl !== undefined) updateData.profilePhotoUrl = data.profilePhotoUrl;
     if (data.backgroundCheckStatus !== undefined) {
       updateData.backgroundCheckStatus = data.backgroundCheckStatus;
       if (data.backgroundCheckStatus !== "pending") {
         updateData.backgroundCheckDate = new Date();
       }
     }
+    
+    // DMV License fields
+    if (data.dmvLicenseFrontUrl !== undefined) updateData.dmvLicenseFrontUrl = data.dmvLicenseFrontUrl;
+    if (data.dmvLicenseBackUrl !== undefined) updateData.dmvLicenseBackUrl = data.dmvLicenseBackUrl;
+    if (data.dmvLicenseExpiry !== undefined) updateData.dmvLicenseExpiry = new Date(data.dmvLicenseExpiry);
+    if (data.dmvLicenseNumber !== undefined) updateData.dmvLicenseNumber = data.dmvLicenseNumber;
+    
+    // TLC License fields (NY only)
+    if (data.tlcLicenseFrontUrl !== undefined) updateData.tlcLicenseFrontUrl = data.tlcLicenseFrontUrl;
+    if (data.tlcLicenseBackUrl !== undefined) updateData.tlcLicenseBackUrl = data.tlcLicenseBackUrl;
+    if (data.tlcLicenseExpiry !== undefined) updateData.tlcLicenseExpiry = new Date(data.tlcLicenseExpiry);
+    if (data.tlcLicenseNumber !== undefined) updateData.tlcLicenseNumber = data.tlcLicenseNumber;
     
     // Encrypt SSN if provided
     if (data.ssn !== undefined && data.ssn) {
@@ -4196,13 +4228,41 @@ router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
       nidFrontImageUrl: driver.nidFrontImageUrl,
       nidBackImageUrl: driver.nidBackImageUrl,
       
-      // US fields
+      // US fields - Identity
       firstName: driver.firstName,
       middleName: driver.middleName,
       lastName: driver.lastName,
+      usaFullLegalName: driver.usaFullLegalName,
+      dateOfBirth: driver.dateOfBirth,
+      usaPhoneNumber: driver.usaPhoneNumber,
+      ssnMasked: driver.ssnEncrypted ? maskSSN(decrypt(driver.ssnEncrypted)) : null,
+      backgroundCheckStatus: driver.backgroundCheckStatus,
+      backgroundCheckDate: driver.backgroundCheckDate,
+      
+      // US fields - Residential Address
+      usaStreet: driver.usaStreet,
+      usaCity: driver.usaCity,
       usaState: driver.usaState,
-      dmvLicenseImageUrl: driver.dmvLicenseImageUrl,
-      tlcLicenseImageUrl: driver.tlcLicenseImageUrl,
+      usaZipCode: driver.usaZipCode,
+      
+      // US fields - Emergency Contact
+      emergencyContactName: driver.emergencyContactName,
+      emergencyContactPhone: driver.emergencyContactPhone,
+      emergencyContactRelationship: driver.emergencyContactRelationship,
+      
+      // US fields - DMV License (all states)
+      dmvLicenseFrontUrl: driver.dmvLicenseFrontUrl,
+      dmvLicenseBackUrl: driver.dmvLicenseBackUrl,
+      dmvLicenseExpiry: driver.dmvLicenseExpiry,
+      dmvLicenseNumber: driver.dmvLicenseNumber,
+      dmvLicenseImageUrl: driver.dmvLicenseImageUrl, // Legacy field
+      
+      // US fields - TLC License (NY only)
+      tlcLicenseFrontUrl: driver.tlcLicenseFrontUrl,
+      tlcLicenseBackUrl: driver.tlcLicenseBackUrl,
+      tlcLicenseExpiry: driver.tlcLicenseExpiry,
+      tlcLicenseNumber: driver.tlcLicenseNumber,
+      tlcLicenseImageUrl: driver.tlcLicenseImageUrl, // Legacy field
       
       // Vehicle documents
       vehicleDocuments: driver.vehicleDocuments.map(doc => ({
