@@ -124,6 +124,30 @@ interface Trip {
   completedAt: string | null;
 }
 
+// Helper functions for USA name handling (backward compatibility)
+function splitFullName(fullName: string): { firstName: string; middleName: string; lastName: string } {
+  if (!fullName) return { firstName: "", middleName: "", lastName: "" };
+  
+  const parts = fullName.trim().split(/\s+/);
+  
+  if (parts.length === 1) {
+    return { firstName: parts[0], middleName: "", lastName: "" };
+  } else if (parts.length === 2) {
+    return { firstName: parts[0], middleName: "", lastName: parts[1] };
+  } else {
+    // 3 or more parts: first = first word, last = last word, middle = everything in between
+    const firstName = parts[0];
+    const lastName = parts[parts.length - 1];
+    const middleName = parts.slice(1, -1).join(" ");
+    return { firstName, middleName, lastName };
+  }
+}
+
+function joinFullName(firstName: string, middleName: string, lastName: string): string {
+  const parts = [firstName?.trim(), middleName?.trim(), lastName?.trim()].filter(Boolean);
+  return parts.join(" ");
+}
+
 export default function AdminDriverDetails() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/admin/drivers/:id");
@@ -158,7 +182,9 @@ export default function AdminDriverDetails() {
   // Edit USA profile dialog state
   const [showEditUsaDialog, setShowEditUsaDialog] = useState(false);
   const [editUsaForm, setEditUsaForm] = useState({
-    usaFullLegalName: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     dateOfBirth: "",
     ssn: "",
     driverLicenseNumber: "",
@@ -399,9 +425,22 @@ export default function AdminDriverDetails() {
   // Update USA profile mutation
   const updateUsaProfileMutation = useMutation({
     mutationFn: async (data: typeof editUsaForm) => {
+      // Join name fields back into usaFullLegalName for backend compatibility
+      const usaFullLegalName = joinFullName(data.firstName, data.middleName, data.lastName);
+      
       // Only send non-empty fields
       const payload: any = {};
+      
+      // Add the joined full name
+      if (usaFullLegalName.trim()) {
+        payload.usaFullLegalName = usaFullLegalName;
+      }
+      
+      // Add other fields
       Object.entries(data).forEach(([key, value]) => {
+        // Skip the name fields as they're already joined
+        if (key === 'firstName' || key === 'middleName' || key === 'lastName') return;
+        
         if (value && String(value).trim()) {
           payload[key] = key === 'ssn' || key === 'dateOfBirth' || key === 'driverLicenseExpiry' 
             ? value 
@@ -422,7 +461,9 @@ export default function AdminDriverDetails() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/drivers"] });
       setShowEditUsaDialog(false);
       setEditUsaForm({
-        usaFullLegalName: "",
+        firstName: "",
+        middleName: "",
+        lastName: "",
         dateOfBirth: "",
         ssn: "",
         driverLicenseNumber: "",
@@ -466,8 +507,13 @@ export default function AdminDriverDetails() {
   // Handler to open USA edit dialog with existing data
   const handleOpenEditUsaDialog = () => {
     if (driver) {
+      // Split existing full name into first/middle/last for edit form
+      const nameParts = splitFullName(driver.usaFullLegalName || "");
+      
       setEditUsaForm({
-        usaFullLegalName: driver.usaFullLegalName || "",
+        firstName: nameParts.firstName,
+        middleName: nameParts.middleName,
+        lastName: nameParts.lastName,
         dateOfBirth: driver.dateOfBirth ? driver.dateOfBirth.split('T')[0] : "",
         ssn: "", // Never pre-populate SSN for security
         driverLicenseNumber: driver.driverLicenseNumber || "",
@@ -953,12 +999,27 @@ export default function AdminDriverDetails() {
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-2">
-                    {driver.usaFullLegalName && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Full Legal Name</p>
-                        <p className="text-sm" data-testid="text-usa-legal-name">{driver.usaFullLegalName}</p>
-                      </div>
-                    )}
+                    {driver.usaFullLegalName && (() => {
+                      const nameParts = splitFullName(driver.usaFullLegalName);
+                      return (
+                        <>
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">First Name</p>
+                            <p className="text-sm" data-testid="text-usa-first-name">{nameParts.firstName || "—"}</p>
+                          </div>
+                          {nameParts.middleName && (
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Middle Name</p>
+                              <p className="text-sm" data-testid="text-usa-middle-name">{nameParts.middleName}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm font-medium text-muted-foreground">Last Name</p>
+                            <p className="text-sm" data-testid="text-usa-last-name">{nameParts.lastName || "—"}</p>
+                          </div>
+                        </>
+                      );
+                    })()}
                     {driver.dateOfBirth && (
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Date of Birth</p>
@@ -1054,26 +1115,6 @@ export default function AdminDriverDetails() {
                           <div>
                             <p className="text-xs text-muted-foreground">ZIP Code</p>
                             <p className="text-sm" data-testid="text-usa-zip">{driver.usaZipCode}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {/* Emergency Contact Section */}
-                  {(driver.emergencyContactName || driver.emergencyContactPhone) && (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-sm font-medium text-muted-foreground">Emergency Contact</p>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {driver.emergencyContactName && (
-                          <div>
-                            <p className="text-xs text-muted-foreground">Name</p>
-                            <p className="text-sm" data-testid="text-emergency-name">{driver.emergencyContactName}</p>
-                          </div>
-                        )}
-                        {driver.emergencyContactPhone && (
-                          <div>
-                            <p className="text-xs text-muted-foreground">Phone</p>
-                            <p className="text-sm" data-testid="text-emergency-phone">{driver.emergencyContactPhone}</p>
                           </div>
                         )}
                       </div>
@@ -1186,6 +1227,27 @@ export default function AdminDriverDetails() {
                           <div>
                             <p className="text-xs text-muted-foreground mb-1">TLC License Number</p>
                             <p className="text-sm font-mono" data-testid="text-tlc-number">{driver.tlcLicenseNumber}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Emergency Contact Section - Last section */}
+                  {(driver.emergencyContactName || driver.emergencyContactPhone) && (
+                    <div className="mt-6 pt-6 border-t space-y-3">
+                      <p className="text-sm font-semibold text-foreground">Emergency Contact</p>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {driver.emergencyContactName && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Name</p>
+                            <p className="text-sm" data-testid="text-emergency-name">{driver.emergencyContactName}</p>
+                          </div>
+                        )}
+                        {driver.emergencyContactPhone && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Phone</p>
+                            <p className="text-sm" data-testid="text-emergency-phone">{driver.emergencyContactPhone}</p>
                           </div>
                         )}
                       </div>
@@ -1466,13 +1528,33 @@ export default function AdminDriverDetails() {
           </DialogHeader>
           <div className="grid gap-4 py-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="usa-fullName">Full Legal Name</Label>
+              <Label htmlFor="usa-firstName">First Name</Label>
               <Input
-                id="usa-fullName"
-                value={editUsaForm.usaFullLegalName}
-                onChange={(e) => setEditUsaForm({ ...editUsaForm, usaFullLegalName: e.target.value })}
-                placeholder="Enter full legal name"
-                data-testid="input-usa-fullName"
+                id="usa-firstName"
+                value={editUsaForm.firstName}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, firstName: e.target.value })}
+                placeholder="Enter first name"
+                data-testid="input-usa-firstName"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-middleName">Middle Name (Optional)</Label>
+              <Input
+                id="usa-middleName"
+                value={editUsaForm.middleName}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, middleName: e.target.value })}
+                placeholder="Enter middle name"
+                data-testid="input-usa-middleName"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="usa-lastName">Last Name</Label>
+              <Input
+                id="usa-lastName"
+                value={editUsaForm.lastName}
+                onChange={(e) => setEditUsaForm({ ...editUsaForm, lastName: e.target.value })}
+                placeholder="Enter last name"
+                data-testid="input-usa-lastName"
               />
             </div>
             <div className="grid gap-2">
