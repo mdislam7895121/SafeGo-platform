@@ -341,18 +341,27 @@ model VehicleDocument {
 }
 
 model Vehicle {
-  id                String            @id
-  driverId          String            @unique
-  vehicleType       String
-  vehicleModel      String
-  vehiclePlate      String
-  isOnline          Boolean           @default(false)
-  totalEarnings     Decimal           @default(0) @db.Decimal(10, 2)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime
-  notes             String?
-  vehicleDocuments  VehicleDocument[]
-  driver            DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  id                      String            @id
+  driverId                String            @unique
+  vehicleType             String
+  vehicleModel            String
+  vehiclePlate            String
+  isOnline                Boolean           @default(false)
+  totalEarnings           Decimal           @default(0) @db.Decimal(10, 2)
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime
+  notes                   String?
+  make                    String?
+  year                    Int?
+  color                   String?
+  licensePlate            String?
+  registrationDocumentUrl String?
+  registrationExpiry      DateTime?
+  insuranceDocumentUrl    String?
+  insuranceExpiry         DateTime?
+  isPrimary               Boolean           @default(true)
+  vehicleDocuments        VehicleDocument[]
+  driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@map("vehicles")
 }
