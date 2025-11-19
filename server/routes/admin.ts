@@ -1234,6 +1234,7 @@ router.get("/drivers", async (req: AuthRequest, res) => {
     const {
       search,
       country,
+      state,
       verificationStatus,
       isSuspended,
       isOnline,
@@ -1258,6 +1259,11 @@ router.get("/drivers", async (req: AuthRequest, res) => {
     // Filter by country
     if (country) {
       userFilters.countryCode = country as string;
+    }
+
+    // Filter by US state (only when country is US)
+    if (state && state !== "all" && country === "US") {
+      where.usaState = state as string;
     }
 
     // Filter by verification status

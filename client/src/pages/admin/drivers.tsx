@@ -50,6 +50,7 @@ export default function AdminDrivers() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [countryFilter, setCountryFilter] = useState<string>("all");
+  const [stateFilter, setStateFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [verificationFilter, setVerificationFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,12 +60,14 @@ export default function AdminDrivers() {
     const urlParams = new URLSearchParams(window.location.search);
     const statusParam = urlParams.get("status");
     const countryParam = urlParams.get("country");
+    const stateParam = urlParams.get("state");
     const verificationParam = urlParams.get("verificationStatus");
     const searchParam = urlParams.get("search");
     const pageParam = urlParams.get("page");
     
     if (statusParam) setStatusFilter(statusParam);
     if (countryParam) setCountryFilter(countryParam);
+    if (stateParam) setStateFilter(stateParam);
     if (verificationParam) setVerificationFilter(verificationParam);
     if (searchParam) setSearchQuery(searchParam);
     if (pageParam) setCurrentPage(parseInt(pageParam));
@@ -74,6 +77,7 @@ export default function AdminDrivers() {
   const queryParams = new URLSearchParams();
   if (searchQuery) queryParams.append("search", searchQuery);
   if (countryFilter !== "all") queryParams.append("country", countryFilter);
+  if (countryFilter === "US" && stateFilter !== "all") queryParams.append("state", stateFilter);
   if (statusFilter !== "all") queryParams.append("status", statusFilter);
   if (verificationFilter !== "all") queryParams.append("verificationStatus", verificationFilter);
   queryParams.append("page", currentPage.toString());
@@ -151,7 +155,14 @@ export default function AdminDrivers() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <Select value={countryFilter} onValueChange={(value) => { setCountryFilter(value); setCurrentPage(1); }}>
+              <Select 
+                value={countryFilter} 
+                onValueChange={(value) => { 
+                  setCountryFilter(value);
+                  if (value !== "US") setStateFilter("all");
+                  setCurrentPage(1);
+                }}
+              >
                 <SelectTrigger data-testid="select-country">
                   <SelectValue placeholder="All Countries" />
                 </SelectTrigger>
@@ -187,6 +198,23 @@ export default function AdminDrivers() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* USA State Filter (conditional) */}
+            {countryFilter === "US" && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <Select value={stateFilter} onValueChange={(value) => { setStateFilter(value); setCurrentPage(1); }}>
+                  <SelectTrigger data-testid="select-state">
+                    <SelectValue placeholder="All States" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All States</SelectItem>
+                    <SelectItem value="NY">New York (NY)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div />
+                <div />
+              </div>
+            )}
           </CardContent>
         </Card>
 
