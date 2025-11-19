@@ -1,6 +1,3 @@
-// SafeGo Super-App Prisma Schema
-// PostgreSQL database with country-specific KYC fields (BD vs US)
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,455 +7,312 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ====================================================
-// USER & AUTHENTICATION
-// ====================================================
-
-model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  passwordHash  String
-  role          String   // "customer" | "driver" | "restaurant" | "admin"
-  countryCode   String   // "BD" | "US" | others for future expansion
-  isBlocked     Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  driverProfile     DriverProfile?
-  customerProfile   CustomerProfile?
-  restaurantProfile RestaurantProfile?
-  adminProfile      AdminProfile?
-  notifications     Notification[]
-
-  @@map("users")
+model admin_profiles {
+  id        String   @id
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ====================================================
-// DRIVER PROFILE (BD + US KYC)
-// ====================================================
-
-model DriverProfile {
-  id                     String    @id @default(uuid())
-  userId                 String    @unique
-  
-  // Profile Photo (Required for all drivers)
-  profilePhotoUrl        String?   // Required but nullable for backward compatibility
-  
-  // Bangladesh-specific fields
-  fullName               String?
-  fatherName             String?
-  phoneNumber            String?
-  village                String?
-  postOffice             String?
-  thana                  String?
-  district               String?
-  presentAddress         String?
-  permanentAddress       String?
-  nidNumber              String?   // Legacy field (deprecated, use nidEncrypted)
-  nidEncrypted           String?   // Encrypted NID for secure storage (REQUIRED for BD drivers)
-  nidFrontImageUrl       String?
-  nidBackImageUrl        String?
-  
-  // US-specific fields - Name Structure
-  firstName              String?   // Required for US drivers
-  middleName             String?   // Optional for US drivers
-  lastName               String?   // Required for US drivers
-  usaFullLegalName       String?   // Legacy field (deprecated, use firstName/middleName/lastName)
-  
-  // US-specific fields - Identity Documents
-  ssnEncrypted           String?   // Encrypted full SSN for secure storage
-  ssnLast4               String?   // Last 4 digits for display (deprecated, use masked SSN)
-  driverLicenseNumber    String?
-  licenseStateIssued     String?   // e.g., "NY", "CA", "TX"
-  driverLicenseExpiry    DateTime?
-  driverLicenseImageUrl  String?   // Legacy: Generic license image
-  dmvLicenseImageUrl     String?   // Required for all US drivers - DMV Driver License
-  tlcLicenseImageUrl     String?   // Required for NY state drivers - TLC License
-  
-  // US Residential Address (structured)
-  usaStreet              String?
-  usaCity                String?
-  usaState               String?
-  usaZipCode             String?
-  // Legacy US fields (kept for backward compatibility)
-  homeAddress            String?   // Deprecated: use structured address fields
-  governmentIdType       String?   // Deprecated: "passport" | "state_id"
-  governmentIdLast4      String?   // Deprecated
-  // Background Check
-  backgroundCheckStatus  String?   @default("pending") // "pending" | "cleared" | "failed"
-  backgroundCheckDate    DateTime?
-  
-  // Common fields
-  dateOfBirth            DateTime?
-  emergencyContactName   String?
-  emergencyContactPhone  String?
-  usaPhoneNumber         String?   // Phone number for US drivers
-  verificationStatus     String    @default("pending") // "pending" | "approved" | "rejected"
-  rejectionReason        String?
-  isVerified             Boolean   @default(false)
-  
-  // Moderation fields
-  isSuspended            Boolean   @default(false)  // Temporary suspension (can't receive rides)
-  suspensionReason       String?
-  suspendedAt            DateTime?
-  lastActive             DateTime?  // Last time driver was online/active
-  
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
-
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  vehicle          Vehicle?
-  stats            DriverStats?
-  driverWallet     DriverWallet?
-  rides            Ride[]
-  foodOrders       FoodOrder[]
-  deliveries       Delivery[]
-  complaints       DriverComplaint[]
-  vehicleDocuments VehicleDocument[]
-
-  @@map("driver_profiles")
-}
-
-// ====================================================
-// CUSTOMER PROFILE (BD + US KYC)
-// ====================================================
-
-model CustomerProfile {
-  id                    String    @id @default(uuid())
-  userId                String    @unique
-  
-  // Bangladesh-specific fields
-  fullName              String?
+model customer_profiles {
+  id                    String              @id
+  userId                String              @unique
   fatherName            String?
-  phoneNumber           String?
-  village               String?
-  postOffice            String?
-  thana                 String?
-  district              String?
   presentAddress        String?
   permanentAddress      String?
-  nidNumber             String?   // Legacy field (deprecated, use nidEncrypted)
-  nidEncrypted          String?   // Encrypted NID for secure storage
+  nidNumber             String?
   nidFrontImageUrl      String?
   nidBackImageUrl       String?
-  
-  // US-specific fields
   homeAddress           String?
   governmentIdType      String?
   governmentIdLast4     String?
-  
-  // Common fields
   dateOfBirth           DateTime?
   emergencyContactName  String?
   emergencyContactPhone String?
-  verificationStatus    String    @default("pending")
+  verificationStatus    String              @default("pending")
   rejectionReason       String?
-  isVerified            Boolean   @default(false)
-  
-  // Moderation fields
-  isSuspended           Boolean   @default(false)  // Temporary suspension (can't place orders)
-  suspensionReason      String?
+  isVerified            Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime
+  isSuspended           Boolean             @default(false)
   suspendedAt           DateTime?
-  
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-
-  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  rides             Ride[]
-  foodOrders        FoodOrder[]
-  deliveries        Delivery[]
-  driverComplaints  DriverComplaint[]
-
-  @@map("customer_profiles")
+  suspensionReason      String?
+  district              String?
+  fullName              String?
+  nidEncrypted          String?
+  phoneNumber           String?
+  postOffice            String?
+  thana                 String?
+  village               String?
+  users                 users               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries            deliveries[]
+  driver_complaints     driver_complaints[]
+  food_orders           food_orders[]
+  rides                 rides[]
 }
 
-// ====================================================
-// RESTAURANT PROFILE
-// ====================================================
-
-model RestaurantProfile {
-  id                 String    @id @default(uuid())
-  userId             String    @unique
-  restaurantName     String
-  address            String
-  verificationStatus String    @default("pending")
-  rejectionReason    String?
-  isVerified         Boolean   @default(false)
-  
-  // Moderation fields
-  isSuspended        Boolean   @default(false)  // Temporary suspension (can't receive orders)
-  suspensionReason   String?
-  suspendedAt        DateTime?
-  
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  restaurantWallet RestaurantWallet?
-  foodOrders       FoodOrder[]
-  complaints       DriverComplaint[]
-
-  @@map("restaurant_profiles")
+model deliveries {
+  id                String            @id
+  customerId        String
+  driverId          String?
+  pickupAddress     String
+  pickupLat         Float?
+  pickupLng         Float?
+  dropoffAddress    String
+  dropoffLat        Float?
+  dropoffLng        Float?
+  serviceFare       Decimal           @db.Decimal(10, 2)
+  safegoCommission  Decimal           @db.Decimal(10, 2)
+  driverPayout      Decimal           @db.Decimal(10, 2)
+  paymentMethod     String
+  status            String
+  customerRating    Int?
+  customerFeedback  String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime
+  deliveredAt       DateTime?
+  customer_profiles customer_profiles @relation(fields: [customerId], references: [id])
+  driver_profiles   driver_profiles?  @relation(fields: [driverId], references: [id])
 }
 
-// ====================================================
-// ADMIN PROFILE
-// ====================================================
-
-model AdminProfile {
-  id        String   @id @default(uuid())
-  userId    String   @unique
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("admin_profiles")
+model driver_complaints {
+  id                  String               @id
+  driverId            String?
+  customerId          String?
+  rideId              String?
+  reason              String
+  description         String?
+  status              String               @default("open")
+  resolvedAt          DateTime?
+  resolvedBy          String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime
+  restaurantId        String?
+  type                String               @default("driver")
+  customer_profiles   customer_profiles?   @relation(fields: [customerId], references: [id])
+  driver_profiles     driver_profiles?     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  restaurant_profiles restaurant_profiles? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  rides               rides?               @relation(fields: [rideId], references: [id])
 }
 
-// ====================================================
-// VEHICLE
-// ====================================================
-
-model Vehicle {
-  id            String   @id @default(uuid())
-  driverId      String   @unique
-  vehicleType   String   // "SafeGo X" | "SafeGo Comfort" | "SafeGo XL" | "car" | "bike"
-  vehicleModel  String
-  vehiclePlate  String   // License plate / Number plate
-  notes         String?  // Optional free-text notes (e.g., "Uber-style sedan, white")
-  isOnline      Boolean  @default(false)
-  totalEarnings Decimal  @default(0) @db.Decimal(10, 2)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  driver    DriverProfile      @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  documents VehicleDocument[]
-
-  @@map("vehicles")
+model driver_profiles {
+  id                    String              @id
+  userId                String              @unique
+  fatherName            String?
+  presentAddress        String?
+  permanentAddress      String?
+  nidNumber             String?
+  nidFrontImageUrl      String?
+  nidBackImageUrl       String?
+  homeAddress           String?
+  governmentIdType      String?
+  governmentIdLast4     String?
+  driverLicenseNumber   String?
+  driverLicenseImageUrl String?
+  driverLicenseExpiry   DateTime?
+  ssnLast4              String?
+  dateOfBirth           DateTime?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  verificationStatus    String              @default("pending")
+  rejectionReason       String?
+  isVerified            Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime
+  isSuspended           Boolean             @default(false)
+  lastActive            DateTime?
+  suspendedAt           DateTime?
+  suspensionReason      String?
+  district              String?
+  fullName              String?
+  nidEncrypted          String?
+  phoneNumber           String?
+  postOffice            String?
+  thana                 String?
+  village               String?
+  backgroundCheckDate   DateTime?
+  backgroundCheckStatus String?             @default("pending")
+  licenseStateIssued    String?
+  ssnEncrypted          String?
+  usaCity               String?
+  usaFullLegalName      String?
+  usaPhoneNumber        String?
+  usaState              String?
+  usaStreet             String?
+  usaZipCode            String?
+  dmvLicenseImageUrl    String?
+  firstName             String?
+  lastName              String?
+  middleName            String?
+  profilePhotoUrl       String?
+  tlcLicenseImageUrl    String?
+  deliveries            deliveries[]
+  driver_complaints     driver_complaints[]
+  users                 users               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driver_stats          driver_stats?
+  driver_wallets        driver_wallets?
+  food_orders           food_orders[]
+  rides                 rides[]
+  vehicle_documents     vehicle_documents[]
+  vehicles              vehicles?
 }
 
-// ====================================================
-// VEHICLE DOCUMENTS (Registration, Insurance, etc.)
-// ====================================================
-
-model VehicleDocument {
-  id           String    @id @default(uuid())
-  driverId     String    // Links to DriverProfile (one driver can have multiple docs)
-  vehicleId    String?   // Optional link to specific Vehicle
-  documentType String    // "registration" | "insurance"
-  fileUrl      String    // Secure file path/URL
-  description  String?   // Optional document description
-  uploadedAt   DateTime  @default(now())
-  expiresAt    DateTime? // Optional expiry date for document
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  driver  DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  vehicle Vehicle?      @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-
-  @@index([driverId])
-  @@index([vehicleId])
-  @@map("vehicle_documents")
+model driver_stats {
+  id              String          @id
+  driverId        String          @unique
+  rating          Decimal         @default(5.0) @db.Decimal(3, 2)
+  totalTrips      Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  driver_profiles driver_profiles @relation(fields: [driverId], references: [id], onDelete: Cascade)
 }
 
-// ====================================================
-// DRIVER STATS
-// ====================================================
-
-model DriverStats {
-  id         String   @id @default(uuid())
-  driverId   String   @unique
-  rating     Decimal  @default(5.0) @db.Decimal(3, 2)
-  totalTrips Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
-
-  @@map("driver_stats")
+model driver_wallets {
+  id              String          @id
+  driverId        String          @unique
+  balance         Decimal         @default(0) @db.Decimal(10, 2)
+  negativeBalance Decimal         @default(0) @db.Decimal(10, 2)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  driver_profiles driver_profiles @relation(fields: [driverId], references: [id], onDelete: Cascade)
 }
 
-// ====================================================
-// DRIVER WALLET
-// Commission logic:
-// - CASH payment: driver gets full amount, SafeGo commission becomes negative balance
-// - ONLINE payment: SafeGo keeps commission, no negative balance
-// ====================================================
-
-model DriverWallet {
-  id              String   @id @default(uuid())
-  driverId        String   @unique
-  balance         Decimal  @default(0) @db.Decimal(10, 2)   // Positive = SafeGo owes driver
-  negativeBalance Decimal  @default(0) @db.Decimal(10, 2)   // SafeGo commission to be settled
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  driver DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
-
-  @@map("driver_wallets")
+model food_orders {
+  id                  String              @id
+  customerId          String
+  restaurantId        String
+  driverId            String?
+  deliveryAddress     String
+  deliveryLat         Float?
+  deliveryLng         Float?
+  serviceFare         Decimal             @db.Decimal(10, 2)
+  safegoCommission    Decimal             @db.Decimal(10, 2)
+  restaurantPayout    Decimal             @db.Decimal(10, 2)
+  driverPayout        Decimal             @db.Decimal(10, 2)
+  paymentMethod       String
+  status              String
+  customerRating      Int?
+  customerFeedback    String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime
+  deliveredAt         DateTime?
+  customer_profiles   customer_profiles   @relation(fields: [customerId], references: [id])
+  driver_profiles     driver_profiles?    @relation(fields: [driverId], references: [id])
+  restaurant_profiles restaurant_profiles @relation(fields: [restaurantId], references: [id])
 }
 
-// ====================================================
-// RESTAURANT WALLET
-// Commission logic same as driver wallet
-// ====================================================
-
-model RestaurantWallet {
-  id              String   @id @default(uuid())
-  restaurantId    String   @unique
-  balance         Decimal  @default(0) @db.Decimal(10, 2)
-  negativeBalance Decimal  @default(0) @db.Decimal(10, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  restaurant RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@map("restaurant_wallets")
-}
-
-// ====================================================
-// RIDES
-// Status flow: requested → searching_driver → accepted → driver_arriving 
-//              → in_progress → completed OR cancelled_*
-// ====================================================
-
-model Ride {
-  id               String    @id @default(uuid())
-  customerId       String
-  driverId         String?
-  pickupAddress    String
-  pickupLat        Float?    // Optional - for future GPS-based matching
-  pickupLng        Float?    // Optional - for future GPS-based matching
-  dropoffAddress   String
-  dropoffLat       Float?    // Optional - for future GPS-based matching
-  dropoffLng       Float?    // Optional - for future GPS-based matching
-  serviceFare      Decimal   @db.Decimal(10, 2)
-  safegoCommission Decimal   @db.Decimal(10, 2)
-  driverPayout     Decimal   @db.Decimal(10, 2)
-  paymentMethod    String    // "cash" | "online"
-  status           String    // ride status flow
-  customerRating   Int?
-  customerFeedback String?
-  driverRating     Int?
-  driverFeedback   String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  completedAt      DateTime?
-
-  customer   CustomerProfile   @relation(fields: [customerId], references: [id])
-  driver     DriverProfile?    @relation(fields: [driverId], references: [id])
-  complaints DriverComplaint[]
-
-  @@map("rides")
-}
-
-// ====================================================
-// FOOD ORDERS
-// Status flow: placed → accepted → preparing → ready_for_pickup 
-//              → picked_up → on_the_way → delivered OR cancelled_*
-// ====================================================
-
-model FoodOrder {
-  id               String    @id @default(uuid())
-  customerId       String
-  restaurantId     String
-  driverId         String?
-  deliveryAddress  String
-  deliveryLat      Float?    // Optional - for future GPS-based matching
-  deliveryLng      Float?    // Optional - for future GPS-based matching
-  serviceFare      Decimal   @db.Decimal(10, 2)
-  safegoCommission Decimal   @db.Decimal(10, 2)
-  restaurantPayout Decimal   @db.Decimal(10, 2)
-  driverPayout     Decimal   @db.Decimal(10, 2)
-  paymentMethod    String    // "cash" | "online"
-  status           String    // food order status flow
-  customerRating   Int?
-  customerFeedback String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  deliveredAt      DateTime?
-
-  customer   CustomerProfile   @relation(fields: [customerId], references: [id])
-  restaurant RestaurantProfile @relation(fields: [restaurantId], references: [id])
-  driver     DriverProfile?    @relation(fields: [driverId], references: [id])
-
-  @@map("food_orders")
-}
-
-// ====================================================
-// PARCEL DELIVERIES
-// Status flow: requested → searching_driver → accepted → picked_up 
-//              → on_the_way → delivered OR cancelled_*
-// ====================================================
-
-model Delivery {
-  id               String    @id @default(uuid())
-  customerId       String
-  driverId         String?
-  pickupAddress    String
-  pickupLat        Float?    // Optional - for future GPS-based matching
-  pickupLng        Float?    // Optional - for future GPS-based matching
-  dropoffAddress   String
-  dropoffLat       Float?    // Optional - for future GPS-based matching
-  dropoffLng       Float?    // Optional - for future GPS-based matching
-  serviceFare      Decimal   @db.Decimal(10, 2)
-  safegoCommission Decimal   @db.Decimal(10, 2)
-  driverPayout     Decimal   @db.Decimal(10, 2)
-  paymentMethod    String    // "cash" | "online"
-  status           String    // parcel status flow
-  customerRating   Int?
-  customerFeedback String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  deliveredAt      DateTime?
-
-  customer CustomerProfile @relation(fields: [customerId], references: [id])
-  driver   DriverProfile?  @relation(fields: [driverId], references: [id])
-
-  @@map("deliveries")
-}
-
-// ====================================================
-// COMPLAINTS (Driver & Restaurant)
-// ====================================================
-
-model DriverComplaint {
-  id           String    @id @default(uuid())
-  type         String    @default("driver") // "driver" | "restaurant"
-  driverId     String?
-  restaurantId String?
-  customerId   String?
-  rideId       String?
-  reason       String
-  description  String?
-  status       String    @default("open") // "open" | "resolved"
-  resolvedAt   DateTime?
-  resolvedBy   String?   // Admin userId who resolved it
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  driver     DriverProfile?     @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  restaurant RestaurantProfile? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  customer   CustomerProfile?   @relation(fields: [customerId], references: [id])
-  ride       Ride?              @relation(fields: [rideId], references: [id])
-
-  @@map("driver_complaints")
-}
-
-// ====================================================
-// NOTIFICATIONS
-// ====================================================
-
-model Notification {
-  id        String   @id @default(uuid())
+model notifications {
+  id        String   @id
   userId    String
-  type      String   // "ride_update" | "food_update" | "parcel_update" | "verification" | "admin"
+  type      String
   title     String
   body      String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+model restaurant_profiles {
+  id                 String              @id
+  userId             String              @unique
+  restaurantName     String
+  address            String
+  verificationStatus String              @default("pending")
+  rejectionReason    String?
+  isVerified         Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime
+  isSuspended        Boolean             @default(false)
+  suspendedAt        DateTime?
+  suspensionReason   String?
+  driver_complaints  driver_complaints[]
+  food_orders        food_orders[]
+  users              users               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurant_wallets restaurant_wallets?
+}
 
-  @@map("notifications")
+model restaurant_wallets {
+  id                  String              @id
+  restaurantId        String              @unique
+  balance             Decimal             @default(0) @db.Decimal(10, 2)
+  negativeBalance     Decimal             @default(0) @db.Decimal(10, 2)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime
+  restaurant_profiles restaurant_profiles @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+}
+
+model rides {
+  id                String              @id
+  customerId        String
+  driverId          String?
+  pickupAddress     String
+  pickupLat         Float?
+  pickupLng         Float?
+  dropoffAddress    String
+  dropoffLat        Float?
+  dropoffLng        Float?
+  serviceFare       Decimal             @db.Decimal(10, 2)
+  safegoCommission  Decimal             @db.Decimal(10, 2)
+  driverPayout      Decimal             @db.Decimal(10, 2)
+  paymentMethod     String
+  status            String
+  customerRating    Int?
+  customerFeedback  String?
+  driverRating      Int?
+  driverFeedback    String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  completedAt       DateTime?
+  driver_complaints driver_complaints[]
+  customer_profiles customer_profiles   @relation(fields: [customerId], references: [id])
+  driver_profiles   driver_profiles?    @relation(fields: [driverId], references: [id])
+}
+
+model users {
+  id                  String               @id
+  email               String               @unique
+  passwordHash        String
+  role                String
+  countryCode         String
+  isBlocked           Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime
+  admin_profiles      admin_profiles?
+  customer_profiles   customer_profiles?
+  driver_profiles     driver_profiles?
+  notifications       notifications[]
+  restaurant_profiles restaurant_profiles?
+}
+
+model vehicle_documents {
+  id              String          @id
+  driverId        String
+  documentType    String
+  uploadedAt      DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime
+  description     String?
+  expiresAt       DateTime?
+  fileUrl         String
+  vehicleId       String?
+  driver_profiles driver_profiles @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicles        vehicles?       @relation(fields: [vehicleId], references: [id])
+
+  @@index([driverId])
+  @@index([vehicleId])
+}
+
+model vehicles {
+  id                String              @id
+  driverId          String              @unique
+  vehicleType       String
+  vehicleModel      String
+  vehiclePlate      String
+  isOnline          Boolean             @default(false)
+  totalEarnings     Decimal             @default(0) @db.Decimal(10, 2)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime
+  notes             String?
+  vehicle_documents vehicle_documents[]
+  driver_profiles   driver_profiles     @relation(fields: [driverId], references: [id], onDelete: Cascade)
 }
