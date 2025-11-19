@@ -1826,6 +1826,109 @@ router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// PATCH /api/admin/drivers/:id/vehicle
+// Update driver vehicle information (admin only, USA drivers)
+// ====================================================
+const updateVehicleSchema = z.object({
+  vehicleType: z.string().min(1).max(50).optional(),
+  make: z.string().min(1).max(100).optional(),
+  model: z.string().min(1).max(100).optional(),
+  year: z.number().int().min(1900).max(2100).optional(),
+  color: z.string().min(1).max(50).optional(),
+  licensePlate: z.string().min(1).max(20).optional(),
+  registrationDocumentUrl: z.string().url().optional(),
+  registrationExpiry: z.string().optional(), // ISO date string
+  insuranceDocumentUrl: z.string().url().optional(),
+  insuranceExpiry: z.string().optional(), // ISO date string
+});
+
+router.patch("/drivers/:id/vehicle", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate request body
+    const validation = updateVehicleSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Invalid vehicle data", 
+        details: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+
+    // Check if driver exists and is USA driver
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      include: {
+        user: { select: { countryCode: true } },
+        vehicle: true,
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    if (driver.user.countryCode !== "US") {
+      return res.status(400).json({ error: "Vehicle updates only available for USA drivers" });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (data.vehicleType) updateData.vehicleType = data.vehicleType;
+    if (data.make) updateData.make = data.make;
+    if (data.model) {
+      updateData.model = data.model;
+      updateData.vehicleModel = data.model; // Keep legacy field in sync
+    }
+    if (data.year) updateData.year = data.year;
+    if (data.color) updateData.color = data.color;
+    if (data.licensePlate) {
+      updateData.licensePlate = data.licensePlate;
+      updateData.vehiclePlate = data.licensePlate; // Keep legacy field in sync
+    }
+    if (data.registrationDocumentUrl) updateData.registrationDocumentUrl = data.registrationDocumentUrl;
+    if (data.registrationExpiry) updateData.registrationExpiry = new Date(data.registrationExpiry);
+    if (data.insuranceDocumentUrl) updateData.insuranceDocumentUrl = data.insuranceDocumentUrl;
+    if (data.insuranceExpiry) updateData.insuranceExpiry = new Date(data.insuranceExpiry);
+
+    // Update or create vehicle
+    let vehicle;
+    if (driver.vehicle) {
+      // Update existing vehicle
+      vehicle = await prisma.vehicle.update({
+        where: { id: driver.vehicle.id },
+        data: updateData,
+      });
+    } else {
+      // Create new vehicle
+      vehicle = await prisma.vehicle.create({
+        data: {
+          id: `vehicle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          driverId: driver.id,
+          vehicleType: data.vehicleType || "sedan",
+          vehicleModel: data.model || "",
+          vehiclePlate: data.licensePlate || "",
+          ...updateData,
+        },
+      });
+    }
+
+    res.json({
+      message: "Vehicle information updated successfully",
+      vehicle: {
+        ...vehicle,
+        totalEarnings: Number(vehicle.totalEarnings),
+      },
+    });
+  } catch (error) {
+    console.error("Update vehicle error:", error);
+    res.status(500).json({ error: "Failed to update vehicle information" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/drivers/:id/ssn
 // Decrypt and return masked SSN (admin only)
 // ====================================================
