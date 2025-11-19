@@ -48,9 +48,17 @@ export default function AdminCustomers() {
   const [searchEmail, setSearchEmail] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
+  // Build query params
+  const queryParams = new URLSearchParams();
+  if (searchEmail) queryParams.append("search", searchEmail);
+  if (statusFilter !== "all") queryParams.append("status", statusFilter);
+
+  const queryString = queryParams.toString();
+  const fullUrl = `/api/admin/customers${queryString ? `?${queryString}` : ''}`;
+
   // Fetch customers
   const { data: customers, isLoading } = useQuery<Customer[]>({
-    queryKey: ["/api/admin/customers", "list", { search: searchEmail, status: statusFilter === "all" ? undefined : statusFilter }],
+    queryKey: [fullUrl],
     refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 

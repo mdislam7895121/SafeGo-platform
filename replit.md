@@ -37,13 +37,18 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 - All changes backward-compatible with existing data
 
 **API Endpoints:**
-- `GET /api/admin/customers` - List with filters and usage stats
+- `GET /api/admin/customers?search=<email>&status=<active|suspended|blocked>` - List with filters and usage stats
 - `GET /api/admin/customers/:id` - Details with full activity history
 - `PATCH /api/admin/customers/:id/suspend` - Suspend with reason
 - `PATCH /api/admin/customers/:id/unsuspend` - Remove suspension
 - `PATCH /api/admin/customers/:id/block` - Block account
 - `PATCH /api/admin/customers/:id/unblock` - Unblock account
 - `GET /api/admin/stats` - Now includes `totalCustomers` count
+
+**Bug Fix (Nov 19, 2025):**
+- Fixed malformed URL construction in customer list query - was calling `/api/admin/customers/list/[object Object]` instead of `/api/admin/customers`
+- Updated query key pattern to match driver/restaurant management (build full URL with query params)
+- Fixed mutation functions to use correct apiRequest signature
 
 ### Restaurant Management System
 **Complete admin-side restaurant management capabilities:**

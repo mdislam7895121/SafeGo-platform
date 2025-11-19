@@ -76,7 +76,7 @@ export default function CustomerDetails() {
 
   // Fetch customer details
   const { data: customer, isLoading } = useQuery<Customer>({
-    queryKey: ["/api/admin/customers", "detail", customerId],
+    queryKey: [`/api/admin/customers/${customerId}`],
     enabled: !!customerId,
     refetchInterval: 5000,
   });
@@ -84,90 +84,88 @@ export default function CustomerDetails() {
   // Suspend mutation
   const suspendMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/admin/customers/${customerId}/suspend`, {
-        method: "PATCH",
-        body: JSON.stringify({ reason: suspensionReason }),
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/suspend`, { reason: suspensionReason });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to suspend customer");
+      }
+      return response.json();
     },
     onSuccess: () => {
+      toast({ title: "Customer suspended successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/customers/${customerId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Customer suspended successfully" });
       setShowSuspendDialog(false);
       setSuspensionReason("");
     },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to suspend customer",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
   // Unsuspend mutation
   const unsuspendMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/admin/customers/${customerId}/unsuspend`, {
-        method: "PATCH",
-      });
+      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/unsuspend`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to unsuspend customer");
+      }
+      return response.json();
     },
     onSuccess: () => {
+      toast({ title: "Customer suspension lifted successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/customers/${customerId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Customer unsuspended successfully" });
     },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to unsuspend customer",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
   // Block mutation
   const blockMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/admin/customers/${customerId}/block`, {
-        method: "PATCH",
-      });
+      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/block`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to block customer");
+      }
+      return response.json();
     },
     onSuccess: () => {
+      toast({ title: "Customer blocked successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/customers/${customerId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Customer blocked successfully" });
       setShowBlockDialog(false);
     },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to block customer",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
   // Unblock mutation
   const unblockMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest(`/api/admin/customers/${customerId}/unblock`, {
-        method: "PATCH",
-      });
+      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/unblock`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to unblock customer");
+      }
+      return response.json();
     },
     onSuccess: () => {
+      toast({ title: "Customer unblocked successfully" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/customers/${customerId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Customer unblocked successfully" });
       setShowUnblockDialog(false);
     },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to unblock customer",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
