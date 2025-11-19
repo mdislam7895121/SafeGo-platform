@@ -33,6 +33,8 @@ import AdminKYC from "@/pages/admin/kyc";
 import AdminSettlement from "@/pages/admin/settlement";
 import AdminDrivers from "@/pages/admin/drivers";
 import AdminDriverDetails from "@/pages/admin/driver-details";
+import AdminRestaurants from "@/pages/admin/restaurants";
+import AdminRestaurantDetails from "@/pages/admin/restaurant-details";
 import AdminComplaints from "@/pages/admin/complaints";
 import AdminComplaintDetails from "@/pages/admin/complaint-details";
 import AdminUsers from "@/pages/admin/users";
@@ -154,6 +156,16 @@ function Router() {
       <Route path="/admin/drivers/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminDriverDetails />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/restaurants">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminRestaurants />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/restaurants/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminRestaurantDetails />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/complaints">

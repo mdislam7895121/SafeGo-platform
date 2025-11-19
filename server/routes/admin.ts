@@ -34,6 +34,16 @@ router.get("/stats", async (req: AuthRequest, res) => {
       where: { verificationStatus: "pending" },
     });
 
+    // Pending customers
+    const pendingCustomers = await prisma.customerProfile.count({
+      where: { verificationStatus: "pending" },
+    });
+
+    // Pending restaurants
+    const pendingRestaurants = await prisma.restaurantProfile.count({
+      where: { verificationStatus: "pending" },
+    });
+
     // Suspended drivers
     const suspendedDrivers = await prisma.driverProfile.count({
       where: { isSuspended: true },
@@ -52,7 +62,7 @@ router.get("/stats", async (req: AuthRequest, res) => {
       where: { role: "restaurant" },
     });
 
-    // Total complaints (open complaints)
+    // Total complaints (open complaints - includes both driver and restaurant complaints)
     const openComplaints = await prisma.driverComplaint.count({
       where: { status: "open" },
     });
@@ -62,6 +72,8 @@ router.get("/stats", async (req: AuthRequest, res) => {
       totalDrivers,
       activeDrivers,
       pendingDrivers,
+      pendingCustomers,
+      pendingRestaurants,
       suspendedDrivers,
       blockedDrivers,
       restaurants,
@@ -1228,6 +1240,401 @@ router.delete("/drivers/:id", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Delete driver error:", error);
     res.status(500).json({ error: "Failed to delete driver" });
+  }
+});
+
+// ====================================================
+// RESTAURANT MANAGEMENT ENDPOINTS
+// ====================================================
+
+// ====================================================
+// GET /api/admin/restaurants
+// List all restaurants with filters
+// ====================================================
+router.get("/restaurants", async (req: AuthRequest, res) => {
+  try {
+    const { search, status } = req.query;
+
+    // Build where clause
+    const where: any = {};
+    const userFilters: any = {};
+
+    // Search by email
+    if (search) {
+      userFilters.email = {
+        contains: search as string,
+        mode: "insensitive",
+      };
+    }
+
+    // Filter by status (active/suspended/blocked)
+    if (status === "active") {
+      where.isSuspended = false;
+      userFilters.isBlocked = false;
+    } else if (status === "suspended") {
+      where.isSuspended = true;
+    } else if (status === "blocked") {
+      userFilters.isBlocked = true;
+    }
+
+    // Combine filters
+    if (Object.keys(userFilters).length > 0) {
+      where.user = userFilters;
+    }
+
+    const restaurants = await prisma.restaurantProfile.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+          },
+        },
+        restaurantWallet: {
+          select: {
+            balance: true,
+            negativeBalance: true,
+          },
+        },
+        foodOrders: {
+          where: {
+            status: "delivered",
+          },
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const formattedRestaurants = restaurants.map((restaurant) => ({
+      id: restaurant.id,
+      userId: restaurant.user.id,
+      email: restaurant.user.email,
+      restaurantName: restaurant.restaurantName,
+      address: restaurant.address,
+      country: restaurant.user.countryCode,
+      verificationStatus: restaurant.verificationStatus,
+      isVerified: restaurant.isVerified,
+      rejectionReason: restaurant.rejectionReason,
+      isSuspended: restaurant.isSuspended,
+      suspensionReason: restaurant.suspensionReason,
+      suspendedAt: restaurant.suspendedAt,
+      isBlocked: restaurant.user.isBlocked,
+      balance: restaurant.restaurantWallet?.balance || 0,
+      negativeBalance: restaurant.restaurantWallet?.negativeBalance || 0,
+      totalOrders: restaurant.foodOrders.length,
+      createdAt: restaurant.createdAt,
+    }));
+
+    res.json(formattedRestaurants);
+  } catch (error) {
+    console.error("List restaurants error:", error);
+    res.status(500).json({ error: "Failed to fetch restaurants" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/restaurants/:id
+// Get restaurant details
+// ====================================================
+router.get("/restaurants/:id", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+        restaurantWallet: true,
+        foodOrders: {
+          select: {
+            id: true,
+            status: true,
+            serviceFare: true,
+            safegoCommission: true,
+            restaurantPayout: true,
+            createdAt: true,
+            deliveredAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+        complaints: {
+          select: {
+            id: true,
+            reason: true,
+            status: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Calculate stats
+    const completedOrders = restaurant.foodOrders.filter(
+      (order) => order.status === "delivered"
+    );
+    const totalRevenue = completedOrders.reduce(
+      (sum, order) => sum + Number(order.restaurantPayout),
+      0
+    );
+    const totalCommission = completedOrders.reduce(
+      (sum, order) => sum + Number(order.safegoCommission),
+      0
+    );
+
+    const formattedRestaurant = {
+      id: restaurant.id,
+      userId: restaurant.user.id,
+      email: restaurant.user.email,
+      restaurantName: restaurant.restaurantName,
+      address: restaurant.address,
+      country: restaurant.user.countryCode,
+      verificationStatus: restaurant.verificationStatus,
+      isVerified: restaurant.isVerified,
+      rejectionReason: restaurant.rejectionReason,
+      isSuspended: restaurant.isSuspended,
+      suspensionReason: restaurant.suspensionReason,
+      suspendedAt: restaurant.suspendedAt,
+      isBlocked: restaurant.user.isBlocked,
+      balance: restaurant.restaurantWallet?.balance || 0,
+      negativeBalance: restaurant.restaurantWallet?.negativeBalance || 0,
+      totalOrders: restaurant.foodOrders.length,
+      completedOrders: completedOrders.length,
+      totalRevenue,
+      totalCommission,
+      recentOrders: restaurant.foodOrders,
+      complaints: restaurant.complaints,
+      createdAt: restaurant.createdAt,
+      accountCreated: restaurant.user.createdAt,
+    };
+
+    res.json(formattedRestaurant);
+  } catch (error) {
+    console.error("Get restaurant details error:", error);
+    res.status(500).json({ error: "Failed to fetch restaurant details" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/restaurants/:id/suspend
+// Suspend a restaurant (temporary - can't receive orders)
+// ====================================================
+router.patch("/restaurants/:id/suspend", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || reason.trim() === "") {
+      return res.status(400).json({ error: "Suspension reason is required" });
+    }
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    if (restaurant.isSuspended) {
+      return res.status(400).json({ error: "Restaurant is already suspended" });
+    }
+
+    const updated = await prisma.restaurantProfile.update({
+      where: { id },
+      data: {
+        isSuspended: true,
+        suspensionReason: reason,
+        suspendedAt: new Date(),
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: restaurant.userId,
+        type: "admin",
+        title: "Account Suspended",
+        body: `Your restaurant account has been suspended. Reason: ${reason}`,
+      },
+    });
+
+    res.json({
+      message: "Restaurant suspended successfully",
+      restaurant: {
+        id: updated.id,
+        isSuspended: updated.isSuspended,
+        suspensionReason: updated.suspensionReason,
+      },
+    });
+  } catch (error) {
+    console.error("Suspend restaurant error:", error);
+    res.status(500).json({ error: "Failed to suspend restaurant" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/restaurants/:id/unsuspend
+// Unsuspend a restaurant (lift temporary suspension)
+// ====================================================
+router.patch("/restaurants/:id/unsuspend", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    if (!restaurant.isSuspended) {
+      return res.status(400).json({ error: "Restaurant is not suspended" });
+    }
+
+    const updated = await prisma.restaurantProfile.update({
+      where: { id },
+      data: {
+        isSuspended: false,
+        suspensionReason: null,
+        suspendedAt: null,
+      },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: restaurant.userId,
+        type: "admin",
+        title: "Account Unsuspended",
+        body: "Your restaurant account suspension has been lifted. You can now receive orders.",
+      },
+    });
+
+    res.json({
+      message: "Restaurant unsuspended successfully",
+      restaurant: {
+        id: updated.id,
+        isSuspended: updated.isSuspended,
+      },
+    });
+  } catch (error) {
+    console.error("Unsuspend restaurant error:", error);
+    res.status(500).json({ error: "Failed to unsuspend restaurant" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/restaurants/:id/block
+// Block a restaurant permanently (disables user account)
+// ====================================================
+router.patch("/restaurants/:id/block", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    if (restaurant.user.isBlocked) {
+      return res.status(400).json({ error: "Restaurant is already blocked" });
+    }
+
+    await prisma.user.update({
+      where: { id: restaurant.userId },
+      data: { isBlocked: true },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: restaurant.userId,
+        type: "admin",
+        title: "Account Blocked",
+        body: "Your restaurant account has been blocked by an administrator.",
+      },
+    });
+
+    res.json({
+      message: "Restaurant blocked successfully",
+      restaurantId: id,
+      userId: restaurant.userId,
+    });
+  } catch (error) {
+    console.error("Block restaurant error:", error);
+    res.status(500).json({ error: "Failed to block restaurant" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/restaurants/:id/unblock
+// Unblock a restaurant (reactivate user account)
+// ====================================================
+router.patch("/restaurants/:id/unblock", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+      include: { user: true },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    if (!restaurant.user.isBlocked) {
+      return res.status(400).json({ error: "Restaurant is not blocked" });
+    }
+
+    await prisma.user.update({
+      where: { id: restaurant.userId },
+      data: { isBlocked: false },
+    });
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId: restaurant.userId,
+        type: "admin",
+        title: "Account Unblocked",
+        body: "Your restaurant account has been unblocked by an administrator.",
+      },
+    });
+
+    res.json({
+      message: "Restaurant unblocked successfully",
+      restaurantId: id,
+      userId: restaurant.userId,
+    });
+  } catch (error) {
+    console.error("Unblock restaurant error:", error);
+    res.status(500).json({ error: "Failed to unblock restaurant" });
   }
 });
 

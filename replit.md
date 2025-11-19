@@ -12,15 +12,48 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Updates (November 2025)
 
+### Restaurant Management System (Latest)
+**Complete admin-side restaurant management capabilities:**
+- **Restaurant List** (`/admin/restaurants`): Simple table showing all restaurants with email, name, country, KYC status, account status, wallet balance, and total orders
+- **Search & Filters**: Search by email, filter by status (All/Active/Suspended/Blocked)
+- **Restaurant Details** (`/admin/restaurants/:id`): Comprehensive view with profile info, KYC status, wallet details (balance, owed amounts), order statistics, recent orders, and complaints
+- **Admin Actions**:
+  - **Suspend/Unsuspend**: Temporary suspension preventing order reception (requires reason)
+  - **Block/Unblock**: Permanent account disablement (affects user.isBlocked)
+- **KYC Integration**: Restaurants tab in `/admin/kyc` for approving/rejecting restaurant verification
+- **Dashboard Integration**: 
+  - Restaurants card is clickable → `/admin/restaurants`
+  - Pending KYC count includes drivers + customers + restaurants
+  - Open Complaints includes both driver and restaurant complaints
+- **Auto-refresh**: 5-second polling on all restaurant management pages
+- **Security**: All routes protected with admin-only middleware
+
+**Database Schema Changes:**
+- `RestaurantProfile` table: Added `isSuspended`, `suspensionReason`, `suspendedAt` fields
+- `DriverComplaint` table extended for restaurants: Added `type` field (driver/restaurant), made `driverId` optional, added `restaurantId` field
+- All changes backward-compatible with existing data
+
+**API Endpoints:**
+- `GET /api/admin/restaurants` - List with filters
+- `GET /api/admin/restaurants/:id` - Details with stats
+- `PATCH /api/admin/restaurants/:id/suspend` - Suspend with reason
+- `PATCH /api/admin/restaurants/:id/unsuspend` - Remove suspension
+- `PATCH /api/admin/restaurants/:id/block` - Block account
+- `PATCH /api/admin/restaurants/:id/unblock` - Unblock account
+- `GET /api/admin/stats` - Now includes `pendingRestaurants` count
+- `POST /api/admin/kyc/approve` - Supports `role: "restaurant"`
+- `POST /api/admin/kyc/reject` - Supports `role: "restaurant"`
+
 ### Interactive Admin Dashboard
 **All statistic cards are now fully interactive** with proper navigation, hover effects, and security:
 - Total Users → /admin/users (with role filtering)
 - Total Drivers → /admin/drivers (with full search and filters)
 - Active Drivers → /admin/drivers?status=active (filtered view)
-- Pending KYC → /admin/kyc
+- Restaurants → /admin/restaurants (NEW - with search and filters)
+- Pending KYC → /admin/kyc (includes all roles: drivers, customers, restaurants)
 - Suspended Drivers → /admin/drivers?status=suspended
 - Blocked Drivers → /admin/drivers?status=blocked
-- Open Complaints → /admin/complaints
+- Open Complaints → /admin/complaints (includes driver and restaurant complaints)
 
 **Implementation Details:**
 - All cards use `hover-elevate` class for interactive feedback

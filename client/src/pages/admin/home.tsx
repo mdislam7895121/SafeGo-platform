@@ -12,6 +12,8 @@ interface AdminStats {
   totalDrivers: number;
   activeDrivers: number;
   pendingDrivers: number;
+  pendingCustomers: number;
+  pendingRestaurants: number;
   suspendedDrivers: number;
   blockedDrivers: number;
   restaurants: number;
@@ -155,21 +157,23 @@ export default function AdminHome() {
               </Card>
             </Link>
 
-            <Card data-testid="card-restaurants">
-              <CardContent className="p-4">
-                <div className="flex flex-col items-center text-center">
-                  <UtensilsCrossed className="h-8 w-8 text-orange-600 mb-2" />
-                  {isLoading ? (
-                    <Skeleton className="h-8 w-12 mb-1" />
-                  ) : (
-                    <p className="text-2xl font-bold" data-testid="stat-restaurants">
-                      {stats?.restaurants ?? 0}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground">Restaurants</p>
-                </div>
-              </CardContent>
-            </Card>
+            <Link href="/admin/restaurants">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-restaurants">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <UtensilsCrossed className="h-8 w-8 text-orange-600 mb-2" />
+                    {isLoading ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-restaurants">
+                        {stats?.restaurants ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Restaurants</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           </div>
         </div>
 
@@ -186,7 +190,7 @@ export default function AdminHome() {
                       <Skeleton className="h-8 w-12 mb-1" />
                     ) : (
                       <p className="text-2xl font-bold" data-testid="stat-pending-drivers">
-                        {stats?.pendingDrivers ?? 0}
+                        {(stats?.pendingDrivers ?? 0) + (stats?.pendingCustomers ?? 0) + (stats?.pendingRestaurants ?? 0)}
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">Pending KYC</p>
