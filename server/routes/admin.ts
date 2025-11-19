@@ -36,14 +36,15 @@ async function validateDriverKYC(
     if (!driver.nidEncrypted && !driver.nidNumber) {
       missing.push("NID (National ID)");
     }
-    // Check for at least one vehicle registration document
-    const vehicleDocs = await prisma.vehicleDocument.count({
+    // Check for vehicle registration document (new Vehicle field OR legacy vehicleDocuments)
+    const hasNewVehicleReg = driver.vehicle?.registrationDocumentUrl;
+    const legacyVehicleDocs = hasNewVehicleReg ? 1 : await prisma.vehicleDocument.count({
       where: {
         driverId: driver.id,
         documentType: "registration",
       },
     });
-    if (vehicleDocs === 0) {
+    if (!hasNewVehicleReg && legacyVehicleDocs === 0) {
       missing.push("Vehicle registration document");
     }
   }
@@ -82,14 +83,15 @@ async function validateDriverKYC(
       }
     }
 
-    // Check for at least one vehicle registration document
-    const vehicleDocs = await prisma.vehicleDocument.count({
+    // Check for vehicle registration document (new Vehicle field OR legacy vehicleDocuments)
+    const hasNewVehicleReg = driver.vehicle?.registrationDocumentUrl;
+    const legacyVehicleDocs = hasNewVehicleReg ? 1 : await prisma.vehicleDocument.count({
       where: {
         driverId: driver.id,
         documentType: "registration",
       },
     });
-    if (vehicleDocs === 0) {
+    if (!hasNewVehicleReg && legacyVehicleDocs === 0) {
       missing.push("Vehicle registration document");
     }
   }
@@ -316,6 +318,9 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
       if (verificationStatus === "approved") {
         const driverProfile = await prisma.driverProfile.findUnique({
           where: { userId },
+          include: {
+            vehicle: true,
+          },
         });
         
         if (!driverProfile) {
@@ -4074,6 +4079,7 @@ router.get("/documents/drivers", async (req: AuthRequest, res) => {
               countryCode: true,
             },
           },
+          vehicle: true,
           vehicleDocuments: {
             select: {
               documentType: true,
@@ -4317,6 +4323,7 @@ router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
             countryCode: true,
           },
         },
+        vehicle: true,
         vehicleDocuments: true,
       },
     });
@@ -4387,7 +4394,7 @@ router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
       tlcLicenseNumber: driver.tlcLicenseNumber,
       tlcLicenseImageUrl: driver.tlcLicenseImageUrl, // Legacy field
       
-      // Vehicle documents
+      // Vehicle documents (legacy)
       vehicleDocuments: driver.vehicleDocuments.map(doc => ({
         id: doc.id,
         documentType: doc.documentType,
@@ -4396,6 +4403,21 @@ router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
         uploadedAt: doc.uploadedAt,
         expiresAt: doc.expiresAt,
       })),
+      
+      // Vehicle information (new fields)
+      vehicle: driver.vehicle ? {
+        id: driver.vehicle.id,
+        vehicleType: driver.vehicle.vehicleType,
+        make: driver.vehicle.make,
+        model: driver.vehicle.model,
+        year: driver.vehicle.year,
+        color: driver.vehicle.color,
+        licensePlate: driver.vehicle.licensePlate,
+        registrationDocumentUrl: driver.vehicle.registrationDocumentUrl,
+        registrationExpiry: driver.vehicle.registrationExpiry,
+        insuranceDocumentUrl: driver.vehicle.insuranceDocumentUrl,
+        insuranceExpiry: driver.vehicle.insuranceExpiry,
+      } : null,
       
       // Validation
       isComplete: kycValidation.isComplete,
@@ -4522,6 +4544,7 @@ router.post("/documents/drivers/:id/approve", async (req: AuthRequest, res) => {
             countryCode: true,
           },
         },
+        vehicle: true,
       },
     });
 

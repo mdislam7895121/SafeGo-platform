@@ -30,6 +30,41 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
+### Step 35: USA Driver Vehicle Information Module (November 19, 2025)
+- **Database Schema Updates** - Extended Vehicle model:
+  * Added USA-specific fields to Vehicle model: `make`, `model`, `year` (Int), `color`, `licensePlate`
+  * Added document tracking: `registrationDocumentUrl`, `registrationExpiry`, `insuranceDocumentUrl`, `insuranceExpiry`
+  * All new fields nullable for backward compatibility with existing records
+  * Maintains `isPrimary` boolean (default true) for future multi-vehicle support
+- **Backend API** (`server/routes/admin.ts`):
+  * New PATCH endpoint: `/api/admin/drivers/:id/vehicle` - Updates vehicle information for any driver
+  * Validates year as integer, accepts URLs for registration/insurance documents with expiry dates
+  * Returns updated vehicle data with success confirmation
+  * Admin-only access with role-based middleware protection
+- **Frontend Updates** - Driver Details Page (`/admin/drivers/:id`):
+  * **Vehicle Information Card** - New section displayed after Emergency Contact section for all drivers
+    - Displays vehicle type (sedan/suv/van/truck/motorcycle), make, model, year, color, license plate
+    - Shows registration and insurance documents with upload status indicators
+    - Document links open in new tabs with view/download functionality
+    - Expiry dates displayed with visual formatting
+    - Positioned at bottom of page after Emergency Contact section
+  * **Edit Vehicle Dialog** - Modal form for updating vehicle information
+    - Vehicle type dropdown (sedan, suv, van, truck, motorcycle, other)
+    - Text inputs for make, model, year, color, license plate
+    - URL inputs for registration and insurance documents with helper text
+    - Date pickers for registration and insurance expiry dates
+    - Save/Cancel buttons with loading states and error handling
+    - Pre-populates existing values when opened, handles missing data gracefully
+- **Document Review Page Integration**:
+  * Vehicle documents (registration/insurance) displayed in dedicated section for USA drivers
+  * Shows document upload status with pending/uploaded indicators
+  * Links to view/download documents with expiry date information
+- **Backward Compatibility**:
+  * All vehicle fields nullable - existing drivers without vehicle data work seamlessly
+  * Frontend handles missing vehicle gracefully (shows "No vehicle information" message)
+  * Edit form backward-compatible with old `vehicleModel`/`vehiclePlate` fields
+- **Impact**: NON-BREAKING - Schema extension with nullable fields, new admin UI module, maintains full backward compatibility
+
 ### Step 34e: USA Driver Name Fields and Emergency Contact Layout Update (November 19, 2025)
 - **Frontend Updates - Driver Details Page** (`/admin/drivers/:id` for USA drivers):
   - **Name Display Restructured**:

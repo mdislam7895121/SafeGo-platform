@@ -145,6 +145,19 @@ interface DocumentDetails {
     uploadedAt: string;
     expiresAt: string | null;
   }>;
+  vehicle?: {
+    id: string;
+    vehicleType: string | null;
+    make: string | null;
+    model: string | null;
+    year: number | null;
+    color: string | null;
+    licensePlate: string | null;
+    registrationDocumentUrl: string | null;
+    registrationExpiry: string | null;
+    insuranceDocumentUrl: string | null;
+    insuranceExpiry: string | null;
+  } | null;
   restaurantName?: string;
   address?: string;
   isComplete?: boolean;
@@ -889,14 +902,66 @@ export default function AdminDocumentCenter() {
               </Card>
 
               {/* Vehicle Documents */}
-              {documentDetails.vehicleDocuments && documentDetails.vehicleDocuments.length > 0 && (
+              {((documentDetails.vehicleDocuments && documentDetails.vehicleDocuments.length > 0) || documentDetails.vehicle) && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Vehicle Documents</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      {documentDetails.vehicleDocuments.map((doc) => (
+                      {/* New Vehicle Registration/Insurance Documents */}
+                      {documentDetails.vehicle && (
+                        <>
+                          {documentDetails.vehicle.registrationDocumentUrl && (
+                            <div className="flex items-center justify-between p-3 border rounded-lg" data-testid="vehicle-registration-doc">
+                              <div>
+                                <p className="font-medium">Registration Document</p>
+                                {documentDetails.vehicle.registrationExpiry && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Expires: {format(new Date(documentDetails.vehicle.registrationExpiry), "PP")}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                  Status: Uploaded
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(documentDetails.vehicle!.registrationDocumentUrl!, "_blank")}
+                                data-testid="button-view-registration-doc"
+                              >
+                                View
+                              </Button>
+                            </div>
+                          )}
+                          {documentDetails.vehicle.insuranceDocumentUrl && (
+                            <div className="flex items-center justify-between p-3 border rounded-lg" data-testid="vehicle-insurance-doc">
+                              <div>
+                                <p className="font-medium">Insurance Document</p>
+                                {documentDetails.vehicle.insuranceExpiry && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Expires: {format(new Date(documentDetails.vehicle.insuranceExpiry), "PP")}
+                                  </p>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                  Status: Uploaded
+                                </p>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => window.open(documentDetails.vehicle!.insuranceDocumentUrl!, "_blank")}
+                                data-testid="button-view-insurance-doc"
+                              >
+                                View
+                              </Button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {/* Legacy Vehicle Documents */}
+                      {documentDetails.vehicleDocuments && documentDetails.vehicleDocuments.map((doc) => (
                         <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`vehicle-doc-${doc.id}`}>
                           <div>
                             <p className="font-medium capitalize">{doc.documentType}</p>
