@@ -1,0 +1,201 @@
+Step 32 – Wallet Settlement & Driver Commission Reporting (Non-breaking)
+
+Role:
+You are enhancing an already production-ready SafeGo admin panel. Your task is to add clear commission and settlement reporting for drivers, without breaking any existing payout or earnings logic.
+
+Goal:
+1. In Driver Management and Driver Details, show how much commission each driver has paid to the platform.
+2. In Wallet Settlement, provide country-based and service-based summaries (BD vs US; Ride vs Food vs Parcel), so admins can review settlements easily.
+
+Important constraints:
+- NO destructive changes.
+- Only additive, backward-compatible updates.
+- Do not alter how money actually moves; this step is reporting + admin tools only.
+
+Current context:
+- Admin dashboard (`/admin`) already shows:
+  - Total Drivers
+  - Active Drivers
+- Driver Management (`/admin/drivers`) is working again after Step 31 (drivers visible, filters working).
+- Wallet Settlement entry exists in the admin sidebar but currently has minimal or basic functionality.
+- Each completed order (rides / food / parcels) already has:
+  - A total fare / amount
+  - Driver earnings and platform commission (or enough data to derive them)
+
+You must preserve this behaviour:
+- Existing ride / food / parcel flows must NOT change.
+- Existing driver balances, payouts, and commission logic must NOT be modified in a way that affects real values.
+- No existing tests for payouts or earnings should start failing.
+
+--------------------------------
+A. Data & Model Usage
+--------------------------------
+
+1. Use existing transaction / trip / order tables
+   - Re-use existing models for:
+     - Trip / Ride orders
+     - Food orders
+     - Parcel deliveries
+   - For each record, identify:
+     - Driver id
+     - Country (BD or US)
+     - Service type (ride / food / parcel)
+     - Total fare
+     - Driver payout
+     - Platform commission (either stored, or computed as `fare - driver_payout` if consistent)
+
+2. Schema changes
+   - Avoid schema changes if possible.
+   - If you absolutely must add anything, only add **optional, additive fields**, for example:
+     - A precomputed `platformCommission` column on a settlement or payout table.
+   - NO dropping columns, NO renaming, NO enum changes that could break existing data.
+
+--------------------------------
+B. Driver Management – Commission Column
+--------------------------------
+
+Update `/admin/drivers` list page:
+
+1. New column: **Commission Paid**
+   - For each driver, show the **total platform commission** collected from all completed rides/food/parcels for that driver.
+   - Display as a single monetary value in the correct currency for that country:
+     - BD: BDT
+     - US: USD
+   - This should be an aggregate across all completed trips/orders for that driver.
+
+2. Filtering behaviour:
+   - Commission aggregation must respect:
+     - Driver id
+   - It should NOT change when admin adjusts the country / status / verification filters.
+   - Filters still work exactly as before; the new column is read-only information.
+
+3. Performance & safety:
+   - Use efficient queries / aggregation (GROUP BY driverId).
+   - Avoid N+1 queries.
+   - If needed, use pagination-aware eager loading or a dedicated aggregate query.
+   - Do NOT expose raw internal IDs beyond what is already used.
+
+--------------------------------
+C. Driver Details – Commission Breakdown
+--------------------------------
+
+On the Driver Details page:
+
+1. Add a **Commission Summary** section:
+   - Fields:
+     - Total Commission Paid (all services)
+     - Breakdown:
+       - Ride commissions
+       - Food delivery commissions
+       - Parcel delivery commissions
+   - Also show:
+     - Total Trips / Orders per service
+     - Time filters (optional): “Last 7 days”, “Last 30 days”, “All time”
+       - If implementing time filters is complex, at minimum implement “All time” now and document how to extend later.
+
+2. Do NOT modify driver payout balances
+   - These numbers are informational.
+   - They must not change how balances are computed or used in actual payout processing.
+
+--------------------------------
+D. Wallet Settlement – Country-based Summary
+--------------------------------
+
+Enhance the Wallet Settlement area (e.g. `/admin/wallet`):
+
+1. Global summary cards:
+   - For a selectable date range (default: Last 30 days):
+     - Total platform commission (all countries)
+     - Total platform commission – Bangladesh
+     - Total platform commission – United States
+   - Optional: per-service cards:
+     - Ride commissions (BD/US)
+     - Food commissions (BD/US)
+     - Parcel commissions (BD/US)
+
+2. Driver settlement table:
+   - Table of drivers with:
+     - Driver email
+     - Country badge (BD / US)
+     - Total earned (driver earnings)
+     - Total commission paid (platform share)
+     - Net settlements (if such concept exists in current model)
+   - This is **read-only** for now (no manual payout actions in this step).
+
+3. Filters:
+   - Country filter: All / BD / US
+   - Date filter: Quick ranges (Last 7 days, 30 days, All time)
+   - Make sure filters only affect aggregates in this page and do not interfere with `/admin/drivers`.
+
+--------------------------------
+E. Security & Compliance (explicit)
+--------------------------------
+
+Apply and confirm these security measures:
+
+1. RBAC:
+   - Wallet Settlement and commission views remain **admin-only**.
+   - Reuse existing ProtectedRoute / middleware guarding admin pages and APIs.
+
+2. Data minimization:
+   - Do NOT expose sensitive PII beyond what is already visible in admin:
+     - Driver name, email, and country are fine.
+     - Do NOT expose NID numbers, license images, or other identity documents in these commission endpoints.
+   - Commission APIs should only return:
+     - Aggregated monetary fields
+     - Driver identifiers already used in admin (id, email)
+     - Service types, counts, and dates.
+
+3. Validation:
+   - Validate all query parameters (dates, country codes, status values) using a whitelist.
+   - Reject invalid inputs with safe error responses (4xx).
+
+4. Integrity:
+   - Aggregations must be computed from authoritative transaction/order tables.
+   - No client-side “trust the UI” calculations for money.
+
+--------------------------------
+F. Testing Checklist (must be described in your output)
+--------------------------------
+
+Create or use seed data with:
+- At least:
+  - 2 BD drivers (with multiple rides and parcels).
+  - 2 US drivers (with rides and food orders).
+- Mix of:
+  - Completed orders with commission.
+  - Pending / cancelled orders that should NOT count towards commission.
+
+Verify:
+
+1. Admin dashboard still loads with correct counts.
+2. `/admin/drivers`:
+   - Lists all drivers correctly with the new “Commission Paid” column.
+   - Commission numbers match the sum of platform commission per driver.
+   - Country/status/verification filters continue to work as before.
+
+3. Driver Details page:
+   - Shows total commission and per-service breakdown.
+   - Counts and totals match actual completed orders.
+
+4. Wallet Settlement page:
+   - Global and per-country totals match the sum of all driver commissions for the selected date range.
+   - Filters by BD / US and by date range work correctly.
+
+5. Regression checks:
+   - KYC flows unaffected.
+   - Driver identity / document uploads unaffected.
+   - Payments, balances, and any existing payout mechanisms behave exactly as in previous step (no new failures).
+
+--------------------------------
+G. Documentation
+--------------------------------
+
+Update `replit.md` with:
+- A short “Step 32 – Wallet Settlement & Commission Reporting” section.
+- What was added:
+  - Commission column in Driver Management
+  - Commission breakdown in Driver Details
+  - Country-based commission summaries in Wallet Settlement
+- Explicit note:
+  - “No changes were made to payout calculation or existing wallet settlement logic in this step. All additions are read-only reports built on existing transaction data.”
