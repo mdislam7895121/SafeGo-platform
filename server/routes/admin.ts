@@ -2655,4 +2655,299 @@ router.get("/drivers/:id/nid", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// PARCEL (DELIVERY) MANAGEMENT ENDPOINTS
+// ====================================================
+
+// ====================================================
+// GET /api/admin/stats/parcels
+// Get parcel statistics for dashboard
+// ====================================================
+router.get("/stats/parcels", async (req: AuthRequest, res) => {
+  try {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(todayStart);
+    todayEnd.setDate(todayEnd.getDate() + 1);
+
+    // Total parcels (all time)
+    const totalParcels = await prisma.delivery.count();
+
+    // Active parcels (statuses: requested, searching_driver, accepted, picked_up, on_the_way)
+    const activeParcels = await prisma.delivery.count({
+      where: {
+        status: {
+          in: ["requested", "searching_driver", "accepted", "picked_up", "on_the_way"]
+        }
+      }
+    });
+
+    // Delivered today (status: delivered AND deliveredAt is today)
+    const deliveredToday = await prisma.delivery.count({
+      where: {
+        status: "delivered",
+        deliveredAt: {
+          gte: todayStart,
+          lt: todayEnd
+        }
+      }
+    });
+
+    // Cancelled parcels (all time)
+    const cancelledParcels = await prisma.delivery.count({
+      where: {
+        status: {
+          in: ["cancelled_by_customer", "cancelled_by_driver"]
+        }
+      }
+    });
+
+    res.json({
+      totalParcels,
+      activeParcels,
+      deliveredToday,
+      cancelledParcels,
+    });
+  } catch (error) {
+    console.error("Get parcel stats error:", error);
+    res.status(500).json({ error: "Failed to fetch parcel statistics" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/parcels
+// Get parcel list with filters and pagination
+// ====================================================
+router.get("/parcels", async (req: AuthRequest, res) => {
+  try {
+    const { 
+      page = "1", 
+      pageSize = "20", 
+      status, 
+      country,
+      search 
+    } = req.query;
+
+    // Validate and sanitize pagination parameters
+    let pageNum = parseInt(page as string);
+    let limitNum = parseInt(pageSize as string);
+    
+    // Ensure valid positive integers, default to safe values if invalid
+    if (isNaN(pageNum) || pageNum < 1) {
+      pageNum = 1;
+    }
+    if (isNaN(limitNum) || limitNum < 1) {
+      limitNum = 20;
+    }
+    
+    // Clamp pageSize to max 100
+    limitNum = Math.min(limitNum, 100);
+    
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+    
+    // Validate and sanitize status filter
+    const validStatusFilters = ["all", "active", "pending_pickup", "assigned", "in_transit", "delivered", "cancelled"];
+    const statusFilter = typeof status === "string" && validStatusFilters.includes(status) ? status : "all";
+
+    // Filter by status
+    if (statusFilter !== "all") {
+      if (statusFilter === "active") {
+        where.status = {
+          in: ["requested", "searching_driver", "accepted", "picked_up", "on_the_way"]
+        };
+      } else if (statusFilter === "pending_pickup") {
+        where.status = {
+          in: ["requested", "searching_driver"]
+        };
+      } else if (statusFilter === "assigned") {
+        where.status = "accepted";
+      } else if (statusFilter === "in_transit") {
+        where.status = {
+          in: ["picked_up", "on_the_way"]
+        };
+      } else if (statusFilter === "delivered") {
+        where.status = "delivered";
+      } else if (statusFilter === "cancelled") {
+        where.status = {
+          in: ["cancelled_by_customer", "cancelled_by_driver"]
+        };
+      }
+    }
+
+    // Validate and sanitize search parameter (limit length to prevent abuse)
+    const searchQuery = typeof search === "string" && search.trim() ? search.trim().substring(0, 100) : null;
+    if (searchQuery) {
+      where.OR = [
+        { id: { contains: searchQuery, mode: "insensitive" } },
+        { customer: { user: { email: { contains: searchQuery, mode: "insensitive" } } } }
+      ];
+    }
+
+    // Validate and sanitize country filter
+    const validCountries = ["all", "BD", "US"];
+    const countryFilter = typeof country === "string" && validCountries.includes(country) ? country : "all";
+    
+    // Filter by country (through customer)
+    if (countryFilter !== "all") {
+      where.customer = {
+        user: {
+          countryCode: countryFilter
+        }
+      };
+    }
+
+    // Get total count for pagination
+    const total = await prisma.delivery.count({ where });
+
+    // Get parcels
+    const parcels = await prisma.delivery.findMany({
+      where,
+      include: {
+        customer: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                email: true,
+                countryCode: true
+              }
+            }
+          }
+        },
+        driver: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                email: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      skip,
+      take: limitNum,
+    });
+
+    res.json({
+      parcels: parcels.map(parcel => ({
+        id: parcel.id,
+        createdAt: parcel.createdAt,
+        status: parcel.status,
+        customerEmail: parcel.customer.user.email,
+        country: parcel.customer.user.countryCode,
+        pickupAddress: parcel.pickupAddress,
+        dropoffAddress: parcel.dropoffAddress,
+        serviceFare: Number(parcel.serviceFare),
+        driverEmail: parcel.driver?.user.email || null,
+        deliveredAt: parcel.deliveredAt,
+      })),
+      pagination: {
+        page: pageNum,
+        pageSize: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("Get parcels error:", error);
+    res.status(500).json({ error: "Failed to fetch parcels" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/parcels/:id
+// Get detailed parcel information
+// ====================================================
+router.get("/parcels/:id", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const parcel = await prisma.delivery.findUnique({
+      where: { id },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                countryCode: true,
+                createdAt: true
+              }
+            }
+          }
+        },
+        driver: {
+          select: {
+            id: true,
+            isSuspended: true,
+            user: {
+              select: {
+                id: true,
+                email: true,
+                countryCode: true,
+                isBlocked: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!parcel) {
+      return res.status(404).json({ error: "Parcel not found" });
+    }
+
+    res.json({
+      id: parcel.id,
+      createdAt: parcel.createdAt,
+      updatedAt: parcel.updatedAt,
+      deliveredAt: parcel.deliveredAt,
+      status: parcel.status,
+      // Customer info
+      customer: {
+        id: parcel.customer.id,
+        userId: parcel.customer.user.id,
+        email: parcel.customer.user.email,
+        countryCode: parcel.customer.user.countryCode,
+      },
+      // Driver info
+      driver: parcel.driver ? {
+        id: parcel.driver.id,
+        userId: parcel.driver.user.id,
+        email: parcel.driver.user.email,
+        countryCode: parcel.driver.user.countryCode,
+        isSuspended: parcel.driver.isSuspended,
+        isBlocked: parcel.driver.user.isBlocked,
+      } : null,
+      // Locations
+      pickupAddress: parcel.pickupAddress,
+      pickupLat: parcel.pickupLat,
+      pickupLng: parcel.pickupLng,
+      dropoffAddress: parcel.dropoffAddress,
+      dropoffLat: parcel.dropoffLat,
+      dropoffLng: parcel.dropoffLng,
+      // Financials
+      serviceFare: Number(parcel.serviceFare),
+      safegoCommission: Number(parcel.safegoCommission),
+      driverPayout: Number(parcel.driverPayout),
+      paymentMethod: parcel.paymentMethod,
+      // Feedback
+      customerRating: parcel.customerRating,
+      customerFeedback: parcel.customerFeedback,
+    });
+  } catch (error) {
+    console.error("Get parcel details error:", error);
+    res.status(500).json({ error: "Failed to fetch parcel details" });
+  }
+});
+
 export default router;

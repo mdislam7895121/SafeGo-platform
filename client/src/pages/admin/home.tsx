@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,12 +21,25 @@ interface AdminStats {
   openComplaints: number;
 }
 
+interface ParcelStats {
+  totalParcels: number;
+  activeParcels: number;
+  deliveredToday: number;
+  cancelledParcels: number;
+}
+
 export default function AdminHome() {
   const { user, logout } = useAuth();
 
   // Fetch admin statistics
   const { data: stats, isLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
+    refetchInterval: 5000, // Auto-refresh every 5 seconds
+  });
+
+  // Fetch parcel statistics
+  const { data: parcelStats, isLoading: isLoadingParcels } = useQuery<ParcelStats>({
+    queryKey: ["/api/admin/stats/parcels"],
     refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 
@@ -275,6 +288,84 @@ export default function AdminHome() {
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground">Open Complaints</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+        </div>
+
+        {/* Parcel Statistics */}
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Parcel Delivery Statistics</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Link href="/admin/parcels">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-total-parcels">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <Package className="h-8 w-8 text-indigo-600 mb-2" />
+                    {isLoadingParcels ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-total-parcels">
+                        {parcelStats?.totalParcels ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Total Parcels</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/admin/parcels?status=active">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-active-parcels">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <TruckIcon className="h-8 w-8 text-blue-600 mb-2" />
+                    {isLoadingParcels ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-active-parcels">
+                        {parcelStats?.activeParcels ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Active Parcels</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/admin/parcels?status=delivered">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-delivered-today">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <PackageCheck className="h-8 w-8 text-green-600 mb-2" />
+                    {isLoadingParcels ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-delivered-today">
+                        {parcelStats?.deliveredToday ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Delivered Today</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link href="/admin/parcels?status=cancelled">
+              <Card className="hover-elevate cursor-pointer" data-testid="card-cancelled-parcels">
+                <CardContent className="p-4">
+                  <div className="flex flex-col items-center text-center">
+                    <PackageX className="h-8 w-8 text-red-600 mb-2" />
+                    {isLoadingParcels ? (
+                      <Skeleton className="h-8 w-12 mb-1" />
+                    ) : (
+                      <p className="text-2xl font-bold" data-testid="stat-cancelled-parcels">
+                        {parcelStats?.cancelledParcels ?? 0}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Cancelled</p>
                   </div>
                 </CardContent>
               </Card>

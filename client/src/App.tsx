@@ -40,6 +40,8 @@ import AdminRestaurantDetails from "@/pages/admin/restaurant-details";
 import AdminComplaints from "@/pages/admin/complaints";
 import AdminComplaintDetails from "@/pages/admin/complaint-details";
 import AdminUsers from "@/pages/admin/users";
+import AdminParcels from "@/pages/admin/parcels";
+import AdminParcelDetails from "@/pages/admin/parcel-details";
 
 import NotFound from "@/pages/not-found";
 
@@ -193,6 +195,16 @@ function Router() {
       <Route path="/admin/settlement">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSettlement />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/parcels/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminParcelDetails />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/parcels">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminParcels />
         </ProtectedRoute>
       </Route>
 
