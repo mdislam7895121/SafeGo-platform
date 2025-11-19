@@ -44,6 +44,7 @@ model CustomerProfile {
   nidEncrypted          String?
   phoneNumber           String?
   postOffice            String?
+  postalCode            String?
   thana                 String?
   village               String?
   user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)

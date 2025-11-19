@@ -31,6 +31,25 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
+### Step 33: Mandatory Postal Code for Bangladesh Driver Identity (November 19, 2025)
+- **Schema Changes**:
+  - Added `postalCode` field to both `DriverProfile` and `CustomerProfile` models (nullable for backward compatibility)
+  - Successfully pushed schema changes to database using `npx prisma db push`
+- **Backend Updates**:
+  - Updated `updateDriverProfileSchema` and `updateCustomerProfileSchema` with 4-6 digit postal code validation (`/^[0-9]{4,6}$/`)
+  - Added `postalCode` to PATCH `/api/admin/drivers/:id/profile` endpoint
+  - Added `postalCode` to PATCH `/api/admin/customers/:id/profile` endpoint
+  - Added `postalCode` to GET `/api/admin/documents/drivers/:id/details` response
+  - Added `postalCode` to GET `/api/admin/documents/customers/:id/details` response
+- **Frontend Updates**:
+  - Added `postalCode` field to Document Review modal (`/admin/documents`) for Bangladesh drivers/customers
+  - Added `postalCode` input to Admin Edit Bangladesh Profile modal (`/admin/drivers/:id`) with inline validation hint
+  - Updated TypeScript interfaces: `Customer`, `DocumentDetails`, `DriverDetails`
+  - Display shows "Not provided" for legacy records with null postal code (backward compatible)
+- **Validation Rules**: Postal Code optional but must be 4-6 digits when provided (Bangladesh standard)
+- **Impact**: NON-BREAKING - Nullable field, legacy data supported, no crashes with null values
+- **Security**: Postal code treated as low-sensitivity address metadata, follows existing admin-only access patterns
+
 ### Step 31 Fix: Driver Management Regression (November 19, 2025)
 - **Problem**: Driver Management page at `/admin/drivers` showed "No drivers found" despite 23 drivers in database
 - **Root Cause**: Incorrect Prisma relation field name `stats` used instead of `driverStats` in 4 endpoints
