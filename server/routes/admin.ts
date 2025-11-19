@@ -1499,9 +1499,13 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
         // nidEncrypted: EXCLUDED - only accessible via dedicated endpoint
         nidFrontImageUrl: driver.nidFrontImageUrl,
         nidBackImageUrl: driver.nidBackImageUrl,
+        // Profile photo (all drivers)
+        profilePhotoUrl: driver.profilePhotoUrl,
         // US fields
         usaFullLegalName: driver.usaFullLegalName,
-        dateOfBirth: driver.dateOfBirth,
+        firstName: driver.firstName,
+        middleName: driver.middleName,
+        lastName: driver.lastName,
         usaPhoneNumber: driver.usaPhoneNumber,
         driverLicenseNumber: driver.driverLicenseNumber,
         licenseStateIssued: driver.licenseStateIssued,
@@ -1511,8 +1515,16 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
         usaCity: driver.usaCity,
         usaState: driver.usaState,
         usaZipCode: driver.usaZipCode,
-        emergencyContactName: driver.emergencyContactName,
-        emergencyContactPhone: driver.emergencyContactPhone,
+        // DMV License (all USA drivers)
+        dmvLicenseFrontUrl: driver.dmvLicenseFrontUrl,
+        dmvLicenseBackUrl: driver.dmvLicenseBackUrl,
+        dmvLicenseExpiry: driver.dmvLicenseExpiry,
+        dmvLicenseNumber: driver.dmvLicenseNumber,
+        // TLC License (NY drivers only)
+        tlcLicenseFrontUrl: driver.tlcLicenseFrontUrl,
+        tlcLicenseBackUrl: driver.tlcLicenseBackUrl,
+        tlcLicenseExpiry: driver.tlcLicenseExpiry,
+        tlcLicenseNumber: driver.tlcLicenseNumber,
         backgroundCheckStatus: driver.backgroundCheckStatus,
         backgroundCheckDate: driver.backgroundCheckDate,
         // Legacy US fields (deprecated but kept for backward compatibility)
@@ -1527,6 +1539,15 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
               vehicleType: driver.vehicle.vehicleType,
               vehicleModel: driver.vehicle.vehicleModel,
               vehiclePlate: driver.vehicle.vehiclePlate,
+              make: driver.vehicle.make,
+              model: driver.vehicle.model,
+              year: driver.vehicle.year,
+              color: driver.vehicle.color,
+              licensePlate: driver.vehicle.licensePlate,
+              registrationDocumentUrl: driver.vehicle.registrationDocumentUrl,
+              registrationExpiry: driver.vehicle.registrationExpiry,
+              insuranceDocumentUrl: driver.vehicle.insuranceDocumentUrl,
+              insuranceExpiry: driver.vehicle.insuranceExpiry,
               isOnline: driver.vehicle.isOnline,
               totalEarnings: Number(driver.vehicle.totalEarnings),
             }

@@ -1354,7 +1354,7 @@ export default function AdminDriverDetails() {
             )}
 
             {/* Vehicle Information (USA drivers only) */}
-            {driver && driver.user.countryCode === "US" && (
+            {driver && driver.user?.countryCode === "US" && (
               <Card className="mt-6">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
