@@ -3226,4 +3226,699 @@ router.get("/parcels/:id", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// DOCUMENT CENTER ENDPOINTS
+// ====================================================
+
+// ====================================================
+// GET /api/admin/documents/drivers
+// List all drivers with document status for Document Center
+// ====================================================
+router.get("/documents/drivers", async (req: AuthRequest, res) => {
+  try {
+    const { search, country, status, page = "1", limit = "20" } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+    const userFilters: any = {};
+
+    // Search by email
+    if (search) {
+      userFilters.email = { contains: search as string, mode: "insensitive" };
+    }
+
+    // Filter by country
+    if (country && country !== "all") {
+      userFilters.countryCode = country as string;
+    }
+
+    // Filter by verification status (document status)
+    if (status && status !== "all") {
+      where.verificationStatus = status as string;
+    }
+
+    // Apply user filters if any exist
+    if (Object.keys(userFilters).length > 0) {
+      where.user = userFilters;
+    }
+
+    const [drivers, total] = await Promise.all([
+      prisma.driverProfile.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              countryCode: true,
+            },
+          },
+          vehicleDocuments: {
+            select: {
+              documentType: true,
+              fileUrl: true,
+              uploadedAt: true,
+            },
+          },
+        },
+        skip,
+        take: limitNum,
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.driverProfile.count({ where }),
+    ]);
+
+    const formatted = await Promise.all(
+      drivers.map(async (driver) => {
+        // Check document completeness
+        const kycValidation = await validateDriverKYC(driver, driver.user.countryCode);
+
+        return {
+          id: driver.id,
+          userId: driver.user.id,
+          email: driver.user.email,
+          countryCode: driver.user.countryCode,
+          verificationStatus: driver.verificationStatus,
+          isVerified: driver.isVerified,
+          hasProfilePhoto: !!driver.profilePhotoUrl,
+          hasNID: !!(driver.nidEncrypted || driver.nidNumber),
+          hasDMVLicense: !!driver.dmvLicenseImageUrl,
+          hasTLCLicense: !!driver.tlcLicenseImageUrl,
+          vehicleDocuments: driver.vehicleDocuments.length,
+          isComplete: kycValidation.isComplete,
+          missingFields: kycValidation.missingFields,
+          lastUpdated: driver.updatedAt,
+        };
+      })
+    );
+
+    res.json({
+      drivers: formatted,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("List drivers for document center error:", error);
+    res.status(500).json({ error: "Failed to fetch drivers" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/documents/customers
+// List all customers with document status for Document Center
+// ====================================================
+router.get("/documents/customers", async (req: AuthRequest, res) => {
+  try {
+    const { search, country, status, page = "1", limit = "20" } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+    const userFilters: any = {};
+
+    // Search by email
+    if (search) {
+      userFilters.email = { contains: search as string, mode: "insensitive" };
+    }
+
+    // Filter by country
+    if (country && country !== "all") {
+      userFilters.countryCode = country as string;
+    }
+
+    // Filter by verification status (document status)
+    if (status && status !== "all") {
+      where.verificationStatus = status as string;
+    }
+
+    // Apply user filters if any exist
+    if (Object.keys(userFilters).length > 0) {
+      where.user = userFilters;
+    }
+
+    const [customers, total] = await Promise.all([
+      prisma.customerProfile.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              countryCode: true,
+            },
+          },
+        },
+        skip,
+        take: limitNum,
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.customerProfile.count({ where }),
+    ]);
+
+    const formatted = customers.map((customer) => ({
+      id: customer.id,
+      userId: customer.user.id,
+      email: customer.user.email,
+      countryCode: customer.user.countryCode,
+      verificationStatus: customer.verificationStatus,
+      isVerified: customer.isVerified,
+      hasNID: !!(customer.nidEncrypted || customer.nidNumber),
+      hasNIDImages: !!(customer.nidFrontImageUrl && customer.nidBackImageUrl),
+      fullName: customer.fullName,
+      fatherName: customer.fatherName,
+      phoneNumber: customer.phoneNumber,
+      village: customer.village,
+      postOffice: customer.postOffice,
+      thana: customer.thana,
+      district: customer.district,
+      lastUpdated: customer.updatedAt,
+    }));
+
+    res.json({
+      customers: formatted,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("List customers for document center error:", error);
+    res.status(500).json({ error: "Failed to fetch customers" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/documents/restaurants
+// List all restaurants with document status for Document Center
+// ====================================================
+router.get("/documents/restaurants", async (req: AuthRequest, res) => {
+  try {
+    const { search, country, status, page = "1", limit = "20" } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+    const userFilters: any = {};
+
+    // Search by email
+    if (search) {
+      userFilters.email = { contains: search as string, mode: "insensitive" };
+    }
+
+    // Filter by country
+    if (country && country !== "all") {
+      userFilters.countryCode = country as string;
+    }
+
+    // Filter by verification status (document status)
+    if (status && status !== "all") {
+      where.verificationStatus = status as string;
+    }
+
+    // Apply user filters if any exist
+    if (Object.keys(userFilters).length > 0) {
+      where.user = userFilters;
+    }
+
+    const [restaurants, total] = await Promise.all([
+      prisma.restaurantProfile.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              countryCode: true,
+            },
+          },
+        },
+        skip,
+        take: limitNum,
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.restaurantProfile.count({ where }),
+    ]);
+
+    const formatted = restaurants.map((restaurant) => ({
+      id: restaurant.id,
+      userId: restaurant.user.id,
+      email: restaurant.user.email,
+      restaurantName: restaurant.restaurantName,
+      address: restaurant.address,
+      countryCode: restaurant.user.countryCode,
+      verificationStatus: restaurant.verificationStatus,
+      isVerified: restaurant.isVerified,
+      lastUpdated: restaurant.updatedAt,
+    }));
+
+    res.json({
+      restaurants: formatted,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("List restaurants for document center error:", error);
+    res.status(500).json({ error: "Failed to fetch restaurants" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/documents/drivers/:id/details
+// Get detailed driver documents for review
+// ====================================================
+router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+          },
+        },
+        vehicleDocuments: true,
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const kycValidation = await validateDriverKYC(driver, driver.user.countryCode);
+
+    res.json({
+      id: driver.id,
+      userId: driver.user.id,
+      email: driver.user.email,
+      countryCode: driver.user.countryCode,
+      verificationStatus: driver.verificationStatus,
+      isVerified: driver.isVerified,
+      rejectionReason: driver.rejectionReason,
+      
+      // Profile photo
+      profilePhotoUrl: driver.profilePhotoUrl,
+      
+      // Bangladesh fields
+      fullName: driver.fullName,
+      fatherName: driver.fatherName,
+      phoneNumber: driver.phoneNumber,
+      village: driver.village,
+      postOffice: driver.postOffice,
+      thana: driver.thana,
+      district: driver.district,
+      nidFrontImageUrl: driver.nidFrontImageUrl,
+      nidBackImageUrl: driver.nidBackImageUrl,
+      
+      // US fields
+      firstName: driver.firstName,
+      middleName: driver.middleName,
+      lastName: driver.lastName,
+      usaState: driver.usaState,
+      dmvLicenseImageUrl: driver.dmvLicenseImageUrl,
+      tlcLicenseImageUrl: driver.tlcLicenseImageUrl,
+      
+      // Vehicle documents
+      vehicleDocuments: driver.vehicleDocuments.map(doc => ({
+        id: doc.id,
+        documentType: doc.documentType,
+        fileUrl: doc.fileUrl,
+        description: doc.description,
+        uploadedAt: doc.uploadedAt,
+        expiresAt: doc.expiresAt,
+      })),
+      
+      // Validation
+      isComplete: kycValidation.isComplete,
+      missingFields: kycValidation.missingFields,
+      
+      lastUpdated: driver.updatedAt,
+    });
+  } catch (error) {
+    console.error("Get driver document details error:", error);
+    res.status(500).json({ error: "Failed to fetch driver details" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/documents/customers/:id/details
+// Get detailed customer documents for review
+// ====================================================
+router.get("/documents/customers/:id/details", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    res.json({
+      id: customer.id,
+      userId: customer.user.id,
+      email: customer.user.email,
+      countryCode: customer.user.countryCode,
+      verificationStatus: customer.verificationStatus,
+      isVerified: customer.isVerified,
+      rejectionReason: customer.rejectionReason,
+      
+      // Bangladesh fields
+      fullName: customer.fullName,
+      fatherName: customer.fatherName,
+      phoneNumber: customer.phoneNumber,
+      village: customer.village,
+      postOffice: customer.postOffice,
+      thana: customer.thana,
+      district: customer.district,
+      nidFrontImageUrl: customer.nidFrontImageUrl,
+      nidBackImageUrl: customer.nidBackImageUrl,
+      
+      lastUpdated: customer.updatedAt,
+    });
+  } catch (error) {
+    console.error("Get customer document details error:", error);
+    res.status(500).json({ error: "Failed to fetch customer details" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/documents/restaurants/:id/details
+// Get detailed restaurant documents for review
+// ====================================================
+router.get("/documents/restaurants/:id/details", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    res.json({
+      id: restaurant.id,
+      userId: restaurant.user.id,
+      email: restaurant.user.email,
+      restaurantName: restaurant.restaurantName,
+      address: restaurant.address,
+      countryCode: restaurant.user.countryCode,
+      verificationStatus: restaurant.verificationStatus,
+      isVerified: restaurant.isVerified,
+      rejectionReason: restaurant.rejectionReason,
+      lastUpdated: restaurant.updatedAt,
+    });
+  } catch (error) {
+    console.error("Get restaurant document details error:", error);
+    res.status(500).json({ error: "Failed to fetch restaurant details" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/documents/drivers/:id/approve
+// Approve driver documents
+// ====================================================
+router.post("/documents/drivers/:id/approve", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Check if all required documents are present
+    const kycValidation = await validateDriverKYC(driver, driver.user.countryCode);
+
+    if (!kycValidation.isComplete) {
+      return res.status(400).json({
+        error: "Cannot approve: missing required documents",
+        missingFields: kycValidation.missingFields,
+      });
+    }
+
+    // Update verification status
+    const updated = await prisma.driverProfile.update({
+      where: { id },
+      data: {
+        verificationStatus: "approved",
+        isVerified: true,
+        rejectionReason: null,
+      },
+    });
+
+    res.json({
+      message: "Driver documents approved successfully",
+      verificationStatus: updated.verificationStatus,
+      isVerified: updated.isVerified,
+    });
+  } catch (error) {
+    console.error("Approve driver documents error:", error);
+    res.status(500).json({ error: "Failed to approve driver documents" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/documents/drivers/:id/reject
+// Reject driver documents
+// ====================================================
+router.post("/documents/drivers/:id/reject", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Update verification status
+    const updated = await prisma.driverProfile.update({
+      where: { id },
+      data: {
+        verificationStatus: "rejected",
+        isVerified: false,
+        rejectionReason: reason || "Documents rejected by admin",
+      },
+    });
+
+    res.json({
+      message: "Driver documents rejected",
+      verificationStatus: updated.verificationStatus,
+      isVerified: updated.isVerified,
+    });
+  } catch (error) {
+    console.error("Reject driver documents error:", error);
+    res.status(500).json({ error: "Failed to reject driver documents" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/documents/customers/:id/approve
+// Approve customer documents
+// ====================================================
+router.post("/documents/customers/:id/approve", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Update verification status
+    const updated = await prisma.customerProfile.update({
+      where: { id },
+      data: {
+        verificationStatus: "approved",
+        isVerified: true,
+        rejectionReason: null,
+      },
+    });
+
+    res.json({
+      message: "Customer documents approved successfully",
+      verificationStatus: updated.verificationStatus,
+      isVerified: updated.isVerified,
+    });
+  } catch (error) {
+    console.error("Approve customer documents error:", error);
+    res.status(500).json({ error: "Failed to approve customer documents" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/documents/customers/:id/reject
+// Reject customer documents
+// ====================================================
+router.post("/documents/customers/:id/reject", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Update verification status
+    const updated = await prisma.customerProfile.update({
+      where: { id },
+      data: {
+        verificationStatus: "rejected",
+        isVerified: false,
+        rejectionReason: reason || "Documents rejected by admin",
+      },
+    });
+
+    res.json({
+      message: "Customer documents rejected",
+      verificationStatus: updated.verificationStatus,
+      isVerified: updated.isVerified,
+    });
+  } catch (error) {
+    console.error("Reject customer documents error:", error);
+    res.status(500).json({ error: "Failed to reject customer documents" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/documents/restaurants/:id/approve
+// Approve restaurant documents
+// ====================================================
+router.post("/documents/restaurants/:id/approve", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Update verification status
+    const updated = await prisma.restaurantProfile.update({
+      where: { id },
+      data: {
+        verificationStatus: "approved",
+        isVerified: true,
+        rejectionReason: null,
+      },
+    });
+
+    res.json({
+      message: "Restaurant documents approved successfully",
+      verificationStatus: updated.verificationStatus,
+      isVerified: updated.isVerified,
+    });
+  } catch (error) {
+    console.error("Approve restaurant documents error:", error);
+    res.status(500).json({ error: "Failed to approve restaurant documents" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/documents/restaurants/:id/reject
+// Reject restaurant documents
+// ====================================================
+router.post("/documents/restaurants/:id/reject", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Update verification status
+    const updated = await prisma.restaurantProfile.update({
+      where: { id },
+      data: {
+        verificationStatus: "rejected",
+        isVerified: false,
+        rejectionReason: reason || "Documents rejected by admin",
+      },
+    });
+
+    res.json({
+      message: "Restaurant documents rejected",
+      verificationStatus: updated.verificationStatus,
+      isVerified: updated.isVerified,
+    });
+  } catch (error) {
+    console.error("Reject restaurant documents error:", error);
+    res.status(500).json({ error: "Failed to reject restaurant documents" });
+  }
+});
+
 export default router;
