@@ -1,0 +1,129 @@
+You are auditing the SafeGo admin panel after implementing Step 26 (Parcel Admin + Dashboard metrics).
+
+IMPORTANT:
+- Do NOT add big new features.
+- Do NOT change database schemas.
+- Only fix issues if you find clear bugs or security problems.
+- This task is a SECURITY & INTEGRITY POST-CHECK for the parcel module.
+
+Scope:
+- Admin dashboard parcel metrics
+- Admin parcel list page (/admin/parcels)
+- Admin parcel detail page (/admin/parcels/:id)
+- Admin parcel APIs (e.g., /api/admin/parcels, /api/admin/parcels/:id, /api/admin/stats/parcels)
+
+Goals:
+1) Confirm security is correctly enforced.
+2) Confirm no sensitive data is leaked.
+3) Confirm no breaking changes were introduced.
+4) Confirm behavior matches the original Step 26 requirements.
+
+--------------------------------
+1. RBAC (Role-Based Access Control)
+--------------------------------
+Check:
+
+1) All parcel admin endpoints are protected by admin-only middleware, similar to driver/customer admin APIs:
+   - /api/admin/parcels
+   - /api/admin/parcels/:id
+   - /api/admin/stats/parcels
+
+2) Verify behavior:
+   - As an unauthenticated user → requests must return 401/403.
+   - As a non-admin (customer, driver, restaurant role) → must return 403.
+   - As an admin user → must return 200 and correct data.
+
+If any endpoint is not properly protected or accidentally accessible to non-admin roles, FIX IT by:
+   - Adding/reusing the correct admin-only middleware/guard.
+   - Adding server-side role checks where necessary.
+
+--------------------------------
+2. Data Minimization & PII Safety
+--------------------------------
+For parcel list and parcel detail responses:
+
+1) Confirm the response structures do NOT include:
+   - Raw payment details (card numbers, tokens, etc.).
+   - Sensitive customer PII not needed for admin operations (e.g., full government ID, full card data).
+   - Any NID or government IDs from other modules.
+
+2) Ensure only the necessary fields are returned:
+   - For list view: parcelId, createdAt, status, short pickup/dropoff, related emails (admin-only), prices.
+   - For detail view: enough info to manage and investigate the parcel, but NOT full raw payment tokens.
+
+3) If you find any sensitive or unnecessary fields in these responses, REMOVE them from the API responses (using Prisma select clauses or DTOs) while keeping the UI functional.
+
+--------------------------------
+3. Input Validation & Abuse Protection
+--------------------------------
+Check:
+
+1) /api/admin/parcels query parameters:
+   - page, pageSize, status, country, search
+   - Ensure pageSize has a reasonable maximum (e.g., 100).
+   - Ensure status and country accept only allowed values.
+   - Ensure search input is sanitized and used safely (no risk of injection or unsafe string interpolation).
+
+2) /api/admin/stats/parcels:
+   - Ensure it does not accept unvalidated inputs (should mostly be parameterless or limited).
+
+Fix any missing validation by:
+   - Adding schema validation (e.g., zod/Yup/custom guards) for these inputs.
+   - Returning clear error responses for invalid parameters.
+
+--------------------------------
+4. Non-breaking Behavior
+--------------------------------
+Verify that Step 26 did NOT alter or break:
+
+1) deliveries schema:
+   - No new required columns that could break existing rows.
+   - No removed columns.
+   - No incompatible type changes.
+
+2) Existing flows:
+   - Customer app: creating a parcel/delivery still works.
+   - Driver app: accepting/completing a parcel still works.
+   - Food and ride flows are unaffected.
+
+Run a minimal regression test:
+   - Create a test parcel as a customer (if there is a UI or seed for it).
+   - Assign or simulate assignment to a driver.
+   - Mark it delivered via the existing flow.
+   - Confirm:
+     - Dashboard stats update correctly.
+     - /admin/parcels shows this parcel.
+     - /admin/parcels/:id shows correct detail.
+
+If anything broke, FIX it in a minimal, backward-compatible way.
+
+--------------------------------
+5. Logging & Privacy
+--------------------------------
+Search the code for any logs added in Step 26:
+
+- Ensure logs do NOT contain:
+  - Full pickup/dropoff addresses in plain text (short identifiers or parcelId are OK).
+  - Customer emails in debug logs (limit these where possible).
+  - Any tokens or internal secrets.
+
+If you find such logs, either:
+  - Remove them, or
+  - Mask sensitive parts before logging.
+
+--------------------------------
+6. Final Summary (REQUIRED)
+--------------------------------
+At the end of this audit, provide a clear summary including:
+
+1) Which files you inspected and/or modified.
+2) Confirmations:
+   - “All admin parcel endpoints are admin-only and return 401/403 for non-admins.”
+   - “Parcel list and detail APIs do not leak sensitive PII or payment info.”
+   - “Input validation is in place for pagination, status, country, and search.”
+   - “No database schema changes were introduced in this step.”
+   - “Existing ride/food/parcel flows still work as before.”
+
+3) Any security issues you found and how you fixed them.
+
+Do NOT add new features beyond what is necessary to fix security or correctness problems.
