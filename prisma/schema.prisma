@@ -7,16 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model admin_profiles {
+model AdminProfile {
   id        String   @id
   userId    String   @unique
   createdAt DateTime @default(now())
-  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("admin_profiles")
 }
 
-model customer_profiles {
-  id                    String              @id
-  userId                String              @unique
+model CustomerProfile {
+  id                    String            @id
+  userId                String            @unique
   fatherName            String?
   presentAddress        String?
   permanentAddress      String?
@@ -29,12 +31,12 @@ model customer_profiles {
   dateOfBirth           DateTime?
   emergencyContactName  String?
   emergencyContactPhone String?
-  verificationStatus    String              @default("pending")
+  verificationStatus    String            @default("pending")
   rejectionReason       String?
-  isVerified            Boolean             @default(false)
-  createdAt             DateTime            @default(now())
+  isVerified            Boolean           @default(false)
+  createdAt             DateTime          @default(now())
   updatedAt             DateTime
-  isSuspended           Boolean             @default(false)
+  isSuspended           Boolean           @default(false)
   suspendedAt           DateTime?
   suspensionReason      String?
   district              String?
@@ -44,60 +46,66 @@ model customer_profiles {
   postOffice            String?
   thana                 String?
   village               String?
-  users                 users               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deliveries            deliveries[]
-  driver_complaints     driver_complaints[]
-  food_orders           food_orders[]
-  rides                 rides[]
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries            Delivery[]
+  driverComplaints      DriverComplaint[]
+  foodOrders            FoodOrder[]
+  rides                 Ride[]
+
+  @@map("customer_profiles")
 }
 
-model deliveries {
-  id                String            @id
-  customerId        String
-  driverId          String?
-  pickupAddress     String
-  pickupLat         Float?
-  pickupLng         Float?
-  dropoffAddress    String
-  dropoffLat        Float?
-  dropoffLng        Float?
-  serviceFare       Decimal           @db.Decimal(10, 2)
-  safegoCommission  Decimal           @db.Decimal(10, 2)
-  driverPayout      Decimal           @db.Decimal(10, 2)
-  paymentMethod     String
-  status            String
-  customerRating    Int?
-  customerFeedback  String?
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime
-  deliveredAt       DateTime?
-  customer_profiles customer_profiles @relation(fields: [customerId], references: [id])
-  driver_profiles   driver_profiles?  @relation(fields: [driverId], references: [id])
+model Delivery {
+  id               String           @id
+  customerId       String
+  driverId         String?
+  pickupAddress    String
+  pickupLat        Float?
+  pickupLng        Float?
+  dropoffAddress   String
+  dropoffLat       Float?
+  dropoffLng       Float?
+  serviceFare      Decimal          @db.Decimal(10, 2)
+  safegoCommission Decimal          @db.Decimal(10, 2)
+  driverPayout     Decimal          @db.Decimal(10, 2)
+  paymentMethod    String
+  status           String
+  customerRating   Int?
+  customerFeedback String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime
+  deliveredAt      DateTime?
+  customer         CustomerProfile  @relation(fields: [customerId], references: [id])
+  driver           DriverProfile?   @relation(fields: [driverId], references: [id])
+
+  @@map("deliveries")
 }
 
-model driver_complaints {
-  id                  String               @id
-  driverId            String?
-  customerId          String?
-  rideId              String?
-  reason              String
-  description         String?
-  status              String               @default("open")
-  resolvedAt          DateTime?
-  resolvedBy          String?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime
-  restaurantId        String?
-  type                String               @default("driver")
-  customer_profiles   customer_profiles?   @relation(fields: [customerId], references: [id])
-  driver_profiles     driver_profiles?     @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  restaurant_profiles restaurant_profiles? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  rides               rides?               @relation(fields: [rideId], references: [id])
+model DriverComplaint {
+  id         String             @id
+  driverId   String?
+  customerId String?
+  rideId     String?
+  reason     String
+  description String?
+  status     String             @default("open")
+  resolvedAt DateTime?
+  resolvedBy String?
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime
+  restaurantId String?
+  type       String             @default("driver")
+  customer   CustomerProfile?   @relation(fields: [customerId], references: [id])
+  driver     DriverProfile?     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  restaurant RestaurantProfile? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ride       Ride?              @relation(fields: [rideId], references: [id])
+
+  @@map("driver_complaints")
 }
 
-model driver_profiles {
-  id                    String              @id
-  userId                String              @unique
+model DriverProfile {
+  id                    String             @id
+  userId                String             @unique
   fatherName            String?
   presentAddress        String?
   permanentAddress      String?
@@ -114,12 +122,12 @@ model driver_profiles {
   dateOfBirth           DateTime?
   emergencyContactName  String?
   emergencyContactPhone String?
-  verificationStatus    String              @default("pending")
+  verificationStatus    String             @default("pending")
   rejectionReason       String?
-  isVerified            Boolean             @default(false)
-  createdAt             DateTime            @default(now())
+  isVerified            Boolean            @default(false)
+  createdAt             DateTime           @default(now())
   updatedAt             DateTime
-  isSuspended           Boolean             @default(false)
+  isSuspended           Boolean            @default(false)
   lastActive            DateTime?
   suspendedAt           DateTime?
   suspensionReason      String?
@@ -131,7 +139,7 @@ model driver_profiles {
   thana                 String?
   village               String?
   backgroundCheckDate   DateTime?
-  backgroundCheckStatus String?             @default("pending")
+  backgroundCheckStatus String?            @default("pending")
   licenseStateIssued    String?
   ssnEncrypted          String?
   usaCity               String?
@@ -146,62 +154,70 @@ model driver_profiles {
   middleName            String?
   profilePhotoUrl       String?
   tlcLicenseImageUrl    String?
-  deliveries            deliveries[]
-  driver_complaints     driver_complaints[]
-  users                 users               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  driver_stats          driver_stats?
-  driver_wallets        driver_wallets?
-  food_orders           food_orders[]
-  rides                 rides[]
-  vehicle_documents     vehicle_documents[]
-  vehicles              vehicles?
+  deliveries            Delivery[]
+  driverComplaints      DriverComplaint[]
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driverStats           DriverStats?
+  driverWallet          DriverWallet?
+  foodOrders            FoodOrder[]
+  rides                 Ride[]
+  vehicleDocuments      VehicleDocument[]
+  vehicle               Vehicle?
+
+  @@map("driver_profiles")
 }
 
-model driver_stats {
-  id              String          @id
-  driverId        String          @unique
-  rating          Decimal         @default(5.0) @db.Decimal(3, 2)
-  totalTrips      Int             @default(0)
-  createdAt       DateTime        @default(now())
+model DriverStats {
+  id         String        @id
+  driverId   String        @unique
+  rating     Decimal       @default(5.0) @db.Decimal(3, 2)
+  totalTrips Int           @default(0)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime
+  driver     DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("driver_stats")
+}
+
+model DriverWallet {
+  id              String        @id
+  driverId        String        @unique
+  balance         Decimal       @default(0) @db.Decimal(10, 2)
+  negativeBalance Decimal       @default(0) @db.Decimal(10, 2)
+  createdAt       DateTime      @default(now())
   updatedAt       DateTime
-  driver_profiles driver_profiles @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  driver          DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("driver_wallets")
 }
 
-model driver_wallets {
-  id              String          @id
-  driverId        String          @unique
-  balance         Decimal         @default(0) @db.Decimal(10, 2)
-  negativeBalance Decimal         @default(0) @db.Decimal(10, 2)
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime
-  driver_profiles driver_profiles @relation(fields: [driverId], references: [id], onDelete: Cascade)
+model FoodOrder {
+  id                String            @id
+  customerId        String
+  restaurantId      String
+  driverId          String?
+  deliveryAddress   String
+  deliveryLat       Float?
+  deliveryLng       Float?
+  serviceFare       Decimal           @db.Decimal(10, 2)
+  safegoCommission  Decimal           @db.Decimal(10, 2)
+  restaurantPayout  Decimal           @db.Decimal(10, 2)
+  driverPayout      Decimal           @db.Decimal(10, 2)
+  paymentMethod     String
+  status            String
+  customerRating    Int?
+  customerFeedback  String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime
+  deliveredAt       DateTime?
+  customer          CustomerProfile   @relation(fields: [customerId], references: [id])
+  driver            DriverProfile?    @relation(fields: [driverId], references: [id])
+  restaurant        RestaurantProfile @relation(fields: [restaurantId], references: [id])
+
+  @@map("food_orders")
 }
 
-model food_orders {
-  id                  String              @id
-  customerId          String
-  restaurantId        String
-  driverId            String?
-  deliveryAddress     String
-  deliveryLat         Float?
-  deliveryLng         Float?
-  serviceFare         Decimal             @db.Decimal(10, 2)
-  safegoCommission    Decimal             @db.Decimal(10, 2)
-  restaurantPayout    Decimal             @db.Decimal(10, 2)
-  driverPayout        Decimal             @db.Decimal(10, 2)
-  paymentMethod       String
-  status              String
-  customerRating      Int?
-  customerFeedback    String?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime
-  deliveredAt         DateTime?
-  customer_profiles   customer_profiles   @relation(fields: [customerId], references: [id])
-  driver_profiles     driver_profiles?    @relation(fields: [driverId], references: [id])
-  restaurant_profiles restaurant_profiles @relation(fields: [restaurantId], references: [id])
-}
-
-model notifications {
+model Notification {
   id        String   @id
   userId    String
   type      String
@@ -209,110 +225,123 @@ model notifications {
   body      String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
-  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
 }
 
-model restaurant_profiles {
-  id                 String              @id
-  userId             String              @unique
+model RestaurantProfile {
+  id                 String             @id
+  userId             String             @unique
   restaurantName     String
   address            String
-  verificationStatus String              @default("pending")
+  verificationStatus String             @default("pending")
   rejectionReason    String?
-  isVerified         Boolean             @default(false)
-  createdAt          DateTime            @default(now())
+  isVerified         Boolean            @default(false)
+  createdAt          DateTime           @default(now())
   updatedAt          DateTime
-  isSuspended        Boolean             @default(false)
+  isSuspended        Boolean            @default(false)
   suspendedAt        DateTime?
   suspensionReason   String?
-  driver_complaints  driver_complaints[]
-  food_orders        food_orders[]
-  users              users               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  restaurant_wallets restaurant_wallets?
+  driverComplaints   DriverComplaint[]
+  foodOrders         FoodOrder[]
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantWallet   RestaurantWallet?
+
+  @@map("restaurant_profiles")
 }
 
-model restaurant_wallets {
-  id                  String              @id
-  restaurantId        String              @unique
-  balance             Decimal             @default(0) @db.Decimal(10, 2)
-  negativeBalance     Decimal             @default(0) @db.Decimal(10, 2)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime
-  restaurant_profiles restaurant_profiles @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-}
-
-model rides {
-  id                String              @id
-  customerId        String
-  driverId          String?
-  pickupAddress     String
-  pickupLat         Float?
-  pickupLng         Float?
-  dropoffAddress    String
-  dropoffLat        Float?
-  dropoffLng        Float?
-  serviceFare       Decimal             @db.Decimal(10, 2)
-  safegoCommission  Decimal             @db.Decimal(10, 2)
-  driverPayout      Decimal             @db.Decimal(10, 2)
-  paymentMethod     String
-  status            String
-  customerRating    Int?
-  customerFeedback  String?
-  driverRating      Int?
-  driverFeedback    String?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime
-  completedAt       DateTime?
-  driver_complaints driver_complaints[]
-  customer_profiles customer_profiles   @relation(fields: [customerId], references: [id])
-  driver_profiles   driver_profiles?    @relation(fields: [driverId], references: [id])
-}
-
-model users {
-  id                  String               @id
-  email               String               @unique
-  passwordHash        String
-  role                String
-  countryCode         String
-  isBlocked           Boolean              @default(false)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime
-  admin_profiles      admin_profiles?
-  customer_profiles   customer_profiles?
-  driver_profiles     driver_profiles?
-  notifications       notifications[]
-  restaurant_profiles restaurant_profiles?
-}
-
-model vehicle_documents {
-  id              String          @id
-  driverId        String
-  documentType    String
-  uploadedAt      DateTime        @default(now())
-  createdAt       DateTime        @default(now())
+model RestaurantWallet {
+  id              String            @id
+  restaurantId    String            @unique
+  balance         Decimal           @default(0) @db.Decimal(10, 2)
+  negativeBalance Decimal           @default(0) @db.Decimal(10, 2)
+  createdAt       DateTime          @default(now())
   updatedAt       DateTime
-  description     String?
-  expiresAt       DateTime?
-  fileUrl         String
-  vehicleId       String?
-  driver_profiles driver_profiles @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  vehicles        vehicles?       @relation(fields: [vehicleId], references: [id])
+  restaurant      RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@map("restaurant_wallets")
+}
+
+model Ride {
+  id               String            @id
+  customerId       String
+  driverId         String?
+  pickupAddress    String
+  pickupLat        Float?
+  pickupLng        Float?
+  dropoffAddress   String
+  dropoffLat       Float?
+  dropoffLng       Float?
+  serviceFare      Decimal           @db.Decimal(10, 2)
+  safegoCommission Decimal           @db.Decimal(10, 2)
+  driverPayout     Decimal           @db.Decimal(10, 2)
+  paymentMethod    String
+  status           String
+  customerRating   Int?
+  customerFeedback String?
+  driverRating     Int?
+  driverFeedback   String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime
+  completedAt      DateTime?
+  driverComplaints DriverComplaint[]
+  customer         CustomerProfile   @relation(fields: [customerId], references: [id])
+  driver           DriverProfile?    @relation(fields: [driverId], references: [id])
+
+  @@map("rides")
+}
+
+model User {
+  id                String             @id
+  email             String             @unique
+  passwordHash      String
+  role              String
+  countryCode       String
+  isBlocked         Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime
+  adminProfile      AdminProfile?
+  customerProfile   CustomerProfile?
+  driverProfile     DriverProfile?
+  notifications     Notification[]
+  restaurantProfile RestaurantProfile?
+
+  @@map("users")
+}
+
+model VehicleDocument {
+  id           String         @id
+  driverId     String
+  documentType String
+  uploadedAt   DateTime       @default(now())
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime
+  description  String?
+  expiresAt    DateTime?
+  fileUrl      String
+  vehicleId    String?
+  driver       DriverProfile  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id])
 
   @@index([driverId])
   @@index([vehicleId])
+  @@map("vehicle_documents")
 }
 
-model vehicles {
-  id                String              @id
-  driverId          String              @unique
+model Vehicle {
+  id                String            @id
+  driverId          String            @unique
   vehicleType       String
   vehicleModel      String
   vehiclePlate      String
-  isOnline          Boolean             @default(false)
-  totalEarnings     Decimal             @default(0) @db.Decimal(10, 2)
-  createdAt         DateTime            @default(now())
+  isOnline          Boolean           @default(false)
+  totalEarnings     Decimal           @default(0) @db.Decimal(10, 2)
+  createdAt         DateTime          @default(now())
   updatedAt         DateTime
   notes             String?
-  vehicle_documents vehicle_documents[]
-  driver_profiles   driver_profiles     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicleDocuments  VehicleDocument[]
+  driver            DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@map("vehicles")
 }
