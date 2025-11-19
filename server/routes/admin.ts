@@ -1476,6 +1476,12 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
         email: driver.user.email,
         countryCode: driver.user.countryCode,
         isBlocked: driver.user.isBlocked,
+        user: {
+          id: driver.user.id,
+          email: driver.user.email,
+          countryCode: driver.user.countryCode,
+          isBlocked: driver.user.isBlocked,
+        },
         verificationStatus: driver.verificationStatus,
         isVerified: driver.isVerified,
         rejectionReason: driver.rejectionReason,
