@@ -3,6 +3,12 @@ import { PrismaClient } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone } from "../utils/encryption";
+import {
+  uploadProfilePhoto,
+  uploadLicenseImage,
+  uploadVehicleDocument,
+  getFileUrl,
+} from "../middleware/upload";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -618,6 +624,369 @@ router.get("/nid", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Get NID error:", error);
     res.status(500).json({ error: "Failed to fetch NID" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/upload/profile-photo
+// Upload driver profile photo
+// ====================================================
+router.post("/upload/profile-photo", uploadProfilePhoto, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const fileUrl = getFileUrl(req.file.filename);
+
+    // Update driver profile with photo URL
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: { profilePhotoUrl: fileUrl },
+    });
+
+    res.json({
+      message: "Profile photo uploaded successfully",
+      profilePhotoUrl: fileUrl,
+    });
+  } catch (error) {
+    console.error("Profile photo upload error:", error);
+    res.status(500).json({ error: "Failed to upload profile photo" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/upload/dmv-license
+// Upload DMV driver license image (USA drivers only)
+// ====================================================
+router.post("/upload/dmv-license", uploadLicenseImage, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Verify driver is from USA
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (driverProfile.user.countryCode !== "US") {
+      return res.status(400).json({
+        error: "DMV license upload is only available for USA drivers",
+      });
+    }
+
+    const fileUrl = getFileUrl(req.file.filename);
+
+    // Update driver profile with DMV license URL
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: { dmvLicenseImageUrl: fileUrl },
+    });
+
+    res.json({
+      message: "DMV license uploaded successfully",
+      dmvLicenseImageUrl: fileUrl,
+    });
+  } catch (error) {
+    console.error("DMV license upload error:", error);
+    res.status(500).json({ error: "Failed to upload DMV license" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/upload/tlc-license
+// Upload TLC license image (NY state drivers only)
+// ====================================================
+router.post("/upload/tlc-license", uploadLicenseImage, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Verify driver is from NY state
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (driverProfile.user.countryCode !== "US") {
+      return res.status(400).json({
+        error: "TLC license upload is only available for USA drivers",
+      });
+    }
+
+    if (driverProfile.usaState !== "NY") {
+      return res.status(400).json({
+        error: "TLC license is only required for NY state drivers",
+      });
+    }
+
+    const fileUrl = getFileUrl(req.file.filename);
+
+    // Update driver profile with TLC license URL
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: { tlcLicenseImageUrl: fileUrl },
+    });
+
+    res.json({
+      message: "TLC license uploaded successfully",
+      tlcLicenseImageUrl: fileUrl,
+    });
+  } catch (error) {
+    console.error("TLC license upload error:", error);
+    res.status(500).json({ error: "Failed to upload TLC license" });
+  }
+});
+
+// ====================================================
+// PUT /api/driver/usa-name
+// Update USA driver structured name fields
+// ====================================================
+const usaNameSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  middleName: z.string().max(100).optional(),
+  lastName: z.string().min(1).max(100),
+});
+
+router.put("/usa-name", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Check if driver is from USA
+    if (driverProfile.user.countryCode !== "US") {
+      return res.status(400).json({
+        error: "Name structure update is only available for USA drivers",
+      });
+    }
+
+    // Validate request body
+    const validation = usaNameSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+
+    const data = validation.data;
+
+    // Update driver profile
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: {
+        firstName: data.firstName.trim(),
+        middleName: data.middleName?.trim() || null,
+        lastName: data.lastName.trim(),
+      },
+    });
+
+    res.json({
+      message: "Name updated successfully",
+      profile: {
+        firstName: updatedProfile.firstName,
+        middleName: updatedProfile.middleName,
+        lastName: updatedProfile.lastName,
+      },
+    });
+  } catch (error) {
+    console.error("USA name update error:", error);
+    res.status(500).json({ error: "Failed to update name" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/upload/vehicle-document
+// Upload vehicle document (registration or insurance)
+// ====================================================
+router.post("/upload/vehicle-document", uploadVehicleDocument, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const { documentType, vehicleId, description, expiresAt } = req.body;
+
+    // Validate document type
+    if (!["registration", "insurance"].includes(documentType)) {
+      return res.status(400).json({
+        error: "Invalid document type. Must be 'registration' or 'insurance'",
+      });
+    }
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // If vehicleId provided, verify it belongs to this driver
+    if (vehicleId) {
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id: vehicleId },
+      });
+
+      if (!vehicle || vehicle.driverId !== driverProfile.id) {
+        return res.status(400).json({
+          error: "Invalid vehicle ID or vehicle does not belong to you",
+        });
+      }
+    }
+
+    const fileUrl = getFileUrl(req.file.filename);
+
+    // Create vehicle document record
+    const document = await prisma.vehicleDocument.create({
+      data: {
+        driverId: driverProfile.id,
+        vehicleId: vehicleId || null,
+        documentType,
+        fileUrl,
+        description: description || null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      },
+    });
+
+    res.json({
+      message: "Vehicle document uploaded successfully",
+      document,
+    });
+  } catch (error) {
+    console.error("Vehicle document upload error:", error);
+    res.status(500).json({ error: "Failed to upload vehicle document" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/vehicle-documents
+// Get all vehicle documents for the driver
+// ====================================================
+router.get("/vehicle-documents", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get all vehicle documents for this driver
+    const documents = await prisma.vehicleDocument.findMany({
+      where: { driverId: driverProfile.id },
+      include: {
+        vehicle: {
+          select: {
+            id: true,
+            make: true,
+            model: true,
+            year: true,
+            licensePlate: true,
+          },
+        },
+      },
+      orderBy: { uploadedAt: "desc" },
+    });
+
+    res.json({ documents });
+  } catch (error) {
+    console.error("Get vehicle documents error:", error);
+    res.status(500).json({ error: "Failed to fetch vehicle documents" });
+  }
+});
+
+// ====================================================
+// DELETE /api/driver/vehicle-documents/:id
+// Delete a vehicle document
+// ====================================================
+router.delete("/vehicle-documents/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get document and verify ownership
+    const document = await prisma.vehicleDocument.findUnique({
+      where: { id },
+    });
+
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    if (document.driverId !== driverProfile.id) {
+      return res.status(403).json({ error: "Not authorized to delete this document" });
+    }
+
+    // Delete document record
+    await prisma.vehicleDocument.delete({
+      where: { id },
+    });
+
+    res.json({ message: "Document deleted successfully" });
+  } catch (error) {
+    console.error("Delete vehicle document error:", error);
+    res.status(500).json({ error: "Failed to delete document" });
   }
 });
 
