@@ -1,0 +1,94 @@
+You are the lead architect and senior full-stack engineer for my SafeGo global super-app. The codebase is already production-ready. Do NOT rewrite existing logic or break any working flows. Make only minimal, incremental changes.
+
+Context:
+- Stack: Node.js + Express, Prisma + PostgreSQL (Neon), React + TypeScript + Vite, TanStack Query, shadcn/ui.
+- Roles: customer, driver, restaurant, admin.
+- Status:
+  - Authentication, KYC, rides/food/parcel flows, driver management, restaurant management, complaints, and wallet settlement are already working.
+  - Admin dashboard shows total users, total drivers, active drivers, restaurants, pending KYC, etc.
+  - There is NO dedicated Customer Management page yet.
+
+Goal:
+Implement a simple but reliable Customer Management area for the admin, without breaking any existing flows.
+
+Requirements:
+
+1) Admin Customers Card & Navigation
+- On the admin dashboard, add a clear “Customers” card/metric under Platform Overview:
+  - Display total number of customers (not drivers/restaurants).
+- Make this “Customers” card clickable.
+- Clicking it should navigate to a new admin page, e.g. `/admin/customers`, protected by the existing admin ProtectedRoute.
+
+2) Customer List Page (`/admin/customers`)
+- Implement a customer list similar in style to the driver list, but simpler:
+  - Columns:
+    - email
+    - country
+    - KYC status (pending / verified / rejected)
+    - account status (active / suspended / blocked)
+    - basic usage stats if easily available (e.g. total rides, total food orders, total parcels).
+- Since the number of customers for now is small, you can:
+  - load them in one request (no complex pagination required),
+  - add a simple text search by email,
+  - optional quick filters: All / Active / Suspended / Blocked.
+- Use Prisma to query `User` + `CustomerProfile` (or equivalent) so that only customer accounts are returned (exclude drivers/restaurants/admin).
+
+3) Customer Details View
+- Each row should have a “View” or “Manage” button that opens a customer details view (page or drawer).
+- In the details view, show:
+  - account info: email, country, createdAt
+  - KYC info and current verification status
+  - account status (active / suspended / blocked)
+  - high-level statistics (if already modeled), such as:
+    - number of completed rides
+    - number of food orders
+    - number of parcels sent
+  - DO NOT introduce new tables for stats if not necessary – reuse existing relations or simple aggregate queries only if they already exist.
+
+4) Admin Actions on Customers
+- From the details view, allow the admin to:
+  - Suspend / Unsuspend customer
+  - Block / Unblock customer (harder restriction than suspend)
+- Reuse the same backend patterns used for driver suspend/block, including:
+  - dedicated PATCH endpoints for updating customer status,
+  - appropriate fields on the customer profile or user model,
+  - return the updated customer object so the UI stays in sync without a full reload.
+- After an action, update the dashboard counts and list views using existing TanStack Query invalidation (no manual window reload).
+
+5) Integration with KYC & Complaints
+- Ensure that:
+  - Customer KYC entries already shown on `/admin/kyc` remain working.
+  - The “Pending KYC” tile on the dashboard includes customers as before (no regression).
+- If complaints already support identifying which user is involved, ensure that:
+  - complaints against customers (if any) still appear on `/admin/complaints`,
+  - the complaints list can indicate if the subject is a driver or a customer (reusing the same approach used for driver/restaurant).
+
+6) Security Phase – RBAC and Safety
+- Apply strict admin-only access for:
+  - `/admin/customers` route,
+  - all new customer-related API endpoints (list, details, suspend/block).
+- Use existing auth middleware / role checks; do not create new ad-hoc mechanisms.
+- Validate IDs and payloads on all new endpoints.
+- Do NOT leak personal data outside the admin scope. Only admins can see full customer information; customers cannot see each other.
+
+7) Non-breaking Changes
+- Do NOT change or break:
+  - customer login or main app flows,
+  - driver management,
+  - restaurant management,
+  - wallet settlement, rides, or KYC logic.
+- If you refactor any shared component or hook for reuse, keep it backward-compatible and add a short code comment describing the change.
+
+8) Testing
+- Perform end-to-end tests and summarize:
+  - admin can see the Customers card and navigate to `/admin/customers`,
+  - customers list loads correctly with real data,
+  - admin can open a customer details view,
+  - suspend/unsuspend and block/unblock actions work and reflect on all relevant screens,
+  - dashboard metrics update correctly,
+  - no regression in existing driver, restaurant, KYC, complaints, or wallet flows.
+
+Finally, provide a summary:
+- files changed (backend + frontend),
+- new API endpoints,
+- how an admin can use the Customer Management page in normal daily operations.

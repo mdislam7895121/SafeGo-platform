@@ -57,6 +57,11 @@ router.get("/stats", async (req: AuthRequest, res) => {
       },
     });
 
+    // Count total customers (users with role = customer)
+    const totalCustomers = await prisma.user.count({
+      where: { role: "customer" },
+    });
+
     // Count total restaurants (users with role = restaurant)
     const restaurants = await prisma.user.count({
       where: { role: "restaurant" },
@@ -76,6 +81,7 @@ router.get("/stats", async (req: AuthRequest, res) => {
       pendingRestaurants,
       suspendedDrivers,
       blockedDrivers,
+      totalCustomers,
       restaurants,
       openComplaints,
     });
@@ -1903,6 +1909,434 @@ router.patch("/complaints/:id/resolve", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Resolve complaint error:", error);
     res.status(500).json({ error: "Failed to resolve complaint" });
+  }
+});
+
+// ====================================================
+// CUSTOMER MANAGEMENT ENDPOINTS
+// ====================================================
+
+// ====================================================
+// GET /api/admin/customers
+// List all customers with filters and usage statistics
+// ====================================================
+router.get("/customers", async (req: AuthRequest, res) => {
+  try {
+    const { search, status } = req.query;
+
+    // Build where clause
+    const whereClause: any = {};
+
+    // Join with user table for email search and status filtering
+    const userWhere: any = { role: "customer" };
+
+    if (search) {
+      userWhere.email = {
+        contains: search as string,
+        mode: "insensitive",
+      };
+    }
+
+    if (status) {
+      if (status === "active") {
+        userWhere.isBlocked = false;
+        whereClause.isSuspended = false;
+      } else if (status === "suspended") {
+        whereClause.isSuspended = true;
+      } else if (status === "blocked") {
+        userWhere.isBlocked = true;
+      }
+    }
+
+    whereClause.user = userWhere;
+
+    const customers = await prisma.customerProfile.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+        rides: {
+          select: { id: true, status: true },
+        },
+        foodOrders: {
+          select: { id: true, status: true },
+        },
+        deliveries: {
+          select: { id: true, status: true },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Calculate usage statistics for each customer
+    const customersWithStats = customers.map((customer) => ({
+      id: customer.id,
+      userId: customer.userId,
+      email: customer.user.email,
+      country: customer.user.countryCode,
+      verificationStatus: customer.verificationStatus,
+      isVerified: customer.isVerified,
+      isSuspended: customer.isSuspended,
+      suspensionReason: customer.suspensionReason,
+      suspendedAt: customer.suspendedAt,
+      isBlocked: customer.user.isBlocked,
+      createdAt: customer.user.createdAt,
+      totalRides: customer.rides.length,
+      completedRides: customer.rides.filter((r) => r.status === "completed").length,
+      totalFoodOrders: customer.foodOrders.length,
+      completedFoodOrders: customer.foodOrders.filter((o) => o.status === "completed").length,
+      totalParcels: customer.deliveries.length,
+      completedParcels: customer.deliveries.filter((d) => d.status === "completed").length,
+    }));
+
+    res.json(customersWithStats);
+  } catch (error) {
+    console.error("Fetch customers error:", error);
+    res.status(500).json({ error: "Failed to fetch customers" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/customers/:id
+// Get detailed customer information with statistics
+// ====================================================
+router.get("/customers/:id", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+        rides: {
+          select: {
+            id: true,
+            status: true,
+            pickupLocation: true,
+            dropoffLocation: true,
+            fare: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+        foodOrders: {
+          select: {
+            id: true,
+            status: true,
+            totalAmount: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+        deliveries: {
+          select: {
+            id: true,
+            status: true,
+            pickupLocation: true,
+            dropoffLocation: true,
+            fare: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+        driverComplaints: {
+          select: {
+            id: true,
+            reason: true,
+            status: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Calculate statistics
+    const stats = {
+      totalRides: customer.rides.length,
+      completedRides: customer.rides.filter((r) => r.status === "completed").length,
+      totalFoodOrders: customer.foodOrders.length,
+      completedFoodOrders: customer.foodOrders.filter((o) => o.status === "completed").length,
+      totalParcels: customer.deliveries.length,
+      completedParcels: customer.deliveries.filter((d) => d.status === "completed").length,
+      openComplaints: customer.driverComplaints.filter((c) => c.status === "open").length,
+    };
+
+    res.json({
+      ...customer,
+      stats,
+    });
+  } catch (error) {
+    console.error("Fetch customer details error:", error);
+    res.status(500).json({ error: "Failed to fetch customer details" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/customers/:id/suspend
+// Suspend a customer account (temporary restriction)
+// ====================================================
+router.patch("/customers/:id/suspend", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || reason.trim().length === 0) {
+      return res.status(400).json({ error: "Suspension reason is required" });
+    }
+
+    const customer = await prisma.customerProfile.findUnique({ where: { id } });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    if (customer.isSuspended) {
+      return res.status(400).json({ error: "Customer is already suspended" });
+    }
+
+    const updated = await prisma.customerProfile.update({
+      where: { id },
+      data: {
+        isSuspended: true,
+        suspensionReason: reason,
+        suspendedAt: new Date(),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+          },
+        },
+      },
+    });
+
+    // Create notification for customer
+    await prisma.notification.create({
+      data: {
+        userId: customer.userId,
+        type: "account_suspended",
+        title: "Account Suspended",
+        message: `Your account has been suspended. Reason: ${reason}`,
+      },
+    });
+
+    res.json({
+      message: "Customer suspended successfully",
+      customer: updated,
+    });
+  } catch (error) {
+    console.error("Suspend customer error:", error);
+    res.status(500).json({ error: "Failed to suspend customer" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/customers/:id/unsuspend
+// Unsuspend a customer account
+// ====================================================
+router.patch("/customers/:id/unsuspend", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({ where: { id } });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    if (!customer.isSuspended) {
+      return res.status(400).json({ error: "Customer is not suspended" });
+    }
+
+    const updated = await prisma.customerProfile.update({
+      where: { id },
+      data: {
+        isSuspended: false,
+        suspensionReason: null,
+        suspendedAt: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+          },
+        },
+      },
+    });
+
+    // Create notification for customer
+    await prisma.notification.create({
+      data: {
+        userId: customer.userId,
+        type: "account_active",
+        title: "Account Unsuspended",
+        message: "Your account suspension has been lifted. You can now use SafeGo services.",
+      },
+    });
+
+    res.json({
+      message: "Customer unsuspended successfully",
+      customer: updated,
+    });
+  } catch (error) {
+    console.error("Unsuspend customer error:", error);
+    res.status(500).json({ error: "Failed to unsuspend customer" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/customers/:id/block
+// Permanently block a customer account
+// ====================================================
+router.patch("/customers/:id/block", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({ 
+      where: { id },
+      include: { user: true }
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    if (customer.user.isBlocked) {
+      return res.status(400).json({ error: "Customer is already blocked" });
+    }
+
+    // Block the user account
+    await prisma.user.update({
+      where: { id: customer.userId },
+      data: { isBlocked: true },
+    });
+
+    // Get updated customer with user data
+    const updated = await prisma.customerProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+          },
+        },
+      },
+    });
+
+    // Create notification for customer
+    await prisma.notification.create({
+      data: {
+        userId: customer.userId,
+        type: "account_blocked",
+        title: "Account Blocked",
+        message: "Your account has been permanently blocked. Please contact support for more information.",
+      },
+    });
+
+    res.json({
+      message: "Customer blocked successfully",
+      customer: updated,
+    });
+  } catch (error) {
+    console.error("Block customer error:", error);
+    res.status(500).json({ error: "Failed to block customer" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/customers/:id/unblock
+// Unblock a customer account
+// ====================================================
+router.patch("/customers/:id/unblock", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({ 
+      where: { id },
+      include: { user: true }
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    if (!customer.user.isBlocked) {
+      return res.status(400).json({ error: "Customer is not blocked" });
+    }
+
+    // Unblock the user account
+    await prisma.user.update({
+      where: { id: customer.userId },
+      data: { isBlocked: false },
+    });
+
+    // Get updated customer with user data
+    const updated = await prisma.customerProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+          },
+        },
+      },
+    });
+
+    // Create notification for customer
+    await prisma.notification.create({
+      data: {
+        userId: customer.userId,
+        type: "account_active",
+        title: "Account Unblocked",
+        message: "Your account has been unblocked. You can now use SafeGo services.",
+      },
+    });
+
+    res.json({
+      message: "Customer unblocked successfully",
+      customer: updated,
+    });
+  } catch (error) {
+    console.error("Unblock customer error:", error);
+    res.status(500).json({ error: "Failed to unblock customer" });
   }
 });
 
