@@ -70,7 +70,15 @@ interface DriverDetails {
   driverLicenseExpiry?: string;
   driverLicenseImageUrl?: string;
   dmvLicenseImageUrl?: string;
+  dmvLicenseFrontUrl?: string;
+  dmvLicenseBackUrl?: string;
+  dmvLicenseExpiry?: string;
+  dmvLicenseNumber?: string;
   tlcLicenseImageUrl?: string;
+  tlcLicenseFrontUrl?: string;
+  tlcLicenseBackUrl?: string;
+  tlcLicenseExpiry?: string;
+  tlcLicenseNumber?: string;
   usaStreet?: string;
   usaCity?: string;
   usaState?: string;
@@ -916,6 +924,34 @@ export default function AdminDriverDetails() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Profile Photo Status */}
+                  <div className="mb-4 pb-4 border-b">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Profile Photo</p>
+                    {driver.profilePhotoUrl ? (
+                      <div className="flex items-center gap-2">
+                        <img 
+                          src={driver.profilePhotoUrl} 
+                          alt="Profile" 
+                          className="w-16 h-16 rounded-full object-cover border-2"
+                          data-testid="img-usa-profile-photo"
+                        />
+                        <a
+                          href={driver.profilePhotoUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline"
+                          data-testid="link-usa-profile-photo-full"
+                        >
+                          View Full Size
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-destructive" data-testid="text-usa-profile-photo-missing">
+                        Profile photo not uploaded
+                      </p>
+                    )}
+                  </div>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     {driver.usaFullLegalName && (
                       <div>
@@ -1038,6 +1074,118 @@ export default function AdminDriverDetails() {
                           <div>
                             <p className="text-xs text-muted-foreground">Phone</p>
                             <p className="text-sm" data-testid="text-emergency-phone">{driver.emergencyContactPhone}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* DMV License Documents Section (All USA drivers) */}
+                  <div className="mt-6 pt-6 border-t space-y-3">
+                    <p className="text-sm font-semibold text-foreground">DMV License Documents</p>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">DMV License Front</p>
+                        {driver.dmvLicenseFrontUrl ? (
+                          <a
+                            href={driver.dmvLicenseFrontUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                            data-testid="link-dmv-front"
+                          >
+                            View Front Image
+                          </a>
+                        ) : (
+                          <p className="text-sm text-destructive" data-testid="text-dmv-front-missing">Missing</p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">DMV License Back</p>
+                        {driver.dmvLicenseBackUrl ? (
+                          <a
+                            href={driver.dmvLicenseBackUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                            data-testid="link-dmv-back"
+                          >
+                            View Back Image
+                          </a>
+                        ) : (
+                          <p className="text-sm text-destructive" data-testid="text-dmv-back-missing">Missing</p>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">DMV License Expiry</p>
+                        {driver.dmvLicenseExpiry ? (
+                          <p className="text-sm" data-testid="text-dmv-expiry">
+                            {format(new Date(driver.dmvLicenseExpiry), "PPP")}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground" data-testid="text-dmv-expiry-missing">Not provided</p>
+                        )}
+                      </div>
+                      {driver.dmvLicenseNumber && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">DMV License Number</p>
+                          <p className="text-sm font-mono" data-testid="text-dmv-number">{driver.dmvLicenseNumber}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* TLC License Documents Section (NY drivers only) */}
+                  {driver.usaState === "NY" && (
+                    <div className="mt-6 pt-6 border-t space-y-3">
+                      <p className="text-sm font-semibold text-foreground">TLC License (New York)</p>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">TLC License Front</p>
+                          {driver.tlcLicenseFrontUrl ? (
+                            <a
+                              href={driver.tlcLicenseFrontUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:underline"
+                              data-testid="link-tlc-front"
+                            >
+                              View Front Image
+                            </a>
+                          ) : (
+                            <p className="text-sm text-destructive" data-testid="text-tlc-front-missing">Missing</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">TLC License Back</p>
+                          {driver.tlcLicenseBackUrl ? (
+                            <a
+                              href={driver.tlcLicenseBackUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:underline"
+                              data-testid="link-tlc-back"
+                            >
+                              View Back Image
+                            </a>
+                          ) : (
+                            <p className="text-sm text-destructive" data-testid="text-tlc-back-missing">Missing</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">TLC License Expiry</p>
+                          {driver.tlcLicenseExpiry ? (
+                            <p className="text-sm" data-testid="text-tlc-expiry">
+                              {format(new Date(driver.tlcLicenseExpiry), "PPP")}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground" data-testid="text-tlc-expiry-missing">Not provided</p>
+                          )}
+                        </div>
+                        {driver.tlcLicenseNumber && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">TLC License Number</p>
+                            <p className="text-sm font-mono" data-testid="text-tlc-number">{driver.tlcLicenseNumber}</p>
                           </div>
                         )}
                       </div>
