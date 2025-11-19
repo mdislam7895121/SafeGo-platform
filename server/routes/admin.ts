@@ -12,6 +12,81 @@ router.use(authenticateToken);
 router.use(requireRole(["admin"]));
 
 // ====================================================
+// HELPER: Validate KYC Completeness
+// Checks if driver has all required documents per country/state
+// ====================================================
+interface KYCValidationResult {
+  isComplete: boolean;
+  missingFields: string[];
+}
+
+async function validateDriverKYC(
+  driver: any,
+  countryCode: string
+): Promise<KYCValidationResult> {
+  const missing: string[] = [];
+
+  // Profile photo required for ALL drivers
+  if (!driver.profilePhotoUrl) {
+    missing.push("Profile photo");
+  }
+
+  // Bangladesh-specific requirements
+  if (countryCode === "BD") {
+    if (!driver.nidEncrypted && !driver.nidNumber) {
+      missing.push("NID (National ID)");
+    }
+    // Check for at least one vehicle registration document
+    const vehicleDocs = await prisma.vehicleDocument.count({
+      where: {
+        driverId: driver.id,
+        documentType: "registration",
+      },
+    });
+    if (vehicleDocs === 0) {
+      missing.push("Vehicle registration document");
+    }
+  }
+
+  // USA-specific requirements
+  if (countryCode === "US") {
+    // Name structure: firstName and lastName required
+    if (!driver.firstName) {
+      missing.push("First name");
+    }
+    if (!driver.lastName) {
+      missing.push("Last name");
+    }
+
+    // DMV License required for ALL US drivers
+    if (!driver.dmvLicenseImageUrl) {
+      missing.push("DMV driver license image");
+    }
+
+    // TLC License required ONLY for NY state drivers
+    if (driver.usaState === "NY" && !driver.tlcLicenseImageUrl) {
+      missing.push("TLC license image (required for NY drivers)");
+    }
+
+    // Check for at least one vehicle registration document
+    const vehicleDocs = await prisma.vehicleDocument.count({
+      where: {
+        driverId: driver.id,
+        documentType: "registration",
+      },
+    });
+    if (vehicleDocs === 0) {
+      missing.push("Vehicle registration document");
+    }
+  }
+
+  return {
+    isComplete: missing.length === 0,
+    missingFields: missing,
+  };
+}
+
+// ====================================================
 // GET /api/admin/stats
 // Get platform statistics for admin dashboard
 // ====================================================
@@ -223,6 +298,26 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
     // Update appropriate profile based on role
     let updatedProfile;
     if (user.role === "driver") {
+      // For drivers: validate KYC completeness before approval
+      if (verificationStatus === "approved") {
+        const driverProfile = await prisma.driverProfile.findUnique({
+          where: { userId },
+        });
+        
+        if (!driverProfile) {
+          return res.status(404).json({ error: "Driver profile not found" });
+        }
+
+        const validation = await validateDriverKYC(driverProfile, user.countryCode);
+        if (!validation.isComplete) {
+          return res.status(400).json({
+            error: "Cannot approve KYC - missing required documents",
+            missingFields: validation.missingFields,
+            message: `Please ensure driver has uploaded: ${validation.missingFields.join(", ")}`,
+          });
+        }
+      }
+
       updatedProfile = await prisma.driverProfile.update({
         where: { userId },
         data: {
