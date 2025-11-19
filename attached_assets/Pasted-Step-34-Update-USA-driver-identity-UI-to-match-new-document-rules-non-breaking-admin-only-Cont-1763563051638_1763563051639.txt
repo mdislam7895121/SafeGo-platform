@@ -1,0 +1,101 @@
+Step 34 – Update USA driver identity UI to match new document rules (non-breaking, admin-only)
+
+Context:
+- The SafeGo admin panel already supports:
+  - Bangladesh driver identity with profile photo + postal code display.
+  - USA driver KYC with DMV + (for NY) TLC document uploads, SSN, and address.
+  - A secure document review modal for all driver documents.
+- Now I want the **USA Identity Information** section on the admin *Driver Details* page to visually reflect the same completeness and safety as the Bangladesh block, without changing any database schema or breaking existing flows.
+
+Goal:
+Update the **USA Identity Information** block on `/admin/drivers/[id]` so admins can quickly see:
+1. Profile photo status
+2. DMV license document status
+3. NY-only TLC license document status
+4. Keep all existing text fields and security rules intact
+
+Requirements:
+
+1) Profile photo status (USA drivers)
+- In the USA Identity Information section, add a row at the top:
+  - Label: `Profile Photo`
+  - Value:
+    - `Profile photo uploaded` (green text or badge) when a profile image exists.
+    - `Profile photo not uploaded` (red text or warning style) when missing.
+- Re-use the same logic you used for Bangladesh drivers:
+  - Do NOT add new DB fields.
+  - Use the existing profile photo field / URL from the driver model.
+- This is **display-only**; no upload from this screen. Uploads stay in the KYC / driver app flows.
+
+2) DMV license document status (USA, all states)
+- Under the existing USA identity fields (name, phone, DOB, license number, etc.), add a “DMV License Documents” sub-section.
+- This section should show, using data that already exists from the document upload step:
+  - DMV License Front:
+    - If a front image URL is present → show a small thumbnail or a “View” link.
+    - If missing → show `Missing` in warning style.
+  - DMV License Back:
+    - Same behavior as front.
+  - License Expiry:
+    - Show the existing expiry date if present, or `Not provided`.
+- Do NOT introduce any new columns or fields in the database.
+- Only **read** the existing document URLs and expiry fields created in the earlier KYC/document steps.
+- Make sure there is no way to modify the images from this screen; it is read-only.
+
+3) TLC license document status (USA → New York only)
+- Only when:
+  - `country = US` AND
+  - `state = NY`
+- Add a second sub-section under the DMV block:
+  - Title: `TLC License (New York)`
+  - Fields:
+    - TLC License Front: thumbnail or “View” link if present, else `Missing`.
+    - TLC License Back: same logic.
+    - TLC License Expiry: show date or `Not provided`.
+- TLC license number should remain optional:
+  - If it already exists in the model, you may display the number as a line of text.
+  - Do NOT make it required and do NOT change validation rules.
+
+4) Layout and UX
+- Keep the current USA Identity Information layout (two-column text layout) as much as possible.
+- Add the new sub-sections at the **bottom** of the USA Identity block so we don’t disturb the existing alignment:
+  - Profile Photo row at the very top.
+  - Then the existing identity / address / SSN fields (unchanged).
+  - Then “DMV License Documents”.
+  - Then conditionally “TLC License (New York)” when applicable.
+- All new content is read-only; edits should still go through the existing “Edit USA Profile” flow and the separate KYC/document upload flows.
+
+5) Security & access control
+- Respect all existing admin-only protections:
+  - Only authenticated admins can access `/admin/drivers/[id]` and see document links or thumbnails.
+  - Do NOT expose raw file URLs publicly; use the same secure URL strategy you already use elsewhere for driver/customer document images.
+- SSN behavior must remain exactly as before:
+  - Stored encrypted.
+  - Displayed masked (`###-##-1234`) and only fully visible after the existing “Show SSN” interaction.
+- Do not log or print any sensitive values (SSN, full license images) in the console.
+
+6) Non-breaking changes
+- No database schema migrations.
+- No changes to Bangladesh identity UI.
+- No changes to API contracts for driver KYC or document uploads.
+- Only adjust the React/TypeScript components that render the admin **Driver Details** page and possibly extract a small reusable “DocumentStatus” sub-component if needed.
+
+7) Testing checklist (please run and confirm)
+- USA driver (non-NY) with documents:
+  - Profile photo status correct.
+  - DMV front/back both show as “View” or thumbnail when uploaded.
+  - DMV fields show `Missing` when not uploaded.
+  - TLC section does NOT appear for non-NY drivers.
+- USA driver (NY) with documents:
+  - State filter works with `country=US` and `state=NY`.
+  - DMV and TLC blocks both render with correct statuses.
+- Existing Bangladesh drivers:
+  - Their identity section remains unchanged.
+  - No layout or runtime errors.
+- Unauthorized user:
+  - Cannot access `/admin/drivers/[id]` or document URLs.
+- No TypeScript errors, no console errors in the browser.
+
+When you’re done, please summarize:
+- Which components were updated.
+- How you wired the DMV/TLC document data into the USA Identity block.
+- Confirmation that no schema or API changes were required.
