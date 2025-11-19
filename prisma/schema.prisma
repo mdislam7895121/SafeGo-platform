@@ -321,6 +321,14 @@ model User {
   @@map("users")
 }
 
+enum DmvInspectionStatus {
+  VALID
+  EXPIRED
+  MISSING
+
+  @@map("dmv_inspection_status")
+}
+
 model VehicleDocument {
   id           String         @id
   driverId     String
@@ -359,6 +367,11 @@ model Vehicle {
   registrationExpiry      DateTime?
   insuranceDocumentUrl    String?
   insuranceExpiry         DateTime?
+  dmvInspectionType       String?
+  dmvInspectionDate       DateTime?
+  dmvInspectionExpiry     DateTime?
+  dmvInspectionImageUrl   String?
+  dmvInspectionStatus     DmvInspectionStatus?
   isPrimary               Boolean           @default(true)
   vehicleDocuments        VehicleDocument[]
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
