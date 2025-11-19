@@ -102,6 +102,8 @@ function validateDriverKYC(
     if (driver.vehicle?.dmvInspectionStatus && driver.vehicle.dmvInspectionStatus !== 'VALID') {
       if (driver.vehicle.dmvInspectionStatus === 'EXPIRED') {
         missing.push("DMV inspection has expired");
+      } else if (driver.vehicle.dmvInspectionStatus === 'MISSING') {
+        missing.push("DMV inspection is missing");
       }
     }
   }
