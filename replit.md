@@ -30,37 +30,28 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 
 ## Recent Changes
 
-### Step 34c: Update USA Driver Identity UI with Document Status Display (November 19, 2025)
+### Step 34e: USA Driver Name Fields and Emergency Contact Layout Update (November 19, 2025)
 - **Frontend Updates - Driver Details Page** (`/admin/drivers/:id` for USA drivers):
-  - Added **Profile Photo Status** at top of USA Identity Information card:
-    * If uploaded: Shows 64x64px rounded thumbnail with "View Full Size" link
-    * If missing: Shows red warning text "Profile photo not uploaded"
-    * Matches Bangladesh driver profile photo display pattern
-  - Added **DMV License Documents section** (for all USA drivers):
-    * DMV License Front: Link to view image or "Missing" warning
-    * DMV License Back: Link to view image or "Missing" warning
-    * DMV License Expiry: Formatted date or "Not provided" fallback
-    * DMV License Number: Displayed when available (optional field)
-  - Added **TLC License Documents section** (for New York drivers only):
-    * Conditional rendering when `usaState === "NY"`
-    * TLC License Front: Link to view image or "Missing" warning
-    * TLC License Back: Link to view image or "Missing" warning
-    * TLC License Expiry: Formatted date or "Not provided" fallback
-    * TLC License Number: Displayed when available (optional field)
-- **TypeScript Interface Updates**:
-  - Added fields: `dmvLicenseFrontUrl`, `dmvLicenseBackUrl`, `dmvLicenseExpiry`, `dmvLicenseNumber`
-  - Added fields: `tlcLicenseFrontUrl`, `tlcLicenseBackUrl`, `tlcLicenseExpiry`, `tlcLicenseNumber`
-  - All fields use existing database schema (no migration required)
-- **Read-Only Display**: All sections display-only, no upload functionality on this page
-- **Security Maintained**:
-  - SSN masking unchanged (still requires "Show SSN" button click)
-  - Admin-only access enforced by existing middleware
-  - Document URLs use secure linking pattern (target="_blank", rel="noopener noreferrer")
-- **Layout Structure**:
-  - Profile photo status at top (with border separator)
-  - Existing identity fields in two-column grid (unchanged)
-  - Address section (unchanged)
-  - Emergency contact section (unchanged)
-  - DMV documents section (new, border-top separator)
-  - TLC documents section (new, conditional on NY state, border-top separator)
-- **Impact**: NON-BREAKING - Frontend-only changes using existing database fields, matches Bangladesh completeness, no schema changes required
+  - **Name Display Restructured**:
+    * Read-only view now displays First Name / Middle Name / Last Name separately instead of single "Full Legal Name"
+    * Uses helper function `splitFullName()` to parse existing `usaFullLegalName` field (first, middle, last)
+    * Middle name conditionally displayed (only when present)
+  - **Edit Form Updated**:
+    * Replaced single "Full Legal Name" input with three separate fields: First Name, Middle Name (Optional), Last Name
+    * Uses helper function `joinFullName()` to combine fields back into `usaFullLegalName` before saving
+    * Maintains backward compatibility with existing database schema (no migration required)
+  - **Layout Restructuring**:
+    * Emergency Contact section moved to bottom of USA Identity Information card (after DMV and TLC sections)
+    * Final layout order: Profile Photo → Identity Fields → Address → DMV Documents → TLC Documents (NY only) → Emergency Contact
+    * All sections maintain border-top separators for visual clarity
+- **Backward Compatibility**:
+  - Helper functions: `splitFullName(fullName)` returns `{firstName, middleName, lastName}`
+  - Helper functions: `joinFullName(first, middle, last)` returns combined string
+  - Existing `usaFullLegalName` field in database unchanged
+  - Display layer transformation only (no backend/schema changes)
+- **Previous Changes (Step 34c)** - Still Active:
+  - Profile Photo Status at top of USA Identity Information card
+  - DMV License Documents section (all USA drivers)
+  - TLC License Documents section (NY drivers only)
+  - All document links and expiry dates displayed
+- **Impact**: NON-BREAKING - Frontend-only changes using helper functions, maintains database schema, improves name clarity and layout consistency
