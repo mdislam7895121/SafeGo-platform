@@ -98,12 +98,16 @@ function validateDriverKYC(
     if (!driver.vehicle?.dmvInspectionImageUrl) {
       missing.push("DMV inspection document");
     }
-    // Check if inspection status is not VALID (i.e., MISSING or EXPIRED)
-    if (driver.vehicle?.dmvInspectionStatus && driver.vehicle.dmvInspectionStatus !== 'VALID') {
-      if (driver.vehicle.dmvInspectionStatus === 'EXPIRED') {
+    // Check DMV inspection status: only "VALID" is acceptable, all others fail
+    // (null, undefined, "MISSING", "EXPIRED", or any unexpected value should be rejected)
+    if (driver.vehicle?.dmvInspectionStatus !== 'VALID') {
+      if (driver.vehicle?.dmvInspectionStatus === 'EXPIRED') {
         missing.push("DMV inspection has expired");
-      } else if (driver.vehicle.dmvInspectionStatus === 'MISSING') {
+      } else if (driver.vehicle?.dmvInspectionStatus === 'MISSING') {
         missing.push("DMV inspection is missing");
+      } else {
+        // null, undefined, or unexpected values
+        missing.push("DMV inspection status is not valid");
       }
     }
   }
