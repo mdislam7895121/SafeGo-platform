@@ -1863,6 +1863,10 @@ const updateVehicleSchema = z.object({
   registrationExpiry: z.string().optional(), // ISO date string
   insuranceDocumentUrl: z.string().url().optional(),
   insuranceExpiry: z.string().optional(), // ISO date string
+  dmvInspectionType: z.string().min(1).max(100).optional(),
+  dmvInspectionDate: z.string().optional(), // ISO date string
+  dmvInspectionExpiry: z.string().optional(), // ISO date string
+  dmvInspectionImageUrl: z.string().url().optional(),
 });
 
 router.patch("/drivers/:id/vehicle", async (req: AuthRequest, res) => {
@@ -1915,6 +1919,31 @@ router.patch("/drivers/:id/vehicle", async (req: AuthRequest, res) => {
     if (data.registrationExpiry) updateData.registrationExpiry = new Date(data.registrationExpiry);
     if (data.insuranceDocumentUrl) updateData.insuranceDocumentUrl = data.insuranceDocumentUrl;
     if (data.insuranceExpiry) updateData.insuranceExpiry = new Date(data.insuranceExpiry);
+    
+    // DMV Inspection fields
+    if (data.dmvInspectionType !== undefined) updateData.dmvInspectionType = data.dmvInspectionType;
+    if (data.dmvInspectionDate) updateData.dmvInspectionDate = new Date(data.dmvInspectionDate);
+    if (data.dmvInspectionExpiry) updateData.dmvInspectionExpiry = new Date(data.dmvInspectionExpiry);
+    if (data.dmvInspectionImageUrl !== undefined) updateData.dmvInspectionImageUrl = data.dmvInspectionImageUrl;
+    
+    // Compute DMV Inspection status
+    if (data.dmvInspectionImageUrl || data.dmvInspectionExpiry) {
+      if (!data.dmvInspectionImageUrl && !driver.vehicle?.dmvInspectionImageUrl) {
+        updateData.dmvInspectionStatus = 'MISSING';
+      } else if (!data.dmvInspectionExpiry && !driver.vehicle?.dmvInspectionExpiry) {
+        updateData.dmvInspectionStatus = 'MISSING';
+      } else {
+        const expiryDate = data.dmvInspectionExpiry 
+          ? new Date(data.dmvInspectionExpiry) 
+          : driver.vehicle?.dmvInspectionExpiry;
+        
+        if (expiryDate && expiryDate < new Date()) {
+          updateData.dmvInspectionStatus = 'EXPIRED';
+        } else {
+          updateData.dmvInspectionStatus = 'VALID';
+        }
+      }
+    }
 
     // Update or create vehicle
     let vehicle;
