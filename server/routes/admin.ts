@@ -1554,6 +1554,11 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
               registrationExpiry: driver.vehicle.registrationExpiry,
               insuranceDocumentUrl: driver.vehicle.insuranceDocumentUrl,
               insuranceExpiry: driver.vehicle.insuranceExpiry,
+              dmvInspectionType: driver.vehicle.dmvInspectionType,
+              dmvInspectionDate: driver.vehicle.dmvInspectionDate,
+              dmvInspectionExpiry: driver.vehicle.dmvInspectionExpiry,
+              dmvInspectionImageUrl: driver.vehicle.dmvInspectionImageUrl,
+              dmvInspectionStatus: driver.vehicle.dmvInspectionStatus,
               isOnline: driver.vehicle.isOnline,
               totalEarnings: Number(driver.vehicle.totalEarnings),
             }
