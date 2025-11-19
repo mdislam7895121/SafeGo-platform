@@ -42,10 +42,17 @@ model DriverProfile {
   userId                 String    @unique
   
   // Bangladesh-specific fields
+  fullName               String?
   fatherName             String?
+  phoneNumber            String?
+  village                String?
+  postOffice             String?
+  thana                  String?
+  district               String?
   presentAddress         String?
   permanentAddress       String?
-  nidNumber              String?
+  nidNumber              String?   // Legacy field (deprecated, use nidEncrypted)
+  nidEncrypted           String?   // Encrypted NID for secure storage
   nidFrontImageUrl       String?
   nidBackImageUrl        String?
   
@@ -96,10 +103,17 @@ model CustomerProfile {
   userId                String    @unique
   
   // Bangladesh-specific fields
+  fullName              String?
   fatherName            String?
+  phoneNumber           String?
+  village               String?
+  postOffice            String?
+  thana                 String?
+  district              String?
   presentAddress        String?
   permanentAddress      String?
-  nidNumber             String?
+  nidNumber             String?   // Legacy field (deprecated, use nidEncrypted)
+  nidEncrypted          String?   // Encrypted NID for secure storage
   nidFrontImageUrl      String?
   nidBackImageUrl       String?
   
