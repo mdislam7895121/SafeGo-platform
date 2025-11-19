@@ -833,6 +833,381 @@ router.post("/settle-wallet", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/admin/settlement/overview
+// Get overall settlement statistics
+// ====================================================
+router.get("/settlement/overview", async (req: AuthRequest, res) => {
+  try {
+    // Get driver wallet stats
+    const driverWallets = await prisma.driverWallet.findMany();
+    const driverStats = {
+      totalWallets: driverWallets.length,
+      totalPendingSettlement: driverWallets.reduce((sum, w) => sum + Number(w.negativeBalance), 0),
+      totalBalance: driverWallets.reduce((sum, w) => sum + Number(w.balance), 0),
+      walletsNeedingSettlement: driverWallets.filter(w => Number(w.negativeBalance) > 0).length,
+    };
+
+    // Get restaurant wallet stats
+    const restaurantWallets = await prisma.restaurantWallet.findMany();
+    const restaurantStats = {
+      totalWallets: restaurantWallets.length,
+      totalPendingSettlement: restaurantWallets.reduce((sum, w) => sum + Number(w.negativeBalance), 0),
+      totalBalance: restaurantWallets.reduce((sum, w) => sum + Number(w.balance), 0),
+      walletsNeedingSettlement: restaurantWallets.filter(w => Number(w.negativeBalance) > 0).length,
+    };
+
+    // Calculate overall platform stats
+    const totalPendingSettlement = driverStats.totalPendingSettlement + restaurantStats.totalPendingSettlement;
+    const totalWalletsNeedingSettlement = driverStats.walletsNeedingSettlement + restaurantStats.walletsNeedingSettlement;
+
+    res.json({
+      driver: driverStats,
+      restaurant: restaurantStats,
+      overall: {
+        totalPendingSettlement,
+        totalWalletsNeedingSettlement,
+        totalBalance: driverStats.totalBalance + restaurantStats.totalBalance,
+      },
+    });
+  } catch (error) {
+    console.error("Get settlement overview error:", error);
+    res.status(500).json({ error: "Failed to fetch settlement overview" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/settlement/pending
+// Get all wallets with pending settlements
+// ====================================================
+router.get("/settlement/pending", async (req: AuthRequest, res) => {
+  try {
+    const { walletType, page = "1", limit = "20" } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    let pendingDrivers: any[] = [];
+    let pendingRestaurants: any[] = [];
+    let driverCount = 0;
+    let restaurantCount = 0;
+
+    if (!walletType || walletType === "driver") {
+      const wallets = await prisma.driverWallet.findMany({
+        where: {
+          negativeBalance: { gt: 0 },
+        },
+        include: {
+          driver: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+        skip: !walletType ? skip : 0,
+        take: !walletType ? limitNum : undefined,
+        orderBy: { negativeBalance: "desc" },
+      });
+
+      driverCount = await prisma.driverWallet.count({
+        where: { negativeBalance: { gt: 0 } },
+      });
+
+      pendingDrivers = wallets.map((w) => ({
+        walletId: w.id,
+        walletType: "driver",
+        driverId: w.driverId,
+        email: w.driver.user.email,
+        countryCode: w.driver.user.countryCode,
+        fullName: w.driver.fullName || `${w.driver.firstName || ""} ${w.driver.lastName || ""}`.trim() || "N/A",
+        balance: Number(w.balance),
+        negativeBalance: Number(w.negativeBalance),
+        lastUpdated: w.updatedAt,
+      }));
+    }
+
+    if (!walletType || walletType === "restaurant") {
+      const wallets = await prisma.restaurantWallet.findMany({
+        where: {
+          negativeBalance: { gt: 0 },
+        },
+        include: {
+          restaurant: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+        skip: !walletType ? 0 : skip,
+        take: !walletType ? undefined : limitNum,
+        orderBy: { negativeBalance: "desc" },
+      });
+
+      restaurantCount = await prisma.restaurantWallet.count({
+        where: { negativeBalance: { gt: 0 } },
+      });
+
+      pendingRestaurants = wallets.map((w) => ({
+        walletId: w.id,
+        walletType: "restaurant",
+        restaurantId: w.restaurantId,
+        email: w.restaurant.user.email,
+        countryCode: w.restaurant.user.countryCode,
+        restaurantName: w.restaurant.restaurantName,
+        address: w.restaurant.address,
+        balance: Number(w.balance),
+        negativeBalance: Number(w.negativeBalance),
+        lastUpdated: w.updatedAt,
+      }));
+    }
+
+    const allPending = [...pendingDrivers, ...pendingRestaurants];
+
+    res.json({
+      pending: allPending,
+      pagination: {
+        total: driverCount + restaurantCount,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil((driverCount + restaurantCount) / limitNum),
+      },
+      counts: {
+        drivers: driverCount,
+        restaurants: restaurantCount,
+      },
+    });
+  } catch (error) {
+    console.error("Get pending settlements error:", error);
+    res.status(500).json({ error: "Failed to fetch pending settlements" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/settlement/transaction-history/:type/:id
+// Get detailed transaction history for a wallet
+// ====================================================
+router.get("/settlement/transaction-history/:type/:id", async (req: AuthRequest, res) => {
+  try {
+    const { type, id } = req.params;
+
+    if (!["driver", "restaurant"].includes(type)) {
+      return res.status(400).json({ error: "Type must be 'driver' or 'restaurant'" });
+    }
+
+    if (type === "driver") {
+      // Get driver wallet
+      const wallet = await prisma.driverWallet.findUnique({
+        where: { id },
+        include: {
+          driver: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!wallet) {
+        return res.status(404).json({ error: "Driver wallet not found" });
+      }
+
+      // Get all rides for this driver
+      const rides = await prisma.ride.findMany({
+        where: { driverId: wallet.driverId },
+        orderBy: { completedAt: "desc" },
+        take: 100,
+      });
+
+      // Get all deliveries for this driver
+      const deliveries = await prisma.delivery.findMany({
+        where: { driverId: wallet.driverId },
+        orderBy: { deliveredAt: "desc" },
+        take: 100,
+      });
+
+      // Get all food orders for this driver
+      const foodOrders = await prisma.foodOrder.findMany({
+        where: { driverId: wallet.driverId },
+        orderBy: { deliveredAt: "desc" },
+        take: 100,
+      });
+
+      // Calculate totals
+      const rideStats = {
+        count: rides.length,
+        totalFare: rides.reduce((sum, r) => sum + Number(r.serviceFare), 0),
+        totalCommission: rides.reduce((sum, r) => sum + Number(r.safegoCommission), 0),
+        totalPayout: rides.reduce((sum, r) => sum + Number(r.driverPayout), 0),
+        cashRides: rides.filter((r) => r.paymentMethod === "cash").length,
+        onlineRides: rides.filter((r) => r.paymentMethod === "online").length,
+      };
+
+      const deliveryStats = {
+        count: deliveries.length,
+        totalFare: deliveries.reduce((sum, d) => sum + Number(d.serviceFare), 0),
+        totalCommission: deliveries.reduce((sum, d) => sum + Number(d.safegoCommission), 0),
+        totalPayout: deliveries.reduce((sum, d) => sum + Number(d.driverPayout), 0),
+        cashDeliveries: deliveries.filter((d) => d.paymentMethod === "cash").length,
+        onlineDeliveries: deliveries.filter((d) => d.paymentMethod === "online").length,
+      };
+
+      const foodOrderStats = {
+        count: foodOrders.length,
+        totalFare: foodOrders.reduce((sum, f) => sum + Number(f.serviceFare), 0),
+        totalCommission: foodOrders.reduce((sum, f) => sum + Number(f.safegoCommission), 0),
+        totalPayout: foodOrders.reduce((sum, f) => sum + Number(f.driverPayout), 0),
+        cashOrders: foodOrders.filter((f) => f.paymentMethod === "cash").length,
+        onlineOrders: foodOrders.filter((f) => f.paymentMethod === "online").length,
+      };
+
+      res.json({
+        walletInfo: {
+          id: wallet.id,
+          driverId: wallet.driverId,
+          email: wallet.driver.user.email,
+          countryCode: wallet.driver.user.countryCode,
+          fullName: wallet.driver.fullName || `${wallet.driver.firstName || ""} ${wallet.driver.lastName || ""}`.trim() || "N/A",
+          balance: Number(wallet.balance),
+          negativeBalance: Number(wallet.negativeBalance),
+        },
+        summary: {
+          totalServices: rideStats.count + deliveryStats.count + foodOrderStats.count,
+          totalEarnings: rideStats.totalFare + deliveryStats.totalFare + foodOrderStats.totalFare,
+          totalCommission: rideStats.totalCommission + deliveryStats.totalCommission + foodOrderStats.totalCommission,
+          totalPayout: rideStats.totalPayout + deliveryStats.totalPayout + foodOrderStats.totalPayout,
+        },
+        breakdown: {
+          rides: rideStats,
+          deliveries: deliveryStats,
+          foodOrders: foodOrderStats,
+        },
+        recentTransactions: [
+          ...rides.slice(0, 10).map((r) => ({
+            type: "ride",
+            id: r.id,
+            date: r.completedAt || r.createdAt,
+            status: r.status,
+            paymentMethod: r.paymentMethod,
+            fare: Number(r.serviceFare),
+            commission: Number(r.safegoCommission),
+            payout: Number(r.driverPayout),
+          })),
+          ...deliveries.slice(0, 10).map((d) => ({
+            type: "delivery",
+            id: d.id,
+            date: d.deliveredAt || d.createdAt,
+            status: d.status,
+            paymentMethod: d.paymentMethod,
+            fare: Number(d.serviceFare),
+            commission: Number(d.safegoCommission),
+            payout: Number(d.driverPayout),
+          })),
+          ...foodOrders.slice(0, 10).map((f) => ({
+            type: "foodOrder",
+            id: f.id,
+            date: f.deliveredAt || f.createdAt,
+            status: f.status,
+            paymentMethod: f.paymentMethod,
+            fare: Number(f.serviceFare),
+            commission: Number(f.safegoCommission),
+            payout: Number(f.driverPayout),
+          })),
+        ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 20),
+      });
+    } else {
+      // Restaurant wallet
+      const wallet = await prisma.restaurantWallet.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!wallet) {
+        return res.status(404).json({ error: "Restaurant wallet not found" });
+      }
+
+      // Get all food orders for this restaurant
+      const foodOrders = await prisma.foodOrder.findMany({
+        where: { restaurantId: wallet.restaurantId },
+        orderBy: { deliveredAt: "desc" },
+        take: 100,
+      });
+
+      const foodOrderStats = {
+        count: foodOrders.length,
+        totalFare: foodOrders.reduce((sum, f) => sum + Number(f.serviceFare), 0),
+        totalCommission: foodOrders.reduce((sum, f) => sum + Number(f.safegoCommission), 0),
+        totalPayout: foodOrders.reduce((sum, f) => sum + Number(f.restaurantPayout), 0),
+        cashOrders: foodOrders.filter((f) => f.paymentMethod === "cash").length,
+        onlineOrders: foodOrders.filter((f) => f.paymentMethod === "online").length,
+      };
+
+      res.json({
+        walletInfo: {
+          id: wallet.id,
+          restaurantId: wallet.restaurantId,
+          email: wallet.restaurant.user.email,
+          countryCode: wallet.restaurant.user.countryCode,
+          restaurantName: wallet.restaurant.restaurantName,
+          address: wallet.restaurant.address,
+          balance: Number(wallet.balance),
+          negativeBalance: Number(wallet.negativeBalance),
+        },
+        summary: {
+          totalServices: foodOrderStats.count,
+          totalEarnings: foodOrderStats.totalFare,
+          totalCommission: foodOrderStats.totalCommission,
+          totalPayout: foodOrderStats.totalPayout,
+        },
+        breakdown: {
+          foodOrders: foodOrderStats,
+        },
+        recentTransactions: foodOrders.slice(0, 20).map((f) => ({
+          type: "foodOrder",
+          id: f.id,
+          date: f.deliveredAt || f.createdAt,
+          status: f.status,
+          paymentMethod: f.paymentMethod,
+          fare: Number(f.serviceFare),
+          commission: Number(f.safegoCommission),
+          payout: Number(f.restaurantPayout),
+        })),
+      });
+    }
+  } catch (error) {
+    console.error("Get transaction history error:", error);
+    res.status(500).json({ error: "Failed to fetch transaction history" });
+  }
+});
+
+// ====================================================
 // DRIVER MANAGEMENT ENDPOINTS
 // ====================================================
 
