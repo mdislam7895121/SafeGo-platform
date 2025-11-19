@@ -1,0 +1,140 @@
+Step 34 – Fix Bangladesh driver profile: add profile photo + postal code (non-breaking)
+
+Context
+- Project: SafeGo super-app (rides, food, parcel).
+- Admin panel already has:
+  - Driver details page with "Bangladesh Identity Information" section.
+  - Driver KYC forms for Bangladesh + USA.
+  - Document upload system (profile photo, vehicle registration, licenses, etc.).
+- For Bangladesh drivers:
+  - Identity section on driver details page is missing:
+    - Profile photo
+    - Postal code
+  - In the Document Review modal, postal code is missing and cannot be edited.
+  - NID is mandatory; postal code should also be mandatory for new/updated Bangladesh identities.
+
+Goal
+Make Bangladesh driver identity fully complete and consistent by:
+1) Showing and using a profile photo for Bangladesh drivers.
+2) Adding a Postal Code field for Bangladesh drivers (required for new/updated data).
+3) Ensuring admin can view and edit postal code where appropriate.
+4) Keeping all changes non-breaking and fully backward compatible.
+
+Scope of this step
+- Only Bangladesh DRIVER identity and related admin views.
+- Do NOT change customer identity or USA driver identity in this step.
+- Do NOT change any wallet, trips, parcel, or commission logic.
+
+Detailed requirements
+
+1) Database / Prisma model
+- Add a `postalCode` field to the Bangladesh driver identity model if it does not exist yet.
+  - Type: string
+  - Nullable in schema to avoid breaking existing data.
+- No destructive migrations (do not drop or rename existing columns).
+- Existing rows without postalCode must continue to work.
+- NID remains mandatory as implemented earlier.
+
+2) Backend: Bangladesh driver identity logic
+- Update validation for Bangladesh driver identity:
+  - When creating or updating Bangladesh driver identity:
+    - `postalCode` must be required (non-empty) for new submissions and updates.
+    - This requirement applies for:
+      - Driver-side KYC submit/update for Bangladesh.
+      - Admin-side edit of Bangladesh identity.
+- Keep encryption and masking logic for NID exactly as-is; do not change key usage.
+- Do NOT expose NID or other sensitive fields outside admin-only APIs.
+
+3) Frontend: Driver KYC form (Bangladesh)
+- On the driver KYC screens for Bangladesh:
+  - Add a Postal Code field in the address section (e.g., near Post Office / Thana / District):
+    - Label: "Postal Code"
+    - Input: text field.
+    - Validation: required for Bangladesh drivers.
+  - If the postal code is missing, the form should show a clear validation error and prevent submit.
+- Do not change any USA forms in this step.
+
+4) Frontend: Admin driver details page (Bangladesh)
+- On `/admin/drivers/:id` when the driver’s country is Bangladesh:
+  - In "Bangladesh Identity Information" section:
+    - Show a Profile Photo block:
+      - If a profile photo document exists:
+        - Show a small thumbnail image.
+        - Provide a "View full" link/button to open the full-size image (reuse existing document viewer pattern if available).
+      - If missing:
+        - Show a small warning text such as "Profile photo not uploaded".
+    - Show a Postal Code line in the address area:
+      - Example:
+        - Post Office: Test PO
+        - Postal Code: 1234
+        - District: Dhaka
+  - The "Edit Profile" modal for Bangladesh identity must:
+    - Include an editable "Postal Code" field.
+    - Treat Postal Code as required (do not allow save with empty postalCode).
+    - Do NOT allow editing NID; keep existing protections.
+    - Profile photo is managed via document uploads, not the text form: only display current status, do not add file input here.
+
+5) Frontend: Admin Document Review modal (Bangladesh driver)
+- On `/admin/documents` in the Document Review modal for a Bangladesh driver:
+  - Under Identity Information:
+    - Include `Postal Code` along with Post Office / Thana / District.
+  - If postal code is missing, show a clear indicator (for example "Postal Code: Missing") so admin understands the identity is incomplete.
+- Do NOT add new editing capabilities in this modal; it is for review only.
+  - Editing postalCode continues to be done from the driver details "Edit Profile" modal.
+
+6) Security requirements
+- Role-based access control:
+  - All new/updated endpoints must continue to be admin-only where appropriate (for admin views).
+  - Driver-side endpoints must only allow a driver to update their own Bangladesh identity.
+- Input validation:
+  - Sanitize postalCode input to avoid script injection.
+  - Enforce reasonable length (for example 3–10 characters) server-side.
+- Documents and profile photo:
+  - Continue using existing secure file upload validation (MIME type checks, size limits, storage rules).
+  - Do NOT change any storage buckets/paths or public access rules in this step.
+- No logging of full NID or other sensitive identifiers to application logs.
+
+7) Backward compatibility
+- All changes must be non-breaking:
+  - Existing Bangladesh drivers without postalCode must continue to load.
+  - New validation rules apply when:
+    - A Bangladesh driver submits/updates their identity.
+    - An admin edits Bangladesh identity and clicks Save.
+  - Do not fail existing reads due to missing postalCode.
+- USA and customer flows must remain fully unchanged by this step.
+
+8) Testing checklist
+Please perform and confirm all of these before finishing:
+
+Bangladesh driver flows:
+1) Create or update a Bangladesh driver identity from the driver-side KYC form:
+   - Submit with empty Postal Code → should show a validation error and block submit.
+   - Submit with valid Postal Code → identity should save successfully.
+2) Open `/admin/drivers/:id` for a Bangladesh driver with full identity:
+   - "Bangladesh Identity Information" shows:
+     - Full Name, Father’s Name, Phone.
+     - Post Office, Postal Code, Thana, District.
+     - Profile Photo thumbnail when uploaded.
+   - "Edit Profile" modal:
+     - Postal Code field is present and required.
+     - Saving with empty postalCode should show an error.
+3) Document Review modal (`/admin/documents`):
+   - For a Bangladesh driver with postalCode set:
+     - Identity Information block displays Postal Code correctly.
+   - For a Bangladesh driver with no postalCode (if any legacy data remains):
+     - The modal clearly indicates missing Postal Code.
+4) Regression checks:
+   - USA drivers (including New York/TLC logic) still load correctly.
+   - Customer identity pages still behave as before.
+   - No errors in server logs related to postalCode.
+
+Documentation
+- Update `replit.md`:
+  - Document that Bangladesh driver identity now includes Postal Code and profile photo display.
+  - Note that postalCode is required for new/updated Bangladesh driver identities but existing data remains supported.
+  - Confirm that no security model changes were introduced.
+
+When you are done, please summarize:
+- What schema/code files you changed.
+- How postalCode and profile photos are handled for Bangladesh drivers.
+- Confirmation that no USA/customer/wallet functionality was affected.
