@@ -48,6 +48,7 @@ interface DriverDetails {
   phoneNumber?: string;
   village?: string;
   postOffice?: string;
+  postalCode?: string;
   thana?: string;
   district?: string;
   presentAddress?: string;
@@ -138,6 +139,7 @@ export default function AdminDriverDetails() {
     phoneNumber: "",
     village: "",
     postOffice: "",
+    postalCode: "",
     thana: "",
     district: "",
     presentAddress: "",
@@ -353,6 +355,7 @@ export default function AdminDriverDetails() {
         phoneNumber: "",
         village: "",
         postOffice: "",
+        postalCode: "",
         thana: "",
         district: "",
         presentAddress: "",
@@ -441,6 +444,7 @@ export default function AdminDriverDetails() {
         phoneNumber: driver.phoneNumber || "",
         village: driver.village || "",
         postOffice: driver.postOffice || "",
+        postalCode: driver.postalCode || "",
         thana: driver.thana || "",
         district: driver.district || "",
         presentAddress: driver.presentAddress || "",
@@ -1180,6 +1184,19 @@ export default function AdminDriverDetails() {
                 placeholder="Enter post office"
                 data-testid="input-edit-postOffice"
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-postalCode">Postal Code</Label>
+              <Input
+                id="edit-postalCode"
+                value={editForm.postalCode}
+                onChange={(e) => setEditForm({ ...editForm, postalCode: e.target.value })}
+                placeholder="4-6 digits (e.g., 1216)"
+                data-testid="input-edit-postalCode"
+              />
+              <p className="text-xs text-muted-foreground">
+                Must be 4-6 digits
+              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-thana">Thana</Label>

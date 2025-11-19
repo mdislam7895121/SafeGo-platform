@@ -57,6 +57,7 @@ interface Customer {
   phoneNumber: string | null;
   village: string | null;
   postOffice: string | null;
+  postalCode: string | null;
   thana: string | null;
   district: string | null;
   lastUpdated: string;
@@ -99,6 +100,7 @@ interface DocumentDetails {
   phoneNumber?: string | null;
   village?: string | null;
   postOffice?: string | null;
+  postalCode?: string | null;
   thana?: string | null;
   district?: string | null;
   nidFrontImageUrl?: string | null;
@@ -589,6 +591,10 @@ export default function AdminDocumentCenter() {
                         <div>
                           <p className="text-sm text-muted-foreground">Post Office</p>
                           <p className="font-medium" data-testid="detail-postoffice">{documentDetails.postOffice || "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Postal Code</p>
+                          <p className="font-medium" data-testid="detail-postalcode">{documentDetails.postalCode || "Not provided"}</p>
                         </div>
                         <div>
                           <p className="text-sm text-muted-foreground">Thana</p>
