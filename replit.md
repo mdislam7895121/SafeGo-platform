@@ -27,3 +27,40 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 - **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 - **UI Components (shadcn/ui)**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 - **Environment Variables**: `DATABASE_URL` (PostgreSQL connection string), `JWT_SECRET`, `NODE_ENV`, `ENCRYPTION_KEY` (for NID and SSN).
+
+## Recent Changes
+
+### Step 34c: Update USA Driver Identity UI with Document Status Display (November 19, 2025)
+- **Frontend Updates - Driver Details Page** (`/admin/drivers/:id` for USA drivers):
+  - Added **Profile Photo Status** at top of USA Identity Information card:
+    * If uploaded: Shows 64x64px rounded thumbnail with "View Full Size" link
+    * If missing: Shows red warning text "Profile photo not uploaded"
+    * Matches Bangladesh driver profile photo display pattern
+  - Added **DMV License Documents section** (for all USA drivers):
+    * DMV License Front: Link to view image or "Missing" warning
+    * DMV License Back: Link to view image or "Missing" warning
+    * DMV License Expiry: Formatted date or "Not provided" fallback
+    * DMV License Number: Displayed when available (optional field)
+  - Added **TLC License Documents section** (for New York drivers only):
+    * Conditional rendering when `usaState === "NY"`
+    * TLC License Front: Link to view image or "Missing" warning
+    * TLC License Back: Link to view image or "Missing" warning
+    * TLC License Expiry: Formatted date or "Not provided" fallback
+    * TLC License Number: Displayed when available (optional field)
+- **TypeScript Interface Updates**:
+  - Added fields: `dmvLicenseFrontUrl`, `dmvLicenseBackUrl`, `dmvLicenseExpiry`, `dmvLicenseNumber`
+  - Added fields: `tlcLicenseFrontUrl`, `tlcLicenseBackUrl`, `tlcLicenseExpiry`, `tlcLicenseNumber`
+  - All fields use existing database schema (no migration required)
+- **Read-Only Display**: All sections display-only, no upload functionality on this page
+- **Security Maintained**:
+  - SSN masking unchanged (still requires "Show SSN" button click)
+  - Admin-only access enforced by existing middleware
+  - Document URLs use secure linking pattern (target="_blank", rel="noopener noreferrer")
+- **Layout Structure**:
+  - Profile photo status at top (with border separator)
+  - Existing identity fields in two-column grid (unchanged)
+  - Address section (unchanged)
+  - Emergency contact section (unchanged)
+  - DMV documents section (new, border-top separator)
+  - TLC documents section (new, conditional on NY state, border-top separator)
+- **Impact**: NON-BREAKING - Frontend-only changes using existing database fields, matches Bangladesh completeness, no schema changes required
