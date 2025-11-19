@@ -147,3 +147,76 @@ export function isValidBdNid(nid: string): boolean {
 export function isValidBdPhone(phone: string): boolean {
   return /^01[0-9]{9}$/.test(phone);
 }
+
+/**
+ * Validates US SSN format (XXX-XX-XXXX or XXXXXXXXX)
+ * Accepts both dashed and non-dashed formats
+ */
+export function isValidSSN(ssn: string): boolean {
+  // Remove dashes for validation
+  const cleaned = ssn.replace(/-/g, "");
+  
+  // Must be exactly 9 digits
+  if (!/^\d{9}$/.test(cleaned)) {
+    return false;
+  }
+  
+  // Reject invalid SSN patterns (000-XX-XXXX, XXX-00-XXXX, XXX-XX-0000)
+  const area = cleaned.substring(0, 3);
+  const group = cleaned.substring(3, 5);
+  const serial = cleaned.substring(5, 9);
+  
+  if (area === "000" || area === "666" || parseInt(area) >= 900) {
+    return false;
+  }
+  if (group === "00") {
+    return false;
+  }
+  if (serial === "0000") {
+    return false;
+  }
+  
+  return true;
+}
+
+/**
+ * Masks SSN for display, showing only last 4 digits
+ * Example: "123-45-6789" becomes "###-##-6789"
+ * 
+ * @param ssn - Plain SSN string (with or without dashes)
+ * @returns Masked SSN in format ###-##-XXXX
+ */
+export function maskSSN(ssn: string): string {
+  if (!ssn) return "";
+  
+  // Remove all non-digit characters
+  const cleaned = ssn.replace(/\D/g, "");
+  
+  // Ensure it's a valid length
+  if (cleaned.length !== 9) {
+    return "###-##-####"; // Return fully masked if invalid
+  }
+  
+  const last4 = cleaned.substring(5, 9);
+  return `###-##-${last4}`;
+}
+
+/**
+ * Formats SSN with dashes (XXX-XX-XXXX)
+ * 
+ * @param ssn - Plain SSN string (without dashes)
+ * @returns Formatted SSN with dashes
+ */
+export function formatSSN(ssn: string): string {
+  if (!ssn) return "";
+  
+  // Remove all non-digit characters
+  const cleaned = ssn.replace(/\D/g, "");
+  
+  // Must be exactly 9 digits
+  if (cleaned.length !== 9) {
+    return ssn; // Return original if invalid
+  }
+  
+  return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 5)}-${cleaned.substring(5, 9)}`;
+}

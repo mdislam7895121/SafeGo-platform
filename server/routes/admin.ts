@@ -2,7 +2,7 @@ import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
-import { encrypt, isValidBdNid, isValidBdPhone } from "../utils/encryption";
+import { encrypt, decrypt, isValidBdNid, isValidBdPhone, isValidSSN, maskSSN } from "../utils/encryption";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -966,12 +966,25 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
         nidFrontImageUrl: driver.nidFrontImageUrl,
         nidBackImageUrl: driver.nidBackImageUrl,
         // US fields
+        usaFullLegalName: driver.usaFullLegalName,
+        dateOfBirth: driver.dateOfBirth,
+        usaPhoneNumber: driver.usaPhoneNumber,
+        driverLicenseNumber: driver.driverLicenseNumber,
+        licenseStateIssued: driver.licenseStateIssued,
+        driverLicenseExpiry: driver.driverLicenseExpiry,
+        driverLicenseImageUrl: driver.driverLicenseImageUrl,
+        usaStreet: driver.usaStreet,
+        usaCity: driver.usaCity,
+        usaState: driver.usaState,
+        usaZipCode: driver.usaZipCode,
+        emergencyContactName: driver.emergencyContactName,
+        emergencyContactPhone: driver.emergencyContactPhone,
+        backgroundCheckStatus: driver.backgroundCheckStatus,
+        backgroundCheckDate: driver.backgroundCheckDate,
+        // Legacy US fields (deprecated but kept for backward compatibility)
         homeAddress: driver.homeAddress,
         governmentIdType: driver.governmentIdType,
         governmentIdLast4: driver.governmentIdLast4,
-        driverLicenseNumber: driver.driverLicenseNumber,
-        driverLicenseImageUrl: driver.driverLicenseImageUrl,
-        driverLicenseExpiry: driver.driverLicenseExpiry,
         ssnLast4: driver.ssnLast4,
         // Vehicle info
         vehicle: driver.vehicle
@@ -1106,6 +1119,174 @@ router.patch("/drivers/:id/profile", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Update driver profile error:", error);
     res.status(500).json({ error: "Failed to update driver profile" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/drivers/:id/usa-profile
+// Update driver USA profile fields (admin only)
+// ====================================================
+const updateUsaDriverProfileSchema = z.object({
+  usaFullLegalName: z.string().min(1).max(200).optional(),
+  dateOfBirth: z.string().optional(), // ISO date string
+  ssn: z.string().refine((val) => !val || isValidSSN(val), {
+    message: "Invalid SSN format (must be XXX-XX-XXXX or XXXXXXXXX)",
+  }).optional(),
+  driverLicenseNumber: z.string().min(1).max(50).optional(),
+  licenseStateIssued: z.string().length(2).optional(), // Two-letter state code
+  driverLicenseExpiry: z.string().optional(), // ISO date string
+  usaPhoneNumber: z.string().min(10).max(15).optional(),
+  usaStreet: z.string().min(1).max(200).optional(),
+  usaCity: z.string().min(1).max(100).optional(),
+  usaState: z.string().length(2).optional(), // Two-letter state code
+  usaZipCode: z.string().min(5).max(10).optional(),
+  emergencyContactName: z.string().min(1).max(200).optional(),
+  emergencyContactPhone: z.string().min(10).max(15).optional(),
+  backgroundCheckStatus: z.enum(["pending", "cleared", "failed"]).optional(),
+});
+
+router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Validate request body
+    const validation = updateUsaDriverProfileSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+
+    // Check if driver exists
+    const driver = await prisma.driverProfile.findUnique({ 
+      where: { id },
+      include: {
+        user: {
+          select: {
+            countryCode: true
+          }
+        }
+      }
+    });
+    
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    
+    if (data.usaFullLegalName !== undefined) updateData.usaFullLegalName = data.usaFullLegalName;
+    if (data.dateOfBirth !== undefined) updateData.dateOfBirth = new Date(data.dateOfBirth);
+    if (data.driverLicenseNumber !== undefined) updateData.driverLicenseNumber = data.driverLicenseNumber;
+    if (data.licenseStateIssued !== undefined) updateData.licenseStateIssued = data.licenseStateIssued;
+    if (data.driverLicenseExpiry !== undefined) updateData.driverLicenseExpiry = new Date(data.driverLicenseExpiry);
+    if (data.usaPhoneNumber !== undefined) updateData.usaPhoneNumber = data.usaPhoneNumber;
+    if (data.usaStreet !== undefined) updateData.usaStreet = data.usaStreet;
+    if (data.usaCity !== undefined) updateData.usaCity = data.usaCity;
+    if (data.usaState !== undefined) updateData.usaState = data.usaState;
+    if (data.usaZipCode !== undefined) updateData.usaZipCode = data.usaZipCode;
+    if (data.emergencyContactName !== undefined) updateData.emergencyContactName = data.emergencyContactName;
+    if (data.emergencyContactPhone !== undefined) updateData.emergencyContactPhone = data.emergencyContactPhone;
+    if (data.backgroundCheckStatus !== undefined) {
+      updateData.backgroundCheckStatus = data.backgroundCheckStatus;
+      if (data.backgroundCheckStatus !== "pending") {
+        updateData.backgroundCheckDate = new Date();
+      }
+    }
+    
+    // Encrypt SSN if provided
+    if (data.ssn !== undefined && data.ssn) {
+      // Remove dashes for storage
+      const cleanedSSN = data.ssn.replace(/-/g, "");
+      updateData.ssnEncrypted = encrypt(cleanedSSN);
+      // Store last 4 for display purposes
+      updateData.ssnLast4 = cleanedSSN.substring(5, 9);
+    }
+
+    // Update driver profile
+    const updatedDriver = await prisma.driverProfile.update({
+      where: { id },
+      data: updateData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            countryCode: true,
+            isBlocked: true,
+            createdAt: true,
+          },
+        },
+        vehicle: true,
+        stats: true,
+        driverWallet: true,
+      },
+    });
+
+    // Return updated profile (exclude ssnEncrypted)
+    const { ssnEncrypted, ...driverProfile } = updatedDriver as any;
+    
+    res.json({
+      message: "USA driver profile updated successfully",
+      driver: {
+        ...driverProfile,
+        vehicle: driverProfile.vehicle ? {
+          ...driverProfile.vehicle,
+          totalEarnings: Number(driverProfile.vehicle.totalEarnings),
+        } : null,
+        totalTrips: driverProfile.stats?.totalTrips || 0,
+        totalEarnings: driverProfile.vehicle?.totalEarnings ? Number(driverProfile.vehicle.totalEarnings) : 0,
+        averageRating: driverProfile.stats?.rating ? Number(driverProfile.stats.rating) : 0,
+        walletBalance: driverProfile.driverWallet?.balance ? Number(driverProfile.driverWallet.balance) : 0,
+        negativeBalance: driverProfile.driverWallet?.negativeBalance ? Number(driverProfile.driverWallet.negativeBalance) : 0,
+      },
+    });
+  } catch (error) {
+    console.error("Update USA driver profile error:", error);
+    res.status(500).json({ error: "Failed to update USA driver profile" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/drivers/:id/ssn
+// Decrypt and return masked SSN (admin only)
+// ====================================================
+router.get("/drivers/:id/ssn", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        ssnEncrypted: true,
+        ssnLast4: true, // Legacy fallback
+      },
+    });
+
+    if (!driver) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Try encrypted SSN first, fallback to legacy ssnLast4
+    let maskedSSN = "";
+    if (driver.ssnEncrypted) {
+      const decryptedSSN = decrypt(driver.ssnEncrypted);
+      maskedSSN = maskSSN(decryptedSSN);
+    } else if (driver.ssnLast4) {
+      maskedSSN = `###-##-${driver.ssnLast4}`; // Legacy format
+    } else {
+      return res.status(404).json({ error: "SSN not found for this driver" });
+    }
+
+    res.json({ maskedSSN });
+  } catch (error) {
+    console.error("Fetch driver SSN error:", error);
+    res.status(500).json({ error: "Failed to fetch driver SSN" });
   }
 });
 
