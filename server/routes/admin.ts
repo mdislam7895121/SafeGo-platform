@@ -1295,7 +1295,7 @@ router.get("/drivers", async (req: AuthRequest, res) => {
             },
           },
           vehicle: onlineFilter ? { where: onlineFilter } : true,
-          stats: true,
+          driverStats: true,
           driverWallet: true,
         },
         skip,
@@ -1317,9 +1317,9 @@ router.get("/drivers", async (req: AuthRequest, res) => {
       suspensionReason: driver.suspensionReason,
       isBlocked: driver.user.isBlocked,
       isOnline: driver.vehicle?.isOnline || false,
-      totalTrips: driver.stats?.totalTrips || 0,
+      totalTrips: driver.driverStats?.totalTrips || 0,
       totalEarnings: driver.vehicle?.totalEarnings ? Number(driver.vehicle.totalEarnings) : 0,
-      averageRating: driver.stats?.rating ? Number(driver.stats.rating) : 0,
+      averageRating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 0,
       walletBalance: driver.driverWallet?.balance ? Number(driver.driverWallet.balance) : 0,
       negativeBalance: driver.driverWallet?.negativeBalance ? Number(driver.driverWallet.negativeBalance) : 0,
       vehicleType: driver.vehicle?.vehicleType,
@@ -1396,7 +1396,7 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
       include: {
         user: true,
         vehicle: true,
-        stats: true,
+        driverStats: true,
         driverWallet: true,
       },
     });
@@ -1468,9 +1468,9 @@ router.get("/drivers/:id", async (req: AuthRequest, res) => {
             }
           : null,
         // Stats
-        totalTrips: driver.stats?.totalTrips || 0,
+        totalTrips: driver.driverStats?.totalTrips || 0,
         totalEarnings: driver.vehicle?.totalEarnings ? Number(driver.vehicle.totalEarnings) : 0,
-        averageRating: driver.stats?.rating ? Number(driver.stats.rating) : 0,
+        averageRating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 0,
         // Wallet
         walletBalance: driver.driverWallet?.balance ? Number(driver.driverWallet.balance) : 0,
         negativeBalance: driver.driverWallet?.negativeBalance ? Number(driver.driverWallet.negativeBalance) : 0,
@@ -1561,7 +1561,7 @@ router.patch("/drivers/:id/profile", async (req: AuthRequest, res) => {
           },
         },
         vehicle: true,
-        stats: true,
+        driverStats: true,
         driverWallet: true,
       },
     });
@@ -1579,9 +1579,9 @@ router.patch("/drivers/:id/profile", async (req: AuthRequest, res) => {
           totalEarnings: Number(driverProfile.vehicle.totalEarnings),
         } : null,
         // Add computed fields
-        totalTrips: driverProfile.stats?.totalTrips || 0,
+        totalTrips: driverProfile.driverStats?.totalTrips || 0,
         totalEarnings: driverProfile.vehicle?.totalEarnings ? Number(driverProfile.vehicle.totalEarnings) : 0,
-        averageRating: driverProfile.stats?.rating ? Number(driverProfile.stats.rating) : 0,
+        averageRating: driverProfile.driverStats?.rating ? Number(driverProfile.driverStats.rating) : 0,
         walletBalance: driverProfile.driverWallet?.balance ? Number(driverProfile.driverWallet.balance) : 0,
         negativeBalance: driverProfile.driverWallet?.negativeBalance ? Number(driverProfile.driverWallet.negativeBalance) : 0,
       },
@@ -1692,7 +1692,7 @@ router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
           },
         },
         vehicle: true,
-        stats: true,
+        driverStats: true,
         driverWallet: true,
       },
     });
@@ -1708,9 +1708,9 @@ router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
           ...driverProfile.vehicle,
           totalEarnings: Number(driverProfile.vehicle.totalEarnings),
         } : null,
-        totalTrips: driverProfile.stats?.totalTrips || 0,
+        totalTrips: driverProfile.driverStats?.totalTrips || 0,
         totalEarnings: driverProfile.vehicle?.totalEarnings ? Number(driverProfile.vehicle.totalEarnings) : 0,
-        averageRating: driverProfile.stats?.rating ? Number(driverProfile.stats.rating) : 0,
+        averageRating: driverProfile.driverStats?.rating ? Number(driverProfile.driverStats.rating) : 0,
         walletBalance: driverProfile.driverWallet?.balance ? Number(driverProfile.driverWallet.balance) : 0,
         negativeBalance: driverProfile.driverWallet?.negativeBalance ? Number(driverProfile.driverWallet.negativeBalance) : 0,
       },
