@@ -95,6 +95,7 @@ interface DocumentDetails {
   isVerified: boolean;
   rejectionReason: string | null;
   profilePhotoUrl?: string;
+  // Bangladesh fields
   fullName?: string | null;
   fatherName?: string | null;
   phoneNumber?: string | null;
@@ -105,12 +106,37 @@ interface DocumentDetails {
   district?: string | null;
   nidFrontImageUrl?: string | null;
   nidBackImageUrl?: string | null;
+  // USA fields - Identity
   firstName?: string | null;
   middleName?: string | null;
   lastName?: string | null;
+  usaFullLegalName?: string | null;
+  dateOfBirth?: string | null;
+  usaPhoneNumber?: string | null;
+  ssnMasked?: string | null;
+  backgroundCheckStatus?: string | null;
+  backgroundCheckDate?: string | null;
+  // USA fields - Residential Address
+  usaStreet?: string | null;
+  usaCity?: string | null;
   usaState?: string | null;
-  dmvLicenseImageUrl?: string | null;
-  tlcLicenseImageUrl?: string | null;
+  usaZipCode?: string | null;
+  // USA fields - Emergency Contact
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  emergencyContactRelationship?: string | null;
+  // USA fields - DMV License (all states)
+  dmvLicenseFrontUrl?: string | null;
+  dmvLicenseBackUrl?: string | null;
+  dmvLicenseExpiry?: string | null;
+  dmvLicenseNumber?: string | null;
+  dmvLicenseImageUrl?: string | null; // Legacy
+  // USA fields - TLC License (NY only)
+  tlcLicenseFrontUrl?: string | null;
+  tlcLicenseBackUrl?: string | null;
+  tlcLicenseExpiry?: string | null;
+  tlcLicenseNumber?: string | null;
+  tlcLicenseImageUrl?: string | null; // Legacy
   vehicleDocuments?: Array<{
     id: string;
     documentType: string;
@@ -621,10 +647,178 @@ export default function AdminDocumentCenter() {
                           <p className="font-medium" data-testid="detail-lastname">{documentDetails.lastName || "N/A"}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">State</p>
-                          <p className="font-medium" data-testid="detail-state">{documentDetails.usaState || "N/A"}</p>
+                          <p className="text-sm text-muted-foreground">Date of Birth</p>
+                          <p className="font-medium" data-testid="detail-dob">
+                            {documentDetails.dateOfBirth ? format(new Date(documentDetails.dateOfBirth), "PP") : "N/A"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Phone Number</p>
+                          <p className="font-medium" data-testid="detail-usa-phone">{documentDetails.usaPhoneNumber || "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">SSN (Masked)</p>
+                          <p className="font-medium font-mono" data-testid="detail-ssn-masked">{documentDetails.ssnMasked || "N/A"}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Background Check</p>
+                          <p className="font-medium capitalize" data-testid="detail-background-check">{documentDetails.backgroundCheckStatus || "N/A"}</p>
                         </div>
                       </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* USA Residential Address */}
+              {documentDetails.countryCode === "US" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Residential Address</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Street</p>
+                      <p className="font-medium" data-testid="detail-street">{documentDetails.usaStreet || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">City</p>
+                      <p className="font-medium" data-testid="detail-city">{documentDetails.usaCity || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">State</p>
+                      <p className="font-medium" data-testid="detail-state">{documentDetails.usaState || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">ZIP Code</p>
+                      <p className="font-medium" data-testid="detail-zip">{documentDetails.usaZipCode || "N/A"}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* USA Emergency Contact */}
+              {documentDetails.countryCode === "US" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Emergency Contact</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Name</p>
+                      <p className="font-medium" data-testid="detail-emergency-name">{documentDetails.emergencyContactName || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Relationship</p>
+                      <p className="font-medium" data-testid="detail-emergency-relationship">{documentDetails.emergencyContactRelationship || "N/A"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <p className="font-medium" data-testid="detail-emergency-phone">{documentDetails.emergencyContactPhone || "N/A"}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* USA DMV License */}
+              {documentDetails.countryCode === "US" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">DMV License (Required for all USA drivers)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">License Number</p>
+                        <p className="font-medium" data-testid="detail-dmv-number">{documentDetails.dmvLicenseNumber || "N/A"}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Expiry Date</p>
+                        <p className="font-medium" data-testid="detail-dmv-expiry">
+                          {documentDetails.dmvLicenseExpiry ? format(new Date(documentDetails.dmvLicenseExpiry), "PP") : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {documentDetails.dmvLicenseFrontUrl && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">DMV License Front</p>
+                          <img 
+                            src={documentDetails.dmvLicenseFrontUrl} 
+                            alt="DMV License Front" 
+                            className="w-full rounded-lg border"
+                            data-testid="image-dmv-front"
+                          />
+                        </div>
+                      )}
+                      {documentDetails.dmvLicenseBackUrl && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">DMV License Back</p>
+                          <img 
+                            src={documentDetails.dmvLicenseBackUrl} 
+                            alt="DMV License Back" 
+                            className="w-full rounded-lg border"
+                            data-testid="image-dmv-back"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {!documentDetails.dmvLicenseFrontUrl && !documentDetails.dmvLicenseBackUrl && (
+                      <p className="text-sm text-orange-600 dark:text-orange-400" data-testid="warning-dmv-missing">
+                        ⚠️ DMV License documents are required for verification
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* USA TLC License (NY only) */}
+              {documentDetails.countryCode === "US" && documentDetails.usaState === "NY" && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">TLC License (Required for New York drivers)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">License Number</p>
+                        <p className="font-medium" data-testid="detail-tlc-number">{documentDetails.tlcLicenseNumber || "N/A"}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Expiry Date</p>
+                        <p className="font-medium" data-testid="detail-tlc-expiry">
+                          {documentDetails.tlcLicenseExpiry ? format(new Date(documentDetails.tlcLicenseExpiry), "PP") : "N/A"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {documentDetails.tlcLicenseFrontUrl && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">TLC License Front</p>
+                          <img 
+                            src={documentDetails.tlcLicenseFrontUrl} 
+                            alt="TLC License Front" 
+                            className="w-full rounded-lg border"
+                            data-testid="image-tlc-front"
+                          />
+                        </div>
+                      )}
+                      {documentDetails.tlcLicenseBackUrl && (
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2">TLC License Back</p>
+                          <img 
+                            src={documentDetails.tlcLicenseBackUrl} 
+                            alt="TLC License Back" 
+                            className="w-full rounded-lg border"
+                            data-testid="image-tlc-back"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {!documentDetails.tlcLicenseFrontUrl && !documentDetails.tlcLicenseBackUrl && (
+                      <p className="text-sm text-orange-600 dark:text-orange-400" data-testid="warning-tlc-missing">
+                        ⚠️ TLC License documents are required for NY drivers
+                      </p>
                     )}
                   </CardContent>
                 </Card>
