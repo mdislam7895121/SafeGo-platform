@@ -47,6 +47,23 @@ interface Customer {
   dateOfBirth?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  // Bangladesh fields
+  fullName?: string;
+  fatherName?: string;
+  phoneNumber?: string;
+  village?: string;
+  postOffice?: string;
+  thana?: string;
+  district?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
+  nidNumber?: string;
+  nidFrontImageUrl?: string;
+  nidBackImageUrl?: string;
+  // US fields
+  homeAddress?: string;
+  governmentIdType?: string;
+  governmentIdLast4?: string;
   createdAt: string;
   rides: any[];
   foodOrders: any[];
@@ -73,6 +90,8 @@ export default function CustomerDetails() {
   const [suspensionReason, setSuspensionReason] = useState("");
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [showUnblockDialog, setShowUnblockDialog] = useState(false);
+  const [showNid, setShowNid] = useState(false);
+  const [nid, setNid] = useState<string>("");
 
   // Fetch customer details
   const { data: customer, isLoading } = useQuery<Customer>({
@@ -163,6 +182,28 @@ export default function CustomerDetails() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       setShowUnblockDialog(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Fetch NID (admin-only, secure endpoint)
+  const fetchNidMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/admin/customers/${customerId}/nid`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to fetch NID");
+      }
+      const data = await response.json();
+      return data.nid;
+    },
+    onSuccess: (data) => {
+      setNid(data);
+      setShowNid(true);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -379,6 +420,132 @@ export default function CustomerDetails() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Bangladesh Info - Only shown for Bangladesh customers */}
+      {customer.user.countryCode === "BD" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Bangladesh Identity Information
+            </CardTitle>
+            <CardDescription>Verified identity details for Bangladesh</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2">
+              {customer.fullName && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Full Name</p>
+                  <p className="text-sm" data-testid="text-full-name">{customer.fullName}</p>
+                </div>
+              )}
+              {customer.fatherName && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Father's Name</p>
+                  <p className="text-sm" data-testid="text-father-name">{customer.fatherName}</p>
+                </div>
+              )}
+              {customer.phoneNumber && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Phone Number</p>
+                  <p className="text-sm" data-testid="text-phone">{customer.phoneNumber}</p>
+                </div>
+              )}
+              {customer.village && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Village</p>
+                  <p className="text-sm" data-testid="text-village">{customer.village}</p>
+                </div>
+              )}
+              {customer.postOffice && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Post Office</p>
+                  <p className="text-sm" data-testid="text-post-office">{customer.postOffice}</p>
+                </div>
+              )}
+              {customer.thana && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Thana</p>
+                  <p className="text-sm" data-testid="text-thana">{customer.thana}</p>
+                </div>
+              )}
+              {customer.district && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">District</p>
+                  <p className="text-sm" data-testid="text-district">{customer.district}</p>
+                </div>
+              )}
+              {customer.presentAddress && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Present Address</p>
+                  <p className="text-sm" data-testid="text-present-address">{customer.presentAddress}</p>
+                </div>
+              )}
+              {customer.permanentAddress && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Permanent Address</p>
+                  <p className="text-sm" data-testid="text-permanent-address">{customer.permanentAddress}</p>
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">NID Number</p>
+                {showNid ? (
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-mono" data-testid="text-nid">{nid || customer.nidNumber || "Not available"}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowNid(false)}
+                      data-testid="button-hide-nid"
+                    >
+                      Hide
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => fetchNidMutation.mutate()}
+                    disabled={fetchNidMutation.isPending}
+                    data-testid="button-show-nid"
+                  >
+                    {fetchNidMutation.isPending ? "Loading..." : "Show NID"}
+                  </Button>
+                )}
+              </div>
+            </div>
+            {(customer.nidFrontImageUrl || customer.nidBackImageUrl) && (
+              <div className="mt-4 space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">NID Images</p>
+                <div className="flex gap-2">
+                  {customer.nidFrontImageUrl && (
+                    <a
+                      href={customer.nidFrontImageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline"
+                      data-testid="link-nid-front"
+                    >
+                      View Front
+                    </a>
+                  )}
+                  {customer.nidBackImageUrl && (
+                    <a
+                      href={customer.nidBackImageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline"
+                      data-testid="link-nid-back"
+                    >
+                      View Back
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Recent Activity */}
       <div className="grid gap-4 md:grid-cols-2">
