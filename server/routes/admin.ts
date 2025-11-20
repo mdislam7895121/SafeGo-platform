@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
+import { AuthRequest, loadAdminProfile, checkPermission } from "../middleware/auth";
+import { Permission } from "../utils/permissions";
 import { z } from "zod";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone, isValidSSN, maskSSN } from "../utils/encryption";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
@@ -8,9 +9,8 @@ import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/aud
 const router = Router();
 const prisma = new PrismaClient();
 
-// All routes require authentication and admin role
-router.use(authenticateToken);
-router.use(requireRole(["admin"]));
+// All routes require authentication, admin role, and active admin status
+router.use(loadAdminProfile);
 
 // ====================================================
 // HELPER: Validate KYC Completeness
@@ -324,6 +324,25 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check role-specific KYC permission
+    const { requirePermission } = await import("../utils/permissions");
+    const permissionMap = {
+      driver: Permission.MANAGE_DRIVER_KYC,
+      customer: Permission.MANAGE_CUSTOMER_KYC,
+      restaurant: Permission.MANAGE_RESTAURANT_KYC,
+    };
+    
+    const requiredPermission = permissionMap[user.role as keyof typeof permissionMap];
+    if (!requiredPermission) {
+      return res.status(400).json({ error: "Invalid user role for KYC processing" });
+    }
+
+    try {
+      requirePermission(req.adminUser, requiredPermission);
+    } catch (permError: any) {
+      return res.status(permError.statusCode || 403).json({ error: permError.message || "Insufficient permissions" });
     }
 
     const isVerified = verificationStatus === "approved";
@@ -720,7 +739,7 @@ router.post("/kyc/reject", async (req: AuthRequest, res) => {
 // PATCH /api/admin/block/:userId
 // Block or unblock a user
 // ====================================================
-router.patch("/block/:userId", async (req: AuthRequest, res) => {
+router.patch("/block/:userId", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { userId } = req.params;
     const { isBlocked } = req.body;
@@ -846,7 +865,7 @@ router.get("/users", async (req: AuthRequest, res) => {
 // POST /api/admin/settle-wallet
 // Settle negative balance for driver or restaurant
 // ====================================================
-router.post("/settle-wallet", async (req: AuthRequest, res) => {
+router.post("/settle-wallet", checkPermission(Permission.PROCESS_WALLET_SETTLEMENT), async (req: AuthRequest, res) => {
   try {
     const { walletType, walletId, settlementAmount } = req.body;
 
@@ -5084,7 +5103,7 @@ router.get("/documents/restaurants/:id/details", async (req: AuthRequest, res) =
 // POST /api/admin/documents/drivers/:id/approve
 // Approve driver documents
 // ====================================================
-router.post("/documents/drivers/:id/approve", async (req: AuthRequest, res) => {
+router.post("/documents/drivers/:id/approve", checkPermission(Permission.MANAGE_DRIVER_KYC), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -5140,7 +5159,7 @@ router.post("/documents/drivers/:id/approve", async (req: AuthRequest, res) => {
 // POST /api/admin/documents/drivers/:id/reject
 // Reject driver documents
 // ====================================================
-router.post("/documents/drivers/:id/reject", async (req: AuthRequest, res) => {
+router.post("/documents/drivers/:id/reject", checkPermission(Permission.MANAGE_DRIVER_KYC), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -5178,7 +5197,7 @@ router.post("/documents/drivers/:id/reject", async (req: AuthRequest, res) => {
 // POST /api/admin/documents/customers/:id/approve
 // Approve customer documents
 // ====================================================
-router.post("/documents/customers/:id/approve", async (req: AuthRequest, res) => {
+router.post("/documents/customers/:id/approve", checkPermission(Permission.MANAGE_CUSTOMER_KYC), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -5215,7 +5234,7 @@ router.post("/documents/customers/:id/approve", async (req: AuthRequest, res) =>
 // POST /api/admin/documents/customers/:id/reject
 // Reject customer documents
 // ====================================================
-router.post("/documents/customers/:id/reject", async (req: AuthRequest, res) => {
+router.post("/documents/customers/:id/reject", checkPermission(Permission.MANAGE_CUSTOMER_KYC), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -5253,7 +5272,7 @@ router.post("/documents/customers/:id/reject", async (req: AuthRequest, res) => 
 // POST /api/admin/documents/restaurants/:id/approve
 // Approve restaurant documents
 // ====================================================
-router.post("/documents/restaurants/:id/approve", async (req: AuthRequest, res) => {
+router.post("/documents/restaurants/:id/approve", checkPermission(Permission.MANAGE_RESTAURANT_KYC), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -5290,7 +5309,7 @@ router.post("/documents/restaurants/:id/approve", async (req: AuthRequest, res) 
 // POST /api/admin/documents/restaurants/:id/reject
 // Reject restaurant documents
 // ====================================================
-router.post("/documents/restaurants/:id/reject", async (req: AuthRequest, res) => {
+router.post("/documents/restaurants/:id/reject", checkPermission(Permission.MANAGE_RESTAURANT_KYC), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -5574,7 +5593,7 @@ router.get("/parcels/commission-summary", async (req: AuthRequest, res) => {
 // GET /api/admin/audit-logs
 // Fetch audit logs with pagination and filters
 // ====================================================
-router.get("/audit-logs", async (req: AuthRequest, res) => {
+router.get("/audit-logs", checkPermission(Permission.VIEW_ACTIVITY_LOG), async (req: AuthRequest, res) => {
   try {
     const {
       page = "1",
