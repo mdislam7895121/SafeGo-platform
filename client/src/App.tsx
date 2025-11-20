@@ -56,6 +56,10 @@ import AdminSupportChat from "@/pages/admin/support-chat";
 import AdminWallets from "@/pages/admin/wallets";
 import AdminWalletDetails from "@/pages/admin/wallet-details";
 import AdminPayouts from "@/pages/admin/payouts";
+import AdminPayoutsRequests from "@/pages/admin/payouts-requests";
+import AdminPayoutsSchedule from "@/pages/admin/payouts-schedule";
+import AdminPayoutsManual from "@/pages/admin/payouts-manual";
+import AdminPayoutsReports from "@/pages/admin/payouts-reports";
 import AdminEarnings from "@/pages/admin/earnings";
 import AdminMonitoring from "@/pages/admin/monitoring";
 import AdminSecurityCenter from "@/pages/admin/security-center";
@@ -287,6 +291,26 @@ function Router() {
       <Route path="/admin/wallets">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminWallets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payouts/requests">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPayoutsRequests />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payouts/schedule">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPayoutsSchedule />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payouts/manual">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPayoutsManual />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payouts/reports">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPayoutsReports />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts">
