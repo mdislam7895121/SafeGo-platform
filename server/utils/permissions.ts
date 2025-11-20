@@ -27,6 +27,10 @@ export enum Permission {
   CREATE_ADMIN = 'CREATE_ADMIN',
   EDIT_ADMIN = 'EDIT_ADMIN',
   VIEW_ADMIN_LIST = 'VIEW_ADMIN_LIST',
+  VIEW_SUPPORT_CONVERSATIONS = 'VIEW_SUPPORT_CONVERSATIONS',
+  REPLY_SUPPORT_CONVERSATIONS = 'REPLY_SUPPORT_CONVERSATIONS',
+  ASSIGN_SUPPORT_CONVERSATIONS = 'ASSIGN_SUPPORT_CONVERSATIONS',
+  MANAGE_SUPPORT_SETTINGS = 'MANAGE_SUPPORT_SETTINGS',
 }
 
 type RolePermissions = {
@@ -55,6 +59,10 @@ const rolePermissions: RolePermissions = {
     Permission.CREATE_ADMIN,
     Permission.EDIT_ADMIN,
     Permission.VIEW_ADMIN_LIST,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.REPLY_SUPPORT_CONVERSATIONS,
+    Permission.ASSIGN_SUPPORT_CONVERSATIONS,
+    Permission.MANAGE_SUPPORT_SETTINGS,
   ]),
 
   [AdminRole.COMPLIANCE_ADMIN]: new Set([
@@ -69,6 +77,7 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_WALLET_SUMMARY,
     Permission.VIEW_COMMISSION_ANALYTICS,
     Permission.VIEW_SETTINGS,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
@@ -79,6 +88,9 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_PARCELS_STATUS,
     Permission.VIEW_WALLET_SUMMARY,
     Permission.VIEW_COMMISSION_ANALYTICS,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.REPLY_SUPPORT_CONVERSATIONS,
+    Permission.ASSIGN_SUPPORT_CONVERSATIONS,
   ]),
 
   [AdminRole.FINANCE_ADMIN]: new Set([
@@ -100,6 +112,7 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_COMMISSION_ANALYTICS,
     Permission.VIEW_ACTIVITY_LOG,
     Permission.VIEW_SETTINGS,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
   ]),
 };
 
