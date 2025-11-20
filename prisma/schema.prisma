@@ -7,11 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AdminRole {
+  SUPER_ADMIN
+  COMPLIANCE_ADMIN
+  SUPPORT_ADMIN
+  FINANCE_ADMIN
+  READONLY_ADMIN
+}
+
 model AdminProfile {
-  id        String   @id
-  userId    String   @unique
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id
+  userId    String    @unique
+  adminRole AdminRole @default(SUPER_ADMIN)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("admin_profiles")
 }

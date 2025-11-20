@@ -1,0 +1,269 @@
+Step 38 – Advanced Admin Roles & Permissions (RBAC Hardening) for SafeGo
+
+Goal
+Strengthen the SafeGo admin security model with clear, role-based access control – without breaking any existing flows. Existing single-admin behavior must keep working exactly as before, but we now introduce multiple admin roles and granular permissions.
+
+Context
+- Platform: SafeGo (rides, food, parcels) for Bangladesh + USA.
+- Core entities: customers, drivers, restaurants, parcels, wallet/settlements, KYC/documents, settings, audit logs.
+- We already have:
+  - KYC + identity flows for BD/US drivers and customers
+  - Restaurant management
+  - Parcel management
+  - Wallet settlement (drivers + restaurants)
+  - Commission analytics
+  - Global document expiry warnings
+  - Admin Activity Log (Step 37) with secure audit trail
+
+Critical requirements
+1. NO breaking changes to existing behavior.
+2. Existing admin user(s) must automatically become “Super Admin” so nothing stops working.
+3. All new fields must be backward compatible, nullable or have safe defaults.
+4. All access control checks must fail SAFE (deny by default if unsure).
+5. No change to customer/driver/restaurant apps – this is admin-only security.
+6. No emojis anywhere in new UI text or backend messages.
+
+1) Data Model: Admin Roles & Permissions
+
+Extend the existing admin user model and codebase to support roles, following the existing ORM and migration style.
+
+AdminRole enum (or equivalent string union):
+- SUPER_ADMIN
+- COMPLIANCE_ADMIN      (KYC, documents, identity)
+- SUPPORT_ADMIN         (basic user management, block/suspend, complaints)
+- FINANCE_ADMIN         (wallet settlement, commission views, payouts)
+- READONLY_ADMIN        (view-only across admin panel, no mutations)
+
+Admin user fields to add:
+- role: AdminRole (default: SUPER_ADMIN for existing records)
+- isActive: boolean (default: true) – allows deactivating admin accounts without deleting.
+
+Migration rules:
+- Follow existing migration pattern.
+- Existing admin records must be migrated with role = SUPER_ADMIN and isActive = true.
+- DO NOT remove or rename any existing columns.
+- Keep everything backward compatible.
+
+2) Permission Matrix (What each role can do)
+
+Implement a centralized permission mapping (e.g., in a config or helper) and never hard-code scattered checks.
+
+Use a function such as:
+- canPerform(adminUser, action, entityType): boolean
+
+Define high-level actions and map them to roles:
+
+Core actions (examples, you can refine names but keep semantics):
+- VIEW_DASHBOARD
+- VIEW_ACTIVITY_LOG
+- VIEW_USER (customer/driver/restaurant)
+- MANAGE_USER_STATUS (suspend, block, unblock)
+- MANAGE_DRIVER_KYC
+- MANAGE_CUSTOMER_KYC
+- MANAGE_RESTAURANT_KYC
+- MANAGE_DOCUMENT_REVIEW (DMV/TLC/NID etc.)
+- VIEW_WALLET_SUMMARY
+- PROCESS_WALLET_SETTLEMENT
+- EDIT_COMMISSION_SETTINGS
+- VIEW_COMMISSION_ANALYTICS
+- VIEW_PARCELS
+- MANAGE_PARCELS_STATUS
+- VIEW_SETTINGS
+- EDIT_SETTINGS
+- CREATE_ADMIN (create new admin accounts)
+- EDIT_ADMIN (change role / active flag)
+- VIEW_ADMIN_LIST
+
+Role capabilities (minimum set):
+
+SUPER_ADMIN:
+- Full access to everything above.
+- Can create/update other admin accounts and roles.
+
+COMPLIANCE_ADMIN:
+- VIEW_DASHBOARD
+- VIEW_USER
+- MANAGE_DRIVER_KYC
+- MANAGE_CUSTOMER_KYC
+- MANAGE_RESTAURANT_KYC
+- MANAGE_DOCUMENT_REVIEW
+- VIEW_ACTIVITY_LOG
+- VIEW_PARCELS
+- VIEW_WALLET_SUMMARY
+- VIEW_COMMISSION_ANALYTICS
+- VIEW_SETTINGS
+- NO financial processing, NO commission edits, NO admin creation.
+
+SUPPORT_ADMIN:
+- VIEW_DASHBOARD
+- VIEW_USER
+- MANAGE_USER_STATUS (suspend, block, unblock)
+- VIEW_PARCELS
+- MANAGE_PARCELS_STATUS
+- VIEW_WALLET_SUMMARY (read-only)
+- VIEW_COMMISSION_ANALYTICS (read-only)
+- Cannot touch KYC decisions, cannot process settlements, cannot edit settings, cannot manage admin users.
+
+FINANCE_ADMIN:
+- VIEW_DASHBOARD
+- VIEW_WALLET_SUMMARY
+- PROCESS_WALLET_SETTLEMENT (drivers + restaurants)
+- VIEW_COMMISSION_ANALYTICS
+- EDIT_COMMISSION_SETTINGS (restaurant/driver/parcel commission rates)
+- VIEW_PARCELS
+- VIEW_ACTIVITY_LOG (financial events)
+- Cannot approve/reject KYC, cannot manage admin accounts.
+
+READONLY_ADMIN:
+- VIEW_DASHBOARD
+- VIEW_USER (all)
+- VIEW_PARCELS
+- VIEW_WALLET_SUMMARY
+- VIEW_COMMISSION_ANALYTICS
+- VIEW_ACTIVITY_LOG
+- VIEW_SETTINGS
+- NO write actions at all.
+
+Important:
+- Deny by default: if role/action is not explicitly allowed, treat as forbidden.
+- Don’t leak partially hidden features. If user has no permission, either hide the button or disable with clear message.
+
+3) Backend Enforcement
+
+Introduce a central permission helper, e.g.:
+- server/utils/permissions.ts (or equivalent)
+
+Key responsibilities:
+- Accept current admin user + action + optional entityType.
+- Return boolean or throw standardized “Forbidden” error.
+- Never rely only on frontend – enforce permissions on backend routes.
+
+Update these routes/controllers to use permission checks:
+
+Auth:
+- When accessing admin APIs, verify:
+  - isActive = true
+  - role is defined
+- If not active → deny.
+
+Driver management:
+- Viewing list/details: roles that can VIEW_USER.
+- Suspending/blocking drivers: MANAGE_USER_STATUS.
+- Approving/rejecting driver KYC: MANAGE_DRIVER_KYC.
+- Managing DMV/TLC/inspection/document review: MANAGE_DOCUMENT_REVIEW.
+
+Customer management:
+- Viewing: VIEW_USER.
+- Approve/reject customer KYC: MANAGE_CUSTOMER_KYC.
+- Block/suspend customers: MANAGE_USER_STATUS.
+
+Restaurant management:
+- Viewing: VIEW_USER.
+- Approve/reject restaurant KYC: MANAGE_RESTAURANT_KYC.
+- Edit commission or status: EDIT_COMMISSION_SETTINGS or MANAGE_USER_STATUS as appropriate.
+
+Parcel management:
+- Listing/reading: VIEW_PARCELS.
+- Updating parcel status: MANAGE_PARCELS_STATUS.
+
+Wallet & settlements:
+- Viewing wallet/commission summaries: VIEW_WALLET_SUMMARY / VIEW_COMMISSION_ANALYTICS.
+- Processing settlements: PROCESS_WALLET_SETTLEMENT only for FINANCE_ADMIN + SUPER_ADMIN.
+
+Settings / configuration:
+- VIEW_SETTINGS: read-only access.
+- EDIT_SETTINGS: only SUPER_ADMIN.
+
+Admin management (if admin-account UI already exists or later will exist):
+- CREATE_ADMIN, EDIT_ADMIN, VIEW_ADMIN_LIST: SUPER_ADMIN only.
+
+Activity Log:
+- VIEW_ACTIVITY_LOG: SUPER_ADMIN, COMPLIANCE_ADMIN, FINANCE_ADMIN, READONLY_ADMIN.
+- Support admins may or may not have access – you can allow read-only if it fits current design, but do NOT allow them to edit logs (no one can edit).
+
+Error behavior:
+- On forbidden actions, return consistent 403 with a generic, non-revealing message like:
+  - "You do not have permission to perform this action."
+- Never reveal internal role or permission mapping details in API errors.
+
+4) Admin UI Changes (Frontend)
+
+Goal: Respect new roles but keep UI behavior identical for SUPER_ADMIN.
+
+a) Role Awareness
+- Use existing auth/context mechanism to expose the current admin’s role and basic capabilities to the frontend.
+- Avoid duplicating all server logic – but you can expose a simple “capabilities” map from backend or compute it in a shared helper.
+
+b) Conditional UI
+- Hide or disable buttons/links that the current role cannot use:
+  - KYC approve/reject for roles without KYC permissions.
+  - Settlement processing buttons for non-finance roles.
+  - Commission edit fields for non-finance roles.
+  - Settings edit controls for non-super admins.
+- Read-only roles should still see tables and data, but no destructive actions.
+
+c) Activity Log page
+- Available only to roles with VIEW_ACTIVITY_LOG.
+- All controls remain read-only (log is append-only).
+
+d) No new pages for managing admins are required in this step (only backend role security), unless there is already an admin-management UI. In that case, respect CREATE_ADMIN / EDIT_ADMIN permissions.
+
+UI rules:
+- No emojis.
+- Do not change existing visual style.
+- If a button is disabled due to permission, optionally show a simple tooltip:
+  - "You do not have permission to perform this action."
+
+5) Security & Compliance
+
+- Confirm all admin APIs now enforce:
+  - Authenticated session
+  - Active account
+  - Role-based permission check
+- Ensure that READONLY_ADMIN cannot mutate any data (no POST/PUT/PATCH/DELETE allowed).
+- Do not weaken or bypass any existing security introduced in previous steps (NID/SSN encryption, masking, audit logs).
+
+Integration with Activity Log (Step 37):
+- When permission checks fail, you may optionally log a “FORBIDDEN_ACTION_ATTEMPT” event (EntityType: "auth" or appropriate) WITHOUT including sensitive detail. This is optional but desirable.
+- Do not break the Activity Log schema or endpoints.
+
+6) Testing Plan
+
+Implement and execute tests (manual or automated):
+
+1. Migration:
+   - Existing admin account(s) are SUPER_ADMIN and can do everything as before.
+
+2. Role behavior:
+   - Create sample admins (or seed in tests) for each role:
+     - SUPER_ADMIN, COMPLIANCE_ADMIN, SUPPORT_ADMIN, FINANCE_ADMIN, READONLY_ADMIN.
+   - For each role, verify:
+     - Accessible pages match the permission matrix.
+     - Forbidden actions return 403 and UI hides or disables those controls.
+
+3. Specific checks:
+   - SUPPORT_ADMIN cannot approve KYC or process settlements.
+   - COMPLIANCE_ADMIN can approve/reject KYC but cannot process settlements or edit commission rates.
+   - FINANCE_ADMIN can process settlements and edit commission but cannot change KYC decisions.
+   - READONLY_ADMIN can view but cannot modify anything.
+   - SUPER_ADMIN behaves exactly like the current admin behavior, with full access.
+
+4. Regression:
+   - Driver, customer, restaurant, parcel, and wallet flows continue working for SUPER_ADMIN with no behavior changes.
+   - No changes to customer/driver mobile/web experiences.
+
+7) Documentation
+
+- Update replit.md (or the main documentation file) with:
+  - Role descriptions
+  - Permission matrix
+  - Notes about admin-only access
+  - How new admins should be created and which role to assign.
+
+Final expectations
+
+- Deliver a production-ready RBAC system for SafeGo admin, aligned with the existing stack.
+- No breaking changes.
+- No emojis.
+- Strong security defaults with deny-by-default behavior.
+- Clear documentation so future developers (or I as the owner) can understand and extend roles safely.
