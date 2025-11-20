@@ -45,10 +45,19 @@ function serializeValue(value: any): any {
   // Prisma Decimal (and any objects with toJSON method) → call toJSON
   if (typeof value.toJSON === "function") {
     const jsonValue = value.toJSON();
-    // SECURITY: Sanitize toJSON output if it's an object (could contain sensitive fields)
-    if (typeof jsonValue === "object" && jsonValue !== null && !Array.isArray(jsonValue)) {
-      return sanitizeFraudMetadata(jsonValue);
+    // SECURITY: Sanitize toJSON output if it returns an object or array
+    if (typeof jsonValue === "object" && jsonValue !== null) {
+      if (Array.isArray(jsonValue)) {
+        // Sanitize array elements
+        return jsonValue
+          .map(item => serializeValue(item))
+          .filter(item => item !== null && item !== undefined);
+      } else {
+        // Sanitize plain object
+        return sanitizeFraudMetadata(jsonValue);
+      }
     }
+    // Primitives (strings, numbers) pass through directly
     return jsonValue;
   }
 
