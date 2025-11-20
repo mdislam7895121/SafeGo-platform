@@ -58,19 +58,20 @@ export default function AdminPayoutsManual() {
     queryFn: async () => {
       const response = await fetch("/api/admin/capabilities", {
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
       
       if (!response.ok) {
-        if (response.status === 401) {
-          throw Object.assign(new Error("Unauthorized"), { status: 401 });
-        }
-        throw new Error("Failed to fetch capabilities");
+        const error: any = new Error(`Failed to fetch capabilities: ${response.status}`);
+        error.status = response.status;
+        throw error;
       }
       
       return response.json();
     },
+    retry: false,
     enabled: !!token,
     onError: (error: any) => {
       if (error?.status === 401) {
@@ -89,7 +90,7 @@ export default function AdminPayoutsManual() {
   const queryString = queryParams.toString();
   const fullUrl = `/api/admin/wallets${queryString ? `?${queryString}` : ""}`;
 
-  const { data: walletsData, isLoading } = useQuery<{ wallets: Wallet[] }>({
+  const { data: walletsData, isPending: isLoadingWallets } = useQuery<{ wallets: Wallet[] }>({
     queryKey: [fullUrl],
     enabled: hasAccess,
   });
@@ -310,8 +311,9 @@ export default function AdminPayoutsManual() {
             <CardTitle>Eligible Wallets</CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoading ? (
+            {isLoadingWallets ? (
               <div className="text-center py-8 text-muted-foreground">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
                 <p>Loading wallets...</p>
               </div>
             ) : filteredWallets.length === 0 ? (

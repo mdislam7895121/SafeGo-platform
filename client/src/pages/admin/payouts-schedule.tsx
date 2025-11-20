@@ -50,19 +50,20 @@ export default function AdminPayoutsSchedule() {
     queryFn: async () => {
       const response = await fetch("/api/admin/capabilities", {
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
       
       if (!response.ok) {
-        if (response.status === 401) {
-          throw Object.assign(new Error("Unauthorized"), { status: 401 });
-        }
-        throw new Error("Failed to fetch capabilities");
+        const error: any = new Error(`Failed to fetch capabilities: ${response.status}`);
+        error.status = response.status;
+        throw error;
       }
       
       return response.json();
     },
+    retry: false,
     enabled: !!token,
     onError: (error: any) => {
       if (error?.status === 401) {
