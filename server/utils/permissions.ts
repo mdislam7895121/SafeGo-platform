@@ -35,6 +35,7 @@ export enum Permission {
   REPLY_SUPPORT_CONVERSATIONS = 'REPLY_SUPPORT_CONVERSATIONS',
   ASSIGN_SUPPORT_CONVERSATIONS = 'ASSIGN_SUPPORT_CONVERSATIONS',
   MANAGE_SUPPORT_SETTINGS = 'MANAGE_SUPPORT_SETTINGS',
+  VIEW_EARNINGS_DASHBOARD = 'VIEW_EARNINGS_DASHBOARD',
 }
 
 type RolePermissions = {
@@ -71,6 +72,7 @@ const rolePermissions: RolePermissions = {
     Permission.REPLY_SUPPORT_CONVERSATIONS,
     Permission.ASSIGN_SUPPORT_CONVERSATIONS,
     Permission.MANAGE_SUPPORT_SETTINGS,
+    Permission.VIEW_EARNINGS_DASHBOARD,
   ]),
 
   [AdminRole.COMPLIANCE_ADMIN]: new Set([
@@ -88,6 +90,7 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_PAYOUT_BATCHES,
     Permission.VIEW_SETTINGS,
     Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.VIEW_EARNINGS_DASHBOARD,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
@@ -116,6 +119,7 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_PAYOUT_BATCHES,
     Permission.VIEW_PARCELS,
     Permission.VIEW_ACTIVITY_LOG,
+    Permission.VIEW_EARNINGS_DASHBOARD,
   ]),
 
   [AdminRole.READONLY_ADMIN]: new Set([
@@ -129,6 +133,7 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_ACTIVITY_LOG,
     Permission.VIEW_SETTINGS,
     Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.VIEW_EARNINGS_DASHBOARD,
   ]),
 };
 
