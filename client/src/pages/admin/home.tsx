@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -92,6 +92,14 @@ export default function AdminHome() {
       description: "Manage driver and restaurant wallet settlements",
       color: "text-green-600",
       bgColor: "bg-green-50 dark:bg-green-950",
+    },
+    {
+      name: "Activity Log",
+      icon: ScrollText,
+      href: "/admin/activity-log",
+      description: "Security audit trail of all admin actions",
+      color: "text-slate-600",
+      bgColor: "bg-slate-50 dark:bg-slate-950",
     },
   ];
 

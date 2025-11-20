@@ -44,6 +44,7 @@ import AdminComplaintDetails from "@/pages/admin/complaint-details";
 import AdminUsers from "@/pages/admin/users";
 import AdminParcels from "@/pages/admin/parcels";
 import AdminParcelDetails from "@/pages/admin/parcel-details";
+import AdminActivityLog from "@/pages/admin/activity-log";
 
 import NotFound from "@/pages/not-found";
 
@@ -217,6 +218,11 @@ function Router() {
       <Route path="/admin/parcels">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminParcels />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/activity-log">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminActivityLog />
         </ProtectedRoute>
       </Route>
 
