@@ -349,13 +349,13 @@ router.post("/login", async (req, res, next) => {
         email: user.email,
         role: user.role,
         adminProfile: {
-          adminRole: user.adminProfile.adminRole,
+          adminRole: user.adminProfile.adminRole as any,
           isActive: user.adminProfile.isActive
         }
       });
       
       // Reset login attempts on successful admin authentication
-      await resetLoginAttempts(req, res);
+      resetLoginAttempts(user.email, getClientIp(req) || 'unknown');
     }
 
     res.json(response);
