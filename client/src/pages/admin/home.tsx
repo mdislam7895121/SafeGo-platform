@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,7 +43,22 @@ export default function AdminHome() {
     refetchInterval: 5000, // Auto-refresh every 5 seconds
   });
 
+  // Fetch unread notification count
+  const { data: unreadCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/admin/notifications/unread-count"],
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+  });
+
   const adminSections = [
+    {
+      name: "Notification Center",
+      icon: Bell,
+      href: "/admin/notifications",
+      description: "System alerts and important notifications",
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-50 dark:bg-indigo-950",
+      badge: unreadCount?.count ? unreadCount.count : undefined,
+    },
     {
       name: "KYC Approvals",
       icon: Shield,
@@ -112,15 +127,34 @@ export default function AdminHome() {
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
             <p className="text-sm opacity-90">{user?.email}</p>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={logout}
-            className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
-            data-testid="button-logout"
-          >
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/admin/notifications">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground relative"
+                data-testid="button-notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount && unreadCount.count > 0 && (
+                  <Badge 
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs bg-red-500 text-white border-2 border-primary"
+                  >
+                    {unreadCount.count > 9 ? "9+" : unreadCount.count}
+                  </Badge>
+                )}
+              </Button>
+            </Link>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={logout}
+              className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
+              data-testid="button-logout"
+            >
+              Logout
+            </Button>
+          </div>
         </div>
 
         <Card>
