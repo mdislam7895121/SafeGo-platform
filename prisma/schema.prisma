@@ -377,12 +377,16 @@ model Vehicle {
   registrationExpiry      DateTime?
   insuranceDocumentUrl    String?
   insuranceExpiry         DateTime?
-  dmvInspectionType       String?
-  dmvInspectionDate       DateTime?
-  dmvInspectionExpiry     DateTime?
-  dmvInspectionImageUrl   String?
-  dmvInspectionStatus     DmvInspectionStatus?
-  isPrimary               Boolean           @default(true)
+  dmvInspectionType                String?
+  dmvInspectionDate                DateTime?
+  dmvInspectionExpiry              DateTime?
+  dmvInspectionImageUrl            String?
+  dmvInspectionFrontImageUrl       String?
+  dmvInspectionBackImageUrl        String?
+  dmvInspectionVerificationStatus  String?              @default("pending_review")
+  dmvInspectionRejectionReason     String?
+  dmvInspectionStatus              DmvInspectionStatus?
+  isPrimary                        Boolean              @default(true)
   vehicleDocuments        VehicleDocument[]
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
