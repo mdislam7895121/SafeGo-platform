@@ -1,0 +1,106 @@
+You are working on the SafeGo system.  
+Stop all current tasks immediately and enter FULL-EXECUTION MODE.  
+Follow EVERYTHING below exactly, safely, and without asking for permission.
+
+====================================================================
+PART 0 — AGENT BEHAVIOR OVERRIDE (FULL-EXECUTION MODE)
+====================================================================
+
+From now on:
+
+1. Whenever I give a prompt, you MUST complete the entire task end-to-end with no questions, no permission requests, and no confirmation prompts.
+2. Do NOT pause or ask:
+   - “Should I continue?”
+   - “Do you want me to proceed?”
+   - “Is this correct?”
+3. If a task has multiple steps, complete ALL steps automatically.
+4. If a previous task is unfinished, finish it before starting a new one unless my prompt explicitly overrides it.
+5. Never break any SafeGo system rules (KYC, schema stability, RBAC, payouts, commission logic).
+6. Avoid ANY destructive changes and stay backward-compatible.
+7. If a step is unclear, choose the safest interpretation and complete it without asking.
+8. After finishing a task, return a short summary listing:
+   - Files changed  
+   - Work completed  
+   - Any fixes or corrections  
+9. DO NOT begin Phase-3 work unless I explicitly say:  
+   “Start Phase 3 now.”
+
+Switch to this full autonomous mode now.
+
+====================================================================
+PART A — VALIDATE & COMPLETE SECURITY PHASE 2 / PART 2
+====================================================================
+
+You must now verify and complete ALL work for Security Phase 2 / Part 2.  
+This includes tasks 7–10:
+
+7. Environment Guard  
+8. Security Status Indicators (driver, customer, restaurant)  
+9. End-to-end security testing  
+10. Security documentation update (replit.md)
+
+Required actions:
+
+1. Audit the entire codebase to confirm:
+   - Environment Guard exists and works correctly.
+   - Security status indicators are implemented correctly for BD + USA users.
+   - RBAC restrictions are correct.
+   - No sensitive data leaks.
+   - Testing covers Phase-2 features.
+   - Documentation explains Phase-2 security components.
+
+2. If any part is missing, incomplete, outdated, or incorrect:
+   FIX it immediately.
+
+3. Do not modify or break:
+   - Trip, ride, food, parcel logic  
+   - KYC flows  
+   - Commission/payout logic  
+   - Wallet settlement  
+   - Existing databases  
+
+4. Ensure all changes remain backward-compatible.
+
+====================================================================
+PART B — CLEAN & RESET ANY ACCIDENTAL PHASE-3 WORK
+====================================================================
+
+If any Phase-3 work was previously generated or partially added—  
+such as:
+
+- Fraud detection models  
+- AI risk scoring  
+- Suspicious pattern engine  
+- High-risk dashboard UI  
+- New tables or fields created for fraud analysis  
+- Alert pipelines  
+
+You must:
+
+1. Safely REMOVE or REVERT that code.  
+2. Keep all Phase-1 and Phase-2 work fully intact.  
+3. Ensure the repo returns to a clean state where Phase-3 has NOT started.  
+4. Do NOT remove audit logs, RBAC, or any Phase-2 logic.
+
+====================================================================
+PART C — FINAL CHECK & SUMMARY
+====================================================================
+
+After completing all tasks above:
+
+1. Verify the project is now:
+   - Phase-1: complete  
+   - Phase-2: fully complete (Part-1 + Part-2)  
+   - Phase-3: clean slate, not started  
+
+2. Return a final summary listing:
+   - What Phase-2 issues were fixed  
+   - What Phase-3 elements were removed  
+   - Which files were changed  
+   - The system’s readiness for Phase-3 start  
+
+Then stop and wait for my next command.
+
+====================================================================
+
+Now begin work immediately in FULL-EXECUTION MODE.

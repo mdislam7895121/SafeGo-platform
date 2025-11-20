@@ -1,13 +1,12 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { PrismaClient, FraudEventType, ActorType } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 import { getAdminCapabilities } from "../utils/permissions";
 import { loadAdminProfile, AuthRequest } from "../middleware/auth";
 import { rateLimitAdminLogin, resetLoginAttempts } from "../middleware/rateLimit";
 import { isTwoFactorEnabled, verifyTwoFactorToken, getTwoFactorSecret } from "../services/twoFactorService";
-import { logFraudEvent, getDeviceId, getUserAgent, getLocationFromRequest } from "../utils/fraudEvents";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -116,26 +115,6 @@ router.post("/signup", async (req, res) => {
       });
     }
 
-    // Log successful signup as fraud event for pattern analysis
-    await logFraudEvent({
-      eventType: FraudEventType.ACCOUNT_CREATED,
-      actorType: userRole === "customer" ? ActorType.customer :
-                 userRole === "driver" ? ActorType.driver :
-                 userRole === "restaurant" ? ActorType.restaurant :
-                 ActorType.admin,
-      actorId: user.id,
-      ipAddress: getClientIp(req),
-      deviceId: getDeviceId(req),
-      userAgent: getUserAgent(req),
-      location: getLocationFromRequest(req),
-      metadata: {
-        email: user.email,
-        role: user.role,
-        countryCode: user.countryCode,
-      },
-      source: "auth_signup",
-    });
-
     res.status(201).json({
       message: "User created successfully",
       user: {
@@ -198,23 +177,6 @@ router.post("/login", async (req, res, next) => {
         success: false,
       });
 
-      // Log failed login attempt (fraud detection)
-      await logFraudEvent({
-        eventType: FraudEventType.LOGIN,
-        actorType: ActorType.customer, // Default to customer for unknown users
-        actorId: "unknown",
-        ipAddress: getClientIp(req),
-        deviceId: getDeviceId(req),
-        userAgent: getUserAgent(req),
-        location: getLocationFromRequest(req),
-        metadata: {
-          email,
-          reason: "user_not_found",
-          success: false,
-        },
-        source: "auth_login",
-      });
-
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -231,26 +193,6 @@ router.post("/login", async (req, res, next) => {
         entityId: user.id,
         description: `Failed login attempt for blocked user ${user.email}`,
         success: false,
-      });
-
-      // Log failed login attempt for blocked user (fraud detection)
-      await logFraudEvent({
-        eventType: FraudEventType.LOGIN,
-        actorType: user.role === "customer" ? ActorType.customer :
-                   user.role === "driver" ? ActorType.driver :
-                   user.role === "restaurant" ? ActorType.restaurant :
-                   ActorType.admin,
-        actorId: user.id,
-        ipAddress: getClientIp(req),
-        deviceId: getDeviceId(req),
-        userAgent: getUserAgent(req),
-        location: getLocationFromRequest(req),
-        metadata: {
-          email: user.email,
-          reason: "account_blocked",
-          success: false,
-        },
-        source: "auth_login",
       });
 
       return res.status(403).json({ error: "Your account has been blocked. Please contact support." });
@@ -305,26 +247,6 @@ router.post("/login", async (req, res, next) => {
         success: false,
       });
 
-      // Log failed login attempt - invalid password (fraud detection)
-      await logFraudEvent({
-        eventType: FraudEventType.LOGIN,
-        actorType: user.role === "customer" ? ActorType.customer :
-                   user.role === "driver" ? ActorType.driver :
-                   user.role === "restaurant" ? ActorType.restaurant :
-                   ActorType.admin,
-        actorId: user.id,
-        ipAddress: getClientIp(req),
-        deviceId: getDeviceId(req),
-        userAgent: getUserAgent(req),
-        location: getLocationFromRequest(req),
-        metadata: {
-          email: user.email,
-          reason: "invalid_password",
-          success: false,
-        },
-        source: "auth_login",
-      });
-
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -372,24 +294,6 @@ router.post("/login", async (req, res, next) => {
             success: false,
           });
 
-          // Log failed 2FA (fraud detection)
-          await logFraudEvent({
-            eventType: FraudEventType.LOGIN,
-            actorType: ActorType.admin,
-            actorId: user.id,
-            ipAddress: getClientIp(req),
-            deviceId: getDeviceId(req),
-            userAgent: getUserAgent(req),
-            location: getLocationFromRequest(req),
-            metadata: {
-              email: user.email,
-              reason: "invalid_2fa_code",
-              twoFactorAttempt: true,
-              success: false,
-            },
-            source: "auth_login",
-          });
-
           return res.status(401).json({ error: "Invalid two-factor authentication code" });
         }
 
@@ -405,23 +309,6 @@ router.post("/login", async (req, res, next) => {
           description: `Successful 2FA verification for admin ${user.email}`,
           metadata: { twoFactorVerified: true },
           success: true,
-        });
-
-        // Log successful 2FA verification (fraud detection)
-        await logFraudEvent({
-          eventType: FraudEventType.LOGIN,
-          actorType: ActorType.admin,
-          actorId: user.id,
-          ipAddress: getClientIp(req),
-          deviceId: getDeviceId(req),
-          userAgent: getUserAgent(req),
-          location: getLocationFromRequest(req),
-          metadata: {
-            email: user.email,
-            twoFactorVerified: true,
-            success: true,
-          },
-          source: "auth_login",
         });
       }
     }
@@ -449,27 +336,6 @@ router.post("/login", async (req, res, next) => {
       description: `Successful login for ${user.role} user ${user.email}`,
       metadata: { role: user.role, countryCode: user.countryCode },
       success: true,
-    });
-
-    // Log successful login (fraud detection)
-    await logFraudEvent({
-      eventType: FraudEventType.LOGIN,
-      actorType: user.role === "customer" ? ActorType.customer :
-                 user.role === "driver" ? ActorType.driver :
-                 user.role === "restaurant" ? ActorType.restaurant :
-                 ActorType.admin,
-      actorId: user.id,
-      ipAddress: getClientIp(req),
-      deviceId: getDeviceId(req),
-      userAgent: getUserAgent(req),
-      location: getLocationFromRequest(req),
-      metadata: {
-        email: user.email,
-        role: user.role,
-        countryCode: user.countryCode,
-        success: true,
-      },
-      source: "auth_login",
     });
 
     // Build response with admin capabilities if admin user
