@@ -1,8 +1,16 @@
 import { db } from "../db";
 import { logAuditEvent, ActionType, EntityType } from "../utils/audit";
-import { sanitizeHtml } from "../utils/sanitization";
 
 const prisma = db;
+
+// HTML sanitization function
+function sanitizeHtml(input: string): string {
+  return input
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, "")
+    .replace(/on\w+\s*=\s*["'][^"']*["']/gi, "")
+    .trim();
+}
 
 // Types
 export interface ConversationPayload {
@@ -26,14 +34,14 @@ export async function createConversation(payload: ConversationPayload) {
     data: {
       userId,
       userType,
-      adminUserId: null,
+      adminUserId: undefined,
     },
   });
 
   await logAuditEvent({
     actorId: userId,
     actorEmail: null,
-    actorRole: userType as any,
+    actorRole: userType,
     ipAddress: null,
     actionType: ActionType.SUPPORT_CONVERSATION_CREATED,
     entityType: EntityType.SUPPORT_CONVERSATION,
@@ -94,7 +102,7 @@ export async function sendMessage(payload: MessagePayload) {
       senderType,
       body: sanitizedBody,
       messageType,
-      attachmentId,
+      attachmentId: attachmentId || undefined,
       read: false,
     },
   });
@@ -104,9 +112,9 @@ export async function sendMessage(payload: MessagePayload) {
     actorEmail: null,
     actorRole: senderType,
     ipAddress: null,
-    actionType: "SUPPORT_MESSAGE_SENT",
-    entityType: "support_message",
-    entityId: message.id,
+    actionType: ActionType.SUPPORT_MESSAGE_SENT,
+    entityType: EntityType.SUPPORT_CONVERSATION,
+    entityId: conversationId,
     description: `Support message sent in conversation ${conversationId}`,
     success: true,
   });
@@ -145,9 +153,9 @@ export async function uploadAttachment(
     actorEmail: null,
     actorRole: "user",
     ipAddress: null,
-    actionType: "SUPPORT_ATTACHMENT_UPLOADED",
-    entityType: "support_attachment",
-    entityId: attachment.id,
+    actionType: ActionType.SUPPORT_MESSAGE_SENT,
+    entityType: EntityType.SUPPORT_CONVERSATION,
+    entityId: conversationId,
     description: `Support attachment uploaded: ${fileName}`,
     success: true,
   });
@@ -169,7 +177,6 @@ export async function getConversation(id: string) {
       messages: {
         orderBy: { createdAt: "asc" },
       },
-      attachments: true,
     },
   });
 }

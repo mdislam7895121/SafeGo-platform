@@ -5,18 +5,37 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Send } from "lucide-react";
 
+interface SupportConversation {
+  id: string;
+  userId: string;
+  userType: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: SupportMessage[];
+}
+
+interface SupportMessage {
+  id: string;
+  conversationId: string;
+  senderType: "user" | "admin";
+  messageType: "text" | "image" | "file";
+  body: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
 export default function RestaurantSupportChat() {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageBody, setMessageBody] = useState("");
 
   const { data: conversations = [] } = useQuery({
     queryKey: ["/api/support/conversations"],
-  });
+  }) as { data: SupportConversation[] };
 
   const { data: currentConversation } = useQuery({
     queryKey: selectedConversation ? ["/api/support/conversations", selectedConversation] : [],
     enabled: !!selectedConversation,
-  });
+  }) as { data: SupportConversation | undefined };
 
   const sendMessageMutation = useMutation({
     mutationFn: async (body: string) => {
@@ -45,7 +64,7 @@ export default function RestaurantSupportChat() {
           </Button>
         ) : (
           <div className="space-y-2">
-            {conversations.map((conv: any) => (
+            {conversations.map((conv) => (
               <Card
                 key={conv.id}
                 className="p-4 cursor-pointer hover:bg-muted"
@@ -74,7 +93,7 @@ export default function RestaurantSupportChat() {
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-3" data-testid="div-messages">
-        {currentConversation?.messages?.map((msg: any) => (
+        {currentConversation?.messages?.map((msg) => (
           <div
             key={msg.id}
             className={`flex ${msg.senderType === "admin" ? "justify-start" : "justify-end"}`}

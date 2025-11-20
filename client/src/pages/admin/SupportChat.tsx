@@ -3,8 +3,26 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Send, FileUp } from "lucide-react";
+
+interface SupportConversation {
+  id: string;
+  userId: string;
+  userType: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: SupportMessage[];
+}
+
+interface SupportMessage {
+  id: string;
+  conversationId: string;
+  senderType: "user" | "admin";
+  messageType: "text" | "image" | "file";
+  body: string | null;
+  read: boolean;
+  createdAt: string;
+}
 
 export default function AdminSupportChat() {
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
@@ -14,13 +32,13 @@ export default function AdminSupportChat() {
   // Fetch all conversations
   const { data: conversations = [] } = useQuery({
     queryKey: ["/api/support/admin/conversations"],
-  });
+  }) as { data: SupportConversation[] };
 
   // Fetch selected conversation
   const { data: currentConversation } = useQuery({
     queryKey: selectedConversation ? ["/api/support/conversations", selectedConversation] : [],
     enabled: !!selectedConversation,
-  });
+  }) as { data: SupportConversation | undefined };
 
   // Send message mutation
   const sendMessageMutation = useMutation({
@@ -40,7 +58,7 @@ export default function AdminSupportChat() {
     setMessageBody("");
   };
 
-  const filteredConversations = conversations.filter((conv: any) =>
+  const filteredConversations = conversations.filter((conv) =>
     `${conv.userId}${conv.userType}`.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -60,7 +78,7 @@ export default function AdminSupportChat() {
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-2">
-          {filteredConversations.map((conv: any) => (
+          {filteredConversations.map((conv) => (
             <Card
               key={conv.id}
               className={`p-3 cursor-pointer hover:bg-muted ${
@@ -90,8 +108,7 @@ export default function AdminSupportChat() {
                 {currentConversation.userType} - {currentConversation.userId}
               </h2>
               <p className="text-xs text-muted-foreground">
-                {currentConversation.createdAt &&
-                  new Date(currentConversation.createdAt).toLocaleDateString()}
+                {new Date(currentConversation.createdAt).toLocaleDateString()}
               </p>
             </div>
 
@@ -99,7 +116,7 @@ export default function AdminSupportChat() {
               className="flex-1 overflow-y-auto space-y-3"
               data-testid="div-messages-container"
             >
-              {currentConversation.messages?.map((msg: any) => (
+              {currentConversation.messages?.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${msg.senderType === "admin" ? "justify-end" : "justify-start"}`}
@@ -169,8 +186,7 @@ export default function AdminSupportChat() {
             <div>
               <span className="text-muted-foreground">Created:</span>
               <p className="font-medium">
-                {currentConversation.createdAt &&
-                  new Date(currentConversation.createdAt).toLocaleDateString()}
+                {new Date(currentConversation.createdAt).toLocaleDateString()}
               </p>
             </div>
           </div>

@@ -1,6 +1,16 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { authenticateToken } from "../middleware/auth";
 import * as supportService from "../services/supportChatService";
+
+declare global {
+  namespace Express {
+    interface User {
+      id: string;
+      role: string;
+      email: string;
+    }
+  }
+}
 
 const router = Router();
 
@@ -8,7 +18,7 @@ const router = Router();
 router.use(authenticateToken);
 
 // Create conversation
-router.post("/conversations", async (req, res) => {
+router.post("/conversations", async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const userType = req.user!.role as "driver" | "customer" | "restaurant";
@@ -25,7 +35,7 @@ router.post("/conversations", async (req, res) => {
 });
 
 // List user conversations
-router.get("/conversations", async (req, res) => {
+router.get("/conversations", async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
     const userType = req.user!.role as "driver" | "customer" | "restaurant";
@@ -38,7 +48,7 @@ router.get("/conversations", async (req, res) => {
 });
 
 // Get conversation with messages
-router.get("/conversations/:conversationId", async (req, res) => {
+router.get("/conversations/:conversationId", async (req: Request, res: Response) => {
   try {
     const { conversationId } = req.params;
     const conversation = await supportService.getConversation(conversationId);
@@ -54,7 +64,7 @@ router.get("/conversations/:conversationId", async (req, res) => {
 });
 
 // Send message
-router.post("/conversations/:conversationId/messages", async (req, res) => {
+router.post("/conversations/:conversationId/messages", async (req: Request, res: Response) => {
   try {
     const { conversationId } = req.params;
     const { body, messageType = "text" } = req.body;
@@ -74,7 +84,7 @@ router.post("/conversations/:conversationId/messages", async (req, res) => {
 });
 
 // Mark message as read
-router.patch("/messages/:messageId/read", async (req, res) => {
+router.patch("/messages/:messageId/read", async (req: Request, res: Response) => {
   try {
     const { messageId } = req.params;
     const message = await supportService.markAsRead(messageId);
@@ -85,7 +95,7 @@ router.patch("/messages/:messageId/read", async (req, res) => {
 });
 
 // Admin: List all conversations
-router.get("/admin/conversations", async (req, res) => {
+router.get("/admin/conversations", async (req: Request, res: Response) => {
   try {
     const conversations = await supportService.listAdminConversations();
     res.json(conversations);
