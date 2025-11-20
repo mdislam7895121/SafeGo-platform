@@ -8,6 +8,8 @@ import adminRoutes from "./routes/admin";
 import rideRoutes from "./routes/rides";
 import foodOrderRoutes from "./routes/food-orders";
 import deliveryRoutes from "./routes/deliveries";
+import supportRoutes from "./routes/support";
+import { setupSupportChatWebSocket } from "./websocket/supportChatSocket";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register all API routes
@@ -19,8 +21,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rides", rideRoutes);
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
+  app.use("/api/support", supportRoutes);
 
   const httpServer = createServer(app);
+  
+  setupSupportChatWebSocket(httpServer);
 
   return httpServer;
 }

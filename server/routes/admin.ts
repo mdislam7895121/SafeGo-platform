@@ -6308,4 +6308,168 @@ router.get("/customers/:customerId/payment-methods", checkPermission(Permission.
   }
 });
 
+// ====================================================
+// Support Chat Admin Endpoints
+// ====================================================
+import * as supportService from "../services/supportService";
+
+router.get("/support/conversations", checkPermission(Permission.VIEW_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 20;
+    const status = req.query.status as string | undefined;
+    const userType = req.query.userType as string | undefined;
+    const countryCode = req.query.countryCode as string | undefined;
+    const assignedAdminId = req.query.assignedAdminId as string | undefined;
+    const search = req.query.search as string | undefined;
+
+    const result = await supportService.listConversations(
+      {
+        page,
+        pageSize,
+        status: status as any,
+        userType: userType as any,
+        countryCode: countryCode as any,
+        assignedAdminId,
+        search,
+      },
+      {
+        userId: req.user!.id,
+        userType: "admin",
+        permissions: req.user!.permissions || [],
+      }
+    );
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("List support conversations error:", error);
+    res.status(500).json({ error: error.message || "Failed to list conversations" });
+  }
+});
+
+router.get("/support/conversations/:id", checkPermission(Permission.VIEW_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
+  try {
+    const conversationId = req.params.id;
+
+    const conversation = await supportService.getConversation(
+      conversationId,
+      {
+        userId: req.user!.id,
+        userType: "admin",
+        permissions: req.user!.permissions || [],
+      },
+      true
+    );
+    const userSummary = await supportService.getUserSummary(conversation.userId, conversation.userType);
+
+    res.json({
+      conversation,
+      userSummary,
+    });
+  } catch (error: any) {
+    console.error("Get support conversation error:", error);
+    const statusCode = error.message?.includes("Unauthorized") ? 403 : 404;
+    res.status(statusCode).json({ error: error.message || "Conversation not found" });
+  }
+});
+
+router.post("/support/conversations/:id/messages", checkPermission(Permission.REPLY_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
+  try {
+    const conversationId = req.params.id;
+    const { content } = req.body;
+    const adminId = req.user!.id;
+
+    if (!content || content.trim().length === 0) {
+      return res.status(400).json({ error: "Message content is required" });
+    }
+
+    const message = await supportService.sendMessage(
+      {
+        conversationId,
+        senderType: "admin",
+        senderId: adminId,
+        content,
+      },
+      {
+        userId: adminId,
+        userType: "admin",
+        permissions: req.user!.permissions || [],
+      }
+    );
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.adminProfile?.adminRole || "SUPER_ADMIN",
+      actionType: ActionType.SUPPORT_MESSAGE_SENT,
+      entityType: EntityType.SUPPORT_CONVERSATION,
+      entityId: conversationId,
+      description: `Admin replied to support conversation`,
+      metadata: { messageId: message.id },
+      success: true,
+      ipAddress: getClientIp(req),
+    });
+
+    res.status(201).json(message);
+  } catch (error: any) {
+    console.error("Send support message error:", error);
+    const statusCode = error.message?.includes("Unauthorized") ? 403 : 500;
+    res.status(statusCode).json({ error: error.message || "Failed to send message" });
+  }
+});
+
+router.patch("/support/conversations/:id", checkPermission(Permission.ASSIGN_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
+  try {
+    const conversationId = req.params.id;
+    const { status, priority, assignedAdminId } = req.body;
+    const adminId = req.user!.id;
+
+    const conversation = await supportService.updateConversation(
+      conversationId,
+      {
+        status,
+        priority,
+        assignedAdminId,
+      },
+      {
+        userId: adminId,
+        userType: "admin",
+        permissions: req.user!.permissions || [],
+      }
+    );
+
+    let actionType = ActionType.SUPPORT_CONVERSATION_UPDATED;
+    let description = "Support conversation updated";
+
+    if (status) {
+      actionType = ActionType.SUPPORT_CONVERSATION_STATUS_CHANGED;
+      description = `Support conversation status changed to ${status}`;
+    } else if (assignedAdminId !== undefined) {
+      actionType = ActionType.SUPPORT_CONVERSATION_ASSIGNED;
+      description = assignedAdminId
+        ? `Support conversation assigned to admin ${assignedAdminId}`
+        : "Support conversation unassigned";
+    }
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.adminProfile?.adminRole || "SUPER_ADMIN",
+      actionType,
+      entityType: EntityType.SUPPORT_CONVERSATION,
+      entityId: conversationId,
+      description,
+      metadata: { status, priority, assignedAdminId },
+      success: true,
+      ipAddress: getClientIp(req),
+    });
+
+    res.json(conversation);
+  } catch (error: any) {
+    console.error("Update support conversation error:", error);
+    const statusCode = error.message?.includes("Unauthorized") ? 403 : 500;
+    res.status(statusCode).json({ error: error.message || "Failed to update conversation" });
+  }
+});
+
 export default router;
