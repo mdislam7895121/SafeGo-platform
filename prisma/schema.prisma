@@ -838,3 +838,113 @@ model AdminSession {
   @@index([createdAt])
   @@map("admin_sessions")
 }
+
+enum FraudEventType {
+  LOGIN
+  TRIP_CREATED
+  TRIP_UPDATED
+  TRIP_CANCELLED
+  PAYMENT_ATTEMPT
+  PAYOUT_REQUEST
+  KYC_CHANGE
+  DOCUMENT_UPLOAD
+  ORDER_CREATED
+  ORDER_CANCELLED
+  PARCEL_CREATED
+  PARCEL_CANCELLED
+}
+
+enum ActorType {
+  driver
+  customer
+  restaurant
+  admin
+  system
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+  critical
+}
+
+model FraudEvent {
+  id           String          @id @default(uuid())
+  createdAt    DateTime        @default(now())
+  eventType    FraudEventType
+  actorType    ActorType
+  actorId      String
+  ipAddress    String?
+  deviceId     String?
+  locationLat  Float?
+  locationLng  Float?
+  city         String?
+  countryCode  String?
+  riskScore    Float           @default(0)
+  riskLevel    RiskLevel       @default(low)
+  source       String          @default("backend")
+  metadata     Json?
+  processed    Boolean         @default(false)
+  incidentId   String?
+  incident     FraudIncident?  @relation(fields: [incidentId], references: [id], onDelete: SetNull)
+
+  @@index([actorId])
+  @@index([actorType])
+  @@index([eventType])
+  @@index([createdAt])
+  @@index([riskLevel])
+  @@index([processed])
+  @@index([incidentId])
+  @@index([deviceId])
+  @@index([ipAddress])
+  @@map("fraud_events")
+}
+
+enum FraudIncidentStatus {
+  open
+  under_review
+  closed
+}
+
+enum FraudIncidentSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum FraudIncidentCategory {
+  account_takeover
+  payment_abuse
+  route_anomaly
+  kyc_abuse
+  device_anomaly
+  other
+}
+
+model FraudIncident {
+  id               String                   @id @default(uuid())
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  status           FraudIncidentStatus      @default(open)
+  severity         FraudIncidentSeverity
+  category         FraudIncidentCategory
+  primaryActorType ActorType
+  primaryActorId   String
+  summary          String
+  details          String?
+  riskScore        Float
+  riskLevel        RiskLevel
+  assignedAdminId  String?
+  resolutionNote   String?
+  events           FraudEvent[]
+
+  @@index([status])
+  @@index([severity])
+  @@index([createdAt])
+  @@index([primaryActorId])
+  @@index([primaryActorType])
+  @@index([assignedAdminId])
+  @@map("fraud_incidents")
+}
