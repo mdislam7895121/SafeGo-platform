@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, Activity } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, Activity, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -158,6 +158,15 @@ export default function AdminHome() {
       description: "Real-time security monitoring and system health",
       color: "text-rose-600",
       bgColor: "bg-rose-50 dark:bg-rose-950",
+      permission: "VIEW_DASHBOARD",
+    },
+    {
+      name: "Security Threat Center",
+      icon: ShieldAlert,
+      href: "/admin/security-center",
+      description: "Advanced threat detection and real-time incident response",
+      color: "text-red-600",
+      bgColor: "bg-red-50 dark:bg-red-950",
       permission: "VIEW_DASHBOARD",
     },
     {

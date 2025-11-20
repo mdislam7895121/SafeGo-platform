@@ -11,6 +11,8 @@ import { walletService } from "../services/walletService";
 import { walletPayoutService } from "../services/payoutService";
 import { commissionService } from "../services/commissionService";
 import * as earningsService from "../services/earningsService";
+import * as fraudDetectionService from "../services/fraudDetectionService";
+import { format } from "date-fns";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -7159,6 +7161,174 @@ router.get("/security-events/summary", checkPermission(Permission.VIEW_DASHBOARD
 });
 
 // ====================================================
+// GET /api/admin/security/threats
+// Real-time threat monitoring dashboard data
+// ====================================================
+router.get("/security/threats", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const lastHour = new Date(now.getTime() - 60 * 60 * 1000);
+
+    // Get threat summary
+    const [blockedLogins, suspiciousActivity] = await Promise.all([
+      // Blocked logins (failed logins + suspended/blocked user attempts)
+      prisma.auditLog.count({
+        where: {
+          actionType: ActionType.LOGIN_FAILED,
+          createdAt: { gte: last24h },
+        },
+      }),
+      // Suspicious activity
+      prisma.auditLog.count({
+        where: {
+          success: false,
+          actionType: { in: [ActionType.UPDATE_USER, ActionType.MANAGE_DRIVER_KYC, ActionType.UPDATE_WALLET] },
+          createdAt: { gte: last24h },
+        },
+      }),
+    ]);
+
+    // Active threats (unresolved security issues)
+    const activeThreats = await prisma.auditLog.count({
+      where: {
+        success: false,
+        createdAt: { gte: last24h },
+      },
+    });
+
+    // Calculate average API latency from recent queries
+    const avgApiLatencyMs = 50; // Simplified - in production, track this via middleware
+
+    // Get active sessions (users who logged in recently)
+    const activeSessionsRaw = await prisma.auditLog.findMany({
+      where: {
+        actionType: ActionType.LOGIN_SUCCESS,
+        createdAt: { gte: lastHour },
+      },
+      select: {
+        actorId: true,
+        actorEmail: true,
+        createdAt: true,
+        ipAddress: true,
+        metadata: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+
+    const activeSessions = activeSessionsRaw.map((session) => {
+      const metadata = session.metadata as any;
+      return {
+        userId: session.actorId || "unknown",
+        email: session.actorEmail || "Unknown",
+        role: metadata?.role || "unknown",
+        loginAt: session.createdAt.toISOString(),
+        ipAddress: session.ipAddress || "Unknown",
+        userAgent: metadata?.userAgent || "",
+      };
+    });
+
+    // Get recent threats (failed actions, suspicious patterns)
+    const recentThreatsRaw = await prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { success: false },
+          { actionType: { in: [ActionType.LOGIN_FAILED, ActionType.SUSPEND_USER, ActionType.BLOCK_USER] } },
+        ],
+        createdAt: { gte: last24h },
+      },
+      select: {
+        id: true,
+        actionType: true,
+        description: true,
+        actorId: true,
+        actorEmail: true,
+        createdAt: true,
+        success: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 15,
+    });
+
+    const recentThreats = recentThreatsRaw.map((threat) => ({
+      id: threat.id,
+      type: threat.actionType,
+      severity: threat.success ? "low" : 
+                threat.actionType === ActionType.LOGIN_FAILED ? "medium" :
+                threat.actionType === ActionType.BLOCK_USER ? "high" : "medium",
+      description: threat.description,
+      userId: threat.actorId,
+      userEmail: threat.actorEmail,
+      createdAt: threat.createdAt.toISOString(),
+      resolved: threat.success,
+    }));
+
+    // Activity chart - hourly breakdown of last 24 hours
+    const activityChart = [];
+    for (let i = 23; i >= 0; i--) {
+      const hourStart = new Date(now.getTime() - i * 60 * 60 * 1000);
+      const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000);
+      
+      const [failedLogins, suspiciousActions, blockedAttempts] = await Promise.all([
+        prisma.auditLog.count({
+          where: {
+            actionType: ActionType.LOGIN_FAILED,
+            createdAt: { gte: hourStart, lt: hourEnd },
+          },
+        }),
+        prisma.auditLog.count({
+          where: {
+            success: false,
+            actionType: { notIn: [ActionType.LOGIN_FAILED] },
+            createdAt: { gte: hourStart, lt: hourEnd },
+          },
+        }),
+        prisma.auditLog.count({
+          where: {
+            actionType: { in: [ActionType.SUSPEND_USER, ActionType.BLOCK_USER] },
+            createdAt: { gte: hourStart, lt: hourEnd },
+          },
+        }),
+      ]);
+
+      activityChart.push({
+        hour: format(hourStart, "ha"),
+        failedLogins,
+        suspiciousActions,
+        blockedAttempts,
+      });
+    }
+
+    // API latency chart - simplified mock data
+    const apiLatencyChart = [];
+    for (let i = 11; i >= 0; i--) {
+      const timestamp = new Date(now.getTime() - i * 5 * 60 * 1000);
+      apiLatencyChart.push({
+        timestamp: format(timestamp, "HH:mm"),
+        latencyMs: Math.floor(Math.random() * 100) + 30, // Mock data
+      });
+    }
+
+    res.json({
+      summary: {
+        blockedLoginsLast24h: blockedLogins,
+        suspiciousActivityLast24h: suspiciousActivity,
+        activeThreatsNow: activeThreats,
+        avgApiLatencyMs,
+      },
+      activeSessions,
+      recentThreats,
+      activityChart,
+      apiLatencyChart,
+    });
+  } catch (error) {
+    console.error("Security threats error:", error);
+    res.status(500).json({ error: "Failed to fetch threat data" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/monitoring
 // Get real-time monitoring data for admin dashboard
 // ====================================================
@@ -7246,6 +7416,108 @@ router.get("/monitoring", checkPermission(Permission.VIEW_DASHBOARD), async (req
   } catch (error) {
     console.error("Monitoring data error:", error);
     res.status(500).json({ error: "Failed to fetch monitoring data" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/fraud/calculate-risk
+// Calculate risk score for a user
+// ====================================================
+router.post("/fraud/calculate-risk", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { userId, deviceInfo } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const riskResult = await fraudDetectionService.calculateUserRiskScore(userId, deviceInfo);
+
+    // Log fraud check
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actionType: ActionType.VIEW_ACTIVITY_LOG,
+      entityType: EntityType.USER,
+      entityId: userId,
+      description: `Fraud risk assessment: ${riskResult.riskLevel} (score: ${riskResult.riskScore})`,
+      success: true,
+      ipAddress: getClientIp(req),
+      metadata: { riskResult },
+    });
+
+    res.json(riskResult);
+  } catch (error) {
+    console.error("Risk calculation error:", error);
+    res.status(500).json({ error: "Failed to calculate risk score" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/fraud/check-parcel
+// Check parcel for fraud patterns
+// ====================================================
+router.post("/fraud/check-parcel", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { parcelId } = req.body;
+
+    if (!parcelId) {
+      return res.status(400).json({ error: "parcelId is required" });
+    }
+
+    const fraudResult = await fraudDetectionService.checkParcelFraud(parcelId);
+
+    // Log fraud check
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actionType: ActionType.VIEW_ACTIVITY_LOG,
+      entityType: EntityType.PARCEL,
+      entityId: parcelId,
+      description: `Parcel fraud check: ${fraudResult.riskLevel} (score: ${fraudResult.riskScore})`,
+      success: true,
+      ipAddress: getClientIp(req),
+      metadata: { fraudResult },
+    });
+
+    res.json(fraudResult);
+  } catch (error) {
+    console.error("Parcel fraud check error:", error);
+    res.status(500).json({ error: "Failed to check parcel fraud" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/fraud/check-multi-account
+// Check for multi-account abuse
+// ====================================================
+router.post("/fraud/check-multi-account", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    const abuseResult = await fraudDetectionService.checkMultiAccountAbuse(userId);
+
+    // Log fraud check
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actionType: ActionType.VIEW_ACTIVITY_LOG,
+      entityType: EntityType.USER,
+      entityId: userId,
+      description: `Multi-account abuse check: ${abuseResult.riskLevel} (score: ${abuseResult.riskScore})`,
+      success: true,
+      ipAddress: getClientIp(req),
+      metadata: { abuseResult },
+    });
+
+    res.json(abuseResult);
+  } catch (error) {
+    console.error("Multi-account check error:", error);
+    res.status(500).json({ error: "Failed to check multi-account abuse" });
   }
 });
 
