@@ -1,0 +1,306 @@
+import { useState } from "react";
+import { useLocation } from "wouter";
+import { ArrowLeft, Calendar, Clock, Play, Pause, Plus, Trash2, Edit } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+interface SchedulePayoutForm {
+  ownerType?: "driver" | "restaurant";
+  countryCode?: string;
+  minAmount?: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export default function AdminPayoutsSchedule() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [formData, setFormData] = useState<SchedulePayoutForm>({
+    periodStart: new Date().toISOString().slice(0, 16),
+    periodEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+  });
+
+  // Fetch admin capabilities for RBAC
+  const { data: capabilitiesData } = useQuery<{ capabilities: string[] }>({
+    queryKey: ["/api/admin/capabilities"],
+  });
+  const capabilities = capabilitiesData?.capabilities || [];
+  const canManagePayouts = capabilities.includes("CREATE_MANUAL_PAYOUT");
+
+  // Schedule payout mutation
+  const scheduleMutation = useMutation({
+    mutationFn: async (data: SchedulePayoutForm) => {
+      const res = await apiRequest("POST", "/api/admin/payouts/schedule", data);
+      return res.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Payouts scheduled",
+        description: `Scheduled ${result.totalPayouts} payouts totaling ${result.totalAmount}`,
+      });
+      setCreateDialogOpen(false);
+      setFormData({
+        periodStart: new Date().toISOString().slice(0, 16),
+        periodEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 16),
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Scheduling failed",
+        description: error.message || "Failed to schedule payouts",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSchedule = () => {
+    if (!canManagePayouts) {
+      toast({
+        title: "Access denied",
+        description: "You don't have permission to schedule payouts",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    scheduleMutation.mutate(formData);
+  };
+
+  if (!canManagePayouts) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              You don't have permission to schedule payouts. Please contact your administrator.
+            </p>
+            <Button onClick={() => navigate("/admin")} data-testid="button-back-to-admin">
+              Back to Admin Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background pb-6">
+      {/* Header */}
+      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
+        <div className="flex items-center gap-4 mb-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/admin/payouts")}
+            className="text-primary-foreground hover:bg-primary-foreground/10"
+            data-testid="button-back"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Scheduled Payouts</h1>
+            <p className="text-sm opacity-90">Configure and manage automatic payout schedules</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6 space-y-6">
+        {/* Info Card */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-lg">
+                <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg mb-2">About Scheduled Payouts</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Schedule automatic batch payouts for drivers and restaurants based on time periods, 
+                  minimum balance thresholds, and country filters. The system will process eligible 
+                  wallets and create payout batches automatically.
+                </p>
+                <Button
+                  onClick={() => setCreateDialogOpen(true)}
+                  data-testid="button-create-schedule"
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Schedule New Payout Batch
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Recent Schedules */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payout Scheduling History</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12 text-muted-foreground">
+              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-sm">
+                Scheduled payout batches will appear here. Use the button above to create your first schedule.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Create Schedule Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-2xl" data-testid="dialog-create-schedule">
+          <DialogHeader>
+            <DialogTitle>Schedule Automatic Payouts</DialogTitle>
+            <DialogDescription>
+              Configure a batch payout for eligible wallets within the specified time period
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ownerType">Target Accounts</Label>
+                <Select
+                  value={formData.ownerType || "all"}
+                  onValueChange={(value) =>
+                    setFormData({
+                      ...formData,
+                      ownerType: value === "all" ? undefined : (value as "driver" | "restaurant"),
+                    })
+                  }
+                >
+                  <SelectTrigger id="ownerType" data-testid="select-owner-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All (Drivers & Restaurants)</SelectItem>
+                    <SelectItem value="driver">Drivers Only</SelectItem>
+                    <SelectItem value="restaurant">Restaurants Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="countryCode">Country Filter (Optional)</Label>
+                <Input
+                  id="countryCode"
+                  placeholder="e.g., BD, US, UK"
+                  maxLength={2}
+                  value={formData.countryCode || ""}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      countryCode: e.target.value.toUpperCase() || undefined,
+                    })
+                  }
+                  data-testid="input-country-code"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="minAmount">Minimum Balance Threshold (Optional)</Label>
+              <Input
+                id="minAmount"
+                type="number"
+                placeholder="e.g., 50.00"
+                min="0"
+                step="0.01"
+                value={formData.minAmount || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    minAmount: e.target.value ? parseFloat(e.target.value) : undefined,
+                  })
+                }
+                data-testid="input-min-amount"
+              />
+              <p className="text-xs text-muted-foreground">
+                Only process wallets with balance greater than or equal to this amount
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="periodStart">Period Start</Label>
+                <Input
+                  id="periodStart"
+                  type="datetime-local"
+                  value={formData.periodStart}
+                  onChange={(e) =>
+                    setFormData({ ...formData, periodStart: e.target.value })
+                  }
+                  data-testid="input-period-start"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="periodEnd">Period End</Label>
+                <Input
+                  id="periodEnd"
+                  type="datetime-local"
+                  value={formData.periodEnd}
+                  onChange={(e) =>
+                    setFormData({ ...formData, periodEnd: e.target.value })
+                  }
+                  data-testid="input-period-end"
+                />
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>Important:</strong> This will create a payout batch for all eligible wallets 
+                matching your criteria. Ensure your filters are correct before proceeding.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCreateDialogOpen(false)}
+              data-testid="button-cancel-schedule"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSchedule}
+              disabled={scheduleMutation.isPending}
+              data-testid="button-confirm-schedule"
+            >
+              {scheduleMutation.isPending ? "Scheduling..." : "Schedule Payouts"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
