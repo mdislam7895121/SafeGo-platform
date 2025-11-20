@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone, isValidSSN, maskSSN } from "../utils/encryption";
+import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -396,6 +397,36 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
       },
     });
 
+    // Log audit event
+    const actionType = verificationStatus === "approved"
+      ? (user.role === "driver" ? ActionType.DRIVER_KYC_APPROVED :
+         user.role === "customer" ? ActionType.CUSTOMER_KYC_APPROVED :
+         ActionType.RESTAURANT_KYC_APPROVED)
+      : (user.role === "driver" ? ActionType.DRIVER_KYC_REJECTED :
+         user.role === "customer" ? ActionType.CUSTOMER_KYC_REJECTED :
+         ActionType.RESTAURANT_KYC_REJECTED);
+
+    await logAuditEvent({
+      actorId: req.user?.userId,
+      actorEmail: req.user?.email || "unknown",
+      actorRole: "admin",
+      ipAddress: getClientIp(req),
+      actionType,
+      entityType: user.role === "driver" ? EntityType.DRIVER :
+                  user.role === "customer" ? EntityType.CUSTOMER :
+                  EntityType.RESTAURANT,
+      entityId: userId,
+      description: `${verificationStatus === "approved" ? "Approved" : "Rejected"} KYC for ${user.role} ${user.email}${rejectionReason ? ` - Reason: ${rejectionReason}` : ""}`,
+      metadata: {
+        userId,
+        userEmail: user.email,
+        role: user.role,
+        verificationStatus,
+        ...(rejectionReason && { rejectionReason }),
+      },
+      success: true,
+    });
+
     res.json({
       message: `KYC ${verificationStatus} for user ${user.email}`,
       profile: updatedProfile,
@@ -723,6 +754,31 @@ router.patch("/block/:userId", async (req: AuthRequest, res) => {
           ? "Your account has been blocked. Please contact support for more information."
           : "Your account has been unblocked. You can now access SafeGo services.",
       },
+    });
+
+    // Log audit event
+    const actionType = user.role === "driver" 
+      ? (isBlocked ? ActionType.DRIVER_BLOCKED : ActionType.DRIVER_UNBLOCKED)
+      : user.role === "customer"
+      ? (isBlocked ? ActionType.CUSTOMER_BLOCKED : ActionType.CUSTOMER_UNBLOCKED)
+      : ActionType.DRIVER_STATUS_CHANGE;
+
+    await logAuditEvent({
+      actorId: req.user?.userId,
+      actorEmail: req.user?.email || "unknown",
+      actorRole: "admin",
+      ipAddress: getClientIp(req),
+      actionType,
+      entityType: user.role === "driver" ? EntityType.DRIVER : EntityType.CUSTOMER,
+      entityId: userId,
+      description: `${isBlocked ? "Blocked" : "Unblocked"} ${user.role} account for ${user.email}`,
+      metadata: {
+        userId,
+        userEmail: user.email,
+        role: user.role,
+        isBlocked,
+      },
+      success: true,
     });
 
     res.json({
@@ -5511,6 +5567,89 @@ router.get("/parcels/commission-summary", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Parcel commission summary error:", error);
     res.status(500).json({ error: "Failed to fetch parcel commission summary" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/audit-logs
+// Fetch audit logs with pagination and filters
+// ====================================================
+router.get("/audit-logs", async (req: AuthRequest, res) => {
+  try {
+    const {
+      page = "1",
+      pageSize = "50",
+      actorEmail,
+      actionType,
+      entityType,
+      dateFrom,
+      dateTo,
+      success,
+    } = req.query;
+
+    // Parse pagination params
+    const pageNum = Math.max(1, parseInt(page as string));
+    const limit = Math.min(100, Math.max(1, parseInt(pageSize as string))); // Max 100 per page
+    const skip = (pageNum - 1) * limit;
+
+    // Build where clause
+    const where: any = {};
+
+    if (actorEmail) {
+      where.actorEmail = {
+        contains: actorEmail as string,
+        mode: "insensitive",
+      };
+    }
+
+    if (actionType) {
+      where.actionType = actionType as string;
+    }
+
+    if (entityType) {
+      where.entityType = entityType as string;
+    }
+
+    if (success !== undefined) {
+      where.success = success === "true";
+    }
+
+    // Date range filters
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom as string);
+      }
+      if (dateTo) {
+        where.createdAt.lte = new Date(dateTo as string);
+      }
+    }
+
+    // Fetch logs with pagination
+    const [logs, total] = await Promise.all([
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.auditLog.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({
+      logs,
+      pagination: {
+        page: pageNum,
+        pageSize: limit,
+        total,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("Fetch audit logs error:", error);
+    res.status(500).json({ error: "Failed to fetch audit logs" });
   }
 });
 

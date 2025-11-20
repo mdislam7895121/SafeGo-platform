@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
+import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -135,17 +136,51 @@ router.post("/login", async (req, res) => {
     // Find user
     const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
+      // Log failed login attempt
+      await logAuditEvent({
+        actorEmail: email,
+        actorRole: "unknown",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.LOGIN_FAILED,
+        entityType: EntityType.AUTH,
+        description: `Failed login attempt for ${email} - user not found`,
+        success: false,
+      });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
     // Check if user is blocked
     if (user.isBlocked) {
+      // Log failed login attempt for blocked user
+      await logAuditEvent({
+        actorId: user.id,
+        actorEmail: user.email,
+        actorRole: user.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.LOGIN_FAILED,
+        entityType: EntityType.AUTH,
+        entityId: user.id,
+        description: `Failed login attempt for blocked user ${user.email}`,
+        success: false,
+      });
       return res.status(403).json({ error: "Your account has been blocked. Please contact support." });
     }
 
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
+      // Log failed login attempt - invalid password
+      await logAuditEvent({
+        actorId: user.id,
+        actorEmail: user.email,
+        actorRole: user.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.LOGIN_FAILED,
+        entityType: EntityType.AUTH,
+        entityId: user.id,
+        description: `Failed login attempt for ${user.email} - invalid password`,
+        success: false,
+      });
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
@@ -159,6 +194,20 @@ router.post("/login", async (req, res) => {
       JWT_SECRET,
       { expiresIn: "7d" }
     );
+
+    // Log successful login (especially important for admin users)
+    await logAuditEvent({
+      actorId: user.id,
+      actorEmail: user.email,
+      actorRole: user.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.LOGIN_SUCCESS,
+      entityType: EntityType.AUTH,
+      entityId: user.id,
+      description: `Successful login for ${user.role} user ${user.email}`,
+      metadata: { role: user.role, countryCode: user.countryCode },
+      success: true,
+    });
 
     res.json({
       token,
