@@ -1,0 +1,156 @@
+You are working on the SafeGo admin security roadmap.
+
+We are currently in **Security Phase 2 – Part 2 (Security Monitoring UI + Remaining Phase 2 tasks)**.
+
+Phase 1 and Phase 2 / Part 1 are already completed (backend access control, rate limiting infra, basic protections). DO NOT change or undo any of that.
+
+Your job now is to COMPLETE Phase 2 / Part 2 only, by finishing tasks 7–10 that you listed:
+
+7. Environment Guard – startup validation of critical security secrets  
+8. Security Status Indicators – Visual flags on user profiles (Normal / Under observation / Needs review)  
+9. Testing – End-to-end validation of all security features  
+10. Documentation – Update replit.md with complete security architecture  
+
+Follow these requirements strictly:
+
+GLOBAL RULES
+- Project name: SafeGo (ride, food, parcel super-app).
+- Countries: Bangladesh (BD) and USA (US, including New York specific rules).
+- Do NOT break any existing flows: rides, food orders, parcel delivery, KYC, documents, settlement, commission, payout, auth, or notifications.
+- No database schema changes that invalidate existing data. Migrations must be backward compatible.
+- No emojis anywhere in new code or UI.
+- Keep all previous security work intact (RBAC, audit logs, 2FA infra, signed document URLs, encrypted fields, rate-limit infra, etc.).
+
+PART A – ENVIRONMENT GUARD (TASK 7)
+Goal: At application startup, verify that all critical security secrets and config values are present and valid.
+
+1. Implement a centralized Environment Guard module (if not already present) that:
+   - Validates presence and minimal format of:
+     - JWT_SECRET
+     - ENCRYPTION_KEY (correct length for the algorithm used)
+     - DB connection string
+     - 2FA / OTP related secrets (if required)
+     - Any file storage/signing keys used for signed document URLs
+   - Fails fast on startup with a clear, developer-friendly error message if any critical secret is missing or invalid.
+   - NEVER logs actual secret values, only key names and generic hints.
+
+2. Integration:
+   - Wire Environment Guard to run at server startup (e.g., in main server bootstrap file).
+   - Ensure that if env validation fails, the app does not start in a half-secure state.
+   - Make sure this does not affect test/dev environments beyond clear error messages.
+
+3. Security:
+   - No secrets printed to logs.
+   - Only log which key failed (e.g., “JWT_SECRET missing”).
+   - Add a short section in replit.md under “Environment Guard” describing required secrets and their purpose (no real values).
+
+PART B – SECURITY STATUS INDICATORS (TASK 8)
+Goal: Add visual security flags on relevant user profiles for admins, without changing user-facing apps.
+
+1. Data model / backend:
+   - Reuse existing models and fields as much as possible.
+   - If a security status concept already exists, use it.
+   - If you must add a field, it must be:
+     - Non-breaking
+     - Nullable with safe defaults
+   - Security status values (enum/string):
+     - "normal"
+     - "under_observation"
+     - "needs_review"
+
+2. Rules for computing status (you can implement as functions or view-model logic):
+   - Drivers:
+     - “needs_review” if:
+       - KYC or documents (NID/DMV/TLC) recently rejected or partially missing, OR
+       - Repeated failed KYC attempts, OR
+       - Security alerts from audit logs (e.g., many failed login attempts).
+     - “under_observation” if:
+       - Some soft flags exist (e.g., recent complaints, fraud-related flags) but KYC is still valid.
+     - Otherwise “normal”.
+
+   - Customers:
+     - “needs_review” if:
+       - Payment fraud flags or chargeback indicators (if such flags exist), OR
+       - Identity mismatch in parcel delivery (if flags exist).
+     - “under_observation” if:
+       - Multiple cancellations, suspicious behavior, or soft fraud flags.
+     - Otherwise “normal”.
+
+   - Restaurants:
+     - “needs_review” if:
+       - Food license or key document expired/rejected.
+     - “under_observation” if:
+       - Commission/payment disputes or repeated complaint flags.
+     - Otherwise “normal”.
+
+   - Make sure these rules use existing fields / flags / documents wherever possible. Do not invent fake features; only derive from current or clearly available data. If something doesn’t exist, keep the rule simple and safe.
+
+3. Admin UI:
+   - On admin profile pages for:
+     - Driver
+     - Customer
+     - Restaurant
+   - Add a small “Security Status” row/label in the header/identity area:
+     - Show one of: “Normal”, “Under observation”, “Needs review”.
+     - Use simple text badges with existing design system styles (no emojis).
+     - Colors should match existing status color conventions (e.g., green / amber / red) if available.
+
+   - Add a hover tooltip or subtle text explaining that this is an internal security indicator for admins only.
+
+4. List views / search:
+   - On admin list pages (drivers/customers/restaurants), if space allows:
+     - Add a small column or icon+tooltip for security status.
+     - Or show a subtle badge near name/email.
+   - Support filtering by security status if it can be added easily WITHOUT breaking existing filters. If this is too invasive, skip the filter but keep the badge.
+
+5. RBAC & audit:
+   - Only admins with appropriate permission should see security status indicators (reuse existing RBAC capabilities).
+   - Log to the audit log when a user’s security status changes because of an explicit admin action (e.g., manual flag), if any such path is introduced. If the status is purely computed on the fly, no extra audit entries are needed.
+
+PART C – TESTING (TASK 9)
+Goal: End-to-end validation of all security features (Phase 1 + Phase 2 / Part 1 + this Part).
+
+1. Write or update tests to cover:
+   - Environment Guard:
+     - Fails when required env vars are missing.
+     - Passes when all are present and valid.
+   - Security Status Indicators:
+     - Correct status computed for different data combinations (driver/customer/restaurant).
+     - Admin list and detail pages render the correct status text/badge.
+     - RBAC: Non-admin users cannot see security status.
+
+2. Manual testing checklist:
+   - Start app with missing JWT_SECRET or ENCRYPTION_KEY → app fails with clear message.
+   - Login as admin:
+     - Visit driver/customer/restaurant pages:
+       - See security status.
+       - Verify color/style and text are as expected.
+     - Ensure no security status is visible to normal (non-admin) users.
+   - Confirm no sensitive values (tokens, keys, SSN, NID) appear in logs or UI.
+
+PART D – DOCUMENTATION (TASK 10)
+Goal: Update replit.md with a clear, concise description of the new security architecture pieces.
+
+1. Add sections:
+   - “Environment Guard”
+   - “Security Status Indicators”
+   - “Security Testing (Phase 2)”
+
+2. For each section, document:
+   - What it does.
+   - Which env vars are required (names only, no example secrets).
+   - High-level logic for status indicators.
+   - How to run tests and manual verification.
+
+3. Ensure wording is clear, professional, and consistent with existing documentation.
+
+FINAL REQUIREMENTS
+- Do NOT start Phase 2 / Part 3 or Phase 3 features yet.
+- Do NOT change any existing UX texts unrelated to security.
+- Keep all changes backward compatible and production-ready.
+- When you’re done, provide a short summary of:
+  - Files changed
+  - New APIs or helpers
+  - How to verify everything is working
+
+Now, start implementing Phase 2 / Part 2 exactly as described above.
