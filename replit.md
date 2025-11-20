@@ -39,6 +39,51 @@ Key features include:
 
 - **Step 45 - Automated Incident Response**: Fully automated incident response system (`incidentResponseService.ts`) implementing: auto-lock suspicious users when risk scores exceed 75, automatic token revocation for compromised accounts, compromised session invalidation with audit logging, admin breach alert system for critical security events, automated fraud response triggering actions based on severity levels, full audit trail for all automated actions, and incident tracking with resolution workflows. System automatically responds to detected threats without manual intervention while maintaining complete audit trails and admin notifications for oversight.
 
+- **Step 46 - Admin Financial Suite**: Comprehensive financial management suite with three dedicated admin pages for wallet management, payout processing, and earnings analytics. The suite provides end-to-end financial visibility and control with full RBAC enforcement.
+
+  **Three Financial Pages:**
+  1. **Wallets Page (`/admin/wallets`)**: Comprehensive wallet management dashboard displaying all driver and restaurant wallets with real-time balance tracking. Features include:
+     - Type filter (driver/restaurant/all) and country filter for targeted viewing
+     - Table columns: Owner email, wallet type, currency, available balance, negative balance, last transaction date
+     - Click-through to detailed wallet view with transaction history and payout records
+     - Protected by `VIEW_WALLET_SUMMARY` permission
+     - Audit logging via `VIEW_WALLETS` and `VIEW_WALLET_DETAILS` actions
+
+  2. **Payouts Page (`/admin/payouts`)**: Payout request management interface for reviewing and processing driver/restaurant withdrawal requests. Features include:
+     - Status filter (pending/processing/completed/failed/all), type filter (driver/restaurant/all), country filter
+     - Table columns: Owner email, wallet type, amount, status, requested date, processed date
+     - Approve/reject modals with confirmation dialogs and rejection reason input
+     - Real-time status updates with optimistic UI and cache invalidation
+     - Protected by `MANAGE_PAYOUTS` permission
+     - Audit logging via `APPROVE_PAYOUT`, `REJECT_PAYOUT`, `VIEW_PAYOUT_REQUESTS` actions
+
+  3. **Earnings Page (`/admin/earnings`)**: Multi-tab analytics dashboard providing comprehensive earnings insights across all services. Features include:
+     - Five analytical tabs: Overview, Ride Earnings, Food Earnings, Parcel Earnings, Payout Trends
+     - Date range filtering (Last 7/30/90 days, All time) and country filter
+     - Recharts visualizations: Line charts for trends, bar charts for comparisons, area charts for cumulative data
+     - Summary metrics: Total earnings, total commissions, net revenue, commission rate
+     - Service-specific breakdowns with driver/restaurant earnings separation
+     - Protected by `VIEW_EARNINGS_DASHBOARD` permission
+     - Audit logging via `VIEW_EARNINGS_DASHBOARD` action with section metadata
+
+  **Backend API Endpoints:**
+  - `GET /api/admin/wallets` - List all wallets with filters, enriched with owner information
+  - `GET /api/admin/wallets/:id` - Detailed wallet view with transactions and payouts
+  - `GET /api/admin/payouts` - List all payout requests with filters and owner data
+  - `PUT /api/admin/payouts/:id/approve` - Approve pending payout (sets status to processing)
+  - `PUT /api/admin/payouts/:id/reject` - Reject pending payout with required reason
+  - `GET /api/admin/earnings/dashboard/*` - Multiple endpoints for earnings analytics (existing)
+
+  **Technical Implementation:**
+  - All endpoints use `checkPermission()` middleware for RBAC enforcement
+  - Owner information enrichment via Prisma joins (DriverProfile/RestaurantProfile/User)
+  - Decimal balance conversion to strings for precise JSON serialization
+  - Comprehensive audit logging with metadata including filters, amounts, and owner details
+  - Frontend uses TanStack Query with automatic refetching and cache invalidation
+  - Shadcn/ui components throughout (Table, Dialog, Select, Badge, Card, Tabs)
+  - Mobile-responsive layouts with skeleton loading states
+  - Toast notifications for success/error feedback
+
 ### Admin Dashboard Cards - Complete Inventory
 
 The admin dashboard (`/admin`) displays 15 management cards with proper RBAC enforcement:
