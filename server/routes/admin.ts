@@ -7039,4 +7039,58 @@ router.get("/earnings/dashboard/payouts", checkPermission(Permission.VIEW_EARNIN
   }
 });
 
+// ====================================================
+// SECURITY EVENTS MONITORING
+// ====================================================
+
+router.get("/security-events", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { dateFrom, dateTo, category, actorEmail, severity, limit, offset } = req.query;
+
+    const { getSecurityEvents } = await import('../services/securityEventsService');
+
+    const query: any = {};
+    if (dateFrom) query.dateFrom = new Date(dateFrom as string);
+    if (dateTo) query.dateTo = new Date(dateTo as string);
+    if (category) query.category = category as string;
+    if (actorEmail) query.actorEmail = actorEmail as string;
+    if (severity) query.severity = severity as string;
+    if (limit) query.limit = parseInt(limit as string);
+    if (offset) query.offset = parseInt(offset as string);
+
+    const result = await getSecurityEvents(query);
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: 'SECURITY_EVENTS_VIEWED',
+      entityType: 'security',
+      description: `Viewed security events`,
+      metadata: { filters: query }
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Get security events error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch security events" });
+  }
+});
+
+router.get("/security-events/summary", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { hours } = req.query;
+    const hoursNum = hours ? parseInt(hours as string) : 24;
+
+    const { getSecurityEventsSummary } = await import('../services/securityEventsService');
+    const summary = await getSecurityEventsSummary(hoursNum);
+
+    res.json(summary);
+  } catch (error: any) {
+    console.error("Get security events summary error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch security summary" });
+  }
+});
+
 export default router;
