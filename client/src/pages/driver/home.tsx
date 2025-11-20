@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Car, DollarSign, TrendingUp, Settings, User, Power } from "lucide-react";
+import { Car, DollarSign, TrendingUp, Settings, User, Power, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -234,6 +234,12 @@ export default function DriverHome() {
             <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-vehicle">
               <Settings className="h-4 w-4" />
               Vehicle
+            </Button>
+          </Link>
+          <Link href="/driver/wallet">
+            <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-wallet">
+              <Wallet className="h-4 w-4" />
+              Wallet
             </Button>
           </Link>
         </div>

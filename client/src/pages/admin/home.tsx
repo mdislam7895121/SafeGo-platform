@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -105,6 +105,24 @@ export default function AdminHome() {
       color: "text-red-600",
       bgColor: "bg-red-50 dark:bg-red-950",
       badge: stats?.openComplaints ? stats.openComplaints : undefined,
+    },
+    {
+      name: "Wallets",
+      icon: Wallet,
+      href: "/admin/wallets",
+      description: "View all driver and restaurant wallets with balances",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50 dark:bg-emerald-950",
+      permission: "VIEW_WALLETS",
+    },
+    {
+      name: "Payouts",
+      icon: HandCoins,
+      href: "/admin/payouts",
+      description: "Review and approve pending payout requests",
+      color: "text-violet-600",
+      bgColor: "bg-violet-50 dark:bg-violet-950",
+      permission: "MANAGE_PAYOUTS",
     },
     {
       name: "Wallet Settlement",

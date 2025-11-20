@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { UtensilsCrossed, DollarSign, Clock, User, Settings } from "lucide-react";
+import { UtensilsCrossed, DollarSign, Clock, User, Settings, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -169,10 +169,12 @@ export default function RestaurantHome() {
               Profile
             </Button>
           </Link>
-          <Button variant="outline" className="w-full justify-start gap-2" disabled>
-            <Settings className="h-4 w-4" />
-            Settings
-          </Button>
+          <Link href="/restaurant/wallet">
+            <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-wallet">
+              <Wallet className="h-4 w-4" />
+              Wallet
+            </Button>
+          </Link>
         </div>
       </div>
     </div>
