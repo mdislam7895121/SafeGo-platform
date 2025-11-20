@@ -6012,4 +6012,300 @@ router.put("/settings/:sectionKey", checkPermission(Permission.EDIT_SETTINGS), a
   }
 });
 
+// ====================================================
+// Payout Account Endpoints
+// ====================================================
+import * as payoutService from "../services/payoutService";
+
+// ====================================================
+// GET /api/admin/drivers/:driverId/payout-accounts
+// List all payout accounts for a driver
+// ====================================================
+router.get("/drivers/:driverId/payout-accounts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { driverId } = req.params;
+
+    const accounts = await payoutService.listPayoutAccounts("driver", driverId);
+    res.json(accounts);
+  } catch (error: any) {
+    console.error("List driver payout accounts error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payout accounts" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/drivers/:driverId/payout-accounts
+// Create a new payout account for a driver
+// ====================================================
+router.post("/drivers/:driverId/payout-accounts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { driverId } = req.params;
+
+    const input = {
+      ...req.body,
+      ownerType: "driver" as const,
+      ownerId: driverId,
+    };
+
+    const account = await payoutService.createPayoutAccount(input);
+
+    await logAuditEvent({
+      actorId: req.user?.id || null,
+      actorEmail: req.user?.email || "unknown",
+      actorRole: req.user?.adminProfile?.adminRole || "unknown",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.PAYOUT_ACCOUNT_CREATED,
+      entityType: EntityType.DRIVER,
+      entityId: driverId,
+      description: `Created payout account for driver ${driverId}`,
+      metadata: {
+        payoutAccountId: account.id,
+        payoutType: account.payoutType,
+        provider: account.provider,
+        countryCode: account.countryCode,
+        isDefault: account.isDefault,
+      },
+      success: true,
+    });
+
+    res.status(201).json(account);
+  } catch (error: any) {
+    console.error("Create driver payout account error:", error);
+
+    try {
+      await logAuditEvent({
+        actorId: req.user?.id || null,
+        actorEmail: req.user?.email || "unknown",
+        actorRole: req.user?.adminProfile?.adminRole || "unknown",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.PAYOUT_ACCOUNT_CREATED,
+        entityType: EntityType.DRIVER,
+        entityId: req.params.driverId,
+        description: `Failed to create payout account for driver ${req.params.driverId}`,
+        metadata: { error: error.message },
+        success: false,
+      });
+    } catch (auditError) {
+      console.error("Failed to log audit event:", auditError);
+    }
+
+    res.status(400).json({ error: error.message || "Failed to create payout account" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/payout-accounts/:id
+// Update a payout account
+// ====================================================
+router.patch("/payout-accounts/:id", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const account = await payoutService.updatePayoutAccount(id, req.body);
+
+    await logAuditEvent({
+      actorId: req.user?.id || null,
+      actorEmail: req.user?.email || "unknown",
+      actorRole: req.user?.adminProfile?.adminRole || "unknown",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.PAYOUT_ACCOUNT_UPDATED,
+      entityType: account.ownerType === "driver" ? EntityType.DRIVER : EntityType.RESTAURANT,
+      entityId: account.ownerId,
+      description: `Updated payout account ${id}`,
+      metadata: {
+        payoutAccountId: id,
+        status: account.status,
+        isDefault: account.isDefault,
+      },
+      success: true,
+    });
+
+    res.json(account);
+  } catch (error: any) {
+    console.error("Update payout account error:", error);
+
+    try {
+      await logAuditEvent({
+        actorId: req.user?.id || null,
+        actorEmail: req.user?.email || "unknown",
+        actorRole: req.user?.adminProfile?.adminRole || "unknown",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.PAYOUT_ACCOUNT_UPDATED,
+        entityType: EntityType.DRIVER,
+        entityId: req.params.id,
+        description: `Failed to update payout account ${req.params.id}`,
+        metadata: { error: error.message },
+        success: false,
+      });
+    } catch (auditError) {
+      console.error("Failed to log audit event:", auditError);
+    }
+
+    res.status(400).json({ error: error.message || "Failed to update payout account" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/drivers/:driverId/payout-accounts/:id/set-default
+// Set a payout account as default for a driver
+// ====================================================
+router.post("/drivers/:driverId/payout-accounts/:id/set-default", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { driverId, id } = req.params;
+
+    const account = await payoutService.setDefaultPayoutAccount("driver", driverId, id);
+
+    await logAuditEvent({
+      actorId: req.user?.id || null,
+      actorEmail: req.user?.email || "unknown",
+      actorRole: req.user?.adminProfile?.adminRole || "unknown",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.PAYOUT_ACCOUNT_SET_DEFAULT,
+      entityType: EntityType.DRIVER,
+      entityId: driverId,
+      description: `Set payout account ${id} as default for driver ${driverId}`,
+      metadata: {
+        payoutAccountId: id,
+      },
+      success: true,
+    });
+
+    res.json(account);
+  } catch (error: any) {
+    console.error("Set default payout account error:", error);
+    res.status(400).json({ error: error.message || "Failed to set default payout account" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/restaurants/:restaurantId/payout-accounts
+// List all payout accounts for a restaurant
+// ====================================================
+router.get("/restaurants/:restaurantId/payout-accounts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { restaurantId } = req.params;
+
+    const accounts = await payoutService.listPayoutAccounts("restaurant", restaurantId);
+    res.json(accounts);
+  } catch (error: any) {
+    console.error("List restaurant payout accounts error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payout accounts" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/restaurants/:restaurantId/payout-accounts
+// Create a new payout account for a restaurant
+// ====================================================
+router.post("/restaurants/:restaurantId/payout-accounts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { restaurantId } = req.params;
+
+    const input = {
+      ...req.body,
+      ownerType: "restaurant" as const,
+      ownerId: restaurantId,
+    };
+
+    const account = await payoutService.createPayoutAccount(input);
+
+    await logAuditEvent({
+      actorId: req.user?.id || null,
+      actorEmail: req.user?.email || "unknown",
+      actorRole: req.user?.adminProfile?.adminRole || "unknown",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.PAYOUT_ACCOUNT_CREATED,
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantId,
+      description: `Created payout account for restaurant ${restaurantId}`,
+      metadata: {
+        payoutAccountId: account.id,
+        payoutType: account.payoutType,
+        provider: account.provider,
+        countryCode: account.countryCode,
+        isDefault: account.isDefault,
+      },
+      success: true,
+    });
+
+    res.status(201).json(account);
+  } catch (error: any) {
+    console.error("Create restaurant payout account error:", error);
+
+    try {
+      await logAuditEvent({
+        actorId: req.user?.id || null,
+        actorEmail: req.user?.email || "unknown",
+        actorRole: req.user?.adminProfile?.adminRole || "unknown",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.PAYOUT_ACCOUNT_CREATED,
+        entityType: EntityType.RESTAURANT,
+        entityId: req.params.restaurantId,
+        description: `Failed to create payout account for restaurant ${req.params.restaurantId}`,
+        metadata: { error: error.message },
+        success: false,
+      });
+    } catch (auditError) {
+      console.error("Failed to log audit event:", auditError);
+    }
+
+    res.status(400).json({ error: error.message || "Failed to create payout account" });
+  }
+});
+
+// ====================================================
+// POST /api/admin/restaurants/:restaurantId/payout-accounts/:id/set-default
+// Set a payout account as default for a restaurant
+// ====================================================
+router.post("/restaurants/:restaurantId/payout-accounts/:id/set-default", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { restaurantId, id } = req.params;
+
+    const account = await payoutService.setDefaultPayoutAccount("restaurant", restaurantId, id);
+
+    await logAuditEvent({
+      actorId: req.user?.id || null,
+      actorEmail: req.user?.email || "unknown",
+      actorRole: req.user?.adminProfile?.adminRole || "unknown",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.PAYOUT_ACCOUNT_SET_DEFAULT,
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantId,
+      description: `Set payout account ${id} as default for restaurant ${restaurantId}`,
+      metadata: {
+        payoutAccountId: id,
+      },
+      success: true,
+    });
+
+    res.json(account);
+  } catch (error: any) {
+    console.error("Set default payout account error:", error);
+    res.status(400).json({ error: error.message || "Failed to set default payout account" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/customers/:customerId/payment-methods
+// List all payment methods for a customer (read-only)
+// ====================================================
+router.get("/customers/:customerId/payment-methods", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const paymentMethods = await prisma.paymentMethod.findMany({
+      where: { customerId },
+      orderBy: [
+        { isDefault: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json(paymentMethods);
+  } catch (error: any) {
+    console.error("List payment methods error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payment methods" });
+  }
+});
+
 export default router;

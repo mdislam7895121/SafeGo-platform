@@ -451,3 +451,61 @@ model PlatformSettings {
   @@index([key])
   @@map("platform_settings")
 }
+
+enum PayoutType {
+  mobile_wallet
+  bank_account
+  stripe_connect
+  manual
+}
+
+enum PayoutAccountStatus {
+  pending_verification
+  active
+  inactive
+}
+
+model PayoutAccount {
+  id                 String               @id @default(uuid())
+  ownerType          String
+  ownerId            String
+  countryCode        String
+  payoutType         PayoutType
+  provider           String?
+  displayName        String
+  accountHolderName  String
+  maskedAccount      String
+  encryptedDetails   String
+  isDefault          Boolean              @default(false)
+  status             PayoutAccountStatus  @default(pending_verification)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([ownerType, ownerId])
+  @@index([ownerType, ownerId, isDefault])
+  @@map("payout_accounts")
+}
+
+enum PaymentMethodStatus {
+  active
+  inactive
+}
+
+model PaymentMethod {
+  id                String                @id @default(uuid())
+  customerId        String
+  provider          String
+  providerMethodId  String
+  brand             String?
+  last4             String
+  expMonth          Int?
+  expYear           Int?
+  isDefault         Boolean               @default(false)
+  status            PaymentMethodStatus   @default(active)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([customerId])
+  @@index([customerId, isDefault])
+  @@map("payment_methods")
+}

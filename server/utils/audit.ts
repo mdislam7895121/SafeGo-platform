@@ -46,6 +46,11 @@ export const ActionType = {
   
   // Settings
   SETTINGS_UPDATED: "SETTINGS_UPDATED",
+  
+  // Payout Management
+  PAYOUT_ACCOUNT_CREATED: "PAYOUT_ACCOUNT_CREATED",
+  PAYOUT_ACCOUNT_UPDATED: "PAYOUT_ACCOUNT_UPDATED",
+  PAYOUT_ACCOUNT_SET_DEFAULT: "PAYOUT_ACCOUNT_SET_DEFAULT",
 } as const;
 
 // Entity type constants
