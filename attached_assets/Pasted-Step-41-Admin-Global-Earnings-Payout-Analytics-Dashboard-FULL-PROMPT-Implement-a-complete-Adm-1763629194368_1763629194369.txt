@@ -1,0 +1,247 @@
+Step 41 – Admin Global Earnings & Payout Analytics Dashboard (FULL PROMPT)
+
+Implement a complete Admin Earnings & Payout Analytics Dashboard for SafeGo’s admin panel.
+The system must be non-breaking, fully compatible with all existing ride/food/parcel modules, and follow the established backend/frontend patterns.
+
+Core Objectives
+Build a production-ready analytics system inside /admin/earnings that shows:
+
+1. Global Earnings Summary
+- Total rides earnings
+- Total food earnings
+- Total parcel earnings
+- Total commission earned (platform revenue)
+- Total payouts completed
+- Total payouts pending
+
+2. Breakdown by Service
+For each module (Ride, Food, Parcel):
+- Total orders/trips/deliveries
+- Gross earnings
+- Commission collected
+- Net payable to driver/restaurant
+- Platform revenue chart
+
+3. Payout Analytics
+- Weekly auto-payout totals
+- Manual cash-out requests
+- Pending payouts
+- Completed payouts
+- Failed payouts with error messages
+- Payout timeline chart
+
+------------------------------------------------
+A. Backend – Aggregation Layer
+------------------------------------------------
+
+Create a dedicated earnings aggregation service:
+
+File: server/services/earningsService.ts
+
+Functions needed:
+
+1) getGlobalSummary(dateFrom, dateTo, country)
+Return:
+- totalRidesEarnings
+- totalFoodEarnings
+- totalParcelEarnings
+- totalCommission
+- payoutsCompleted
+- payoutsPending
+
+2) getRideEarnings(dateFrom, dateTo, country)
+Return:
+- gross
+- commission
+- net
+- chartData[] (time-series points)
+
+3) getFoodEarnings(dateFrom, dateTo, country)
+Same structure as getRideEarnings.
+
+4) getParcelEarnings(dateFrom, dateTo, country)
+Same structure as getRideEarnings.
+
+5) getPayoutAnalytics(dateFrom, dateTo, country)
+Return:
+- weeklyAutoPayouts (grouped by week)
+- manualCashouts
+- pending
+- completed
+- failed[] (items with high-level reason codes)
+
+Backend rules:
+- Do NOT introduce any breaking schema changes.
+- Use efficient Prisma aggregation (groupBy, sum, count) against existing tables.
+- Add a 30-second caching layer for heavy aggregations (reuse the existing caching pattern you use elsewhere).
+- Every successful fetch of earnings data must create an audit-log entry with actionType = VIEW_EARNINGS_DASHBOARD.
+- Respect RBAC permissions exactly as in Step 38/39.
+- Never return raw card numbers, bank account numbers, or any sensitive payment provider tokens. Only return high-level aggregates and safe identifiers.
+
+------------------------------------------------
+B. API Endpoints (Admin-only)
+------------------------------------------------
+
+Create these endpoints (use existing routing style and middleware):
+
+GET /api/admin/earnings/global
+GET /api/admin/earnings/rides
+GET /api/admin/earnings/food
+GET /api/admin/earnings/parcels
+GET /api/admin/earnings/payouts
+
+Common query params:
+- dateFrom (optional, ISO)
+- dateTo (optional, ISO)
+- country (optional, e.g. "BD", "US")
+- serviceType (optional when applicable)
+
+Behavior:
+- All endpoints must be admin-only and protected by RBAC:
+  - Permission key: VIEW_EARNINGS_DASHBOARD
+- Return JSON in a chart-friendly structure (labels + data arrays) plus numeric totals.
+- Support pagination where it makes sense (especially for payout-level details).
+- Order by createdAt DESC for detailed lists.
+- Ensure no sensitive payment details are leaked.
+
+------------------------------------------------
+C. Admin Frontend – Earnings Dashboard
+------------------------------------------------
+
+Route:
+- /admin/earnings
+
+Navigation:
+- Add “Earnings & Payouts” (or “Earnings”) item in the admin sidebar, grouped under analytics/operations as appropriate.
+- Respect the existing capabilities object (RBAC). Only show this item if VIEW_EARNINGS_DASHBOARD is allowed.
+
+Page layout:
+
+1) Tabs
+Create a tabbed interface:
+- Global
+- Rides
+- Food
+- Parcels
+- Payouts
+
+2) Filters Panel (shared across tabs)
+- Country selector: All Countries, Bangladesh, United States (and any future countries)
+- Date range: shortcuts (Last 7 days, Last 30 days, This month, Custom)
+- Service type (where applicable)
+- Apply / Reset buttons
+
+3) Global Tab
+- Summary cards at the top:
+  - Total rides earnings
+  - Total food earnings
+  - Total parcel earnings
+  - Total commission
+  - Total payouts completed
+  - Total payouts pending
+- Line chart: total gross earnings over selected period.
+- Bar chart: commission vs net payouts (stacked or grouped) per service type.
+
+4) Rides / Food / Parcels Tabs
+Each tab should show:
+- Summary cards (orders, gross, commission, net)
+- Line or bar chart of earnings over time for that specific service
+- Table listing:
+  - grouping by day/week with:
+    - date
+    - total orders
+    - gross
+    - commission
+    - net
+
+5) Payouts Tab
+- Summary cards:
+  - Auto payouts (total amount + count)
+  - Manual cash-outs (total amount + count)
+  - Pending amount
+  - Failed amount
+- Chart: payouts per week (stacked: auto vs manual)
+- Table:
+  Columns:
+    - Beneficiary type (Driver / Restaurant)
+    - Name (or identifier)
+    - Country
+    - Amount
+    - Status (Pending / Completed / Failed)
+    - Type (Auto / Manual)
+    - Date
+    - Error code (for failed payouts, high-level only)
+- Support pagination and basic search (by name or email).
+
+Frontend rules:
+- Follow the same design system and card/table styles used in existing admin analytics pages.
+- No emojis anywhere in the new UI strings.
+- All currency formatting should match existing conventions (e.g., $123,456.78 or localized if already implemented).
+- Handle loading, empty, and error states gracefully.
+
+------------------------------------------------
+D. Security & Performance
+------------------------------------------------
+
+Security:
+- All new endpoints must be protected with admin auth and RBAC.
+- Only admins with VIEW_EARNINGS_DASHBOARD can access UI and APIs.
+- Each API call should write an AuditLog entry using the existing audit helper, e.g.:
+  - actionType: VIEW_EARNINGS_DASHBOARD
+  - entityType: "analytics"
+  - metadata: { section: "global" | "rides" | "food" | "parcels" | "payouts" }
+
+Data safety:
+- No PII beyond what is already shown on existing payout/settlement screens.
+- No raw payment details, tokens, or card data in API responses or metadata.
+
+Performance:
+- Use aggregation queries with proper indexes (reuse existing indexes where possible).
+- Implement short-lived caching for heavy queries (approx 30 seconds).
+- Avoid N+1 patterns.
+
+------------------------------------------------
+E. Testing Plan
+------------------------------------------------
+
+Implement and execute an end-to-end testing checklist:
+
+1) Global Analytics
+- Change date ranges and verify totals update correctly.
+- Verify that totals equal the sum of rides/food/parcel aggregates for the same period.
+
+2) Service Tabs
+- Compare sample ride/food/parcel data versus aggregated numbers.
+- Confirm charts and tables align.
+
+3) Payout Analytics
+- Verify that amounts and counts match the Wallet Settlement System.
+- Confirm pending/completed/failed states display correctly.
+- Test pagination and search.
+
+4) Security
+- Confirm that a user without VIEW_EARNINGS_DASHBOARD cannot access /admin/earnings nor the related APIs.
+- Confirm audit logs are written when data is fetched.
+
+5) Performance
+- Verify that repeated fetching within a short time window benefits from caching (no excessive DB load).
+- Ensure the page loads within acceptable latency for real-world-sized datasets.
+
+------------------------------------------------
+F. Deliverables
+------------------------------------------------
+
+When you finish, provide:
+
+1) Summary of changes:
+   - New service functions
+   - New API routes
+   - New frontend components/pages
+2) Any schema/index additions (must be backward-compatible).
+3) Confirmation that all tests in the checklist have passed.
+4) Update replit.md with:
+   - Description of the Earnings & Payout Analytics Dashboard
+   - API documentation for the new endpoints
+   - Notes on RBAC permissions and audit logging
+
+Now implement Step 41 completely according to this specification, without breaking any existing SafeGo functionality.
