@@ -1,0 +1,135 @@
+SafeGo Security Hardening – Phase 1 (Part 1/2)
+
+Goal
+Strengthen SafeGo’s backend, admin, data, RBAC, and document access security without breaking any existing features. Apply this as an additive upgrade only.
+
+Global Rules
+- Do NOT rename/remove any existing fields, APIs, or routes.
+- Only ADD new middleware, helpers, endpoints, encrypted fields.
+- Must be 100% backward compatible.
+- Must not break rides, food_orders, deliveries, payouts, KYC, documents, admin panel.
+- No emojis in UI/messages.
+
+=====================================================================
+1. Backend Access Control Hardening (Zero Trust API Layer)
+=====================================================================
+
+1.1 Create centralized authorization middleware:
+Create/extend:
+server/middleware/authz.ts
+
+Features:
+- Validate token
+- Attach user context (userId, role, country, permissions)
+- Enforce role restrictions
+- Enforce “own-resource” rules
+
+Add helpers:
+- requireAdmin(permissionKey?)
+- requireRole("driver"|"customer"|"restaurant")
+- requireOwner(entityType, entityIdField)
+
+Apply these middlewares to:
+- rides, food_orders, deliveries
+- payouts, wallets, commissions
+- documents + KYC
+- all admin protected endpoints
+
+1.2 Country-based visibility:
+- For admins: if role is "super-admin" → can view all countries.
+- For non-super admins → filter results to assigned country only.
+
+=====================================================================
+2. Sensitive Data Encryption Layer
+=====================================================================
+
+Create:
+server/utils/crypto.ts
+
+Use AES-256-GCM with ENCRYPTION_KEY from environment.
+
+Expose:
+- encryptSensitive()
+- decryptSensitive()
+
+Add encrypted variants for sensitive fields:
+
+Bangladesh:
+- customer.nid_encrypted
+- driver.nid_encrypted
+
+USA:
+- user.ssn_encrypted (store full encrypted)
+- driver.dmv_license_number_encrypted
+
+Bank/Payout:
+- payoutAccount.accountNumber_encrypted
+- payoutAccount.routingNumber_encrypted (if exists)
+
+Rules:
+- Do NOT delete old plaintext fields.
+- New writes → encrypted field
+- Reads → decrypt encrypted if available, else fallback to old plaintext.
+- Do NOT log decrypted values.
+
+=====================================================================
+3. Secure Document Handling (NID, DMV/TLC, Registration, Food License)
+=====================================================================
+
+3.1 Make document storage private (no public raw URLs)
+
+3.2 Create secure signed URL endpoints:
+- GET /api/admin/documents/:id/url
+- GET /api/driver/documents/:id/url
+- GET /api/restaurant/documents/:id/url
+
+Rules:
+- Only authorized users can access documents.
+- Admin with MANAGE_KYC permission only.
+- Drivers see only their own docs.
+- Customers see only allowed docs (NID only if policy allows).
+
+Each signed URL:
+- Short-lived (10–15 min)
+- Contains token validation on download
+
+3.3 Document access audit logging:
+Log:
+actionType: "DOCUMENT_URL_ISSUED"
+entityType: "document"
+metadata: { docId, role, purpose }
+
+NEVER log:
+- full URL
+- NID/SSN numbers
+- license number
+
+3.4 Update frontend to use signed URLs only.
+
+=====================================================================
+4. Admin Authentication Hardening (2FA + Rate Limit)
+=====================================================================
+
+4.1 Implement Admin 2FA (TOTP)
+Add fields:
+- twoFactorEnabled (boolean)
+- twoFactorSecret_encrypted
+- twoFactorRecoveryCodes_encrypted (optional)
+
+Flows:
+Setup 2FA:
+- Generate TOTP secret
+- Store encrypted
+- Admin verifies once, then enable 2FA
+
+Login:
+Step 1: password  
+Step 2: 6-digit TOTP (if enabled)
+
+Do NOT log TOTP or secrets.
+
+4.2 Add rate limiting:
+On /api/admin/auth/login:
+- Allow max 5 failed attempts per 15 minutes per IP+email
+- After limit → temporary block
+- Log actionType: ADMIN_LOGIN_RATE_LIMITED

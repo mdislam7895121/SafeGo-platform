@@ -9,6 +9,8 @@ import rideRoutes from "./routes/rides";
 import foodOrderRoutes from "./routes/food-orders";
 import deliveryRoutes from "./routes/deliveries";
 import supportRoutes from "./routes/support";
+import documentRoutes from "./routes/documents";
+import twoFactorRoutes from "./routes/twoFactor";
 import { setupSupportChatWebSocket } from "./websocket/supportChatSocket";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -22,6 +24,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
   app.use("/api/support", supportRoutes);
+  app.use("/api", documentRoutes);
+  app.use("/api/admin/auth/2fa", twoFactorRoutes);
 
   const httpServer = createServer(app);
   

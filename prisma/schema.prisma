@@ -16,12 +16,18 @@ enum AdminRole {
 }
 
 model AdminProfile {
-  id        String    @id @default(uuid())
-  userId    String    @unique
-  adminRole AdminRole @default(SUPER_ADMIN)
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                           String    @id @default(uuid())
+  userId                       String    @unique
+  adminRole                    AdminRole @default(SUPER_ADMIN)
+  isActive                     Boolean   @default(true)
+  createdAt                    DateTime  @default(now())
+  twoFactorEnabled             Boolean   @default(false)
+  twoFactorSecret_encrypted    String?
+  twoFactorRecoveryCodes_encrypted String?
+  pending2FASecret_encrypted   String?
+  pending2FAExpiresAt          DateTime?
+  country                      String?
+  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("admin_profiles")
 }
@@ -166,6 +172,7 @@ model DriverProfile {
   dmvLicenseBackUrl     String?
   dmvLicenseExpiry      DateTime?
   dmvLicenseNumber      String?
+  dmvLicenseNumber_encrypted String?
   firstName             String?
   lastName              String?
   middleName            String?
@@ -327,6 +334,7 @@ model User {
   driverProfile     DriverProfile?
   notifications     Notification[]
   restaurantProfile RestaurantProfile?
+  documents         Document[]
 
   @@map("users")
 }
@@ -337,6 +345,29 @@ enum DmvInspectionStatus {
   MISSING
 
   @@map("dmv_inspection_status")
+}
+
+model Document {
+  id           String    @id @default(uuid())
+  userId       String
+  documentType String
+  fileUrl      String
+  fileName     String?
+  fileSize     Int?
+  mimeType     String?
+  category     String
+  status       String    @default("pending_review")
+  expiresAt    DateTime?
+  uploadedAt   DateTime  @default(now())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([documentType])
+  @@index([category])
+  @@index([status])
+  @@map("documents")
 }
 
 model VehicleDocument {
@@ -476,6 +507,8 @@ model PayoutAccount {
   accountHolderName  String
   maskedAccount      String
   encryptedDetails   String
+  accountNumber_encrypted String?
+  routingNumber_encrypted String?
   isDefault          Boolean              @default(false)
   status             PayoutAccountStatus  @default(pending_verification)
   createdAt          DateTime             @default(now())
