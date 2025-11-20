@@ -12,7 +12,11 @@ import {
   Package,
   Car,
   UtensilsCrossed,
-  Store
+  Store,
+  Download,
+  Play,
+  Clock,
+  XCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -150,6 +154,12 @@ export default function AdminSettlement() {
   // Analytics filters
   const [analyticsCountry, setAnalyticsCountry] = useState<string>("all");
   const [analyticsDateRange, setAnalyticsDateRange] = useState<string>("all");
+  
+  // Batch management state
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false);
+  const [batchOwnerType, setBatchOwnerType] = useState("all");
+  const [batchCountry, setBatchCountry] = useState("all");
+  const [minPayoutAmount, setMinPayoutAmount] = useState("10");
 
   // Fetch overview stats
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewStats>({
@@ -210,10 +220,44 @@ export default function AdminSettlement() {
       // Invalidate all settlement-related queries to refresh dashboard immediately
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/overview"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/pending"] });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && 
+        typeof query.queryKey[0] === 'string' && 
+        query.queryKey[0].startsWith('/api/admin/payouts')
+      });
     },
     onError: (error: any) => {
       toast({
         title: "Settlement failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Batch creation mutation
+  const createBatchMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/admin/payout-batches", data);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Batch created",
+        description: `Created batch with ${data.payouts?.length || 0} payouts`,
+      });
+      setBatchDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settlement/pending"] });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        Array.isArray(query.queryKey) && 
+        typeof query.queryKey[0] === 'string' && 
+        query.queryKey[0].startsWith('/api/admin/payouts')
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create batch",
         description: error.message,
         variant: "destructive",
       });
@@ -229,6 +273,28 @@ export default function AdminSettlement() {
     setSelectedWallet(wallet);
     setSettlementAmount(wallet.negativeBalance.toFixed(2));
     setSettleDialogOpen(true);
+  };
+
+  const handleCreateBatch = () => {
+    const now = new Date();
+    const periodEnd = now.toISOString();
+    const periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    const payload: any = {
+      periodStart,
+      periodEnd,
+      minPayoutAmount: parseFloat(minPayoutAmount),
+    };
+
+    if (batchOwnerType !== "all") {
+      payload.ownerType = batchOwnerType;
+    }
+
+    if (batchCountry !== "all") {
+      payload.countryCode = batchCountry;
+    }
+
+    createBatchMutation.mutate(payload);
   };
 
   const handleSubmitSettlement = async (e: React.FormEvent) => {
@@ -392,6 +458,17 @@ export default function AdminSettlement() {
               </p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Batch Actions */}
+        <div className="flex justify-end mb-4">
+          <Button 
+            onClick={() => setBatchDialogOpen(true)}
+            data-testid="button-create-batch"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Create Payout Batch
+          </Button>
         </div>
 
         {/* Pending Settlements Table */}
@@ -998,6 +1075,77 @@ export default function AdminSettlement() {
               )}
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Creation Dialog */}
+      <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+        <DialogContent data-testid="dialog-create-batch">
+          <DialogHeader>
+            <DialogTitle>Create Payout Batch</DialogTitle>
+            <DialogDescription>
+              Create a batch of payouts for eligible wallets (last 7 days)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="batch-owner-type">Wallet Type</Label>
+              <Select value={batchOwnerType} onValueChange={setBatchOwnerType}>
+                <SelectTrigger id="batch-owner-type" data-testid="select-batch-owner-type">
+                  <SelectValue placeholder="Select wallet type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="driver">Driver</SelectItem>
+                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="batch-country">Country</Label>
+              <Select value={batchCountry} onValueChange={setBatchCountry}>
+                <SelectTrigger id="batch-country" data-testid="select-batch-country">
+                  <SelectValue placeholder="Select country" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Countries</SelectItem>
+                  <SelectItem value="BD">Bangladesh</SelectItem>
+                  <SelectItem value="US">United States</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="batch-min-amount">Minimum Payout Amount</Label>
+              <Input
+                id="batch-min-amount"
+                type="number"
+                value={minPayoutAmount}
+                onChange={(e) => setMinPayoutAmount(e.target.value)}
+                placeholder="10.00"
+                data-testid="input-batch-min-amount"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setBatchDialogOpen(false)}
+              className="flex-1"
+              data-testid="button-cancel-batch"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleCreateBatch}
+              disabled={createBatchMutation.isPending}
+              className="flex-1"
+              data-testid="button-confirm-batch"
+            >
+              {createBatchMutation.isPending ? "Creating..." : "Create Batch"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
