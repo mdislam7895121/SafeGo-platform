@@ -1,0 +1,128 @@
+You are working on the SafeGo super-app (rides, food, parcels). Phase 1 security hardening is already complete (no hardcoded secrets, encrypted sensitive data, signed document URLs, RBAC, 2FA infra, audit logs). Now implement Phase 2 Security Hardening with the explicit goal of exceeding typical ride-share security standards, without breaking any existing behavior.
+
+Stack reminder:
+- Backend: Node/TypeScript (Express or similar) with Prisma
+- Frontend: React/TypeScript admin panel and user apps
+- Auth: JWT-based sessions, admin 2FA infra already in place
+- Existing security: encrypted SSN/NID/bank data, audit logs, RBAC, rate limiting infra
+
+Critical constraints:
+- Do not break existing APIs, routes, database schemas, or flows for drivers, customers, restaurants, parcels, payouts, or admin tools.
+- Preserve all current behavior (backward compatibility is mandatory).
+- No emojis in any code, comments, UI text, or documentation.
+- Follow the existing coding style, folder structure, and security helpers.
+
+Goal of Phase 2:
+Introduce advanced security controls in these areas:
+1) Admin 2FA enforcement and recovery
+2) Critical action dual-control (two-person rule)
+3) Device and session security
+4) Global rate limiting and abuse protection
+5) Security headers and browser-side defenses
+
+Implement the following tasks step by step:
+
+1. Admin 2FA Enforcement
+- Enforce 2FA for all admin roles (super-admin, admin, support).
+- If an admin account does not have 2FA configured:
+  - On login, force them into a "2FA setup required" flow with limited access.
+  - Allow access only to the 2FA setup and logout routes until setup is complete.
+- Store 2FA secrets and recovery codes using existing encryption helpers.
+- Ensure recovery codes are one-time use and properly audited in the AuditLog.
+- Update the login flow to clearly distinguish between:
+  - Password failed
+  - 2FA required
+  - 2FA code invalid
+
+2. Critical Action Dual-Control (Two-Person Rule)
+Introduce dual-approval for high-risk actions, using a new "ApprovalRequest" model.
+
+High-risk actions include at minimum:
+- Changing global commission settings
+- Issuing manual wallet adjustments above a configurable threshold
+- Changing KYC rules or document expiry policies in /admin/settings
+- Forcing account unlock for flagged drivers/restaurants/customers
+- Force-resetting admin 2FA for another admin account
+
+Data model (adjust to existing Prisma style):
+- id
+- createdAt, updatedAt
+- requesterId (admin who initiated the change)
+- approverId (admin who approved the change, nullable until approved)
+- actionType (string enum)
+- payload (JSON, safe and non-sensitive; IDs and status only)
+- status (pending/approved/rejected/expired)
+- reason (optional comment)
+- executedAt (when the change was actually applied)
+
+Behavior:
+- When a high-risk action is triggered:
+  - Do not apply it immediately.
+  - Create an ApprovalRequest with status="pending".
+  - Notify appropriate admins (for now, an entry in AuditLog plus a TODO hook for future email).
+- A different admin must approve:
+  - Enforce that requesterId != approverId.
+  - Only on approval should the underlying action execute.
+- All state changes must be logged into AuditLog with references to the ApprovalRequest id.
+- Provide a safe fallback so that missing dual-control does not break existing flows:
+  - For now, wire dual-control only around new endpoints and admin settings pages.
+  - Do not intercept core transactional flows for users.
+
+3. Device and Session Security
+- Introduce a "Session" or "AdminSession" model that tracks:
+  - id
+  - adminId
+  - createdAt, lastSeenAt
+  - ipAddress
+  - userAgent hash
+  - isActive
+- On admin login, create a session record and bind JWT tokens to that session.
+- Implement secure logout:
+  - Invalidate the session server-side.
+  - Ensure JWT tokens tied to that session are rejected on future requests.
+- Add an admin page "Active Sessions" (read-only for now) under the admin account/profile area:
+  - Show IP, approximate location (if existing helper available), createdAt, lastSeenAt, and userAgent summary.
+- Add backend checks:
+  - If isActive is false or session is revoked, reject the request and force re-login.
+  - Optional: if IP address or userAgent changes drastically for an active session, treat it as "suspicious" and require re-authentication or 2FA re-check.
+
+4. Global Rate Limiting and Abuse Protection
+The infrastructure for rate limiting already exists. Now:
+- Apply standardized rate limits to:
+  - Login endpoint (username + password)
+  - 2FA verification endpoint
+  - Password reset / recovery flows
+  - Public endpoints that can be spammed (e.g., signup, KYC submission)
+- Implement an IP and account-based limiter:
+  - Example: 5 failed login attempts per 15 minutes per email + IP.
+  - After the threshold, return a generic error and log an AuditLog event:
+    - actionType: LOGIN_RATE_LIMITED
+- Ensure rate limiting errors are handled gracefully on the frontend (no unhandled exceptions).
+- Do not break automated internal tests; use configuration flags (e.g., disable strict limits in test environment).
+
+5. Security Headers and Browser-Side Defenses
+On the backend HTTP layer, configure robust security headers:
+- Content-Security-Policy (CSP):
+  - Default to self for scripts/styles, plus known CDNs used by the app.
+  - Disable inline scripts where feasible or use nonces.
+- X-Frame-Options: DENY
+- X-Content-Type-Options: nosniff
+- Referrer-Policy: strict-origin-when-cross-origin
+- Strict-Transport-Security (HSTS) with a safe max-age setting (only if HTTPS is enforced).
+- X-XSS-Protection: 0 (modern browsers, but ensure CSP is strict enough).
+Ensure:
+- These headers are applied consistently across admin and user-facing apps.
+- No breaking changes in asset loading; adjust CSP only after validating which domains are needed.
+
+Throughout implementation:
+- Reuse existing helpers and patterns wherever possible.
+- Add or update unit/integration tests for critical paths (login, 2FA, approvals).
+- Update audit logging to capture:
+  - 2FA setup and recovery code usage (without logging the actual codes).
+  - Dual-control approvals and rejections.
+  - Session revocations and forced logouts.
+
+Finally, update replit.md:
+- Add a new "Security Phase 2" section summarizing all changes.
+- Document how dual-control works, how to configure rate limits, and how admin sessions/2FA enforcement behave.
+- Confirm that all changes are backward compatible and production-ready.

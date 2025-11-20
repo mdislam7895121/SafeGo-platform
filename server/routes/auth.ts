@@ -348,11 +348,14 @@ router.post("/login", async (req, res, next) => {
         id: user.id,
         email: user.email,
         role: user.role,
-        adminProfile: user.adminProfile,
+        adminProfile: {
+          adminRole: user.adminProfile.adminRole,
+          isActive: user.adminProfile.isActive
+        }
       });
       
       // Reset login attempts on successful admin authentication
-      await resetLoginAttempts(req);
+      await resetLoginAttempts(req, res);
     }
 
     res.json(response);

@@ -56,7 +56,7 @@ export async function verifyTwoFactorToken(
 export async function enableTwoFactor(
   adminId: string,
   encryptedSecret: string
-): Promise<void> {
+): Promise<string[]> {
   const recoveryCodes = generateRecoveryCodes(8);
   const encryptedRecoveryCodes = encryptSensitive(JSON.stringify(recoveryCodes));
 
@@ -68,6 +68,8 @@ export async function enableTwoFactor(
       twoFactorRecoveryCodes_encrypted: encryptedRecoveryCodes
     }
   });
+
+  return recoveryCodes;
 }
 
 export async function disableTwoFactor(adminId: string): Promise<void> {

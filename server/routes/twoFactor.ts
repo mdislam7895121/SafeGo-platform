@@ -7,7 +7,8 @@ import {
   enableTwoFactor,
   disableTwoFactor,
   isTwoFactorEnabled,
-  getTwoFactorSecret
+  getTwoFactorSecret,
+  verifyRecoveryCode
 } from '../services/twoFactorService';
 import { logAuditEvent } from '../utils/audit';
 import { getClientIp } from '../utils/ip';
@@ -133,7 +134,7 @@ router.post(
         return res.status(400).json({ error: 'Invalid token' });
       }
 
-      await enableTwoFactor(adminId, pendingSecret);
+      const recoveryCodes = await enableTwoFactor(adminId, pendingSecret);
       
       await prisma.adminProfile.update({
         where: { userId: adminId },
@@ -151,12 +152,14 @@ router.post(
         actionType: 'ADMIN_2FA_ENABLED',
         entityType: 'admin_profile',
         entityId: adminId,
-        description: `Admin ${email} enabled 2FA`
+        description: `Admin ${email} enabled 2FA`,
+        metadata: { recoveryCodesGenerated: recoveryCodes.length }
       });
 
       res.json({ 
         success: true, 
-        message: '2FA has been enabled successfully' 
+        message: '2FA has been enabled successfully',
+        recoveryCodes
       });
     } catch (error) {
       console.error('Error enabling 2FA:', error);
@@ -226,6 +229,83 @@ router.get(
     } catch (error) {
       console.error('Error checking 2FA status:', error);
       res.status(500).json({ error: 'Failed to check 2FA status' });
+    }
+  }
+);
+
+router.post(
+  '/recovery',
+  authenticateToken,
+  requireAdmin(),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      const { code } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: 'Recovery code is required' });
+      }
+
+      const adminId = req.user!.id;
+      const email = req.user!.email;
+
+      const isValid = await verifyRecoveryCode(adminId, code);
+      
+      if (!isValid) {
+        await logAuditEvent({
+          actorId: adminId,
+          actorEmail: email,
+          actorRole: 'admin',
+          ipAddress: getClientIp(req),
+          actionType: 'ADMIN_2FA_RECOVERY_FAILED',
+          entityType: 'admin_profile',
+          entityId: adminId,
+          description: `Admin ${email} failed recovery code verification`,
+          success: false
+        });
+
+        return res.status(400).json({ error: 'Invalid or already used recovery code' });
+      }
+
+      const adminProfile = await prisma.adminProfile.findUnique({
+        where: { userId: adminId },
+        select: { twoFactorRecoveryCodes_encrypted: true }
+      });
+
+      let remainingCodes = 0;
+      if (adminProfile?.twoFactorRecoveryCodes_encrypted) {
+        try {
+          const { decryptSensitive } = await import('../utils/crypto');
+          const recoveryCodesJson = decryptSensitive(
+            adminProfile.twoFactorRecoveryCodes_encrypted
+          );
+          if (recoveryCodesJson) {
+            const recoveryCodes: string[] = JSON.parse(recoveryCodesJson);
+            remainingCodes = recoveryCodes.length;
+          }
+        } catch (error) {
+          console.error('Error counting remaining recovery codes:', error);
+        }
+      }
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: email,
+        actorRole: 'admin',
+        ipAddress: getClientIp(req),
+        actionType: 'ADMIN_2FA_RECOVERY_USED',
+        entityType: 'admin_profile',
+        entityId: adminId,
+        description: `Admin ${email} used recovery code for 2FA`,
+        metadata: { remainingCodes }
+      });
+
+      res.json({ 
+        success: true, 
+        message: 'Recovery code verified successfully',
+        remainingCodes
+      });
+    } catch (error) {
+      console.error('Error verifying recovery code:', error);
+      res.status(500).json({ error: 'Failed to verify recovery code' });
     }
   }
 );
