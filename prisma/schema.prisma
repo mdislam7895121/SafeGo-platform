@@ -378,3 +378,25 @@ model Vehicle {
 
   @@map("vehicles")
 }
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  createdAt   DateTime @default(now())
+  actorId     String?
+  actorEmail  String
+  actorRole   String
+  ipAddress   String?
+  actionType  String
+  entityType  String
+  entityId    String?
+  description String
+  metadata    Json?
+  success     Boolean  @default(true)
+
+  @@index([createdAt])
+  @@index([actorEmail])
+  @@index([actionType])
+  @@index([entityType])
+  @@index([success])
+  @@map("audit_logs")
+}
