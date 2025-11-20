@@ -712,7 +712,9 @@ model Payout {
   createdByAdminId    String?
   processedAt         DateTime?
   externalReferenceId String?
+  batchId             String?
   wallet              Wallet        @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  batch               PayoutBatch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
   @@index([walletId])
   @@index([ownerType])
@@ -720,5 +722,33 @@ model Payout {
   @@index([countryCode])
   @@index([createdAt])
   @@index([ownerType, ownerId])
+  @@index([batchId])
   @@map("payouts")
+}
+
+enum PayoutBatchStatus {
+  created
+  processing
+  completed
+  partially_failed
+  failed
+}
+
+model PayoutBatch {
+  id                String             @id @default(uuid())
+  batchType         WalletOwnerType?
+  periodStart       DateTime
+  periodEnd         DateTime
+  totalPayoutCount  Int                @default(0)
+  totalPayoutAmount Decimal            @default(0) @db.Decimal(12, 2)
+  status            PayoutBatchStatus  @default(created)
+  createdByAdminId  String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  payouts           Payout[]
+
+  @@index([status])
+  @@index([createdByAdminId])
+  @@index([createdAt])
+  @@map("payout_batches")
 }
