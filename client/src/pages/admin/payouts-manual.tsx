@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
-import { ArrowLeft, DollarSign, Search, AlertTriangle } from "lucide-react";
+import { ArrowLeft, DollarSign, Search, AlertTriangle, AlertCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Dialog,
@@ -43,6 +44,7 @@ interface Wallet {
 export default function AdminPayoutsManual() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { token, logout } = useAuth();
   const [ownerTypeFilter, setOwnerTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWallet, setSelectedWallet] = useState<Wallet | null>(null);
@@ -50,12 +52,36 @@ export default function AdminPayoutsManual() {
   const [payoutAmount, setPayoutAmount] = useState("");
   const [payoutReason, setPayoutReason] = useState("");
 
-  // Fetch admin capabilities for RBAC
-  const { data: capabilitiesData } = useQuery<{ capabilities: string[] }>({
-    queryKey: ["/api/admin/capabilities"],
+  // Fetch admin capabilities for RBAC with improved error handling
+  const { data: capabilitiesData, error: capabilitiesError, isPending: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
+    queryKey: ["/api/admin/capabilities", token],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/capabilities", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw Object.assign(new Error("Unauthorized"), { status: 401 });
+        }
+        throw new Error("Failed to fetch capabilities");
+      }
+      
+      return response.json();
+    },
+    enabled: !!token,
+    onError: (error: any) => {
+      if (error?.status === 401) {
+        logout();
+      }
+    },
   });
+
   const capabilities = capabilitiesData?.capabilities || [];
-  const canManagePayouts = capabilities.includes("CREATE_MANUAL_PAYOUT");
+  const hasAccess = capabilities.includes("CREATE_MANUAL_PAYOUT");
+  const hasCapabilitiesError = !isLoadingCapabilities && capabilitiesError && (capabilitiesError as any)?.status !== 401;
 
   // Fetch wallets
   const queryParams = new URLSearchParams();
@@ -65,7 +91,7 @@ export default function AdminPayoutsManual() {
 
   const { data: walletsData, isLoading } = useQuery<{ wallets: Wallet[] }>({
     queryKey: [fullUrl],
-    enabled: canManagePayouts,
+    enabled: hasAccess,
   });
 
   // Manual payout mutation
@@ -146,7 +172,20 @@ export default function AdminPayoutsManual() {
     );
   }) || [];
 
-  if (!canManagePayouts) {
+  // Loading state
+  if (isLoadingCapabilities) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No access (only if capabilities loaded successfully and user doesn't have permission)
+  if (!hasAccess && !hasCapabilitiesError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <Card className="max-w-md">
@@ -188,6 +227,25 @@ export default function AdminPayoutsManual() {
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Error Banner */}
+        {hasCapabilitiesError && (
+          <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    Unable to verify permissions
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    Some features may not work correctly. Please refresh the page.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Warning Card */}
         <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
           <CardContent className="p-4">
