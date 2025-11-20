@@ -892,6 +892,48 @@ router.get("/settlement/overview", async (req: AuthRequest, res) => {
       walletsNeedingSettlement: restaurantWallets.filter(w => Number(w.negativeBalance) > 0).length,
     };
 
+    // Get parcel commission stats (from deliveries)
+    const completedDeliveries = await prisma.delivery.findMany({
+      where: {
+        status: "delivered",
+      },
+      select: {
+        safegoCommission: true,
+        driverId: true,
+      },
+    });
+
+    const totalParcelCommission = completedDeliveries.reduce(
+      (sum, d) => sum + Number(d.safegoCommission),
+      0
+    );
+
+    // Approximate pending parcel commission using driver negative balances
+    // Note: This is an approximation since drivers handle multiple service types
+    const parcelDriverIds = [...new Set(completedDeliveries.map(d => d.driverId).filter(Boolean))];
+    const parcelDriverWallets = parcelDriverIds.length > 0 
+      ? await prisma.driverWallet.findMany({
+          where: {
+            driverId: {
+              in: parcelDriverIds as string[],
+            },
+            negativeBalance: { gt: 0 },
+          },
+        })
+      : [];
+
+    const parcelPendingCommission = parcelDriverWallets.reduce(
+      (sum, w) => sum + Number(w.negativeBalance),
+      0
+    );
+
+    const parcelStats = {
+      totalDeliveries: completedDeliveries.length,
+      totalCommission: totalParcelCommission,
+      pendingCommission: Math.min(parcelPendingCommission, totalParcelCommission),
+      walletsNeedingSettlement: parcelDriverWallets.length,
+    };
+
     // Calculate overall platform stats
     const totalPendingSettlement = driverStats.totalPendingSettlement + restaurantStats.totalPendingSettlement;
     const totalWalletsNeedingSettlement = driverStats.walletsNeedingSettlement + restaurantStats.walletsNeedingSettlement;
@@ -899,6 +941,7 @@ router.get("/settlement/overview", async (req: AuthRequest, res) => {
     res.json({
       driver: driverStats,
       restaurant: restaurantStats,
+      parcel: parcelStats,
       overall: {
         totalPendingSettlement,
         totalWalletsNeedingSettlement,
@@ -5222,6 +5265,252 @@ router.post("/documents/restaurants/:id/reject", async (req: AuthRequest, res) =
   } catch (error) {
     console.error("Reject restaurant documents error:", error);
     res.status(500).json({ error: "Failed to reject restaurant documents" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/restaurants/commission-summary
+// Get restaurant commission summary with filters (efficient aggregation)
+// ====================================================
+router.get("/restaurants/commission-summary", async (req: AuthRequest, res) => {
+  try {
+    const { country, dateRange } = req.query;
+    
+    // Calculate date filter
+    let dateFilter: any = undefined;
+    if (dateRange === "7days") {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      dateFilter = { gte: sevenDaysAgo };
+    } else if (dateRange === "30days") {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      dateFilter = { gte: thirtyDaysAgo };
+    }
+
+    // Build where clause for restaurants
+    const restaurantWhere: any = {};
+    if (country && country !== "all") {
+      restaurantWhere.user = {
+        countryCode: country,
+      };
+    }
+
+    // Get all restaurants with their wallet info in a single query
+    const restaurants = await prisma.restaurantProfile.findMany({
+      where: restaurantWhere,
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+            email: true,
+          },
+        },
+        restaurantWallet: {
+          select: {
+            balance: true,
+            negativeBalance: true,
+          },
+        },
+      },
+    });
+
+    // Get all food orders in a single aggregation query grouped by restaurant
+    const ordersWhere: any = {
+      status: "delivered",
+      ...(dateFilter && { createdAt: dateFilter }),
+    };
+
+    if (country && country !== "all") {
+      // Filter by restaurant country
+      ordersWhere.restaurant = {
+        user: {
+          countryCode: country,
+        },
+      };
+    }
+
+    const orderStats = await prisma.foodOrder.groupBy({
+      by: ['restaurantId'],
+      where: ordersWhere,
+      _sum: {
+        serviceFare: true,
+        restaurantPayout: true,
+        safegoCommission: true,
+      },
+      _count: {
+        id: true,
+      },
+    });
+
+    // Create a map of restaurant order stats for quick lookup
+    const orderStatsMap = new Map(
+      orderStats.map(stat => [
+        stat.restaurantId,
+        {
+          count: stat._count.id || 0,
+          earnings: Number(stat._sum.restaurantPayout || 0),
+          commission: Number(stat._sum.safegoCommission || 0),
+        }
+      ])
+    );
+
+    // Combine restaurant data with order stats
+    const restaurantSummaries = restaurants.map(restaurant => {
+      const stats = orderStatsMap.get(restaurant.id) || { count: 0, earnings: 0, commission: 0 };
+      const walletBalance = Number(restaurant.restaurantWallet?.balance || 0);
+      const negativeBalance = Number(restaurant.restaurantWallet?.negativeBalance || 0);
+
+      // Commission Paid = Total Commission - Negative Balance (pending)
+      const commissionPaid = Math.max(0, stats.commission - negativeBalance);
+      const commissionPending = negativeBalance;
+
+      return {
+        restaurantId: restaurant.id,
+        restaurantName: restaurant.restaurantName,
+        email: restaurant.user.email,
+        countryCode: restaurant.user.countryCode,
+        totalOrders: stats.count,
+        totalEarnings: stats.earnings,
+        totalCommission: stats.commission,
+        commissionPaid,
+        commissionPending,
+        walletBalance,
+      };
+    });
+
+    res.json({ restaurants: restaurantSummaries });
+  } catch (error) {
+    console.error("Restaurant commission summary error:", error);
+    res.status(500).json({ error: "Failed to fetch restaurant commission summary" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/parcels/commission-summary  
+// Get parcel commission summary with filters
+// ====================================================
+router.get("/parcels/commission-summary", async (req: AuthRequest, res) => {
+  try {
+    const { country, dateRange } = req.query;
+    
+    // Calculate date filter
+    let dateFilter: any = undefined;
+    if (dateRange === "7days") {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      dateFilter = { gte: sevenDaysAgo };
+    } else if (dateRange === "30days") {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      dateFilter = { gte: thirtyDaysAgo };
+    }
+
+    // Get all completed deliveries
+    const deliveryWhere: any = {
+      status: "delivered",
+      ...(dateFilter && { createdAt: dateFilter }),
+    };
+
+    // If country filter is specified, join with customer to filter by country
+    let deliveries;
+    if (country && country !== "all") {
+      deliveries = await prisma.delivery.findMany({
+        where: deliveryWhere,
+        include: {
+          customer: {
+            include: {
+              user: {
+                select: {
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      
+      // Filter by country code
+      deliveries = deliveries.filter(d => d.customer.user?.countryCode === country);
+    } else {
+      deliveries = await prisma.delivery.findMany({
+        where: deliveryWhere,
+        include: {
+          customer: {
+            include: {
+              user: {
+                select: {
+                  countryCode: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // Calculate aggregates
+    const totalParcels = deliveries.length;
+    const totalParcelRevenue = deliveries.reduce(
+      (sum, d) => sum + Number(d.serviceFare), 
+      0
+    );
+    const totalParcelCommission = deliveries.reduce(
+      (sum, d) => sum + Number(d.safegoCommission), 
+      0
+    );
+
+    // For "commission collected", we need to check driver wallets
+    // The negative balance represents commission not yet collected
+    const driverIds = [...new Set(deliveries.map(d => d.driverId).filter(Boolean))];
+    const driverWallets = await prisma.driverWallet.findMany({
+      where: {
+        driverId: {
+          in: driverIds as string[],
+        },
+      },
+      select: {
+        negativeBalance: true,
+      },
+    });
+
+    // Sum up all negative balances from these drivers
+    // Note: This is an approximation as drivers might have negative balances from rides/food too
+    // For a more accurate calculation, we'd need a transaction ledger system
+    const totalNegativeBalance = driverWallets.reduce(
+      (sum, w) => sum + Number(w.negativeBalance),
+      0
+    );
+
+    // Commission collected = total commission - pending (approximation)
+    const commissionCollected = Math.max(0, totalParcelCommission - totalNegativeBalance);
+    const commissionPending = Math.min(totalNegativeBalance, totalParcelCommission);
+
+    // Group by country
+    const byCountry: Record<string, { parcels: number; revenue: number; commission: number }> = {};
+    deliveries.forEach(d => {
+      const countryCode = d.customer.user?.countryCode || "UNKNOWN";
+      if (!byCountry[countryCode]) {
+        byCountry[countryCode] = { parcels: 0, revenue: 0, commission: 0 };
+      }
+      byCountry[countryCode].parcels += 1;
+      byCountry[countryCode].revenue += Number(d.serviceFare);
+      byCountry[countryCode].commission += Number(d.safegoCommission);
+    });
+
+    res.json({
+      summary: {
+        totalParcels,
+        totalParcelRevenue,
+        totalParcelCommission,
+        commissionCollected,
+        commissionPending,
+      },
+      byCountry,
+    });
+  } catch (error) {
+    console.error("Parcel commission summary error:", error);
+    res.status(500).json({ error: "Failed to fetch parcel commission summary" });
   }
 });
 

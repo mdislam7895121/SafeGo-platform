@@ -44,6 +44,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 interface OverviewStats {
   driver: {
@@ -105,6 +111,34 @@ interface TransactionHistory {
   }>;
 }
 
+interface RestaurantSummary {
+  restaurantId: string;
+  restaurantName: string;
+  email: string;
+  countryCode: string;
+  totalOrders: number;
+  totalEarnings: number;
+  totalCommission: number;
+  commissionPaid: number;
+  commissionPending: number;
+  walletBalance: number;
+}
+
+interface ParcelSummary {
+  summary: {
+    totalParcels: number;
+    totalParcelRevenue: number;
+    totalParcelCommission: number;
+    commissionCollected: number;
+    commissionPending: number;
+  };
+  byCountry: Record<string, {
+    parcels: number;
+    revenue: number;
+    commission: number;
+  }>;
+}
+
 export default function AdminSettlement() {
   const { toast } = useToast();
   const [selectedWallet, setSelectedWallet] = useState<PendingWallet | null>(null);
@@ -112,6 +146,10 @@ export default function AdminSettlement() {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [settleDialogOpen, setSettleDialogOpen] = useState(false);
   const [filterType, setFilterType] = useState<string>("all");
+  
+  // Analytics filters
+  const [analyticsCountry, setAnalyticsCountry] = useState<string>("all");
+  const [analyticsDateRange, setAnalyticsDateRange] = useState<string>("all");
 
   // Fetch overview stats
   const { data: overview, isLoading: overviewLoading } = useQuery<OverviewStats>({
@@ -135,6 +173,24 @@ export default function AdminSettlement() {
       selectedWallet?.walletId,
     ],
     enabled: !!selectedWallet && historyDialogOpen,
+  });
+
+  // Fetch restaurant commission summary
+  const { data: restaurantData, isLoading: restaurantLoading } = useQuery<{ restaurants: RestaurantSummary[] }>({
+    queryKey: [
+      "/api/admin/restaurants/commission-summary",
+      { country: analyticsCountry, dateRange: analyticsDateRange }
+    ],
+    refetchInterval: 30000,
+  });
+
+  // Fetch parcel commission summary  
+  const { data: parcelData, isLoading: parcelLoading } = useQuery<ParcelSummary>({
+    queryKey: [
+      "/api/admin/parcels/commission-summary",
+      { country: analyticsCountry, dateRange: analyticsDateRange }
+    ],
+    refetchInterval: 30000,
   });
 
   // Settlement mutation
@@ -315,6 +371,27 @@ export default function AdminSettlement() {
               </p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Parcel Settlements
+              </CardTitle>
+              <Package className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              {overviewLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <div className="text-2xl font-bold" data-testid="text-parcel-pending">
+                  ${overview?.parcel?.pendingCommission?.toFixed(2) || "0.00"}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-1">
+                {overview?.parcel?.totalDeliveries || 0} deliveries
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Pending Settlements Table */}
@@ -468,6 +545,235 @@ export default function AdminSettlement() {
                 </ol>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Restaurant & Parcel Analytics */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <CardTitle>Commission Analytics</CardTitle>
+                <CardDescription>
+                  Detailed breakdown of restaurant and parcel commission data
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={analyticsCountry} onValueChange={setAnalyticsCountry}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-analytics-country">
+                    <SelectValue placeholder="Country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Countries</SelectItem>
+                    <SelectItem value="BD">Bangladesh</SelectItem>
+                    <SelectItem value="US">United States</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={analyticsDateRange} onValueChange={setAnalyticsDateRange}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-analytics-daterange">
+                    <SelectValue placeholder="Date Range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="7days">Last 7 Days</SelectItem>
+                    <SelectItem value="30days">Last 30 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="restaurants" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="restaurants" data-testid="tab-restaurants">
+                  <Store className="h-4 w-4 mr-2" />
+                  Restaurants
+                </TabsTrigger>
+                <TabsTrigger value="parcels" data-testid="tab-parcels">
+                  <Package className="h-4 w-4 mr-2" />
+                  Parcels
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Restaurants Tab */}
+              <TabsContent value="restaurants" className="mt-6">
+                {restaurantLoading ? (
+                  <div className="space-y-2">
+                    {[...Array(5)].map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : !restaurantData?.restaurants || restaurantData.restaurants.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Store className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium">No data available</p>
+                    <p className="text-sm text-muted-foreground">
+                      No restaurant commission data found for the selected filters
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Restaurant</TableHead>
+                          <TableHead>Country</TableHead>
+                          <TableHead className="text-right">Orders</TableHead>
+                          <TableHead className="text-right">Earnings</TableHead>
+                          <TableHead className="text-right">Commission</TableHead>
+                          <TableHead className="text-right">Paid</TableHead>
+                          <TableHead className="text-right">Pending</TableHead>
+                          <TableHead className="text-right">Balance</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {restaurantData.restaurants.map((restaurant) => (
+                          <TableRow key={restaurant.restaurantId} data-testid={`row-restaurant-${restaurant.restaurantId}`}>
+                            <TableCell>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{restaurant.restaurantName}</span>
+                                <span className="text-xs text-muted-foreground">{restaurant.email}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{restaurant.countryCode}</Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{restaurant.totalOrders}</TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-green-600 font-medium">
+                                ${restaurant.totalEarnings.toFixed(2)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-blue-600 font-medium">
+                                ${restaurant.totalCommission.toFixed(2)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${restaurant.commissionPaid.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className="text-orange-600 font-bold">
+                                ${restaurant.commissionPending.toFixed(2)}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              ${restaurant.walletBalance.toFixed(2)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Link href={`/admin/restaurants/${restaurant.restaurantId}`}>
+                                <Button variant="outline" size="sm" data-testid={`button-view-${restaurant.restaurantId}`}>
+                                  <Eye className="h-3 w-3 mr-1" />
+                                  View
+                                </Button>
+                              </Link>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Parcels Tab */}
+              <TabsContent value="parcels" className="mt-6">
+                {parcelLoading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-40 w-full" />
+                  </div>
+                ) : !parcelData?.summary ? (
+                  <div className="text-center py-12">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-lg font-medium">No data available</p>
+                    <p className="text-sm text-muted-foreground">
+                      No parcel commission data found for the selected filters
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Summary Metrics */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <Card>
+                        <CardContent className="pt-6">
+                          <p className="text-sm text-muted-foreground mb-1">Total Parcels</p>
+                          <p className="text-2xl font-bold" data-testid="text-total-parcels">
+                            {parcelData.summary.totalParcels}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
+                          <p className="text-2xl font-bold text-green-600" data-testid="text-parcel-revenue">
+                            ${parcelData.summary.totalParcelRevenue.toFixed(2)}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <p className="text-sm text-muted-foreground mb-1">Total Commission</p>
+                          <p className="text-2xl font-bold text-blue-600" data-testid="text-parcel-total-commission">
+                            ${parcelData.summary.totalParcelCommission.toFixed(2)}
+                          </p>
+                        </CardContent>
+                      </Card>
+                      <Card>
+                        <CardContent className="pt-6">
+                          <p className="text-sm text-muted-foreground mb-1">Commission Pending</p>
+                          <p className="text-2xl font-bold text-orange-600" data-testid="text-parcel-pending-commission">
+                            ${parcelData.summary.commissionPending.toFixed(2)}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* By Country Breakdown */}
+                    {Object.keys(parcelData.byCountry).length > 0 && (
+                      <div>
+                        <h3 className="font-semibold mb-3">Breakdown by Country</h3>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Country</TableHead>
+                                <TableHead className="text-right">Parcels</TableHead>
+                                <TableHead className="text-right">Revenue</TableHead>
+                                <TableHead className="text-right">Commission</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {Object.entries(parcelData.byCountry).map(([country, stats]) => (
+                                <TableRow key={country} data-testid={`row-country-${country}`}>
+                                  <TableCell>
+                                    <Badge variant="outline">
+                                      {country === "BD" ? "Bangladesh" : country === "US" ? "USA" : country}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">{stats.parcels}</TableCell>
+                                  <TableCell className="text-right">
+                                    <span className="text-green-600 font-medium">
+                                      ${stats.revenue.toFixed(2)}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <span className="text-blue-600 font-medium">
+                                      ${stats.commission.toFixed(2)}
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>

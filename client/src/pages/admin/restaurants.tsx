@@ -171,7 +171,8 @@ export default function AdminRestaurants() {
                       <th className="text-left p-3 font-semibold">Country</th>
                       <th className="text-left p-3 font-semibold">KYC</th>
                       <th className="text-left p-3 font-semibold">Status</th>
-                      <th className="text-left p-3 font-semibold">Wallet</th>
+                      <th className="text-right p-3 font-semibold">Commission Pending</th>
+                      <th className="text-right p-3 font-semibold">Wallet Balance</th>
                       <th className="text-left p-3 font-semibold">Orders</th>
                       <th className="text-left p-3 font-semibold">Actions</th>
                     </tr>
@@ -209,17 +210,15 @@ export default function AdminRestaurants() {
                         <td className="p-3">
                           {getStatusBadge(restaurant)}
                         </td>
-                        <td className="p-3">
-                          <div className="text-sm">
-                            <p className="text-green-600 font-medium" data-testid={`text-balance-${restaurant.id}`}>
-                              ${Number(restaurant.balance).toFixed(2)}
-                            </p>
-                            {restaurant.negativeBalance > 0 && (
-                              <p className="text-red-600 text-xs">
-                                Owed: ${Number(restaurant.negativeBalance).toFixed(2)}
-                              </p>
-                            )}
-                          </div>
+                        <td className="p-3 text-right">
+                          <p className={`text-sm font-medium ${restaurant.negativeBalance > 0 ? 'text-orange-600' : 'text-muted-foreground'}`} data-testid={`text-pending-${restaurant.id}`}>
+                            ${Number(restaurant.negativeBalance || 0).toFixed(2)}
+                          </p>
+                        </td>
+                        <td className="p-3 text-right">
+                          <p className="text-sm text-green-600 font-medium" data-testid={`text-balance-${restaurant.id}`}>
+                            ${Number(restaurant.balance || 0).toFixed(2)}
+                          </p>
                         </td>
                         <td className="p-3">
                           <p className="text-sm" data-testid={`text-orders-${restaurant.id}`}>

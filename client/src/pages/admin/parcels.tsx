@@ -45,6 +45,7 @@ export default function AdminParcels() {
   const [countryFilter, setCountryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [dateRange, setDateRange] = useState<string>("all");
 
   // Parse URL query parameters on mount
   useEffect(() => {
@@ -74,6 +75,24 @@ export default function AdminParcels() {
   const { data, isLoading } = useQuery<ParcelsResponse>({
     queryKey: [fullUrl],
     refetchInterval: 5000, // Auto-refresh every 5 seconds
+  });
+
+  // Fetch parcel commission summary
+  const { data: commissionData, isLoading: commissionLoading } = useQuery<{
+    summary: {
+      totalParcels: number;
+      totalParcelRevenue: number;
+      totalParcelCommission: number;
+      commissionCollected: number;
+      commissionPending: number;
+    };
+    byCountry: Record<string, { parcels: number; revenue: number; commission: number }>;
+  }>({
+    queryKey: [
+      "/api/admin/parcels/commission-summary",
+      { country: countryFilter === "all" ? undefined : countryFilter, dateRange }
+    ],
+    refetchInterval: 30000,
   });
 
   const getStatusBadge = (status: string) => {
@@ -152,7 +171,7 @@ export default function AdminParcels() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <Select value={countryFilter} onValueChange={(value) => { setCountryFilter(value); setCurrentPage(1); }}>
                 <SelectTrigger data-testid="select-country">
                   <SelectValue placeholder="All Countries" />
@@ -161,6 +180,17 @@ export default function AdminParcels() {
                   <SelectItem value="all">All Countries</SelectItem>
                   <SelectItem value="BD">Bangladesh</SelectItem>
                   <SelectItem value="US">United States</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger data-testid="select-daterange">
+                  <SelectValue placeholder="Date Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Time</SelectItem>
+                  <SelectItem value="7days">Last 7 Days</SelectItem>
+                  <SelectItem value="30days">Last 30 Days</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -181,6 +211,79 @@ export default function AdminParcels() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Commission Summary */}
+        {commissionLoading ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Commission Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : commissionData?.summary ? (
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <CardTitle className="text-lg">Commission Overview</CardTitle>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {countryFilter !== "all" && (
+                    <Badge variant="outline">
+                      {countryFilter === "BD" ? "Bangladesh" : "USA"}
+                    </Badge>
+                  )}
+                  {dateRange !== "all" && (
+                    <Badge variant="secondary">
+                      {dateRange === "7days" ? "Last 7 Days" : "Last 30 Days"}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Total Parcels</p>
+                  <p className="text-2xl font-bold" data-testid="text-total-parcels">
+                    {commissionData.summary.totalParcels}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Commission Pending</p>
+                  <p className="text-2xl font-bold text-orange-600" data-testid="text-commission-pending">
+                    ${commissionData.summary.commissionPending.toFixed(2)}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Commission Collected</p>
+                  <p className="text-2xl font-bold text-green-600" data-testid="text-commission-collected">
+                    ${commissionData.summary.commissionCollected.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Commission Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8" data-testid="empty-commission-summary">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg font-medium">No commission data available</p>
+                <p className="text-sm text-muted-foreground">
+                  No parcel deliveries found for the selected filters
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Statistics */}
         {data && (
