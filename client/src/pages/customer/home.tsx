@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { Car, Package, UtensilsCrossed, User, Clock } from "lucide-react";
+import { Car, Package, UtensilsCrossed, User, Clock, HelpCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -115,6 +115,12 @@ export default function CustomerHome() {
           <Button variant="ghost" size="sm" className="flex flex-col gap-1 h-auto" data-testid="nav-activity">
             <Clock className="h-5 w-5" />
             <span className="text-xs">Activity</span>
+          </Button>
+        </Link>
+        <Link href="/customer/support">
+          <Button variant="ghost" size="sm" className="flex flex-col gap-1 h-auto" data-testid="nav-support">
+            <HelpCircle className="h-5 w-5" />
+            <span className="text-xs">Support</span>
           </Button>
         </Link>
         <Link href="/customer/profile">
