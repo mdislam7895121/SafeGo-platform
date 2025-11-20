@@ -60,10 +60,25 @@ export default function AdminHome() {
   }, 0) || 0;
 
   // Fetch admin capabilities for RBAC
-  const { data: capabilitiesData } = useQuery<{ capabilities: string[] }>({
+  const { data: capabilitiesData, error: capabilitiesError, isLoading: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
     queryKey: ["/api/admin/capabilities"],
   });
+  
+  // Auto-logout on auth failure (invalid/expired token)
+  if (capabilitiesError && (capabilitiesError as any).message?.includes("401")) {
+    console.error("❌ Admin capabilities fetch failed - auto-logging out:", capabilitiesError);
+    logout();
+  }
+  
   const capabilities = capabilitiesData?.capabilities || [];
+  
+  // Debug logging for capabilities
+  if (capabilitiesData) {
+    console.log("✅ Admin capabilities loaded:", capabilities);
+    console.log(`📊 Total admin sections: 15, Capability-protected sections: 6`);
+  } else if (isLoadingCapabilities) {
+    console.log("⏳ Loading admin capabilities...");
+  }
 
   const adminSections = [
     {

@@ -1,0 +1,61 @@
+You recently added the /api/admin/capabilities endpoint and said all 15 admin dashboard cards are wired with RBAC, but on my side only the 9 core management cards are visible now.
+
+Missing RBAC-protected cards on /admin:
+10. Wallets → /admin/wallets (VIEW_WALLETS)
+11. Payouts → /admin/payouts (MANAGE_PAYOUTS)
+12. Earnings Analytics → /admin/earnings (VIEW_EARNINGS_DASHBOARD)
+13. System Monitoring → /admin/monitoring (VIEW_DASHBOARD)
+14. Security Threat Center → /admin/security-center (VIEW_DASHBOARD)
+15. Support Chat → /admin/support-chat (VIEW_SUPPORT_CONVERSATIONS)
+
+What I see in the UI now:
+- Core stats cards (Total Users, Total Drivers, Active Drivers, Customers, Restaurants)
+- Driver Statistics cards
+- Parcel Delivery Statistics cards
+- Management section: Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings
+- NONE of the 6 RBAC-protected cards above appear anymore on desktop or mobile.
+
+Assume I am logged in as SUPER_ADMIN. I already:
+- Logged out and logged back in
+- Opened the same /admin URL on laptop and mobile
+
+Please fully debug and FIX this without removing any existing security or financial logic:
+
+1. Call GET /api/admin/capabilities in the running app and show the JSON response.
+   - Confirm that the SUPER_ADMIN user actually has:
+     VIEW_WALLETS,
+     MANAGE_PAYOUTS,
+     VIEW_EARNINGS_DASHBOARD,
+     VIEW_DASHBOARD,
+     VIEW_SUPPORT_CONVERSATIONS.
+
+2. Open client/src/pages/admin/home.tsx:
+   - Inspect the adminSections array and any filtering logic that uses capabilities.
+   - Verify that each of the 6 missing cards checks the correct permission name (no typos or mismatched strings).
+
+3. Check the RBAC/permissions implementation in the backend:
+   - Where are these permissions defined?
+   - How are they attached to the SUPER_ADMIN role or seeding logic?
+   - Confirm that the same exact strings are returned in /api/admin/capabilities.
+
+4. Verify there is no environment mismatch:
+   - Make sure /api/admin/capabilities is called from the same base URL/domain as the /admin page.
+   - Ensure there is no old JWT token or different origin breaking the capability check.
+
+5. Check for responsive / mobile UI issues:
+   - Confirm there is no CSS or layout logic that hides the financial/security/support cards on smaller screens.
+
+6. Implement the fix:
+   - If permission names are wrong, align them on both backend and frontend.
+   - If SUPER_ADMIN is missing some permissions, update the role/seed so SUPER_ADMIN gets ALL admin capabilities.
+   - Make sure the /api/admin/capabilities response includes all required permissions.
+
+7. Rebuild and restart the app.
+   - Then verify on /admin that ALL 15 cards appear again for SUPER_ADMIN on both desktop and mobile.
+   - Take a screenshot after the cards are visible.
+   - Update replit.md with:
+     - root cause
+     - exact code changes
+     - final list of all 15 cards + their required permissions.
+
+Do NOT remove or downgrade any existing security phases (Steps 40–47) or financial suite logic. Only fix the RBAC/capabilities so the admin dashboard cards display correctly for SUPER_ADMIN.

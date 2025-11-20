@@ -33,7 +33,18 @@ Key features include:
 - **DevOps Security Enhancements**: Enterprise-grade DevOps security service featuring automated log rotation, background job failure monitoring, crash alert webhooks, backup encryption/decryption, auto-scaling firewall rules, and system health checks.
 - **Automated Incident Response**: Fully automated incident response system implementing auto-locking of suspicious users, token revocation, session invalidation, admin breach alerts, automated fraud response, and full audit trails.
 - **Admin Financial Suite**: Comprehensive financial management suite with dedicated admin pages for Wallets, Payouts, and Earnings, providing end-to-end financial visibility and control with full RBAC enforcement.
-- **Admin Dashboard Cards**: The admin dashboard (`/admin`) displays 15 management cards with proper RBAC enforcement covering core management, financial, security, and support functionalities. Fixed capabilities fetching to use `/api/admin/capabilities` instead of `/api/auth/me`, ensuring all permission-protected cards (Wallets, Payouts, Earnings Analytics, System Monitoring, Security Threat Center, Support Chat) are visible on both desktop and mobile viewports.
+- **Admin Dashboard Cards**: The admin dashboard (`/admin`) displays 15 management cards with proper RBAC enforcement covering core management, financial, security, and support functionalities. 
+  - **Root Cause Fix**: Created missing `/api/admin/capabilities` endpoint (was 404ing, causing capabilities array to be empty and filtering out all RBAC-protected cards). Added auto-logout on 401 errors to force fresh login when JWT tokens expire/become invalid.
+  - **15 Total Cards**:
+    - **9 Core Management** (no permission required): Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings
+    - **6 RBAC-Protected Cards**:
+      - Wallets (`VIEW_WALLET_SUMMARY`)
+      - Payouts (`MANAGE_PAYOUTS`)
+      - Earnings Analytics (`VIEW_EARNINGS_DASHBOARD`)
+      - System Monitoring (`VIEW_DASHBOARD`)
+      - Security Threat Center (`VIEW_DASHBOARD`)
+      - Support Chat (`VIEW_SUPPORT_CONVERSATIONS`)
+  - **Implementation**: `/api/admin/capabilities` endpoint (server/routes/admin.ts lines 34-44) returns `{ capabilities: string[] }` using `getAdminCapabilities()` from permissions system. Frontend (client/src/pages/admin/home.tsx) fetches capabilities and filters cards based on permission requirements. Auto-logout added for expired tokens.
 - **Payout Scheduling & Auto-Reconciliation Engine (Backend)**: Automated payout scheduling system with weekly/daily batch processing, manual payout capabilities, and a comprehensive reconciliation engine that matches completed orders with wallet ledger entries, detects discrepancies, and generates detailed reports with full audit logging.
 - **Step 47 Admin Financial Suite UI**: Complete frontend implementation for payout management with five dedicated pages:
   - `/admin/payouts` - Hub page with navigation to all payout management features
