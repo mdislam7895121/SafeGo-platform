@@ -3,6 +3,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
+import { getAdminCapabilities } from "../utils/permissions";
+import { loadAdminProfile, AuthRequest } from "../middleware/auth";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -134,7 +136,10 @@ router.post("/login", async (req, res) => {
     }
 
     // Find user
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { adminProfile: true },
+    });
     if (!user) {
       // Log failed login attempt
       await logAuditEvent({
@@ -164,6 +169,39 @@ router.post("/login", async (req, res) => {
         success: false,
       });
       return res.status(403).json({ error: "Your account has been blocked. Please contact support." });
+    }
+
+    // For admin users, check if their admin account is active
+    if (user.role === 'admin') {
+      if (!user.adminProfile) {
+        await logAuditEvent({
+          actorId: user.id,
+          actorEmail: user.email,
+          actorRole: user.role,
+          ipAddress: getClientIp(req),
+          actionType: ActionType.LOGIN_FAILED,
+          entityType: EntityType.AUTH,
+          entityId: user.id,
+          description: `Failed login attempt for ${user.email} - admin profile not found`,
+          success: false,
+        });
+        return res.status(403).json({ error: "Admin profile not found. Please contact support." });
+      }
+
+      if (!user.adminProfile.isActive) {
+        await logAuditEvent({
+          actorId: user.id,
+          actorEmail: user.email,
+          actorRole: user.role,
+          ipAddress: getClientIp(req),
+          actionType: ActionType.LOGIN_FAILED,
+          entityType: EntityType.AUTH,
+          entityId: user.id,
+          description: `Failed login attempt for deactivated admin ${user.email}`,
+          success: false,
+        });
+        return res.status(403).json({ error: "Your admin account has been deactivated. Please contact support." });
+      }
     }
 
     // Verify password
@@ -209,7 +247,8 @@ router.post("/login", async (req, res) => {
       success: true,
     });
 
-    res.json({
+    // Build response with admin capabilities if admin user
+    const response: any = {
       token,
       user: {
         id: user.id,
@@ -217,10 +256,55 @@ router.post("/login", async (req, res) => {
         role: user.role,
         countryCode: user.countryCode,
       },
-    });
+    };
+
+    // Add admin-specific information
+    if (user.role === 'admin' && user.adminProfile) {
+      response.user.adminRole = user.adminProfile.adminRole;
+      response.user.isActive = user.adminProfile.isActive;
+      response.capabilities = getAdminCapabilities({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        adminProfile: user.adminProfile,
+      });
+    }
+
+    res.json(response);
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({ error: "Failed to login" });
+  }
+});
+
+// ====================================================
+// GET /api/auth/me
+// Get current authenticated user with capabilities
+// ====================================================
+router.get("/me", loadAdminProfile, async (req: AuthRequest, res) => {
+  try {
+    const authReq = req as AuthRequest;
+
+    if (!authReq.adminUser) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const user = authReq.adminUser;
+    const capabilities = getAdminCapabilities(user);
+
+    res.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        adminRole: user.adminProfile?.adminRole,
+        isActive: user.adminProfile?.isActive,
+      },
+      capabilities,
+    });
+  } catch (error) {
+    console.error("Error fetching user info:", error);
+    res.status(500).json({ error: "Failed to fetch user info" });
   }
 });
 
