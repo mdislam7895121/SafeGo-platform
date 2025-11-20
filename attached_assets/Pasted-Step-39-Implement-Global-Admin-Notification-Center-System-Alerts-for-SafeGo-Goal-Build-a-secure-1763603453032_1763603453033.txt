@@ -1,0 +1,390 @@
+Step 39 – Implement Global Admin Notification Center (System Alerts) for SafeGo
+
+Goal
+Build a secure, non-breaking Notification Center for the SafeGo admin portal that shows all important system alerts (KYC, document expiry, wallet, parcels, etc.) in one place.
+
+This step MUST:
+1) Keep all existing features working (drivers, customers, restaurants, parcels, wallet, audit log).
+2) Respect all SafeGo security rules (no sensitive data, proper RBAC).
+3) Use clean, documented code with migrations aligned to the existing backend style.
+4) Use NO emojis in any new UI.
+
+Global business rule from earlier steps:
+- Document expiry warning (30 days before expiry) MUST apply to ALL countries and ALL relevant documents (NID, DMV/TLC, vehicle registration, insurance, restaurant license, etc.).
+
+────────────────────────────────────
+1. High-Level Features
+────────────────────────────────────
+
+You will build:
+
+1) Backend notification model + helper
+   - Store notifications for admins in an append-only table.
+   - Trigger notifications for key events (KYC, expiry, wallet, parcels, etc.).
+
+2) Admin-only API endpoints
+   - Paginated, filterable list of notifications.
+   - Mark-as-read endpoints.
+   - No delete from the UI.
+
+3) Frontend Notification Center
+   - New page: /admin/notifications
+   - Bell icon with unread count in the top navbar.
+   - List + filters + detail view.
+
+4) Security & performance
+   - Admin-only access, integrated with existing RBAC/capabilities.
+   - No full SSN / NID / passwords / secrets in notification data.
+   - Efficient queries with indexes, pagination.
+
+Do NOT:
+- Break or change existing business flows.
+- Change or remove any previous tables in an incompatible way.
+- Log or display any sensitive data (full SSN, full NID, secrets, tokens, raw document URLs).
+
+────────────────────────────────────
+2. Backend – Notification Model
+────────────────────────────────────
+
+Follow the existing ORM and migration style already used in this repo.
+
+Create a new table/model, e.g. `AdminNotification` with at least:
+
+- id                (primary key, same style as other tables)
+- createdAt         (timestamp, default now)
+- readAt            (timestamp nullable, null = unread)
+- type              (string enum)
+- severity          (string enum: "info", "warning", "critical")
+- actorId           (optional admin user id who caused the event, nullable)
+- actorEmail        (optional)
+- entityType        (string enum: "driver", "customer", "restaurant", "parcel", "wallet", "document", "kyc", "settings", "system")
+- entityId          (string, nullable if not tied to a single entity)
+- countryCode       (nullable, e.g. "BD", "US")
+- title             (short text)
+- message           (longer text, but still non-sensitive)
+- metadata          (JSON, nullable – only NON-SENSITIVE info)
+- isRead            (boolean, redundant but useful, driven by readAt)
+
+Important rules:
+- Append-only: there should be NO update that changes the original meaning, except setting `readAt` / `isRead`.
+- Never store full SSN, full NID, passwords, access tokens, or raw file URLs in `message` or `metadata`.
+- If you need to refer to SSN/NID, use existing masking helpers (same as audit log).
+
+Notification type examples (string values, not emojis):
+- "KYC_PENDING"
+- "KYC_APPROVED"
+- "KYC_REJECTED"
+- "DOCUMENT_EXPIRING"
+- "DOCUMENT_EXPIRED"
+- "DRIVER_STATUS_CHANGED"
+- "RESTAURANT_STATUS_CHANGED"
+- "RESTAURANT_COMMISSION_CHANGED"
+- "PARCEL_STATUS_ISSUE"
+- "WALLET_SETTLEMENT_PENDING"
+- "WALLET_SETTLEMENT_PROCESSED"
+- "SYSTEM_ERROR"
+
+Severity rules:
+- "warning": expiring in 30 days, pending KYC, pending wallet settlement.
+- "critical": already expired documents, repeated parcel issues, system errors.
+- "info": approvals, successful settlements, status changes that are not risky.
+
+Add proper DB indexes for:
+- createdAt DESC (default sort)
+- isRead
+- type
+- entityType
+- countryCode
+
+────────────────────────────────────
+3. Backend – Notification Helper & Triggers
+────────────────────────────────────
+
+Create a reusable helper, e.g. `logNotification()` in a dedicated util/service file, following the existing project structure.
+
+Example signature (adapt to actual codebase):
+
+logNotification({
+  type,
+  severity,
+  actorId,
+  actorEmail,
+  entityType,
+  entityId,
+  countryCode,
+  title,
+  message,
+  metadata,
+})
+
+This helper MUST:
+- Validate type & severity against allowed values.
+- Strip or mask any sensitive data before insert.
+- Never throw in a way that breaks the main business action. If notification creation fails, log it server-side but do NOT break the main API.
+
+Integrate this helper into key flows. You do NOT need to cover every possible action now, but you MUST include at least:
+
+A) Document expiry (global rule)
+Use the existing document fields:
+- Bangladesh:
+  - NID expiry (if present)
+  - Any other gov document expiry fields used in driver / customer / restaurant KYC.
+- USA:
+  - DMV License Expiry
+  - TLC License Expiry (for NY)
+- Vehicle:
+  - Registration expiry (if present)
+  - Insurance expiry (if present)
+- Restaurants:
+  - Any license expiry field already in schema.
+
+Implement a daily check that:
+- Finds documents expiring within the next 30 days → create "DOCUMENT_EXPIRING" notifications (severity = "warning").
+- Finds documents already expired → create "DOCUMENT_EXPIRED" notifications (severity = "critical").
+
+You can implement this either as:
+- A scheduled-like endpoint (e.g. `/api/admin/system/refresh-expiry-notifications`) that is called when the admin dashboard loads (idempotent, avoids duplicates), OR
+- A background job if the app already has a scheduler pattern.
+
+Important:
+- Do not create duplicate notifications for the same doc + same status on every run. Use a simple de-duplication strategy (e.g. check if a notification of that type/entity is already open).
+
+B) KYC flows (drivers, customers, restaurants)
+Hook into existing KYC approval/rejection logic (same place where AuditLog is written):
+
+- When new KYC is submitted:
+  - Create "KYC_PENDING" notification.
+- When KYC is approved:
+  - Create "KYC_APPROVED" notification.
+- When KYC is rejected:
+  - Create "KYC_REJECTED" notification.
+
+C) Driver status changes
+When admin changes a driver state (e.g. suspend / block / unblock):
+- Create "DRIVER_STATUS_CHANGED" notification.
+- Severity = "warning" for suspend/block, "info" for unblock.
+
+D) Restaurant status & commission
+When:
+- Restaurant status changes (active/suspended) → "RESTAURANT_STATUS_CHANGED"
+- Commission config changed for a restaurant or country → "RESTAURANT_COMMISSION_CHANGED"
+
+E) Parcel & wallet
+- When a parcel is cancelled due to issue → "PARCEL_STATUS_ISSUE"
+- When a wallet settlement becomes pending above a threshold (e.g. amount or age) → "WALLET_SETTLEMENT_PENDING"
+- When a wallet settlement is processed → "WALLET_SETTLEMENT_PROCESSED"
+
+F) System errors (optional, low priority)
+If there is an existing central error handler:
+- Optionally create "SYSTEM_ERROR" notifications for certain critical cases (but never include stack traces or secrets in message or metadata).
+
+────────────────────────────────────
+4. Backend – Notification API (Admin-only)
+────────────────────────────────────
+
+Add admin-only endpoints, consistent with current routing style.
+
+1) List notifications
+   - GET /api/admin/notifications
+
+Query parameters:
+- page        (default 1)
+- pageSize    (default 20, max 100)
+- type        (optional)
+- entityType  (optional)
+- countryCode (optional)
+- isRead      (optional: "true" | "false")
+- severity    (optional)
+- dateFrom    (optional, ISO)
+- dateTo      (optional, ISO)
+
+Response:
+- items: array of notifications (no sensitive fields)
+- pagination: { page, pageSize, totalPages, totalCount }
+
+Sort:
+- Default: createdAt DESC (latest first).
+
+2) Mark single notification as read
+   - POST /api/admin/notifications/:id/read
+Behavior:
+- Set readAt = now, isRead = true.
+- Return updated notification.
+- Do NOT allow un-read from API (simple, one-way).
+
+3) Mark all as read
+   - POST /api/admin/notifications/mark-all-read
+Behavior:
+- Mark all unread notifications as read for this admin context (if there is multi-admin support).
+- If actor-specific scoping is not implemented, you may mark all as read globally, but document this in code comments.
+
+Security:
+- Reuse existing admin auth middleware.
+- Reuse RBAC/capabilities: only admins with the appropriate capability (e.g. "VIEW_NOTIFICATIONS") can call these endpoints.
+
+────────────────────────────────────
+5. Frontend – Admin Notification Center
+────────────────────────────────────
+
+Tech: Follow existing frontend stack (React + whatever UI library is already used).
+
+A) Navigation
+- Add a new navigation item in the admin sidebar under "Management" or similar:
+  - Label: "Notifications"
+  - Route: /admin/notifications
+
+- Add a bell icon in the top navbar (near the admin email or Activity Log link):
+  - Shows a small badge with count of unread notifications (if > 0).
+  - On click: open either:
+    - a dropdown with the latest N notifications and a link "View all", OR
+    - direct navigation to /admin/notifications.
+  - No emojis anywhere.
+
+B) Notification List Page – /admin/notifications
+
+Layout:
+- Title: "Notifications"
+- Subtitle: "View system alerts and admin activity notifications."
+
+Filters section at the top:
+- Date range picker (from/to)
+- Type dropdown (using the main types only)
+- Entity type dropdown
+- Country dropdown (All / Bangladesh / United States etc.)
+- Status dropdown: All / Unread / Read
+- Severity dropdown: All / Info / Warning / Critical
+- "Apply" and "Reset" buttons
+
+Table/List columns:
+- Time (createdAt, human-friendly)
+- Type (human label, e.g. "Document expiring", "KYC pending")
+- Severity (color-coded badge for info/warning/critical)
+- Entity (e.g. "Driver – driver@example.com", "Restaurant – rest@test.com", or ID)
+- Message/title (truncated to one line)
+- Status (Unread / Read)
+
+Row interaction:
+- Clicking a row opens a side panel or modal with:
+  - Title
+  - Full message
+  - Time
+  - Type, severity
+  - Entity type + ID
+  - Country
+  - Metadata rendered as simple key/value list (non-sensitive info only)
+- If the notification was unread, mark it as read when the detail is opened (via API).
+
+Empty state:
+- Show a simple, text-only message: "No notifications found for the selected filters."
+
+C) Unread count behavior
+- When page loads, fetch `/api/admin/notifications` with isRead=false (or use a dedicated endpoint if you prefer).
+- Show a numeric badge in the navbar bell.
+- When marking as read, optimistically update the count in the UI without full reload.
+
+D) Design
+- Reuse existing admin styling for table, filters, badges.
+- No emojis.
+- Use consistent typography, spacing and colors as other admin pages.
+
+────────────────────────────────────
+6. Security, Privacy, and Compliance
+────────────────────────────────────
+
+You MUST validate that:
+
+1) Only authenticated admins can access:
+   - /api/admin/notifications*
+   - /admin/notifications UI page.
+
+2) RBAC:
+   - Integrate with existing capabilities model if present.
+   - For example, require capability "VIEW_NOTIFICATIONS" (or similar) to see the Notification Center.
+   - If such a capability system exists, document which capability is required and where it is checked.
+
+3) Sensitive data:
+   - No full SSN, full NID, passwords, tokens, or raw document URLs in title/message/metadata.
+   - Use existing masking helpers for any mention of SSN/NID.
+   - Use generic wording in messages, e.g.:
+     - "Driver document expiring in 30 days" instead of "NID 1234567890 expiring".
+
+4) Audit trail:
+   - Optionally log an AuditLog entry when:
+     - A notification of type "critical" is created.
+     - Admin marks all notifications as read.
+   - Follow the existing `logAuditEvent()` pattern.
+
+5) Performance:
+   - Ensure notifications list queries are paginated and indexed.
+   - Avoid N+1 queries when enriching data (if you join with driver/restaurant tables, do so efficiently).
+
+────────────────────────────────────
+7. Testing Checklist (End-to-End)
+────────────────────────────────────
+
+Implement and run the following tests (manually or automated):
+
+1) Basic flow
+   - Login as admin.
+   - Trigger actions that generate notifications:
+     - Approve a BD driver KYC.
+     - Reject another BD driver KYC.
+     - Approve a USA driver DMV/TLC document.
+     - Change a driver status (suspend → unsuspend).
+     - Change a restaurant commission.
+     - Create a test wallet settlement.
+   - Run the document expiry generator (expiry close or test using dates).
+   - Confirm notifications are created in the database with correct type, severity, entity, country.
+
+2) API tests
+   - GET /api/admin/notifications returns paginated list sorted by createdAt DESC.
+   - Filters by:
+     - type
+     - entityType
+     - isRead
+     - countryCode
+     - date range
+     all work correctly.
+   - POST /api/admin/notifications/:id/read marks a single item as read.
+   - POST /api/admin/notifications/mark-all-read marks all as read.
+   - Non-admin user cannot access any of these endpoints (expect 401/403).
+
+3) UI tests
+   - /admin/notifications page loads and displays data.
+   - Filters update the list correctly.
+   - Clicking a row opens details modal/panel.
+   - Unread badge in navbar updates when items are read.
+   - Empty state is correct when there are no notifications.
+   - No emojis appear anywhere.
+
+4) Security tests
+   - Verify no full SSN or NID appears in the notifications page or API.
+   - Confirm access is blocked for non-admins or admins without the required permission.
+   - Confirm that failing to create a notification does NOT break the main operation (e.g. KYC approval still works).
+
+────────────────────────────────────
+8. Final Deliverables
+────────────────────────────────────
+
+When you are done, please:
+
+1) Summarize:
+   - New model/table(s) and migrations.
+   - New helpers/services.
+   - New API endpoints.
+   - New frontend pages/components/routes.
+   - Any new RBAC capability introduced.
+
+2) Confirm:
+   - No existing SafeGo flows were broken (drivers, customers, restaurants, parcels, wallet, KYC, audit log).
+   - No sensitive data is stored or exposed in notifications.
+   - Document expiry warning (30 days) is applied globally across all countries and document types as implemented.
+
+3) Update documentation:
+   - Extend `replit.md` (or the main project docs) with:
+     - "Admin Notification Center" section.
+     - How to use filters.
+     - Which actions generate notifications.
+     - Security and privacy notes.
+
+This completes Step 39: Global Admin Notification Center, fully aligned with SafeGo’s security-first and non-breaking design principles.

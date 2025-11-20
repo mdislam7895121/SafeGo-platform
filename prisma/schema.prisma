@@ -414,3 +414,28 @@ model AuditLog {
   @@index([success])
   @@map("audit_logs")
 }
+
+model AdminNotification {
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+  type        String
+  severity    String
+  actorId     String?
+  actorEmail  String?
+  entityType  String
+  entityId    String?
+  countryCode String?
+  title       String
+  message     String
+  metadata    Json?
+  isRead      Boolean   @default(false)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([isRead])
+  @@index([type])
+  @@index([entityType])
+  @@index([countryCode])
+  @@index([severity])
+  @@map("admin_notifications")
+}
