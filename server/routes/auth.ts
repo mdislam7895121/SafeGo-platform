@@ -4,7 +4,7 @@ import jwt from "jsonwebtoken";
 import { PrismaClient } from "@prisma/client";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 import { getAdminCapabilities } from "../utils/permissions";
-import { loadAdminProfile, AuthRequest } from "../middleware/auth";
+import { loadAdminProfile, AuthRequest, authenticateToken } from "../middleware/auth";
 import { rateLimitAdminLogin, resetLoginAttempts } from "../middleware/rateLimit";
 import { isTwoFactorEnabled, verifyTwoFactorToken, getTwoFactorSecret } from "../services/twoFactorService";
 
@@ -379,7 +379,7 @@ router.post("/login", async (req, res, next) => {
 // GET /api/auth/me
 // Get current authenticated user with capabilities
 // ====================================================
-router.get("/me", loadAdminProfile, async (req: AuthRequest, res) => {
+router.get("/me", authenticateToken, loadAdminProfile, async (req: AuthRequest, res) => {
   try {
     const authReq = req as AuthRequest;
 
