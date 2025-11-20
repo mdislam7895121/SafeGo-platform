@@ -60,7 +60,7 @@ export default function AdminHome() {
   }, 0) || 0;
 
   // Fetch admin capabilities for RBAC with custom error handling
-  const { data: capabilitiesData, error: capabilitiesError, isLoading: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
+  const { data: capabilitiesData, error: capabilitiesError, isPending: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
     queryKey: ["/api/admin/capabilities", token],
     queryFn: async () => {
       const response = await fetch("/api/admin/capabilities", {
@@ -92,7 +92,9 @@ export default function AdminHome() {
     },
   });
   
+  // Use empty array as fallback only, but track if it's an error state
   const capabilities = capabilitiesData?.capabilities || [];
+  const hasCapabilitiesError = !isLoadingCapabilities && capabilitiesError && (capabilitiesError as any)?.status !== 401;
   
   // Debug logging for capabilities
   if (capabilitiesData) {
@@ -237,8 +239,11 @@ export default function AdminHome() {
   ];
 
   // Filter sections based on admin permissions (only after capabilities are loaded)
+  // On error (non-401), show all cards instead of hiding RBAC cards to avoid bad UX
   const filteredSections = isLoadingCapabilities 
     ? [] // Don't show any cards while loading capabilities
+    : hasCapabilitiesError
+    ? adminSections // Show all cards on error, display error banner separately
     : adminSections.filter((section) => {
         if (!section.permission) return true;
         return capabilities.includes(section.permission);
@@ -552,6 +557,25 @@ export default function AdminHome() {
         {/* Admin Sections */}
         <div>
           <h2 className="text-lg font-semibold mb-3">Management</h2>
+          
+          {/* Error Banner for Capabilities Fetch Failure */}
+          {hasCapabilitiesError && (
+            <Card className="mb-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="font-medium text-amber-900 dark:text-amber-100">Unable to load permissions</p>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                      All management cards are shown below, but some may require specific permissions to access. 
+                      Please refresh the page or contact support if this issue persists.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           {isLoadingCapabilities ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[...Array(6)].map((_, i) => (
