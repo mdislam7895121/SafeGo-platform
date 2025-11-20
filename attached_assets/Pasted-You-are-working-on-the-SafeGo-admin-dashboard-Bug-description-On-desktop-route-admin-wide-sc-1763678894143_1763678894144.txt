@@ -1,0 +1,29 @@
+You are working on the SafeGo admin dashboard.
+
+Bug description:
+- On desktop (route /admin, wide screen) all 15 admin cards are visible:
+  - Core Management (9 cards: notifications, KYC, documents, drivers, customers, complaints, wallet settlement, activity log, global settings)
+  - Financial (3 cards: Wallets, Payouts, Earnings Analytics)
+  - Security (2 cards: System Monitoring, Security Threat Center)
+  - Support (1 card: Support Chat)
+- On mobile preview (same /admin route, narrow screen) only the Core Management section is visible up to "Global Settings".
+- The Financial cards (Wallets, Payouts, Earnings Analytics), Security cards (System Monitoring, Security Threat Center), and Support Chat card are missing on mobile.
+- The same SUPER_ADMIN user with all permissions (VIEW_DASHBOARD, VIEW_WALLETS, MANAGE_PAYOUTS, VIEW_EARNINGS_DASHBOARD, VIEW_SUPPORT_CONVERSATIONS, etc.) is logged in, so this is NOT an RBAC issue.
+
+Your task:
+1. Inspect `client/src/pages/admin/home.tsx` and any related layout/components used to render the admin dashboard cards.
+2. Fix the responsive layout/styles so that ALL 15 admin dashboard cards are rendered on mobile as a vertical list. Do not hide the Financial, Security, or Support sections on small screens.
+   - Remove or adjust any Tailwind / CSS classes like `hidden`, `md:block`, `lg:grid`, etc. that prevent these sections from appearing on small viewports.
+3. Do NOT change RBAC or capability logic. Only adjust layout / CSS so that visibility is consistent across desktop and mobile.
+4. Verify in dev:
+   - Desktop: layout and styling remain the same as before (all 15 cards visible and grouped correctly).
+   - Mobile: when the viewport is narrow, you can scroll and see all cards including:
+     - Wallets
+     - Payouts
+     - Earnings Analytics
+     - System Monitoring
+     - Security Threat Center
+     - Support Chat
+5. Update `replit.md` under the admin dashboard section with a short note stating that the admin card layout has been fixed for mobile, and all cards are now visible on both desktop and mobile without changing any security or RBAC behavior.
+
+Do not rename or remove any cards, routes, or permissions. Keep all existing security phases, endpoints, and RBAC checks intact.
