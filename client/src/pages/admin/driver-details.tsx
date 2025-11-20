@@ -115,6 +115,16 @@ interface DriverDetails {
     registrationExpiry?: string;
     insuranceDocumentUrl?: string;
     insuranceExpiry?: string;
+    // DMV Inspection fields
+    dmvInspectionType?: string;
+    dmvInspectionDate?: string;
+    dmvInspectionExpiry?: string;
+    dmvInspectionImageUrl?: string;
+    dmvInspectionFrontImageUrl?: string;
+    dmvInspectionBackImageUrl?: string;
+    dmvInspectionVerificationStatus?: string;
+    dmvInspectionRejectionReason?: string;
+    dmvInspectionStatus?: string;
   } | null;
   stats: {
     rating: string;
@@ -1406,7 +1416,7 @@ export default function AdminDriverDetails() {
                     </div>
                   )}
 
-                  {/* Emergency Contact Section - Last section */}
+                  {/* Emergency Contact Section */}
                   {(driver.emergencyContactName || driver.emergencyContactPhone) && (
                     <div className="mt-6 pt-6 border-t space-y-3">
                       <p className="text-sm font-semibold text-foreground">Emergency Contact</p>
@@ -1426,229 +1436,208 @@ export default function AdminDriverDetails() {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            )}
 
-            {/* Vehicle Information (USA drivers only) */}
-            {driver && driver.user?.countryCode === "US" && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Car className="h-5 w-5" />
-                    Vehicle Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {!driver.vehicle && (
-                    <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-                      <p className="text-sm text-destructive font-medium">
-                        Vehicle information is incomplete. Please add vehicle details.
-                      </p>
-                    </div>
-                  )}
-                  {driver.vehicle && (
-                    <>
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">Vehicle Type</p>
-                          <p className="text-sm" data-testid="text-vehicle-type">{driver.vehicle.vehicleType || "—"}</p>
-                        </div>
-                        {driver.vehicle.make && (
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Make</p>
-                            <p className="text-sm" data-testid="text-vehicle-make">{driver.vehicle.make}</p>
-                          </div>
-                        )}
-                        {(driver.vehicle.model || driver.vehicle.vehicleModel) && (
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Model</p>
-                            <p className="text-sm" data-testid="text-vehicle-model">{driver.vehicle.model || driver.vehicle.vehicleModel}</p>
-                          </div>
-                        )}
-                        {driver.vehicle.year && (
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Year</p>
-                            <p className="text-sm" data-testid="text-vehicle-year">{driver.vehicle.year}</p>
-                          </div>
-                        )}
-                        {driver.vehicle.color && (
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">Color</p>
-                            <p className="text-sm" data-testid="text-vehicle-color">{driver.vehicle.color}</p>
-                          </div>
-                        )}
-                        {(driver.vehicle.licensePlate || driver.vehicle.vehiclePlate) && (
-                          <div>
-                            <p className="text-sm font-medium text-muted-foreground">License Plate</p>
-                            <p className="text-sm font-mono" data-testid="text-vehicle-plate">{driver.vehicle.licensePlate || driver.vehicle.vehiclePlate}</p>
-                          </div>
-                        )}
+                  {/* Horizontal Divider */}
+                  <div className="mt-8 mb-6 border-t" />
+
+                  {/* Vehicle Information Section */}
+                  <div className="mt-6">
+                    <p className="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Car className="h-5 w-5" />
+                      Vehicle Information
+                    </p>
+                    {!driver.vehicle && (
+                      <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
+                        <p className="text-sm text-destructive font-medium">
+                          Vehicle information is incomplete. Please add vehicle details.
+                        </p>
                       </div>
-
-                      {/* Registration Document */}
-                      <div className="mt-6 pt-6 border-t space-y-3">
-                        <p className="text-sm font-semibold text-foreground">Registration Document</p>
+                    )}
+                    {driver.vehicle && (
+                      <>
                         <div className="grid gap-4 md:grid-cols-2">
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">Status</p>
-                            {driver.vehicle.registrationDocumentUrl ? (
-                              <a
-                                href={driver.vehicle.registrationDocumentUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
-                                data-testid="link-registration-doc"
-                              >
-                                View Document
-                              </a>
-                            ) : (
-                              <p className="text-sm text-destructive" data-testid="text-registration-missing">Missing</p>
-                            )}
+                            <p className="text-sm font-medium text-muted-foreground">Vehicle Type</p>
+                            <p className="text-sm" data-testid="text-vehicle-type">{driver.vehicle.vehicleType || "—"}</p>
                           </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
-                            {driver.vehicle.registrationExpiry ? (
-                              <p className="text-sm" data-testid="text-registration-expiry">
-                                {format(new Date(driver.vehicle.registrationExpiry), "PPP")}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">Not provided</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Insurance Document */}
-                      <div className="mt-6 pt-6 border-t space-y-3">
-                        <p className="text-sm font-semibold text-foreground">Insurance Document</p>
-                        <div className="grid gap-4 md:grid-cols-2">
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Status</p>
-                            {driver.vehicle.insuranceDocumentUrl ? (
-                              <a
-                                href={driver.vehicle.insuranceDocumentUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
-                                data-testid="link-insurance-doc"
-                              >
-                                View Document
-                              </a>
-                            ) : (
-                              <p className="text-sm text-destructive" data-testid="text-insurance-missing">Missing</p>
-                            )}
-                          </div>
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
-                            {driver.vehicle.insuranceExpiry ? (
-                              <p className="text-sm" data-testid="text-insurance-expiry">
-                                {format(new Date(driver.vehicle.insuranceExpiry), "PPP")}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">Not provided</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* DMV Inspection */}
-                      <div className="mt-6 pt-6 border-t space-y-3">
-                        <p className="text-sm font-semibold text-foreground">DMV Inspection</p>
-                        
-                        {/* Status Badge */}
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs text-muted-foreground">Status:</p>
-                          {driver.vehicle.dmvInspectionStatus === "VALID" && (
-                            <Badge variant="default" className="bg-green-600" data-testid="badge-dmv-status">Valid</Badge>
-                          )}
-                          {driver.vehicle.dmvInspectionStatus === "EXPIRED" && (
-                            <Badge variant="destructive" data-testid="badge-dmv-status">Expired</Badge>
-                          )}
-                          {(!driver.vehicle.dmvInspectionStatus || driver.vehicle.dmvInspectionStatus === "MISSING") && (
-                            <Badge variant="secondary" data-testid="badge-dmv-status">Missing</Badge>
-                          )}
-                        </div>
-
-                        {/* Warning Banners */}
-                        {(!driver.vehicle.dmvInspectionImageUrl || driver.vehicle.dmvInspectionStatus === "MISSING") && (
-                          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-                            <p className="text-sm text-destructive font-medium">
-                              DMV inspection document is missing. Please request the driver to upload a valid inspection document.
-                            </p>
-                          </div>
-                        )}
-                        {driver.vehicle.dmvInspectionStatus === "EXPIRED" && (
-                          <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-                            <p className="text-sm text-destructive font-medium">
-                              DMV inspection has expired. Please verify and request updated inspection documents.
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Inspection Details */}
-                        <div className="grid gap-4 md:grid-cols-2">
-                          {driver.vehicle.dmvInspectionType && (
+                          {driver.vehicle.make && (
                             <div>
-                              <p className="text-xs text-muted-foreground mb-1">Inspection Type</p>
-                              <p className="text-sm" data-testid="text-dmv-type">{driver.vehicle.dmvInspectionType}</p>
+                              <p className="text-sm font-medium text-muted-foreground">Make</p>
+                              <p className="text-sm" data-testid="text-vehicle-make">{driver.vehicle.make}</p>
                             </div>
                           )}
-                          {driver.vehicle.dmvInspectionDate && (
+                          {(driver.vehicle.model || driver.vehicle.vehicleModel) && (
                             <div>
-                              <p className="text-xs text-muted-foreground mb-1">Inspection Date</p>
-                              <p className="text-sm" data-testid="text-dmv-date">
-                                {format(new Date(driver.vehicle.dmvInspectionDate), "PPP")}
-                              </p>
+                              <p className="text-sm font-medium text-muted-foreground">Model</p>
+                              <p className="text-sm" data-testid="text-vehicle-model">{driver.vehicle.model || driver.vehicle.vehicleModel}</p>
                             </div>
                           )}
-                          {driver.vehicle.dmvInspectionExpiry && (
+                          {driver.vehicle.year && (
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Year</p>
+                              <p className="text-sm" data-testid="text-vehicle-year">{driver.vehicle.year}</p>
+                            </div>
+                          )}
+                          {driver.vehicle.color && (
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">Color</p>
+                              <p className="text-sm" data-testid="text-vehicle-color">{driver.vehicle.color}</p>
+                            </div>
+                          )}
+                          {(driver.vehicle.licensePlate || driver.vehicle.vehiclePlate) && (
+                            <div>
+                              <p className="text-sm font-medium text-muted-foreground">License Plate</p>
+                              <p className="text-sm font-mono" data-testid="text-vehicle-plate">{driver.vehicle.licensePlate || driver.vehicle.vehiclePlate}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Registration Document */}
+                        <div className="mt-6 pt-6 border-t space-y-3">
+                          <p className="text-sm font-semibold text-foreground">Registration Document</p>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Status</p>
+                              {driver.vehicle.registrationDocumentUrl ? (
+                                <a
+                                  href={driver.vehicle.registrationDocumentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                  data-testid="link-registration-doc"
+                                >
+                                  View Document
+                                </a>
+                              ) : (
+                                <p className="text-sm text-destructive" data-testid="text-registration-missing">Missing</p>
+                              )}
+                            </div>
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
-                              <p className="text-sm" data-testid="text-dmv-expiry">
-                                {format(new Date(driver.vehicle.dmvInspectionExpiry), "PPP")}
+                              {driver.vehicle.registrationExpiry ? (
+                                <p className="text-sm" data-testid="text-registration-expiry">
+                                  {format(new Date(driver.vehicle.registrationExpiry), "PPP")}
+                                </p>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">Not provided</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Insurance Document */}
+                        <div className="mt-6 pt-6 border-t space-y-3">
+                          <p className="text-sm font-semibold text-foreground">Insurance Document</p>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Status</p>
+                              {driver.vehicle.insuranceDocumentUrl ? (
+                                <a
+                                  href={driver.vehicle.insuranceDocumentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                  data-testid="link-insurance-doc"
+                                >
+                                  View Document
+                                </a>
+                              ) : (
+                                <p className="text-sm text-destructive" data-testid="text-insurance-missing">Missing</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Expiry Date</p>
+                              {driver.vehicle.insuranceExpiry ? (
+                                <p className="text-sm" data-testid="text-insurance-expiry">
+                                  {format(new Date(driver.vehicle.insuranceExpiry), "PPP")}
+                                </p>
+                              ) : (
+                                <p className="text-sm text-muted-foreground">Not provided</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* DMV Inspection Section */}
+                        <div className="mt-6 pt-6 border-t space-y-3">
+                          <p className="text-sm font-semibold text-foreground">DMV Inspection</p>
+                          
+                          {/* Verification Status Badge */}
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-muted-foreground">Verification Status:</p>
+                            <Badge
+                              variant={
+                                driver.vehicle.dmvInspectionVerificationStatus === "approved"
+                                  ? "default"
+                                  : driver.vehicle.dmvInspectionVerificationStatus === "rejected"
+                                  ? "destructive"
+                                  : "secondary"
+                              }
+                              data-testid="badge-dmv-verification-status"
+                            >
+                              {driver.vehicle.dmvInspectionVerificationStatus || "pending_review"}
+                            </Badge>
+                          </div>
+
+                          {/* Rejection Reason */}
+                          {driver.vehicle.dmvInspectionRejectionReason && (
+                            <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                              <p className="text-xs text-muted-foreground mb-1">Rejection Reason</p>
+                              <p className="text-sm text-destructive" data-testid="text-dmv-rejection-reason">
+                                {driver.vehicle.dmvInspectionRejectionReason}
                               </p>
                             </div>
                           )}
-                          <div>
-                            <p className="text-xs text-muted-foreground mb-1">Document</p>
-                            {driver.vehicle.dmvInspectionImageUrl ? (
-                              <a
-                                href={driver.vehicle.dmvInspectionImageUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:text-blue-800 underline"
-                                data-testid="link-dmv-doc"
-                              >
-                                View Document
-                              </a>
-                            ) : (
-                              <p className="text-sm text-destructive" data-testid="text-dmv-doc-missing">Missing</p>
-                            )}
+
+                          {/* Front and Back Images */}
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Front Image</p>
+                              {driver.vehicle.dmvInspectionFrontImageUrl ? (
+                                <a
+                                  href={driver.vehicle.dmvInspectionFrontImageUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                  data-testid="link-dmv-inspection-front"
+                                >
+                                  View Front Image
+                                </a>
+                              ) : (
+                                <p className="text-sm text-muted-foreground" data-testid="text-dmv-inspection-front-missing">Not uploaded</p>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Back Image</p>
+                              {driver.vehicle.dmvInspectionBackImageUrl ? (
+                                <a
+                                  href={driver.vehicle.dmvInspectionBackImageUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                                  data-testid="link-dmv-inspection-back"
+                                >
+                                  View Back Image
+                                </a>
+                              ) : (
+                                <p className="text-sm text-muted-foreground" data-testid="text-dmv-inspection-back-missing">Not uploaded</p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Warning if documents are missing */}
-                      {(!driver.vehicle.registrationDocumentUrl || !driver.vehicle.insuranceDocumentUrl) && (
-                        <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-md">
-                          <p className="text-sm text-destructive font-medium">
-                            Vehicle information is incomplete. Please review registration and insurance documents.
-                          </p>
+                        {/* Edit Button */}
+                        <div className="mt-6 flex justify-end">
+                          <Button 
+                            variant="outline" 
+                            onClick={handleOpenEditVehicleDialog}
+                            data-testid="button-edit-vehicle"
+                          >
+                            Edit Vehicle
+                          </Button>
                         </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Edit Button */}
-                  <div className="mt-6 flex justify-end">
-                    <Button 
-                      variant="outline" 
-                      onClick={handleOpenEditVehicleDialog}
-                      data-testid="button-edit-vehicle"
-                    >
-                      Edit Vehicle
-                    </Button>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
