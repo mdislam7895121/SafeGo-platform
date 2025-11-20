@@ -558,105 +558,58 @@ model PaymentMethod {
   @@map("payment_methods")
 }
 
-enum SupportConversationStatus {
-  open
-  pending
-  resolved
-  closed
-}
-
-enum SupportChannel {
-  driver
-  customer
-  restaurant
-}
-
-enum SupportPriority {
-  low
-  normal
-  high
-  urgent
-}
-
 enum SupportSenderType {
   user
   admin
-  system
 }
 
 enum SupportMessageType {
   text
-  system
-  attachment
+  image
+  file
 }
 
 model SupportConversation {
-  id                  String                      @id @default(uuid())
-  createdAt           DateTime                    @default(now())
-  updatedAt           DateTime                    @updatedAt
-  status              SupportConversationStatus   @default(open)
-  channel             SupportChannel
-  subject             String
-  priority            SupportPriority             @default(normal)
-  lastMessageAt       DateTime                    @default(now())
-  lastMessagePreview  String?
-  userId              String
-  userType            SupportChannel
-  countryCode         String
-  assignedAdminId     String?
-  unreadCountUser     Int                         @default(0)
-  unreadCountAdmin    Int                         @default(0)
-  metadata            Json?
-  isFlagged           Boolean                     @default(false)
-  flaggedReason       String?
-  internalNotes       String?
-  messages            SupportMessage[]
+  id             String            @id @default(uuid())
+  userId         String
+  userType       String            // "driver" | "customer" | "restaurant"
+  adminUserId    String?           // Reference to User.id (admin)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  messages       SupportMessage[]
+  attachments    SupportAttachment[]
 
-  @@index([userId])
-  @@index([userType])
-  @@index([status])
-  @@index([assignedAdminId])
-  @@index([lastMessageAt])
-  @@index([countryCode])
-  @@index([userId, userType])
+  @@index([userId, userType, createdAt])
+  @@index([adminUserId])
   @@map("support_conversations")
 }
 
 model SupportMessage {
-  id              String              @id @default(uuid())
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
-  conversationId  String
-  senderType      SupportSenderType
-  senderId        String?
-  content         String              @db.Text
-  messageType     SupportMessageType  @default(text)
-  isReadByUser    Boolean             @default(false)
-  isReadByAdmin   Boolean             @default(false)
-  metadata        Json?
-  conversation    SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  attachments     SupportAttachment[]
+  id             String            @id @default(uuid())
+  conversationId String
+  senderType     SupportSenderType
+  messageType    SupportMessageType @default(text)
+  body           String?           @db.Text
+  attachmentId   String?
+  read           Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  @@index([conversationId])
-  @@index([createdAt])
+  @@index([conversationId, createdAt])
   @@map("support_messages")
 }
 
 model SupportAttachment {
-  id               String         @id @default(uuid())
-  createdAt        DateTime       @default(now())
-  messageId        String
-  fileUrl          String
-  encryptedFileUrl String?
-  fileType         String
-  fileName         String
-  fileSize         Int
-  isImage          Boolean        @default(false)
-  isEncrypted      Boolean        @default(false)
-  uploadedBy       String?
-  message          SupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  id             String            @id @default(uuid())
+  conversationId String
+  fileName       String
+  fileType       String
+  fileSize       Int
+  secureStoragePath String           // Signed document URL path, NOT direct URL
+  createdAt      DateTime          @default(now())
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  @@index([messageId])
+  @@index([conversationId])
   @@map("support_attachments")
 }
 

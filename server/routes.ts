@@ -11,7 +11,7 @@ import deliveryRoutes from "./routes/deliveries";
 import supportRoutes from "./routes/support";
 import documentRoutes from "./routes/documents";
 import twoFactorRoutes from "./routes/twoFactor";
-import { setupSupportChatWebSocket } from "./websocket/supportChatSocket";
+import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register all API routes
