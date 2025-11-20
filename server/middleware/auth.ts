@@ -88,7 +88,7 @@ export async function loadAdminProfile(req: AuthRequest, res: Response, next: Ne
       email: user.email,
       role: user.role as 'admin',
       adminProfile: {
-        adminRole: user.adminProfile.adminRole,
+        adminRole: user.adminProfile.adminRole as any,
         isActive: user.adminProfile.isActive
       }
     });
@@ -98,9 +98,12 @@ export async function loadAdminProfile(req: AuthRequest, res: Response, next: Ne
       id: user.id,
       email: user.email,
       role: user.role,
-      adminProfile: user.adminProfile,
+      adminProfile: {
+        adminRole: user.adminProfile.adminRole as any,
+        isActive: user.adminProfile.isActive
+      },
       permissions  // CRITICAL: Include permissions array
-    };
+    } as any;
 
     next();
   } catch (error) {

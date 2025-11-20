@@ -5680,6 +5680,71 @@ router.get("/parcels/commission-summary", checkPermission(Permission.VIEW_COMMIS
 });
 
 // ====================================================
+// GET /api/admin/audit-summary/:userId
+// Get lightweight audit event summary for a user (for profile indicators)
+// ====================================================
+router.get("/audit-summary/:userId", checkPermission(Permission.VIEW_ACTIVITY_LOG), async (req: AuthRequest, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Count security-relevant audit events for this user
+    const [failedLogins, suspiciousActivity, documentRejections, accountSuspensions] = await Promise.all([
+      // Failed login attempts in the last 30 days
+      prisma.auditLog.count({
+        where: {
+          entityId: userId,
+          actionType: ActionType.LOGIN_FAILED,
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+      // Suspicious activity (failed actions, unauthorized access)
+      prisma.auditLog.count({
+        where: {
+          entityId: userId,
+          success: false,
+          actionType: { in: [ActionType.UPDATE_USER, ActionType.MANAGE_DRIVER_KYC, ActionType.UPDATE_WALLET] },
+          createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+      // Document rejections
+      prisma.auditLog.count({
+        where: {
+          entityId: userId,
+          actionType: ActionType.MANAGE_DRIVER_KYC,
+          description: { contains: "rejected" },
+          createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+      // Account suspensions
+      prisma.auditLog.count({
+        where: {
+          entityId: userId,
+          actionType: ActionType.SUSPEND_USER,
+          createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+        },
+      }),
+    ]);
+
+    const totalEvents = failedLogins + suspiciousActivity + documentRejections + accountSuspensions;
+    const hasAuditEvents = totalEvents > 0;
+
+    res.json({
+      hasAuditEvents,
+      eventCount: totalEvents,
+      breakdown: {
+        failedLogins,
+        suspiciousActivity,
+        documentRejections,
+        accountSuspensions,
+      },
+    });
+  } catch (error) {
+    console.error("Audit summary error:", error);
+    res.status(500).json({ error: "Failed to fetch audit summary" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/audit-logs
 // Fetch audit logs with pagination and filters
 // ====================================================
