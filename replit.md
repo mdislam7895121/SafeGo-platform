@@ -1,7 +1,7 @@
 # SafeGo Global Super-App
 
 ## Overview
-SafeGo is a production-ready, full-stack multi-service super-app platform designed for global on-demand services, including ride-hailing, food delivery, and parcel delivery. The platform aims to be a leading global super-app by providing a comprehensive, scalable, and secure solution for integrated urban services. Key features include multi-role authentication, country-specific KYC, commission tracking with negative balance support, and full service lifecycle management.
+SafeGo is a production-ready, full-stack multi-service super-app platform designed for global on-demand services, including ride-hailing, food delivery, and parcel delivery. The platform aims to be a leading global super-app by providing a comprehensive, scalable, and secure solution for integrated urban services. Key features include multi-role authentication, country-specific KYC, commission tracking with negative balance support, full service lifecycle management, and unified payout/payment section layouts across all user profile pages.
 
 ## User Preferences
 **Preferred communication style**: Simple, everyday language.
@@ -11,7 +11,7 @@ SafeGo is a production-ready, full-stack multi-service super-app platform design
 ## System Architecture
 
 ### UI/UX Decisions
-The frontend utilizes React 18 with TypeScript, Vite 5, shadcn/ui (Radix UI), Tailwind CSS 3, TanStack Query v5, wouter, and React Hook Form with Zod. It features a custom HSL-based color palette for light/dark modes, Inter/Manrope typography, mobile-first responsive design, skeleton loading, toast notifications, error boundaries, and protected routes with role-based access control.
+The frontend utilizes React 18 with TypeScript, Vite 5, shadcn/ui (Radix UI), Tailwind CSS 3, TanStack Query v5, wouter, and React Hook Form with Zod. It features a custom HSL-based color palette for light/dark modes, Inter/Manrope typography, mobile-first responsive design, skeleton loading, toast notifications, error boundaries, and protected routes with role-based access control. **Step 40 Completed (Nov 20, 2025)**: Unified payout/payment section layout standardized across driver, restaurant, and customer admin profile pages with consistent ordering: Identity/KYC → Earnings Summary → Payout/Payment Information → Additional sections.
 
 ### Technical Implementations
 The platform is built with a Node.js 20+ TypeScript backend using Express.js 4 and Prisma Client 6 with PostgreSQL 14+. It supports multi-role authentication (customer, driver, restaurant, admin), country-specific KYC with admin approval, and comprehensive service lifecycle management for ride-hailing, food delivery, and parcel delivery.
@@ -44,7 +44,7 @@ Comprehensive financial management system tracking driver/restaurant earnings, p
 
 **Navigation**: Admin home has Wallets and Payouts navigation cards with permission filtering. Driver and restaurant dashboards have Wallet quick links.
 
-**Implementation Status**: ✅ Completed: Database schema, WalletService, PayoutService, all API routes, all frontend pages, service integration (rides, food, parcels), navigation links, RBAC. ⏳ Pending: Weekly auto-settlement job (Task 18), Commission analytics dashboard (Task 12).
+**Implementation Status**: ✅ Completed: Database schema, WalletService, PayoutService, all API routes, all frontend pages, service integration (rides, food, parcels), navigation links, RBAC, unified payout/payment section layouts (Step 40). ⏳ Pending: Weekly auto-settlement job (Task 18), Commission analytics dashboard (Task 12).
 
 ### Database Schema Design
 The database schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields, driver profile photos, structured driver names, DMV/TLC license images, and vehicle documents. The `AuditLog` tracks all critical admin actions with detailed metadata, and `AdminNotification` stores system alerts with filtering capabilities. `PlatformSettings` provides global configuration storage, and `PayoutAccount` securely stores encrypted payout information.
