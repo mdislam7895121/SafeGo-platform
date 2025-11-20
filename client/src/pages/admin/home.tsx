@@ -49,6 +49,16 @@ export default function AdminHome() {
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
+  // Fetch unread support messages count
+  const { data: supportConversations } = useQuery({
+    queryKey: ["/api/support/admin/conversations"],
+    refetchInterval: 5000,
+  }) as { data: Array<{ id: string; messages: Array<{ read: boolean; senderType: string }> }> };
+
+  const unreadSupportMessages = supportConversations?.reduce((count, conv) => {
+    return count + (conv.messages?.filter((msg) => !msg.read && msg.senderType === "user").length || 0);
+  }, 0) || 0;
+
   // Fetch admin capabilities for RBAC
   const { data: capabilitiesData } = useQuery<{ capabilities: string[] }>({
     queryKey: ["/api/auth/me"],
@@ -156,6 +166,7 @@ export default function AdminHome() {
       description: "Real-time support conversations with users",
       color: "text-teal-600",
       bgColor: "bg-teal-50 dark:bg-teal-950",
+      badge: unreadSupportMessages > 0 ? unreadSupportMessages : undefined,
       permission: "VIEW_SUPPORT_CONVERSATIONS",
     },
     {
