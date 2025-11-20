@@ -51,6 +51,8 @@ import AdminActivityLog from "@/pages/admin/activity-log";
 import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
 import AdminSupportChat from "@/pages/admin/support-chat";
+import AdminWallets from "@/pages/admin/wallets";
+import AdminWalletDetails from "@/pages/admin/wallet-details";
 
 import NotFound from "@/pages/not-found";
 
@@ -259,6 +261,16 @@ function Router() {
       <Route path="/admin/support-chat">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSupportChat />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/wallets/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminWalletDetails />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/wallets">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminWallets />
         </ProtectedRoute>
       </Route>
 
