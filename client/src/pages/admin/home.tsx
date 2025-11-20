@@ -29,7 +29,7 @@ interface ParcelStats {
 }
 
 export default function AdminHome() {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
 
   // Fetch admin statistics
   const { data: stats, isLoading } = useQuery<AdminStats>({
@@ -61,28 +61,35 @@ export default function AdminHome() {
 
   // Fetch admin capabilities for RBAC with custom error handling
   const { data: capabilitiesData, error: capabilitiesError, isLoading: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
-    queryKey: ["/api/admin/capabilities"],
+    queryKey: ["/api/admin/capabilities", token],
     queryFn: async () => {
       const response = await fetch("/api/admin/capabilities", {
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
       });
       
-      // Auto-logout on auth failure (invalid/expired token)
-      if (response.status === 401) {
-        console.error("❌ Admin capabilities fetch failed (401) - auto-logging out");
-        logout();
-        throw new Error("Unauthorized - logging out");
-      }
-      
       if (!response.ok) {
-        throw new Error(`Failed to fetch capabilities: ${response.status}`);
+        // Throw with status code so onError can check it
+        const error: any = new Error(`Failed to fetch capabilities: ${response.status}`);
+        error.status = response.status;
+        throw error;
       }
       
       return response.json();
     },
     retry: false, // Don't retry on auth failures
+    enabled: !!token, // Only run query if token exists
+    onError: (error: any) => {
+      // Auto-logout on auth failure (invalid/expired token)
+      if (error?.status === 401) {
+        console.error("❌ Admin capabilities fetch failed (401) - auto-logging out");
+        logout();
+      } else {
+        console.error("❌ Failed to load capabilities:", error);
+      }
+    },
   });
   
   const capabilities = capabilitiesData?.capabilities || [];
