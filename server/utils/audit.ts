@@ -61,6 +61,9 @@ export const ActionType = {
   SUPPORT_CONVERSATION_STATUS_CHANGED: "SUPPORT_CONVERSATION_STATUS_CHANGED",
   SUPPORT_CONVERSATION_UPDATED: "SUPPORT_CONVERSATION_UPDATED",
   SUPPORT_MESSAGE_SENT: "SUPPORT_MESSAGE_SENT",
+  
+  // Analytics
+  VIEW_EARNINGS_DASHBOARD: "VIEW_EARNINGS_DASHBOARD",
 } as const;
 
 // Entity type constants
@@ -76,6 +79,7 @@ export const EntityType = {
   SETTINGS: "settings",
   AUTH: "auth",
   SUPPORT_CONVERSATION: "support_conversation",
+  ANALYTICS: "analytics",
 } as const;
 
 interface AuditLogParams {

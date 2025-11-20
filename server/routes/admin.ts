@@ -9,6 +9,7 @@ import { notifyKYCPending, notifyKYCApproved, notifyKYCRejected, notifyDriverSta
 import { walletService } from "../services/walletService";
 import { walletPayoutService } from "../services/payoutService";
 import { commissionService } from "../services/commissionService";
+import * as earningsService from "../services/earningsService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -6878,6 +6879,145 @@ router.get("/earnings/summary", checkPermission(Permission.VIEW_COMMISSION_ANALY
   } catch (error: any) {
     console.error("Get earnings summary error:", error);
     res.status(500).json({ error: error.message || "Failed to fetch earnings summary" });
+  }
+});
+
+// ====================================================
+// EARNINGS DASHBOARD API
+// ====================================================
+
+// Get global earnings summary
+router.get("/earnings/dashboard/global", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { dateFrom, dateTo, country } = req.query;
+
+    const filters: any = {};
+    if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
+    if (dateTo) filters.dateTo = new Date(dateTo as string);
+    if (country) filters.country = country as string;
+
+    const summary = await earningsService.getGlobalSummary(filters);
+
+    await logAuditEvent({
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      performedByAdminId: req.user!.id,
+      ipAddress: getClientIp(req),
+      entityType: EntityType.ANALYTICS,
+      metadata: { section: 'global', filters },
+    });
+
+    res.json(summary);
+  } catch (error: any) {
+    console.error("Get global earnings error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch global earnings" });
+  }
+});
+
+// Get ride earnings
+router.get("/earnings/dashboard/rides", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { dateFrom, dateTo, country } = req.query;
+
+    const filters: any = {};
+    if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
+    if (dateTo) filters.dateTo = new Date(dateTo as string);
+    if (country) filters.country = country as string;
+
+    const earnings = await earningsService.getRideEarnings(filters);
+
+    await logAuditEvent({
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      performedByAdminId: req.user!.id,
+      ipAddress: getClientIp(req),
+      entityType: EntityType.ANALYTICS,
+      metadata: { section: 'rides', filters },
+    });
+
+    res.json(earnings);
+  } catch (error: any) {
+    console.error("Get ride earnings error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch ride earnings" });
+  }
+});
+
+// Get food earnings
+router.get("/earnings/dashboard/food", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { dateFrom, dateTo, country } = req.query;
+
+    const filters: any = {};
+    if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
+    if (dateTo) filters.dateTo = new Date(dateTo as string);
+    if (country) filters.country = country as string;
+
+    const earnings = await earningsService.getFoodEarnings(filters);
+
+    await logAuditEvent({
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      performedByAdminId: req.user!.id,
+      ipAddress: getClientIp(req),
+      entityType: EntityType.ANALYTICS,
+      metadata: { section: 'food', filters },
+    });
+
+    res.json(earnings);
+  } catch (error: any) {
+    console.error("Get food earnings error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch food earnings" });
+  }
+});
+
+// Get parcel earnings
+router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { dateFrom, dateTo, country } = req.query;
+
+    const filters: any = {};
+    if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
+    if (dateTo) filters.dateTo = new Date(dateTo as string);
+    if (country) filters.country = country as string;
+
+    const earnings = await earningsService.getParcelEarnings(filters);
+
+    await logAuditEvent({
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      performedByAdminId: req.user!.id,
+      ipAddress: getClientIp(req),
+      entityType: EntityType.ANALYTICS,
+      metadata: { section: 'parcels', filters },
+    });
+
+    res.json(earnings);
+  } catch (error: any) {
+    console.error("Get parcel earnings error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch parcel earnings" });
+  }
+});
+
+// Get payout analytics
+router.get("/earnings/dashboard/payouts", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { dateFrom, dateTo, country } = req.query;
+
+    const filters: any = {};
+    if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
+    if (dateTo) filters.dateTo = new Date(dateTo as string);
+    if (country) filters.country = country as string;
+
+    const analytics = await earningsService.getPayoutAnalytics(filters);
+
+    await logAuditEvent({
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      performedByAdminId: req.user!.id,
+      ipAddress: getClientIp(req),
+      entityType: EntityType.ANALYTICS,
+      metadata: { section: 'payouts', filters },
+    });
+
+    res.json(analytics);
+  } catch (error: any) {
+    console.error("Get payout analytics error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payout analytics" });
   }
 });
 
