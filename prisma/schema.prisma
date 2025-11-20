@@ -16,7 +16,7 @@ enum AdminRole {
 }
 
 model AdminProfile {
-  id        String    @id
+  id        String    @id @default(uuid())
   userId    String    @unique
   adminRole AdminRole @default(SUPER_ADMIN)
   isActive  Boolean   @default(true)
@@ -27,7 +27,7 @@ model AdminProfile {
 }
 
 model CustomerProfile {
-  id                    String            @id
+  id                    String            @id @default(uuid())
   userId                String            @unique
   fatherName            String?
   presentAddress        String?
@@ -45,7 +45,7 @@ model CustomerProfile {
   rejectionReason       String?
   isVerified            Boolean           @default(false)
   createdAt             DateTime          @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime          @updatedAt
   isSuspended           Boolean           @default(false)
   suspendedAt           DateTime?
   suspensionReason      String?
@@ -115,7 +115,7 @@ model DriverComplaint {
 }
 
 model DriverProfile {
-  id                    String             @id
+  id                    String             @id @default(uuid())
   userId                String             @unique
   fatherName            String?
   presentAddress        String?
@@ -138,7 +138,7 @@ model DriverProfile {
   rejectionReason       String?
   isVerified            Boolean            @default(false)
   createdAt             DateTime           @default(now())
-  updatedAt             DateTime
+  updatedAt             DateTime           @updatedAt
   isSuspended           Boolean            @default(false)
   lastActive            DateTime?
   suspendedAt           DateTime?
@@ -189,24 +189,24 @@ model DriverProfile {
 }
 
 model DriverStats {
-  id         String        @id
+  id         String        @id @default(uuid())
   driverId   String        @unique
   rating     Decimal       @default(5.0) @db.Decimal(3, 2)
   totalTrips Int           @default(0)
   createdAt  DateTime      @default(now())
-  updatedAt  DateTime
+  updatedAt  DateTime      @updatedAt
   driver     DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@map("driver_stats")
 }
 
 model DriverWallet {
-  id              String        @id
+  id              String        @id @default(uuid())
   driverId        String        @unique
   balance         Decimal       @default(0) @db.Decimal(10, 2)
   negativeBalance Decimal       @default(0) @db.Decimal(10, 2)
   createdAt       DateTime      @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime      @updatedAt
   driver          DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@map("driver_wallets")
@@ -252,7 +252,7 @@ model Notification {
 }
 
 model RestaurantProfile {
-  id                 String             @id
+  id                 String             @id @default(uuid())
   userId             String             @unique
   restaurantName     String
   address            String
@@ -260,7 +260,7 @@ model RestaurantProfile {
   rejectionReason    String?
   isVerified         Boolean            @default(false)
   createdAt          DateTime           @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime           @updatedAt
   isSuspended        Boolean            @default(false)
   suspendedAt        DateTime?
   suspensionReason   String?
@@ -273,12 +273,12 @@ model RestaurantProfile {
 }
 
 model RestaurantWallet {
-  id              String            @id
+  id              String            @id @default(uuid())
   restaurantId    String            @unique
   balance         Decimal           @default(0) @db.Decimal(10, 2)
   negativeBalance Decimal           @default(0) @db.Decimal(10, 2)
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime
+  updatedAt       DateTime          @updatedAt
   restaurant      RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("restaurant_wallets")
@@ -314,14 +314,14 @@ model Ride {
 }
 
 model User {
-  id                String             @id
+  id                String             @id @default(uuid())
   email             String             @unique
   passwordHash      String
   role              String
   countryCode       String
   isBlocked         Boolean            @default(false)
   createdAt         DateTime           @default(now())
-  updatedAt         DateTime
+  updatedAt         DateTime           @updatedAt
   adminProfile      AdminProfile?
   customerProfile   CustomerProfile?
   driverProfile     DriverProfile?
