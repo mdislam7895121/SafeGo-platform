@@ -2688,6 +2688,7 @@ router.patch("/restaurants/:id/suspend", async (req: AuthRequest, res) => {
 
     const restaurant = await prisma.restaurantProfile.findUnique({
       where: { id },
+      include: { user: true },
     });
 
     if (!restaurant) {
@@ -2717,6 +2718,16 @@ router.patch("/restaurants/:id/suspend", async (req: AuthRequest, res) => {
       },
     });
 
+    // Create admin notification
+    await notifyRestaurantStatusChanged({
+      restaurantId: restaurant.id,
+      countryCode: restaurant.user.countryCode,
+      email: restaurant.user.email,
+      action: "suspended",
+      actorId: req.user?.userId || "",
+      actorEmail: req.user?.email || "unknown",
+    });
+
     res.json({
       message: "Restaurant suspended successfully",
       restaurant: {
@@ -2741,6 +2752,7 @@ router.patch("/restaurants/:id/unsuspend", async (req: AuthRequest, res) => {
 
     const restaurant = await prisma.restaurantProfile.findUnique({
       where: { id },
+      include: { user: true },
     });
 
     if (!restaurant) {
@@ -2768,6 +2780,16 @@ router.patch("/restaurants/:id/unsuspend", async (req: AuthRequest, res) => {
         title: "Account Unsuspended",
         body: "Your restaurant account suspension has been lifted. You can now receive orders.",
       },
+    });
+
+    // Create admin notification
+    await notifyRestaurantStatusChanged({
+      restaurantId: restaurant.id,
+      countryCode: restaurant.user.countryCode,
+      email: restaurant.user.email,
+      action: "unsuspended",
+      actorId: req.user?.userId || "",
+      actorEmail: req.user?.email || "unknown",
     });
 
     res.json({
@@ -5730,6 +5752,160 @@ router.get("/audit-logs", checkPermission(Permission.VIEW_ACTIVITY_LOG), async (
   } catch (error) {
     console.error("Fetch audit logs error:", error);
     res.status(500).json({ error: "Failed to fetch audit logs" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/notifications
+// Fetch admin notifications with pagination and filters
+// ====================================================
+router.get("/notifications", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const {
+      page = "1",
+      pageSize = "20",
+      type,
+      severity,
+      isRead,
+      countryCode,
+      entityType,
+      dateFrom,
+      dateTo,
+    } = req.query;
+
+    // Parse pagination params
+    const pageNum = Math.max(1, parseInt(page as string));
+    const limit = Math.min(100, Math.max(1, parseInt(pageSize as string))); // Max 100 per page
+    const skip = (pageNum - 1) * limit;
+
+    // Build where clause
+    const where: any = {};
+
+    if (type) {
+      where.type = type as string;
+    }
+
+    if (severity) {
+      where.severity = severity as string;
+    }
+
+    if (isRead !== undefined) {
+      where.isRead = isRead === "true";
+    }
+
+    if (countryCode) {
+      where.countryCode = countryCode as string;
+    }
+
+    if (entityType) {
+      where.entityType = entityType as string;
+    }
+
+    // Date range filters
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) {
+        where.createdAt.gte = new Date(dateFrom as string);
+      }
+      if (dateTo) {
+        where.createdAt.lte = new Date(dateTo as string);
+      }
+    }
+
+    // Fetch notifications with pagination
+    const [notifications, total] = await Promise.all([
+      prisma.adminNotification.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.adminNotification.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    res.json({
+      notifications,
+      pagination: {
+        page: pageNum,
+        pageSize: limit,
+        total,
+        totalPages,
+      },
+    });
+  } catch (error) {
+    console.error("Fetch notifications error:", error);
+    res.status(500).json({ error: "Failed to fetch notifications" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/notifications/unread-count
+// Get count of unread notifications for navbar badge
+// ====================================================
+router.get("/notifications/unread-count", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const count = await prisma.adminNotification.count({
+      where: { isRead: false },
+    });
+
+    res.json({ count });
+  } catch (error) {
+    console.error("Get unread count error:", error);
+    res.status(500).json({ error: "Failed to get unread count" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/notifications/:id/read
+// Mark a single notification as read
+// ====================================================
+router.patch("/notifications/:id/read", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const notification = await prisma.adminNotification.findUnique({
+      where: { id },
+    });
+
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    const updated = await prisma.adminNotification.update({
+      where: { id },
+      data: { isRead: true },
+    });
+
+    res.json({ 
+      message: "Notification marked as read",
+      notification: updated,
+    });
+  } catch (error) {
+    console.error("Mark notification as read error:", error);
+    res.status(500).json({ error: "Failed to mark notification as read" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/notifications/read-all
+// Mark all notifications as read
+// ====================================================
+router.patch("/notifications/read-all", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const result = await prisma.adminNotification.updateMany({
+      where: { isRead: false },
+      data: { isRead: true },
+    });
+
+    res.json({ 
+      message: "All notifications marked as read",
+      count: result.count,
+    });
+  } catch (error) {
+    console.error("Mark all as read error:", error);
+    res.status(500).json({ error: "Failed to mark all notifications as read" });
   }
 });
 
