@@ -59,16 +59,31 @@ export default function AdminHome() {
     return count + (conv.messages?.filter((msg) => !msg.read && msg.senderType === "user").length || 0);
   }, 0) || 0;
 
-  // Fetch admin capabilities for RBAC
+  // Fetch admin capabilities for RBAC with custom error handling
   const { data: capabilitiesData, error: capabilitiesError, isLoading: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
     queryKey: ["/api/admin/capabilities"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/capabilities", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      // Auto-logout on auth failure (invalid/expired token)
+      if (response.status === 401) {
+        console.error("❌ Admin capabilities fetch failed (401) - auto-logging out");
+        logout();
+        throw new Error("Unauthorized - logging out");
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch capabilities: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    retry: false, // Don't retry on auth failures
   });
-  
-  // Auto-logout on auth failure (invalid/expired token)
-  if (capabilitiesError && (capabilitiesError as any).message?.includes("401")) {
-    console.error("❌ Admin capabilities fetch failed - auto-logging out:", capabilitiesError);
-    logout();
-  }
   
   const capabilities = capabilitiesData?.capabilities || [];
   
@@ -78,6 +93,8 @@ export default function AdminHome() {
     console.log(`📊 Total admin sections: 15, Capability-protected sections: 6`);
   } else if (isLoadingCapabilities) {
     console.log("⏳ Loading admin capabilities...");
+  } else if (capabilitiesError) {
+    console.error("❌ Failed to load capabilities:", capabilitiesError);
   }
 
   const adminSections = [
@@ -212,11 +229,13 @@ export default function AdminHome() {
     },
   ];
 
-  // Filter sections based on admin permissions
-  const filteredSections = adminSections.filter((section) => {
-    if (!section.permission) return true;
-    return capabilities.includes(section.permission);
-  });
+  // Filter sections based on admin permissions (only after capabilities are loaded)
+  const filteredSections = isLoadingCapabilities 
+    ? [] // Don't show any cards while loading capabilities
+    : adminSections.filter((section) => {
+        if (!section.permission) return true;
+        return capabilities.includes(section.permission);
+      });
 
   return (
     <div className="min-h-screen bg-background pb-6">
@@ -526,28 +545,44 @@ export default function AdminHome() {
         {/* Admin Sections */}
         <div>
           <h2 className="text-lg font-semibold mb-3">Management</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredSections.map((section) => (
-              <Link key={section.name} href={section.href}>
-                <Card className="hover-elevate cursor-pointer" data-testid={`card-${section.name.toLowerCase().replace(/\s+/g, '-')}`}>
+          {isLoadingCapabilities ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <Card key={i}>
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
-                      <div className={`h-12 w-12 rounded-2xl ${section.bgColor} flex items-center justify-center`}>
-                        <section.icon className={`h-6 w-6 ${section.color}`} />
-                      </div>
-                      {section.badge !== undefined && section.badge > 0 && (
-                        <Badge variant="destructive" data-testid={`badge-${section.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                          {section.badge}
-                        </Badge>
-                      )}
+                      <Skeleton className="h-12 w-12 rounded-2xl" />
                     </div>
-                    <h3 className="font-semibold text-lg mb-2">{section.name}</h3>
-                    <p className="text-sm text-muted-foreground">{section.description}</p>
+                    <Skeleton className="h-6 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-full" />
                   </CardContent>
                 </Card>
-              </Link>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {filteredSections.map((section) => (
+                <Link key={section.name} href={section.href}>
+                  <Card className="hover-elevate cursor-pointer" data-testid={`card-${section.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className={`h-12 w-12 rounded-2xl ${section.bgColor} flex items-center justify-center`}>
+                          <section.icon className={`h-6 w-6 ${section.color}`} />
+                        </div>
+                        {section.badge !== undefined && section.badge > 0 && (
+                          <Badge variant="destructive" data-testid={`badge-${section.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                            {section.badge}
+                          </Badge>
+                        )}
+                      </div>
+                      <h3 className="font-semibold text-lg mb-2">{section.name}</h3>
+                      <p className="text-sm text-muted-foreground">{section.description}</p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
