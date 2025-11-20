@@ -1,0 +1,326 @@
+Step 39 – Implement Real-Time Support Chat System for SafeGo
+
+Context
+You are updating the SafeGo super-app platform. The platform already supports:
+- Four roles: customer (passenger), driver, restaurant owner, and admin
+- Three core services: rides, food delivery, parcel delivery
+- Country-specific KYC and payments for Bangladesh and USA
+- Existing admin panel with RBAC, audit logging, wallet settlement, commission tracking, document expiry notifications, and global settings (/admin/settings)
+
+Goal
+Implement a complete, production-ready Real-Time Support Chat System for all roles (customer, driver, restaurant owner, admin) without breaking any existing functionality.
+
+Hard constraints
+- NO breaking changes to existing ride/food/parcel, KYC, payments, or wallet flows
+- NO emojis anywhere in code or UI labels
+- Reuse existing RBAC, audit logging, and global settings patterns
+- Logs must never contain secrets, passwords, full SSN/NID, or raw document URLs
+- All new APIs must be admin-authenticated or user-authenticated as appropriate
+- All new database changes must follow existing migration style and indexing patterns
+
+System requirements
+
+1) Database models (Support chat)
+
+Add new models (names can follow existing ORM style):
+
+SupportConversation
+- id
+- userId           // id of driver/customer/restaurant/admin who opened the conversation
+- userType         // "driver" | "customer" | "restaurant" | "admin"
+- assignedAdminId  // admin user id currently handling the conversation (nullable)
+- status           // "open" | "closed"
+- lastMessageAt    // timestamp for sorting
+- createdAt
+- updatedAt
+
+SupportMessage
+- id
+- conversationId
+- senderId         // user or admin id
+- senderType       // "driver" | "customer" | "restaurant" | "admin"
+- messageText
+- attachments      // JSON array of safe attachment metadata (no secrets)
+- createdAt
+
+SupportAttachment (future-proof, simple)
+- id
+- messageId
+- fileUrl          // safe storage URL
+- fileType         // "image" | "pdf" | "other"
+- createdAt
+
+Rules:
+- Add indexes for conversationId, userId, assignedAdminId, status, lastMessageAt
+- Follow existing migration and schema conventions
+- Do not remove or modify existing tables in a breaking way
+
+2) WebSocket real-time messaging
+
+Add a WebSocket layer (or reuse existing one if present) to support real-time chat:
+
+Events (server-side and client-side):
+- "conversation:start"      // new conversation created
+- "conversation:assign"     // admin assignment changed
+- "conversation:close"      // conversation closed
+- "message:new"             // new message posted
+- "message:read"            // optional read receipts
+
+Room conventions:
+- "admin_support"           // admins listening to all conversations
+- "conversation_<id>"       // individual conversation room
+
+Security:
+- Use existing auth token / session middleware
+- Only authenticated users can connect
+- A non-admin user may join only:
+  - "conversation_<theirActiveConversationId>" rooms
+- Admins may join:
+  - "admin_support"
+  - any "conversation_<id>"
+- WebSocket errors must not crash the server; log them and fail gracefully
+
+3) Backend REST APIs for support chat
+
+Add REST endpoints following existing routing style, for example under /api/support:
+
+- POST /api/support/conversations
+  - For driver/customer/restaurant to start a new conversation
+  - If an open conversation already exists for that user, reuse it instead of creating a duplicate
+  - Emits "conversation:start" and initial "message:new" if message included
+
+- GET /api/support/conversations/me
+  - Return current user’s conversations (driver/customer/restaurant)
+
+- GET /api/admin/support/conversations
+  - Admin-only
+  - Filters: status, userType, assignedAdminId, dateFrom, dateTo
+  - Paginated, ordered by lastMessageAt DESC
+
+- POST /api/admin/support/conversations/:id/assign
+  - Admin-only
+  - Assign conversation to an admin
+
+- POST /api/admin/support/conversations/:id/close
+  - Admin-only
+  - Close conversation (status -> "closed")
+
+- GET /api/support/conversations/:id/messages
+  - Authenticated user or admin must belong to this conversation
+  - Paginated messages (oldest first)
+
+- POST /api/support/conversations/:id/messages
+  - Authenticated user or assigned admin sends a new message
+  - Emits "message:new" on WebSocket
+
+Attachment rules:
+- If there is already a safe file upload system, reuse it
+- Otherwise, create a simple endpoint using existing upload patterns
+- Never allow executable file types if there is a security policy
+- Store only safe metadata in attachments
+
+4) RBAC and permissions
+
+Reuse existing RBAC system. Add new capabilities:
+
+- VIEW_SUPPORT_CHAT_LIST      // see conversations list
+- REPLY_SUPPORT_CHAT          // send messages as admin
+- ASSIGN_SUPPORT_CHAT         // assign conversations
+- CLOSE_SUPPORT_CHAT          // close conversations
+
+Rules:
+- Only admins with proper capabilities can:
+  - See the admin conversations list
+  - Assign conversations
+  - Close conversations
+  - Reply as admin
+- Regular users (driver/customer/restaurant) can only:
+  - Start conversations for themselves
+  - View and send messages in their own conversations
+
+5) Audit logging
+
+Integrate with the existing AuditLog system (created in previous steps):
+
+Log the following actions using the existing logAuditEvent helper:
+
+- "SUPPORT_CONVERSATION_CREATED"
+  - entityType: "support_conversation"
+  - entityId: conversation id
+  - metadata: { userId, userType }
+
+- "SUPPORT_CONVERSATION_ASSIGNED"
+  - metadata: { conversationId, assignedAdminId }
+
+- "SUPPORT_CONVERSATION_CLOSED"
+  - metadata: { conversationId, closedBy }
+
+- "SUPPORT_MESSAGE_SENT"
+  - metadata: { conversationId, senderType }
+
+Security:
+- Never log raw message text in AuditLog
+- Do not log attachments URLs in AuditLog
+- Use masked identifiers where necessary
+
+6) Admin UI – Support Chat Dashboard
+
+Route: /admin/support-chat
+
+Navigation:
+- Add a new entry in the admin sidebar, under "Management" or "Support":
+  - Label: "Support Chat"
+
+Layout:
+- Page title: "Support Chat"
+- Description: "Handle live support conversations with drivers, customers, and restaurants."
+
+Three main sections:
+
+(1) Conversation list (left sidebar)
+- Search by user email or id (if available)
+- Filters:
+  - Status: All / Open / Closed
+  - User type: All / Driver / Customer / Restaurant
+  - Assigned: All / Unassigned / Me
+- Show list items with:
+  - User type badge (text only, no emoji)
+  - User identifier (email or masked phone if that is what the system uses)
+  - Conversation status
+  - Last message time
+
+(2) Message panel (center)
+- Show message history for selected conversation
+- Different alignment for admin vs user messages (left/right)
+- Show timestamp for each message
+- Input box for typing a new message
+- Send button
+- Optional: attachment button reusing existing upload UI
+- Auto-scroll to latest message
+
+(3) Conversation details (right panel)
+- Basic user info
+- Country and user type
+- Links to:
+  - Driver profile OR
+  - Customer profile OR
+  - Restaurant profile
+- Quick stats (for example: completed trips/orders if easily available)
+- Buttons:
+  - Assign to me
+  - Close conversation
+
+Design rules:
+- Follow existing typography, spacing, and components
+- No emojis
+- Show loading states and empty states clearly
+- If the user lacks a permission, hide or disable related actions
+
+WebSocket behavior (frontend):
+- When the page loads, subscribe to:
+  - "admin_support" (for admins)
+  - "conversation_<id>" for the selected conversation
+- New incoming messages should appear without full reload
+- If connection drops, automatically retry with exponential backoff
+
+7) User-side chat UI (Driver, Customer, Restaurant)
+
+Add "Support Chat" entry in the main menu/profile area for each app:
+
+- Driver app route: /driver/support
+- Customer app route: /customer/support
+- Restaurant app route: /restaurant/support
+
+Simple layout:
+- Conversation panel with messages
+- If no conversation, show "Start a new conversation" button
+- Once started, show:
+  - Messages (user vs admin)
+  - Text input + send button
+  - Optional attachment button
+- Support chat must work on mobile layout
+
+8) Global Settings – Support tab
+
+Reuse /admin/settings and add a new tab: "Support"
+
+Fields:
+- Support chat enabled (boolean)
+- Support business hours (text or structured)
+- Auto-assign mode: "round_robin" | "manual"
+- Auto-close after (hours) for inactive conversations (integer)
+
+Behavior:
+- Settings are stored using existing settings infrastructure
+- Admin chat behavior reads these settings:
+  - If support chat is disabled, hide or disable entry points for non-admin users
+  - If auto-assign is round_robin, new conversations are automatically assigned to available admins with proper permission
+  - If auto-close is configured, backend job or logic marks conversations as closed after the configured period of inactivity
+
+9) Validation, security, and performance
+
+Validation:
+- Use existing validation layer (for example, Zod or similar) for all new endpoints
+- Enforce max message length
+- Enforce safe attachment types and sizes
+
+Security:
+- Authenticate all chat requests
+- Enforce authorization based on RBAC
+- Do not expose internal ids that are considered sensitive
+- Sanitize messageText to prevent XSS on display
+
+Performance:
+- Use pagination on all list endpoints:
+  - Conversations list
+  - Messages list
+- Index frequently used fields
+- Ensure WebSocket handlers are efficient and non-blocking
+
+10) Testing plan
+
+Implement and/or manually verify:
+
+1. As a driver:
+   - Open "Support Chat"
+   - Start a new conversation
+   - Send a message
+2. As an admin:
+   - Open /admin/support-chat
+   - See the new conversation in the list
+   - Assign it to self
+   - Reply; driver sees the reply in real time
+3. Close the conversation; confirm:
+   - Status is "closed"
+   - Driver cannot send new messages unless a new conversation is opened
+4. As a customer and restaurant owner:
+   - Repeat the basic flow to ensure userType works correctly
+5. RBAC:
+   - Admin without REPLY_SUPPORT_CHAT cannot send replies
+   - Admin without ASSIGN_SUPPORT_CHAT cannot assign conversations
+6. Audit logs:
+   - Verify audit entries for created, assigned, closed, and message-sent actions
+   - Confirm no sensitive message content or secrets are stored in AuditLog
+7. Settings:
+   - Disable support chat and confirm user-side entry points are hidden or show a disabled state
+   - Change auto-assign mode and confirm new conversations reflect the behavior
+8. Regression:
+   - Confirm rides, food orders, parcels, KYC, payments, wallet settlement, commissions, and notifications continue to work without errors
+
+Documentation
+
+Update replit.md with:
+- New models and database changes
+- New endpoints and WebSocket events
+- Support chat UI for admin and users
+- New RBAC permissions
+- Support settings behavior
+- Security considerations and limitations
+
+Final expectation
+
+The result should be a production-ready, secure, real-time support chat system for SafeGo that:
+- Works for drivers, customers, restaurants, and admins
+- Respects existing RBAC, audit logging, and settings patterns
+- Does not break any current functionality
+- Is efficient and scalable for many concurrent conversations.
