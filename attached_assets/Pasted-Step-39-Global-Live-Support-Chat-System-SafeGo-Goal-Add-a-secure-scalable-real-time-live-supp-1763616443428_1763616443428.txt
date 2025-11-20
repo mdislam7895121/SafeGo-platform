@@ -1,0 +1,371 @@
+Step 39 – Global Live Support Chat System (SafeGo)
+
+Goal
+Add a secure, scalable, real-time live support chat system for the SafeGo platform, without breaking any existing functionality. The system must let admins and support agents chat with drivers, passengers, and restaurant owners in real time, with full RBAC, audit logging, and no sensitive data leaks.
+
+Very important global constraints
+- Do NOT break or change existing ride, food, or parcel flows.
+- Do NOT change any existing KYC, commission, or settlement logic.
+- Do NOT remove or weaken any existing security features (RBAC, audit logs, masking, notifications, document expiry alerts).
+- No emojis anywhere in the new UI or text.
+- Keep all new features backward compatible and production-ready.
+- Respect existing role-based access control and audit logging system from previous steps.
+
+User roles (for this feature)
+Reuse existing RBAC, but extend it for support:
+- SuperAdmin / Admin
+  - Can view and manage all conversations
+  - Can configure support settings in Global Settings
+  - Can assign conversations to agents
+- SupportAgent
+  - Can view and reply to assigned or unassigned conversations (if allowed by config)
+  - Cannot change global settings
+- ReadOnlyAdmin (if already present)
+  - Can view conversations but cannot send replies
+
+Do not invent new roles if they do not exist; instead, map to existing role model and extend capabilities if needed.
+
+1. Data Model – Support Chat
+
+Follow existing ORM and migration style. Add new tables/models without breaking existing ones.
+
+1.1 SupportConversation
+Fields:
+- id (primary key, UUID or existing style)
+- createdAt (timestamp)
+- updatedAt (timestamp)
+- status: "open" | "pending" | "closed"
+- userType: "driver" | "customer" | "restaurant"
+- userId: reference id to the driver/customer/restaurant table (string)
+- countryCode: "BD" | "US" | others if already supported
+- lastMessageAt (timestamp)
+- lastMessagePreview (short text, optional)
+- assignedAdminId (nullable, reference to admin/support user)
+- priority: "normal" | "high" | "urgent" (default: "normal")
+- source: "mobile_app" | "web_app" | "admin_created" (string)
+- metadata (JSON, optional, non-sensitive only; examples: appVersion, deviceType, platform)
+- closedAt (nullable timestamp)
+- closedByAdminId (nullable)
+
+1.2 SupportMessage
+Fields:
+- id (primary key)
+- conversationId (foreign key to SupportConversation)
+- createdAt (timestamp)
+- senderType: "user" | "admin"
+- senderId (admin id or user id, as string)
+- body (text, required for text messages)
+- attachmentUrl (nullable, safe file storage URL if attachments are allowed)
+- attachmentType (nullable: "image" | "file" | "log" etc.)
+- metadata (JSON, optional, no sensitive info)
+- readByAdmin (boolean, default false)
+- readByUser (boolean, default false)
+
+1.3 SupportSettings
+Configured through Global Settings panel (see section 4):
+- liveChatEnabled: boolean
+- supportEmail (reuse existing if present)
+- supportPhone (reuse existing if present)
+- allowedUserTypes: array ["driver","customer","restaurant"]
+- maxAttachmentSizeMb
+- allowAttachments: boolean
+- autoCloseDays: integer (e.g. close conversation after X days of inactivity)
+- defaultAssignmentMode: "unassigned" | "auto_assign"
+- workingHours (optional JSON: day ranges and time ranges)
+Store these settings in a way consistent with the existing Global Settings system (reusing the existing settings infrastructure you already built).
+
+Security note:
+- No SSN, NID, password, or secrets in any metadata or message body automatically. Do not log these automatically anywhere.
+
+2. Backend – Support Chat Services and APIs
+
+All endpoints must be admin-authenticated where appropriate, and user-authenticated for driver/customer/restaurant apps. Follow existing auth middleware and patterns.
+
+2.1 Admin-side APIs
+
+Base route example: /api/admin/support
+
+Endpoints:
+1) GET /api/admin/support/conversations
+   - Query params: page, pageSize, status, userType, countryCode, assignedAdminId, search (by user email or id), dateFrom, dateTo, priority
+   - Returns paginated list of conversations, latest message preview, unread counts, filters.
+   - Only accessible by Admin / SupportAgent / ReadOnlyAdmin according to RBAC.
+
+2) GET /api/admin/support/conversations/:id
+   - Returns the conversation and its messages (paginated)
+   - Includes associated user summary (name, email, phone, last few trips/orders summary if cheaply available)
+   - No sensitive data (no full SSN or NID, follow existing masking rules).
+
+3) POST /api/admin/support/conversations/:id/messages
+   - Send admin reply.
+   - Request: { body: string, attachment? }
+   - Validate that sender is an authorized Admin/SupportAgent.
+   - Persist SupportMessage, update SupportConversation.lastMessageAt and lastMessagePreview.
+   - Trigger notifications (push or in-app) for user side if available.
+
+4) POST /api/admin/support/conversations/:id/assign
+   - Assign to specific admin / agent.
+   - Request: { adminId }
+   - Update assignedAdminId.
+   - Log audit event (see section 3).
+
+5) POST /api/admin/support/conversations/:id/status
+   - Change status to open/pending/closed.
+   - If closing, set closedAt and closedByAdminId.
+   - Log audit event.
+
+2.2 User-side APIs (driver, customer, restaurant)
+
+Use separate routes according to existing API style, for example /api/support.
+
+Endpoints:
+1) GET /api/support/conversations
+   - Scoped to authenticated user (driver/customer/restaurant).
+   - Returns their own conversations, newest first.
+   - Supports pagination.
+
+2) POST /api/support/conversations
+   - Creates a new conversation if none is open or if last conversation is closed.
+   - Automatically sets userType and userId from auth context.
+   - Optionally attach context (e.g. last tripId, last orderId) in metadata.
+
+3) GET /api/support/conversations/:id/messages
+   - Returns messages for that conversation, only if user owns it.
+
+4) POST /api/support/conversations/:id/messages
+   - User sends a message.
+   - Validate message (length, content).
+   - Persist message, update conversation.
+   - Notify assigned admin(s) if online.
+
+2.3 Real-time transport
+
+- Use WebSockets or existing real-time infrastructure (for example Server-Sent Events or a pub/sub abstraction already in the codebase).
+- Create a safe abstraction (e.g. SupportChatGateway or similar) that:
+  - Authenticates connected clients.
+  - Subscribes them only to conversations they are allowed to see.
+  - Emits events for new messages, assignments, status changes.
+- Ensure that an error in the real-time path never breaks main HTTP APIs.
+
+3. Security, Audit Logging, and RBAC
+
+3.1 RBAC integration
+- Reuse existing RBAC implementation from previous steps.
+- Define capabilities, for example:
+  - VIEW_SUPPORT_CONVERSATIONS
+  - REPLY_SUPPORT_CONVERSATIONS
+  - ASSIGN_SUPPORT_CONVERSATIONS
+  - MANAGE_SUPPORT_SETTINGS
+- Map them to roles:
+  - Admin: all above.
+  - SupportAgent: VIEW_SUPPORT_CONVERSATIONS, REPLY_SUPPORT_CONVERSATIONS, ASSIGN_SUPPORT_CONVERSATIONS.
+  - ReadOnlyAdmin: VIEW_SUPPORT_CONVERSATIONS only.
+- Frontend must hide buttons or actions if capability is missing, but backend must still enforce RBAC.
+
+3.2 Audit logging
+Reuse the existing audit logging helper (logAuditEvent) created in Step 37. Log at least:
+
+- When a new support conversation is created:
+  - actionType: "SUPPORT_CONVERSATION_CREATED"
+  - entityType: "support_conversation"
+  - entityId: conversationId
+- When an admin sends a message:
+  - actionType: "SUPPORT_MESSAGE_SENT"
+  - entityType: "support_conversation"
+- When a conversation is assigned:
+  - actionType: "SUPPORT_CONVERSATION_ASSIGNED"
+- When status changes (open/pending/closed):
+  - actionType: "SUPPORT_CONVERSATION_STATUS_CHANGED"
+- When support settings are changed:
+  - actionType: "SETTINGS_UPDATED"
+  - entityType: "support_settings"
+
+Constraints:
+- Never log full SSN, NID, or passwords.
+- Messages can be referenced by id but should not be copied fully into the audit description. Use short, non-sensitive summaries.
+
+3.3 Data and privacy
+- If attachments are allowed, validate:
+  - Maximum size
+  - Allowed mime types (images, pdf, text log, etc.).
+- Store files in a safe storage mechanism consistent with current system.
+- Virus/malware scanning hook if already supported or easily pluggable.
+- Respect existing masking utilities for personally sensitive data wherever reused.
+
+4. Admin UI – Global Settings for Support Chat
+
+Extend the existing Global Settings page at /admin/settings.
+
+4.1 New "Support" tab
+Tabs remain:
+- General
+- KYC Rules
+- Commission
+- Settlement
+- Notifications
+- Security
+- Support Chat (new tab)
+
+In the Support Chat tab, include:
+
+Fields:
+- Live Chat Enabled: checkbox
+- Allowed User Types: multiselect (Drivers, Customers, Restaurants)
+- Support working hours: start/end time per day (basic implementation, can be simple text or structured fields)
+- Auto Close Conversations after X days: integer input
+- Allow Attachments: checkbox
+- Max Attachment Size (MB): numeric
+- Default Assignment:
+  - "Unassigned queue" (manual pick up by agents)
+  - "Auto-assign to first available agent" (only structure, do not build complex queueing if out of scope)
+- Save button that persists through existing settings backend.
+
+Security:
+- Only Admins with MANAGE_SUPPORT_SETTINGS can view/change this tab.
+
+5. Admin UI – Support Chat Dashboard
+
+Create a new page at /admin/support (or similar route based on existing routing style).
+
+5.1 Layout
+- Title: "Support Chat"
+- Description: "View and respond to support conversations from drivers, customers, and restaurants."
+
+Structure:
+1) Left panel: Conversation list
+   - Search by user email/id
+   - Filters:
+     - Status: All, Open, Pending, Closed
+     - User Type: All, Drivers, Customers, Restaurants
+     - Country: All, BD, US, etc.
+     - Assigned: All, Assigned to me, Unassigned
+     - Priority: All, Normal, High, Urgent
+   - Each conversation item shows:
+     - User type (label)
+     - User name or email
+     - Last message preview
+     - Time of last message
+     - Status badge
+     - Unread count (admin side)
+
+2) Right panel: Conversation detail
+   - Header:
+     - User name
+     - User type
+     - Country
+     - Status dropdown (open/pending/closed)
+     - Assignment dropdown (assign to admin/agent)
+   - Middle:
+     - Message history (bubbles or simple list)
+     - Clear timestamp for each message
+     - Sender type (User/Admin)
+   - Bottom:
+     - Text input
+     - Attach file button (if allowed by settings)
+     - Send button (disabled if liveChatEnabled is false or user’s conversation closed)
+
+3) Side info panel (can be in header or right side):
+   - User summary:
+     - Name, email, phone
+     - Country
+     - For drivers: rating, total trips, current status
+     - For customers: total trips/orders
+     - For restaurants: active status, total orders
+   - Recent activity overview if data is easily available without heavy queries.
+
+5.2 UX rules
+- If support chat is disabled in settings:
+  - Admin page shows a clear message: "Support chat is currently disabled in Global Settings."
+- If conversation is closed:
+  - Disable message input and show "This conversation is closed."
+- Respect RBAC:
+  - ReadOnly users see conversations but no input box.
+  - Agents without assign capability cannot see the assign dropdown.
+
+6. User-side UI entry points (structure only)
+
+The actual mobile apps or web portals may be separate, so keep implementation minimal and consistent with existing patterns. At minimum:
+
+6.1 Driver app
+- Add "Support" or "Help & Support" section.
+- Entry point leads to list of conversations.
+- If none exists or last is closed, allow creating a new conversation.
+
+6.2 Customer app
+- Similar Help or Support Center entry.
+- Same conversation behavior.
+
+6.3 Restaurant portal
+- In restaurant dashboard, add "Support" link.
+- Reuse the same user-side conversation UI component.
+
+7. Non-breaking changes and performance
+
+- Do not modify existing tables in a way that breaks migrations or legacy data.
+- Use new tables for support chat and settings entries.
+- Index columns that are heavily used for filtering:
+  - SupportConversation: userId, userType, status, assignedAdminId, createdAt, lastMessageAt.
+- Ensure pagination is implemented everywhere (admin and user side) to avoid loading too many messages at once.
+
+8. Testing Plan
+
+Create and execute a full end-to-end test checklist:
+
+1) Admin login:
+   - Verify that audit log records login events as before.
+
+2) Support settings:
+   - Navigate to /admin/settings.
+   - Enable support chat.
+   - Configure allowed user types and auto close days.
+   - Verify settings persist.
+
+3) User flows:
+   - As a driver, create a new support conversation from their app or test client.
+   - Send a few messages.
+   - As a customer and restaurant, create conversations as well.
+
+4) Admin flows:
+   - Open /admin/support.
+   - See all new conversations in Open status.
+   - Filter by userType and country.
+   - Assign conversations to a specific admin.
+   - Send replies and see them in the user apps in real time.
+   - Close a conversation and verify that users cannot send new messages (or a new conversation is created instead as per design).
+
+5) Audit log verification:
+   - Confirm that support events are recorded:
+     - Conversation created.
+     - Conversation status changed.
+     - Conversation assigned.
+     - Admin messages sent.
+     - Settings changed.
+   - Check that no full SSN or NID values appear anywhere.
+
+6) Security checks:
+   - Verify that an unauthenticated user cannot access admin support APIs.
+   - Verify that one user cannot read another user’s conversations.
+   - Verify RBAC: Read-only admins cannot send messages.
+
+7) Performance:
+   - Test listing conversations with a realistic number of rows.
+   - Confirm pagination and filters work efficiently.
+
+9. Documentation
+
+Update the main project documentation file (replit.md or equivalent) with:
+
+- New database tables and their fields.
+- New APIs (admin and user side), including routes, parameters, and auth requirements.
+- Description of Support Settings tab.
+- Description of Support Chat admin page.
+- Security and audit logging rules.
+
+Final acceptance criteria
+
+- Live support chat is fully functional for drivers, customers, and restaurants.
+- Admins and support agents can manage conversations in a dedicated Support Chat dashboard.
+- All new features respect RBAC and audit logging rules from previous steps.
+- No existing features (rides, food orders, parcels, KYC, wallet settlements, notifications, activity logs) are broken or changed in behavior.
+- No emojis or sensitive data appear in the new UI or logs.
+- The implementation is architect-reviewed, secure, and production-ready.
