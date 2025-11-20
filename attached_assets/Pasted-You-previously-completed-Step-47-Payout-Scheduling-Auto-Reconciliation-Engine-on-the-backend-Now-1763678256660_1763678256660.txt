@@ -1,0 +1,127 @@
+You previously completed Step 47: Payout Scheduling & Auto-Reconciliation Engine on the backend. Now I want you to implement the ADMIN UI for these features, without breaking any existing security or financial logic.
+
+Context and constraints:
+- App: SafeGo multi-tenant platform (rides, food, parcels).
+- Roles: customer, driver, restaurant, admin.
+- Admin is SUPER_ADMIN with RBAC permissions.
+- Security Phases 1–4 (core auth, secure UX, monitoring, fraud, incident response) are already COMPLETE and MUST NOT be modified.
+- Admin dashboard currently has the “Payouts” card (route: /admin/payouts) and financial suite implemented (wallets, earnings analytics). You must EXTEND this, not rewrite it.
+
+Your task:
+1. FRONTEND SCOPE ONLY
+   - Build the admin UI pages for:
+     a) Scheduled payouts management
+     b) Manual payouts
+     c) Reconciliation reports
+   - Use the backend endpoints you already created in Step 47 (schedule payouts, run manual payouts, reconciliation reports).
+   - Do NOT change any existing Prisma models or backend business logic unless absolutely required. If a change is truly necessary, clearly describe WHY in replit.md.
+
+2. ROUTES & NAVIGATION
+   - Confirm the following admin routes and implement if missing:
+     • /admin/payouts          → Main payouts management hub
+     • /admin/payouts/schedule → Scheduled payouts configuration
+     • /admin/payouts/manual   → Manual payout execution
+     • /admin/payouts/reports  → Reconciliation reports
+   - The main Payouts card on the admin dashboard should still link to /admin/payouts.
+   - From /admin/payouts, provide clear navigation buttons/links to the three sub-pages.
+   - Keep the existing admin layout, header, breadcrumbs, and SafeGo design system styles.
+
+3. RBAC & SECURITY (Phase 4 must remain intact)
+   - Enforce existing permissions:
+     • MANAGE_PAYOUTS → required for creating, editing, or executing payouts.
+     • VIEW_WALLETS or VIEW_EARNINGS_DASHBOARD → required for viewing payout and reconciliation data.
+   - If user does NOT have the required permission, show a friendly “Access denied” message and do NOT call the backend.
+   - All payout actions must:
+     • Use the existing audit logging system (record who did what and when).
+     • Respect the existing fraud/risk controls (do not bypass any validation).
+
+4. UI REQUIREMENTS
+
+   4.1. /admin/payouts (Payouts Hub)
+   - Show a summary panel:
+     • Total scheduled payout jobs
+     • Next upcoming payout time
+     • Last payout run status (success/failure, timestamp)
+   - Show a table of recent payout executions:
+     • Columns: Run ID, Type (Scheduled/Manual), Date/Time, Status, Total Amount, Initiated By.
+     • Filters: date range, status.
+   - Provide buttons:
+     • “Manage scheduled payouts” → /admin/payouts/schedule
+     • “Run manual payout”        → /admin/payouts/manual
+     • “View reconciliation reports” → /admin/payouts/reports
+
+   4.2. /admin/payouts/schedule (Scheduled Payouts)
+   - Display a list of existing payout schedules:
+     • Columns: Schedule ID, Target (Drivers / Restaurants / Both), Frequency (daily/weekly/monthly), Next Run, Status (Active/Paused), Last Result.
+   - Actions per row:
+     • View details
+     • Pause/resume
+     • Edit schedule
+   - “Create new schedule” form:
+     • Target: Drivers / Restaurants / Both
+     • Frequency: Daily / Weekly / Monthly
+     • Execution time (with timezone)
+     • Minimum balance threshold
+     • Destination type (bank transfer, wallet, etc., as supported by backend)
+   - Submit/Update should call the existing Step 47 scheduling endpoint with proper validation and show success/error toasts.
+   - All changes must be audited using the existing audit logging functions.
+
+   4.3. /admin/payouts/manual (Manual Payouts)
+   - Filter panel:
+     • Account type: Drivers / Restaurants
+     • Search by name, email, or ID
+     • Minimum balance threshold
+   - Results table:
+     • Entity (driver/restaurant name), ID, Current balance, Last payout date, Selected? (checkbox).
+   - Admin can:
+     • Select individual rows or “Select all” (respecting sensible limits, e.g., pagination).
+     • Click “Run Manual Payout”.
+   - Show a confirmation modal (use existing SensitiveActionModal / security confirmation pattern if available):
+     • Number of recipients
+     • Total amount (approximate)
+     • Warning about irreversibility
+   - On confirm, call the manual payout endpoint from Step 47 and show progress + result (success count, failed count, link to reconciliation report if available).
+
+   4.4. /admin/payouts/reports (Reconciliation Reports)
+   - Filter options:
+     • Date range
+     • Payout type (Scheduled / Manual)
+     • Status (Balanced / Mismatch / Pending)
+   - Reports list:
+     • Columns: Report ID, Period (start–end), Type, Generated on, Status, Mismatch count.
+   - Clicking a report opens a detailed view:
+     • Summary: Total debits vs. total credits vs. actual payouts
+     • Mismatches table: Entity, Expected amount, Actual amount, Difference, Status, Notes.
+   - If backend exposes “download report” endpoint, provide a Download button (CSV/JSON). Otherwise, just display data in UI.
+
+5. UX & DESIGN
+   - Follow the same card + table visual style as existing admin pages (wallets, earnings analytics, monitoring).
+   - Use loading states, empty states (“No scheduled payouts yet”), and clear error messages.
+   - Do not introduce new colors or typography outside the SafeGo design system.
+
+6. SECURITY & QUALITY GUARDRAILS
+   - DO NOT:
+     • Disable or weaken any of the Phase 1–4 security features.
+     • Change JWT, auth middleware, fraud detection, or incident response logic.
+     • Touch Security Center, System Monitoring, or Activity Log except to add new audit events if required.
+   - DO:
+     • Validate all user input on the frontend before sending it to the backend.
+     • Handle backend error responses gracefully (show non-technical messages to the admin, log technical details if needed).
+     • Make sure sensitive actions (creating/updating payout schedules, running manual payouts) are wrapped with existing security confirmation components if available.
+
+7. DOCUMENTATION (replit.md)
+   - Update replit.md with a new subsection for:
+     • “Step 47 – Admin Financial Suite UI”
+     • Routes created/used
+     • RBAC permissions required per route/action
+     • Main backend endpoints consumed
+     • Any important notes for operators (for example: “Manual payouts should be used only for exceptional cases”).
+
+8. FINAL CHECKLIST
+   - All four pages build successfully with TypeScript compilation clean.
+   - RBAC is enforced on all payout pages.
+   - Existing admin dashboard cards still work: Wallets, Payouts, Earnings Analytics, System Monitoring, Security Threat Center, Activity Log, etc.
+   - No changes to existing security phases; fraud detection and incident response remain intact.
+   - Take a final screenshot of /admin/payouts and confirm everything is working.
+
+Now start implementing these admin UI pages in an incremental, non-breaking way.
