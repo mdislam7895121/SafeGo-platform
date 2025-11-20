@@ -579,6 +579,336 @@ export class WalletPayoutService {
 
     return payouts.reduce((sum, payout) => sum + parseFloat(payout.amount.toString()), 0);
   }
+
+  async createPayoutBatch(params: {
+    periodStart: Date;
+    periodEnd: Date;
+    ownerType?: WalletOwnerType;
+    countryCode?: string;
+    minPayoutAmount?: number;
+    createdByAdminId: string;
+  }) {
+    const {
+      periodStart,
+      periodEnd,
+      ownerType,
+      countryCode,
+      minPayoutAmount = 10,
+      createdByAdminId,
+    } = params;
+
+    return await prisma.$transaction(async (tx) => {
+      const walletWhere: any = {};
+
+      if (ownerType) {
+        walletWhere.ownerType = ownerType;
+      } else {
+        walletWhere.ownerType = { in: ["driver", "restaurant"] };
+      }
+
+      if (countryCode) {
+        walletWhere.countryCode = countryCode;
+      }
+
+      const eligibleWallets = await tx.wallet.findMany({
+        where: walletWhere,
+        include: {
+          _count: {
+            select: {
+              payouts: {
+                where: {
+                  status: { in: ["pending", "processing"] },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      const walletsForPayout = eligibleWallets.filter((wallet) => {
+        const availableBalance = parseFloat(wallet.availableBalance.toString());
+        const negativeBalance = parseFloat(wallet.negativeBalance.toString());
+        const hasPendingPayouts = wallet._count.payouts > 0;
+
+        return (
+          availableBalance >= minPayoutAmount &&
+          negativeBalance === 0 &&
+          !hasPendingPayouts
+        );
+      });
+
+      const batch = await tx.payoutBatch.create({
+        data: {
+          batchType: ownerType || null,
+          periodStart,
+          periodEnd,
+          totalPayoutCount: walletsForPayout.length,
+          totalPayoutAmount: 0,
+          status: "created",
+          createdByAdminId,
+        },
+      });
+
+      let totalBatchAmount = 0;
+      const createdPayouts = [];
+
+      for (const wallet of walletsForPayout) {
+        const availableBalance = parseFloat(wallet.availableBalance.toString());
+
+        const payout = await tx.payout.create({
+          data: {
+            walletId: wallet.id,
+            countryCode: wallet.countryCode,
+            ownerType: wallet.ownerType,
+            ownerId: wallet.ownerId,
+            amount: availableBalance,
+            method: "auto_weekly",
+            status: "pending",
+            scheduledAt: new Date(),
+            createdByAdminId,
+            batchId: batch.id,
+          },
+        });
+
+        totalBatchAmount += availableBalance;
+        createdPayouts.push(payout);
+      }
+
+      await tx.payoutBatch.update({
+        where: { id: batch.id },
+        data: {
+          totalPayoutAmount: totalBatchAmount,
+        },
+      });
+
+      return {
+        batch,
+        payouts: createdPayouts,
+      };
+    });
+  }
+
+  async processPayoutBatch(batchId: string, processedByAdminId: string) {
+    return await prisma.$transaction(async (tx) => {
+      const batch = await tx.payoutBatch.findUnique({
+        where: { id: batchId },
+        include: {
+          payouts: true,
+        },
+      });
+
+      if (!batch) {
+        throw new Error(`Batch ${batchId} not found`);
+      }
+
+      if (batch.status !== "created") {
+        throw new Error(`Batch is already ${batch.status}`);
+      }
+
+      await tx.payoutBatch.update({
+        where: { id: batchId },
+        data: {
+          status: "processing",
+        },
+      });
+
+      let completedCount = 0;
+      let failedCount = 0;
+
+      for (const payout of batch.payouts) {
+        if (payout.status !== "pending") {
+          continue;
+        }
+
+        const wallet = await tx.wallet.findUnique({
+          where: { id: payout.walletId },
+        });
+
+        if (!wallet) {
+          await tx.payout.update({
+            where: { id: payout.id },
+            data: {
+              status: "failed",
+              failureReason: "Wallet not found",
+              processedAt: new Date(),
+            },
+          });
+          failedCount++;
+          continue;
+        }
+
+        const currentBalance = parseFloat(wallet.availableBalance.toString());
+        const payoutAmount = parseFloat(payout.amount.toString());
+
+        if (currentBalance < payoutAmount) {
+          await tx.payout.update({
+            where: { id: payout.id },
+            data: {
+              status: "failed",
+              failureReason: `Insufficient balance. Available: ${currentBalance}, Required: ${payoutAmount}`,
+              processedAt: new Date(),
+            },
+          });
+          failedCount++;
+          continue;
+        }
+
+        const newBalance = currentBalance - payoutAmount;
+
+        await tx.wallet.update({
+          where: { id: wallet.id },
+          data: {
+            availableBalance: newBalance,
+          },
+        });
+
+        await tx.walletTransaction.create({
+          data: {
+            walletId: wallet.id,
+            ownerType: wallet.ownerType,
+            countryCode: wallet.countryCode,
+            serviceType: "payout",
+            direction: "debit",
+            amount: payoutAmount,
+            balanceSnapshot: newBalance,
+            negativeBalanceSnapshot: wallet.negativeBalance,
+            referenceType: "payout",
+            referenceId: payout.id,
+            description: `Batch payout debit: ${payoutAmount.toFixed(2)} ${wallet.currency}`,
+            createdByAdminId: processedByAdminId,
+          },
+        });
+
+        try {
+          await tx.payout.update({
+            where: { id: payout.id },
+            data: {
+              status: "completed",
+              processedAt: new Date(),
+            },
+          });
+          completedCount++;
+        } catch (error: any) {
+          const refundBalance = newBalance + payoutAmount;
+          await tx.wallet.update({
+            where: { id: wallet.id },
+            data: {
+              availableBalance: refundBalance,
+            },
+          });
+
+          await tx.walletTransaction.create({
+            data: {
+              walletId: wallet.id,
+              ownerType: wallet.ownerType,
+              countryCode: wallet.countryCode,
+              serviceType: "payout",
+              direction: "credit",
+              amount: payoutAmount,
+              balanceSnapshot: refundBalance,
+              negativeBalanceSnapshot: wallet.negativeBalance,
+              referenceType: "payout",
+              referenceId: payout.id,
+              description: `Batch payout refund (failed): ${payoutAmount.toFixed(2)} ${wallet.currency}`,
+              createdByAdminId: processedByAdminId,
+            },
+          });
+
+          await tx.payout.update({
+            where: { id: payout.id },
+            data: {
+              status: "failed",
+              failureReason: error.message || "Payout execution failed",
+              processedAt: new Date(),
+            },
+          });
+          failedCount++;
+        }
+      }
+
+      const finalStatus =
+        failedCount === 0
+          ? "completed"
+          : completedCount === 0
+          ? "failed"
+          : "partially_failed";
+
+      await tx.payoutBatch.update({
+        where: { id: batchId },
+        data: {
+          status: finalStatus,
+        },
+      });
+
+      return {
+        batchId,
+        status: finalStatus,
+        completedCount,
+        failedCount,
+      };
+    });
+  }
+
+  async getPayoutBatch(batchId: string) {
+    return prisma.payoutBatch.findUnique({
+      where: { id: batchId },
+      include: {
+        payouts: {
+          include: {
+            wallet: true,
+          },
+        },
+      },
+    });
+  }
+
+  async listPayoutBatches(filters?: {
+    status?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: any = {};
+
+    if (filters?.status) {
+      where.status = filters.status;
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        where.createdAt.gte = filters.startDate;
+      }
+      if (filters.endDate) {
+        where.createdAt.lte = filters.endDate;
+      }
+    }
+
+    const [batches, total] = await Promise.all([
+      prisma.payoutBatch.findMany({
+        where,
+        include: {
+          _count: {
+            select: {
+              payouts: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: filters?.limit || 50,
+        skip: filters?.offset || 0,
+      }),
+      prisma.payoutBatch.count({ where }),
+    ]);
+
+    return {
+      batches,
+      total,
+      limit: filters?.limit || 50,
+      offset: filters?.offset || 0,
+    };
+  }
 }
 
 export const walletPayoutService = new WalletPayoutService();

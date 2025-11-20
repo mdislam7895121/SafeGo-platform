@@ -6702,6 +6702,141 @@ router.patch("/payouts/:id/status", checkPermission(Permission.MANAGE_PAYOUTS), 
 });
 
 // ====================================================
+// PAYOUT BATCH MANAGEMENT API
+// ====================================================
+
+// Create a new payout batch
+router.post("/payout-batches", checkPermission(Permission.PROCESS_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { periodStart, periodEnd, ownerType, countryCode, minPayoutAmount } = req.body;
+    const adminId = req.user!.id;
+
+    if (!periodStart || !periodEnd) {
+      return res.status(400).json({ error: "periodStart and periodEnd are required" });
+    }
+
+    const result = await walletPayoutService.createPayoutBatch({
+      periodStart: new Date(periodStart),
+      periodEnd: new Date(periodEnd),
+      ownerType: ownerType as "driver" | "restaurant" | undefined,
+      countryCode,
+      minPayoutAmount: minPayoutAmount ? parseFloat(minPayoutAmount) : undefined,
+      createdByAdminId: adminId,
+    });
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.adminProfile?.adminRole || "SUPER_ADMIN",
+      actionType: ActionType.PAYOUT_BATCH_CREATED,
+      entityType: EntityType.PAYOUT,
+      entityId: result.batch.id,
+      description: `Created payout batch with ${result.payouts.length} payouts, total amount: ${result.batch.totalPayoutAmount}`,
+      metadata: { 
+        batchId: result.batch.id,
+        payoutCount: result.payouts.length,
+        totalAmount: result.batch.totalPayoutAmount,
+        periodStart,
+        periodEnd,
+        ownerType,
+        countryCode
+      },
+      success: true,
+      ipAddress: getClientIp(req),
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Create payout batch error:", error);
+    res.status(400).json({ error: error.message || "Failed to create payout batch" });
+  }
+});
+
+// List all payout batches
+router.get("/payout-batches", checkPermission(Permission.VIEW_PAYOUT_BATCHES), async (req: AuthRequest, res) => {
+  try {
+    const { status, page = "1", limit = "50", startDate, endDate } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    const filters: any = {};
+    if (status) filters.status = status as string;
+    if (startDate) filters.startDate = new Date(startDate as string);
+    if (endDate) filters.endDate = new Date(endDate as string);
+
+    const result = await walletPayoutService.listPayoutBatches({
+      ...filters,
+      limit: limitNum,
+      offset,
+    });
+
+    res.json({
+      batches: result.batches,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: result.total,
+      },
+    });
+  } catch (error: any) {
+    console.error("List payout batches error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payout batches" });
+  }
+});
+
+// Get specific batch by ID
+router.get("/payout-batches/:id", checkPermission(Permission.VIEW_PAYOUT_BATCHES), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const batch = await walletPayoutService.getPayoutBatch(id);
+
+    if (!batch) {
+      return res.status(404).json({ error: "Payout batch not found" });
+    }
+
+    res.json(batch);
+  } catch (error: any) {
+    console.error("Get payout batch error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payout batch" });
+  }
+});
+
+// Process a payout batch
+router.post("/payout-batches/:id/process", checkPermission(Permission.PROCESS_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.id;
+
+    const result = await walletPayoutService.processPayoutBatch(id, adminId);
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.adminProfile?.adminRole || "SUPER_ADMIN",
+      actionType: ActionType.PAYOUT_BATCH_PROCESSED,
+      entityType: EntityType.PAYOUT,
+      entityId: id,
+      description: `Processed payout batch ${id}: ${result.completedCount} completed, ${result.failedCount} failed`,
+      metadata: { 
+        batchId: id,
+        status: result.status,
+        completedCount: result.completedCount,
+        failedCount: result.failedCount
+      },
+      success: true,
+      ipAddress: getClientIp(req),
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Process payout batch error:", error);
+    res.status(400).json({ error: error.message || "Failed to process payout batch" });
+  }
+});
+
+// ====================================================
 // COMMISSION ANALYTICS API
 // ====================================================
 
