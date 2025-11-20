@@ -970,6 +970,7 @@ model DeviceProfile {
   @@index([deviceId])
   @@index([lastSeenAt])
   @@index([isTrusted])
+  @@index([deviceId, lastSeenAt])
   @@map("device_profiles")
 }
 
@@ -980,20 +981,28 @@ enum RiskZoneLevel {
   critical
 }
 
-model RiskZone {
-  id          String        @id @default(uuid())
-  countryCode String
-  city        String        @default("")
-  region      String        @default("")
-  riskLevel   RiskZoneLevel
-  notes       String?
-  isActive    Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+enum RiskZoneScope {
+  country
+  city
+  region
+}
 
-  @@unique([countryCode, city, region])
+model RiskZone {
+  id           String        @id @default(uuid())
+  scope        RiskZoneScope
+  compositeKey String        @unique
+  countryCode  String
+  city         String?
+  region       String?
+  riskLevel    RiskZoneLevel
+  notes        String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
   @@index([countryCode])
   @@index([riskLevel])
   @@index([isActive])
+  @@index([scope])
   @@map("risk_zones")
 }
