@@ -189,24 +189,26 @@ export default function AdminEarnings() {
     return params.toString() ? `?${params.toString()}` : "";
   };
 
+  const queryString = buildQueryString();
+
   const { data: globalData, isLoading: globalLoading } = useQuery<GlobalSummary>({
-    queryKey: ["/api/admin/earnings/dashboard/global", dateFrom, dateTo, country],
+    queryKey: [`/api/admin/earnings/dashboard/global${queryString}`],
   });
 
   const { data: rideData, isLoading: rideLoading } = useQuery<RideEarnings>({
-    queryKey: ["/api/admin/earnings/dashboard/rides", dateFrom, dateTo, country],
+    queryKey: [`/api/admin/earnings/dashboard/rides${queryString}`],
   });
 
   const { data: foodData, isLoading: foodLoading } = useQuery<FoodEarnings>({
-    queryKey: ["/api/admin/earnings/dashboard/food", dateFrom, dateTo, country],
+    queryKey: [`/api/admin/earnings/dashboard/food${queryString}`],
   });
 
   const { data: parcelData, isLoading: parcelLoading } = useQuery<ParcelEarnings>({
-    queryKey: ["/api/admin/earnings/dashboard/parcels", dateFrom, dateTo, country],
+    queryKey: [`/api/admin/earnings/dashboard/parcels${queryString}`],
   });
 
   const { data: payoutData, isLoading: payoutLoading } = useQuery<PayoutAnalytics>({
-    queryKey: ["/api/admin/earnings/dashboard/payouts", dateFrom, dateTo, country],
+    queryKey: [`/api/admin/earnings/dashboard/payouts${queryString}`],
   });
 
   const formatCurrency = (amount: number, countryCode?: string) => {

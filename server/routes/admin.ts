@@ -6899,10 +6899,13 @@ router.get("/earnings/dashboard/global", checkPermission(Permission.VIEW_EARNING
     const summary = await earningsService.getGlobalSummary(filters);
 
     await logAuditEvent({
-      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
-      performedByAdminId: req.user!.id,
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
       ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
+      description: `Viewed global earnings dashboard`,
       metadata: { section: 'global', filters },
     });
 
@@ -6926,10 +6929,13 @@ router.get("/earnings/dashboard/rides", checkPermission(Permission.VIEW_EARNINGS
     const earnings = await earningsService.getRideEarnings(filters);
 
     await logAuditEvent({
-      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
-      performedByAdminId: req.user!.id,
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
       ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
+      description: `Viewed ride earnings analytics`,
       metadata: { section: 'rides', filters },
     });
 
@@ -6953,10 +6959,13 @@ router.get("/earnings/dashboard/food", checkPermission(Permission.VIEW_EARNINGS_
     const earnings = await earningsService.getFoodEarnings(filters);
 
     await logAuditEvent({
-      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
-      performedByAdminId: req.user!.id,
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
       ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
+      description: `Viewed food earnings analytics`,
       metadata: { section: 'food', filters },
     });
 
@@ -6980,10 +6989,13 @@ router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNIN
     const earnings = await earningsService.getParcelEarnings(filters);
 
     await logAuditEvent({
-      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
-      performedByAdminId: req.user!.id,
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
       ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
+      description: `Viewed parcel earnings analytics`,
       metadata: { section: 'parcels', filters },
     });
 
@@ -7007,10 +7019,13 @@ router.get("/earnings/dashboard/payouts", checkPermission(Permission.VIEW_EARNIN
     const analytics = await earningsService.getPayoutAnalytics(filters);
 
     await logAuditEvent({
-      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
-      performedByAdminId: req.user!.id,
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
       ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
+      description: `Viewed payout analytics`,
       metadata: { section: 'payouts', filters },
     });
 
