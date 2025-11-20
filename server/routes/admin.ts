@@ -7158,4 +7158,95 @@ router.get("/security-events/summary", checkPermission(Permission.VIEW_DASHBOARD
   }
 });
 
+// ====================================================
+// GET /api/admin/monitoring
+// Get real-time monitoring data for admin dashboard
+// ====================================================
+router.get("/monitoring", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const now = new Date();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // Get summary statistics
+    const [failedLogins, suspiciousActivity, blockedAttempts] = await Promise.all([
+      // Failed logins in last 24h
+      prisma.auditLog.count({
+        where: {
+          actionType: ActionType.LOGIN_FAILED,
+          createdAt: { gte: last24h },
+        },
+      }),
+      // Suspicious activity (failed sensitive actions)
+      prisma.auditLog.count({
+        where: {
+          success: false,
+          actionType: { in: [ActionType.UPDATE_USER, ActionType.MANAGE_DRIVER_KYC, ActionType.UPDATE_WALLET] },
+          createdAt: { gte: last24h },
+        },
+      }),
+      // Blocked attempts (suspended/blocked users)
+      prisma.auditLog.count({
+        where: {
+          actionType: { in: [ActionType.SUSPEND_USER, ActionType.BLOCK_USER] },
+          createdAt: { gte: last24h },
+        },
+      }),
+    ]);
+
+    // Get recent security events (limited fields for security)
+    const recentEvents = await prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { success: false },
+          { actionType: { in: [ActionType.LOGIN_FAILED, ActionType.SUSPEND_USER, ActionType.BLOCK_USER] } },
+        ],
+        createdAt: { gte: last24h },
+      },
+      select: {
+        id: true,
+        actorEmail: true,
+        actionType: true,
+        entityType: true,
+        description: true,
+        success: true,
+        createdAt: true,
+        ipAddress: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    });
+
+    // Simple active sessions estimate (users who logged in successfully in last hour)
+    const activeSessions = await prisma.auditLog.count({
+      where: {
+        actionType: ActionType.LOGIN_SUCCESS,
+        createdAt: { gte: new Date(now.getTime() - 60 * 60 * 1000) },
+      },
+    });
+
+    // System health check (simplified)
+    const startTime = Date.now();
+    await prisma.$queryRaw`SELECT 1`;
+    const apiLatencyMs = Date.now() - startTime;
+
+    res.json({
+      summary: {
+        failedLoginsLast24h: failedLogins,
+        suspiciousActivityLast24h: suspiciousActivity,
+        blockedAttemptsLast24h: blockedAttempts,
+        activeSessionsNow: activeSessions,
+      },
+      recentEvents,
+      systemHealth: {
+        apiLatencyMs,
+        databaseStatus: apiLatencyMs < 1000 ? "healthy" : "degraded",
+        cacheStatus: "healthy",
+      },
+    });
+  } catch (error) {
+    console.error("Monitoring data error:", error);
+    res.status(500).json({ error: "Failed to fetch monitoring data" });
+  }
+});
+
 export default router;

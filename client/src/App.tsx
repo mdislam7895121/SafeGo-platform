@@ -57,6 +57,7 @@ import AdminWallets from "@/pages/admin/wallets";
 import AdminWalletDetails from "@/pages/admin/wallet-details";
 import AdminPayouts from "@/pages/admin/payouts";
 import AdminEarnings from "@/pages/admin/earnings";
+import AdminMonitoring from "@/pages/admin/monitoring";
 
 import NotFound from "@/pages/not-found";
 
@@ -295,6 +296,11 @@ function Router() {
       <Route path="/admin/earnings">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminEarnings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/monitoring">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminMonitoring />
         </ProtectedRoute>
       </Route>
 
