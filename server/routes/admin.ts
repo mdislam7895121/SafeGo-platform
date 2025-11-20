@@ -25,6 +25,22 @@ router.use(requireAdmin());      // Step 2: Verify user is admin
 router.use(loadAdminProfile);    // Step 3: Load admin profile and capabilities
 
 // ====================================================
+// GET /api/admin/capabilities
+// Returns the current admin user's permissions/capabilities
+// ====================================================
+router.get("/capabilities", async (req: AuthRequest, res) => {
+  try {
+    const { getAdminCapabilities } = await import('../utils/permissions');
+    const capabilities = getAdminCapabilities(req.adminUser);
+    
+    res.json({ capabilities });
+  } catch (error) {
+    console.error("Error fetching admin capabilities:", error);
+    res.status(500).json({ error: "Failed to fetch capabilities" });
+  }
+});
+
+// ====================================================
 // HELPER: Validate KYC Completeness
 // Checks if driver has all required documents per country/state
 // ====================================================
