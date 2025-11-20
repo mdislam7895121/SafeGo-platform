@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { walletService } from "../services/walletService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -413,24 +414,19 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
           },
         });
 
-        // Apply wallet logic based on payment method
-        if (ride.paymentMethod === "cash") {
-          // Driver gets full cash, SafeGo commission becomes negative balance
-          await prisma.driverWallet.update({
-            where: { id: driver.driverWallet!.id },
-            data: {
-              negativeBalance: { increment: parseFloat(ride.safegoCommission.toString()) },
-            },
-          });
-        } else {
-          // Online payment: driver gets payout
-          await prisma.driverWallet.update({
-            where: { id: driver.driverWallet!.id },
-            data: {
-              balance: { increment: parseFloat(ride.driverPayout.toString()) },
-            },
-          });
-        }
+        // Record ride earning in wallet with full transaction logging
+        await walletService.recordRideEarning(
+          ride.driverId,
+          {
+            id: ride.id,
+            serviceFare: ride.serviceFare,
+            driverPayout: ride.driverPayout,
+            safegoCommission: ride.safegoCommission,
+            paymentMethod: ride.paymentMethod as "cash" | "online",
+            pickupAddress: ride.pickupAddress,
+            dropoffAddress: ride.dropoffAddress,
+          }
+        );
       }
     }
 

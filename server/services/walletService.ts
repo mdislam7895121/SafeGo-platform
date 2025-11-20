@@ -224,13 +224,254 @@ export class WalletService {
       walletId: wallet.id,
       ownerType,
       countryCode,
-      serviceType: "commission",
+      serviceType,  // CRITICAL: Preserve passed serviceType (ride, parcel_delivery, food_order)
       direction: "debit",
       amount,
       referenceType,
       referenceId,
       description,
     });
+  }
+
+  // Service-specific earning recording methods
+  async recordRideEarning(
+    driverId: string,
+    ride: {
+      id: string;
+      serviceFare: any;
+      driverPayout: any;
+      safegoCommission: any;
+      paymentMethod: "cash" | "online";
+      pickupAddress: string;
+      dropoffAddress: string;
+    }
+  ): Promise<void> {
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id: driverId },
+      include: { user: true },
+    });
+
+    if (!driver) {
+      throw new Error(`Driver ${driverId} not found`);
+    }
+
+    const countryCode = driver.user.countryCode;
+    
+    if (!ride.safegoCommission || !ride.driverPayout) {
+      throw new Error(`Missing commission or payout amounts for ride ${ride.id}`);
+    }
+
+    const commissionAmount = Number(ride.safegoCommission.toString());
+    const payoutAmount = Number(ride.driverPayout.toString());
+
+    if (isNaN(commissionAmount) || commissionAmount < 0) {
+      throw new Error(`Invalid commission amount: ${ride.safegoCommission}`);
+    }
+
+    if (isNaN(payoutAmount) || payoutAmount < 0) {
+      throw new Error(`Invalid payout amount: ${ride.driverPayout}`);
+    }
+
+    if (ride.paymentMethod === "cash") {
+      // Cash: Driver collects full cash, SafeGo commission becomes negative balance
+      await this.recordCommission(
+        driverId,
+        "driver",
+        countryCode,
+        "ride",
+        commissionAmount,
+        "ride",
+        ride.id,
+        `Commission owed for cash ride: ${ride.pickupAddress} → ${ride.dropoffAddress}`
+      );
+    } else {
+      // Online: SafeGo pays driver their payout
+      await this.recordEarning(
+        driverId,
+        "driver",
+        countryCode,
+        "ride",
+        payoutAmount,
+        "ride",
+        ride.id,
+        `Ride payout: ${ride.pickupAddress} → ${ride.dropoffAddress}`
+      );
+    }
+  }
+
+  async recordFoodOrderEarning(
+    restaurantId: string,
+    order: {
+      id: string;
+      serviceFare: any;
+      restaurantPayout: any;
+      safegoCommission: any;
+      paymentMethod: "cash" | "online";
+      deliveryAddress: string;
+    }
+  ): Promise<void> {
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: restaurantId },
+      include: { user: true },
+    });
+
+    if (!restaurant) {
+      throw new Error(`Restaurant ${restaurantId} not found`);
+    }
+
+    const countryCode = restaurant.user.countryCode;
+    
+    if (!order.safegoCommission || !order.restaurantPayout) {
+      throw new Error(`Missing commission or payout amounts for order ${order.id}`);
+    }
+
+    const commissionAmount = Number(order.safegoCommission.toString());
+    const payoutAmount = Number(order.restaurantPayout.toString());
+
+    if (isNaN(commissionAmount) || commissionAmount < 0) {
+      throw new Error(`Invalid commission amount: ${order.safegoCommission}`);
+    }
+
+    if (isNaN(payoutAmount) || payoutAmount < 0) {
+      throw new Error(`Invalid payout amount: ${order.restaurantPayout}`);
+    }
+
+    if (order.paymentMethod === "cash") {
+      // Cash: Restaurant collects full cash, SafeGo commission becomes negative balance
+      await this.recordCommission(
+        restaurantId,
+        "restaurant",
+        countryCode,
+        "food_order",
+        commissionAmount,
+        "food_order",
+        order.id,
+        `Commission owed for cash food order → ${order.deliveryAddress}`
+      );
+    } else {
+      // Online: SafeGo pays restaurant their payout
+      await this.recordEarning(
+        restaurantId,
+        "restaurant",
+        countryCode,
+        "food_order",
+        payoutAmount,
+        "food_order",
+        order.id,
+        `Food order payout → ${order.deliveryAddress}`
+      );
+    }
+  }
+
+  async recordFoodDeliveryEarning(
+    driverId: string,
+    delivery: {
+      id: string;
+      deliveryPayout: any;
+      paymentMethod: "cash" | "online";
+      deliveryAddress: string;
+    }
+  ): Promise<void> {
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id: driverId },
+      include: { user: true },
+    });
+
+    if (!driver) {
+      throw new Error(`Driver ${driverId} not found`);
+    }
+
+    const countryCode = driver.user.countryCode;
+
+    if (delivery.paymentMethod === "online") {
+      // Online: SafeGo pays driver their delivery fee
+      if (!delivery.deliveryPayout) {
+        throw new Error(`Missing delivery payout amount for order ${delivery.id}`);
+      }
+
+      const deliveryPayoutAmount = Number(delivery.deliveryPayout.toString());
+
+      if (isNaN(deliveryPayoutAmount) || deliveryPayoutAmount < 0) {
+        throw new Error(`Invalid delivery payout amount: ${delivery.deliveryPayout}`);
+      }
+
+      await this.recordEarning(
+        driverId,
+        "driver",
+        countryCode,
+        "food_delivery",
+        deliveryPayoutAmount,
+        "food_order",
+        delivery.id,
+        `Food delivery payout → ${delivery.deliveryAddress}`
+      );
+    }
+    // Cash: Driver collects delivery fee directly, no wallet transaction needed
+  }
+
+  async recordParcelDeliveryEarning(
+    driverId: string,
+    parcel: {
+      id: string;
+      serviceFare: any;
+      driverPayout: any;
+      safegoCommission: any;
+      paymentMethod: "cash" | "online";
+      pickupAddress: string;
+      dropoffAddress: string;
+    }
+  ): Promise<void> {
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id: driverId },
+      include: { user: true },
+    });
+
+    if (!driver) {
+      throw new Error(`Driver ${driverId} not found`);
+    }
+
+    const countryCode = driver.user.countryCode;
+    
+    if (!parcel.safegoCommission || !parcel.driverPayout) {
+      throw new Error(`Missing commission or payout amounts for parcel ${parcel.id}`);
+    }
+
+    const commissionAmount = Number(parcel.safegoCommission.toString());
+    const payoutAmount = Number(parcel.driverPayout.toString());
+
+    if (isNaN(commissionAmount) || commissionAmount < 0) {
+      throw new Error(`Invalid commission amount: ${parcel.safegoCommission}`);
+    }
+
+    if (isNaN(payoutAmount) || payoutAmount < 0) {
+      throw new Error(`Invalid payout amount: ${parcel.driverPayout}`);
+    }
+
+    if (parcel.paymentMethod === "cash") {
+      // Cash: Driver collects full cash, SafeGo commission becomes negative balance
+      await this.recordCommission(
+        driverId,
+        "driver",
+        countryCode,
+        "parcel_delivery",
+        commissionAmount,
+        "delivery",
+        parcel.id,
+        `Commission owed for cash parcel: ${parcel.pickupAddress} → ${parcel.dropoffAddress}`
+      );
+    } else {
+      // Online: SafeGo pays driver their payout
+      await this.recordEarning(
+        driverId,
+        "driver",
+        countryCode,
+        "parcel_delivery",
+        payoutAmount,
+        "delivery",
+        parcel.id,
+        `Parcel delivery payout: ${parcel.pickupAddress} → ${parcel.dropoffAddress}`
+      );
+    }
   }
 
   async settleNegativeBalance(walletId: string, adminId?: string): Promise<{

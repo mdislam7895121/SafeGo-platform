@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { walletService } from "../services/walletService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -423,24 +424,19 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
           },
         });
 
-        // Apply wallet logic based on payment method
-        if (delivery.paymentMethod === "cash") {
-          // Driver gets full cash, SafeGo commission becomes negative balance
-          await prisma.driverWallet.update({
-            where: { id: driver.driverWallet!.id },
-            data: {
-              negativeBalance: { increment: parseFloat(delivery.safegoCommission.toString()) },
-            },
-          });
-        } else {
-          // Online payment: driver gets payout
-          await prisma.driverWallet.update({
-            where: { id: driver.driverWallet!.id },
-            data: {
-              balance: { increment: parseFloat(delivery.driverPayout.toString()) },
-            },
-          });
-        }
+        // Record parcel delivery earning in wallet with full transaction logging
+        await walletService.recordParcelDeliveryEarning(
+          delivery.driverId,
+          {
+            id: delivery.id,
+            serviceFare: delivery.serviceFare,
+            driverPayout: delivery.driverPayout,
+            safegoCommission: delivery.safegoCommission,
+            paymentMethod: delivery.paymentMethod as "cash" | "online",
+            pickupAddress: delivery.pickupAddress,
+            dropoffAddress: delivery.dropoffAddress,
+          }
+        );
       }
     }
 

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { walletService } from "../services/walletService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -523,31 +524,18 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
       updateData.status = "completed";
       updateData.completedAt = new Date();
 
-      // Apply commission logic for restaurant
-      const restaurant = await prisma.restaurantProfile.findUnique({
-        where: { id: foodOrder.restaurantId },
-        include: { restaurantWallet: true },
-      });
-
-      if (restaurant) {
-        if (foodOrder.paymentMethod === "cash") {
-          // Restaurant gets full cash, SafeGo commission becomes negative balance
-          await prisma.restaurantWallet.update({
-            where: { id: restaurant.restaurantWallet!.id },
-            data: {
-              negativeBalance: { increment: parseFloat(foodOrder.safegoCommission.toString()) },
-            },
-          });
-        } else {
-          // Online payment: restaurant gets payout
-          await prisma.restaurantWallet.update({
-            where: { id: restaurant.restaurantWallet!.id },
-            data: {
-              balance: { increment: parseFloat(foodOrder.restaurantPayout.toString()) },
-            },
-          });
+      // Record food order earning in restaurant wallet with full transaction logging
+      await walletService.recordFoodOrderEarning(
+        foodOrder.restaurantId,
+        {
+          id: foodOrder.id,
+          serviceFare: foodOrder.serviceFare,
+          restaurantPayout: foodOrder.restaurantPayout,
+          safegoCommission: foodOrder.safegoCommission,
+          paymentMethod: foodOrder.paymentMethod as "cash" | "online",
+          deliveryAddress: foodOrder.deliveryAddress,
         }
-      }
+      );
 
       // Apply commission logic for driver (if assigned)
       if (foodOrder.driverId) {
@@ -573,20 +561,16 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
             },
           });
 
-          // Driver delivery fee handling
-          if (foodOrder.paymentMethod === "cash") {
-            // Cash: Driver collects delivery fee directly from customer or restaurant
-            // No wallet credit needed - driver already has cash
-            // Driver should collect $5 delivery fee in cash
-          } else {
-            // Online payment: SafeGo credits driver the delivery fee
-            await prisma.driverWallet.update({
-              where: { id: driver.driverWallet!.id },
-              data: {
-                balance: { increment: parseFloat(foodOrder.deliveryPayout.toString()) },
-              },
-            });
-          }
+          // Record food delivery earning in driver wallet
+          await walletService.recordFoodDeliveryEarning(
+            foodOrder.driverId!,
+            {
+              id: foodOrder.id,
+              deliveryPayout: foodOrder.deliveryPayout,
+              paymentMethod: foodOrder.paymentMethod as "cash" | "online",
+              deliveryAddress: foodOrder.deliveryAddress,
+            }
+          );
         }
       }
     }
