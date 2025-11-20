@@ -1,0 +1,457 @@
+Step 40 – Global Earnings, Wallet, Commission and Payout System for SafeGo
+
+Context
+You are extending the SafeGo global super-app backend and admin panel. The platform already supports:
+
+- Roles:
+  - Customer
+  - Driver
+  - Restaurant (Merchant)
+  - Admin
+
+- Services:
+  - Ride-hailing (rides collection)
+  - Food delivery (food_orders collection)
+  - Parcel delivery (deliveries collection)
+
+- Country-specific KYC:
+  - Bangladesh (BD): father_name, date_of_birth, present_address, permanent_address, NID (number + images), emergency contact, verification_status, is_verified
+  - United States (US): date_of_birth, home_address, emergency contact, government_id_type, government_id_last4, drivers: license + image + expiry, optional ssn_last4, verification_status, is_verified
+
+- Commission rules (already defined conceptually):
+  1) Customer pays cash for ride:
+     - Driver receives full cash
+     - SafeGo commission is recorded as a negative balance in driver_wallet_balance
+     - Driver must settle weekly
+  2) Food order cash:
+     - Restaurant gets all cash
+     - Commission becomes negative balance in restaurant_wallet
+  3) Online payment:
+     - SafeGo keeps its commission directly
+  4) Admin can settle balances and mark them paid
+
+- Admin panel:
+  - Can verify customers, drivers, restaurants
+  - Can approve/reject KYC with rejection_reason
+  - Can change pricing, fees, commissions
+  - Can block/unblock users
+  - Can manage payouts and view negative balances
+
+- Security:
+  - Customers cannot see driver documents
+  - Drivers cannot see customer NID/SSN
+  - Restaurants cannot view other restaurants
+  - Only admin can change pricing, commission, verification, blocking
+  - Users can update only their own profile
+  - Status flows for rides, food, parcels are already respected and must not be broken.
+
+Goal
+Implement a robust, global Earnings, Wallet, Commission and Payout System for SafeGo that works for:
+
+- Drivers (ride, food, parcel)
+- Restaurants (food)
+- Platform (SafeGo commission)
+- Customers (payments and refunds view)
+
+The implementation must:
+
+- Be fully backward-compatible with existing rides, food_orders, deliveries collections.
+- Respect all SafeGo commission and payout rules (especially cash vs online).
+- Support BD and US with different payment methods.
+- Provide clear admin views for wallets, commission, settlements and payouts.
+- Enforce all existing RBAC, security, and audit logging rules.
+- Not introduce emojis in any UI or string.
+
+IMPORTANT: Do not rename or remove existing fields, collections or APIs. Only ADD new models, fields, endpoints, and UI components.
+
+1) Data Model – Wallets and Transactions
+
+Add new models/tables in the existing ORM/migration style.
+
+1.1 Wallet
+Represents the financial state of a specific owner (driver, restaurant, customer).
+
+Fields:
+- id (primary key, UUID or existing style)
+- ownerId (string; reference to driver_id, customer_id, or restaurant_id)
+- ownerType: enum("driver", "customer", "restaurant")
+- countryCode: "BD" | "US" (reuse existing country model if present)
+- availableBalance: decimal (funds available to withdraw or auto-settle)
+- negativeBalance: decimal (commission or debts owed to SafeGo; usually >= 0, representing amount owed)
+- currency: string (e.g. "BDT", "USD")
+- createdAt
+- updatedAt
+
+Rules:
+- For drivers:
+  - BD: active for rides, food, parcel
+  - US: active for rides, food, parcel
+- For restaurants:
+  - Active for food_orders only
+- For customers:
+  - Optional, mainly for refunds or future wallet features
+
+1.2 WalletTransaction
+Immutable ledger of all money movements related to a wallet. Append-only.
+
+Fields:
+- id
+- walletId (FK to Wallet)
+- ownerType ("driver" | "customer" | "restaurant")
+- countryCode
+- serviceType: enum("ride", "food", "parcel", "adjustment", "payout", "commission", "refund")
+- direction: enum("credit", "debit")
+- amount: decimal (positive number)
+- balanceSnapshot: decimal (wallet availableBalance after this transaction)
+- negativeBalanceSnapshot: decimal (wallet negativeBalance after this transaction)
+- referenceType: enum("ride", "food_order", "delivery", "payout", "manual_adjustment")
+- referenceId: string (id from rides / food_orders / deliveries / payout table)
+- description: short text (human-readable, no sensitive data)
+- createdAt
+- createdByAdminId (nullable; if an admin initiated the change)
+
+Rules:
+- Never update or delete WalletTransaction rows (append-only).
+- Use this table as primary source for financial audits.
+
+1.3 Payout
+Represents a withdrawal/settlement from a wallet to an external bank or payment method.
+
+Fields:
+- id
+- walletId
+- countryCode
+- ownerType
+- amount
+- method: enum("auto_weekly", "manual_request", "manual_admin_settlement")
+- status: enum("pending", "processing", "completed", "failed")
+- failureReason (nullable)
+- scheduledAt (for auto payouts)
+- createdAt
+- createdByAdminId (nullable)
+- processedAt (nullable)
+- externalReferenceId (nullable, gateway transaction id)
+
+Rules:
+- Payout is based on availableBalance only.
+- On payout initiation:
+  - availableBalance decreases
+  - Optionally, create WalletTransaction with type "payout"
+- On payout failure:
+  - Revert the decrease, log a compensating transaction.
+
+2) Commission and Earnings Logic
+
+Do not change existing rides, food_orders, deliveries schemas. Instead, read from them and compute earnings and commission.
+
+2.1 Shared principles
+- All earnings and commissions are computed when a ride/food_order/delivery reaches a final "completed" or "delivered" status (existing flows).
+- For each completed service:
+  - Compute platform commission
+  - Compute owner earning (driver and/or restaurant)
+  - Post entries into the appropriate Wallet and WalletTransaction
+- Respect the existing status flows:
+  - Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+  - Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+  - Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+2.2 Commission config (admin-managed)
+Reuse or extend existing commission configuration in global settings.
+
+Add CommissionRule-like structure if needed:
+
+Fields (conceptual, may already exist):
+- id
+- serviceType: "ride" | "food" | "parcel"
+- countryCode: "BD" | "US"
+- customerPaymentType: "cash" | "online" | "mixed"
+- driverCommissionPercent
+- restaurantCommissionPercent (for food)
+- platformCommissionPercent
+- createdAt, updatedAt
+
+Admin can change these via existing commission settings screens. Do not break existing UI; only extend with new backend usage.
+
+2.3 Cash vs Online logic
+
+Implement strictly:
+
+Ride – Customer pays CASH:
+- Driver receives full cash from customer in hand.
+- Platform commission is NOT taken from cash immediately.
+- Instead:
+  - Record a WalletTransaction for driver:
+    - type: "commission"
+    - direction: "debit"
+    - amount = calculated platform commission
+    - Effect:
+      - driverWallet.negativeBalance increases by commission amount.
+- This negativeBalance must be settled weekly via payout or admin settlement.
+
+Ride – Customer pays ONLINE:
+- Platform receives full amount (through payment gateway, outside of driver wallet).
+- Driver earning is credited as:
+  - WalletTransaction: type "earning", direction "credit",
+  - driverWallet.availableBalance increases.
+- No negativeBalance created.
+
+Food – Customer pays CASH:
+- Restaurant receives full order amount from customer.
+- SafeGo commission must be deducted logically:
+  - restaurantWallet.negativeBalance increases by platform commission amount via WalletTransaction (type "commission", direction "debit").
+
+Food – Customer pays ONLINE:
+- Platform collects money online.
+- Restaurant earning credited to restaurantWallet.availableBalance (after commission).
+
+Parcel – same logic as ride:
+- If cash: driver gets cash, commission goes to negativeBalance.
+- If online: platform keeps commission, driver earning goes to availableBalance.
+
+3) Weekly Auto-Settlement and Manual Cash-Out
+
+3.1 Weekly auto-settlement (for negative balances)
+Create a scheduled job (cron-style or existing scheduled task system) that runs weekly (for example, Monday 00:00 per region/timezone):
+
+For each driver and restaurant wallet:
+- If negativeBalance > 0:
+  - If availableBalance >= negativeBalance:
+    - Deduct negativeBalance from availableBalance.
+    - Set negativeBalance to 0.
+    - Create WalletTransaction for "commission_settlement".
+  - If availableBalance < negativeBalance:
+    - Deduct all availableBalance to partially reduce negativeBalance.
+    - Create WalletTransaction documenting partial settlement.
+    - negativeBalance remains > 0.
+
+This creates an automatic internal settlement between earnings and owed commission.
+
+3.2 Weekly auto-payout (optional, if business rules say so)
+If business rules require weekly payout of positive balances to bank accounts:
+
+- For each wallet where:
+  - availableBalance > configured threshold
+  - KYC is verified (verification_status == "approved", is_verified == true)
+- Create Payout with method "auto_weekly"
+- Set status "pending"
+- Decrease availableBalance accordingly and create WalletTransaction type "payout"
+- An external integration or manual admin operation will later mark Payout as "completed" or "failed".
+
+3.3 Manual cash-out request from driver/restaurant
+In driver and restaurant apps:
+
+- Driver/Restaurant can see their wallet and a "Request Payout" button (only if KYC is verified).
+- On request:
+  - Create Payout with method "manual_request"
+  - Move amount from availableBalance to payout pending using WalletTransaction.
+
+Admin side (/admin/payouts):
+- Admin can see pending payout requests.
+- Admin can mark them as "processing", "completed", or "failed".
+- On "completed":
+  - Confirm that funds have already been transferred externally (bank/mobile money).
+- On "failed":
+  - Reverse the pending deduction and move amount back to availableBalance using compensating WalletTransaction.
+
+4) Admin Panel – New Views and Controls
+
+Do NOT break existing admin routes. Only add new pages or cards.
+
+4.1 Wallet Overview Page
+Route suggestion: /admin/wallets
+
+Features:
+- List of wallets:
+  - ownerType, ownerId, countryCode
+  - availableBalance
+  - negativeBalance
+  - currency
+- Filters:
+  - ownerType
+  - country
+  - balance range
+- Actions:
+  - View wallet ledger (opens a detailed view)
+
+4.2 Wallet Ledger View
+Route suggestion: /admin/wallets/:id
+
+Features:
+- Paginated table of WalletTransaction:
+  - date
+  - serviceType
+  - direction (credit/debit)
+  - amount
+  - resulting balanceSnapshot
+  - description
+  - referenceType + referenceId (link to ride/food_order/delivery where possible)
+- Read-only; no edit/delete.
+- This view is essential for finance and audit.
+
+4.3 Payout Management Page
+Route suggestion: /admin/payouts
+
+Features:
+- List payouts:
+  - ownerType + ownerId
+  - country
+  - amount
+  - method (auto_weekly/manual_request/admin_settlement)
+  - status
+  - createdAt, processedAt
+- Filters:
+  - status
+  - ownerType
+  - country
+  - date range
+- Actions:
+  - For status = "pending" or "processing":
+    - Mark as "completed"
+    - Mark as "failed" and provide failureReason
+- Each action must:
+  - Create appropriate WalletTransaction adjustments if needed.
+  - Log to audit.
+
+4.4 Commission Analytics Page
+Route suggestion: /admin/earnings or /admin/commission
+
+High-level dashboard:
+- Total platform commission by:
+  - serviceType (ride/food/parcel)
+  - country
+  - time range (day/week/month)
+- Charts or aggregated numbers (use existing design system).
+- This is read-only analytics; do not implement complex BI, just basic aggregated queries.
+
+5) Driver, Restaurant, Customer Views
+
+5.1 Driver App – Wallet Section
+In driver app (home > menu > wallet):
+
+- Show:
+  - availableBalance
+  - negativeBalance
+  - upcoming settlement rules summary (for example: "Negative balance will be settled weekly from your earnings.")
+  - last 10 transactions (type, amount, service)
+- If manual payout is allowed:
+  - "Request payout" button
+  - Minimal form to confirm amount (<= availableBalance and above minimum threshold)
+- Enforce KYC check:
+  - If driver not verified (is_verified == false), hide or disable payout request with clear message.
+
+5.2 Restaurant App – Wallet Section
+Similar to driver:
+
+- Show:
+  - availableBalance (restaurant earnings)
+  - negativeBalance (owed commission)
+  - transaction list, mainly food_orders based
+- Payout request and auto-settlement rules same as driver, but using restaurant_wallet_balance logic.
+
+5.3 Customer – Payment History (not full wallet yet)
+For customers, keep it simple for now:
+
+- Show payment history for rides/food/parcel from existing collections (rides, food_orders, deliveries).
+- If a customer wallet is used for refunds, show:
+  - Refund credits
+  - Wallet balance (if implemented)
+- No payout for customers.
+
+6) Security, RBAC, and Audit Logging
+
+6.1 RBAC
+- Only Admin roles with financial permissions should see:
+  - /admin/wallets
+  - /admin/payouts
+  - /admin/earnings
+- Reuse existing RBAC; add granular permissions if the system supports it:
+  - VIEW_WALLETS
+  - VIEW_PAYOUTS
+  - MANAGE_PAYOUTS
+  - VIEW_EARNINGS_REPORTS
+
+6.2 Security
+- All wallet and payout endpoints must be authenticated and authorized.
+- Drivers/Restaurants can only see their own wallet.
+- Admins cannot modify WalletTransaction rows; they can only initiate new operations that result in new transactions.
+- No sensitive KYC data (full NID, full SSN, document URLs) should appear in wallet views or transactions.
+
+6.3 Audit log integration
+For every important action:
+
+- Create audit entries using the existing audit logging system:
+  - "WALLET_TRANSACTION_CREATED"
+  - "PAYOUT_CREATED"
+  - "PAYOUT_STATUS_CHANGED"
+  - "COMMISSION_RULE_UPDATED" (if this step touches settings)
+- Store only high-level references:
+  - walletId
+  - payoutId
+  - ownerType
+  - serviceType
+  - amounts
+- Never log full payment provider responses or secrets.
+
+7) Notifications
+
+Integrate with existing notification system (if available):
+
+- When driver or restaurant receives new earnings (WalletTransaction of type "earning"):
+  - Optional in-app notification: "New earning credited"
+- When payout is created with method "auto_weekly" or "manual_request":
+  - Notify owner: "Payout initiated"
+- When payout is completed or failed:
+  - Notify owner with basic info (amount and status, no bank details).
+
+8) Testing Plan
+
+End-to-end tests should cover:
+
+1) BD driver, cash ride:
+   - Complete a ride paid in cash.
+   - Driver gets cash physically, not via wallet.
+   - driverWallet.negativeBalance increases by SafeGo commission.
+   - Weekly job runs:
+     - If driver has sufficient availableBalance from other online rides, commission is auto-settled.
+
+2) US driver, online ride:
+   - Complete an online-paid ride.
+   - driverWallet.availableBalance increases by earning.
+   - No negativeBalance created.
+   - Payout flow works as expected.
+
+3) BD restaurant, cash food order:
+   - Restaurant gets cash.
+   - restaurantWallet.negativeBalance increases by commission.
+   - Weekly settlement adjusts availableBalance (if any) with negativeBalance.
+
+4) Online food order:
+   - Platform keeps commission online.
+   - restaurantWallet.availableBalance gets net earnings.
+
+5) Payout scenarios:
+   - Manual payout request by driver, approved by admin.
+   - Auto-weekly payout run; pending payouts appear and can be updated.
+
+6) Admin views:
+   - /admin/wallets shows correct balances.
+   - /admin/wallets/:id shows correct ledger (WalletTransaction).
+   - /admin/payouts shows correct status flows.
+   - /admin/earnings aggregates correct commission totals.
+
+7) Regression:
+   - Existing rides, food_orders, deliveries flows continue to work as before.
+   - No breaking changes to KYC, pricing, commission settings, or admin verification functions.
+
+Final requirement
+After implementation, summarize:
+
+- All new models and migrations
+- All new endpoints and admin pages
+- Any new settings flags used for commission and payouts
+- How the weekly job is scheduled and configured
+
+Confirm that:
+- No existing SafeGo features are broken.
+- All commission logic matches the defined rules.
+- All security and audit rules are satisfied.
