@@ -62,8 +62,14 @@ export async function scheduleAutomaticPayouts(
     (wallet) => wallet.payouts.length === 0
   );
 
+  // Return empty result if no eligible wallets found (graceful handling)
   if (walletsNeedingPayout.length === 0) {
-    throw new Error("No eligible wallets found for payout");
+    return {
+      batchId: "",
+      totalPayouts: 0,
+      totalAmount: "0.00",
+      payoutIds: [],
+    };
   }
 
   // Create a payout batch

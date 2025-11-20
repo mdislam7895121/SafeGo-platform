@@ -7347,43 +7347,60 @@ router.put("/payouts/:id/reject", checkPermission(Permission.MANAGE_PAYOUTS), as
 // ====================================================
 
 // Schedule automatic payouts
-router.post("/payouts/schedule", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+router.post("/payouts/schedule", checkPermission(Permission.CREATE_MANUAL_PAYOUT), async (req: AuthRequest, res) => {
   try {
-    const { ownerType, countryCode, minAmount, periodStart, periodEnd } = req.body;
-    const adminId = req.user!.id;
+    // Zod validation for request body
+    const schedulePayoutSchema = z.object({
+      ownerType: z.enum(["driver", "restaurant"]).optional(),
+      countryCode: z.string().length(2).optional(),
+      minAmount: z.number().positive().optional(),
+      periodStart: z.string().datetime(),
+      periodEnd: z.string().datetime(),
+    });
 
-    if (!periodStart || !periodEnd) {
-      return res.status(400).json({ error: "Period start and end dates are required" });
+    const validationResult = schedulePayoutSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        error: "Invalid input", 
+        details: validationResult.error.errors 
+      });
     }
 
+    const validatedData = validationResult.data;
+    const adminId = req.user!.id;
+
     const result = await scheduleAutomaticPayouts({
-      ownerType,
-      countryCode,
-      minAmount: minAmount ? Number(minAmount) : undefined,
-      periodStart: new Date(periodStart),
-      periodEnd: new Date(periodEnd),
+      ownerType: validatedData.ownerType,
+      countryCode: validatedData.countryCode,
+      minAmount: validatedData.minAmount,
+      periodStart: new Date(validatedData.periodStart),
+      periodEnd: new Date(validatedData.periodEnd),
       adminId,
     });
 
-    await logAuditEvent({
-      actorId: adminId,
-      actorEmail: req.user!.email,
-      actorRole: req.user!.role,
-      ipAddress: getClientIp(req),
-      actionType: ActionType.PAYOUT_SCHEDULED,
-      entityType: EntityType.PAYOUT,
-      entityId: result.batchId,
-      description: `Scheduled ${result.totalPayouts} payouts totaling ${result.totalAmount}`,
-      metadata: {
-        batchId: result.batchId,
-        totalPayouts: result.totalPayouts,
-        totalAmount: result.totalAmount,
-        ownerType: ownerType || "all",
-        countryCode: countryCode || "all",
-        periodStart,
-        periodEnd,
-      },
-    });
+    // Only log audit event if payouts were actually scheduled
+    if (result.totalPayouts > 0) {
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: req.user!.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.PAYOUT_SCHEDULED,
+        entityType: EntityType.PAYOUT,
+        entityId: result.batchId,
+        description: `Scheduled ${result.totalPayouts} payouts totaling ${result.totalAmount}`,
+        metadata: {
+          batchId: result.batchId,
+          totalPayouts: result.totalPayouts,
+          totalAmount: result.totalAmount,
+          ownerType: validatedData.ownerType || "all",
+          countryCode: validatedData.countryCode || "all",
+          periodStart: validatedData.periodStart,
+          periodEnd: validatedData.periodEnd,
+        },
+      });
+    }
 
     res.json(result);
   } catch (error: any) {
@@ -7395,18 +7412,30 @@ router.post("/payouts/schedule", checkPermission(Permission.MANAGE_PAYOUTS), asy
 // Run manual payout
 router.post("/payouts/run-manual", checkPermission(Permission.CREATE_MANUAL_PAYOUT), async (req: AuthRequest, res) => {
   try {
-    const { walletId, amount, reason } = req.body;
-    const adminId = req.user!.id;
+    // Zod validation for request body
+    const manualPayoutSchema = z.object({
+      walletId: z.string().uuid(),
+      amount: z.number().positive(),
+      reason: z.string().optional(),
+    });
 
-    if (!walletId || !amount) {
-      return res.status(400).json({ error: "Wallet ID and amount are required" });
+    const validationResult = manualPayoutSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        error: "Invalid input", 
+        details: validationResult.error.errors 
+      });
     }
 
+    const validatedData = validationResult.data;
+    const adminId = req.user!.id;
+
     const result = await runManualPayout({
-      walletId,
-      amount: Number(amount),
+      walletId: validatedData.walletId,
+      amount: validatedData.amount,
       adminId,
-      reason,
+      reason: validatedData.reason,
     });
 
     await logAuditEvent({
@@ -7420,9 +7449,9 @@ router.post("/payouts/run-manual", checkPermission(Permission.CREATE_MANUAL_PAYO
       description: `Initiated manual payout of ${result.amount}`,
       metadata: {
         payoutId: result.payoutId,
-        walletId,
+        walletId: validatedData.walletId,
         amount: result.amount,
-        reason: reason || "Manual admin payout",
+        reason: validatedData.reason || "Manual admin payout",
       },
     });
 
@@ -7436,12 +7465,25 @@ router.post("/payouts/run-manual", checkPermission(Permission.CREATE_MANUAL_PAYO
 // Get reconciliation report
 router.get("/payouts/reconciliation", checkPermission(Permission.VIEW_PAYOUTS), async (req: AuthRequest, res) => {
   try {
-    const { periodStart, periodEnd, ownerType, countryCode } = req.query;
-    const adminId = req.user!.id;
+    // Zod validation for query parameters
+    const reconciliationQuerySchema = z.object({
+      periodStart: z.string().datetime(),
+      periodEnd: z.string().datetime(),
+      ownerType: z.enum(["driver", "restaurant"]).optional(),
+      countryCode: z.string().length(2).optional(),
+    });
 
-    if (!periodStart || !periodEnd) {
-      return res.status(400).json({ error: "Period start and end dates are required" });
+    const validationResult = reconciliationQuerySchema.safeParse(req.query);
+    
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        error: "Invalid input", 
+        details: validationResult.error.errors 
+      });
     }
+
+    const validatedQuery = validationResult.data;
+    const adminId = req.user!.id;
 
     await logAuditEvent({
       actorId: adminId,
@@ -7451,20 +7493,20 @@ router.get("/payouts/reconciliation", checkPermission(Permission.VIEW_PAYOUTS), 
       actionType: ActionType.RECONCILIATION_INITIATED,
       entityType: EntityType.ANALYTICS,
       entityId: null,
-      description: `Initiated reconciliation for period ${periodStart} to ${periodEnd}`,
+      description: `Initiated reconciliation for period ${validatedQuery.periodStart} to ${validatedQuery.periodEnd}`,
       metadata: {
-        periodStart,
-        periodEnd,
-        ownerType: ownerType || "all",
-        countryCode: countryCode || "all",
+        periodStart: validatedQuery.periodStart,
+        periodEnd: validatedQuery.periodEnd,
+        ownerType: validatedQuery.ownerType || "all",
+        countryCode: validatedQuery.countryCode || "all",
       },
     });
 
     const report = await reconcileWalletTransactions({
-      periodStart: new Date(periodStart as string),
-      periodEnd: new Date(periodEnd as string),
-      ownerType: ownerType as any,
-      countryCode: countryCode as string,
+      periodStart: new Date(validatedQuery.periodStart),
+      periodEnd: new Date(validatedQuery.periodEnd),
+      ownerType: validatedQuery.ownerType,
+      countryCode: validatedQuery.countryCode,
     });
 
     await logAuditEvent({
