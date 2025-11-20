@@ -80,6 +80,32 @@ export function getFileUrl(filename: string): string {
   return `/uploads/${filename}`;
 }
 
+// File filter for support attachments (images and PDFs)
+const supportAttachmentFileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedMimes = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+  ];
+  
+  if (allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Invalid file type. Only JPEG, PNG, WebP, and PDF files are allowed."));
+  }
+};
+
+// Upload configuration for support attachments
+export const uploadSupportAttachment = multer({
+  storage,
+  fileFilter: supportAttachmentFileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB default (configurable via settings)
+  },
+}).single("attachment");
+
 // Helper to delete file
 export function deleteFile(filename: string): void {
   const filePath = path.join(uploadDir, filename);

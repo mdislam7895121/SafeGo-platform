@@ -607,6 +607,9 @@ model SupportConversation {
   unreadCountUser     Int                         @default(0)
   unreadCountAdmin    Int                         @default(0)
   metadata            Json?
+  isFlagged           Boolean                     @default(false)
+  flaggedReason       String?
+  internalNotes       String?
   messages            SupportMessage[]
 
   @@index([userId])
@@ -640,15 +643,18 @@ model SupportMessage {
 }
 
 model SupportAttachment {
-  id        String         @id @default(uuid())
-  createdAt DateTime       @default(now())
-  messageId String
-  fileUrl   String
-  fileType  String
-  fileName  String
-  fileSize  Int
-  isImage   Boolean        @default(false)
-  message   SupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  id               String         @id @default(uuid())
+  createdAt        DateTime       @default(now())
+  messageId        String
+  fileUrl          String
+  encryptedFileUrl String?
+  fileType         String
+  fileName         String
+  fileSize         Int
+  isImage          Boolean        @default(false)
+  isEncrypted      Boolean        @default(false)
+  uploadedBy       String?
+  message          SupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
   @@map("support_attachments")

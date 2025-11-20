@@ -383,23 +383,24 @@ export async function updateConversation(conversationId: string, input: UpdateCo
     }
     
     if (validated.assignedAdminId !== null) {
-      const targetAdmin = await prisma.admin.findUnique({
-        where: { id: validated.assignedAdminId },
+      const targetAdmin = await prisma.adminProfile.findUnique({
+        where: { userId: validated.assignedAdminId },
         select: {
           id: true,
-          role: {
-            select: {
-              permissions: true,
-            },
-          },
+          userId: true,
+          adminRole: true,
+          isActive: true,
         },
       });
 
-      if (!targetAdmin) {
-        throw new Error("Target admin not found");
+      if (!targetAdmin || !targetAdmin.isActive) {
+        throw new Error("Target admin not found or inactive");
       }
 
-      const hasReplyPermission = targetAdmin.role?.permissions?.includes("REPLY_SUPPORT_CONVERSATIONS") ?? false;
+      // Check if admin has required permission using role permissions
+      const { rolePermissions, Permission } = await import("../utils/permissions");
+      const adminPermissions = rolePermissions[targetAdmin.adminRole];
+      const hasReplyPermission = adminPermissions?.has(Permission.REPLY_SUPPORT_CONVERSATIONS) ?? false;
       if (!hasReplyPermission) {
         throw new Error("Cannot assign conversation to admin without REPLY_SUPPORT_CONVERSATIONS permission");
       }

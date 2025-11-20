@@ -107,6 +107,28 @@ export interface SecuritySettings {
   forceMfaForSuperAdmin: boolean;
 }
 
+export interface SupportSettings {
+  enabled: boolean;
+  maxFileSizeMB: number;
+  allowedFileTypes: string[];
+  rateLimitMessagesPerHour: number;
+  workingHours: {
+    enabled: boolean;
+    timezone: string;
+    schedule: {
+      monday: { start: string; end: string; enabled: boolean };
+      tuesday: { start: string; end: string; enabled: boolean };
+      wednesday: { start: string; end: string; enabled: boolean };
+      thursday: { start: string; end: string; enabled: boolean };
+      friday: { start: string; end: string; enabled: boolean };
+      saturday: { start: string; end: string; enabled: boolean };
+      sunday: { start: string; end: string; enabled: boolean };
+    };
+  };
+  autoCloseInactiveDays: number;
+  requireAdminApprovalForFileUploads: boolean;
+}
+
 export interface AllSettings {
   general: GeneralSettings;
   kyc: KYCSettings;
@@ -114,6 +136,7 @@ export interface AllSettings {
   settlement: SettlementSettings;
   notifications: NotificationSettings;
   security: SecuritySettings;
+  support: SupportSettings;
 }
 
 // Zod validation schemas for each section
@@ -218,6 +241,34 @@ const securitySettingsSchema = z.object({
   forceMfaForSuperAdmin: z.boolean(),
 });
 
+const dayScheduleSchema = z.object({
+  start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid time format (HH:MM)"),
+  end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid time format (HH:MM)"),
+  enabled: z.boolean(),
+});
+
+const supportSettingsSchema = z.object({
+  enabled: z.boolean(),
+  maxFileSizeMB: z.number().min(1).max(50, "Max file size must be between 1 and 50 MB"),
+  allowedFileTypes: z.array(z.string()).min(1, "At least one file type must be allowed"),
+  rateLimitMessagesPerHour: z.number().int().min(1).max(1000, "Rate limit must be between 1 and 1000 messages per hour"),
+  workingHours: z.object({
+    enabled: z.boolean(),
+    timezone: z.string(),
+    schedule: z.object({
+      monday: dayScheduleSchema,
+      tuesday: dayScheduleSchema,
+      wednesday: dayScheduleSchema,
+      thursday: dayScheduleSchema,
+      friday: dayScheduleSchema,
+      saturday: dayScheduleSchema,
+      sunday: dayScheduleSchema,
+    }),
+  }),
+  autoCloseInactiveDays: z.number().int().min(0).max(365, "Auto-close days must be between 0 and 365"),
+  requireAdminApprovalForFileUploads: z.boolean(),
+});
+
 // Map section keys to their validation schemas
 const sectionSchemas: Record<keyof AllSettings, z.ZodSchema> = {
   general: generalSettingsSchema,
@@ -226,6 +277,7 @@ const sectionSchemas: Record<keyof AllSettings, z.ZodSchema> = {
   settlement: settlementSettingsSchema,
   notifications: notificationSettingsSchema,
   security: securitySettingsSchema,
+  support: supportSettingsSchema,
 };
 
 // Validation function for settings payload
@@ -346,6 +398,27 @@ const DEFAULT_SETTINGS: AllSettings = {
   security: {
     sessionTimeoutMinutes: 480,
     forceMfaForSuperAdmin: false,
+  },
+  support: {
+    enabled: true,
+    maxFileSizeMB: 10,
+    allowedFileTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
+    rateLimitMessagesPerHour: 100,
+    workingHours: {
+      enabled: false,
+      timezone: "UTC",
+      schedule: {
+        monday: { start: "09:00", end: "17:00", enabled: true },
+        tuesday: { start: "09:00", end: "17:00", enabled: true },
+        wednesday: { start: "09:00", end: "17:00", enabled: true },
+        thursday: { start: "09:00", end: "17:00", enabled: true },
+        friday: { start: "09:00", end: "17:00", enabled: true },
+        saturday: { start: "10:00", end: "14:00", enabled: false },
+        sunday: { start: "10:00", end: "14:00", enabled: false },
+      },
+    },
+    autoCloseInactiveDays: 30,
+    requireAdminApprovalForFileUploads: false,
   },
 };
 
@@ -506,7 +579,7 @@ export function getDefaultSection<K extends keyof AllSettings>(
 
 // Validation helpers
 export function isValidSettingKey(key: string): key is keyof AllSettings {
-  return ["general", "kyc", "commission", "settlement", "notifications", "security"].includes(key);
+  return ["general", "kyc", "commission", "settlement", "notifications", "security", "support"].includes(key);
 }
 
 export const SettingsService = {
