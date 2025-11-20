@@ -12,6 +12,8 @@ import { walletPayoutService } from "../services/payoutService";
 import { commissionService } from "../services/commissionService";
 import * as earningsService from "../services/earningsService";
 import * as fraudDetectionService from "../services/fraudDetectionService";
+import { scheduleAutomaticPayouts, runManualPayout } from "../services/payoutSchedulingService";
+import { reconcileWalletTransactions } from "../services/reconciliationService";
 import { format } from "date-fns";
 
 const router = Router();
@@ -7337,6 +7339,179 @@ router.put("/payouts/:id/reject", checkPermission(Permission.MANAGE_PAYOUTS), as
   } catch (error: any) {
     console.error("Reject payout error:", error);
     res.status(500).json({ error: error.message || "Failed to reject payout" });
+  }
+});
+
+// ====================================================
+// STEP 47: PAYOUT SCHEDULING & RECONCILIATION API
+// ====================================================
+
+// Schedule automatic payouts
+router.post("/payouts/schedule", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { ownerType, countryCode, minAmount, periodStart, periodEnd } = req.body;
+    const adminId = req.user!.id;
+
+    if (!periodStart || !periodEnd) {
+      return res.status(400).json({ error: "Period start and end dates are required" });
+    }
+
+    const result = await scheduleAutomaticPayouts({
+      ownerType,
+      countryCode,
+      minAmount: minAmount ? Number(minAmount) : undefined,
+      periodStart: new Date(periodStart),
+      periodEnd: new Date(periodEnd),
+      adminId,
+    });
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.PAYOUT_SCHEDULED,
+      entityType: EntityType.PAYOUT,
+      entityId: result.batchId,
+      description: `Scheduled ${result.totalPayouts} payouts totaling ${result.totalAmount}`,
+      metadata: {
+        batchId: result.batchId,
+        totalPayouts: result.totalPayouts,
+        totalAmount: result.totalAmount,
+        ownerType: ownerType || "all",
+        countryCode: countryCode || "all",
+        periodStart,
+        periodEnd,
+      },
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Schedule payouts error:", error);
+    res.status(500).json({ error: error.message || "Failed to schedule payouts" });
+  }
+});
+
+// Run manual payout
+router.post("/payouts/run-manual", checkPermission(Permission.CREATE_MANUAL_PAYOUT), async (req: AuthRequest, res) => {
+  try {
+    const { walletId, amount, reason } = req.body;
+    const adminId = req.user!.id;
+
+    if (!walletId || !amount) {
+      return res.status(400).json({ error: "Wallet ID and amount are required" });
+    }
+
+    const result = await runManualPayout({
+      walletId,
+      amount: Number(amount),
+      adminId,
+      reason,
+    });
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.PAYOUT_MANUAL_INITIATED,
+      entityType: EntityType.PAYOUT,
+      entityId: result.payoutId,
+      description: `Initiated manual payout of ${result.amount}`,
+      metadata: {
+        payoutId: result.payoutId,
+        walletId,
+        amount: result.amount,
+        reason: reason || "Manual admin payout",
+      },
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Manual payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to process manual payout" });
+  }
+});
+
+// Get reconciliation report
+router.get("/payouts/reconciliation", checkPermission(Permission.VIEW_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { periodStart, periodEnd, ownerType, countryCode } = req.query;
+    const adminId = req.user!.id;
+
+    if (!periodStart || !periodEnd) {
+      return res.status(400).json({ error: "Period start and end dates are required" });
+    }
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.RECONCILIATION_INITIATED,
+      entityType: EntityType.ANALYTICS,
+      entityId: null,
+      description: `Initiated reconciliation for period ${periodStart} to ${periodEnd}`,
+      metadata: {
+        periodStart,
+        periodEnd,
+        ownerType: ownerType || "all",
+        countryCode: countryCode || "all",
+      },
+    });
+
+    const report = await reconcileWalletTransactions({
+      periodStart: new Date(periodStart as string),
+      periodEnd: new Date(periodEnd as string),
+      ownerType: ownerType as any,
+      countryCode: countryCode as string,
+    });
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.RECONCILIATION_COMPLETED,
+      entityType: EntityType.ANALYTICS,
+      entityId: null,
+      description: `Reconciliation completed: ${report.totalMismatches} mismatches found`,
+      metadata: {
+        totalOrders: report.totalOrders,
+        totalTransactions: report.totalTransactions,
+        totalMismatches: report.totalMismatches,
+        summary: report.summary,
+      },
+    });
+
+    // Log individual mismatches if any found
+    if (report.mismatches.length > 0) {
+      for (const mismatch of report.mismatches.slice(0, 10)) {
+        await logAuditEvent({
+          actorId: adminId,
+          actorEmail: req.user!.email,
+          actorRole: req.user!.role,
+          ipAddress: getClientIp(req),
+          actionType: ActionType.RECONCILIATION_MISMATCH_FOUND,
+          entityType: EntityType.ANALYTICS,
+          entityId: mismatch.orderId,
+          description: `Reconciliation mismatch: ${mismatch.details}`,
+          metadata: {
+            type: mismatch.type,
+            severity: mismatch.severity,
+            orderId: mismatch.orderId,
+            orderType: mismatch.orderType,
+            expectedAmount: mismatch.expectedAmount,
+            actualAmount: mismatch.actualAmount,
+          },
+        });
+      }
+    }
+
+    res.json(report);
+  } catch (error: any) {
+    console.error("Reconciliation error:", error);
+    res.status(500).json({ error: error.message || "Failed to run reconciliation" });
   }
 });
 
