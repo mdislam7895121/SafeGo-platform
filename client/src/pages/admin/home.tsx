@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -123,6 +123,15 @@ export default function AdminHome() {
       color: "text-violet-600",
       bgColor: "bg-violet-50 dark:bg-violet-950",
       permission: "MANAGE_PAYOUTS",
+    },
+    {
+      name: "Earnings Analytics",
+      icon: BarChart3,
+      href: "/admin/earnings",
+      description: "Global earnings, commission, and payout analytics dashboard",
+      color: "text-fuchsia-600",
+      bgColor: "bg-fuchsia-50 dark:bg-fuchsia-950",
+      permission: "VIEW_EARNINGS_DASHBOARD",
     },
     {
       name: "Wallet Settlement",
