@@ -6,6 +6,9 @@ import { z } from "zod";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone, isValidSSN, maskSSN } from "../utils/encryption";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 import { notifyKYCPending, notifyKYCApproved, notifyKYCRejected, notifyDriverStatusChanged, notifyRestaurantStatusChanged, notifyRestaurantCommissionChanged } from "../utils/notifications";
+import { walletService } from "../services/walletService";
+import { walletPayoutService } from "../services/payoutService";
+import { commissionService } from "../services/commissionService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -6469,6 +6472,277 @@ router.patch("/support/conversations/:id", checkPermission(Permission.ASSIGN_SUP
     console.error("Update support conversation error:", error);
     const statusCode = error.message?.includes("Unauthorized") ? 403 : 500;
     res.status(statusCode).json({ error: error.message || "Failed to update conversation" });
+  }
+});
+
+// ====================================================
+// WALLET MANAGEMENT API
+// ====================================================
+
+// Get wallet overview with filters
+router.get("/wallets", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
+  try {
+    const { ownerType, countryCode, page = "1", limit = "50", search } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    const filters: any = {};
+    if (ownerType) filters.ownerType = ownerType as "driver" | "restaurant";
+    if (countryCode) filters.countryCode = countryCode as string;
+    if (search) filters.search = search as string;
+
+    const wallets = await walletService.listWallets({
+      ...filters,
+      limit: limitNum,
+      offset,
+    });
+
+    const total = await walletService.getWalletCount(filters);
+
+    res.json({
+      wallets,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error: any) {
+    console.error("Get wallets error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch wallets" });
+  }
+});
+
+// Get specific wallet by ID
+router.get("/wallets/:id", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const wallet = await walletService.getWalletById(id);
+
+    if (!wallet) {
+      return res.status(404).json({ error: "Wallet not found" });
+    }
+
+    res.json(wallet);
+  } catch (error: any) {
+    console.error("Get wallet error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch wallet" });
+  }
+});
+
+// Get wallet transactions (ledger)
+router.get("/wallets/:id/transactions", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { page = "1", limit = "50", serviceType, direction, startDate, endDate } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    const filters: any = { walletId: id };
+    if (serviceType) filters.serviceType = serviceType;
+    if (direction) filters.direction = direction;
+    if (startDate) filters.startDate = new Date(startDate as string);
+    if (endDate) filters.endDate = new Date(endDate as string);
+
+    const transactions = await walletService.listTransactions({
+      ...filters,
+      limit: limitNum,
+      offset,
+    });
+
+    const total = await walletService.getTransactionCount(filters);
+
+    res.json({
+      transactions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error: any) {
+    console.error("Get wallet transactions error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch transactions" });
+  }
+});
+
+// Process manual wallet settlement
+router.post("/wallets/:id/settle", checkPermission(Permission.PROCESS_WALLET_SETTLEMENT), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.id;
+
+    const result = await walletService.settleNegativeBalance(id, adminId);
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.adminProfile?.adminRole || "SUPER_ADMIN",
+      actionType: ActionType.WALLET_SETTLEMENT_PROCESSED,
+      entityType: EntityType.WALLET,
+      entityId: id,
+      description: `Manual settlement of ${result.amountSettled} for wallet ${id}`,
+      metadata: { amountSettled: result.amountSettled, remainingNegativeBalance: result.remainingNegativeBalance },
+      success: true,
+      ipAddress: getClientIp(req),
+    });
+
+    const updatedWallet = await walletService.getWalletById(id);
+    res.json(updatedWallet);
+  } catch (error: any) {
+    console.error("Wallet settlement error:", error);
+    res.status(400).json({ error: error.message || "Failed to process settlement" });
+  }
+});
+
+// ====================================================
+// PAYOUT MANAGEMENT API
+// ====================================================
+
+// Get all payouts with filters
+router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { ownerType, ownerId, status, countryCode, page = "1", limit = "50", startDate, endDate } = req.query;
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const offset = (pageNum - 1) * limitNum;
+
+    const filters: any = {};
+    if (ownerType) filters.ownerType = ownerType as "driver" | "restaurant";
+    if (ownerId) filters.ownerId = ownerId as string;
+    if (status) filters.status = status;
+    if (countryCode) filters.countryCode = countryCode as string;
+    if (startDate) filters.startDate = new Date(startDate as string);
+    if (endDate) filters.endDate = new Date(endDate as string);
+
+    const payouts = await walletPayoutService.listWalletPayouts({
+      ...filters,
+      limit: limitNum,
+      offset,
+    });
+
+    const total = await walletPayoutService.getWalletPayoutCount(filters);
+
+    res.json({
+      payouts,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error: any) {
+    console.error("Get payouts error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payouts" });
+  }
+});
+
+// Get specific payout by ID
+router.get("/payouts/:id", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const payout = await walletPayoutService.getWalletPayoutById(id);
+
+    if (!payout) {
+      return res.status(404).json({ error: "Payout not found" });
+    }
+
+    res.json(payout);
+  } catch (error: any) {
+    console.error("Get payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payout" });
+  }
+});
+
+// Update payout status (approve/reject)
+router.patch("/payouts/:id/status", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status, failureReason, externalReferenceId } = req.body;
+    const adminId = req.user!.id;
+
+    if (!status || !["completed", "failed"].includes(status)) {
+      return res.status(400).json({ error: "Status must be 'completed' or 'failed'" });
+    }
+
+    const updatedPayout = await walletPayoutService.updateWalletPayoutStatus({
+      payoutId: id,
+      status,
+      failureReason,
+      externalReferenceId,
+      processedByAdminId: adminId,
+    });
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.adminProfile?.adminRole || "SUPER_ADMIN",
+      actionType: ActionType.PAYOUT_STATUS_CHANGED,
+      entityType: EntityType.PAYOUT,
+      entityId: id,
+      description: `Payout ${id} status changed to ${status}`,
+      metadata: { status, failureReason, externalReferenceId },
+      success: true,
+      ipAddress: getClientIp(req),
+    });
+
+    res.json(updatedPayout);
+  } catch (error: any) {
+    console.error("Update payout status error:", error);
+    res.status(400).json({ error: error.message || "Failed to update payout status" });
+  }
+});
+
+// ====================================================
+// COMMISSION ANALYTICS API
+// ====================================================
+
+// Get commission analytics with aggregations
+router.get("/earnings/analytics", checkPermission(Permission.VIEW_COMMISSION_ANALYTICS), async (req: AuthRequest, res) => {
+  try {
+    const { startDate, endDate, groupBy = "day", countryCode, ownerType } = req.query;
+
+    const filters: any = {};
+    if (startDate) filters.startDate = new Date(startDate as string);
+    if (endDate) filters.endDate = new Date(endDate as string);
+    if (countryCode) filters.countryCode = countryCode as string;
+    if (ownerType) filters.ownerType = ownerType as "driver" | "restaurant";
+
+    const analytics = await walletService.getCommissionAnalytics({
+      ...filters,
+      groupBy: groupBy as "day" | "week" | "month",
+    });
+
+    res.json(analytics);
+  } catch (error: any) {
+    console.error("Get commission analytics error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch commission analytics" });
+  }
+});
+
+// Get earnings summary
+router.get("/earnings/summary", checkPermission(Permission.VIEW_COMMISSION_ANALYTICS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode, ownerType } = req.query;
+
+    const filters: any = {};
+    if (countryCode) filters.countryCode = countryCode as string;
+    if (ownerType) filters.ownerType = ownerType as "driver" | "restaurant";
+
+    const summary = await walletService.getEarningsSummary(filters);
+
+    res.json(summary);
+  } catch (error: any) {
+    console.error("Get earnings summary error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch earnings summary" });
   }
 });
 

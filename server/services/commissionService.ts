@@ -12,7 +12,42 @@ export interface CommissionCalculation {
 
 export class CommissionService {
   /**
-   * Calculate commission based on service type, owner type, and country
+   * Calculate commission for rides and parcels (driver services)
+   * Driver receives gross amount, owes commission to platform
+   */
+  async calculateDriverCommission(
+    fareAmount: number,
+    serviceType: "ride" | "parcel",
+    countryCode: "BD" | "US",
+    currency: string = "BDT"
+  ): Promise<CommissionCalculation> {
+    if (fareAmount <= 0) {
+      throw new Error("Fare amount must be greater than zero");
+    }
+
+    const commissionSettings = await getSection("commission");
+    const commissionPercent = this.getCommissionRate(
+      commissionSettings,
+      serviceType,
+      "driver",
+      countryCode
+    );
+
+    const commissionAmount = (fareAmount * commissionPercent) / 100;
+    const netAmount = fareAmount - commissionAmount;
+
+    return {
+      grossAmount: fareAmount,
+      commissionAmount: parseFloat(commissionAmount.toFixed(2)),
+      netAmount: parseFloat(netAmount.toFixed(2)),
+      commissionPercent,
+      currency,
+    };
+  }
+
+  /**
+   * Legacy method - use calculateDriverCommission or calculateFoodOrderCommission instead
+   * @deprecated
    */
   async calculateCommission(
     grossAmount: number,
@@ -21,28 +56,10 @@ export class CommissionService {
     countryCode: "BD" | "US",
     currency: string = "BDT"
   ): Promise<CommissionCalculation> {
-    if (grossAmount <= 0) {
-      throw new Error("Gross amount must be greater than zero");
+    if (serviceType === "food") {
+      throw new Error("Use calculateFoodOrderCommission for food orders");
     }
-
-    const commissionSettings = await getSection("commission");
-    const commissionPercent = this.getCommissionRate(
-      commissionSettings,
-      serviceType,
-      ownerType,
-      countryCode
-    );
-
-    const commissionAmount = (grossAmount * commissionPercent) / 100;
-    const netAmount = grossAmount - commissionAmount;
-
-    return {
-      grossAmount,
-      commissionAmount: parseFloat(commissionAmount.toFixed(2)),
-      netAmount: parseFloat(netAmount.toFixed(2)),
-      commissionPercent,
-      currency,
-    };
+    return this.calculateDriverCommission(grossAmount, serviceType as "ride" | "parcel", countryCode, currency);
   }
 
   /**

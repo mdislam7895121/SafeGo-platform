@@ -316,10 +316,48 @@ export class WalletService {
     });
   }
 
-  async getTransactionCount(walletId: string): Promise<number> {
-    return prisma.walletTransaction.count({
-      where: { walletId },
-    });
+  async getTransactionCount(filters?: {
+    walletId?: string;
+    ownerType?: WalletOwnerType;
+    countryCode?: string;
+    serviceType?: WalletTransactionServiceType;
+    direction?: WalletTransactionDirection;
+    startDate?: Date;
+    endDate?: Date;
+  }): Promise<number> {
+    const where: Prisma.WalletTransactionWhereInput = {};
+
+    if (filters?.walletId) {
+      where.walletId = filters.walletId;
+    }
+
+    if (filters?.ownerType) {
+      where.ownerType = filters.ownerType;
+    }
+
+    if (filters?.countryCode) {
+      where.countryCode = filters.countryCode;
+    }
+
+    if (filters?.serviceType) {
+      where.serviceType = filters.serviceType;
+    }
+
+    if (filters?.direction) {
+      where.direction = filters.direction;
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        where.createdAt.gte = filters.startDate;
+      }
+      if (filters.endDate) {
+        where.createdAt.lte = filters.endDate;
+      }
+    }
+
+    return prisma.walletTransaction.count({ where });
   }
 
   async listWallets(filters?: {
@@ -366,11 +404,105 @@ export class WalletService {
     });
   }
 
+  async getWalletCount(filters?: {
+    ownerType?: WalletOwnerType;
+    countryCode?: string;
+    minAvailableBalance?: number;
+    maxAvailableBalance?: number;
+    minNegativeBalance?: number;
+    maxNegativeBalance?: number;
+    search?: string;
+  }): Promise<number> {
+    const where: Prisma.WalletWhereInput = {};
+
+    if (filters?.ownerType) {
+      where.ownerType = filters.ownerType;
+    }
+
+    if (filters?.countryCode) {
+      where.countryCode = filters.countryCode;
+    }
+
+    if (filters?.minAvailableBalance !== undefined || filters?.maxAvailableBalance !== undefined) {
+      where.availableBalance = {};
+      if (filters.minAvailableBalance !== undefined) {
+        where.availableBalance.gte = new Prisma.Decimal(filters.minAvailableBalance);
+      }
+      if (filters.maxAvailableBalance !== undefined) {
+        where.availableBalance.lte = new Prisma.Decimal(filters.maxAvailableBalance);
+      }
+    }
+
+    if (filters?.minNegativeBalance !== undefined || filters?.maxNegativeBalance !== undefined) {
+      where.negativeBalance = {};
+      if (filters.minNegativeBalance !== undefined) {
+        where.negativeBalance.gte = new Prisma.Decimal(filters.minNegativeBalance);
+      }
+      if (filters.maxNegativeBalance !== undefined) {
+        where.negativeBalance.lte = new Prisma.Decimal(filters.maxNegativeBalance);
+      }
+    }
+
+    return prisma.wallet.count({ where });
+  }
+
+  async listTransactions(filters?: {
+    walletId?: string;
+    ownerType?: WalletOwnerType;
+    countryCode?: string;
+    serviceType?: WalletTransactionServiceType;
+    direction?: WalletTransactionDirection;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: Prisma.WalletTransactionWhereInput = {};
+
+    if (filters?.walletId) {
+      where.walletId = filters.walletId;
+    }
+
+    if (filters?.ownerType) {
+      where.ownerType = filters.ownerType;
+    }
+
+    if (filters?.countryCode) {
+      where.countryCode = filters.countryCode;
+    }
+
+    if (filters?.serviceType) {
+      where.serviceType = filters.serviceType;
+    }
+
+    if (filters?.direction) {
+      where.direction = filters.direction;
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        where.createdAt.gte = filters.startDate;
+      }
+      if (filters.endDate) {
+        where.createdAt.lte = filters.endDate;
+      }
+    }
+
+    return prisma.walletTransaction.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: filters?.limit || 50,
+      skip: filters?.offset || 0,
+    });
+  }
+
   async getCommissionAnalytics(filters?: {
     startDate?: Date;
     endDate?: Date;
     countryCode?: string;
-    serviceType?: WalletTransactionServiceType;
+    ownerType?: WalletOwnerType;
+    groupBy?: "day" | "week" | "month";
   }) {
     const where: Prisma.WalletTransactionWhereInput = {
       serviceType: "commission",
@@ -388,8 +520,8 @@ export class WalletService {
       where.countryCode = filters.countryCode;
     }
 
-    if (filters?.serviceType && filters.serviceType !== "commission") {
-      where.serviceType = filters.serviceType;
+    if (filters?.ownerType) {
+      where.ownerType = filters.ownerType;
     }
 
     const transactions = await prisma.walletTransaction.findMany({
@@ -399,6 +531,7 @@ export class WalletService {
         countryCode: true,
         serviceType: true,
         ownerType: true,
+        createdAt: true,
       },
     });
 
@@ -422,6 +555,69 @@ export class WalletService {
       byServiceType,
       byOwnerType,
       transactionCount: transactions.length,
+    };
+  }
+
+  async getEarningsSummary(filters?: {
+    countryCode?: string;
+    ownerType?: WalletOwnerType;
+  }) {
+    const where: Prisma.WalletTransactionWhereInput = {
+      direction: "credit",
+    };
+
+    if (filters?.countryCode) {
+      where.countryCode = filters.countryCode;
+    }
+
+    if (filters?.ownerType) {
+      where.ownerType = filters.ownerType;
+    }
+
+    const transactions = await prisma.walletTransaction.findMany({
+      where,
+      select: {
+        amount: true,
+        serviceType: true,
+        countryCode: true,
+        ownerType: true,
+      },
+    });
+
+    let totalEarnings = 0;
+    const earningsByService: Record<string, number> = {};
+    const earningsByCountry: Record<string, number> = {};
+    const earningsByOwnerType: Record<string, number> = {};
+
+    transactions.forEach((tx) => {
+      const amount = parseFloat(tx.amount.toString());
+      totalEarnings += amount;
+
+      earningsByService[tx.serviceType] = (earningsByService[tx.serviceType] || 0) + amount;
+      earningsByCountry[tx.countryCode] = (earningsByCountry[tx.countryCode] || 0) + amount;
+      earningsByOwnerType[tx.ownerType] = (earningsByOwnerType[tx.ownerType] || 0) + amount;
+    });
+
+    const walletAggregates = await prisma.wallet.aggregate({
+      where: {
+        countryCode: filters?.countryCode,
+        ownerType: filters?.ownerType,
+      },
+      _sum: {
+        availableBalance: true,
+        negativeBalance: true,
+      },
+      _count: true,
+    });
+
+    return {
+      totalEarnings,
+      earningsByService,
+      earningsByCountry,
+      earningsByOwnerType,
+      totalAvailableBalance: parseFloat(walletAggregates._sum.availableBalance?.toString() || "0"),
+      totalNegativeBalance: parseFloat(walletAggregates._sum.negativeBalance?.toString() || "0"),
+      walletCount: walletAggregates._count,
     };
   }
 }
