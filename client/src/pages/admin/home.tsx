@@ -123,7 +123,7 @@ export default function AdminHome() {
       description: "View all driver and restaurant wallets with balances",
       color: "text-emerald-600",
       bgColor: "bg-emerald-50 dark:bg-emerald-950",
-      permission: "VIEW_WALLETS",
+      permission: "VIEW_WALLET_SUMMARY",
     },
     {
       name: "Payouts",

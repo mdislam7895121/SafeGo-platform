@@ -55,7 +55,7 @@ The admin dashboard (`/admin`) displays 15 management cards with proper RBAC enf
 9. **Global Settings** → `/admin/settings` - Configure platform-wide settings
 
 **Financial Cards** (RBAC-gated):
-10. **Wallets** → `/admin/wallets` - View all wallet balances (requires `VIEW_WALLETS`)
+10. **Wallets** → `/admin/wallets` - View all wallet balances (requires `VIEW_WALLET_SUMMARY`)
 11. **Payouts** → `/admin/payouts` - Review and approve payout requests (requires `MANAGE_PAYOUTS`)
 12. **Earnings Analytics** → `/admin/earnings` - Global earnings and commission dashboard (requires `VIEW_EARNINGS_DASHBOARD`)
 
