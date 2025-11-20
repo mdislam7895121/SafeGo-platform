@@ -34,7 +34,7 @@ Key features include:
 - **Automated Incident Response**: Fully automated incident response system implementing auto-locking of suspicious users, token revocation, session invalidation, admin breach alerts, automated fraud response, and full audit trails.
 - **Admin Financial Suite**: Comprehensive financial management suite with dedicated admin pages for Wallets, Payouts, and Earnings, providing end-to-end financial visibility and control with full RBAC enforcement.
 - **Admin Dashboard Cards**: The admin dashboard (`/admin`) displays 15 management cards with proper RBAC enforcement covering core management, financial, security, and support functionalities. 
-  - **Root Cause Fix**: Created missing `/api/admin/capabilities` endpoint (was 404ing, causing capabilities array to be empty and filtering out all RBAC-protected cards). Added auto-logout on 401 errors to force fresh login when JWT tokens expire/become invalid.
+  - **Root Cause & Fix**: Created missing `/api/admin/capabilities` endpoint (was 404ing, causing capabilities array to be empty and filtering out all RBAC-protected cards). Implemented comprehensive error handling with auto-logout on 401 errors, skeleton loading during token hydration, and error banner for non-401 failures that preserves card visibility.
   - **15 Total Cards**:
     - **9 Core Management** (no permission required): Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings
     - **6 RBAC-Protected Cards**:
@@ -44,7 +44,10 @@ Key features include:
       - System Monitoring (`VIEW_DASHBOARD`)
       - Security Threat Center (`VIEW_DASHBOARD`)
       - Support Chat (`VIEW_SUPPORT_CONVERSATIONS`)
-  - **Implementation**: `/api/admin/capabilities` endpoint (server/routes/admin.ts lines 34-44) returns `{ capabilities: string[] }` using `getAdminCapabilities()` from permissions system. Frontend (client/src/pages/admin/home.tsx) fetches capabilities and filters cards based on permission requirements. Auto-logout added for expired tokens.
+  - **Implementation Details**:
+    - Backend: `/api/admin/capabilities` endpoint (server/routes/admin.ts) returns `{ capabilities: string[] }` using `getAdminCapabilities()` from permissions system
+    - Frontend: Custom useQuery with `isPending` to prevent flash during token hydration, `onError` callback for clean 401 logout without React warnings, error banner on non-401 failures that shows all cards to avoid bad UX during transient backend issues
+    - Demo credentials: `admin@demo.com` / `demo123` (SUPER_ADMIN with all permissions)
 - **Payout Scheduling & Auto-Reconciliation Engine (Backend)**: Automated payout scheduling system with weekly/daily batch processing, manual payout capabilities, and a comprehensive reconciliation engine that matches completed orders with wallet ledger entries, detects discrepancies, and generates detailed reports with full audit logging.
 - **Step 47 Admin Financial Suite UI**: Complete frontend implementation for payout management with five dedicated pages:
   - `/admin/payouts` - Hub page with navigation to all payout management features
