@@ -6953,6 +6953,394 @@ router.get("/earnings/summary", checkPermission(Permission.VIEW_COMMISSION_ANALY
 });
 
 // ====================================================
+// WALLET MANAGEMENT API
+// ====================================================
+
+// Get all wallets with filters
+router.get("/wallets", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
+  try {
+    const { walletType, country } = req.query;
+
+    const where: any = {};
+    if (walletType && walletType !== "all") {
+      where.ownerType = walletType as string;
+    }
+    if (country && country !== "all") {
+      where.countryCode = country as string;
+    }
+
+    const wallets = await prisma.wallet.findMany({
+      where,
+      include: {
+        transactions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Enrich with owner information
+    const enrichedWallets = await Promise.all(
+      wallets.map(async (wallet) => {
+        let owner: any = { email: "Unknown", countryCode: wallet.countryCode };
+
+        if (wallet.ownerType === "driver") {
+          const driver = await prisma.driverProfile.findFirst({
+            where: { id: wallet.ownerId },
+            include: { user: true },
+          });
+          if (driver) {
+            owner = {
+              email: driver.user.email,
+              countryCode: driver.user.countryCode,
+              fullName: driver.fullName || `${driver.firstName || ""} ${driver.lastName || ""}`.trim(),
+            };
+          }
+        } else if (wallet.ownerType === "restaurant") {
+          const restaurant = await prisma.restaurantProfile.findFirst({
+            where: { id: wallet.ownerId },
+            include: { user: true },
+          });
+          if (restaurant) {
+            owner = {
+              email: restaurant.user.email,
+              countryCode: restaurant.user.countryCode,
+              restaurantName: restaurant.restaurantName,
+            };
+          }
+        }
+
+        return {
+          id: wallet.id,
+          walletType: wallet.ownerType,
+          driverId: wallet.ownerType === "driver" ? wallet.ownerId : null,
+          restaurantId: wallet.ownerType === "restaurant" ? wallet.ownerId : null,
+          currency: wallet.currency,
+          availableBalance: wallet.availableBalance.toString(),
+          negativeBalance: wallet.negativeBalance.toString(),
+          lastTransactionDate: wallet.transactions[0]?.createdAt || null,
+          createdAt: wallet.createdAt,
+          owner,
+        };
+      })
+    );
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_WALLET_SUMMARY,
+      entityType: EntityType.WALLET,
+      description: `Viewed wallets list`,
+      metadata: { filters: { walletType, country }, total: enrichedWallets.length },
+    });
+
+    res.json({ wallets: enrichedWallets, total: enrichedWallets.length });
+  } catch (error: any) {
+    console.error("Get wallets error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch wallets" });
+  }
+});
+
+// Get wallet details by ID
+router.get("/wallets/:id", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { id },
+      include: {
+        transactions: {
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        },
+        payouts: {
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+      },
+    });
+
+    if (!wallet) {
+      return res.status(404).json({ error: "Wallet not found" });
+    }
+
+    // Get owner information
+    let owner: any = { email: "Unknown", countryCode: wallet.countryCode };
+
+    if (wallet.ownerType === "driver") {
+      const driver = await prisma.driverProfile.findFirst({
+        where: { id: wallet.ownerId },
+        include: { user: true },
+      });
+      if (driver) {
+        owner = {
+          email: driver.user.email,
+          countryCode: driver.user.countryCode,
+          fullName: driver.fullName || `${driver.firstName || ""} ${driver.lastName || ""}`.trim(),
+        };
+      }
+    } else if (wallet.ownerType === "restaurant") {
+      const restaurant = await prisma.restaurantProfile.findFirst({
+        where: { id: wallet.ownerId },
+        include: { user: true },
+      });
+      if (restaurant) {
+        owner = {
+          email: restaurant.user.email,
+          countryCode: restaurant.user.countryCode,
+          restaurantName: restaurant.restaurantName,
+        };
+      }
+    }
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_WALLET_DETAILS,
+      entityType: EntityType.WALLET,
+      entityId: id,
+      description: `Viewed wallet details for ${wallet.ownerType}`,
+      metadata: { walletId: id, ownerType: wallet.ownerType, ownerId: wallet.ownerId },
+    });
+
+    res.json({
+      ...wallet,
+      availableBalance: wallet.availableBalance.toString(),
+      negativeBalance: wallet.negativeBalance.toString(),
+      owner,
+      transactions: wallet.transactions.map(t => ({
+        ...t,
+        amount: t.amount.toString(),
+        balanceSnapshot: t.balanceSnapshot.toString(),
+        negativeBalanceSnapshot: t.negativeBalanceSnapshot.toString(),
+      })),
+      payouts: wallet.payouts.map(p => ({
+        ...p,
+        amount: p.amount.toString(),
+      })),
+    });
+  } catch (error: any) {
+    console.error("Get wallet details error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch wallet details" });
+  }
+});
+
+// ====================================================
+// PAYOUT MANAGEMENT API
+// ====================================================
+
+// Get all payouts with filters
+router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { status, walletType, country } = req.query;
+
+    const where: any = {};
+    if (status && status !== "all") {
+      where.status = status as string;
+    }
+    if (walletType && walletType !== "all") {
+      where.ownerType = walletType as string;
+    }
+    if (country && country !== "all") {
+      where.countryCode = country as string;
+    }
+
+    const payouts = await prisma.payout.findMany({
+      where,
+      include: {
+        wallet: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Enrich with owner information
+    const enrichedPayouts = await Promise.all(
+      payouts.map(async (payout) => {
+        let owner: any = { email: "Unknown", countryCode: payout.countryCode, currency: payout.wallet.currency };
+
+        if (payout.ownerType === "driver") {
+          const driver = await prisma.driverProfile.findFirst({
+            where: { id: payout.ownerId },
+            include: { user: true },
+          });
+          if (driver) {
+            owner = {
+              email: driver.user.email,
+              countryCode: driver.user.countryCode,
+              currency: payout.wallet.currency,
+              fullName: driver.fullName || `${driver.firstName || ""} ${driver.lastName || ""}`.trim(),
+            };
+          }
+        } else if (payout.ownerType === "restaurant") {
+          const restaurant = await prisma.restaurantProfile.findFirst({
+            where: { id: payout.ownerId },
+            include: { user: true },
+          });
+          if (restaurant) {
+            owner = {
+              email: restaurant.user.email,
+              countryCode: restaurant.user.countryCode,
+              currency: payout.wallet.currency,
+              restaurantName: restaurant.restaurantName,
+            };
+          }
+        }
+
+        return {
+          id: payout.id,
+          walletType: payout.ownerType,
+          amount: payout.amount.toString(),
+          status: payout.status,
+          requestedAt: payout.createdAt,
+          processedAt: payout.processedAt,
+          processedByAdminId: payout.createdByAdminId,
+          rejectionReason: payout.failureReason,
+          owner,
+        };
+      })
+    );
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_PAYOUT_REQUESTS,
+      entityType: EntityType.PAYOUT,
+      description: `Viewed payouts list`,
+      metadata: { filters: { status, walletType, country }, total: enrichedPayouts.length },
+    });
+
+    res.json({ payouts: enrichedPayouts, total: enrichedPayouts.length });
+  } catch (error: any) {
+    console.error("Get payouts error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payouts" });
+  }
+});
+
+// Approve a payout
+router.put("/payouts/:id/approve", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.id;
+
+    const payout = await prisma.payout.findUnique({
+      where: { id },
+      include: { wallet: true },
+    });
+
+    if (!payout) {
+      return res.status(404).json({ error: "Payout not found" });
+    }
+
+    if (payout.status !== "pending") {
+      return res.status(400).json({ error: `Payout is already ${payout.status}` });
+    }
+
+    const updatedPayout = await prisma.payout.update({
+      where: { id },
+      data: {
+        status: "processing",
+        processedAt: new Date(),
+        createdByAdminId: adminId,
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.APPROVE_PAYOUT,
+      entityType: EntityType.PAYOUT,
+      entityId: id,
+      description: `Approved payout of ${payout.amount} for ${payout.ownerType}`,
+      metadata: {
+        payoutId: id,
+        amount: payout.amount.toString(),
+        ownerType: payout.ownerType,
+        ownerId: payout.ownerId,
+      },
+    });
+
+    res.json({
+      ...updatedPayout,
+      amount: updatedPayout.amount.toString(),
+    });
+  } catch (error: any) {
+    console.error("Approve payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to approve payout" });
+  }
+});
+
+// Reject a payout
+router.put("/payouts/:id/reject", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user!.id;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const payout = await prisma.payout.findUnique({
+      where: { id },
+      include: { wallet: true },
+    });
+
+    if (!payout) {
+      return res.status(404).json({ error: "Payout not found" });
+    }
+
+    if (payout.status !== "pending") {
+      return res.status(400).json({ error: `Payout is already ${payout.status}` });
+    }
+
+    const updatedPayout = await prisma.payout.update({
+      where: { id },
+      data: {
+        status: "failed",
+        failureReason: reason,
+        processedAt: new Date(),
+        createdByAdminId: adminId,
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.REJECT_PAYOUT,
+      entityType: EntityType.PAYOUT,
+      entityId: id,
+      description: `Rejected payout of ${payout.amount} for ${payout.ownerType}: ${reason}`,
+      metadata: {
+        payoutId: id,
+        amount: payout.amount.toString(),
+        ownerType: payout.ownerType,
+        ownerId: payout.ownerId,
+        reason,
+      },
+    });
+
+    res.json({
+      ...updatedPayout,
+      amount: updatedPayout.amount.toString(),
+    });
+  } catch (error: any) {
+    console.error("Reject payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to reject payout" });
+  }
+});
+
+// ====================================================
 // EARNINGS DASHBOARD API
 // ====================================================
 
