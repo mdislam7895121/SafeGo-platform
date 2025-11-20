@@ -158,6 +158,7 @@ export default function AdminHome() {
       description: "Real-time security monitoring and system health",
       color: "text-rose-600",
       bgColor: "bg-rose-50 dark:bg-rose-950",
+      permission: "VIEW_DASHBOARD",
     },
     {
       name: "Security Threat Center",
@@ -166,6 +167,7 @@ export default function AdminHome() {
       description: "Advanced threat detection and real-time incident response",
       color: "text-red-600",
       bgColor: "bg-red-50 dark:bg-red-950",
+      permission: "VIEW_DASHBOARD",
     },
     {
       name: "Activity Log",

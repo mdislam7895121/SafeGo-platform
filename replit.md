@@ -39,13 +39,41 @@ Key features include:
 
 - **Step 45 - Automated Incident Response**: Fully automated incident response system (`incidentResponseService.ts`) implementing: auto-lock suspicious users when risk scores exceed 75, automatic token revocation for compromised accounts, compromised session invalidation with audit logging, admin breach alert system for critical security events, automated fraud response triggering actions based on severity levels, full audit trail for all automated actions, and incident tracking with resolution workflows. System automatically responds to detected threats without manual intervention while maintaining complete audit trails and admin notifications for oversight.
 
-### Admin Dashboard Card Visibility Fix
+### Admin Dashboard Cards - Complete Inventory
 
-**Issue**: "System Monitoring" and "Security Threat Center" cards were not visible on the admin dashboard due to JWT token invalidation after JWT_SECRET was added/changed. The `/api/auth/me` endpoint returned 401 errors for existing sessions, resulting in an empty capabilities array `[]`, which caused the RBAC filtering to hide all cards with permission requirements.
+The admin dashboard (`/admin`) displays 15 management cards with proper RBAC enforcement:
 
-**Root Cause**: When JWT_SECRET changes, all existing JWT tokens become invalid (signature mismatch). The capabilities query failed with 401, defaulting to an empty array, and the filter logic `capabilities.includes(section.permission)` removed any cards with a `permission` field.
+**Core Management Cards** (no permission required - visible to all authenticated admins):
+1. **Notification Center** → `/admin/notifications` - System alerts and notifications with unread badge
+2. **KYC Approvals** → `/admin/kyc` - Review and approve verification requests
+3. **Document Center** → `/admin/documents` - Review all user-submitted documents
+4. **Driver Management** → `/admin/drivers` - View, suspend, and manage drivers
+5. **Customer Management** → `/admin/customers` - View, block, and manage customers
+6. **Complaints** → `/admin/complaints` - Review and resolve driver complaints with open count badge
+7. **Wallet Settlement** → `/admin/settlement` - Manage wallet settlements
+8. **Activity Log** → `/admin/activity-log` - Security audit trail of admin actions
+9. **Global Settings** → `/admin/settings` - Configure platform-wide settings
 
-**Fix Applied**: Removed the `permission: "VIEW_DASHBOARD"` requirement from both security cards to match the pattern of other core admin cards (Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings) which also have no permission checks. This ensures the cards are immediately visible to all admin users without requiring logout/login cycles. The backend routes `/admin/monitoring` and `/admin/security-center` remain protected by the `VIEW_DASHBOARD` permission check via middleware.
+**Financial Cards** (RBAC-gated):
+10. **Wallets** → `/admin/wallets` - View all wallet balances (requires `VIEW_WALLETS`)
+11. **Payouts** → `/admin/payouts` - Review and approve payout requests (requires `MANAGE_PAYOUTS`)
+12. **Earnings Analytics** → `/admin/earnings` - Global earnings and commission dashboard (requires `VIEW_EARNINGS_DASHBOARD`)
+
+**Security Cards** (RBAC-gated):
+13. **System Monitoring** → `/admin/monitoring` - Real-time security monitoring (requires `VIEW_DASHBOARD`)
+14. **Security Threat Center** → `/admin/security-center` - Advanced threat detection (requires `VIEW_DASHBOARD`)
+
+**Support Card** (RBAC-gated):
+15. **Support Chat** → `/admin/support-chat` - Real-time support conversations with unread badge (requires `VIEW_SUPPORT_CONVERSATIONS`)
+
+**RBAC Enforcement Summary:**
+- SUPER_ADMIN sees all 15 cards (has all permissions)
+- COMPLIANCE_ADMIN sees 14 cards (lacks MANAGE_PAYOUTS but has VIEW_DASHBOARD, VIEW_EARNINGS_DASHBOARD, VIEW_SUPPORT_CONVERSATIONS)
+- SUPPORT_ADMIN sees fewer cards based on role permissions
+- FINANCE_ADMIN sees financial + core cards
+- READONLY_ADMIN has VIEW_DASHBOARD for monitoring cards
+
+**Security Note:** All backend routes remain protected by middleware permission checks regardless of frontend card visibility. Frontend RBAC filtering provides UX optimization only; security enforcement occurs at the API layer.
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields, driver profile photos, and vehicle documents.

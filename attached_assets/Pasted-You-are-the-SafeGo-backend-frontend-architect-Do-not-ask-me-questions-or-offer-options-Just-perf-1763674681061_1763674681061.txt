@@ -1,0 +1,95 @@
+You are the SafeGo backend + frontend architect. Do not ask me questions or offer options. Just perform the changes and then show me a concise summary of what you did.
+
+Goal:
+The security stack (Phase 1–4) is complete and must NOT be changed. Now I need you to restore ALL expected admin dashboard cards so that the Management section matches the design and documentation.
+
+Context and constraints:
+- Security is FINAL: RBAC, Environment Guard, JWT_SECRET, Fraud Detection Engine, DevOps Security, Automated Incident Response must remain exactly as they are.
+- Do NOT modify:
+  - Environment guard logic
+  - Security Center (/admin/security-center)
+  - System Monitoring (/admin/monitoring)
+  - Fraud engine, log rotation, firewall rules, or incident automation
+- Only fix the ADMIN DASHBOARD HOME CARDS (UI + routing + RBAC visibility).
+
+Tasks:
+
+1. Discover the full list of admin home cards
+   - Open `replit.md` and any admin design docs.
+   - Open the admin dashboard home component (for example `client/src/pages/admin/home.tsx` or whatever file renders the admin cards).
+   - Build a complete list of all cards that are supposed to exist on the admin dashboard, including but not limited to:
+     - Notification Center
+     - KYC Approvals
+     - Document Center
+     - Driver Management
+     - Customer Management
+     - Complaints
+     - Wallet Settlement
+     - Payouts
+     - Earnings Analytics
+     - System Monitoring
+     - Security Threat Center
+     - Support Chat (real-time support conversations)
+     - Activity Log
+     - Global Settings
+   - If the docs or code define any additional admin cards, include those too. Do NOT invent new features; only use what already exists in the codebase/spec.
+
+2. Fix the adminSections / layout configuration
+   - Find the array or structure that defines the admin dashboard cards (often something like `adminSections` or `managementSections` used by the home page).
+   - Ensure that **all** expected cards from step 1 are present in that configuration with:
+     - Correct title and description
+     - Correct icon
+     - Correct route (re-use existing routes; do NOT create new fake routes)
+   - Routes to use (adjust if the real paths differ):
+     - Support Chat → existing support chat route (e.g. `/admin/support-chat`)
+     - Payouts → existing payouts route (e.g. `/admin/payouts`)
+     - Earnings Analytics → existing earnings/analytics route (e.g. `/admin/earnings-analytics` or the real one in the code)
+     - System Monitoring → `/admin/monitoring`
+     - Security Threat Center → `/admin/security-center`
+   - If you find different actual paths in the router, always use those actual paths instead of guessing.
+
+3. RBAC and visibility rules
+   - Do NOT weaken security.
+   - Every card must be gated by the proper permission:
+     - General dashboard visibility: `VIEW_DASHBOARD`
+     - Support Chat card: must additionally respect the capability/permission for viewing support conversations (e.g. `VIEW_SUPPORT_CONVERSATIONS`).
+     - Payouts / Wallet / Earnings cards: use the existing payout/finance permissions if defined (for example `MANAGE_PAYOUTS`, `VIEW_EARNINGS_ANALYTICS`). If such permissions already exist in the RBAC config, use them; do NOT create new arbitrary names.
+   - SUPER_ADMIN must see all cards.
+   - Non-privileged admins should only see cards allowed by their existing permissions.
+   - Do NOT change the RBAC role definitions themselves beyond wiring these cards to the existing permissions.
+
+4. Keep layout and UX consistent
+   - Preserve the existing admin dashboard layout structure:
+     - Platform Overview
+     - Driver Statistics
+     - Parcel Delivery Statistics
+     - Management section with the cards in a clean grid.
+   - Insert the missing cards back into the Management section in a logical order:
+     - Notification, KYC, Documents, Driver/Customer/Complaints
+     - Wallet + Payouts + Earnings Analytics
+     - System Monitoring + Security Threat Center + Support Chat
+     - Activity Log + Global Settings
+   - Make sure the cards are responsive and match the SafeGo design system (colors, spacing, typography).
+
+5. Regression checks
+   - Run type checking and build to ensure no TypeScript or runtime errors are introduced.
+   - Confirm:
+     - Admin dashboard loads without error.
+     - All expected cards appear for the SUPER_ADMIN account.
+     - Clicking each card navigates to the correct existing page.
+     - No security-related code or environment guard behavior has changed.
+   - Update `replit.md` with:
+     - Final list of admin dashboard cards
+     - The routes they link to
+     - The permissions required for each card
+     - A note that security phases 1–4 remain unchanged.
+
+Important:
+- Do not ask me which option to choose. Complete all tasks above in one pass.
+- Do not remove or rename existing cards that are already working (System Monitoring, Security Threat Center, Activity Log, etc.).
+- Focus ONLY on restoring and wiring the missing cards, while preserving the enterprise security model.
+
+When you are done, provide a short summary:
+- Which cards were missing and how you restored them.
+- Any routes or permissions you wired.
+- Confirmation that security phases 1–4 are unchanged and all checks pass.
