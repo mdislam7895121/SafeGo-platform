@@ -5,6 +5,7 @@ import { Permission } from "../utils/permissions";
 import { z } from "zod";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone, isValidSSN, maskSSN } from "../utils/encryption";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
+import { notifyKYCPending, notifyKYCApproved, notifyKYCRejected, notifyDriverStatusChanged, notifyRestaurantStatusChanged, notifyRestaurantCommissionChanged } from "../utils/notifications";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -446,6 +447,28 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
       success: true,
     });
 
+    // Create admin notification
+    if (verificationStatus === "approved") {
+      await notifyKYCApproved({
+        entityType: user.role as "driver" | "customer" | "restaurant",
+        entityId: updatedProfile.id,
+        countryCode: user.countryCode,
+        email: user.email,
+        actorId: req.user?.userId || "",
+        actorEmail: req.user?.email || "unknown",
+      });
+    } else if (verificationStatus === "rejected") {
+      await notifyKYCRejected({
+        entityType: user.role as "driver" | "customer" | "restaurant",
+        entityId: updatedProfile.id,
+        countryCode: user.countryCode,
+        email: user.email,
+        actorId: req.user?.userId || "",
+        actorEmail: req.user?.email || "unknown",
+        reason: rejectionReason || "Not specified",
+      });
+    }
+
     res.json({
       message: `KYC ${verificationStatus} for user ${user.email}`,
       profile: updatedProfile,
@@ -799,6 +822,24 @@ router.patch("/block/:userId", checkPermission(Permission.MANAGE_USER_STATUS), a
       },
       success: true,
     });
+
+    // Create admin notification for driver status change
+    if (user.role === "driver") {
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+      });
+      
+      if (driverProfile) {
+        await notifyDriverStatusChanged({
+          driverId: driverProfile.id,
+          countryCode: user.countryCode,
+          email: user.email,
+          action: isBlocked ? "blocked" : "unblocked",
+          actorId: req.user?.userId || "",
+          actorEmail: req.user?.email || "unknown",
+        });
+      }
+    }
 
     res.json({
       message: `User ${isBlocked ? "blocked" : "unblocked"} successfully`,
@@ -2294,6 +2335,16 @@ router.patch("/drivers/:id/suspend", async (req: AuthRequest, res) => {
       },
     });
 
+    // Create admin notification
+    await notifyDriverStatusChanged({
+      driverId: driver.id,
+      countryCode: driver.user.countryCode,
+      email: driver.user.email,
+      action: "suspended",
+      actorId: req.user?.userId || "",
+      actorEmail: req.user?.email || "unknown",
+    });
+
     res.json({
       message: "Driver suspended successfully",
       driver: {
@@ -2348,6 +2399,16 @@ router.patch("/drivers/:id/unsuspend", async (req: AuthRequest, res) => {
         title: "Account Unsuspended",
         body: "Your driver account suspension has been lifted. You can now accept ride requests.",
       },
+    });
+
+    // Create admin notification
+    await notifyDriverStatusChanged({
+      driverId: driver.id,
+      countryCode: driver.user.countryCode,
+      email: driver.user.email,
+      action: "unsuspended",
+      actorId: req.user?.userId || "",
+      actorEmail: req.user?.email || "unknown",
     });
 
     res.json({
