@@ -39,6 +39,14 @@ Key features include:
 
 - **Step 45 - Automated Incident Response**: Fully automated incident response system (`incidentResponseService.ts`) implementing: auto-lock suspicious users when risk scores exceed 75, automatic token revocation for compromised accounts, compromised session invalidation with audit logging, admin breach alert system for critical security events, automated fraud response triggering actions based on severity levels, full audit trail for all automated actions, and incident tracking with resolution workflows. System automatically responds to detected threats without manual intervention while maintaining complete audit trails and admin notifications for oversight.
 
+### Admin Dashboard Card Visibility Fix
+
+**Issue**: "System Monitoring" and "Security Threat Center" cards were not visible on the admin dashboard due to JWT token invalidation after JWT_SECRET was added/changed. The `/api/auth/me` endpoint returned 401 errors for existing sessions, resulting in an empty capabilities array `[]`, which caused the RBAC filtering to hide all cards with permission requirements.
+
+**Root Cause**: When JWT_SECRET changes, all existing JWT tokens become invalid (signature mismatch). The capabilities query failed with 401, defaulting to an empty array, and the filter logic `capabilities.includes(section.permission)` removed any cards with a `permission` field.
+
+**Fix Applied**: Removed the `permission: "VIEW_DASHBOARD"` requirement from both security cards to match the pattern of other core admin cards (Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings) which also have no permission checks. This ensures the cards are immediately visible to all admin users without requiring logout/login cycles. The backend routes `/admin/monitoring` and `/admin/security-center` remain protected by the `VIEW_DASHBOARD` permission check via middleware.
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields, driver profile photos, and vehicle documents.
 

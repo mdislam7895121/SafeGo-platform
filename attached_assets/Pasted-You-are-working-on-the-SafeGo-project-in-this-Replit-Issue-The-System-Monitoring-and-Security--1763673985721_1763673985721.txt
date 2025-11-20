@@ -1,0 +1,40 @@
+You are working on the SafeGo project in this Replit.
+
+Issue:
+The "System Monitoring" and "Security Threat Center" cards are NOT visible on the /admin dashboard home page, even though:
+- The JWT_SECRET is configured and the app is running.
+- /api/auth/me returns SUPER_ADMIN with VIEW_DASHBOARD and MANAGE_SECURITY capabilities.
+- Your own summary says the cards exist in home.tsx and are gated by VIEW_DASHBOARD.
+- I can open the admin home at /admin, but those two cards are missing from the Management section.
+
+Goal:
+Make both cards clearly visible again on the /admin dashboard for SUPER_ADMIN users, WITHOUT changing any other security logic.
+
+Detailed requirements:
+1. Open the admin dashboard home component (for example client/src/pages/admin/home.tsx or whichever file renders the admin sections).
+2. Find the config/array where the Management cards are defined (Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings).
+3. Confirm that:
+   - "System Monitoring" card is present with:
+     - title: "System Monitoring"
+     - description: "Real-time security monitoring and system health"
+     - route: "/admin/monitoring"
+     - permission: VIEW_DASHBOARD
+   - "Security Threat Center" card is present with:
+     - title: "Security Threat Center"
+     - description: "Advanced threat detection and real-time incident response"
+     - route: "/admin/security-center"
+     - permission: VIEW_DASHBOARD
+4. If they are missing from that list, add them back into the same Management section as normal cards, AFTER "Wallet Settlement" and BEFORE "Activity Log".
+5. If they are already in the list, debug why they are not rendered:
+   - Check the map/filter conditions used to render adminSections.
+   - Ensure VIEW_DASHBOARD is being checked correctly and not filtered out by any other condition (for example, wrong capability name, typo, or extra filter).
+   - Make sure there is no mobile/desktop specific layout that hides these two cards.
+6. Do NOT remove or rename any existing cards. Only fix or add the two security cards so they show up.
+7. Run the app, open /admin, and VERIFY that:
+   - I can see both "System Monitoring" and "Security Threat Center" cards in the Management section.
+   - Clicking them correctly navigates to /admin/monitoring and /admin/security-center.
+8. Update replit.md briefly describing:
+   - What was wrong with the visibility.
+   - What you changed to restore the cards.
+
+Complete this fix fully without asking me to choose an option. When you are done, show me a short summary and confirm that the cards are visible.
