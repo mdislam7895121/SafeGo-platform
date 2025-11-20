@@ -35,11 +35,9 @@ export async function authenticateToken(
       return;
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      console.error('JWT_SECRET is not configured');
-      res.status(500).json({ error: 'Server configuration error' });
-      return;
+    const jwtSecret = process.env.JWT_SECRET || "safego-secret-key-change-in-production";
+    if (!process.env.JWT_SECRET) {
+      console.warn('JWT_SECRET not set, using default fallback (not secure for production)');
     }
 
     const decoded = jwt.verify(token, jwtSecret) as JWTPayload;

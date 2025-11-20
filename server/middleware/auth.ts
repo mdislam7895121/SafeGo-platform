@@ -1,10 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
 import { requirePermission, Permission, AdminUser } from "../utils/permissions";
+import { prisma } from "../db";
 
 const JWT_SECRET = process.env.JWT_SECRET || "safego-secret-key-change-in-production";
-const prisma = new PrismaClient();
 
 export interface JWTPayload {
   userId: string;
@@ -48,47 +47,61 @@ export function requireRole(allowedRoles: string[]) {
   };
 }
 
-export function loadAdminProfile(req: AuthRequest, res: Response, next: NextFunction) {
-  return authenticateToken(req, res, async () => {
-    if (!req.user) {
-      return res.status(401).json({ error: "Authentication required" });
+export async function loadAdminProfile(req: AuthRequest, res: Response, next: NextFunction) {
+  // Trust prior authenticateToken from authz.ts - DO NOT re-authenticate
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+
+  try {
+    // Load admin profile using userId from JWT payload (set by prior authenticateToken)
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      include: { adminProfile: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
     }
 
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: "Admin access required" });
+    if (!user.adminProfile) {
+      return res.status(403).json({ error: "Admin profile not found" });
     }
 
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: req.user.userId },
-        include: { adminProfile: true },
-      });
-
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
-
-      if (!user.adminProfile) {
-        return res.status(403).json({ error: "Admin profile not found" });
-      }
-
-      if (!user.adminProfile.isActive) {
-        return res.status(403).json({ error: "Your admin account has been deactivated. Please contact support." });
-      }
-
-      req.adminUser = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        adminProfile: user.adminProfile,
-      };
-
-      next();
-    } catch (error) {
-      console.error("Error loading admin profile:", error);
-      return res.status(500).json({ error: "Failed to load admin profile" });
+    if (!user.adminProfile.isActive) {
+      return res.status(403).json({ error: "Your admin account has been deactivated. Please contact support." });
     }
-  });
+
+    // Get admin capabilities (permissions) from the permissions system
+    const { getAdminCapabilities } = await import('../utils/permissions');
+    const permissions = getAdminCapabilities({
+      id: user.id,
+      email: user.email,
+      role: user.role as 'admin',
+      adminProfile: {
+        adminRole: user.adminProfile.adminRole,
+        isActive: user.adminProfile.isActive
+      }
+    });
+
+    // Set up req.adminUser with permissions array for checkPermission to use
+    req.adminUser = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      adminProfile: user.adminProfile,
+      permissions  // CRITICAL: Include permissions array
+    };
+
+    next();
+  } catch (error) {
+    console.error("Error loading admin profile:", error);
+    return res.status(500).json({ error: "Failed to load admin profile" });
+  }
 }
 
 export function checkPermission(permission: Permission) {

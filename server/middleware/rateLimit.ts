@@ -109,7 +109,8 @@ export function resetLoginAttempts(email: string, ip: string): void {
 
 setInterval(() => {
   const now = Date.now();
-  for (const [key, attempt] of loginAttempts.entries()) {
+  const entries = Array.from(loginAttempts.entries());
+  for (const [key, attempt] of entries) {
     if (attempt.blockedUntil && attempt.blockedUntil < now) {
       loginAttempts.delete(key);
     } else if (now - attempt.firstAttempt > WINDOW_MS * 2) {

@@ -17,7 +17,7 @@ const router = express.Router();
 router.post(
   '/setup',
   authenticateToken,
-  requireAdmin(),
+  requireAdmin('VIEW_SECURITY_SETTINGS'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const adminId = req.user!.id;
@@ -64,7 +64,7 @@ router.post(
 router.post(
   '/verify',
   authenticateToken,
-  requireAdmin(),
+  requireAdmin('VIEW_SECURITY_SETTINGS'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { token } = req.body;
@@ -103,7 +103,7 @@ router.post(
 router.post(
   '/enable',
   authenticateToken,
-  requireAdmin(),
+  requireAdmin('VIEW_SECURITY_SETTINGS'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { token } = req.body;
@@ -168,7 +168,7 @@ router.post(
 router.post(
   '/disable',
   authenticateToken,
-  requireAdmin(),
+  requireAdmin('VIEW_SECURITY_SETTINGS'),
   async (req: AuthenticatedRequest, res) => {
     try {
       const { token } = req.body;

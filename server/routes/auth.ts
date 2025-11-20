@@ -5,6 +5,8 @@ import { PrismaClient } from "@prisma/client";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 import { getAdminCapabilities } from "../utils/permissions";
 import { loadAdminProfile, AuthRequest } from "../middleware/auth";
+import { rateLimitAdminLogin, resetLoginAttempts } from "../middleware/rateLimit";
+import { isTwoFactorEnabled, verifyTwoFactorToken, getTwoFactorSecret } from "../services/twoFactorService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -126,20 +128,38 @@ router.post("/signup", async (req, res) => {
 // ====================================================
 // POST /api/auth/login
 // Authenticate user and return JWT
+// Rate-limited for admin users, with 2FA support
 // ====================================================
-router.post("/login", async (req, res) => {
+router.post("/login", async (req, res, next) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, twoFactorCode } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    // Find user
+    // Find user first to determine if admin (for rate limiting)
     const user = await prisma.user.findUnique({
       where: { email },
       include: { adminProfile: true },
     });
+    
+    // Apply rate limiting for admin users BEFORE password check
+    if (user && user.role === 'admin') {
+      // Use a Promise to wrap the middleware since we can't use next() pattern
+      const rateLimited = await new Promise<boolean>((resolve) => {
+        rateLimitAdminLogin(req, res, () => resolve(false));
+        // If response is sent by middleware, rate limit was exceeded
+        setImmediate(() => {
+          if (res.headersSent) resolve(true);
+        });
+      });
+      
+      if (rateLimited || res.headersSent) {
+        return; // Rate limit exceeded, response already sent
+      }
+    }
+    
     if (!user) {
       // Log failed login attempt
       await logAuditEvent({
@@ -222,6 +242,67 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
 
+    // For admin users, verify 2FA if enabled
+    if (user.role === 'admin' && user.adminProfile) {
+      const twoFactorRequired = await isTwoFactorEnabled(user.adminProfile.id);
+      
+      if (twoFactorRequired) {
+        if (!twoFactorCode) {
+          return res.status(403).json({ 
+            error: "Two-factor authentication code required",
+            requiresTwoFactor: true 
+          });
+        }
+
+        const secret = await getTwoFactorSecret(user.adminProfile.id);
+        if (!secret) {
+          await logAuditEvent({
+            actorId: user.id,
+            actorEmail: user.email,
+            actorRole: user.role,
+            ipAddress: getClientIp(req),
+            actionType: ActionType.LOGIN_FAILED,
+            entityType: EntityType.AUTH,
+            entityId: user.id,
+            description: `2FA verification failed for ${user.email} - secret not found`,
+            success: false,
+          });
+          return res.status(500).json({ error: "2FA configuration error" });
+        }
+
+        const isValid2FA = verifyTwoFactorToken(twoFactorCode, secret);
+        if (!isValid2FA) {
+          await logAuditEvent({
+            actorId: user.id,
+            actorEmail: user.email,
+            actorRole: user.role,
+            ipAddress: getClientIp(req),
+            actionType: ActionType.LOGIN_FAILED,
+            entityType: EntityType.AUTH,
+            entityId: user.id,
+            description: `Failed login attempt for ${user.email} - invalid 2FA code`,
+            metadata: { twoFactorAttempt: true },
+            success: false,
+          });
+          return res.status(401).json({ error: "Invalid two-factor authentication code" });
+        }
+
+        // Log successful 2FA verification
+        await logAuditEvent({
+          actorId: user.id,
+          actorEmail: user.email,
+          actorRole: user.role,
+          ipAddress: getClientIp(req),
+          actionType: ActionType.LOGIN_SUCCESS,
+          entityType: EntityType.AUTH,
+          entityId: user.id,
+          description: `Successful 2FA verification for admin ${user.email}`,
+          metadata: { twoFactorVerified: true },
+          success: true,
+        });
+      }
+    }
+
     // Generate JWT
     const token = jwt.sign(
       {
@@ -262,12 +343,16 @@ router.post("/login", async (req, res) => {
     if (user.role === 'admin' && user.adminProfile) {
       response.user.adminRole = user.adminProfile.adminRole;
       response.user.isActive = user.adminProfile.isActive;
+      response.user.twoFactorEnabled = user.adminProfile.twoFactorEnabled;
       response.capabilities = getAdminCapabilities({
         id: user.id,
         email: user.email,
         role: user.role,
         adminProfile: user.adminProfile,
       });
+      
+      // Reset login attempts on successful admin authentication
+      await resetLoginAttempts(req);
     }
 
     res.json(response);

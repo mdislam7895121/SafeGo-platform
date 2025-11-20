@@ -1,0 +1,112 @@
+SafeGo Security Hardening – Phase 1 (Part 2/2)
+
+=====================================================================
+5. Server-Side RBAC Security Enforcement
+=====================================================================
+
+5.1 Create/extend a centralized permission matrix:
+Keys:
+- VIEW_DASHBOARD
+- VIEW_EARNINGS_DASHBOARD
+- MANAGE_DRIVERS
+- MANAGE_CUSTOMERS
+- MANAGE_RESTAURANTS
+- MANAGE_PARCELS
+- MANAGE_KYC
+- MANAGE_PAYOUTS
+- MANAGE_COMMISSIONS
+- VIEW_AUDIT_LOG
+- MANAGE_ROLES
+
+Map all existing roles → permissions.
+
+5.2 Enforce RBAC in backend routes:
+Wrap all admin endpoints with:
+requireAdmin("PERMISSION_KEY")
+
+Examples:
+- Approve driver KYC → requireAdmin("MANAGE_KYC")
+- Driver/restaurant payout → requireAdmin("MANAGE_PAYOUTS")
+- Commission config → requireAdmin("MANAGE_COMMISSIONS")
+- Activity log → requireAdmin("VIEW_AUDIT_LOG")
+- Role editing → requireAdmin("MANAGE_ROLES")
+
+UI hiding is not enough — backend enforcement is mandatory.
+
+=====================================================================
+6. Audit Log Hardening (Append-Only / WORM)
+=====================================================================
+
+Do NOT allow:
+- delete
+- update
+- modification of audit logs
+
+Ensure:
+- Logs are append-only
+- No soft delete for audit logs
+- Mask all sensitive info inside metadata
+- No SSN/NID/license full numbers ever appear in metadata
+
+=====================================================================
+7. Security Configuration Dashboard (Admin → Security)
+=====================================================================
+
+Add new admin route:
+- /admin/security
+
+RBAC: requireAdmin("VIEW_SECURITY_SETTINGS")
+
+Show:
+- “Admin 2FA: Enabled/Disabled”
+- Count → admins with 2FA enabled
+- Last 24h failed admin login attempts
+- Last 24h rate-limited events
+
+Read-only for now.
+
+=====================================================================
+8. Security Test Plan (Must pass all)
+=====================================================================
+
+8.1 Access control:
+- Customer cannot view another customer’s rides/orders.
+- Driver cannot access other driver’s rides/docs.
+- Restaurant cannot view other restaurants.
+
+8.2 Encryption:
+- New entries save encrypted.
+- Old entries fallback-safe.
+- No decrypted values logged.
+
+8.3 Documents:
+- Raw file URLs cannot be loaded.
+- Only signed URLs accessible.
+- Unauthorized access blocked.
+
+8.4 Admin login:
+- 2FA works
+- Rate limit works
+- Audit logs written
+
+8.5 Regression:
+Ensure NO BREAKS in:
+- Ride lifecycle
+- Food order lifecycle
+- Parcel lifecycle
+- Wallet settlement
+- Admin KYC/approval
+
+=====================================================================
+9. Documentation
+=====================================================================
+
+Update system docs with:
+- Encrypted fields list
+- How ENCRYPTION_KEY rotates
+- 2FA admin flow
+- RBAC permission map
+- Signed URL document access model
+
+End of Phase 1.
+This must be implemented without breaking any existing SafeGo logic across rides, food_orders, deliveries, payouts, KYC, admin panel, or earnings engine.

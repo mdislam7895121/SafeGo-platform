@@ -170,7 +170,7 @@ router.get(
   }
 );
 
-router.get('/download/:id', async (req, res) => {
+router.get('/download/:id', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     const { id } = req.params;
     const { token } = req.query;
@@ -186,12 +186,48 @@ router.get('/download/:id', async (req, res) => {
     }
 
     const document = await prisma.document.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        driverProfile: { select: { userId: true } },
+        customerProfile: { select: { userId: true } },
+        restaurantProfile: { select: { userId: true } }
+      }
     });
 
     if (!document) {
       return res.status(404).json({ error: 'Document not found' });
     }
+
+    // Verify ownership or admin access
+    const userId = req.user!.id;
+    const isOwner = 
+      (document.driverProfile?.userId === userId) ||
+      (document.customerProfile?.userId === userId) ||
+      (document.restaurantProfile?.userId === userId);
+    
+    const isAdmin = req.user!.role === 'admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({ error: 'Access denied - you do not have permission to access this document' });
+    }
+
+    // Log document download
+    await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: 'DOCUMENT_DOWNLOADED',
+      entityType: 'document',
+      entityId: id,
+      description: `User ${req.user!.email} downloaded document ${id}`,
+      metadata: {
+        documentType: document.documentType,
+        category: document.category,
+        isOwner,
+        isAdmin
+      }
+    });
 
     return res.redirect(document.fileUrl);
   } catch (error) {

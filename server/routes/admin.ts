@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { AuthRequest, loadAdminProfile, checkPermission } from "../middleware/auth";
+import { authenticateToken, requireAdmin } from "../middleware/authz";
 import { Permission } from "../utils/permissions";
 import { z } from "zod";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone, isValidSSN, maskSSN } from "../utils/encryption";
@@ -15,7 +16,9 @@ const router = Router();
 const prisma = new PrismaClient();
 
 // All routes require authentication, admin role, and active admin status
-router.use(loadAdminProfile);
+router.use(authenticateToken);  // Step 1: Verify JWT token and set req.user
+router.use(requireAdmin());      // Step 2: Verify user is admin
+router.use(loadAdminProfile);    // Step 3: Load admin profile and capabilities
 
 // ====================================================
 // HELPER: Validate KYC Completeness
@@ -128,7 +131,7 @@ function validateDriverKYC(
 // GET /api/admin/stats
 // Get platform statistics for admin dashboard
 // ====================================================
-router.get("/stats", async (req: AuthRequest, res) => {
+router.get("/stats", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
   try {
     // Count total users
     const totalUsers = await prisma.user.count();
@@ -209,7 +212,7 @@ router.get("/stats", async (req: AuthRequest, res) => {
 // GET /api/admin/pending-kyc
 // List all users with pending verification
 // ====================================================
-router.get("/pending-kyc", async (req: AuthRequest, res) => {
+router.get("/pending-kyc", checkPermission(Permission.MANAGE_KYC), async (req: AuthRequest, res) => {
   try {
     const { role } = req.query;
 
@@ -312,7 +315,7 @@ router.get("/pending-kyc", async (req: AuthRequest, res) => {
 // PATCH /api/admin/kyc/:userId
 // Approve or reject KYC verification
 // ====================================================
-router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
+router.patch("/kyc/:userId", checkPermission(Permission.MANAGE_KYC), async (req: AuthRequest, res) => {
   try {
     const { userId } = req.params;
     const { verificationStatus, rejectionReason } = req.body;
@@ -487,7 +490,7 @@ router.patch("/kyc/:userId", async (req: AuthRequest, res) => {
 // GET /api/admin/kyc/pending
 // Frontend-compatible endpoint for pending KYC requests
 // ====================================================
-router.get("/kyc/pending", async (req: AuthRequest, res) => {
+router.get("/kyc/pending", checkPermission(Permission.MANAGE_KYC), async (req: AuthRequest, res) => {
   try {
     const { role } = req.query;
 
@@ -590,7 +593,7 @@ router.get("/kyc/pending", async (req: AuthRequest, res) => {
 // POST /api/admin/kyc/approve
 // Frontend-compatible endpoint for approving KYC
 // ====================================================
-router.post("/kyc/approve", async (req: AuthRequest, res) => {
+router.post("/kyc/approve", checkPermission(Permission.MANAGE_KYC), async (req: AuthRequest, res) => {
   try {
     const { role, profileId } = req.body;
 
@@ -678,7 +681,7 @@ router.post("/kyc/approve", async (req: AuthRequest, res) => {
 // POST /api/admin/kyc/reject
 // Frontend-compatible endpoint for rejecting KYC
 // ====================================================
-router.post("/kyc/reject", async (req: AuthRequest, res) => {
+router.post("/kyc/reject", checkPermission(Permission.MANAGE_KYC), async (req: AuthRequest, res) => {
   try {
     const { role, profileId, reason } = req.body;
 
@@ -863,7 +866,7 @@ router.patch("/block/:userId", checkPermission(Permission.MANAGE_USER_STATUS), a
 // GET /api/admin/users
 // List all users with optional role filter
 // ====================================================
-router.get("/users", async (req: AuthRequest, res) => {
+router.get("/users", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const { role } = req.query;
 
@@ -992,7 +995,7 @@ router.post("/settle-wallet", checkPermission(Permission.PROCESS_WALLET_SETTLEME
 // GET /api/admin/settlement/overview
 // Get overall settlement statistics
 // ====================================================
-router.get("/settlement/overview", async (req: AuthRequest, res) => {
+router.get("/settlement/overview", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
   try {
     // Get driver wallet stats
     const driverWallets = await prisma.driverWallet.findMany();
@@ -1078,7 +1081,7 @@ router.get("/settlement/overview", async (req: AuthRequest, res) => {
 // GET /api/admin/settlement/pending
 // Get all wallets with pending settlements
 // ====================================================
-router.get("/settlement/pending", async (req: AuthRequest, res) => {
+router.get("/settlement/pending", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
   try {
     const { walletType, page = "1", limit = "20" } = req.query;
 
@@ -1197,7 +1200,7 @@ router.get("/settlement/pending", async (req: AuthRequest, res) => {
 // GET /api/admin/settlement/transaction-history/:type/:id
 // Get detailed transaction history for a wallet
 // ====================================================
-router.get("/settlement/transaction-history/:type/:id", async (req: AuthRequest, res) => {
+router.get("/settlement/transaction-history/:type/:id", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
   try {
     const { type, id } = req.params;
 
@@ -1414,7 +1417,7 @@ router.get("/settlement/transaction-history/:type/:id", async (req: AuthRequest,
 // GET /api/admin/drivers
 // List all drivers with search, filters, and pagination
 // ====================================================
-router.get("/drivers", async (req: AuthRequest, res) => {
+router.get("/drivers", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const {
       search,
@@ -1600,7 +1603,7 @@ router.get("/drivers", async (req: AuthRequest, res) => {
 // GET /api/admin/drivers/pending
 // List drivers with pending verification
 // ====================================================
-router.get("/drivers/pending", async (req: AuthRequest, res) => {
+router.get("/drivers/pending", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const pendingDrivers = await prisma.driverProfile.findMany({
       where: { verificationStatus: "pending" },
@@ -1640,7 +1643,7 @@ router.get("/drivers/pending", async (req: AuthRequest, res) => {
 // GET /api/admin/drivers/:id
 // Get detailed driver information
 // ====================================================
-router.get("/drivers/:id", async (req: AuthRequest, res) => {
+router.get("/drivers/:id", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -1793,7 +1796,7 @@ const updateDriverProfileSchema = z.object({
   }).optional(),
 });
 
-router.patch("/drivers/:id/profile", async (req: AuthRequest, res) => {
+router.patch("/drivers/:id/profile", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     
@@ -1919,7 +1922,7 @@ const updateUsaDriverProfileSchema = z.object({
   tlcLicenseNumber: z.string().min(1).max(50).optional(),
 });
 
-router.patch("/drivers/:id/usa-profile", async (req: AuthRequest, res) => {
+router.patch("/drivers/:id/usa-profile", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     
@@ -2063,7 +2066,7 @@ const updateVehicleSchema = z.object({
   dmvInspectionImageUrl: z.string().url().optional(),
 });
 
-router.patch("/drivers/:id/vehicle", async (req: AuthRequest, res) => {
+router.patch("/drivers/:id/vehicle", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     
@@ -2178,7 +2181,7 @@ router.patch("/drivers/:id/vehicle", async (req: AuthRequest, res) => {
 // GET /api/admin/drivers/:id/ssn
 // Decrypt and return masked SSN (admin only)
 // ====================================================
-router.get("/drivers/:id/ssn", async (req: AuthRequest, res) => {
+router.get("/drivers/:id/ssn", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -2217,7 +2220,7 @@ router.get("/drivers/:id/ssn", async (req: AuthRequest, res) => {
 // GET /api/admin/drivers/:id/trips
 // Get driver trip history with filters
 // ====================================================
-router.get("/drivers/:id/trips", async (req: AuthRequest, res) => {
+router.get("/drivers/:id/trips", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status, startDate, endDate, page = "1", limit = "20" } = req.query;
@@ -2297,7 +2300,7 @@ router.get("/drivers/:id/trips", async (req: AuthRequest, res) => {
 // PATCH /api/admin/drivers/:id/suspend
 // Suspend a driver (temporary)
 // ====================================================
-router.patch("/drivers/:id/suspend", async (req: AuthRequest, res) => {
+router.patch("/drivers/:id/suspend", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -2368,7 +2371,7 @@ router.patch("/drivers/:id/suspend", async (req: AuthRequest, res) => {
 // PATCH /api/admin/drivers/:id/unsuspend
 // Unsuspend a driver
 // ====================================================
-router.patch("/drivers/:id/unsuspend", async (req: AuthRequest, res) => {
+router.patch("/drivers/:id/unsuspend", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -2432,7 +2435,7 @@ router.patch("/drivers/:id/unsuspend", async (req: AuthRequest, res) => {
 // DELETE /api/admin/drivers/:id
 // Delete a driver (only if no active trips/wallet issues)
 // ====================================================
-router.delete("/drivers/:id", async (req: AuthRequest, res) => {
+router.delete("/drivers/:id", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -2494,7 +2497,7 @@ router.delete("/drivers/:id", async (req: AuthRequest, res) => {
 // GET /api/admin/restaurants
 // List all restaurants with filters
 // ====================================================
-router.get("/restaurants", async (req: AuthRequest, res) => {
+router.get("/restaurants", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const { search, status } = req.query;
 
@@ -2585,7 +2588,7 @@ router.get("/restaurants", async (req: AuthRequest, res) => {
 // GET /api/admin/restaurants/:id
 // Get restaurant details
 // ====================================================
-router.get("/restaurants/:id", async (req: AuthRequest, res) => {
+router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -2681,7 +2684,7 @@ router.get("/restaurants/:id", async (req: AuthRequest, res) => {
 // PATCH /api/admin/restaurants/:id/suspend
 // Suspend a restaurant (temporary - can't receive orders)
 // ====================================================
-router.patch("/restaurants/:id/suspend", async (req: AuthRequest, res) => {
+router.patch("/restaurants/:id/suspend", checkPermission(Permission.MANAGE_RESTAURANTS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -2750,7 +2753,7 @@ router.patch("/restaurants/:id/suspend", async (req: AuthRequest, res) => {
 // PATCH /api/admin/restaurants/:id/unsuspend
 // Unsuspend a restaurant (lift temporary suspension)
 // ====================================================
-router.patch("/restaurants/:id/unsuspend", async (req: AuthRequest, res) => {
+router.patch("/restaurants/:id/unsuspend", checkPermission(Permission.MANAGE_RESTAURANTS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -2813,7 +2816,7 @@ router.patch("/restaurants/:id/unsuspend", async (req: AuthRequest, res) => {
 // PATCH /api/admin/restaurants/:id/block
 // Block a restaurant permanently (disables user account)
 // ====================================================
-router.patch("/restaurants/:id/block", async (req: AuthRequest, res) => {
+router.patch("/restaurants/:id/block", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -2860,7 +2863,7 @@ router.patch("/restaurants/:id/block", async (req: AuthRequest, res) => {
 // PATCH /api/admin/restaurants/:id/unblock
 // Unblock a restaurant (reactivate user account)
 // ====================================================
-router.patch("/restaurants/:id/unblock", async (req: AuthRequest, res) => {
+router.patch("/restaurants/:id/unblock", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -2911,7 +2914,7 @@ router.patch("/restaurants/:id/unblock", async (req: AuthRequest, res) => {
 // GET /api/admin/complaints
 // List all driver complaints with filters
 // ====================================================
-router.get("/complaints", async (req: AuthRequest, res) => {
+router.get("/complaints", checkPermission(Permission.VIEW_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
   try {
     const { status, driverId, page = "1", limit = "20" } = req.query;
 
@@ -3006,7 +3009,7 @@ router.get("/complaints", async (req: AuthRequest, res) => {
 // GET /api/admin/complaints/:id
 // Get complaint details
 // ====================================================
-router.get("/complaints/:id", async (req: AuthRequest, res) => {
+router.get("/complaints/:id", checkPermission(Permission.VIEW_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -3083,7 +3086,7 @@ router.get("/complaints/:id", async (req: AuthRequest, res) => {
 // POST /api/admin/complaints
 // Create a new complaint (admin can create manually)
 // ====================================================
-router.post("/complaints", async (req: AuthRequest, res) => {
+router.post("/complaints", checkPermission(Permission.REPLY_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
   try {
     const { driverId, customerId, rideId, reason, description } = req.body;
 
@@ -3137,7 +3140,7 @@ router.post("/complaints", async (req: AuthRequest, res) => {
 // PATCH /api/admin/complaints/:id/resolve
 // Resolve a complaint
 // ====================================================
-router.patch("/complaints/:id/resolve", async (req: AuthRequest, res) => {
+router.patch("/complaints/:id/resolve", checkPermission(Permission.REPLY_SUPPORT_CONVERSATIONS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const adminUserId = req.user?.userId;
@@ -3179,7 +3182,7 @@ router.patch("/complaints/:id/resolve", async (req: AuthRequest, res) => {
 // GET /api/admin/customers
 // List all customers with filters and usage statistics
 // ====================================================
-router.get("/customers", async (req: AuthRequest, res) => {
+router.get("/customers", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const { search, status } = req.query;
 
@@ -3268,7 +3271,7 @@ router.get("/customers", async (req: AuthRequest, res) => {
 // GET /api/admin/customers/:id
 // Get detailed customer information with statistics
 // ====================================================
-router.get("/customers/:id", async (req: AuthRequest, res) => {
+router.get("/customers/:id", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -3412,7 +3415,7 @@ const updateCustomerProfileSchema = z.object({
   }).optional(),
 });
 
-router.patch("/customers/:id/profile", async (req: AuthRequest, res) => {
+router.patch("/customers/:id/profile", checkPermission(Permission.MANAGE_CUSTOMERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     
@@ -3488,7 +3491,7 @@ router.patch("/customers/:id/profile", async (req: AuthRequest, res) => {
 // PATCH /api/admin/customers/:id/suspend
 // Suspend a customer account (temporary restriction)
 // ====================================================
-router.patch("/customers/:id/suspend", async (req: AuthRequest, res) => {
+router.patch("/customers/:id/suspend", checkPermission(Permission.MANAGE_CUSTOMERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -3550,7 +3553,7 @@ router.patch("/customers/:id/suspend", async (req: AuthRequest, res) => {
 // PATCH /api/admin/customers/:id/unsuspend
 // Unsuspend a customer account
 // ====================================================
-router.patch("/customers/:id/unsuspend", async (req: AuthRequest, res) => {
+router.patch("/customers/:id/unsuspend", checkPermission(Permission.MANAGE_CUSTOMERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -3607,7 +3610,7 @@ router.patch("/customers/:id/unsuspend", async (req: AuthRequest, res) => {
 // PATCH /api/admin/customers/:id/block
 // Permanently block a customer account
 // ====================================================
-router.patch("/customers/:id/block", async (req: AuthRequest, res) => {
+router.patch("/customers/:id/block", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -3669,7 +3672,7 @@ router.patch("/customers/:id/block", async (req: AuthRequest, res) => {
 // PATCH /api/admin/customers/:id/unblock
 // Unblock a customer account
 // ====================================================
-router.patch("/customers/:id/unblock", async (req: AuthRequest, res) => {
+router.patch("/customers/:id/unblock", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -3735,7 +3738,7 @@ router.patch("/customers/:id/unblock", async (req: AuthRequest, res) => {
 // GET /api/admin/customers/:id/nid
 // Decrypt and return customer NID (admin only)
 // ====================================================
-router.get("/customers/:id/nid", async (req: AuthRequest, res) => {
+router.get("/customers/:id/nid", checkPermission(Permission.MANAGE_CUSTOMERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { decrypt } = await import("../utils/encryption.js");
@@ -3772,7 +3775,7 @@ router.get("/customers/:id/nid", async (req: AuthRequest, res) => {
 // GET /api/admin/drivers/:id/nid
 // Decrypt and return driver NID (admin only)
 // ====================================================
-router.get("/drivers/:id/nid", async (req: AuthRequest, res) => {
+router.get("/drivers/:id/nid", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { decrypt } = await import("../utils/encryption.js");
@@ -3809,7 +3812,7 @@ router.get("/drivers/:id/nid", async (req: AuthRequest, res) => {
 // GET /api/admin/drivers/:id/commission
 // Get commission breakdown for a specific driver (all-time and by service)
 // ====================================================
-router.get("/drivers/:id/commission", async (req: AuthRequest, res) => {
+router.get("/drivers/:id/commission", checkPermission(Permission.VIEW_COMMISSION_ANALYTICS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -3899,7 +3902,7 @@ router.get("/drivers/:id/commission", async (req: AuthRequest, res) => {
 // Get comprehensive commission & wallet summary for a specific driver
 // Includes earnings, commission, balance, country/service breakdown, and recent transactions
 // ====================================================
-router.get("/drivers/:id/wallet-summary", async (req: AuthRequest, res) => {
+router.get("/drivers/:id/wallet-summary", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -4273,7 +4276,7 @@ router.get("/drivers/:id/wallet-summary", async (req: AuthRequest, res) => {
 // GET /api/admin/commission/summary
 // Get platform-wide commission summary with filters
 // ====================================================
-router.get("/commission/summary", async (req: AuthRequest, res) => {
+router.get("/commission/summary", checkPermission(Permission.VIEW_COMMISSION_ANALYTICS), async (req: AuthRequest, res) => {
   try {
     const { country, startDate, endDate } = req.query;
 
@@ -4399,7 +4402,7 @@ router.get("/commission/summary", async (req: AuthRequest, res) => {
 // GET /api/admin/stats/parcels
 // Get parcel statistics for dashboard
 // ====================================================
-router.get("/stats/parcels", async (req: AuthRequest, res) => {
+router.get("/stats/parcels", checkPermission(Permission.VIEW_PARCELS), async (req: AuthRequest, res) => {
   try {
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -4454,7 +4457,7 @@ router.get("/stats/parcels", async (req: AuthRequest, res) => {
 // GET /api/admin/parcels
 // Get parcel list with filters and pagination
 // ====================================================
-router.get("/parcels", async (req: AuthRequest, res) => {
+router.get("/parcels", checkPermission(Permission.VIEW_PARCELS), async (req: AuthRequest, res) => {
   try {
     const { 
       page = "1", 
@@ -4601,7 +4604,7 @@ router.get("/parcels", async (req: AuthRequest, res) => {
 // GET /api/admin/parcels/:id
 // Get detailed parcel information
 // ====================================================
-router.get("/parcels/:id", async (req: AuthRequest, res) => {
+router.get("/parcels/:id", checkPermission(Permission.VIEW_PARCELS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -4694,7 +4697,7 @@ router.get("/parcels/:id", async (req: AuthRequest, res) => {
 // GET /api/admin/documents/drivers
 // List all drivers with document status for Document Center
 // ====================================================
-router.get("/documents/drivers", async (req: AuthRequest, res) => {
+router.get("/documents/drivers", checkPermission(Permission.MANAGE_DOCUMENT_REVIEW), async (req: AuthRequest, res) => {
   try {
     const { search, country, status, page = "1", limit = "20" } = req.query;
 
@@ -4796,7 +4799,7 @@ router.get("/documents/drivers", async (req: AuthRequest, res) => {
 // GET /api/admin/documents/customers
 // List all customers with document status for Document Center
 // ====================================================
-router.get("/documents/customers", async (req: AuthRequest, res) => {
+router.get("/documents/customers", checkPermission(Permission.MANAGE_DOCUMENT_REVIEW), async (req: AuthRequest, res) => {
   try {
     const { search, country, status, page = "1", limit = "20" } = req.query;
 
@@ -4885,7 +4888,7 @@ router.get("/documents/customers", async (req: AuthRequest, res) => {
 // GET /api/admin/documents/restaurants
 // List all restaurants with document status for Document Center
 // ====================================================
-router.get("/documents/restaurants", async (req: AuthRequest, res) => {
+router.get("/documents/restaurants", checkPermission(Permission.MANAGE_DOCUMENT_REVIEW), async (req: AuthRequest, res) => {
   try {
     const { search, country, status, page = "1", limit = "20" } = req.query;
 
@@ -4967,7 +4970,7 @@ router.get("/documents/restaurants", async (req: AuthRequest, res) => {
 // GET /api/admin/documents/drivers/:id/details
 // Get detailed driver documents for review
 // ====================================================
-router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
+router.get("/documents/drivers/:id/details", checkPermission(Permission.MANAGE_DOCUMENT_REVIEW), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -5093,7 +5096,7 @@ router.get("/documents/drivers/:id/details", async (req: AuthRequest, res) => {
 // GET /api/admin/documents/customers/:id/details
 // Get detailed customer documents for review
 // ====================================================
-router.get("/documents/customers/:id/details", async (req: AuthRequest, res) => {
+router.get("/documents/customers/:id/details", checkPermission(Permission.MANAGE_DOCUMENT_REVIEW), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -5147,7 +5150,7 @@ router.get("/documents/customers/:id/details", async (req: AuthRequest, res) => 
 // GET /api/admin/documents/restaurants/:id/details
 // Get detailed restaurant documents for review
 // ====================================================
-router.get("/documents/restaurants/:id/details", async (req: AuthRequest, res) => {
+router.get("/documents/restaurants/:id/details", checkPermission(Permission.MANAGE_DOCUMENT_REVIEW), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -5434,7 +5437,7 @@ router.post("/documents/restaurants/:id/reject", checkPermission(Permission.MANA
 // GET /api/admin/restaurants/commission-summary
 // Get restaurant commission summary with filters (efficient aggregation)
 // ====================================================
-router.get("/restaurants/commission-summary", async (req: AuthRequest, res) => {
+router.get("/restaurants/commission-summary", checkPermission(Permission.VIEW_COMMISSION_ANALYTICS), async (req: AuthRequest, res) => {
   try {
     const { country, dateRange } = req.query;
     
@@ -5552,7 +5555,7 @@ router.get("/restaurants/commission-summary", async (req: AuthRequest, res) => {
 // GET /api/admin/parcels/commission-summary  
 // Get parcel commission summary with filters
 // ====================================================
-router.get("/parcels/commission-summary", async (req: AuthRequest, res) => {
+router.get("/parcels/commission-summary", checkPermission(Permission.VIEW_COMMISSION_ANALYTICS), async (req: AuthRequest, res) => {
   try {
     const { country, dateRange } = req.query;
     
