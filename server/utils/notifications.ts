@@ -112,20 +112,37 @@ function validateNotification(type: string, severity: string): boolean {
 /**
  * Check for duplicate notifications to avoid spam
  * Returns true if a similar unread notification already exists
+ * For document expiry notifications, also checks documentType to allow multiple alerts per driver
  */
 async function isDuplicate(
   type: string,
   entityType: string,
-  entityId: string | null
+  entityId: string | null,
+  metadata?: Record<string, any> | null
 ): Promise<boolean> {
   try {
+    const whereClause: any = {
+      type,
+      entityType,
+      entityId: entityId || undefined,
+      isRead: false,
+    };
+
+    // For document expiry notifications, include documentType in uniqueness check
+    // This allows multiple document expiry alerts for the same driver (TLC, DMV, registration, insurance, etc.)
+    if (
+      (type === NotificationType.DOCUMENT_EXPIRING || type === NotificationType.DOCUMENT_EXPIRED) &&
+      metadata?.documentType
+    ) {
+      // Check if the exact same document type was already notified
+      whereClause.metadata = {
+        path: ["documentType"],
+        equals: metadata.documentType,
+      };
+    }
+
     const existing = await prisma.adminNotification.findFirst({
-      where: {
-        type,
-        entityType,
-        entityId: entityId || undefined,
-        isRead: false,
-      },
+      where: whereClause,
     });
     return !!existing;
   } catch (error) {
@@ -161,7 +178,8 @@ export async function logNotification(params: NotificationParams): Promise<void>
     }
 
     // Check for duplicates (avoid spamming the same notification)
-    if (await isDuplicate(type, entityType, entityId)) {
+    // Pass metadata to allow document-type-specific de-duplication
+    if (await isDuplicate(type, entityType, entityId, metadata)) {
       // Silently skip duplicate notifications
       return;
     }
