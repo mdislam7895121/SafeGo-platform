@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { ArrowLeft, UtensilsCrossed, MapPin, DollarSign, ShoppingBag, AlertTriangle, Shield, Ban, Unlock, CheckCircle } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, MapPin, DollarSign, ShoppingBag, AlertTriangle, Shield, Ban, Unlock, CheckCircle, Wallet, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -54,10 +54,16 @@ export default function RestaurantDetails() {
   const [showSuspendDialog, setShowSuspendDialog] = useState(false);
   const [showBlockDialog, setShowBlockDialog] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState("");
+  const [showPayoutDialog, setShowPayoutDialog] = useState(false);
 
   const { data: restaurant, isLoading } = useQuery<RestaurantDetails>({
     queryKey: [`/api/admin/restaurants/${restaurantId}`],
     refetchInterval: 5000,
+    enabled: !!restaurantId,
+  });
+
+  const { data: payoutAccounts, isLoading: isLoadingPayouts } = useQuery({
+    queryKey: [`/api/admin/restaurants/${restaurantId}/payout-accounts`],
     enabled: !!restaurantId,
   });
 
@@ -276,6 +282,99 @@ export default function RestaurantDetails() {
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Payout Information */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                Payout Information
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPayoutDialog(true)}
+                data-testid="button-add-payout"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Payout Account
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingPayouts ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : payoutAccounts && payoutAccounts.length > 0 ? (
+              <div className="space-y-3">
+                {payoutAccounts.map((account: any) => (
+                  <div
+                    key={account.id}
+                    className="p-4 border rounded-lg hover-elevate"
+                    data-testid={`payout-account-${account.id}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium" data-testid={`payout-name-${account.id}`}>
+                            {account.displayName}
+                          </p>
+                          {account.isDefault && (
+                            <Badge variant="default" data-testid={`payout-default-${account.id}`}>
+                              Default
+                            </Badge>
+                          )}
+                          <Badge variant="outline" data-testid={`payout-status-${account.id}`}>
+                            {account.status}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {account.payoutType === "mobile_wallet" && "Mobile Wallet"}
+                          {account.payoutType === "bank_account" && "Bank Account"}
+                          {account.payoutType === "stripe" && "Stripe"}
+                          {account.provider && ` (${account.provider})`}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1" data-testid={`payout-masked-${account.id}`}>
+                          {account.maskedAccount}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {account.accountHolderName}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        {!account.isDefault && account.status === "active" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await apiRequest("POST", `/api/admin/restaurants/${restaurantId}/payout-accounts/${account.id}/set-default`);
+                                queryClient.invalidateQueries({ queryKey: [`/api/admin/restaurants/${restaurantId}/payout-accounts`] });
+                                toast({ title: "Default payout account updated" });
+                              } catch (error: any) {
+                                toast({ title: "Error", description: error.message, variant: "destructive" });
+                              }
+                            }}
+                            data-testid={`button-set-default-${account.id}`}
+                          >
+                            Set Default
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-payouts">
+                No payout accounts configured. Click "Add Payout Account" to add one.
+              </p>
+            )}
           </CardContent>
         </Card>
 
