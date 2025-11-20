@@ -11,6 +11,11 @@ import { logFraudEvent, getDeviceId, getUserAgent, getLocationFromRequest } from
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// Defense in depth: Fail fast if JWT_SECRET missing in production
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+}
 const JWT_SECRET = process.env.JWT_SECRET || "safego-secret-key-change-in-production";
 
 // ====================================================

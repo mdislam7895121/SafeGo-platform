@@ -3,6 +3,11 @@ import jwt from "jsonwebtoken";
 import { requirePermission, Permission, AdminUser } from "../utils/permissions";
 import { prisma } from "../db";
 
+// Defense in depth: Fail fast if JWT_SECRET missing in production
+// In development, this is redundant with Environment Guard but provides extra safety
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+}
 const JWT_SECRET = process.env.JWT_SECRET || "safego-secret-key-change-in-production";
 
 export interface JWTPayload {

@@ -5,6 +5,11 @@ import jwt from "jsonwebtoken";
 import * as supportService from "../services/supportService";
 
 const prisma = db;
+
+// Defense in depth: Fail fast if JWT_SECRET missing in production
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+}
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 async function loadAdminPermissions(adminId: string): Promise<string[]> {

@@ -117,6 +117,10 @@ function decryptLegacyCBC(encryptedText: string): string {
     const encrypted = parts[1];
     
     // Use legacy CBC algorithm with padded key (same as old implementation)
+    // Defense in depth: Fail fast if ENCRYPTION_KEY missing in production
+    if (!process.env.ENCRYPTION_KEY && process.env.NODE_ENV === "production") {
+      throw new Error("FATAL: ENCRYPTION_KEY environment variable is not set. Cannot decrypt legacy data.");
+    }
     const legacyKey = (process.env.ENCRYPTION_KEY || "safego-default-encryption-key-32b")
       .padEnd(32, "0")
       .slice(0, 32);
