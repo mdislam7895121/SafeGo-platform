@@ -25,11 +25,13 @@ import DriverVehicle from "@/pages/driver/vehicle";
 import DriverProfile from "@/pages/driver/profile";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
+import DriverWallet from "@/pages/driver/wallet";
 
 // Restaurant pages
 import RestaurantHome from "@/pages/restaurant/home";
 import RestaurantProfile from "@/pages/restaurant/profile";
 import RestaurantSupport from "@/pages/restaurant/support";
+import RestaurantWallet from "@/pages/restaurant/wallet";
 
 // Admin pages
 import AdminHome from "@/pages/admin/home";
@@ -53,6 +55,7 @@ import AdminSettings from "@/pages/admin/settings";
 import AdminSupportChat from "@/pages/admin/support-chat";
 import AdminWallets from "@/pages/admin/wallets";
 import AdminWalletDetails from "@/pages/admin/wallet-details";
+import AdminPayouts from "@/pages/admin/payouts";
 
 import NotFound from "@/pages/not-found";
 
@@ -149,6 +152,11 @@ function Router() {
           <DriverSupport />
         </ProtectedRoute>
       </Route>
+      <Route path="/driver/wallet">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverWallet />
+        </ProtectedRoute>
+      </Route>
 
       {/* Restaurant routes */}
       <Route path="/restaurant">
@@ -164,6 +172,11 @@ function Router() {
       <Route path="/restaurant/support">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantSupport />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/wallet">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantWallet />
         </ProtectedRoute>
       </Route>
 
@@ -271,6 +284,11 @@ function Router() {
       <Route path="/admin/wallets">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminWallets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payouts">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPayouts />
         </ProtectedRoute>
       </Route>
 
