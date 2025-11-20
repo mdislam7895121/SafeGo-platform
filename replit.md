@@ -44,10 +44,12 @@ Comprehensive financial management system tracking driver/restaurant earnings, p
 
 **Navigation**: Admin home has Wallets and Payouts navigation cards with permission filtering. Driver and restaurant dashboards have Wallet quick links.
 
-**Implementation Status**: ✅ Completed: Database schema, WalletService, PayoutService, all API routes, all frontend pages, service integration (rides, food, parcels), navigation links, RBAC, unified payout/payment section layouts (Step 40). ⏳ Pending: Weekly auto-settlement job (Task 18), Commission analytics dashboard (Task 12).
+**Batch Processing**: PayoutBatch model enables bulk payout creation and processing for eligible wallets. Admin can create batches filtered by wallet type (driver/restaurant), country (BD/US), and minimum amount threshold. Batch processing atomically debits wallets with automatic refund on failure.
+
+**Implementation Status**: ✅ Completed: Database schema (including PayoutBatch), WalletService, PayoutService with batch operations, all API routes, all frontend pages, service integration (rides, food, parcels), navigation links, RBAC, unified payout/payment section layouts (Step 40), Settlement & Payout Processing Dashboard with batch management (Step 41, Nov 20, 2025). ⏳ Pending: Weekly auto-settlement job (Task 18), Commission analytics dashboard (Task 12).
 
 ### Database Schema Design
-The database schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields, driver profile photos, structured driver names, DMV/TLC license images, and vehicle documents. The `AuditLog` tracks all critical admin actions with detailed metadata, and `AdminNotification` stores system alerts with filtering capabilities. `PlatformSettings` provides global configuration storage, and `PayoutAccount` securely stores encrypted payout information.
+The database schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields, driver profile photos, structured driver names, DMV/TLC license images, and vehicle documents. The `AuditLog` tracks all critical admin actions with detailed metadata, and `AdminNotification` stores system alerts with filtering capabilities. `PlatformSettings` provides global configuration storage, `PayoutAccount` securely stores encrypted payout information, and `PayoutBatch` manages bulk payout processing with status tracking (created, processing, completed, failed, partially_failed).
 
 ## External Dependencies
 
