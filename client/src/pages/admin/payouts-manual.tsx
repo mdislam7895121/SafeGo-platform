@@ -83,7 +83,12 @@ export default function AdminPayoutsManual() {
       setSelectedWallet(null);
       setPayoutAmount("");
       setPayoutReason("");
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/wallets"] });
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          Array.isArray(query.queryKey) &&
+          typeof query.queryKey[0] === 'string' &&
+          query.queryKey[0].startsWith('/api/admin/wallets')
+      });
     },
     onError: (error: any) => {
       toast({

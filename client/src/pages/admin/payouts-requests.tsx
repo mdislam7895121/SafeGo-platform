@@ -62,6 +62,13 @@ export default function AdminPayouts() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
 
+  // Fetch admin capabilities for RBAC
+  const { data: capabilitiesData } = useQuery<{ capabilities: string[] }>({
+    queryKey: ["/api/admin/capabilities"],
+  });
+  const capabilities = capabilitiesData?.capabilities || [];
+  const canManagePayouts = capabilities.includes("MANAGE_PAYOUTS");
+
   // Build query params
   const queryParams = new URLSearchParams();
   if (statusFilter !== "all") queryParams.append("status", statusFilter);
@@ -283,6 +290,26 @@ export default function AdminPayouts() {
       </div>
 
       <div className="p-6 space-y-4">
+        {/* Permission Warning */}
+        {!canManagePayouts && (
+          <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                    View-Only Access
+                  </h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    You can view payout requests but don't have permission to approve or reject them. 
+                    Contact your administrator if you need the MANAGE_PAYOUTS permission.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Payouts List */}
         {isLoading ? (
           <div className="space-y-3">
@@ -346,7 +373,7 @@ export default function AdminPayouts() {
                       )}
                     </div>
 
-                    {payout.status === "pending" && (
+                    {payout.status === "pending" && canManagePayouts && (
                       <div className="flex flex-col gap-2">
                         <Button
                           variant="default"
