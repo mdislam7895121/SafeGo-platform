@@ -1,9 +1,23 @@
 import { PrismaClient } from "@prisma/client";
 import { notifyDocumentExpiring, notifyDocumentExpired } from "./notifications";
+import { SettingsService } from "./settings";
 
 const prisma = new PrismaClient();
 
-const DAYS_BEFORE_EXPIRY_WARNING = 30;
+const DAYS_BEFORE_EXPIRY_WARNING = 30; // Fallback default
+
+/**
+ * Get warning days from settings or use fallback
+ */
+async function getWarningDays(): Promise<number> {
+  try {
+    const kycSettings = await SettingsService.getSection("kyc");
+    return kycSettings.documentExpiry.warningDays;
+  } catch (error) {
+    console.error("Error getting warning days from settings, using fallback:", error);
+    return DAYS_BEFORE_EXPIRY_WARNING;
+  }
+}
 
 /**
  * Calculate days until a date
@@ -16,9 +30,9 @@ function daysUntil(date: Date): number {
 }
 
 /**
- * Check if a document is expiring soon (within 30 days) or expired
+ * Check if a document is expiring soon or expired
  */
-function getDocumentStatus(expiryDate: Date | null): {
+function getDocumentStatus(expiryDate: Date | null, warningDays: number): {
   isExpiring: boolean;
   isExpired: boolean;
   daysUntil: number;
@@ -30,7 +44,7 @@ function getDocumentStatus(expiryDate: Date | null): {
   const days = daysUntil(expiryDate);
   
   return {
-    isExpiring: days >= 0 && days <= DAYS_BEFORE_EXPIRY_WARNING,
+    isExpiring: days >= 0 && days <= warningDays,
     isExpired: days < 0,
     daysUntil: days,
   };
@@ -41,6 +55,9 @@ function getDocumentStatus(expiryDate: Date | null): {
  */
 async function checkDriverDocuments() {
   try {
+    // Get warning days from settings
+    const warningDays = await getWarningDays();
+
     // Get all drivers with their associated user and vehicle data
     const drivers = await prisma.driverProfile.findMany({
       include: {
@@ -59,7 +76,7 @@ async function checkDriverDocuments() {
       
       // USA: Check DMV License Expiry
       if (countryCode === "US" && driver.dmvLicenseExpiry) {
-        const status = getDocumentStatus(new Date(driver.dmvLicenseExpiry));
+        const status = getDocumentStatus(new Date(driver.dmvLicenseExpiry), warningDays);
         
         if (status.isExpired) {
           await notifyDocumentExpired({
@@ -85,7 +102,7 @@ async function checkDriverDocuments() {
 
       // USA: Check TLC License Expiry (for NY drivers)
       if (countryCode === "US" && driver.tlcLicenseExpiry) {
-        const status = getDocumentStatus(new Date(driver.tlcLicenseExpiry));
+        const status = getDocumentStatus(new Date(driver.tlcLicenseExpiry), warningDays);
         
         if (status.isExpired) {
           await notifyDocumentExpired({
@@ -115,7 +132,7 @@ async function checkDriverDocuments() {
 
         // Check Vehicle Registration Expiry
         if (vehicle.registrationExpiry) {
-          const status = getDocumentStatus(new Date(vehicle.registrationExpiry));
+          const status = getDocumentStatus(new Date(vehicle.registrationExpiry), warningDays);
           
           if (status.isExpired) {
             await notifyDocumentExpired({
@@ -141,7 +158,7 @@ async function checkDriverDocuments() {
 
         // Check Vehicle Insurance Expiry
         if (vehicle.insuranceExpiry) {
-          const status = getDocumentStatus(new Date(vehicle.insuranceExpiry));
+          const status = getDocumentStatus(new Date(vehicle.insuranceExpiry), warningDays);
           
           if (status.isExpired) {
             await notifyDocumentExpired({
@@ -167,7 +184,7 @@ async function checkDriverDocuments() {
 
         // Check DMV Inspection Expiry
         if (vehicle.dmvInspectionExpiry) {
-          const status = getDocumentStatus(new Date(vehicle.dmvInspectionExpiry));
+          const status = getDocumentStatus(new Date(vehicle.dmvInspectionExpiry), warningDays);
           
           if (status.isExpired) {
             await notifyDocumentExpired({
@@ -216,7 +233,7 @@ async function checkRestaurantDocuments() {
 
       // Check restaurant license expiry (if present in schema)
       if (restaurant.licenseExpiry) {
-        const status = getDocumentStatus(new Date(restaurant.licenseExpiry));
+        const status = getDocumentStatus(new Date(restaurant.licenseExpiry), await getWarningDays());
         
         if (status.isExpired) {
           await notifyDocumentExpired({

@@ -439,3 +439,15 @@ model AdminNotification {
   @@index([severity])
   @@map("admin_notifications")
 }
+
+model PlatformSettings {
+  id                String   @id @default(uuid())
+  key               String   @unique
+  valueJson         Json
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  updatedByAdminId  String?
+
+  @@index([key])
+  @@map("platform_settings")
+}

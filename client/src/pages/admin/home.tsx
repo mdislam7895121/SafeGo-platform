@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -115,6 +115,14 @@ export default function AdminHome() {
       description: "Security audit trail of all admin actions",
       color: "text-slate-600",
       bgColor: "bg-slate-50 dark:bg-slate-950",
+    },
+    {
+      name: "Global Settings",
+      icon: Settings,
+      href: "/admin/settings",
+      description: "Configure platform-wide settings and policies",
+      color: "text-amber-600",
+      bgColor: "bg-amber-50 dark:bg-amber-950",
     },
   ];
 

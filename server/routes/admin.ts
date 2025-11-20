@@ -5909,4 +5909,107 @@ router.patch("/notifications/read-all", checkPermission(Permission.VIEW_DASHBOAR
   }
 });
 
+// ====================================================
+// Global Settings Endpoints
+// ====================================================
+import { SettingsService, validateSettingsPayload } from "../utils/settings";
+
+// ====================================================
+// GET /api/admin/settings
+// Get all platform settings
+// ====================================================
+router.get("/settings", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const settings = await SettingsService.getSettings();
+    res.json(settings);
+  } catch (error) {
+    console.error("Get settings error:", error);
+    res.status(500).json({ error: "Failed to fetch settings" });
+  }
+});
+
+// ====================================================
+// PUT /api/admin/settings/:sectionKey
+// Update specific settings section
+// ====================================================
+router.put("/settings/:sectionKey", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const { sectionKey } = req.params;
+    const payload = req.body;
+
+    // Validate section key
+    if (!SettingsService.isValidSettingKey(sectionKey)) {
+      return res.status(400).json({ 
+        error: "Invalid section key",
+        validKeys: ["general", "kyc", "commission", "settlement", "notifications", "security"],
+      });
+    }
+
+    // Validate payload structure and types
+    const validation = validateSettingsPayload(sectionKey as any, payload);
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: "Invalid settings payload",
+        details: validation.errors,
+      });
+    }
+
+    // Update settings with validated payload
+    const updated = await SettingsService.updateSection(
+      sectionKey as any,
+      validation.data!,
+      req.user?.id
+    );
+
+    // Log audit event (with error handling)
+    try {
+      await logAuditEvent({
+        actorId: req.user?.id || null,
+        actorEmail: req.user?.email || "unknown",
+        actorRole: req.user?.adminProfile?.adminRole || "unknown",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.SETTINGS_UPDATED,
+        entityType: EntityType.SETTINGS,
+        entityId: sectionKey,
+        description: `Updated ${sectionKey} settings`,
+        metadata: {
+          section: sectionKey,
+          keys: Object.keys(payload),
+        },
+        success: true,
+      });
+    } catch (auditError) {
+      // Log but don't fail the request
+      console.error("Failed to log successful settings update:", auditError);
+    }
+
+    res.json({ 
+      message: `${sectionKey} settings updated successfully`,
+      settings: updated,
+    });
+  } catch (error: any) {
+    console.error("Update settings error:", error);
+    
+    // Log failed audit event
+    try {
+      await logAuditEvent({
+        actorId: req.user?.id || null,
+        actorEmail: req.user?.email || "unknown",
+        actorRole: req.user?.adminProfile?.adminRole || "unknown",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.SETTINGS_UPDATED,
+        entityType: EntityType.SETTINGS,
+        entityId: req.params.sectionKey,
+        description: `Failed to update ${req.params.sectionKey} settings`,
+        metadata: { error: error.message },
+        success: false,
+      });
+    } catch (auditError) {
+      console.error("Failed to log audit event:", auditError);
+    }
+    
+    res.status(500).json({ error: error.message || "Failed to update settings" });
+  }
+});
+
 export default router;
