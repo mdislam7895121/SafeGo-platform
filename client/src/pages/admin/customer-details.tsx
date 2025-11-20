@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, User, MapPin, Calendar, AlertCircle, Car, ShoppingBag, Package, Shield, Edit } from "lucide-react";
+import { ArrowLeft, User, MapPin, Calendar, AlertCircle, Car, ShoppingBag, Package, Shield, Edit, CreditCard } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +123,12 @@ export default function CustomerDetails() {
     queryKey: [`/api/admin/customers/${customerId}`],
     enabled: !!customerId,
     refetchInterval: 5000,
+  });
+
+  // Fetch payment methods
+  const { data: paymentMethods, isLoading: isLoadingPayments } = useQuery({
+    queryKey: [`/api/admin/customers/${customerId}/payment-methods`],
+    enabled: !!customerId,
   });
 
   // Suspend mutation
@@ -642,6 +648,74 @@ export default function CustomerDetails() {
           </CardContent>
         </Card>
       )}
+
+      {/* Payment Methods */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Payment Methods
+          </CardTitle>
+          <CardDescription>Saved payment methods (read-only)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingPayments ? (
+            <div className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : paymentMethods && paymentMethods.length > 0 ? (
+            <div className="space-y-3">
+              {paymentMethods.map((method: any) => (
+                <div
+                  key={method.id}
+                  className="p-4 border rounded-lg"
+                  data-testid={`payment-method-${method.id}`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium" data-testid={`payment-name-${method.id}`}>
+                          {method.paymentType === "card" ? "Credit/Debit Card" : "Mobile Wallet"}
+                        </p>
+                        {method.isDefault && (
+                          <Badge variant="default" data-testid={`payment-default-${method.id}`}>
+                            Default
+                          </Badge>
+                        )}
+                        <Badge variant="outline" data-testid={`payment-status-${method.id}`}>
+                          {method.status}
+                        </Badge>
+                      </div>
+                      {method.paymentType === "card" && (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            {method.cardBrand} •••• {method.cardLast4}
+                          </p>
+                          {method.expiryMonth && method.expiryYear && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Expires {method.expiryMonth}/{method.expiryYear}
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {method.paymentType === "mobile_wallet" && (
+                        <p className="text-sm text-muted-foreground">
+                          {method.provider} •••• {method.cardLast4 || method.last4Digits}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-8" data-testid="text-no-payment-methods">
+              No payment methods configured
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Recent Activity */}
       <div className="grid gap-4 md:grid-cols-2">
