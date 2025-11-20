@@ -948,3 +948,52 @@ model FraudIncident {
   @@index([assignedAdminId])
   @@map("fraud_incidents")
 }
+
+model DeviceProfile {
+  id             String    @id @default(uuid())
+  actorType      ActorType
+  actorId        String
+  deviceId       String
+  lastSeenAt     DateTime  @default(now())
+  firstSeenAt    DateTime  @default(now())
+  lastIpAddress  String?
+  countryCode    String?
+  city           String?
+  isTrusted      Boolean   @default(false)
+  userAgent      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([actorType, actorId, deviceId])
+  @@index([actorId])
+  @@index([actorType])
+  @@index([deviceId])
+  @@index([lastSeenAt])
+  @@index([isTrusted])
+  @@map("device_profiles")
+}
+
+enum RiskZoneLevel {
+  low
+  medium
+  high
+  critical
+}
+
+model RiskZone {
+  id          String        @id @default(uuid())
+  countryCode String
+  city        String        @default("")
+  region      String        @default("")
+  riskLevel   RiskZoneLevel
+  notes       String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([countryCode, city, region])
+  @@index([countryCode])
+  @@index([riskLevel])
+  @@index([isActive])
+  @@map("risk_zones")
+}
