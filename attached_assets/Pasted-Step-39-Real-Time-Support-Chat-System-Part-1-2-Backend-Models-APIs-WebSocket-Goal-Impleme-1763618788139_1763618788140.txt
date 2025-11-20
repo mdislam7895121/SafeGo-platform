@@ -1,0 +1,174 @@
+Step 39 – Real-Time Support Chat System (Part 1/2 – Backend, Models, APIs, WebSocket)
+
+Goal:
+Implement the secure backend foundation for a real-time support chat system for SafeGo, without breaking any existing flows. This step focuses only on database models, REST APIs, WebSocket infrastructure, and backend security/audit integration. Frontend UIs and settings will come in Step 39 Part 2.
+
+Strict constraints:
+- Do NOT break any existing ride, food, parcel, wallet, KYC, or admin flows.
+- Do NOT change or remove existing tables in a breaking way. Only additive migrations in the same style as before.
+- Reuse the existing RBAC, audit logging, and settings patterns already implemented.
+- No emojis in any new code, strings, or UI labels.
+- All chat data must be scoped to a tenant-safe, user-safe model. Never expose data from one user to another by mistake.
+
+1. Database Models
+
+Follow the existing ORM and migration style and add three new models for the support chat system:
+
+1.1 SupportConversation
+- id
+- createdAt, updatedAt
+- status: enum ("open", "pending", "resolved", "closed")
+- channel: enum ("driver", "customer", "restaurant")
+- subject: short string
+- priority: enum ("low", "normal", "high", "urgent")
+- lastMessageAt: timestamp
+- lastMessagePreview: short text
+- userId: the id of the driver/customer/restaurant who opened the conversation
+- userType: enum ("driver", "customer", "restaurant")
+- countryCode: "BD" or "US" (reuse existing country strategy)
+- assignedAdminId: nullable admin id (the admin currently handling the case)
+- unreadCountUser: number
+- unreadCountAdmin: number
+- metadata: JSON (optional, non-sensitive)
+
+1.2 SupportMessage
+- id
+- createdAt, updatedAt
+- conversationId: FK to SupportConversation
+- senderType: enum ("user", "admin", "system")
+- senderId: user/admin id (nullable for "system")
+- content: text (sanitized HTML or plain text, follow existing pattern)
+- messageType: enum ("text", "system", "attachment")
+- isReadByUser: boolean
+- isReadByAdmin: boolean
+- metadata: JSON (safe, non-sensitive)
+
+1.3 SupportAttachment
+- id
+- createdAt
+- messageId: FK to SupportMessage
+- fileUrl: safe storage URL (reuse existing document/file storage strategy)
+- fileType: string (mime type)
+- fileName: string
+- fileSize: number
+- isImage: boolean
+
+Security rules for all models:
+- Never store passwords, full SSN, full NID, or any secrets/tokens in content or metadata.
+- If any identity number is referenced, it must be masked using existing helpers.
+- Attachments must reuse the existing secure file storage approach (signed URLs or protected access, consistent with the rest of the system).
+
+2. WebSocket Infrastructure
+
+Add a real-time messaging layer using the WebSocket or SSE approach that matches the current backend stack.
+
+2.1 Connection and Authentication
+- Only authenticated users (drivers, customers, restaurants) and authenticated admins can connect.
+- Reuse the existing auth tokens/session middleware to authenticate WebSocket connections.
+- On connect, validate the user type and load minimal profile (id, role, country).
+
+2.2 Rooms / Channels
+- Use conversation-based rooms:
+  - Room key pattern: "support:conversation:{conversationId}"
+- When a user or admin joins a conversation, they subscribe to that conversation room.
+- When a new message is created, broadcast it only to that conversation’s room.
+
+2.3 Events
+Define a minimal set of WebSocket events:
+
+Client to server:
+- "support:joinConversation" { conversationId }
+- "support:leaveConversation" { conversationId }
+- "support:sendMessage" { conversationId, content, optional attachment metadata }
+
+Server to client:
+- "support:newMessage" { message payload }
+- "support:conversationUpdated" { conversation summary fields }
+- "support:typing" (optional, can be added later; do not block the step on this)
+
+All events must:
+- Pass through authentication.
+- Validate payloads with the same validation approach already used (for example Zod schemas if already integrated).
+- Enforce authorization: a user can only access conversations where userId matches and userType matches. Admins must have the correct RBAC permission.
+
+3. REST APIs for Support Chat
+
+Add REST endpoints under an admin and user namespace. Follow existing routing style (for example /api/admin/... and /api/app/...).
+
+3.1 User-side endpoints (drivers/customers/restaurants)
+- GET /api/support/conversations
+  - Returns a paginated list of conversations for the current authenticated user.
+  - Filters: status, date range, search by subject.
+- POST /api/support/conversations
+  - Creates a new conversation for the current user.
+  - Body: subject, initial message content, optional priority.
+- GET /api/support/conversations/:id/messages
+  - Paginated list of messages for a conversation that belongs to the current user.
+- POST /api/support/conversations/:id/messages
+  - Sends a new message in a conversation.
+  - Also triggers WebSocket broadcast and updates unread counters.
+
+3.2 Admin-side endpoints
+- GET /api/admin/support/conversations
+  - Paginated list of all conversations.
+  - Filters: status, channel (driver/customer/restaurant), countryCode, priority, assignedAdminId.
+- GET /api/admin/support/conversations/:id
+  - Details of a single conversation with safe user info.
+- POST /api/admin/support/conversations/:id/messages
+  - Admin reply in a conversation.
+- PATCH /api/admin/support/conversations/:id
+  - Update conversation status, priority, assignedAdminId.
+
+Security:
+- All admin routes protected with existing admin auth and RBAC.
+- User routes protected with normal auth.
+- Always verify that a user is only accessing their own conversation.
+
+4. RBAC and Audit Logging (Backend)
+
+4.1 RBAC
+Add the following new capabilities/permissions in the existing RBAC system:
+- VIEW_SUPPORT_CONVERSATIONS
+- REPLY_SUPPORT_CONVERSATIONS
+- ASSIGN_SUPPORT_CONVERSATIONS
+- MANAGE_SUPPORT_SETTINGS (this will be used in Part 2)
+
+Use these permissions in the admin routes and WebSocket handlers to control access.
+
+4.2 Audit logging
+Reuse the existing logAuditEvent helper introduced in Step 37:
+- Log conversation creation (user and admin).
+- Log status changes, priority changes, and assignment changes.
+- Log admin replies (but do not log full message content, only a short description such as "Admin replied to conversation {id}").
+
+Never log full chat messages, SSN, NID, or any sensitive content into the audit log.
+
+5. Validation and Security
+
+- Use the existing validation layer (for example Zod schemas) for all new endpoints and WebSocket payloads.
+- Sanitize message content to prevent XSS. Follow existing sanitization utilities if present.
+- Limit message length and attachment size using configuration.
+- Respect rate limiting or add a basic rate limiting guard for message sending if there is an existing pattern.
+
+6. Testing Plan (Backend)
+
+Implement and verify the following:
+
+1) As a driver:
+   - Create a new support conversation.
+   - Send a few messages.
+   - Confirm they are saved in the database and retrievable through the REST API.
+2) As an admin:
+   - List conversations with filters.
+   - Open a conversation and send replies.
+   - Change status and assignment.
+3) WebSocket:
+   - Open two clients (user and admin) listening to the same conversation room.
+   - Send a message from one side and verify the other side receives "support:newMessage".
+4) Security:
+   - Verify that one user cannot access another user’s conversation.
+   - Verify that admin routes require appropriate RBAC permissions.
+5) Audit:
+   - Confirm that audit logs are created for key actions and contain no sensitive data.
+
+When this Part 1 is complete, summarize the backend changes and confirm that nothing breaks existing SafeGo behavior. Then we will proceed to Step 39 – Part 2 for the admin and user interfaces, settings integration, and final UX.

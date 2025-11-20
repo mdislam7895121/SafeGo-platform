@@ -509,3 +509,99 @@ model PaymentMethod {
   @@index([customerId, isDefault])
   @@map("payment_methods")
 }
+
+enum SupportConversationStatus {
+  open
+  pending
+  resolved
+  closed
+}
+
+enum SupportChannel {
+  driver
+  customer
+  restaurant
+}
+
+enum SupportPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum SupportSenderType {
+  user
+  admin
+  system
+}
+
+enum SupportMessageType {
+  text
+  system
+  attachment
+}
+
+model SupportConversation {
+  id                  String                      @id @default(uuid())
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  status              SupportConversationStatus   @default(open)
+  channel             SupportChannel
+  subject             String
+  priority            SupportPriority             @default(normal)
+  lastMessageAt       DateTime                    @default(now())
+  lastMessagePreview  String?
+  userId              String
+  userType            SupportChannel
+  countryCode         String
+  assignedAdminId     String?
+  unreadCountUser     Int                         @default(0)
+  unreadCountAdmin    Int                         @default(0)
+  metadata            Json?
+  messages            SupportMessage[]
+
+  @@index([userId])
+  @@index([userType])
+  @@index([status])
+  @@index([assignedAdminId])
+  @@index([lastMessageAt])
+  @@index([countryCode])
+  @@index([userId, userType])
+  @@map("support_conversations")
+}
+
+model SupportMessage {
+  id              String              @id @default(uuid())
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  conversationId  String
+  senderType      SupportSenderType
+  senderId        String?
+  content         String              @db.Text
+  messageType     SupportMessageType  @default(text)
+  isReadByUser    Boolean             @default(false)
+  isReadByAdmin   Boolean             @default(false)
+  metadata        Json?
+  conversation    SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments     SupportAttachment[]
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("support_messages")
+}
+
+model SupportAttachment {
+  id        String         @id @default(uuid())
+  createdAt DateTime       @default(now())
+  messageId String
+  fileUrl   String
+  fileType  String
+  fileName  String
+  fileSize  Int
+  isImage   Boolean        @default(false)
+  message   SupportMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@map("support_attachments")
+}
