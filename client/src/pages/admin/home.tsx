@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -48,6 +48,12 @@ export default function AdminHome() {
     queryKey: ["/api/admin/notifications/unread-count"],
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
+
+  // Fetch admin capabilities for RBAC
+  const { data: capabilitiesData } = useQuery<{ capabilities: string[] }>({
+    queryKey: ["/api/auth/me"],
+  });
+  const capabilities = capabilitiesData?.capabilities || [];
 
   const adminSections = [
     {
@@ -117,6 +123,15 @@ export default function AdminHome() {
       bgColor: "bg-slate-50 dark:bg-slate-950",
     },
     {
+      name: "Support Chat",
+      icon: MessageCircle,
+      href: "/admin/support-chat",
+      description: "Real-time support conversations with users",
+      color: "text-teal-600",
+      bgColor: "bg-teal-50 dark:bg-teal-950",
+      permission: "VIEW_SUPPORT_CONVERSATIONS",
+    },
+    {
       name: "Global Settings",
       icon: Settings,
       href: "/admin/settings",
@@ -125,6 +140,12 @@ export default function AdminHome() {
       bgColor: "bg-amber-50 dark:bg-amber-950",
     },
   ];
+
+  // Filter sections based on admin permissions
+  const filteredSections = adminSections.filter((section) => {
+    if (!section.permission) return true;
+    return capabilities.includes(section.permission);
+  });
 
   return (
     <div className="min-h-screen bg-background pb-6">
@@ -435,7 +456,7 @@ export default function AdminHome() {
         <div>
           <h2 className="text-lg font-semibold mb-3">Management</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {adminSections.map((section) => (
+            {filteredSections.map((section) => (
               <Link key={section.name} href={section.href}>
                 <Card className="hover-elevate cursor-pointer" data-testid={`card-${section.name.toLowerCase().replace(/\s+/g, '-')}`}>
                   <CardContent className="p-6">

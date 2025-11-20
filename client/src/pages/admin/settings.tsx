@@ -114,6 +114,17 @@ interface SecuritySettings {
   forceMfaForSuperAdmin: boolean;
 }
 
+interface SupportSettings {
+  maxMessageLength: number;
+  maxAttachmentSizeMB: number;
+  allowedMimeTypes: string;
+  defaultPriority: "low" | "normal" | "high" | "urgent";
+  autoAssignMode: "manual" | "round_robin";
+  businessHoursEnabled: boolean;
+  businessHoursStart: string;
+  businessHoursEnd: string;
+}
+
 interface AllSettings {
   general: GeneralSettings;
   kyc: KYCSettings;
@@ -121,6 +132,7 @@ interface AllSettings {
   settlement: SettlementSettings;
   notifications: NotificationSettings;
   security: SecuritySettings;
+  support: SupportSettings;
 }
 
 export default function AdminSettings() {
@@ -140,6 +152,7 @@ export default function AdminSettings() {
   const [settlement, setSettlement] = useState<SettlementSettings | null>(null);
   const [notifications, setNotifications] = useState<NotificationSettings | null>(null);
   const [security, setSecurity] = useState<SecuritySettings | null>(null);
+  const [support, setSupport] = useState<SupportSettings | null>(null);
 
   // Initialize state when settings load
   if (settings && !general) {
@@ -149,6 +162,17 @@ export default function AdminSettings() {
     setSettlement(settings.settlement);
     setNotifications(settings.notifications);
     setSecurity(settings.security);
+    // Set support with defaults if not provided by API
+    setSupport(settings.support || {
+      maxMessageLength: 2000,
+      maxAttachmentSizeMB: 10,
+      allowedMimeTypes: "image/jpeg,image/png,application/pdf",
+      defaultPriority: "normal",
+      autoAssignMode: "manual",
+      businessHoursEnabled: false,
+      businessHoursStart: "09:00",
+      businessHoursEnd: "17:00",
+    });
   }
 
   // Update mutation
@@ -211,6 +235,12 @@ export default function AdminSettings() {
     }
   };
 
+  const handleSaveSupport = () => {
+    if (support) {
+      updateMutation.mutate({ section: "support", data: support });
+    }
+  };
+
   if (isLoading || !general || !kyc || !commission || !settlement || !notifications || !security) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -218,6 +248,18 @@ export default function AdminSettings() {
       </div>
     );
   }
+  
+  // Support may not exist yet, use defaults if null
+  const supportSettings = support || {
+    maxMessageLength: 2000,
+    maxAttachmentSizeMB: 10,
+    allowedMimeTypes: "image/jpeg,image/png,application/pdf",
+    defaultPriority: "normal" as const,
+    autoAssignMode: "manual" as const,
+    businessHoursEnabled: false,
+    businessHoursStart: "09:00",
+    businessHoursEnd: "17:00",
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -232,13 +274,14 @@ export default function AdminSettings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
           <TabsTrigger value="kyc" data-testid="tab-kyc">KYC Rules</TabsTrigger>
           <TabsTrigger value="commission" data-testid="tab-commission">Commission</TabsTrigger>
           <TabsTrigger value="settlement" data-testid="tab-settlement">Settlement</TabsTrigger>
           <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
+          <TabsTrigger value="support" data-testid="tab-support">Support</TabsTrigger>
         </TabsList>
 
         {/* General Tab */}
@@ -1070,6 +1113,181 @@ export default function AdminSettings() {
                 {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <Save className="mr-2 h-4 w-4" />
                 Save Security Settings
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Support Tab */}
+        <TabsContent value="support" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Support Chat Settings</CardTitle>
+              <CardDescription>
+                Configure support chat system parameters
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label>Max Message Length (characters)</Label>
+                <Input
+                  type="number"
+                  min="100"
+                  max="10000"
+                  value={supportSettings.maxMessageLength}
+                  onChange={(e) =>
+                    setSupport({ ...supportSettings,
+                      maxMessageLength: parseInt(e.target.value) || 2000,
+                    })
+                  }
+                  data-testid="input-max-message-length"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Maximum characters allowed per message (100-10000)
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Max Attachment Size (MB)</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="50"
+                  value={supportSettings.maxAttachmentSizeMB}
+                  onChange={(e) =>
+                    setSupport({ ...supportSettings,
+                      maxAttachmentSizeMB: parseInt(e.target.value) || 10,
+                    })
+                  }
+                  data-testid="input-max-attachment-size"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Maximum file size for attachments (1-50 MB)
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Allowed MIME Types</Label>
+                <Input
+                  value={supportSettings.allowedMimeTypes}
+                  onChange={(e) =>
+                    setSupport({ ...supportSettings,
+                      allowedMimeTypes: e.target.value,
+                    })
+                  }
+                  placeholder="image/jpeg,image/png,application/pdf"
+                  data-testid="input-allowed-mime-types"
+                />
+                <p className="text-sm text-muted-foreground">
+                  Comma-separated list of allowed MIME types for attachments
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Default Priority for New Conversations</Label>
+                <Select
+                  value={supportSettings.defaultPriority}
+                  onValueChange={(value: any) =>
+                    setSupport({ ...supportSettings, defaultPriority: value })
+                  }
+                >
+                  <SelectTrigger data-testid="select-default-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  Default priority level for user-created support requests
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <Label>Auto-Assign Mode</Label>
+                <Select
+                  value={supportSettings.autoAssignMode}
+                  onValueChange={(value: any) =>
+                    setSupport({ ...supportSettings, autoAssignMode: value })
+                  }
+                >
+                  <SelectTrigger data-testid="select-auto-assign-mode">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">Manual</SelectItem>
+                    <SelectItem value="round_robin">Round Robin (Future)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-sm text-muted-foreground">
+                  How conversations are assigned to support admins
+                </p>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="business-hours-enabled"
+                    checked={supportSettings.businessHoursEnabled}
+                    onCheckedChange={(checked) =>
+                      setSupport({ ...supportSettings, businessHoursEnabled: checked as boolean })
+                    }
+                    data-testid="checkbox-business-hours"
+                  />
+                  <Label htmlFor="business-hours-enabled">Enable Business Hours</Label>
+                </div>
+                {supportSettings.businessHoursEnabled && (
+                  <div className="grid grid-cols-2 gap-4 ml-6">
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Input
+                        type="time"
+                        value={supportSettings.businessHoursStart}
+                        onChange={(e) =>
+                          setSupport({ ...supportSettings, businessHoursStart: e.target.value })
+                        }
+                        data-testid="input-business-hours-start"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Input
+                        type="time"
+                        value={supportSettings.businessHoursEnd}
+                        onChange={(e) =>
+                          setSupport({ ...supportSettings, businessHoursEnd: e.target.value })
+                        }
+                        data-testid="input-business-hours-end"
+                      />
+                    </div>
+                  </div>
+                )}
+                <p className="text-sm text-muted-foreground">
+                  Optional: Set business hours for support availability (stored for future use)
+                </p>
+              </div>
+
+              <Button
+                onClick={handleSaveSupport}
+                disabled={updateMutation.isPending}
+                data-testid="button-save-support"
+              >
+                {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Save className="mr-2 h-4 w-4" />
+                Save Support Settings
               </Button>
             </CardContent>
           </Card>

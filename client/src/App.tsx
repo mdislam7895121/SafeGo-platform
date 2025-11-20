@@ -17,16 +17,19 @@ import CustomerActivity from "@/pages/customer/activity";
 import RideRequest from "@/pages/customer/ride-request";
 import FoodOrder from "@/pages/customer/food-order";
 import ParcelRequest from "@/pages/customer/parcel-request";
+import CustomerSupport from "@/pages/customer/support";
 
 // Driver pages
 import DriverHome from "@/pages/driver/home";
 import DriverVehicle from "@/pages/driver/vehicle";
 import DriverProfile from "@/pages/driver/profile";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
+import DriverSupport from "@/pages/driver/support";
 
 // Restaurant pages
 import RestaurantHome from "@/pages/restaurant/home";
 import RestaurantProfile from "@/pages/restaurant/profile";
+import RestaurantSupport from "@/pages/restaurant/support";
 
 // Admin pages
 import AdminHome from "@/pages/admin/home";
@@ -47,6 +50,7 @@ import AdminParcelDetails from "@/pages/admin/parcel-details";
 import AdminActivityLog from "@/pages/admin/activity-log";
 import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
+import AdminSupportChat from "@/pages/admin/support-chat";
 
 import NotFound from "@/pages/not-found";
 
@@ -111,6 +115,11 @@ function Router() {
           <ParcelRequest />
         </ProtectedRoute>
       </Route>
+      <Route path="/customer/support">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupport />
+        </ProtectedRoute>
+      </Route>
 
       {/* Driver routes */}
       <Route path="/driver">
@@ -133,6 +142,11 @@ function Router() {
           <DriverKYCDocuments />
         </ProtectedRoute>
       </Route>
+      <Route path="/driver/support">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverSupport />
+        </ProtectedRoute>
+      </Route>
 
       {/* Restaurant routes */}
       <Route path="/restaurant">
@@ -143,6 +157,11 @@ function Router() {
       <Route path="/restaurant/profile">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantProfile />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/support">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantSupport />
         </ProtectedRoute>
       </Route>
 
@@ -235,6 +254,11 @@ function Router() {
       <Route path="/admin/settings">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-chat">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportChat />
         </ProtectedRoute>
       </Route>
 
