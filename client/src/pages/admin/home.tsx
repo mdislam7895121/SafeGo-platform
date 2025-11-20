@@ -61,7 +61,7 @@ export default function AdminHome() {
 
   // Fetch admin capabilities for RBAC
   const { data: capabilitiesData } = useQuery<{ capabilities: string[] }>({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/admin/capabilities"],
   });
   const capabilities = capabilitiesData?.capabilities || [];
 
