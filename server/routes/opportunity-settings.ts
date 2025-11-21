@@ -2,7 +2,7 @@ import { Router } from "express";
 import { PrismaClient, OpportunityBonusType } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
-import { logAdminAction } from "../utils/audit";
+import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -125,6 +125,11 @@ router.post("/", async (req: AuthRequest, res) => {
       }
     }
 
+    const admin = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { email: true, role: true },
+    });
+
     const newSetting = await prisma.opportunitySetting.create({
       data: {
         bonusType: validatedData.bonusType as OpportunityBonusType,
@@ -144,12 +149,20 @@ router.post("/", async (req: AuthRequest, res) => {
     });
 
     // Audit log
-    await logAdminAction({
-      adminId,
-      action: "CREATE_OPPORTUNITY_SETTING",
-      resource: "OpportunitySetting",
-      resourceId: newSetting.id,
-      newValue: JSON.stringify(newSetting),
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: admin?.email || "unknown",
+      actorRole: admin?.role || "admin",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.CREATE,
+      entityType: "opportunity_setting",
+      entityId: newSetting.id,
+      description: `Created ${validatedData.bonusType} opportunity setting for ${validatedData.countryCode}`,
+      metadata: {
+        bonusType: newSetting.bonusType,
+        countryCode: newSetting.countryCode,
+        baseAmount: newSetting.baseAmount.toString(),
+      },
     });
 
     res.status(201).json(newSetting);
@@ -220,6 +233,11 @@ router.patch("/:id", async (req: AuthRequest, res) => {
       });
     }
 
+    const admin = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { email: true, role: true },
+    });
+
     // Update the setting
     const updatedSetting = await prisma.opportunitySetting.update({
       where: { id },
@@ -244,13 +262,18 @@ router.patch("/:id", async (req: AuthRequest, res) => {
     });
 
     // Audit log
-    await logAdminAction({
-      adminId,
-      action: "UPDATE_OPPORTUNITY_SETTING",
-      resource: "OpportunitySetting",
-      resourceId: id,
-      oldValue: JSON.stringify(existingSetting),
-      newValue: JSON.stringify(updatedSetting),
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: admin?.email || "unknown",
+      actorRole: admin?.role || "admin",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.UPDATE,
+      entityType: "opportunity_setting",
+      entityId: id,
+      description: `Updated ${updatedSetting.bonusType} opportunity setting for ${updatedSetting.countryCode}`,
+      metadata: {
+        changes: Object.keys(validatedData),
+      },
     });
 
     res.json(updatedSetting);
@@ -281,6 +304,11 @@ router.delete("/:id", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Opportunity setting not found" });
     }
 
+    const admin = await prisma.user.findUnique({
+      where: { id: adminId },
+      select: { email: true, role: true },
+    });
+
     // Soft delete by setting isActive to false
     const deactivatedSetting = await prisma.opportunitySetting.update({
       where: { id },
@@ -291,13 +319,19 @@ router.delete("/:id", async (req: AuthRequest, res) => {
     });
 
     // Audit log
-    await logAdminAction({
-      adminId,
-      action: "DEACTIVATE_OPPORTUNITY_SETTING",
-      resource: "OpportunitySetting",
-      resourceId: id,
-      oldValue: JSON.stringify(existingSetting),
-      newValue: JSON.stringify(deactivatedSetting),
+    await logAuditEvent({
+      actorId: adminId,
+      actorEmail: admin?.email || "unknown",
+      actorRole: admin?.role || "admin",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.DELETE,
+      entityType: "opportunity_setting",
+      entityId: id,
+      description: `Deactivated ${deactivatedSetting.bonusType} opportunity setting for ${deactivatedSetting.countryCode}`,
+      metadata: {
+        bonusType: deactivatedSetting.bonusType,
+        countryCode: deactivatedSetting.countryCode,
+      },
     });
 
     res.json({ message: "Opportunity setting deactivated successfully" });
