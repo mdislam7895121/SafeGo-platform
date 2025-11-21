@@ -1,9 +1,8 @@
-import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
-  Car, Plus, FileText, Calendar, CheckCircle2, AlertCircle, 
-  Clock, XCircle, Edit, ArrowLeft, ChevronRight, Shield, 
+  Car, Plus, FileText, CheckCircle2, AlertCircle, 
+  Clock, XCircle, ArrowLeft, Shield, 
   FileCheck, CreditCard, Diamond 
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,16 +12,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const getStatusBadge = (status: string) => {
+type DocumentStatus = "PENDING" | "UNDER_REVIEW" | "APPROVED" | "EXPIRING_SOON" | "EXPIRED" | "REJECTED" | "NEEDS_UPDATE";
+
+const getStatusBadge = (status: DocumentStatus) => {
   const config = {
-    approved: { variant: "default" as const, icon: CheckCircle2, label: "Approved", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-    expiring: { variant: "outline" as const, icon: AlertCircle, label: "Expiring Soon", className: "border-yellow-500 text-yellow-700 dark:text-yellow-500" },
-    pending: { variant: "outline" as const, icon: Clock, label: "Pending", className: "border-gray-400 text-gray-700 dark:text-gray-400" },
-    rejected: { variant: "destructive" as const, icon: XCircle, label: "Rejected", className: "" },
-    under_review: { variant: "outline" as const, icon: Clock, label: "Under Review", className: "border-blue-500 text-blue-700 dark:text-blue-500" },
+    APPROVED: { icon: CheckCircle2, label: "Approved", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300" },
+    EXPIRING_SOON: { icon: AlertCircle, label: "Expiring Soon", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300" },
+    EXPIRED: { icon: XCircle, label: "Expired", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300" },
+    PENDING: { icon: Clock, label: "Pending", className: "bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-400 border-gray-300" },
+    UNDER_REVIEW: { icon: Clock, label: "Under Review", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-300" },
+    REJECTED: { icon: XCircle, label: "Rejected", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300" },
+    NEEDS_UPDATE: { icon: AlertCircle, label: "Needs Update", className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300" },
   };
   
-  const statusConfig = config[status as keyof typeof config] || config.pending;
+  const statusConfig = config[status] || config.PENDING;
   return { ...statusConfig };
 };
 
@@ -35,13 +38,7 @@ export default function DriverVehicles() {
   });
 
   const vehicle = (driverData as any)?.vehicle;
-  const profile = (driverData as any)?.profile;
-
-  // Check if driver is in NYC market (include various NYC city name variations)
-  const nycCityVariations = ["New York", "New York City", "NYC", "Brooklyn", "Queens", "Manhattan", "Bronx", "Staten Island"];
-  const isNYCDriver = nycCityVariations.some(city => 
-    profile?.usaCity?.toLowerCase().includes(city.toLowerCase())
-  );
+  const vehicleDocuments = (driverData as any)?.vehicleDocuments;
 
   if (isLoading) {
     return (
@@ -53,12 +50,6 @@ export default function DriverVehicles() {
       </div>
     );
   }
-
-  // Use backend-provided status values directly
-  const registrationStatus = vehicle?.registrationStatus || "pending";
-  const insuranceStatus = vehicle?.insuranceStatus || "pending";
-  const inspectionStatus = vehicle?.inspectionStatus || "pending";
-  const tlcStatus = vehicle?.tlcLicenseStatus || "pending";
 
   return (
     <div className="bg-background min-h-screen">
@@ -133,7 +124,7 @@ export default function DriverVehicles() {
           </Card>
         )}
 
-        {vehicle && (
+        {vehicleDocuments && (
           <>
             {/* Vehicle Documents Section */}
             <Card>
@@ -153,8 +144,8 @@ export default function DriverVehicles() {
                       <p className="text-xs text-muted-foreground">Required for verification</p>
                     </div>
                   </div>
-                  <Badge {...getStatusBadge(registrationStatus)} className={cn(getStatusBadge(registrationStatus).className, "flex-shrink-0")}>
-                    {getStatusBadge(registrationStatus).label}
+                  <Badge className={cn(getStatusBadge(vehicleDocuments.registration.status).className, "flex-shrink-0")}>
+                    {getStatusBadge(vehicleDocuments.registration.status).label}
                   </Badge>
                 </div>
 
@@ -169,8 +160,8 @@ export default function DriverVehicles() {
                       <p className="text-xs text-muted-foreground">Required for verification</p>
                     </div>
                   </div>
-                  <Badge {...getStatusBadge(insuranceStatus)} className={cn(getStatusBadge(insuranceStatus).className, "flex-shrink-0")}>
-                    {getStatusBadge(insuranceStatus).label}
+                  <Badge className={cn(getStatusBadge(vehicleDocuments.insurance.status).className, "flex-shrink-0")}>
+                    {getStatusBadge(vehicleDocuments.insurance.status).label}
                   </Badge>
                 </div>
 
@@ -185,8 +176,8 @@ export default function DriverVehicles() {
                       <p className="text-xs text-muted-foreground">DMV/NYS Inspection</p>
                     </div>
                   </div>
-                  <Badge {...getStatusBadge(inspectionStatus)} className={cn(getStatusBadge(inspectionStatus).className, "flex-shrink-0")}>
-                    {getStatusBadge(inspectionStatus).label}
+                  <Badge className={cn(getStatusBadge(vehicleDocuments.inspection.status).className, "flex-shrink-0")}>
+                    {getStatusBadge(vehicleDocuments.inspection.status).label}
                   </Badge>
                 </div>
 
@@ -201,19 +192,19 @@ export default function DriverVehicles() {
                       <p className="text-xs text-muted-foreground">Required for all vehicles</p>
                     </div>
                   </div>
-                  {vehicle.licensePlate ? (
-                    <Badge {...getStatusBadge("approved")} className={cn(getStatusBadge("approved").className, "flex-shrink-0")}>
-                      {vehicle.licensePlate}
+                  {vehicleDocuments.plate.plateNumber ? (
+                    <Badge className={cn(getStatusBadge("APPROVED").className, "flex-shrink-0")}>
+                      {vehicleDocuments.plate.plateNumber}
                     </Badge>
                   ) : (
-                    <Badge {...getStatusBadge("pending")} className={cn(getStatusBadge("pending").className, "flex-shrink-0")}>
+                    <Badge className={cn(getStatusBadge("PENDING").className, "flex-shrink-0")}>
                       Pending
                     </Badge>
                   )}
                 </div>
 
                 {/* TLC License (NYC only) */}
-                {isNYCDriver && (
+                {vehicleDocuments.requiresTlcCompliance && (
                   <div className="flex items-center justify-between p-4 bg-background border-2 border-primary/20 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground flex-shrink-0">
@@ -224,12 +215,12 @@ export default function DriverVehicles() {
                         <p className="text-xs text-muted-foreground">Required for NYC drivers</p>
                       </div>
                     </div>
-                    {vehicle.tlcLicenseNumber ? (
-                      <Badge {...getStatusBadge(tlcStatus)} className={cn(getStatusBadge(tlcStatus).className, "flex-shrink-0")}>
-                        {vehicle.tlcLicenseNumber.slice(-4).padStart(vehicle.tlcLicenseNumber.length, '*')}
+                    {vehicleDocuments.tlcLicense.licenseNumber ? (
+                      <Badge className={cn(getStatusBadge(vehicleDocuments.tlcLicense.status).className, "flex-shrink-0")}>
+                        {vehicleDocuments.tlcLicense.licenseNumber.slice(-4).padStart(vehicleDocuments.tlcLicense.licenseNumber.length, '*')}
                       </Badge>
                     ) : (
-                      <Badge {...getStatusBadge("pending")} className={cn(getStatusBadge("pending").className, "flex-shrink-0")}>
+                      <Badge className={cn(getStatusBadge("PENDING").className, "flex-shrink-0")}>
                         Pending
                       </Badge>
                     )}

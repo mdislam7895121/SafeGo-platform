@@ -10,6 +10,7 @@ import {
   uploadVehicleDocument,
   getFileUrl,
 } from "../middleware/upload";
+import { getVehicleDocumentsPayload } from "../services/documentStatusService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -92,6 +93,9 @@ router.get("/home", async (req: AuthRequest, res) => {
       where: { driverId: driverProfile.id },
     });
 
+    // Get vehicle documents payload with calculated statuses
+    const vehicleDocuments = getVehicleDocumentsPayload(vehicle, driverProfile);
+
     res.json({
       profile: {
         id: driverProfile.id,
@@ -123,9 +127,14 @@ router.get("/home", async (req: AuthRequest, res) => {
         vehicleType: vehicle.vehicleType,
         vehicleModel: vehicle.vehicleModel,
         vehiclePlate: vehicle.vehiclePlate,
+        make: vehicle.make,
+        year: vehicle.year,
+        color: vehicle.color,
+        licensePlate: vehicle.licensePlate,
         isOnline: vehicle.isOnline,
         totalEarnings: vehicle.totalEarnings,
       } : null,
+      vehicleDocuments,
       stats: stats ? {
         rating: stats.rating,
         totalTrips: stats.totalTrips,
