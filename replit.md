@@ -43,31 +43,12 @@ Both Customer and Driver profile experiences have been upgraded to Uber-level qu
 - Skeleton loading states for better perceived performance
 - Integration with existing KYC system and wallet functionality
 
-**Driver Profile Enhancements** (`/driver/profile`):
-- Uber-style header with driver avatar, name, location, star rating, total trips, and daily/weekly earnings summary
-- Online/Offline status badge with quick "Go Online" button
-- **Onboarding Progress Component** (shown for unverified drivers):
-  - 5-step progress tracker: Personal Info, KYC Documents, Vehicle Added, Vehicle Documents, Account Approval
-  - Visual progress bar with percentage completion
-  - Color-coded status badges: Completed (green), In Progress (gray), Needs Attention (red), Pending (outline)
-- **Tabbed Navigation** with 5 sections:
-  - **Overview**: Account status, verification badge, total balance, and total trips summary cards
-  - **Vehicle**: Active vehicle details (type, model, plate, earnings) with edit functionality
-  - **Documents**: Required documents checklist (profile photo, driver license, vehicle documents) with upload status indicators
-  - **Payouts**: Wallet summary showing available balance and negative balance with link to full wallet page
-  - **Account & Security**: Profile editing, password change, email, and membership date
-- Clean information hierarchy with icons, badges, and visual status indicators
-- Fully backward compatible with existing driver onboarding and document upload systems
-
-**Key Design Features**:
-- Consistent use of SafeGo's design system (shadcn/ui components, custom color palette)
-- Avatar components with fallback initials
-- Country-specific data display (Bangladesh 🇧🇩 vs United States 🇺🇸)
-- Demo statistics for rating and trips (ready for real API integration)
-- Non-breaking changes - all existing backend logic and security features remain intact
-- Data-testid attributes on all interactive elements for testing
-- Responsive grid layouts adapting from mobile to desktop
-- Hover and active states following universal design guidelines
+**Driver Profile UI - Current State (November 21, 2025)**:
+- **Status**: Legacy driver profile, vehicle, and wallet UI completely removed
+- **Placeholder Pages**: `/driver/profile`, `/driver/vehicle`, and `/driver/wallet` now display "Under Reconstruction" messages
+- **Backend Preserved**: All backend APIs, database models, and services remain untouched and fully functional
+- **Ready for Rebuild**: Clean codebase prepared for fresh Uber-style driver profile implementation
+- **Navigation Intact**: Unified DriverLayout navigation system fully operational with 12-item sidebar menu
 
 ### Driver Web App with Unified Navigation Layout (November 2025)
 Built a comprehensive Driver Web App featuring a unified navigation system with top bar, sidebar, dashboard, and complete feature set while preserving backward compatibility with legacy onboarding flow:
@@ -113,8 +94,10 @@ Built a comprehensive Driver Web App featuring a unified navigation system with 
   - `/driver/refer`: Refer & Earn with Copy/WhatsApp/Email share
   - `/driver/premium`: SafeGo Premium subscription page
   - `/driver/help`: Help Center with 4 support channels
-  - `/driver/profile`: Enhanced profile with tabs
-  - `/driver/vehicle`, `/driver/wallet`, `/driver/kyc-documents`: Feature pages
+  - `/driver/profile`: Placeholder page (UI under reconstruction)
+  - `/driver/vehicle`: Placeholder page (UI under reconstruction)
+  - `/driver/wallet`: Placeholder page (UI under reconstruction)
+  - `/driver/kyc-documents`: Document management page
   - All `/driver/account/*` routes: Account settings and preferences
 - Page titles dynamically set per route via DriverLayout
 - Protected routes requiring driver role authentication
