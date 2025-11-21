@@ -109,7 +109,7 @@ export default function DriverHome() {
           <Card className="border-orange-500">
             <CardContent className="p-4">
               <p className="text-sm">
-                ⚠️ Your account is pending verification. You can't go online until approved.
+                WARNING: Your account is pending verification. You can't go online until approved.
               </p>
             </CardContent>
           </Card>
@@ -119,7 +119,7 @@ export default function DriverHome() {
           <Card className="border-orange-500">
             <CardContent className="p-4">
               <p className="text-sm mb-3">
-                🚗 You need to register a vehicle before going online
+                VEHICLE: You need to register a vehicle before going online
               </p>
               <Link href="/driver/vehicle">
                 <Button size="sm" data-testid="button-register-vehicle">Register Vehicle</Button>

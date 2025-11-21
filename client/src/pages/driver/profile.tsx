@@ -152,7 +152,7 @@ export default function DriverProfile() {
             <div>
               <p className="text-sm text-muted-foreground">Country</p>
               <p className="font-medium" data-testid="text-country">
-                {profile?.countryCode === "BD" ? "🇧🇩 Bangladesh" : "🇺🇸 United States"}
+                {profile?.countryCode === "BD" ? "BD Bangladesh" : "US United States"}
               </p>
             </div>
             <div>

@@ -115,22 +115,18 @@ export function DriverSidebar() {
   const initials = driverName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
   const cityName = profile?.usaCity || (profile?.countryCode === 'BD' ? 'Dhaka' : 'New York');
   const countryCode = profile?.countryCode || 'US';
-  const rating = stats?.rating || 4.8;
+  const rating = Number(stats?.rating || 4.8);
 
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3 p-2">
-          <Link href="/driver/profile">
-            <a data-testid="link-driver-profile">
-              <Avatar className="h-14 w-14">
-                <AvatarImage src={profile?.profilePhotoUrl} alt={driverName} />
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-lg">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-            </a>
-          </Link>
+          <Avatar className="h-14 w-14 cursor-pointer" onClick={() => window.location.href = '/driver/profile'}>
+            <AvatarImage src={profile?.profilePhotoUrl} alt={driverName} />
+            <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-lg">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-base truncate" data-testid="text-driver-name">
               {driverName}
