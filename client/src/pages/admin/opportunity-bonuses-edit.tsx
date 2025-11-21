@@ -190,23 +190,35 @@ export default function AdminOpportunityBonusesEdit() {
   }
 
   if (isError) {
-    const errorMessage = error instanceof Error && error.message.includes("404")
+    // Get HTTP status code from error object (ApiError has .status property)
+    const statusCode = (error as any)?.status || null;
+
+    const is404 = statusCode === 404;
+    const isUnauthorized = statusCode === 401 || statusCode === 403;
+
+    const displayMessage = is404
       ? "Bonus setting not found"
+      : isUnauthorized
+      ? "You don't have permission to view this setting"
       : "Failed to load bonus setting. Please try again.";
 
-    if (error && !(error instanceof Error && error.message.includes("404"))) {
+    if (!is404) {
       toast({
         title: "Error",
-        description: errorMessage,
+        description: displayMessage,
         variant: "destructive",
       });
+
+      if (isUnauthorized) {
+        setTimeout(() => setLocation("/admin/opportunity-bonuses"), 2000);
+      }
     }
 
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">{errorMessage}</p>
+            <p className="text-center text-muted-foreground">{displayMessage}</p>
             <Button
               onClick={handleCancel}
               variant="outline"
