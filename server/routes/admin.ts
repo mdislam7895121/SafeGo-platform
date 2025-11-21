@@ -8193,6 +8193,290 @@ router.post("/fraud/check-multi-account", checkPermission(Permission.VIEW_DASHBO
 });
 
 // ====================================================
+// TAX & FEES MANAGEMENT API
+// ====================================================
+
+// GET /api/admin/tax - List all tax rules with RBAC filtering
+router.get("/tax", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const { serviceType, payeeType, active, countryCode } = req.query;
+    
+    // Get RBAC filter
+    const rbacFilter = await getRBACFilter(req);
+    
+    // Build where clause
+    const where: any = {
+      isDemo: false,
+    };
+    
+    // Apply RBAC filtering - strict jurisdiction isolation
+    if (!rbacFilter.isUnrestricted) {
+      if (rbacFilter.countryCode) {
+        where.countryCode = rbacFilter.countryCode;
+        
+        // CITY_ADMIN: Only see rules specific to their city (exclude broader state/country rules)
+        if (rbacFilter.cityCode) {
+          where.cityCode = rbacFilter.cityCode;
+        } else {
+          // COUNTRY_ADMIN: Only see country-level rules (exclude city-specific rules)
+          where.cityCode = null;
+          where.stateCode = null;
+        }
+      }
+    }
+    
+    // Apply optional filters from query params
+    if (serviceType && serviceType !== "all") {
+      where.appliesTo = serviceType as string;
+    }
+    if (payeeType && payeeType !== "all") {
+      where.payeeType = payeeType as string;
+    }
+    if (active === "true") {
+      where.isActive = true;
+    } else if (active === "false") {
+      where.isActive = false;
+    }
+    if (countryCode && rbacFilter.isUnrestricted) {
+      // Only SUPER_ADMIN can filter by specific country
+      where.countryCode = countryCode as string;
+    }
+    
+    const taxRules = await prisma.taxRule.findMany({
+      where,
+      orderBy: [
+        { countryCode: "asc" },
+        { effectiveFrom: "desc" },
+      ],
+    });
+    
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_SETTINGS,
+      entityType: EntityType.TAX_RULE,
+      description: `Viewed tax rules list`,
+      metadata: { filters: { serviceType, payeeType, active }, rbac: rbacFilter, total: taxRules.length },
+    });
+    
+    res.json({
+      taxRules: taxRules.map(rule => ({
+        ...rule,
+        taxRatePercent: rule.taxRatePercent.toString(),
+      })),
+      total: taxRules.length,
+    });
+  } catch (error: any) {
+    console.error("[Tax API] Error fetching tax rules:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch tax rules" });
+  }
+});
+
+// POST /api/admin/tax - Create new tax rule
+router.post("/tax", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const {
+      countryCode,
+      stateCode,
+      cityCode,
+      taxName,
+      taxRatePercent,
+      appliesTo,
+      payeeType,
+      isInclusive,
+      isActive,
+      effectiveFrom,
+      effectiveTo,
+    } = req.body;
+    
+    // Validate required fields
+    if (!countryCode || !taxName || taxRatePercent === undefined || !appliesTo || !payeeType || !effectiveFrom) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+    
+    // Get RBAC filter
+    const rbacFilter = await getRBACFilter(req);
+    
+    // RBAC check: ensure admin can only create tax rules for their jurisdiction
+    if (!rbacFilter.isUnrestricted) {
+      if (rbacFilter.countryCode && countryCode !== rbacFilter.countryCode) {
+        return res.status(403).json({ error: "You can only create tax rules for your assigned country" });
+      }
+      if (rbacFilter.cityCode && (!cityCode || cityCode !== rbacFilter.cityCode)) {
+        return res.status(403).json({ error: "You can only create tax rules for your assigned city" });
+      }
+    }
+    
+    // Create tax rule
+    const taxRule = await prisma.taxRule.create({
+      data: {
+        countryCode: safeString(countryCode),
+        stateCode: stateCode ? safeString(stateCode) : null,
+        cityCode: cityCode ? safeString(cityCode) : null,
+        taxName: safeString(taxName),
+        taxRatePercent: safeNumber(taxRatePercent),
+        appliesTo,
+        payeeType,
+        isInclusive: isInclusive !== undefined ? isInclusive : false,
+        isActive: isActive !== undefined ? isActive : true,
+        effectiveFrom: new Date(effectiveFrom),
+        effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
+        isDemo: false,
+      },
+    });
+    
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.EDIT_SETTINGS,
+      entityType: EntityType.TAX_RULE,
+      entityId: taxRule.id,
+      description: `Created tax rule: ${taxName} (${taxRatePercent}% for ${appliesTo})`,
+      metadata: { taxRule },
+    });
+    
+    res.json({
+      ...taxRule,
+      taxRatePercent: taxRule.taxRatePercent.toString(),
+    });
+  } catch (error: any) {
+    console.error("[Tax API] Error creating tax rule:", error);
+    res.status(500).json({ error: error.message || "Failed to create tax rule" });
+  }
+});
+
+// PATCH /api/admin/tax/:id - Update tax rule
+router.patch("/tax/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      taxName,
+      taxRatePercent,
+      appliesTo,
+      payeeType,
+      isInclusive,
+      isActive,
+      effectiveFrom,
+      effectiveTo,
+    } = req.body;
+    
+    // Get existing tax rule
+    const existingRule = await prisma.taxRule.findUnique({
+      where: { id },
+    });
+    
+    if (!existingRule) {
+      return res.status(404).json({ error: "Tax rule not found" });
+    }
+    
+    // Get RBAC filter
+    const rbacFilter = await getRBACFilter(req);
+    
+    // RBAC check: ensure admin can only update tax rules in their jurisdiction
+    if (!rbacFilter.isUnrestricted) {
+      if (rbacFilter.countryCode && existingRule.countryCode !== rbacFilter.countryCode) {
+        return res.status(403).json({ error: "You can only update tax rules in your assigned country" });
+      }
+      if (rbacFilter.cityCode && (!existingRule.cityCode || existingRule.cityCode !== rbacFilter.cityCode)) {
+        return res.status(403).json({ error: "You can only update tax rules in your assigned city" });
+      }
+    }
+    
+    // Build update data
+    const updateData: any = {};
+    if (taxName !== undefined) updateData.taxName = safeString(taxName);
+    if (taxRatePercent !== undefined) updateData.taxRatePercent = safeNumber(taxRatePercent);
+    if (appliesTo !== undefined) updateData.appliesTo = appliesTo;
+    if (payeeType !== undefined) updateData.payeeType = payeeType;
+    if (isInclusive !== undefined) updateData.isInclusive = isInclusive;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (effectiveFrom !== undefined) updateData.effectiveFrom = new Date(effectiveFrom);
+    if (effectiveTo !== undefined) updateData.effectiveTo = effectiveTo ? new Date(effectiveTo) : null;
+    
+    // Update tax rule
+    const taxRule = await prisma.taxRule.update({
+      where: { id },
+      data: updateData,
+    });
+    
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.EDIT_SETTINGS,
+      entityType: EntityType.TAX_RULE,
+      entityId: taxRule.id,
+      description: `Updated tax rule: ${taxRule.taxName}`,
+      metadata: { before: existingRule, after: taxRule },
+    });
+    
+    res.json({
+      ...taxRule,
+      taxRatePercent: taxRule.taxRatePercent.toString(),
+    });
+  } catch (error: any) {
+    console.error("[Tax API] Error updating tax rule:", error);
+    res.status(500).json({ error: error.message || "Failed to update tax rule" });
+  }
+});
+
+// DELETE /api/admin/tax/:id - Delete tax rule
+router.delete("/tax/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get existing tax rule
+    const existingRule = await prisma.taxRule.findUnique({
+      where: { id },
+    });
+    
+    if (!existingRule) {
+      return res.status(404).json({ error: "Tax rule not found" });
+    }
+    
+    // Get RBAC filter
+    const rbacFilter = await getRBACFilter(req);
+    
+    // RBAC check: ensure admin can only delete tax rules in their jurisdiction
+    if (!rbacFilter.isUnrestricted) {
+      if (rbacFilter.countryCode && existingRule.countryCode !== rbacFilter.countryCode) {
+        return res.status(403).json({ error: "You can only delete tax rules in your assigned country" });
+      }
+      if (rbacFilter.cityCode && (!existingRule.cityCode || existingRule.cityCode !== rbacFilter.cityCode)) {
+        return res.status(403).json({ error: "You can only delete tax rules in your assigned city" });
+      }
+    }
+    
+    // Delete tax rule
+    await prisma.taxRule.delete({
+      where: { id },
+    });
+    
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.EDIT_SETTINGS,
+      entityType: EntityType.TAX_RULE,
+      entityId: id,
+      description: `Deleted tax rule: ${existingRule.taxName}`,
+      metadata: { deletedRule: existingRule },
+    });
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[Tax API] Error deleting tax rule:", error);
+    res.status(500).json({ error: error.message || "Failed to delete tax rule" });
+  }
+});
+
+// ====================================================
 // Mount Analytics Routes
 // ====================================================
 router.use("/analytics", analyticsRouter);

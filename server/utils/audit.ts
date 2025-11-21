@@ -104,6 +104,7 @@ export const EntityType = {
   SUPPORT_CONVERSATION: "support_conversation",
   ANALYTICS: "analytics",
   PERFORMANCE: "performance",
+  TAX_RULE: "tax_rule",
 } as const;
 
 interface AuditLogParams {
