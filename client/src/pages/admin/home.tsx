@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, Activity, ShieldAlert } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -168,6 +168,15 @@ export default function AdminHome() {
       color: "text-fuchsia-600",
       bgColor: "bg-fuchsia-50 dark:bg-fuchsia-950",
       permission: "VIEW_EARNINGS_DASHBOARD",
+    },
+    {
+      name: "Analytics Dashboard",
+      icon: TrendingUp,
+      href: "/admin/analytics",
+      description: "Comprehensive platform analytics for drivers, customers, restaurants, revenue, and risk",
+      color: "text-indigo-600",
+      bgColor: "bg-indigo-50 dark:bg-indigo-950",
+      permission: "VIEW_ANALYTICS_DASHBOARD",
     },
     {
       name: "Wallet Settlement",

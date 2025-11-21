@@ -118,3 +118,83 @@ setInterval(() => {
     }
   }
 }, WINDOW_MS);
+
+// ====================================================
+// Analytics Rate Limiter
+// Prevents abuse while allowing legitimate dashboard usage
+// ====================================================
+
+interface AnalyticsRequest {
+  count: number;
+  windowStart: number;
+}
+
+const analyticsRequests = new Map<string, AnalyticsRequest>();
+
+// Analytics rate limiting: 60 requests per minute per user
+const ANALYTICS_MAX_REQUESTS = 60;
+const ANALYTICS_WINDOW_MS = 60 * 1000; // 1 minute
+
+export async function rateLimitAnalytics(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  const userId = (req as any).user?.id;
+  const ip = getClientIp(req);
+  const key = userId ? `user:${userId}` : `ip:${ip}`;
+
+  const now = Date.now();
+  let request = analyticsRequests.get(key);
+
+  // Initialize or reset window
+  if (!request || (now - request.windowStart > ANALYTICS_WINDOW_MS)) {
+    request = {
+      count: 0,
+      windowStart: now
+    };
+    analyticsRequests.set(key, request);
+  }
+
+  request.count++;
+  analyticsRequests.set(key, request);
+
+  // Check if rate limit exceeded
+  if (request.count > ANALYTICS_MAX_REQUESTS) {
+    const remainingSec = Math.ceil((ANALYTICS_WINDOW_MS - (now - request.windowStart)) / 1000);
+
+    await logAuditEvent({
+      actorId: userId || null,
+      actorEmail: (req as any).user?.email || null,
+      actorRole: 'admin',
+      ipAddress: ip,
+      actionType: 'ANALYTICS_RATE_LIMITED',
+      entityType: 'analytics',
+      description: `Analytics API rate limited for ${userId ? 'user ' + userId : 'IP ' + ip}`,
+      metadata: {
+        requestCount: request.count,
+        windowStart: new Date(request.windowStart),
+        remainingSeconds: remainingSec
+      },
+      success: false
+    });
+
+    res.status(429).json({
+      error: `Analytics rate limit exceeded. Please try again in ${remainingSec} seconds.`
+    });
+    return;
+  }
+
+  next();
+}
+
+// Cleanup old analytics request tracking
+setInterval(() => {
+  const now = Date.now();
+  const entries = Array.from(analyticsRequests.entries());
+  for (const [key, request] of entries) {
+    if (now - request.windowStart > ANALYTICS_WINDOW_MS * 2) {
+      analyticsRequests.delete(key);
+    }
+  }
+}, ANALYTICS_WINDOW_MS);

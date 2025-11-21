@@ -276,3 +276,29 @@ export function filterByCountry<T extends { country?: string }>(
 
   return items.filter(item => item.country === userCountry);
 }
+
+/**
+ * Middleware to check if authenticated admin user has required permission
+ * Uses the new RBAC system from utils/permissions.ts
+ */
+export function checkPermission(permission: string) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    // Check if user has the required permission
+    if (req.user.permissions && !req.user.permissions.includes(permission)) {
+      res.status(403).json({ error: 'Insufficient permissions' });
+      return;
+    }
+
+    next();
+  };
+}

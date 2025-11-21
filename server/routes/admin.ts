@@ -15,6 +15,7 @@ import * as fraudDetectionService from "../services/fraudDetectionService";
 import { scheduleAutomaticPayouts, runManualPayout } from "../services/payoutSchedulingService";
 import { reconcileWalletTransactions } from "../services/reconciliationService";
 import { format } from "date-fns";
+import analyticsRouter from "./analytics";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -8141,5 +8142,10 @@ router.post("/fraud/check-multi-account", checkPermission(Permission.VIEW_DASHBO
     res.status(500).json({ error: "Failed to check multi-account abuse" });
   }
 });
+
+// ====================================================
+// Mount Analytics Routes
+// ====================================================
+router.use("/analytics", analyticsRouter);
 
 export default router;

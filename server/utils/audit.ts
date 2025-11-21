@@ -76,6 +76,7 @@ export const ActionType = {
   
   // Analytics
   VIEW_EARNINGS_DASHBOARD: "VIEW_EARNINGS_DASHBOARD",
+  VIEW_ANALYTICS_DASHBOARD: "VIEW_ANALYTICS_DASHBOARD",
 } as const;
 
 // Entity type constants
