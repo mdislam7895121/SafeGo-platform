@@ -135,7 +135,7 @@ async function reconcileRides(
         severity: "critical",
         orderId: ride.id,
         orderType: "ride",
-        expectedAmount: ride.fare?.toString() || "0",
+        expectedAmount: ride.serviceFare?.toString() || "0",
         details: `Missing wallet transaction for completed ride ${ride.id}`,
       });
       continue;
@@ -156,7 +156,7 @@ async function reconcileRides(
         severity: "critical",
         orderId: ride.id,
         orderType: "ride",
-        expectedAmount: ride.fare?.toString() || "0",
+        expectedAmount: ride.serviceFare?.toString() || "0",
         actualAmount: transaction.amount.toString(),
         transactionId: transaction.id,
         details: `Found ${duplicates.length} wallet transactions for ride ${ride.id}`,
@@ -327,7 +327,7 @@ async function reconcileParcels(
     // Find corresponding wallet transaction
     const transaction = await prisma.walletTransaction.findFirst({
       where: {
-        referenceType: "parcel",
+        referenceType: "delivery",
         referenceId: delivery.id,
         ownerType: "driver",
       },
@@ -348,7 +348,7 @@ async function reconcileParcels(
     // Check for duplicates
     const duplicates = await prisma.walletTransaction.findMany({
       where: {
-        referenceType: "parcel",
+        referenceType: "delivery",
         referenceId: delivery.id,
         ownerType: "driver",
       },

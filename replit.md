@@ -34,3 +34,38 @@ The schema uses UUID primary keys, indexed foreign keys, decimal types for monet
 - **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 - **UI Components (shadcn/ui)**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 - **Environment Variables**: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV`, `ENCRYPTION_KEY`.
+
+## Recent Changes (Step 49: Payout & Reconciliation Bug Fixes)
+
+### Bug Fixes - Reconciliation Service (November 21, 2025)
+
+**Root Cause**: The reconciliation service (`server/services/reconciliationService.ts`) was using incorrect field names that didn't match the Prisma schema, causing 500 errors when generating reconciliation reports.
+
+**Issues Fixed**:
+1. **FoodOrder Reconciliation**: Changed `completedAt` → `deliveredAt` (FoodOrder model only has `deliveredAt`)
+2. **Parcel Reconciliation**: Changed `prisma.parcel` → `prisma.delivery` (model is called `Delivery`, not `Parcel`)
+3. **Delivery Reference Type**: Changed `referenceType: "parcel"` → `referenceType: "delivery"` (matches enum)
+4. **Amount Field Corrections**:
+   - Ride: Changed `ride.fare` → `ride.serviceFare`
+   - FoodOrder: Changed `order.totalAmount` → `order.serviceFare`
+   - Delivery: Changed `delivery.deliveryFee` → `delivery.serviceFare`
+
+**Files Modified**:
+- `server/services/reconciliationService.ts`: Fixed all Prisma query field names to match schema
+
+**Impact**: Reconciliation reports now generate successfully without 500 errors. All order types (rides, food orders, deliveries) use correct date and amount fields.
+
+### Bug Fixes - Payouts RBAC (November 21, 2025)
+
+**Root Cause**: The payouts endpoint was manually accessing `req.user!.adminProfile` which could be null or unpopulated.
+
+**Fix**: Switched to using the proven `getRBACFilter` helper function from `server/routes/analytics.ts` that:
+- Fetches admin profile from database on-demand
+- Returns structured `RBACFilter` object with `isUnrestricted`, `countryCode`, `cityCode`
+- Ensures consistent RBAC filtering across all admin endpoints
+
+**Files Modified**:
+- `server/routes/admin.ts` (line 7118-7150): Updated `/api/admin/payouts` endpoint to use `getRBACFilter`
+- `client/src/pages/admin/payouts-requests.tsx`: Added comprehensive defensive null checks with optional chaining
+
+**Impact**: Payouts page now loads correctly without blank screens, and RBAC filtering is properly enforced for SUPER_ADMIN, COUNTRY_ADMIN, and CITY_ADMIN roles.
