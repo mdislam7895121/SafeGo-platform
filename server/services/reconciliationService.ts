@@ -135,7 +135,7 @@ async function reconcileRides(
         severity: "critical",
         orderId: ride.id,
         orderType: "ride",
-        expectedAmount: ride.serviceFare?.toString() || "0",
+        expectedAmount: ride.driverPayout?.toString() || "0",
         details: `Missing wallet transaction for completed ride ${ride.id}`,
       });
       continue;
@@ -156,16 +156,15 @@ async function reconcileRides(
         severity: "critical",
         orderId: ride.id,
         orderType: "ride",
-        expectedAmount: ride.serviceFare?.toString() || "0",
+        expectedAmount: ride.driverPayout?.toString() || "0",
         actualAmount: transaction.amount.toString(),
         transactionId: transaction.id,
         details: `Found ${duplicates.length} wallet transactions for ride ${ride.id}`,
       });
     }
 
-    // Verify amount (ride fare should match transaction amount for driver earnings)
-    // Note: This is simplified - in reality, you'd need to account for commissions
-    const expectedAmount = ride.serviceFare || new Decimal(0);
+    // Verify amount (driver payout should match transaction amount)
+    const expectedAmount = ride.driverPayout || new Decimal(0);
     if (transaction.amount.abs().gt(expectedAmount.mul(1.1))) {
       // Allow 10% variance for commission calculations
       mismatches.push({
@@ -238,7 +237,7 @@ async function reconcileFoodOrders(
         severity: "critical",
         orderId: order.id,
         orderType: "food",
-        expectedAmount: order.serviceFare?.toString() || "0",
+        expectedAmount: order.restaurantPayout?.toString() || "0",
         details: `Missing wallet transaction for delivered food order ${order.id}`,
       });
       continue;
@@ -259,15 +258,15 @@ async function reconcileFoodOrders(
         severity: "critical",
         orderId: order.id,
         orderType: "food",
-        expectedAmount: order.serviceFare?.toString() || "0",
+        expectedAmount: order.restaurantPayout?.toString() || "0",
         actualAmount: transaction.amount.toString(),
         transactionId: transaction.id,
         details: `Found ${duplicates.length} wallet transactions for food order ${order.id}`,
       });
     }
 
-    // Verify amount
-    const expectedAmount = order.serviceFare || new Decimal(0);
+    // Verify amount (restaurant payout should match transaction amount)
+    const expectedAmount = order.restaurantPayout || new Decimal(0);
     if (transaction.amount.abs().gt(expectedAmount.mul(1.1))) {
       mismatches.push({
         type: "amount_mismatch",
@@ -339,7 +338,7 @@ async function reconcileParcels(
         severity: "critical",
         orderId: delivery.id,
         orderType: "parcel",
-        expectedAmount: delivery.serviceFare?.toString() || "0",
+        expectedAmount: delivery.driverPayout?.toString() || "0",
         details: `Missing wallet transaction for delivered parcel ${delivery.id}`,
       });
       continue;
@@ -360,15 +359,15 @@ async function reconcileParcels(
         severity: "critical",
         orderId: delivery.id,
         orderType: "parcel",
-        expectedAmount: delivery.serviceFare?.toString() || "0",
+        expectedAmount: delivery.driverPayout?.toString() || "0",
         actualAmount: transaction.amount.toString(),
         transactionId: transaction.id,
         details: `Found ${duplicates.length} wallet transactions for parcel ${delivery.id}`,
       });
     }
 
-    // Verify amount
-    const expectedAmount = delivery.serviceFare || new Decimal(0);
+    // Verify amount (driver payout should match transaction amount)
+    const expectedAmount = delivery.driverPayout || new Decimal(0);
     if (transaction.amount.abs().gt(expectedAmount.mul(1.1))) {
       mismatches.push({
         type: "amount_mismatch",
@@ -394,42 +393,72 @@ async function countOrdersInPeriod(
 ): Promise<number> {
   let total = 0;
 
-  // Count rides
+  // Count rides (filtered by driver's country if countryCode is provided)
   if (!ownerType || ownerType === "driver") {
+    const rideWhere: any = {
+      completedAt: {
+        gte: periodStart,
+        lte: periodEnd,
+      },
+      status: "completed",
+    };
+    
+    if (countryCode) {
+      rideWhere.driver = {
+        user: {
+          countryCode: countryCode,
+        },
+      };
+    }
+    
     total += await prisma.ride.count({
-      where: {
-        completedAt: {
-          gte: periodStart,
-          lte: periodEnd,
-        },
-        status: "completed",
-      },
+      where: rideWhere,
     });
   }
 
-  // Count food orders
+  // Count food orders (filtered by restaurant's country if countryCode is provided)
   if (!ownerType || ownerType === "restaurant") {
-    total += await prisma.foodOrder.count({
-      where: {
-        deliveredAt: {
-          gte: periodStart,
-          lte: periodEnd,
-        },
-        status: "delivered",
+    const orderWhere: any = {
+      deliveredAt: {
+        gte: periodStart,
+        lte: periodEnd,
       },
+      status: "delivered",
+    };
+    
+    if (countryCode) {
+      orderWhere.restaurant = {
+        user: {
+          countryCode: countryCode,
+        },
+      };
+    }
+    
+    total += await prisma.foodOrder.count({
+      where: orderWhere,
     });
   }
 
-  // Count parcels (deliveries)
+  // Count parcels (deliveries) (filtered by driver's country if countryCode is provided)
   if (!ownerType || ownerType === "driver") {
-    total += await prisma.delivery.count({
-      where: {
-        deliveredAt: {
-          gte: periodStart,
-          lte: periodEnd,
-        },
-        status: "delivered",
+    const deliveryWhere: any = {
+      deliveredAt: {
+        gte: periodStart,
+        lte: periodEnd,
       },
+      status: "delivered",
+    };
+    
+    if (countryCode) {
+      deliveryWhere.driver = {
+        user: {
+          countryCode: countryCode,
+        },
+      };
+    }
+    
+    total += await prisma.delivery.count({
+      where: deliveryWhere,
     });
   }
 
