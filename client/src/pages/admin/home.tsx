@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -159,6 +159,14 @@ export default function AdminHome() {
       color: "text-violet-600",
       bgColor: "bg-violet-50 dark:bg-violet-950",
       permission: "MANAGE_PAYOUTS",
+    },
+    {
+      name: "Referral Bonus Management",
+      icon: Gift,
+      href: "/admin/referral-settings",
+      description: "Manage referral bonus amounts and promotional campaigns",
+      color: "text-pink-600",
+      bgColor: "bg-pink-50 dark:bg-pink-950",
     },
     {
       name: "Earnings Analytics",
