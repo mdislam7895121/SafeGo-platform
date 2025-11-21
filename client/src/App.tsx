@@ -18,7 +18,8 @@ import CustomerKYC from "@/pages/customer/kyc";
 import CustomerActivity from "@/pages/customer/activity";
 import RideRequest from "@/pages/customer/ride-request";
 import RideDetails from "@/pages/customer/ride-details";
-import FoodOrder from "@/pages/customer/food-order";
+import FoodRestaurants from "@/pages/customer/food-restaurants";
+import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
 import ParcelRequest from "@/pages/customer/parcel-request";
 import CustomerSupport from "@/pages/customer/support";
 import CustomerWallet from "@/pages/customer/wallet";
@@ -125,9 +126,14 @@ function Router() {
           <RideRequest />
         </ProtectedRoute>
       </Route>
+      <Route path="/customer/food/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <FoodRestaurantDetails />
+        </ProtectedRoute>
+      </Route>
       <Route path="/customer/food">
         <ProtectedRoute allowedRoles={["customer"]}>
-          <FoodOrder />
+          <FoodRestaurants />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/parcel">
