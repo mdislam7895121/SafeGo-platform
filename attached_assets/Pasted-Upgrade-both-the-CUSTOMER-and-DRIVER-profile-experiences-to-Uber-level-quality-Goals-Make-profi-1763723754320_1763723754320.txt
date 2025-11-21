@@ -1,0 +1,75 @@
+Upgrade both the CUSTOMER and DRIVER profile experiences to Uber-level quality.
+
+Goals:
+- Make profiles the central identity screens for each role.
+- Keep all existing backend logic and security intact.
+- Do NOT remove or break any current features (rides, food, wallets, payouts, KYC, tax, admin, etc.).
+
+1) Customer Profile (/customer, /customer/profile)
+
+Implement:
+- A modern profile header card with:
+  - Full name
+  - Country flag + city
+  - Email with "Verified" badge when KYC is approved
+  - Rating and total trip count (use demo data if needed)
+  - Small circular avatar (even if placeholder)
+
+- Quick action row under the header:
+  - Payment methods
+  - Saved places (Home, Work, Favorites)
+  - Safety / KYC status
+  - Edit profile
+
+- Structured sections:
+  - Personal Info (name, phone, email, DOB)
+  - Addresses & Saved Places
+  - KYC & Verification (status, last reviewed date)
+  - Preferences (language, notification preferences – safe defaults)
+
+Make sure everything is mobile-first and matches the existing SafeGo design system.
+
+2) Driver Profile & Onboarding (/driver, /driver/profile, /driver/onboarding)
+
+Backend:
+- Fix and complete all driver profile APIs:
+  - Register vehicle
+  - Upload profile photo
+  - Upload vehicle documents (registration, insurance, license)
+  - Fetch driver profile with vehicle, documents, stats
+- Ensure these APIs are fully wired and no longer return 500 errors.
+
+UI:
+- Create an Uber-style driver profile header showing:
+  - Driver name, city, country flag
+  - Rating and total trips (use demo/demo-mode data)
+  - Today / This week earnings summary
+  - Online/Offline status toggle
+
+- Add an onboarding progress component with steps:
+  1) Personal info
+  2) KYC documents
+  3) Vehicle added
+  4) Vehicle documents
+  5) Account approval
+  Each step should show a status badge (Pending, Completed, Needs attention).
+
+- Add tabs/sections:
+  - Overview: rating, stats, earnings shortcuts, account status
+  - Vehicle: current active vehicle details, ability to update/change
+  - Documents: license, registration, insurance, profile photo, each with status
+  - Payouts shortcut: link to wallet/payouts screen with basic summary
+  - Account & Security: change password / contact info (re-use existing screens if present)
+
+General:
+- Follow SafeGo security rules and RBAC.
+- Respect existing routing and layout components.
+- Use defensive coding patterns already used in the project (safeNumber, safeString, etc.).
+- Keep everything non-breaking and backward compatible.
+
+When finished:
+- Test full flows:
+  - New driver completing onboarding (vehicle + documents).
+  - Existing driver viewing profile and earnings.
+  - Customer viewing and editing profile, saved places, and seeing KYC status.
+- Update replit.md with a short "Profile UX Upgrade" section explaining new features.
