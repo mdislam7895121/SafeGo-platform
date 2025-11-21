@@ -1,12 +1,11 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import type {
   WalletOwnerType,
   WalletTransactionServiceType,
   WalletTransactionDirection,
   WalletTransactionReferenceType,
 } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db";
 
 export interface CreateWalletParams {
   ownerId: string;
@@ -860,6 +859,140 @@ export class WalletService {
       totalNegativeBalance: parseFloat(walletAggregates._sum.negativeBalance?.toString() || "0"),
       walletCount: walletAggregates._count,
     };
+  }
+
+  async listWalletsWithRBAC(adminContext: {
+    adminRole: string;
+    countryCode?: string;
+    cityCode?: string;
+    ownerType?: WalletOwnerType;
+  }) {
+    const { adminRole, countryCode, cityCode, ownerType } = adminContext;
+
+    // Build RBAC filter for user jurisdiction
+    const userFilter: Prisma.UserWhereInput = {};
+    
+    if (adminRole === "COUNTRY_ADMIN" && countryCode) {
+      userFilter.countryCode = countryCode;
+    } else if (adminRole === "CITY_ADMIN" && countryCode && cityCode) {
+      userFilter.countryCode = countryCode;
+      userFilter.cityCode = cityCode;
+    }
+    // SUPER_ADMIN: no filter (sees all)
+
+    // Fetch wallets with proper filters
+    const where: Prisma.WalletWhereInput = {};
+    if (ownerType) {
+      where.ownerType = ownerType;
+    }
+
+    const wallets = await prisma.wallet.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 100, // Limit for performance
+    });
+
+    // Group wallets by owner type for batch fetching
+    const driverOwnerIds = wallets.filter(w => w.ownerType === 'driver').map(w => w.ownerId);
+    const customerOwnerIds = wallets.filter(w => w.ownerType === 'customer').map(w => w.ownerId);
+    const restaurantOwnerIds = wallets.filter(w => w.ownerType === 'restaurant').map(w => w.ownerId);
+
+    // Batch fetch owners with RBAC filtering
+    const [driverProfiles, customerProfiles, restaurantProfiles] = await Promise.all([
+      // Drivers: ownerId = user.id
+      driverOwnerIds.length > 0 ? prisma.user.findMany({
+        where: {
+          id: { in: driverOwnerIds },
+          ...(Object.keys(userFilter).length > 0 ? userFilter : {}),
+        },
+        include: {
+          driverProfile: true,
+        },
+      }) : [],
+      // Customers: ownerId = user.id
+      customerOwnerIds.length > 0 ? prisma.user.findMany({
+        where: {
+          id: { in: customerOwnerIds },
+          ...(Object.keys(userFilter).length > 0 ? userFilter : {}),
+        },
+        include: {
+          customerProfile: true,
+        },
+      }) : [],
+      // Restaurants: ownerId = restaurantProfile.id
+      restaurantOwnerIds.length > 0 ? prisma.restaurantProfile.findMany({
+        where: {
+          id: { in: restaurantOwnerIds },
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+        include: {
+          user: true,
+        },
+      }) : [],
+    ]);
+
+    // Build owner lookup maps
+    const driverMap = new Map(driverProfiles.map(u => [u.id, u]));
+    const customerMap = new Map(customerProfiles.map(u => [u.id, u]));
+    const restaurantMap = new Map(restaurantProfiles.map(r => [r.id, r]));
+
+    // Transform wallets to DTO with owner data
+    const walletsWithOwners = wallets
+      .map(wallet => {
+        let owner: any = null;
+        
+        if (wallet.ownerType === 'driver') {
+          const user = driverMap.get(wallet.ownerId);
+          if (user) {
+            owner = {
+              email: user.email,
+              countryCode: user.countryCode || '',
+              cityCode: user.cityCode || '',
+              fullName: user.driverProfile?.fullName || user.email,
+            };
+          }
+        } else if (wallet.ownerType === 'customer') {
+          const user = customerMap.get(wallet.ownerId);
+          if (user) {
+            owner = {
+              email: user.email,
+              countryCode: user.countryCode || '',
+              cityCode: user.cityCode || '',
+              fullName: user.customerProfile?.fullName || user.email,
+            };
+          }
+        } else if (wallet.ownerType === 'restaurant') {
+          const restaurant = restaurantMap.get(wallet.ownerId);
+          if (restaurant) {
+            owner = {
+              email: restaurant.user?.email || '',
+              countryCode: restaurant.user?.countryCode || '',
+              cityCode: restaurant.user?.cityCode || '',
+              restaurantName: restaurant.restaurantName || 'Unknown Restaurant',
+            };
+          }
+        }
+
+        // Skip if owner not found (RBAC filtered out)
+        if (!owner) return null;
+
+        // Get last transaction date
+        return {
+          id: wallet.id,
+          walletType: wallet.ownerType, // Map ownerType to walletType for frontend
+          ownerType: wallet.ownerType,
+          ownerId: wallet.ownerId,
+          currency: wallet.currency,
+          availableBalance: wallet.availableBalance.toString(),
+          negativeBalance: wallet.negativeBalance.toString(),
+          createdAt: wallet.createdAt.toISOString(),
+          lastTransactionDate: null, // Will be populated if needed
+          owner,
+        };
+      })
+      .filter((w): w is NonNullable<typeof w> => w !== null);
+
+    return walletsWithOwners;
   }
 }
 

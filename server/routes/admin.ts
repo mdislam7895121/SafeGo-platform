@@ -6570,39 +6570,51 @@ router.patch("/support/conversations/:id", checkPermission(Permission.ASSIGN_SUP
 // WALLET MANAGEMENT API
 // ====================================================
 
-// Get wallet overview with filters
+// Get wallet overview with filters - RBAC-aware
 router.get("/wallets", checkPermission(Permission.VIEW_WALLET_SUMMARY), async (req: AuthRequest, res) => {
   try {
-    const { ownerType, countryCode, page = "1", limit = "50", search } = req.query;
+    const { walletType } = req.query;
+    const adminProfile = req.user!.adminProfile;
+    
+    if (!adminProfile) {
+      console.error("[Wallets API] No admin profile found for user:", req.user!.email);
+      return res.status(403).json({ error: "Unauthorized: Admin profile required" });
+    }
 
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const offset = (pageNum - 1) * limitNum;
+    const adminRole = adminProfile.adminRole;
+    const adminContext = {
+      adminRole,
+      countryCode: adminProfile.countryCode || undefined,
+      cityCode: adminProfile.cityCode || undefined,
+      ownerType: walletType ? (walletType as "driver" | "customer" | "restaurant") : undefined,
+    };
 
-    const filters: any = {};
-    if (ownerType) filters.ownerType = ownerType as "driver" | "restaurant";
-    if (countryCode) filters.countryCode = countryCode as string;
-    if (search) filters.search = search as string;
-
-    const wallets = await walletService.listWallets({
-      ...filters,
-      limit: limitNum,
-      offset,
+    console.log("[Wallets API] Fetching wallets with RBAC context:", {
+      adminRole,
+      countryCode: adminContext.countryCode,
+      cityCode: adminContext.cityCode,
+      ownerTypeFilter: adminContext.ownerType,
+      adminEmail: req.user!.email,
     });
 
-    const total = await walletService.getWalletCount(filters);
+    const wallets = await walletService.listWalletsWithRBAC(adminContext);
+
+    console.log("[Wallets API] RBAC filtering results:", {
+      totalWallets: wallets.length,
+      byOwnerType: {
+        driver: wallets.filter(w => w.ownerType === 'driver').length,
+        customer: wallets.filter(w => w.ownerType === 'customer').length,
+        restaurant: wallets.filter(w => w.ownerType === 'restaurant').length,
+      },
+      adminRole,
+    });
 
     res.json({
       wallets,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
-      },
+      total: wallets.length,
     });
   } catch (error: any) {
-    console.error("Get wallets error:", error);
+    console.error("[Wallets API] Error fetching wallets:", error);
     res.status(500).json({ error: error.message || "Failed to fetch wallets" });
   }
 });
