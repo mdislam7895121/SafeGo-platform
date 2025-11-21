@@ -8199,7 +8199,7 @@ router.post("/fraud/check-multi-account", checkPermission(Permission.VIEW_DASHBO
 // GET /api/admin/tax - List all tax rules with RBAC filtering
 router.get("/tax", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRequest, res) => {
   try {
-    const { serviceType, payeeType, active, countryCode } = req.query;
+    const { serviceType, taxType, active, countryCode } = req.query;
     
     // Get RBAC filter
     const rbacFilter = await getRBACFilter(req);
@@ -8214,23 +8214,22 @@ router.get("/tax", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRe
       if (rbacFilter.countryCode) {
         where.countryCode = rbacFilter.countryCode;
         
-        // CITY_ADMIN: Only see rules specific to their city (exclude broader state/country rules)
+        // CITY_ADMIN: Only see rules specific to their city (exclude country rules)
         if (rbacFilter.cityCode) {
           where.cityCode = rbacFilter.cityCode;
         } else {
           // COUNTRY_ADMIN: Only see country-level rules (exclude city-specific rules)
           where.cityCode = null;
-          where.stateCode = null;
         }
       }
     }
     
     // Apply optional filters from query params
     if (serviceType && serviceType !== "all") {
-      where.appliesTo = serviceType as string;
+      where.serviceType = serviceType as string;
     }
-    if (payeeType && payeeType !== "all") {
-      where.payeeType = payeeType as string;
+    if (taxType && taxType !== "all") {
+      where.taxType = taxType as string;
     }
     if (active === "true") {
       where.isActive = true;
@@ -8246,7 +8245,7 @@ router.get("/tax", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRe
       where,
       orderBy: [
         { countryCode: "asc" },
-        { effectiveFrom: "desc" },
+        { createdAt: "desc" },
       ],
     });
     
@@ -8258,13 +8257,14 @@ router.get("/tax", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRe
       actionType: ActionType.VIEW_SETTINGS,
       entityType: EntityType.TAX_RULE,
       description: `Viewed tax rules list`,
-      metadata: { filters: { serviceType, payeeType, active }, rbac: rbacFilter, total: taxRules.length },
+      metadata: { filters: { serviceType, taxType, active }, rbac: rbacFilter, total: taxRules.length },
     });
     
     res.json({
       taxRules: taxRules.map(rule => ({
         ...rule,
-        taxRatePercent: rule.taxRatePercent.toString(),
+        percentRate: rule.percentRate?.toString() || null,
+        flatFee: rule.flatFee?.toString() || null,
       })),
       total: taxRules.length,
     });
@@ -8279,21 +8279,22 @@ router.post("/tax", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthR
   try {
     const {
       countryCode,
-      stateCode,
       cityCode,
-      taxName,
-      taxRatePercent,
-      appliesTo,
-      payeeType,
-      isInclusive,
+      taxType,
+      serviceType,
+      percentRate,
+      flatFee,
       isActive,
-      effectiveFrom,
-      effectiveTo,
     } = req.body;
     
     // Validate required fields
-    if (!countryCode || !taxName || taxRatePercent === undefined || !appliesTo || !payeeType || !effectiveFrom) {
-      return res.status(400).json({ error: "Missing required fields" });
+    if (!countryCode || !taxType || !serviceType) {
+      return res.status(400).json({ error: "Missing required fields: countryCode, taxType, and serviceType are required" });
+    }
+    
+    // Validate that at least one of percentRate or flatFee is provided
+    if (percentRate === undefined && flatFee === undefined) {
+      return res.status(400).json({ error: "At least one of percentRate or flatFee must be provided" });
     }
     
     // Get RBAC filter
@@ -8313,16 +8314,12 @@ router.post("/tax", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthR
     const taxRule = await prisma.taxRule.create({
       data: {
         countryCode: safeString(countryCode),
-        stateCode: stateCode ? safeString(stateCode) : null,
         cityCode: cityCode ? safeString(cityCode) : null,
-        taxName: safeString(taxName),
-        taxRatePercent: safeNumber(taxRatePercent),
-        appliesTo,
-        payeeType,
-        isInclusive: isInclusive !== undefined ? isInclusive : false,
+        taxType,
+        serviceType,
+        percentRate: percentRate !== undefined ? safeNumber(percentRate) : null,
+        flatFee: flatFee !== undefined ? safeNumber(flatFee) : null,
         isActive: isActive !== undefined ? isActive : true,
-        effectiveFrom: new Date(effectiveFrom),
-        effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
         isDemo: false,
       },
     });
@@ -8335,13 +8332,14 @@ router.post("/tax", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthR
       actionType: ActionType.EDIT_SETTINGS,
       entityType: EntityType.TAX_RULE,
       entityId: taxRule.id,
-      description: `Created tax rule: ${taxName} (${taxRatePercent}% for ${appliesTo})`,
+      description: `Created tax rule: ${taxType} for ${serviceType} in ${countryCode}${cityCode ? `/${cityCode}` : ''}`,
       metadata: { taxRule },
     });
     
     res.json({
       ...taxRule,
-      taxRatePercent: taxRule.taxRatePercent.toString(),
+      percentRate: taxRule.percentRate?.toString() || null,
+      flatFee: taxRule.flatFee?.toString() || null,
     });
   } catch (error: any) {
     console.error("[Tax API] Error creating tax rule:", error);
@@ -8354,14 +8352,11 @@ router.patch("/tax/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: 
   try {
     const { id } = req.params;
     const {
-      taxName,
-      taxRatePercent,
-      appliesTo,
-      payeeType,
-      isInclusive,
+      taxType,
+      serviceType,
+      percentRate,
+      flatFee,
       isActive,
-      effectiveFrom,
-      effectiveTo,
     } = req.body;
     
     // Get existing tax rule
@@ -8388,14 +8383,18 @@ router.patch("/tax/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: 
     
     // Build update data
     const updateData: any = {};
-    if (taxName !== undefined) updateData.taxName = safeString(taxName);
-    if (taxRatePercent !== undefined) updateData.taxRatePercent = safeNumber(taxRatePercent);
-    if (appliesTo !== undefined) updateData.appliesTo = appliesTo;
-    if (payeeType !== undefined) updateData.payeeType = payeeType;
-    if (isInclusive !== undefined) updateData.isInclusive = isInclusive;
+    if (taxType !== undefined) updateData.taxType = taxType;
+    if (serviceType !== undefined) updateData.serviceType = serviceType;
+    if (percentRate !== undefined) updateData.percentRate = safeNumber(percentRate);
+    if (flatFee !== undefined) updateData.flatFee = safeNumber(flatFee);
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (effectiveFrom !== undefined) updateData.effectiveFrom = new Date(effectiveFrom);
-    if (effectiveTo !== undefined) updateData.effectiveTo = effectiveTo ? new Date(effectiveTo) : null;
+    
+    // Validate that at least one of percentRate or flatFee will exist after update
+    const finalPercentRate = percentRate !== undefined ? percentRate : existingRule.percentRate;
+    const finalFlatFee = flatFee !== undefined ? flatFee : existingRule.flatFee;
+    if (finalPercentRate === null && finalFlatFee === null) {
+      return res.status(400).json({ error: "At least one of percentRate or flatFee must be set" });
+    }
     
     // Update tax rule
     const taxRule = await prisma.taxRule.update({
@@ -8411,13 +8410,14 @@ router.patch("/tax/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: 
       actionType: ActionType.EDIT_SETTINGS,
       entityType: EntityType.TAX_RULE,
       entityId: taxRule.id,
-      description: `Updated tax rule: ${taxRule.taxName}`,
+      description: `Updated tax rule: ${taxRule.taxType} for ${taxRule.serviceType}`,
       metadata: { before: existingRule, after: taxRule },
     });
     
     res.json({
       ...taxRule,
-      taxRatePercent: taxRule.taxRatePercent.toString(),
+      percentRate: taxRule.percentRate?.toString() || null,
+      flatFee: taxRule.flatFee?.toString() || null,
     });
   } catch (error: any) {
     console.error("[Tax API] Error updating tax rule:", error);
@@ -8465,7 +8465,7 @@ router.delete("/tax/:id", checkPermission(Permission.EDIT_SETTINGS), async (req:
       actionType: ActionType.EDIT_SETTINGS,
       entityType: EntityType.TAX_RULE,
       entityId: id,
-      description: `Deleted tax rule: ${existingRule.taxName}`,
+      description: `Deleted tax rule: ${existingRule.taxType} for ${existingRule.serviceType}`,
       metadata: { deletedRule: existingRule },
     });
     

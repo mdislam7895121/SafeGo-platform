@@ -67,68 +67,113 @@ async function seed() {
   console.log("└─────────────┴─────────┴─────────────────────────┴──────────┘");
   console.log("\n✅ Demo users seeded successfully!\n");
 
-  // Seed demo tax rules
-  console.log("\n🏛️  Seeding demo tax rules...\n");
+  // Seed demo tax rules (Uber-style)
+  console.log("\n🏛️  Seeding demo tax rules (Uber-style)...\n");
   
   const demoTaxRules = [
-    // US Sales Tax - Customer pays
+    // USA - Country-level Sales Tax (applies to all services)
     {
       countryCode: "US",
-      stateCode: null,
       cityCode: null,
-      taxName: "Sales Tax",
-      taxRatePercent: 7.5,
-      appliesTo: "ALL",
-      payeeType: "CUSTOMER",
-      isInclusive: false,
+      taxType: "SALES_TAX",
+      serviceType: "RIDE",
+      percentRate: 7.5,
+      flatFee: null,
       isActive: true,
-      effectiveFrom: new Date("2024-01-01"),
-      effectiveTo: null,
       isDemo: true,
     },
-    // US Self-Employment Tax - Driver pays
     {
       countryCode: "US",
-      stateCode: null,
       cityCode: null,
-      taxName: "Self-Employment Tax",
-      taxRatePercent: 15.3,
-      appliesTo: "RIDE",
-      payeeType: "DRIVER",
-      isInclusive: true,
+      taxType: "SALES_TAX",
+      serviceType: "FOOD",
+      percentRate: 7.5,
+      flatFee: null,
       isActive: true,
-      effectiveFrom: new Date("2024-01-01"),
-      effectiveTo: null,
       isDemo: true,
     },
-    // Bangladesh VAT - Customer pays
+    {
+      countryCode: "US",
+      cityCode: null,
+      taxType: "SALES_TAX",
+      serviceType: "PARCEL",
+      percentRate: 7.5,
+      flatFee: null,
+      isActive: true,
+      isDemo: true,
+    },
+    // NYC - Trip Fee (overrides country rules for rides in NYC)
+    {
+      countryCode: "US",
+      cityCode: "NYC",
+      taxType: "TRIP_FEE",
+      serviceType: "RIDE",
+      percentRate: 0.5,
+      flatFee: 2.50,
+      isActive: true,
+      isDemo: true,
+    },
+    {
+      countryCode: "US",
+      cityCode: "NYC",
+      taxType: "LOCAL_MUNICIPALITY_FEE",
+      serviceType: "FOOD",
+      percentRate: null,
+      flatFee: 0.75,
+      isActive: true,
+      isDemo: true,
+    },
+    // SF - Local Municipality Fee (overrides country rules for rides in SF)
+    {
+      countryCode: "US",
+      cityCode: "SF",
+      taxType: "LOCAL_MUNICIPALITY_FEE",
+      serviceType: "RIDE",
+      percentRate: null,
+      flatFee: 1.50,
+      isActive: true,
+      isDemo: true,
+    },
+    // Bangladesh - Country-level VAT
     {
       countryCode: "BD",
-      stateCode: null,
       cityCode: null,
-      taxName: "VAT",
-      taxRatePercent: 15.0,
-      appliesTo: "ALL",
-      payeeType: "CUSTOMER",
-      isInclusive: true,
+      taxType: "VAT",
+      serviceType: "RIDE",
+      percentRate: 15.0,
+      flatFee: null,
       isActive: true,
-      effectiveFrom: new Date("2024-01-01"),
-      effectiveTo: null,
       isDemo: true,
     },
-    // New York City Tax - Additional city tax
     {
-      countryCode: "US",
-      stateCode: "NY",
-      cityCode: "NYC",
-      taxName: "NYC Local Tax",
-      taxRatePercent: 4.5,
-      appliesTo: "RIDE",
-      payeeType: "CUSTOMER",
-      isInclusive: false,
+      countryCode: "BD",
+      cityCode: null,
+      taxType: "VAT",
+      serviceType: "FOOD",
+      percentRate: 15.0,
+      flatFee: null,
       isActive: true,
-      effectiveFrom: new Date("2024-01-01"),
-      effectiveTo: null,
+      isDemo: true,
+    },
+    {
+      countryCode: "BD",
+      cityCode: null,
+      taxType: "VAT",
+      serviceType: "PARCEL",
+      percentRate: 15.0,
+      flatFee: null,
+      isActive: true,
+      isDemo: true,
+    },
+    // Dhaka - Government Service Fee (city-specific, stacks with VAT)
+    {
+      countryCode: "BD",
+      cityCode: "DHK",
+      taxType: "GOVERNMENT_SERVICE_FEE",
+      serviceType: "RIDE",
+      percentRate: 5.0,
+      flatFee: null,
+      isActive: true,
       isDemo: true,
     },
   ];
@@ -138,15 +183,15 @@ async function seed() {
       const existing = await prisma.taxRule.findFirst({
         where: {
           countryCode: taxRule.countryCode,
-          stateCode: taxRule.stateCode,
           cityCode: taxRule.cityCode,
-          taxName: taxRule.taxName,
+          taxType: taxRule.taxType,
+          serviceType: taxRule.serviceType,
           isDemo: true,
         },
       });
 
       if (existing) {
-        console.log(`  ✓ ${taxRule.taxName} (${taxRule.countryCode}) - exists`);
+        console.log(`  ✓ ${taxRule.taxType} for ${taxRule.serviceType} (${taxRule.countryCode}${taxRule.cityCode ? `/${taxRule.cityCode}` : ''}) - exists`);
         continue;
       }
 
@@ -154,9 +199,9 @@ async function seed() {
         data: taxRule as any,
       });
 
-      console.log(`  ✓ ${taxRule.taxName} (${taxRule.countryCode}) - created`);
+      console.log(`  ✓ ${taxRule.taxType} for ${taxRule.serviceType} (${taxRule.countryCode}${taxRule.cityCode ? `/${taxRule.cityCode}` : ''}) - created`);
     } catch (error: any) {
-      console.error(`  ✗ ${taxRule.taxName} - error: ${error.message}`);
+      console.error(`  ✗ ${taxRule.taxType} - error: ${error.message}`);
     }
   }
 
