@@ -285,32 +285,59 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
       const profile = driverProfiles.find((p) => p.id === id);
       const stats = driverMap.get(id)!;
       return {
-        driverId: id,
-        name: profile?.fullName || profile?.user.email || "Unknown",
-        email: profile?.user.email || "unknown",
-        country: profile?.user.countryCode || "unknown",
-        totalTrips: stats.trips,
-        totalEarnings: stats.earnings.toFixed(2),
+        driverName: profile?.fullName || profile?.user.email || "Unknown",
+        revenue: Number(stats.earnings.toFixed(2)),
+        trips: stats.trips,
       };
     });
 
-    // Driver status distribution
-    const [totalDriverProfiles, verifiedDrivers, pendingDrivers, rejectedDrivers] = await Promise.all([
-      prisma.driverProfile.count(),
-      prisma.driverProfile.count({ where: { verificationStatus: "approved" } }),
-      prisma.driverProfile.count({ where: { verificationStatus: "pending" } }),
-      prisma.driverProfile.count({ where: { verificationStatus: "rejected" } }),
-    ]);
-
-    // Average ratings
-    const avgRatings = await prisma.ride.aggregate({
+    // Driver status - active vs inactive
+    const totalDriverProfiles = await prisma.driverProfile.count();
+    const activeDriversCount = await prisma.driverProfile.count({
       where: {
-        status: "completed",
-        driverRating: { not: null },
-        ...(from || to ? { completedAt: dateFilter } : {}),
+        id: {
+          in: await prisma.ride.findMany({
+            where: {
+              status: "completed",
+              driverId: { not: null },
+              ...(from || to ? { completedAt: dateFilter } : {}),
+            },
+            select: { driverId: true },
+            distinct: ["driverId"],
+          }).then((rides) => rides.map((r) => r.driverId!).filter(Boolean)),
+        },
       },
-      _avg: { driverRating: true },
     });
+
+    const inactiveDriversCount = Math.max(0, totalDriverProfiles - activeDriversCount);
+    const retentionRate = totalDriverProfiles > 0 ? (activeDriversCount / totalDriverProfiles) * 100 : 0;
+
+    // Performance trend - trips over time (daily aggregation)
+    const performanceTrend: Array<{ date: string; trips: number }> = [];
+    if (from && to) {
+      const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+      for (let i = 0; i < Math.min(days, 30); i++) {
+        const date = new Date(from);
+        date.setDate(date.getDate() + i);
+        const nextDate = new Date(date);
+        nextDate.setDate(nextDate.getDate() + 1);
+        
+        const dayTrips = await prisma.ride.count({
+          where: {
+            status: "completed",
+            completedAt: {
+              gte: date,
+              lt: nextDate,
+            },
+          },
+        });
+        
+        performanceTrend.push({
+          date: date.toISOString().split('T')[0],
+          trips: dayTrips,
+        });
+      }
+    }
 
     // Audit log
     await logAuditEvent({
@@ -325,16 +352,12 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
     });
 
     res.json({
-      topDrivers,
-      status: {
-        total: totalDriverProfiles,
-        verified: verifiedDrivers,
-        pending: pendingDrivers,
-        rejected: rejectedDrivers,
-      },
-      performance: {
-        averageRating: avgRatings._avg.driverRating ? Number(avgRatings._avg.driverRating).toFixed(2) : "N/A",
-      },
+      performanceTrend: performanceTrend || [],
+      topDrivers: topDrivers || [],
+      activeDrivers: activeDriversCount || 0,
+      inactiveDrivers: inactiveDriversCount || 0,
+      retentionRate: retentionRate || 0,
+      totalDrivers: totalDriverProfiles || 0,
     });
   } catch (error) {
     console.error("Driver analytics error:", error);
