@@ -119,8 +119,8 @@ async function reconcileRides(
       continue;
     }
 
-    // Find corresponding wallet transaction
-    const transaction = await prisma.walletTransaction.findFirst({
+    // Find all corresponding wallet transactions (to detect both missing and duplicates)
+    const transactions = await prisma.walletTransaction.findMany({
       where: {
         referenceType: "ride",
         referenceId: ride.id,
@@ -128,7 +128,7 @@ async function reconcileRides(
       },
     });
 
-    if (!transaction) {
+    if (transactions.length === 0) {
       mismatches.push({
         type: "missing",
         severity: "critical",
@@ -140,32 +140,26 @@ async function reconcileRides(
       continue;
     }
 
-    // Check for duplicates
-    const duplicates = await prisma.walletTransaction.findMany({
-      where: {
-        referenceType: "ride",
-        referenceId: ride.id,
-        ownerType: "driver",
-      },
-    });
-
-    if (duplicates.length > 1) {
+    if (transactions.length > 1) {
       mismatches.push({
         type: "duplicate",
         severity: "critical",
         orderId: ride.id,
         orderType: "ride",
         expectedAmount: ride.driverPayout?.toString() || "0",
-        actualAmount: transaction.amount.toString(),
-        transactionId: transaction.id,
-        details: `Found ${duplicates.length} wallet transactions for ride ${ride.id}`,
+        actualAmount: transactions[0].amount.toString(),
+        transactionId: transactions[0].id,
+        details: `Found ${transactions.length} wallet transactions for ride ${ride.id}`,
       });
     }
 
-    // Verify amount (driver payout should match transaction amount)
+    // Verify amount using first transaction (driver payout should match transaction amount)
+    const transaction = transactions[0];
     const expectedAmount = ride.driverPayout || new Decimal(0);
-    if (transaction.amount.abs().gt(expectedAmount.mul(1.1))) {
-      // Allow 10% variance for commission calculations
+    const amountDifference = transaction.amount.abs().minus(expectedAmount).abs();
+    const allowedVariance = expectedAmount.mul(0.1); // 10% variance
+
+    if (amountDifference.gt(allowedVariance)) {
       mismatches.push({
         type: "amount_mismatch",
         severity: "warning",
@@ -174,7 +168,7 @@ async function reconcileRides(
         expectedAmount: expectedAmount.toString(),
         actualAmount: transaction.amount.toString(),
         transactionId: transaction.id,
-        details: `Amount mismatch for ride ${ride.id}: expected ~${expectedAmount}, got ${transaction.amount}`,
+        details: `Amount mismatch for ride ${ride.id}: expected ${expectedAmount}, got ${transaction.amount}`,
       });
     }
   }
@@ -221,8 +215,8 @@ async function reconcileFoodOrders(
       continue;
     }
 
-    // Find corresponding wallet transaction
-    const transaction = await prisma.walletTransaction.findFirst({
+    // Find all corresponding wallet transactions (to detect both missing and duplicates)
+    const transactions = await prisma.walletTransaction.findMany({
       where: {
         referenceType: "food_order",
         referenceId: order.id,
@@ -230,7 +224,7 @@ async function reconcileFoodOrders(
       },
     });
 
-    if (!transaction) {
+    if (transactions.length === 0) {
       mismatches.push({
         type: "missing",
         severity: "critical",
@@ -242,31 +236,26 @@ async function reconcileFoodOrders(
       continue;
     }
 
-    // Check for duplicates
-    const duplicates = await prisma.walletTransaction.findMany({
-      where: {
-        referenceType: "food_order",
-        referenceId: order.id,
-        ownerType: "restaurant",
-      },
-    });
-
-    if (duplicates.length > 1) {
+    if (transactions.length > 1) {
       mismatches.push({
         type: "duplicate",
         severity: "critical",
         orderId: order.id,
         orderType: "food",
         expectedAmount: order.restaurantPayout?.toString() || "0",
-        actualAmount: transaction.amount.toString(),
-        transactionId: transaction.id,
-        details: `Found ${duplicates.length} wallet transactions for food order ${order.id}`,
+        actualAmount: transactions[0].amount.toString(),
+        transactionId: transactions[0].id,
+        details: `Found ${transactions.length} wallet transactions for food order ${order.id}`,
       });
     }
 
-    // Verify amount (restaurant payout should match transaction amount)
+    // Verify amount using first transaction (restaurant payout should match transaction amount)
+    const transaction = transactions[0];
     const expectedAmount = order.restaurantPayout || new Decimal(0);
-    if (transaction.amount.abs().gt(expectedAmount.mul(1.1))) {
+    const amountDifference = transaction.amount.abs().minus(expectedAmount).abs();
+    const allowedVariance = expectedAmount.mul(0.1); // 10% variance
+
+    if (amountDifference.gt(allowedVariance)) {
       mismatches.push({
         type: "amount_mismatch",
         severity: "warning",
@@ -275,7 +264,7 @@ async function reconcileFoodOrders(
         expectedAmount: expectedAmount.toString(),
         actualAmount: transaction.amount.toString(),
         transactionId: transaction.id,
-        details: `Amount mismatch for food order ${order.id}`,
+        details: `Amount mismatch for food order ${order.id}: expected ${expectedAmount}, got ${transaction.amount}`,
       });
     }
   }
@@ -322,8 +311,8 @@ async function reconcileParcels(
       continue;
     }
 
-    // Find corresponding wallet transaction
-    const transaction = await prisma.walletTransaction.findFirst({
+    // Find all corresponding wallet transactions (to detect both missing and duplicates)
+    const transactions = await prisma.walletTransaction.findMany({
       where: {
         referenceType: "delivery",
         referenceId: delivery.id,
@@ -331,7 +320,7 @@ async function reconcileParcels(
       },
     });
 
-    if (!transaction) {
+    if (transactions.length === 0) {
       mismatches.push({
         type: "missing",
         severity: "critical",
@@ -343,31 +332,26 @@ async function reconcileParcels(
       continue;
     }
 
-    // Check for duplicates
-    const duplicates = await prisma.walletTransaction.findMany({
-      where: {
-        referenceType: "delivery",
-        referenceId: delivery.id,
-        ownerType: "driver",
-      },
-    });
-
-    if (duplicates.length > 1) {
+    if (transactions.length > 1) {
       mismatches.push({
         type: "duplicate",
         severity: "critical",
         orderId: delivery.id,
         orderType: "parcel",
         expectedAmount: delivery.driverPayout?.toString() || "0",
-        actualAmount: transaction.amount.toString(),
-        transactionId: transaction.id,
-        details: `Found ${duplicates.length} wallet transactions for parcel ${delivery.id}`,
+        actualAmount: transactions[0].amount.toString(),
+        transactionId: transactions[0].id,
+        details: `Found ${transactions.length} wallet transactions for parcel ${delivery.id}`,
       });
     }
 
-    // Verify amount (driver payout should match transaction amount)
+    // Verify amount using first transaction (driver payout should match transaction amount)
+    const transaction = transactions[0];
     const expectedAmount = delivery.driverPayout || new Decimal(0);
-    if (transaction.amount.abs().gt(expectedAmount.mul(1.1))) {
+    const amountDifference = transaction.amount.abs().minus(expectedAmount).abs();
+    const allowedVariance = expectedAmount.mul(0.1); // 10% variance
+
+    if (amountDifference.gt(allowedVariance)) {
       mismatches.push({
         type: "amount_mismatch",
         severity: "warning",
@@ -376,7 +360,7 @@ async function reconcileParcels(
         expectedAmount: expectedAmount.toString(),
         actualAmount: transaction.amount.toString(),
         transactionId: transaction.id,
-        details: `Amount mismatch for parcel ${delivery.id}`,
+        details: `Amount mismatch for parcel ${delivery.id}: expected ${expectedAmount}, got ${transaction.amount}`,
       });
     }
   }
@@ -470,7 +454,7 @@ async function countTransactionsInPeriod(
   ownerType?: WalletOwnerType,
   countryCode?: string
 ): Promise<number> {
-  // Build base filters
+  // Build base filters - WalletTransaction has countryCode field directly
   const filters: any = {
     createdAt: {
       gte: periodStart,
@@ -485,55 +469,9 @@ async function countTransactionsInPeriod(
     filters.ownerType = ownerType;
   }
 
-  // If no country filtering needed, return count directly
-  if (!countryCode) {
-    return await prisma.walletTransaction.count({
-      where: filters,
-    });
+  if (countryCode) {
+    filters.countryCode = countryCode;
   }
-
-  // For country filtering, build OR clauses for each owner type
-  const walletFilters: any[] = [];
-  
-  // Only filter by relevant owner types
-  const ownerTypes = ownerType ? [ownerType] : ["driver", "restaurant", "customer"];
-  
-  if (ownerTypes.includes("driver")) {
-    walletFilters.push({
-      ownerType: "driver",
-      driver: {
-        user: {
-          countryCode: countryCode,
-        },
-      },
-    });
-  }
-  
-  if (ownerTypes.includes("restaurant")) {
-    walletFilters.push({
-      ownerType: "restaurant",
-      restaurant: {
-        user: {
-          countryCode: countryCode,
-        },
-      },
-    });
-  }
-  
-  if (ownerTypes.includes("customer")) {
-    walletFilters.push({
-      ownerType: "customer",
-      customer: {
-        user: {
-          countryCode: countryCode,
-        },
-      },
-    });
-  }
-
-  filters.wallet = {
-    OR: walletFilters,
-  };
 
   return await prisma.walletTransaction.count({
     where: filters,
