@@ -12,6 +12,7 @@ import deliveryRoutes from "./routes/deliveries";
 import supportRoutes from "./routes/support";
 import documentRoutes from "./routes/documents";
 import twoFactorRoutes from "./routes/twoFactor";
+import referralSettingsRoutes from "./routes/referral-settings";
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -22,6 +23,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/customer/food", customerFoodRoutes);
   app.use("/api/restaurant", restaurantRoutes);
   app.use("/api/admin", adminRoutes);
+  app.use("/api/admin/referral-settings", referralSettingsRoutes);
   app.use("/api/rides", rideRoutes);
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);

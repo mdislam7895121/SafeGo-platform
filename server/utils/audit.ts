@@ -87,6 +87,11 @@ export const ActionType = {
   // Performance & Telemetry
   VIEW_PERFORMANCE_DASHBOARD: "VIEW_PERFORMANCE_DASHBOARD",
   STABILITY_ALERT_TRIGGERED: "STABILITY_ALERT_TRIGGERED",
+  
+  // Generic CRUD
+  CREATE: "CREATE",
+  UPDATE: "UPDATE",
+  DELETE: "DELETE",
 } as const;
 
 // Entity type constants
@@ -103,6 +108,7 @@ export const EntityType = {
   AUTH: "auth",
   SUPPORT_CONVERSATION: "support_conversation",
   ANALYTICS: "analytics",
+  REFERRAL_SETTING: "referral_setting",
   PERFORMANCE: "performance",
   TAX_RULE: "tax_rule",
 } as const;
