@@ -33,6 +33,25 @@ import DriverProfileEnhanced from "@/pages/driver/profile-enhanced";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
 import DriverWallet from "@/pages/driver/wallet";
+import DriverRefer from "@/pages/driver/refer";
+import DriverPremium from "@/pages/driver/premium";
+import DriverPromotions from "@/pages/driver/promotions";
+import DriverAccount from "@/pages/driver/account";
+import DriverAccountVehicles from "@/pages/driver/account/vehicles";
+import DriverAccountWorkHub from "@/pages/driver/account/work-hub";
+import DriverAccountPayment from "@/pages/driver/account/payment";
+import DriverAccountTaxInfo from "@/pages/driver/account/tax-info";
+import DriverAccountManage from "@/pages/driver/account/manage";
+import DriverAccountAddress from "@/pages/driver/account/address";
+import DriverAccountNotifications from "@/pages/driver/account/notifications";
+import DriverAccountPrivacy from "@/pages/driver/account/privacy";
+import DriverAccountLanguage from "@/pages/driver/account/language";
+import DriverAccountDarkMode from "@/pages/driver/account/dark-mode";
+import DriverAccountMapTheme from "@/pages/driver/account/map-theme";
+import DriverAccountNavigation from "@/pages/driver/account/navigation";
+import DriverAccountBlockedUsers from "@/pages/driver/account/blocked-users";
+import DriverAccountPermissions from "@/pages/driver/account/permissions";
+import DriverAccountAbout from "@/pages/driver/account/about";
 
 // Restaurant pages
 import RestaurantHome from "@/pages/restaurant/home";
@@ -207,6 +226,101 @@ function Router() {
       <Route path="/driver/wallet">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverWallet />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/refer">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverRefer />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/premium">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverPremium />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/promotions">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverPromotions />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/vehicles">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountVehicles />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/work-hub">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountWorkHub />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/payment">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountPayment />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/tax-info">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountTaxInfo />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/manage">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountManage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/address">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountAddress />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/notifications">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountNotifications />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/privacy">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountPrivacy />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/language">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountLanguage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/dark-mode">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountDarkMode />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/map-theme">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountMapTheme />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/navigation">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountNavigation />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/blocked-users">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountBlockedUsers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/permissions">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountPermissions />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/about">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountAbout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccount />
         </ProtectedRoute>
       </Route>
 
