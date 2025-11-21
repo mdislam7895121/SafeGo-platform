@@ -84,6 +84,23 @@ function safeString(value: any, defaultValue: string = ""): string {
   return typeof value === "string" ? value : defaultValue;
 }
 
+// Helper to build jurisdiction filter for Prisma queries
+function buildJurisdictionFilter(rbacFilter: RBACFilter) {
+  if (rbacFilter.isUnrestricted) {
+    return {};
+  }
+  
+  const userFilter: any = {};
+  if (rbacFilter.countryCode) {
+    userFilter.countryCode = rbacFilter.countryCode;
+  }
+  if (rbacFilter.cityCode) {
+    userFilter.cityCode = rbacFilter.cityCode;
+  }
+  
+  return userFilter;
+}
+
 // ====================================================
 // Input sanitization helper
 // ====================================================
@@ -147,7 +164,7 @@ router.get("/overview", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), as
       }
     }
 
-    // Get counts by service type
+    // Get counts by service type with RBAC filtering
     const [
       totalRides,
       completedRides,
@@ -162,42 +179,116 @@ router.get("/overview", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), as
       activeDrivers,
       totalRevenue,
     ] = await Promise.all([
-      // Rides
-      prisma.ride.count({ where: whereClause }),
-      prisma.ride.count({ where: { ...whereClause, status: "completed" } }),
+      // Rides - filter by customer jurisdiction
+      prisma.ride.count({
+        where: {
+          ...whereClause,
+          ...(Object.keys(userFilter).length > 0 ? {
+            customer: { user: userFilter }
+          } : {}),
+        },
+      }),
+      prisma.ride.count({
+        where: {
+          ...whereClause,
+          status: "completed",
+          ...(Object.keys(userFilter).length > 0 ? {
+            customer: { user: userFilter }
+          } : {}),
+        },
+      }),
       
-      // Food Orders
-      prisma.foodOrder.count({ where: whereClause }),
-      prisma.foodOrder.count({ where: { ...whereClause, status: "delivered" } }),
+      // Food Orders - filter by customer jurisdiction
+      prisma.foodOrder.count({
+        where: {
+          ...whereClause,
+          ...(Object.keys(userFilter).length > 0 ? {
+            customer: { user: userFilter }
+          } : {}),
+        },
+      }),
+      prisma.foodOrder.count({
+        where: {
+          ...whereClause,
+          status: "delivered",
+          ...(Object.keys(userFilter).length > 0 ? {
+            customer: { user: userFilter }
+          } : {}),
+        },
+      }),
       
-      // Deliveries
-      prisma.delivery.count({ where: whereClause }),
-      prisma.delivery.count({ where: { ...whereClause, status: "delivered" } }),
+      // Deliveries - filter by customer jurisdiction
+      prisma.delivery.count({
+        where: {
+          ...whereClause,
+          ...(Object.keys(userFilter).length > 0 ? {
+            customer: { user: userFilter }
+          } : {}),
+        },
+      }),
+      prisma.delivery.count({
+        where: {
+          ...whereClause,
+          status: "delivered",
+          ...(Object.keys(userFilter).length > 0 ? {
+            customer: { user: userFilter }
+          } : {}),
+        },
+      }),
       
-      // Users
-      prisma.user.count(),
-      prisma.driverProfile.count(),
-      prisma.customerProfile.count(),
-      prisma.restaurantProfile.count(),
+      // Users - filter by jurisdiction
+      prisma.user.count({ where: userFilter }),
+      prisma.driverProfile.count({
+        where: Object.keys(userFilter).length > 0 ? { user: userFilter } : undefined,
+      }),
+      prisma.customerProfile.count({
+        where: Object.keys(userFilter).length > 0 ? { user: userFilter } : undefined,
+      }),
+      prisma.restaurantProfile.count({
+        where: Object.keys(userFilter).length > 0 ? { user: userFilter } : undefined,
+      }),
       
-      // Active drivers (vehicles online)
+      // Active drivers (vehicles online) - filter by driver jurisdiction
       prisma.vehicle.groupBy({
         by: ["driverId"],
-        where: { isOnline: true },
+        where: {
+          isOnline: true,
+          ...(Object.keys(userFilter).length > 0 ? {
+            driver: { user: userFilter }
+          } : {}),
+        },
       }).then(list => list.length),
       
-      // Total revenue (sum of all service fares)
+      // Total revenue (sum of all service fares) - filter by customer jurisdiction
       Promise.all([
         prisma.ride.aggregate({
-          where: { ...whereClause, status: "completed" },
+          where: {
+            ...whereClause,
+            status: "completed",
+            ...(Object.keys(userFilter).length > 0 ? {
+              customer: { user: userFilter }
+            } : {}),
+          },
           _sum: { serviceFare: true },
         }),
         prisma.foodOrder.aggregate({
-          where: { ...whereClause, status: "delivered" },
+          where: {
+            ...whereClause,
+            status: "delivered",
+            ...(Object.keys(userFilter).length > 0 ? {
+              customer: { user: userFilter }
+            } : {}),
+          },
           _sum: { serviceFare: true },
         }),
         prisma.delivery.aggregate({
-          where: { ...whereClause, status: "delivered" },
+          where: {
+            ...whereClause,
+            status: "delivered",
+            ...(Object.keys(userFilter).length > 0 ? {
+              customer: { user: userFilter }
+            } : {}),
+          },
           _sum: { serviceFare: true },
         }),
       ]).then(([rides, food, deliveries]) => {
