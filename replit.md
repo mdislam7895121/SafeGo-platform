@@ -1,7 +1,7 @@
 # SafeGo Global Super-App
 
 ## Overview
-SafeGo is a production-ready, full-stack multi-service super-app platform designed for global on-demand services like ride-hailing, food delivery, and parcel delivery. Its primary purpose is to be a leading global super-app by offering a comprehensive, scalable, and secure solution for integrated urban services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, full service lifecycle management, and unified payout/payment section layouts.
+SafeGo is a production-ready, full-stack multi-service super-app platform for global on-demand services like ride-hailing, food delivery, and parcel delivery. Its purpose is to be a leading global super-app by offering a comprehensive, scalable, and secure solution for integrated urban services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, full service lifecycle management, and unified payout/payment section layouts. The project aims for global market leadership in the super-app space.
 
 ## User Preferences
 **Preferred communication style**: Simple, everyday language.
@@ -17,16 +17,15 @@ The frontend uses React 18, TypeScript, Vite 5, shadcn/ui (Radix UI), Tailwind C
 The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with PostgreSQL 14+. It supports multi-role authentication, country-specific KYC with admin approval, and comprehensive service lifecycle management.
 
 Key architectural features include:
-- **Admin Capabilities**: An admin panel with an interactive dashboard, real-time data, a Document Center, a Wallet Settlement System, Global Earnings & Payout Analytics, and advanced analytics dashboards for various entities.
-- **Security & Compliance**: Admin Activity Audit Trail with IP tracking and PII masking, Global Admin Notification Center, Global Admin Settings Panel, advanced RBAC with 5 admin roles and 20 granular permissions (deny-by-default model), environment guard, secure UX components, real-time threat monitoring, and a comprehensive fraud detection engine.
-- **Wallet & Earnings System**: A financial management system tracking earnings, commissions, negative balances, and payout processing, including automated payout scheduling, manual payout capabilities, and a reconciliation engine.
-- **System Monitoring**: Real-time performance monitoring with telemetry hooks, system stability alerts, and an enterprise performance dashboard.
-- **Automated Incident Response**: Fully automated incident response system including auto-locking suspicious users, token revocation, session invalidation, and automated fraud responses.
+- **Admin Capabilities**: Admin panel with interactive dashboard, real-time data, Document Center, Wallet Settlement System, Global Earnings & Payout Analytics, and advanced analytics.
+- **Security & Compliance**: Admin Activity Audit Trail, Global Admin Notification Center, Global Admin Settings Panel, advanced Role-Based Access Control (RBAC) with 5 admin roles and 20 granular permissions (deny-by-default model), secure UX components, real-time threat monitoring, and a comprehensive fraud detection engine with automated incident response.
+- **Wallet & Earnings System**: Financial management system tracking earnings, commissions, negative balances, and payout processing, including automated/manual payouts and reconciliation.
+- **System Monitoring**: Real-time performance monitoring, system stability alerts, and an enterprise performance dashboard.
 - **Support Chat System**: Real-time WebSocket-integrated support chat with full CRUD and RBAC checks.
-- **Demo Mode**: A comprehensive demo data generation system with realistic multi-jurisdiction data for testing analytics, earnings, wallet, and RBAC systems, including `isDemo` flags for data separation.
+- **Demo Mode**: Comprehensive demo data generation system with realistic multi-jurisdiction data.
 
 ### Database Schema Design
-The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields and includes `isDemo: Boolean @default(false)` for managing demo data.
+The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields and includes `isDemo: Boolean @default(false)`.
 
 ## External Dependencies
 
