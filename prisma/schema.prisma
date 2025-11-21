@@ -209,6 +209,7 @@ model DriverProfile {
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   driverStats           DriverStats?
   driverWallet          DriverWallet?
+  driverPoints          DriverPoints?
   foodOrders            FoodOrder[]
   rides                 Ride[]
   vehicleDocuments      VehicleDocument[]
@@ -519,6 +520,93 @@ model Vehicle {
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@map("vehicles")
+}
+
+// Driver Loyalty Points Tier System
+model DriverTier {
+  id               String           @id @default(uuid())
+  name             String           @unique
+  requiredPoints   Int
+  color            String
+  description      String?
+  displayOrder     Int
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  benefits         TierBenefit[]
+  drivers          DriverPoints[]
+
+  @@index([requiredPoints])
+  @@index([displayOrder])
+  @@map("driver_tiers")
+}
+
+model TierBenefit {
+  id               String           @id @default(uuid())
+  tierId           String
+  benefitText      String
+  displayOrder     Int              @default(0)
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  tier             DriverTier       @relation(fields: [tierId], references: [id], onDelete: Cascade)
+
+  @@index([tierId])
+  @@index([displayOrder])
+  @@map("tier_benefits")
+}
+
+model DriverPoints {
+  id               String             @id @default(uuid())
+  driverId         String             @unique
+  currentTierId    String
+  totalPoints      Int                @default(0)
+  lifetimePoints   Int                @default(0)
+  lastEarnedAt     DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  driver           DriverProfile      @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  tier             DriverTier         @relation(fields: [currentTierId], references: [id])
+  transactions     PointsTransaction[]
+
+  @@index([driverId])
+  @@index([currentTierId])
+  @@index([totalPoints])
+  @@map("driver_points")
+}
+
+model PointsRule {
+  id               String           @id @default(uuid())
+  ruleName         String           @unique
+  description      String?
+  basePoints       Int              @default(10)
+  multiplier       Decimal          @default(1.0) @db.Decimal(5, 2)
+  countryCode      String?
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@index([countryCode])
+  @@index([isActive])
+  @@map("points_rules")
+}
+
+model PointsTransaction {
+  id               String           @id @default(uuid())
+  driverPointsId   String
+  points           Int
+  reason           String
+  referenceType    String?
+  referenceId      String?
+  countryCode      String?
+  metadata         Json?
+  createdAt        DateTime         @default(now())
+  driverPoints     DriverPoints     @relation(fields: [driverPointsId], references: [id], onDelete: Cascade)
+
+  @@index([driverPointsId])
+  @@index([createdAt])
+  @@index([referenceType, referenceId])
+  @@map("points_transactions")
 }
 
 model AuditLog {
