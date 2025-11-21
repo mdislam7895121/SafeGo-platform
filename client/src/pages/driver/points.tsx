@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star, Award, TrendingUp, Check } from "lucide-react";
+import { Star, Award, TrendingUp, Check, Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface Tier {
@@ -36,7 +36,7 @@ interface PointsData {
 }
 
 export default function DriverPoints() {
-  const { data, isLoading } = useQuery<PointsData>({
+  const { data, isLoading, error } = useQuery<PointsData>({
     queryKey: ["/api/driver/points"],
   });
 
@@ -52,10 +52,17 @@ export default function DriverPoints() {
     );
   }
 
-  if (!data) {
+  if (error || !data) {
     return (
       <div className="bg-background min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Failed to load points data</p>
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground mb-2">Failed to load points data</p>
+            <p className="text-sm text-muted-foreground">
+              {error ? "Please try again later" : "Unable to connect to the server"}
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -66,13 +73,25 @@ export default function DriverPoints() {
     <div className="bg-background min-h-screen">
       <div className="p-6 max-w-4xl mx-auto space-y-6">
         {/* Current Tier Card */}
-        <Card className="border-2" style={{ borderColor: currentTier.color }}>
+        <Card 
+          className="border-2"
+          style={{ 
+            borderColor: currentTier.color,
+            "--tier-color": currentTier.color
+          } as React.CSSProperties}
+        >
           <CardContent className="p-8">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="flex items-center gap-3 mb-2">
-                  <Award className="h-8 w-8" style={{ color: currentTier.color }} />
-                  <h1 className="text-3xl font-bold" style={{ color: currentTier.color }}>
+                  <Award 
+                    className="h-8 w-8" 
+                    style={{ color: currentTier.color }}
+                  />
+                  <h1 
+                    className="text-3xl font-bold"
+                    style={{ color: currentTier.color }}
+                  >
                     {currentTier.name} Tier
                   </h1>
                 </div>
@@ -96,7 +115,10 @@ export default function DriverPoints() {
                   <span className="text-muted-foreground">
                     Progress to {nextTier.name} tier
                   </span>
-                  <span className="font-semibold" style={{ color: nextTier.color }}>
+                  <span 
+                    className="font-semibold"
+                    style={{ color: nextTier.color }}
+                  >
                     {pointsToNextTier} points needed
                   </span>
                 </div>
@@ -112,8 +134,9 @@ export default function DriverPoints() {
             )}
 
             {!nextTier && (
-              <div className="bg-muted p-4 rounded-lg text-center">
-                <p className="text-sm font-medium">🎉 You've reached the highest tier!</p>
+              <div className="bg-muted p-4 rounded-lg flex items-center justify-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                <p className="text-sm font-medium">You have reached the highest tier!</p>
               </div>
             )}
           </CardContent>
@@ -127,57 +150,70 @@ export default function DriverPoints() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {allTiers.map((tier, index) => (
-                <div
-                  key={tier.name}
-                  className="flex items-center gap-4 p-4 rounded-lg border"
-                  style={{
-                    borderColor: tier.isCurrentTier ? tier.color : "transparent",
-                    backgroundColor: tier.isCurrentTier
-                      ? `${tier.color}10`
-                      : tier.isUnlocked
-                      ? "transparent"
-                      : "transparent",
-                  }}
-                  data-testid={`tier-${tier.name.toLowerCase()}`}
-                >
+              {allTiers.map((tier, index) => {
+                const isCurrentTier = tier.isCurrentTier;
+                const isUnlocked = tier.isUnlocked;
+
+                return (
                   <div
-                    className="flex items-center justify-center h-12 w-12 rounded-full flex-shrink-0"
-                    style={{
-                      backgroundColor: tier.isUnlocked ? `${tier.color}20` : "#F3F4F6",
-                    }}
+                    key={tier.name}
+                    className={`flex items-center gap-4 p-4 rounded-lg border ${
+                      isCurrentTier ? "border-2" : "border"
+                    }`}
+                    style={
+                      isCurrentTier
+                        ? { 
+                            borderColor: tier.color,
+                            backgroundColor: `${tier.color}10`
+                          }
+                        : undefined
+                    }
+                    data-testid={`tier-${tier.name.toLowerCase()}`}
                   >
-                    {tier.isUnlocked ? (
-                      <Check className="h-6 w-6" style={{ color: tier.color }} />
-                    ) : (
-                      <span className="text-muted-foreground font-semibold">{index + 1}</span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3
-                        className="font-semibold"
-                        style={{ color: tier.isUnlocked ? tier.color : undefined }}
-                      >
-                        {tier.name}
-                      </h3>
-                      {tier.isCurrentTier && (
-                        <Badge variant="outline" style={{ borderColor: tier.color, color: tier.color }}>
-                          Current
-                        </Badge>
+                    <div
+                      className="flex items-center justify-center h-12 w-12 rounded-full flex-shrink-0"
+                      style={{
+                        backgroundColor: isUnlocked ? `${tier.color}20` : undefined,
+                      }}
+                    >
+                      {isUnlocked ? (
+                        <Check 
+                          className="h-6 w-6"
+                          style={{ color: tier.color }}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground font-semibold">{index + 1}</span>
                       )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {tier.requiredPoints} points required
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 
+                          className="font-semibold"
+                          style={{ color: isUnlocked ? tier.color : undefined }}
+                        >
+                          {tier.name}
+                        </h3>
+                        {isCurrentTier && (
+                          <Badge 
+                            variant="outline"
+                            style={{ borderColor: tier.color, color: tier.color }}
+                          >
+                            Current
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {tier.requiredPoints} points required
+                      </p>
+                    </div>
+                    {isUnlocked ? (
+                      <Check className="h-5 w-5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                    ) : (
+                      <span className="text-sm text-muted-foreground flex-shrink-0">Locked</span>
+                    )}
                   </div>
-                  {tier.isUnlocked ? (
-                    <Check className="h-5 w-5 text-green-600 flex-shrink-0" />
-                  ) : (
-                    <span className="text-sm text-muted-foreground flex-shrink-0">Locked</span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -189,18 +225,27 @@ export default function DriverPoints() {
             <CardDescription>Perks you enjoy at {currentTier.name} tier</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {currentTier.benefits.map((benefit) => (
-                <div
-                  key={benefit.id}
-                  className="flex items-start gap-3 p-3 rounded-lg bg-muted"
-                  data-testid={`benefit-${benefit.id}`}
-                >
-                  <Check className="h-5 w-5 flex-shrink-0 mt-0.5" style={{ color: currentTier.color }} />
-                  <p className="text-sm">{benefit.text}</p>
-                </div>
-              ))}
-            </div>
+            {currentTier.benefits.length > 0 ? (
+              <div className="space-y-3">
+                {currentTier.benefits.map((benefit) => (
+                  <div
+                    key={benefit.id}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-muted"
+                    data-testid={`benefit-${benefit.id}`}
+                  >
+                    <Check 
+                      className="h-5 w-5 flex-shrink-0 mt-0.5"
+                      style={{ color: currentTier.color }}
+                    />
+                    <p className="text-sm">{benefit.text}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No benefits available for this tier
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -212,9 +257,7 @@ export default function DriverPoints() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start gap-4">
-              <div
-                className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 flex-shrink-0"
-              >
+              <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 flex-shrink-0">
                 <TrendingUp className="h-6 w-6 text-primary" />
               </div>
               <div className="flex-1">

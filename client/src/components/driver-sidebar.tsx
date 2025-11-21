@@ -161,7 +161,7 @@ export function DriverSidebar() {
                         <a data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`} className="flex items-center gap-3 w-full text-sm font-medium">
                           <item.icon className="h-5 w-5 flex-shrink-0" />
                           <span className="flex-1">{item.title}</span>
-                          {item.title === "SafeGo Premium" && (
+                          {item.title === "SafeGo Points" && (
                             <Badge variant="secondary" className="ml-auto bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
                               New
                             </Badge>

@@ -1456,7 +1456,7 @@ router.get("/points", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Driver profile not found" });
     }
 
-    // Get or create driver points
+    // Get or create driver points using transaction for safety
     let driverPoints = await prisma.driverPoints.findUnique({
       where: { driverId: driverProfile.id },
       include: {
@@ -1471,40 +1471,88 @@ router.get("/points", async (req: AuthRequest, res) => {
       },
     });
 
-    // If driver has no points record, create one with Blue tier
+    // If driver has no points record, create one with lowest tier atomically
     if (!driverPoints) {
-      const blueTier = await prisma.driverTier.findFirst({
-        where: { name: "Blue" },
-        include: {
-          benefits: {
+      try {
+        driverPoints = await prisma.$transaction(async (tx) => {
+          // Get lowest tier (by required points) as fallback
+          const lowestTier = await tx.driverTier.findFirst({
             where: { isActive: true },
-            orderBy: { displayOrder: "asc" },
-          },
-        },
-      });
-
-      if (!blueTier) {
-        return res.status(500).json({ error: "Default tier not found" });
-      }
-
-      driverPoints = await prisma.driverPoints.create({
-        data: {
-          driverId: driverProfile.id,
-          currentTierId: blueTier.id,
-          totalPoints: 0,
-          lifetimePoints: 0,
-        },
-        include: {
-          tier: {
+            orderBy: { requiredPoints: "asc" },
             include: {
               benefits: {
                 where: { isActive: true },
                 orderBy: { displayOrder: "asc" },
               },
             },
-          },
-        },
-      });
+          });
+
+          if (!lowestTier) {
+            throw new Error("No active tiers found. Please contact support.");
+          }
+
+          // Create driver points record
+          const newDriverPoints = await tx.driverPoints.create({
+            data: {
+              driverId: driverProfile.id,
+              currentTierId: lowestTier.id,
+              totalPoints: 0,
+              lifetimePoints: 0,
+            },
+            include: {
+              tier: {
+                include: {
+                  benefits: {
+                    where: { isActive: true },
+                    orderBy: { displayOrder: "asc" },
+                  },
+                },
+              },
+            },
+          });
+
+          // Create initial transaction record
+          await tx.pointsTransaction.create({
+            data: {
+              driverPointsId: newDriverPoints.id,
+              points: 0,
+              reason: "Account initialized",
+              referenceType: "system",
+            },
+          });
+
+          return newDriverPoints;
+        });
+      } catch (error: any) {
+        console.error("Error initializing driver points:", error);
+        if (error.message?.includes("No active tiers")) {
+          return res.status(503).json({ 
+            error: "Loyalty program is currently unavailable. Please try again later." 
+          });
+        }
+        // Handle unique constraint violation (race condition)
+        if (error.code === "P2002") {
+          // Retry fetching - another request created it
+          driverPoints = await prisma.driverPoints.findUnique({
+            where: { driverId: driverProfile.id },
+            include: {
+              tier: {
+                include: {
+                  benefits: {
+                    where: { isActive: true },
+                    orderBy: { displayOrder: "asc" },
+                  },
+                },
+              },
+            },
+          });
+          if (!driverPoints) {
+            return res.status(500).json({ error: "Failed to initialize points system" });
+          }
+        } else {
+          return res.status(500).json({ error: "Failed to initialize points system" });
+        }
+      }
     }
 
     // Get all active tiers ordered by required points
@@ -1567,11 +1615,21 @@ router.get("/points", async (req: AuthRequest, res) => {
 
 // ====================================================
 // GET /api/driver/points/history
-// Get points transaction history
+// Get points transaction history with pagination
 // ====================================================
 router.get("/points/history", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
+    
+    // Parse and sanitize pagination parameters
+    const pageParam = parseInt(req.query.page as string);
+    const limitParam = parseInt(req.query.limit as string);
+    
+    const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
+    const limit = Number.isInteger(limitParam) && limitParam > 0 
+      ? Math.min(100, limitParam) 
+      : 50;
+    const skip = (page - 1) * limit;
 
     // Get driver profile
     const driverProfile = await prisma.driverProfile.findUnique({
@@ -1588,15 +1646,32 @@ router.get("/points/history", async (req: AuthRequest, res) => {
     });
 
     if (!driverPoints) {
-      return res.json({ transactions: [] });
+      return res.json({ 
+        transactions: [],
+        pagination: {
+          page,
+          limit,
+          total: 0,
+          totalPages: 0,
+        }
+      });
     }
 
-    // Get points transaction history
-    const transactions = await prisma.pointsTransaction.findMany({
-      where: { driverPointsId: driverPoints.id },
-      orderBy: { createdAt: "desc" },
-      take: 100, // Limit to last 100 transactions
-    });
+    // Get points transaction history with pagination and deterministic ordering
+    const [transactions, total] = await Promise.all([
+      prisma.pointsTransaction.findMany({
+        where: { driverPointsId: driverPoints.id },
+        orderBy: [
+          { createdAt: "desc" },
+          { id: "desc" }, // Secondary sort for deterministic ordering
+        ],
+        skip,
+        take: limit,
+      }),
+      prisma.pointsTransaction.count({
+        where: { driverPointsId: driverPoints.id },
+      }),
+    ]);
 
     res.json({
       transactions: transactions.map(t => ({
@@ -1607,6 +1682,12 @@ router.get("/points/history", async (req: AuthRequest, res) => {
         referenceId: t.referenceId,
         createdAt: t.createdAt,
       })),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     console.error("Error fetching points history:", error);

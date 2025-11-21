@@ -23,9 +23,10 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 - **Support Chat System**: Real-time WebSocket-integrated support chat with full CRUD and RBAC checks.
 - **Demo Mode**: Comprehensive demo data generation for multi-jurisdiction scenarios.
 - **Opportunity Bonus Management System**: Allows admins to create and manage ride incentives with country-specific amounts, promotional campaigns, and zone-based targeting. Drivers view dynamic opportunity bonuses on their Promotions page.
+- **Driver Loyalty Points Tier System**: Uber Pro-style gamified loyalty program with 4 tiers (Blue, Gold, Premium, Diamond). Drivers earn points through trips (10 points/trip default), advance through tiers automatically, and unlock progressive benefits. Features tier progress visualization, points transaction history with pagination, and configurable points rules.
 
 ### Database Schema Design
-The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, `PaymentMethod`, `OpportunitySetting`, and `OpportunityReward`. It supports country-specific identity fields and an `isDemo` flag.
+The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, `PaymentMethod`, `OpportunitySetting`, `OpportunityReward`, `DriverTier`, `DriverPoints`, `TierBenefit`, `PointsRule`, and `PointsTransaction`. It supports country-specific identity fields and an `isDemo` flag.
 
 ## External Dependencies
 
