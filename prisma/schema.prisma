@@ -103,6 +103,8 @@ model Delivery {
   status           String
   customerRating   Int?
   customerFeedback String?
+  taxBreakdown     Json?
+  totalTaxAmount   Decimal?         @db.Decimal(10, 2)
   isDemo           Boolean          @default(false)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime
@@ -253,6 +255,8 @@ model FoodOrder {
   status            String
   customerRating    Int?
   customerFeedback  String?
+  taxBreakdown      Json?
+  totalTaxAmount    Decimal?          @db.Decimal(10, 2)
   isDemo            Boolean           @default(false)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime
@@ -332,6 +336,8 @@ model Ride {
   customerFeedback String?
   driverRating     Int?
   driverFeedback   String?
+  taxBreakdown     Json?
+  totalTaxAmount   Decimal?          @db.Decimal(10, 2)
   isDemo           Boolean           @default(false)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime
@@ -834,38 +840,34 @@ enum ServiceType {
   RIDE
   FOOD
   PARCEL
-  ALL
 }
 
-enum PayeeType {
-  DRIVER
-  RESTAURANT
-  CUSTOMER
-  PLATFORM
+enum TaxType {
+  VAT
+  SALES_TAX
+  GOVERNMENT_SERVICE_FEE
+  MARKETPLACE_FACILITATOR_TAX
+  TRIP_FEE
+  LOCAL_MUNICIPALITY_FEE
+  REGULATORY_FEE
 }
 
 model TaxRule {
-  id              String       @id @default(cuid())
-  countryCode     String
-  stateCode       String?
-  cityCode        String?
-  taxName         String
-  taxRatePercent  Decimal      @db.Decimal(5, 2)
-  appliesTo       ServiceType
-  payeeType       PayeeType
-  isInclusive     Boolean      @default(false)
-  isActive        Boolean      @default(true)
-  effectiveFrom   DateTime
-  effectiveTo     DateTime?
-  isDemo          Boolean      @default(false)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  id           String      @id @default(cuid())
+  countryCode  String
+  cityCode     String?
+  serviceType  ServiceType
+  taxType      TaxType
+  percentRate  Decimal?    @db.Decimal(5, 2)
+  flatFee      Decimal?    @db.Decimal(10, 2)
+  isActive     Boolean     @default(true)
+  isDemo       Boolean     @default(false)
+  createdAt    DateTime    @default(now())
 
   @@index([countryCode])
-  @@index([stateCode])
   @@index([cityCode])
-  @@index([appliesTo])
-  @@index([payeeType])
+  @@index([serviceType])
+  @@index([taxType])
   @@index([isActive])
   @@index([isDemo])
   @@map("tax_rules")
