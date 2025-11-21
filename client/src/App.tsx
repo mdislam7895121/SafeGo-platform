@@ -29,12 +29,11 @@ import CustomerNotifications from "@/pages/customer/notifications";
 import { DriverLayout } from "@/layouts/DriverLayout";
 import DriverHome from "@/pages/driver/home";
 import DriverDashboard from "@/pages/driver/dashboard";
-import DriverVehicle from "@/pages/driver/vehicle";
 import DriverProfile from "@/pages/driver/profile";
-import DriverProfileEnhanced from "@/pages/driver/profile-enhanced";
+import DriverVehicle from "@/pages/driver/vehicle";
+import DriverWallet from "@/pages/driver/wallet";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
-import DriverWallet from "@/pages/driver/wallet";
 import DriverRefer from "@/pages/driver/refer";
 import DriverPremium from "@/pages/driver/premium";
 import DriverPromotions from "@/pages/driver/promotions";
@@ -220,13 +219,6 @@ function Router() {
       <Route path="/driver/profile">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Profile">
-            <DriverProfileEnhanced />
-          </DriverLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/driver/profile/legacy">
-        <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverLayout pageTitle="Profile (Legacy)">
             <DriverProfile />
           </DriverLayout>
         </ProtectedRoute>
