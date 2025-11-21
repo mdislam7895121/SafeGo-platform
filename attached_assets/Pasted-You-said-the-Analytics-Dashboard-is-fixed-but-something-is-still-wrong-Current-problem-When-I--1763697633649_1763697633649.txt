@@ -1,0 +1,53 @@
+You said the Analytics Dashboard is fixed, but something is still wrong.
+
+Current problem:
+- When I open the Analytics Dashboard at route /admin/analytics in Preview, the page is completely blank white.
+- No header, no filters, no error banner, nothing – just a white screen.
+- This happens even after your last fix where you adjusted date ranges, query construction, and RBAC guard.
+- Previously I was seeing red error banners (string pattern error, failed to load analytics). Now those are gone but the whole page is empty.
+
+Please do a focused Step 49 fix for the Analytics Dashboard with all our SafeGo rules:
+
+1. Reproduce the issue
+   - Run the dev server and open /admin/analytics in the browser (both desktop and mobile viewport).
+   - Confirm that the page is blank and note any errors in the browser console and network tab.
+
+2. Debug the frontend component
+   - Open the React/TypeScript file for the analytics page (likely client/src/pages/admin/analytics.tsx or similar).
+   - Look for any early `return null`, uncaught exception, or invalid JSX that could cause a blank screen.
+   - Verify that the component still renders the Analytics header, filters (date range + country), and tab sections (Drivers, Customers, Restaurants, Revenue, Risk).
+   - Make sure any new guard or conditional you added for RBAC or date ranges does NOT stop the component from rendering when data is missing.
+
+3. Fix the analytics query and rendering logic
+   - Ensure date range parameters are constructed in the correct format expected by the backend.
+   - If the backend returns an error, the page must still render with a clear error banner (like before), not a white screen.
+   - Add defensive checks around all data access (e.g., avoid accessing properties of `undefined`).
+   - Make sure all tabs handle “no data” states gracefully with friendly messages instead of crashing.
+
+4. RBAC and security rules
+   - Keep the RBAC guard for the analytics page aligned with our SafeGo security rules (no weakening of permissions).
+   - Do NOT change or remove roles, capabilities, or JWT handling that were already validated in earlier steps.
+   - Confirm that an admin with the demo credentials (admin@demo.com / demo123, SUPER_ADMIN) can see the analytics page.
+
+5. Regression safety
+   - Do not change any other admin dashboard cards, payout pages, capabilities endpoint, or financial suite logic.
+   - No breaking changes to existing security phases, payouts, wallets, or support chat.
+   - Keep all previous SafeGo security phases and admin dashboard behavior intact.
+
+6. Verification checklist
+   - /admin/analytics loads with:
+     - Page title and description
+     - Date range selector and country selector
+     - All tabs visible: Drivers, Customers, Restaurants, Revenue, Risk
+   - When data loads correctly, charts/tables show analytics.
+   - When the backend returns an error or there is no data, the page still renders with a visible error or “no data” message — NOT a blank white screen.
+   - Works in both desktop and mobile viewport (no layout that hides everything off-screen).
+
+7. Documentation
+   - Update replit.md under Step 49 to clearly describe:
+     - Root cause of the blank page
+     - Files changed
+     - How the new error handling and RBAC checks work
+     - How to test /admin/analytics safely
+
+When you are done, summarize exactly what caused the blank page and list the files you modified, then ask me to test /admin/analytics again.

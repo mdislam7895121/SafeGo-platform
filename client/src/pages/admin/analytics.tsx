@@ -300,10 +300,10 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="stat-total-revenue">
-                  {formatCurrency(overviewData.totalRevenue)}
+                  {formatCurrency(overviewData?.totalRevenue ?? 0)}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {overviewData.totalTrips.toLocaleString()} total trips
+                  {(overviewData?.totalTrips ?? 0).toLocaleString()} total trips
                 </p>
               </CardContent>
             </Card>
@@ -314,10 +314,10 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="stat-active-users">
-                  {overviewData.activeUsers.toLocaleString()}
+                  {(overviewData?.activeUsers ?? 0).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {overviewData.newUsers.toLocaleString()} new this period
+                  {(overviewData?.newUsers ?? 0).toLocaleString()} new this period
                 </p>
               </CardContent>
             </Card>
@@ -328,10 +328,10 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="stat-active-drivers">
-                  {overviewData.activeDrivers.toLocaleString()}
+                  {(overviewData?.activeDrivers ?? 0).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {((overviewData.activeDrivers / Math.max(overviewData.totalDrivers, 1)) * 100).toFixed(1)}% of total
+                  {(((overviewData?.activeDrivers ?? 0) / Math.max(overviewData?.totalDrivers ?? 1, 1)) * 100).toFixed(1)}% of total
                 </p>
               </CardContent>
             </Card>
@@ -342,10 +342,10 @@ export default function AnalyticsDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-primary" data-testid="stat-avg-commission">
-                  {overviewData.avgCommissionRate.toFixed(1)}%
+                  {(overviewData?.avgCommissionRate ?? 0).toFixed(1)}%
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {formatCurrency(overviewData.totalCommission)} total
+                  {formatCurrency(overviewData?.totalCommission ?? 0)} total
                 </p>
               </CardContent>
             </Card>
@@ -399,7 +399,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={driversData.performanceTrend}>
+                      <AreaChart data={driversData?.performanceTrend ?? []}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis />
@@ -424,7 +424,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={driversData.topDrivers.slice(0, 5)}>
+                      <BarChart data={(driversData?.topDrivers ?? []).slice(0, 5)}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="driverName" />
                         <YAxis />
@@ -445,8 +445,8 @@ export default function AnalyticsDashboard() {
                       <PieChart>
                         <Pie
                           data={[
-                            { name: "Active", value: driversData.activeDrivers },
-                            { name: "Inactive", value: driversData.inactiveDrivers },
+                            { name: "Active", value: driversData?.activeDrivers ?? 0 },
+                            { name: "Inactive", value: driversData?.inactiveDrivers ?? 0 },
                           ]}
                           cx="50%"
                           cy="50%"
@@ -472,10 +472,10 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-4xl font-bold text-center py-8" data-testid="stat-retention-rate">
-                      {driversData.retentionRate.toFixed(1)}%
+                      {(driversData?.retentionRate ?? 0).toFixed(1)}%
                     </div>
                     <p className="text-center text-muted-foreground">
-                      {driversData.activeDrivers} of {driversData.totalDrivers} drivers active
+                      {driversData?.activeDrivers ?? 0} of {driversData?.totalDrivers ?? 0} drivers active
                     </p>
                   </CardContent>
                 </Card>
@@ -505,7 +505,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={customersData.growthTrend}>
+                      <LineChart data={customersData?.growthTrend ?? []}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis />
@@ -526,7 +526,7 @@ export default function AnalyticsDashboard() {
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie
-                          data={customersData.spendingDistribution}
+                          data={customersData?.spendingDistribution ?? []}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
@@ -534,7 +534,7 @@ export default function AnalyticsDashboard() {
                           outerRadius={80}
                           dataKey="revenue"
                         >
-                          {customersData.spendingDistribution.map((entry: any, index: number) => (
+                          {(customersData?.spendingDistribution ?? []).map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                           ))}
                         </Pie>
@@ -551,7 +551,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={customersData.topCustomers.slice(0, 5)}>
+                      <BarChart data={(customersData?.topCustomers ?? []).slice(0, 5)}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="customerName" />
                         <YAxis />
@@ -569,10 +569,10 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-4xl font-bold text-center py-8" data-testid="stat-customer-retention">
-                      {customersData.repeatCustomerRate.toFixed(1)}%
+                      {(customersData?.repeatCustomerRate ?? 0).toFixed(1)}%
                     </div>
                     <p className="text-center text-muted-foreground">
-                      {customersData.repeatCustomers} repeat of {customersData.totalCustomers} total
+                      {customersData?.repeatCustomers ?? 0} repeat of {customersData?.totalCustomers ?? 0} total
                     </p>
                   </CardContent>
                 </Card>
@@ -602,7 +602,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={restaurantsData.orderTrend}>
+                      <AreaChart data={restaurantsData?.orderTrend ?? []}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis />
@@ -627,7 +627,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={restaurantsData.topRestaurants.slice(0, 5)}>
+                      <BarChart data={(restaurantsData?.topRestaurants ?? []).slice(0, 5)}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="restaurantName" />
                         <YAxis />
@@ -648,8 +648,8 @@ export default function AnalyticsDashboard() {
                       <PieChart>
                         <Pie
                           data={[
-                            { name: "Active", value: restaurantsData.activeRestaurants },
-                            { name: "Inactive", value: restaurantsData.inactiveRestaurants },
+                            { name: "Active", value: restaurantsData?.activeRestaurants ?? 0 },
+                            { name: "Inactive", value: restaurantsData?.inactiveRestaurants ?? 0 },
                           ]}
                           cx="50%"
                           cy="50%"
@@ -675,10 +675,10 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-4xl font-bold text-center py-8" data-testid="stat-avg-order-value">
-                      {formatCurrency(restaurantsData.avgOrderValue)}
+                      {formatCurrency(restaurantsData?.avgOrderValue ?? 0)}
                     </div>
                     <p className="text-center text-muted-foreground">
-                      {restaurantsData.totalOrders.toLocaleString()} total orders
+                      {(restaurantsData?.totalOrders ?? 0).toLocaleString()} total orders
                     </p>
                   </CardContent>
                 </Card>
@@ -708,7 +708,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={revenueData.revenueTrend}>
+                      <AreaChart data={revenueData?.revenueTrend ?? []}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis />
@@ -744,7 +744,7 @@ export default function AnalyticsDashboard() {
                     <ResponsiveContainer width="100%" height={300}>
                       <PieChart>
                         <Pie
-                          data={revenueData.serviceBreakdown}
+                          data={revenueData?.serviceBreakdown ?? []}
                           cx="50%"
                           cy="50%"
                           labelLine={false}
@@ -752,7 +752,7 @@ export default function AnalyticsDashboard() {
                           outerRadius={80}
                           dataKey="revenue"
                         >
-                          {revenueData.serviceBreakdown.map((entry: any, index: number) => (
+                          {(revenueData?.serviceBreakdown ?? []).map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                           ))}
                         </Pie>
@@ -769,7 +769,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={revenueData.paymentMethods}>
+                      <BarChart data={revenueData?.paymentMethods ?? []}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="method" />
                         <YAxis />
@@ -787,7 +787,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <BarChart data={revenueData.countryBreakdown}>
+                      <BarChart data={revenueData?.countryBreakdown ?? []}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="country" />
                         <YAxis />
@@ -823,7 +823,7 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={riskData.fraudTrend}>
+                      <LineChart data={riskData?.fraudTrend ?? []}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="date" />
                         <YAxis />
@@ -847,9 +847,9 @@ export default function AnalyticsDashboard() {
                       <PieChart>
                         <Pie
                           data={[
-                            { name: "High Risk", value: riskData.highRiskCount },
-                            { name: "Medium Risk", value: riskData.mediumRiskCount },
-                            { name: "Low Risk", value: riskData.lowRiskCount },
+                            { name: "High Risk", value: riskData?.highRiskCount ?? 0 },
+                            { name: "Medium Risk", value: riskData?.mediumRiskCount ?? 0 },
+                            { name: "Low Risk", value: riskData?.lowRiskCount ?? 0 },
                           ]}
                           cx="50%"
                           cy="50%"
@@ -875,10 +875,10 @@ export default function AnalyticsDashboard() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-4xl font-bold text-center py-8 text-destructive" data-testid="stat-blocked-txn">
-                      {riskData.blockedTransactions.toLocaleString()}
+                      {(riskData?.blockedTransactions ?? 0).toLocaleString()}
                     </div>
                     <p className="text-center text-muted-foreground">
-                      {formatCurrency(riskData.preventedLoss)} in prevented losses
+                      {formatCurrency(riskData?.preventedLoss ?? 0)} in prevented losses
                     </p>
                   </CardContent>
                 </Card>
@@ -892,15 +892,15 @@ export default function AnalyticsDashboard() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Normal</span>
-                        <Badge variant="outline">{riskData.normalAccounts.toLocaleString()}</Badge>
+                        <Badge variant="outline">{(riskData?.normalAccounts ?? 0).toLocaleString()}</Badge>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Under Observation</span>
-                        <Badge variant="secondary">{riskData.observationAccounts.toLocaleString()}</Badge>
+                        <Badge variant="secondary">{(riskData?.observationAccounts ?? 0).toLocaleString()}</Badge>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground">Needs Review</span>
-                        <Badge variant="destructive">{riskData.reviewAccounts.toLocaleString()}</Badge>
+                        <Badge variant="destructive">{(riskData?.reviewAccounts ?? 0).toLocaleString()}</Badge>
                       </div>
                     </div>
                   </CardContent>
