@@ -68,7 +68,7 @@ export default function AdminOpportunityBonusesEdit() {
   const id = params?.id;
 
   // Fetch the opportunity setting
-  const { data: setting, isLoading } = useQuery<OpportunitySetting>({
+  const { data: setting, isLoading, error, isError } = useQuery<OpportunitySetting>({
     queryKey: ["/api/admin/opportunity-settings", id],
     enabled: !!id,
   });
@@ -189,12 +189,24 @@ export default function AdminOpportunityBonusesEdit() {
     );
   }
 
-  if (!setting) {
+  if (isError) {
+    const errorMessage = error instanceof Error && error.message.includes("404")
+      ? "Bonus setting not found"
+      : "Failed to load bonus setting. Please try again.";
+
+    if (error && !(error instanceof Error && error.message.includes("404"))) {
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    }
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="pt-6">
-            <p className="text-center text-muted-foreground">Bonus setting not found</p>
+            <p className="text-center text-muted-foreground">{errorMessage}</p>
             <Button
               onClick={handleCancel}
               variant="outline"
@@ -203,6 +215,18 @@ export default function AdminOpportunityBonusesEdit() {
             >
               Back to List
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!setting) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-center text-muted-foreground">Loading...</p>
           </CardContent>
         </Card>
       </div>
