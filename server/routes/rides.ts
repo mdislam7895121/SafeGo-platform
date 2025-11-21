@@ -38,6 +38,12 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Pickup address, dropoff address, fare, and payment method are required" });
     }
 
+    // Validate serviceFare is a valid positive number
+    const fareNumber = parseFloat(serviceFare);
+    if (isNaN(fareNumber) || fareNumber <= 0) {
+      return res.status(400).json({ error: "Service fare must be a positive number" });
+    }
+
     if (!["cash", "online"].includes(paymentMethod)) {
       return res.status(400).json({ error: "paymentMethod must be 'cash' or 'online'" });
     }
@@ -68,7 +74,7 @@ router.post("/", async (req: AuthRequest, res) => {
 
     // Calculate commission using Prisma Decimal (20% for now - can be made configurable later)
     const commissionRate = 0.20;
-    const serviceFareDecimal = new Prisma.Decimal(serviceFare);
+    const serviceFareDecimal = new Prisma.Decimal(fareNumber);
     const safegoCommission = serviceFareDecimal.mul(commissionRate);
     const driverPayout = serviceFareDecimal.sub(safegoCommission);
 

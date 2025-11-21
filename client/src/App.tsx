@@ -126,6 +126,11 @@ function Router() {
           <RideRequest />
         </ProtectedRoute>
       </Route>
+      <Route path="/customer/ride-request">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RideRequest />
+        </ProtectedRoute>
+      </Route>
       <Route path="/customer/food/:id">
         <ProtectedRoute allowedRoles={["customer"]}>
           <FoodRestaurantDetails />
