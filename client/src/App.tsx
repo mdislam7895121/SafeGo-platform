@@ -80,6 +80,7 @@ import AdminParcelDetails from "@/pages/admin/parcel-details";
 import AdminActivityLog from "@/pages/admin/activity-log";
 import AdminNotifications from "@/pages/admin/notifications";
 import AdminSettings from "@/pages/admin/settings";
+import AdminReferralSettings from "@/pages/admin/referral-settings";
 import AdminSupportChat from "@/pages/admin/support-chat";
 import AdminWallets from "@/pages/admin/wallets";
 import AdminWalletDetails from "@/pages/admin/wallet-details";
@@ -496,6 +497,11 @@ function Router() {
       <Route path="/admin/settings">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/referral-settings">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminReferralSettings />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-chat">
