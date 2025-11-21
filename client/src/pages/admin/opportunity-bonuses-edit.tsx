@@ -68,12 +68,10 @@ export default function AdminOpportunityBonusesEdit() {
   const id = params?.id;
 
   // Fetch the opportunity setting
-  const { data, isLoading } = useQuery<{ setting: OpportunitySetting }>({
+  const { data: setting, isLoading } = useQuery<OpportunitySetting>({
     queryKey: ["/api/admin/opportunity-settings", id],
     enabled: !!id,
   });
-
-  const setting = data?.setting;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
