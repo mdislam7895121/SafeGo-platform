@@ -1,7 +1,7 @@
 # SafeGo Global Super-App
 
 ## Overview
-SafeGo is a production-ready, full-stack multi-service super-app platform designed for global on-demand services such as ride-hailing, food delivery, and parcel delivery. The project aims to be a leading global super-app by providing a comprehensive, scalable, and secure solution for integrated urban services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, full service lifecycle management, and unified payout/payment section layouts.
+SafeGo is a production-ready, full-stack multi-service super-app platform designed for global on-demand services like ride-hailing, food delivery, and parcel delivery. Its primary purpose is to be a leading global super-app by offering a comprehensive, scalable, and secure solution for integrated urban services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, full service lifecycle management, and unified payout/payment section layouts.
 
 ## User Preferences
 **Preferred communication style**: Simple, everyday language.
@@ -16,61 +16,13 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui (Radix UI), T
 ### Technical Implementations
 The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with PostgreSQL 14+. It supports multi-role authentication, country-specific KYC with admin approval, and comprehensive service lifecycle management.
 
-Key features include:
-- **Admin Capabilities**: An admin panel with an interactive dashboard, real-time data, a Document Center, a Wallet Settlement System, and Global Earnings & Payout Analytics.
-- **Security & Compliance**: Admin Activity Audit Trail with IP tracking and PII masking, Global Admin Notification Center, and a Global Admin Settings Panel.
-- **Identity & Payouts**: Standardized identity layouts for driver profiles and admin-managed driver/restaurant payout accounts with encrypted storage and country-specific validation.
-- **Wallet & Earnings System**: A financial management system tracking earnings, commissions, negative balances, and payout processing.
-- **Security Architecture**: Environment variable-based JWT secret, bcrypt hashing, AES-256-GCM encryption, Zod validation, role-based middleware, CSRF protection, SQL injection prevention, and audit logging with PII masking.
-- **Admin RBAC System**: Advanced role-based access control with 5 admin roles and 20 granular permissions, implementing a deny-by-default security model.
-- **Environment Guard**: Startup validation for critical security secrets.
-- **Security Status Indicators**: Visual flags on user profiles (`normal`, `under_observation`, `needs_review`).
+Key architectural features include:
+- **Admin Capabilities**: An admin panel with an interactive dashboard, real-time data, a Document Center, a Wallet Settlement System, Global Earnings & Payout Analytics, and advanced analytics dashboards for drivers, customers, restaurants, revenue, and security risk.
+- **Security & Compliance**: Admin Activity Audit Trail with IP tracking and PII masking, Global Admin Notification Center, Global Admin Settings Panel, advanced RBAC with 5 admin roles and 20 granular permissions (deny-by-default model), environment guard, security status indicators, secure UX components, real-time threat monitoring, and a comprehensive fraud detection engine.
+- **Wallet & Earnings System**: A financial management system tracking earnings, commissions, negative balances, and payout processing, including automated payout scheduling, manual payout capabilities, and a reconciliation engine.
+- **System Monitoring**: Real-time performance monitoring system with telemetry hooks, system stability alerts, and an enterprise performance dashboard.
+- **Automated Incident Response**: Fully automated incident response system including auto-locking suspicious users, token revocation, session invalidation, and automated fraud responses.
 - **Support Chat System**: Real-time WebSocket-integrated support chat with full CRUD and RBAC checks.
-- **Secure UX Surfaces**: Comprehensive security UX components for admin use including Security Status Badges, Security Notes Panels, Account Type Labels, Sensitive Action Confirmation modals, Session Refresh Indicator banners, RBAC-based UI visibility controls, and Audit Log Visual Highlighting.
-- **Admin Monitoring Panel**: Real-time system monitoring dashboard displaying security metrics, recent security events, and system health indicators.
-- **Real-Time Threat Monitoring**: Advanced security threat center with blocked login attempts tracker, suspicious activity charts, active sessions list, API latency monitor, and threat activity visualization.
-- **Fraud Detection Engine**: Comprehensive fraud detection service implementing device mismatch detection, duplicate account detection, impossible travel checks, parcel fraud rules, multi-account abuse detection, and risk score calculation.
-- **DevOps Security Enhancements**: Enterprise-grade DevOps security service featuring automated log rotation, background job failure monitoring, crash alert webhooks, backup encryption/decryption, auto-scaling firewall rules, and system health checks.
-- **Automated Incident Response**: Fully automated incident response system implementing auto-locking of suspicious users, token revocation, session invalidation, admin breach alerts, automated fraud response, and full audit trails.
-- **Admin Financial Suite**: Comprehensive financial management suite with dedicated admin pages for Wallets, Payouts, and Earnings, providing end-to-end financial visibility and control with full RBAC enforcement.
-- **Admin Dashboard Cards**: The admin dashboard (`/admin`) displays 15 management cards with proper RBAC enforcement covering core management, financial, security, and support functionalities. 
-  - **Root Cause & Fix**: Created missing `/api/admin/capabilities` endpoint (was 404ing, causing capabilities array to be empty and filtering out all RBAC-protected cards). Implemented comprehensive error handling with auto-logout on 401 errors, skeleton loading during token hydration, and error banner for non-401 failures that preserves card visibility.
-  - **15 Total Cards**:
-    - **9 Core Management** (no permission required): Notification Center, KYC Approvals, Document Center, Driver Management, Customer Management, Complaints, Wallet Settlement, Activity Log, Global Settings
-    - **6 RBAC-Protected Cards**:
-      - Wallets (`VIEW_WALLET_SUMMARY`)
-      - Payouts (`MANAGE_PAYOUTS`)
-      - Earnings Analytics (`VIEW_EARNINGS_DASHBOARD`)
-      - System Monitoring (`VIEW_DASHBOARD`)
-      - Security Threat Center (`VIEW_DASHBOARD`)
-      - Support Chat (`VIEW_SUPPORT_CONVERSATIONS`)
-  - **Implementation Details**:
-    - Backend: `/api/admin/capabilities` endpoint (server/routes/admin.ts) returns `{ capabilities: string[] }` using `getAdminCapabilities()` from permissions system
-    - Frontend: Custom useQuery with `isPending` to prevent flash during token hydration, `onError` callback for clean 401 logout without React warnings, error banner on non-401 failures that shows all cards to avoid bad UX during transient backend issues
-    - Demo credentials: `admin@demo.com` / `demo123` (SUPER_ADMIN with all permissions)
-- **Payout Scheduling & Auto-Reconciliation Engine (Backend)**: Automated payout scheduling system with weekly/daily batch processing, manual payout capabilities, and a comprehensive reconciliation engine that matches completed orders with wallet ledger entries, detects discrepancies, and generates detailed reports with full audit logging.
-- **Step 47 Admin Financial Suite UI**: Complete frontend implementation for payout management with five dedicated pages:
-  - `/admin/payouts` - Hub page with navigation to all payout management features
-  - `/admin/payouts/requests` - Payout request approval workflow (existing functionality preserved)
-  - `/admin/payouts/schedule` - Schedule automatic batch payouts with configurable filters (owner type, country, minimum amount, time period)
-  - `/admin/payouts/manual` - Execute one-time manual payouts for exceptional cases with wallet search and amount configuration
-  - `/admin/payouts/reports` - Generate reconciliation reports with mismatch detection and detailed analysis
-  All pages enforce RBAC permissions (`CREATE_MANUAL_PAYOUT`, `MANAGE_PAYOUTS`, `VIEW_PAYOUTS`), integrate with existing audit logging, and follow SafeGo's design system.
-- **Step 49 Earnings Analytics RBAC Enforcement**: Added enterprise-grade RBAC security to the existing earnings analytics page (`/admin/earnings`):
-  - **Security Implementation**: Full capability checking using `VIEW_EARNINGS_DASHBOARD` permission with three-tier security gating: loading state (spinner during capability fetch), capability error state (amber warning with retry button, hides all privileged UI), and access denied state (shows only error message for unauthorized users).
-  - **Auto-Logout on 401**: Implemented useEffect-based logout to prevent React "setState during render" errors when authentication fails.
-  - **Query Protection**: All earnings data queries (global summary, ride earnings, food earnings, parcel earnings, payout analytics) include `enabled: hasAccess` flag to prevent unauthorized data fetching.
-  - **Shared Utility Integration**: Uses `fetchAdminCapabilities` utility from queryClient.ts with proper token passing and error status propagation.
-  - **Backend Endpoints**: Existing earnings dashboard endpoints (`/api/admin/earnings/dashboard/global`, `/rides`, `/food`, `/parcels`, `/payouts`) already have RBAC enforcement via `checkPermission(Permission.VIEW_EARNINGS_DASHBOARD)` middleware.
-  - **Consistency**: Security pattern matches all other protected admin pages (home, payouts-schedule, payouts-manual, payouts-reports) ensuring uniform RBAC enforcement across the entire admin panel.
-- **Step 49 Admin Analytics & Performance Dashboard**: Comprehensive platform analytics dashboard providing role-based insights for drivers, customers, restaurants, revenue, and security risk across the SafeGo platform:
-  - **Backend Infrastructure**: 6 analytics endpoints (`/api/admin/analytics/overview`, `/drivers`, `/customers`, `/restaurants`, `/revenue`, `/risk`) with full RBAC enforcement using `VIEW_ANALYTICS_DASHBOARD` permission, input sanitization via helper functions, rate limiting (60 requests/min per user), token freshness validation (30 minutes), and comprehensive audit logging for all analytics access events.
-  - **Permission System**: `VIEW_ANALYTICS_DASHBOARD` permission added to permissions enum and assigned to SUPER_ADMIN, COMPLIANCE_ADMIN, FINANCE_ADMIN, and READONLY_ADMIN roles for enterprise-grade access control.
-  - **Security Layer**: Shared Prisma instance to prevent connection exhaustion, `requireTokenFreshness` middleware for token validation, `rateLimitAnalytics` middleware to prevent abuse, input sanitization via `sanitizeQueryInput` and `validateDateRange` helpers, and audit logging via `logAuditEvent` for compliance tracking.
-  - **Frontend Dashboard** (`/admin/analytics`): Rich visualization dashboard with 5 tabs (Drivers, Customers, Restaurants, Revenue, Risk) featuring recharts-powered visualizations (AreaChart, BarChart, LineChart, PieChart), date range filters (1d, 7d, 30d, 90d), country filters, three-tier security gating (loading state, capability error state, access denied state), auto-logout on 401 errors, skeleton loading states, graceful error handling with retry buttons, and full data-testid attributes for testing.
-  - **Navigation**: Analytics Dashboard card added to admin home dashboard with proper RBAC visibility control, TrendingUp icon, indigo color scheme, and descriptive copy highlighting comprehensive platform analytics capabilities.
-  - **Data Aggregations**: Overview stats (total revenue, active users, active drivers, average commission rate), driver analytics (performance trends, top drivers, activity status, retention rate), customer analytics (growth trends, spending distribution, top customers, repeat customer rate), restaurant analytics (order volume trends, top restaurants, status distribution, average order value), revenue analytics (revenue trends, service breakdown, payment methods, country distribution), and risk analytics (fraud detection trends, risk distribution, blocked transactions, user security status).
-  - **Future Enhancements**: Country-based RBAC filtering (currently accepts country parameter but returns global data), export functionality with audit logging, and real-time data refresh capabilities.
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields, driver profile photos, and vehicle documents.

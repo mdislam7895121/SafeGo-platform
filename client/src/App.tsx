@@ -62,6 +62,7 @@ import AdminPayoutsManual from "@/pages/admin/payouts-manual";
 import AdminPayoutsReports from "@/pages/admin/payouts-reports";
 import AdminEarnings from "@/pages/admin/earnings";
 import AdminAnalytics from "@/pages/admin/analytics";
+import AdminPerformance from "@/pages/admin/performance";
 import AdminMonitoring from "@/pages/admin/monitoring";
 import AdminSecurityCenter from "@/pages/admin/security-center";
 
@@ -327,6 +328,11 @@ function Router() {
       <Route path="/admin/analytics">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminAnalytics />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/performance">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPerformance />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/monitoring">
