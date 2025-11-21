@@ -103,12 +103,14 @@ model Delivery {
   status           String
   customerRating   Int?
   customerFeedback String?
+  isDemo           Boolean          @default(false)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime
   deliveredAt      DateTime?
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   driver           DriverProfile?   @relation(fields: [driverId], references: [id])
 
+  @@index([isDemo])
   @@map("deliveries")
 }
 
@@ -251,6 +253,7 @@ model FoodOrder {
   status            String
   customerRating    Int?
   customerFeedback  String?
+  isDemo            Boolean           @default(false)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime
   deliveredAt       DateTime?
@@ -258,6 +261,7 @@ model FoodOrder {
   driver            DriverProfile?    @relation(fields: [driverId], references: [id])
   restaurant        RestaurantProfile @relation(fields: [restaurantId], references: [id])
 
+  @@index([isDemo])
   @@map("food_orders")
 }
 
@@ -328,6 +332,7 @@ model Ride {
   customerFeedback String?
   driverRating     Int?
   driverFeedback   String?
+  isDemo           Boolean           @default(false)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime
   completedAt      DateTime?
@@ -335,6 +340,7 @@ model Ride {
   customer         CustomerProfile   @relation(fields: [customerId], references: [id])
   driver           DriverProfile?    @relation(fields: [driverId], references: [id])
 
+  @@index([isDemo])
   @@map("rides")
 }
 
@@ -345,6 +351,7 @@ model User {
   role              String
   countryCode       String
   isBlocked         Boolean            @default(false)
+  isDemo            Boolean            @default(false)
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   adminProfile      AdminProfile?
@@ -357,6 +364,7 @@ model User {
   approvalRequestsApproved ApprovalRequest[] @relation("ApprovalApprover")
   adminSessions     AdminSession[] @relation("AdminSessions")
 
+  @@index([isDemo])
   @@map("users")
 }
 
@@ -672,6 +680,7 @@ model Wallet {
   availableBalance Decimal           @default(0) @db.Decimal(12, 2)
   negativeBalance  Decimal           @default(0) @db.Decimal(12, 2)
   currency         String
+  isDemo           Boolean           @default(false)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   transactions     WalletTransaction[]
@@ -681,6 +690,7 @@ model Wallet {
   @@index([ownerType])
   @@index([countryCode])
   @@index([ownerType, countryCode])
+  @@index([isDemo])
   @@map("wallets")
 }
 
@@ -697,6 +707,7 @@ model WalletTransaction {
   referenceType           WalletTransactionReferenceType
   referenceId             String?
   description             String
+  isDemo                  Boolean                          @default(false)
   createdAt               DateTime                         @default(now())
   createdByAdminId        String?
   wallet                  Wallet                           @relation(fields: [walletId], references: [id], onDelete: Cascade)
@@ -707,6 +718,7 @@ model WalletTransaction {
   @@index([referenceType, referenceId])
   @@index([createdAt])
   @@index([walletId, createdAt])
+  @@index([isDemo])
   @@map("wallet_transactions")
 }
 
@@ -721,6 +733,7 @@ model Payout {
   status              PayoutStatus  @default(pending)
   failureReason       String?
   scheduledAt         DateTime?
+  isDemo              Boolean       @default(false)
   createdAt           DateTime      @default(now())
   createdByAdminId    String?
   processedAt         DateTime?
@@ -736,6 +749,7 @@ model Payout {
   @@index([createdAt])
   @@index([ownerType, ownerId])
   @@index([batchId])
+  @@index([isDemo])
   @@map("payouts")
 }
 
