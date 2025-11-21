@@ -13,6 +13,7 @@ import supportRoutes from "./routes/support";
 import documentRoutes from "./routes/documents";
 import twoFactorRoutes from "./routes/twoFactor";
 import referralSettingsRoutes from "./routes/referral-settings";
+import opportunitySettingsRoutes from "./routes/opportunity-settings";
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -24,6 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/restaurant", restaurantRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/admin/referral-settings", referralSettingsRoutes);
+  app.use("/api/admin/opportunity-settings", opportunitySettingsRoutes);
   app.use("/api/rides", rideRoutes);
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);

@@ -1288,6 +1288,77 @@ router.get("/payouts", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/driver/opportunity-bonuses
+// Get all effective opportunity bonuses for driver
+// ====================================================
+router.get("/opportunity-bonuses", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver's country code
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { countryCode: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const countryCode = user.countryCode || "US";
+    const now = new Date();
+
+    // Fetch all active opportunity settings for this country
+    const settings = await prisma.opportunitySetting.findMany({
+      where: {
+        countryCode,
+        isActive: true,
+        isDemo: false,
+      },
+    });
+
+    // Calculate effective bonus for each bonus type
+    const bonuses = settings.map((setting) => {
+      const isWithinDateRange =
+        (!setting.startAt || new Date(setting.startAt) <= now) &&
+        (!setting.endAt || new Date(setting.endAt) >= now);
+
+      let effectiveBonus = setting.baseAmount;
+      let isPromoActive = false;
+
+      if (isWithinDateRange) {
+        if (setting.promoAmount && setting.promoAmount.gt(setting.baseAmount)) {
+          effectiveBonus = setting.promoAmount;
+          isPromoActive = true;
+        } else if (setting.promoMultiplier) {
+          effectiveBonus = setting.baseAmount.mul(setting.promoMultiplier);
+          isPromoActive = true;
+        }
+      }
+
+      const currencySymbol = setting.currency === "BDT" ? "৳" : "$";
+
+      return {
+        bonusType: setting.bonusType,
+        baseAmount: setting.baseAmount.toString(),
+        effectiveBonus: effectiveBonus.toString(),
+        currency: setting.currency,
+        currencySymbol,
+        isPromoActive,
+        zoneId: setting.zoneId,
+        startAt: setting.startAt,
+        endAt: setting.endAt,
+      };
+    });
+
+    res.json({ bonuses });
+  } catch (error) {
+    console.error("Error fetching opportunity bonuses:", error);
+    res.status(500).json({ error: "Failed to fetch opportunity bonuses" });
+  }
+});
+
+// ====================================================
 // GET /api/driver/referral-bonus
 // Get current effective referral bonus for driver
 // ====================================================
