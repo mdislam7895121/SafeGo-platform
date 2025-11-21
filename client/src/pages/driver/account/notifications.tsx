@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 
 export default function NotificationSettings() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
+    <div className="bg-background">
+      <div className="bg-primary text-primary-foreground p-6 ">
         <div className="flex items-center gap-4">
           <Link href="/driver/account">
             <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-back">

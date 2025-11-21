@@ -52,16 +52,7 @@ export default function DriverPremium() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-gradient-to-br from-yellow-500 via-yellow-600 to-orange-600 text-white p-6 sticky top-0 z-10">
-        <div className="flex items-center gap-2 mb-2">
-          <Crown className="h-6 w-6" />
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">SafeGo Premium</h1>
-        </div>
-        <p className="text-sm opacity-90">Unlock exclusive benefits and maximize your earnings</p>
-      </div>
-
+    <div className="bg-background">
       <div className="p-6 max-w-2xl mx-auto space-y-6">
         {/* Pricing Card */}
         <Card className="border-2 border-yellow-500/30 bg-gradient-to-br from-yellow-50 via-white to-orange-50 dark:from-yellow-950/20 dark:via-background dark:to-orange-950/20">

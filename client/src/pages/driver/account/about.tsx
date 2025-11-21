@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-background">
-      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
+    <div className="bg-background">
+      <div className="bg-primary text-primary-foreground p-6 ">
         <div className="flex items-center gap-4">
           <Link href="/driver/account">
             <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-back">

@@ -42,9 +42,9 @@ export default function DriverPromotions() {
   const currency = profile?.countryCode === "BD" ? "৳" : "$";
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 sticky top-0 z-10">
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 ">
         <div className="flex items-center gap-2 mb-2">
           <Gift className="h-6 w-6" />
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Promotions</h1>

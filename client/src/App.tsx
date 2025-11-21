@@ -26,7 +26,9 @@ import CustomerWallet from "@/pages/customer/wallet";
 import CustomerNotifications from "@/pages/customer/notifications";
 
 // Driver pages
+import { DriverLayout } from "@/layouts/DriverLayout";
 import DriverHome from "@/pages/driver/home";
+import DriverDashboard from "@/pages/driver/dashboard";
 import DriverVehicle from "@/pages/driver/vehicle";
 import DriverProfile from "@/pages/driver/profile";
 import DriverProfileEnhanced from "@/pages/driver/profile-enhanced";
@@ -36,6 +38,7 @@ import DriverWallet from "@/pages/driver/wallet";
 import DriverRefer from "@/pages/driver/refer";
 import DriverPremium from "@/pages/driver/premium";
 import DriverPromotions from "@/pages/driver/promotions";
+import DriverHelp from "@/pages/driver/help";
 import DriverAccount from "@/pages/driver/account";
 import DriverAccountVehicles from "@/pages/driver/account/vehicles";
 import DriverAccountWorkHub from "@/pages/driver/account/work-hub";
@@ -193,134 +196,200 @@ function Router() {
       </Route>
 
       {/* Driver routes */}
+      {/* Legacy /driver route uses standalone DriverHome layout */}
       <Route path="/driver">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverHome />
         </ProtectedRoute>
       </Route>
+      {/* New driver routes wrapped with unified DriverLayout */}
+      <Route path="/driver/dashboard">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Dashboard">
+            <DriverDashboard />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/driver/vehicle">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverVehicle />
+          <DriverLayout pageTitle="Vehicles">
+            <DriverVehicle />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/profile">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverProfileEnhanced />
+          <DriverLayout pageTitle="Profile">
+            <DriverProfileEnhanced />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/profile/legacy">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverProfile />
+          <DriverLayout pageTitle="Profile (Legacy)">
+            <DriverProfile />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/kyc-documents">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverKYCDocuments />
+          <DriverLayout pageTitle="Documents">
+            <DriverKYCDocuments />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverSupport />
+          <DriverLayout pageTitle="Support">
+            <DriverSupport />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/wallet">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverWallet />
+          <DriverLayout pageTitle="Wallet">
+            <DriverWallet />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/refer">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverRefer />
+          <DriverLayout pageTitle="Refer & Earn">
+            <DriverRefer />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/premium">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverPremium />
+          <DriverLayout pageTitle="SafeGo Premium">
+            <DriverPremium />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/promotions">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverPromotions />
+          <DriverLayout pageTitle="Opportunity">
+            <DriverPromotions />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/help">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Help Center">
+            <DriverHelp />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/vehicles">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountVehicles />
+          <DriverLayout pageTitle="My Vehicles">
+            <DriverAccountVehicles />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/work-hub">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountWorkHub />
+          <DriverLayout pageTitle="Work Hub">
+            <DriverAccountWorkHub />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/payment">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountPayment />
+          <DriverLayout pageTitle="Payment Methods">
+            <DriverAccountPayment />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/tax-info">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountTaxInfo />
+          <DriverLayout pageTitle="Tax Info">
+            <DriverAccountTaxInfo />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/manage">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountManage />
+          <DriverLayout pageTitle="Manage Account">
+            <DriverAccountManage />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/address">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountAddress />
+          <DriverLayout pageTitle="Edit Address">
+            <DriverAccountAddress />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/notifications">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountNotifications />
+          <DriverLayout pageTitle="Notifications">
+            <DriverAccountNotifications />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/privacy">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountPrivacy />
+          <DriverLayout pageTitle="Privacy">
+            <DriverAccountPrivacy />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/language">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountLanguage />
+          <DriverLayout pageTitle="Language">
+            <DriverAccountLanguage />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/dark-mode">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountDarkMode />
+          <DriverLayout pageTitle="Dark Mode">
+            <DriverAccountDarkMode />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/map-theme">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountMapTheme />
+          <DriverLayout pageTitle="Map Theme">
+            <DriverAccountMapTheme />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/navigation">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountNavigation />
+          <DriverLayout pageTitle="Navigation">
+            <DriverAccountNavigation />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/blocked-users">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountBlockedUsers />
+          <DriverLayout pageTitle="Blocked Users">
+            <DriverAccountBlockedUsers />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/permissions">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountPermissions />
+          <DriverLayout pageTitle="App Permissions">
+            <DriverAccountPermissions />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/about">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountAbout />
+          <DriverLayout pageTitle="About">
+            <DriverAccountAbout />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccount />
+          <DriverLayout pageTitle="Account Settings">
+            <DriverAccount />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
 

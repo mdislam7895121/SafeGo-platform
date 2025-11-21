@@ -37,7 +37,7 @@ export default function DriverVehicles() {
 
   if (isLoading || docsLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="bg-background">
         <div className="p-6 space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-48 w-full" />
@@ -47,9 +47,9 @@ export default function DriverVehicles() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
+      <div className="bg-primary text-primary-foreground p-6 ">
         <div className="flex items-center gap-4">
           <Link href="/driver/account">
             <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-back">

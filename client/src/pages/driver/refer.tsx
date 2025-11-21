@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Copy, Share2, Check, Users, Gift } from "lucide-react";
+import { Copy, Check, Users, Gift, Mail } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,30 +31,19 @@ export default function DriverRefer() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Join SafeGo as a Driver",
-          text: `Use my referral code ${referralCode} to join SafeGo and earn ${currency}${rewardAmount}!`,
-          url: referralLink,
-        });
-      } catch (err) {
-        console.error("Share failed:", err);
-      }
-    } else {
-      handleCopy();
-    }
+  const handleWhatsAppShare = () => {
+    const message = encodeURIComponent(`Join SafeGo as a Driver! Use my referral code ${referralCode} and earn ${currency}${rewardAmount}. Sign up here: ${referralLink}`);
+    window.open(`https://wa.me/?text=${message}`, '_blank');
+  };
+
+  const handleEmailShare = () => {
+    const subject = encodeURIComponent("Join SafeGo as a Driver");
+    const body = encodeURIComponent(`Hi!\n\nI'm inviting you to become a driver with SafeGo. Use my referral code ${referralCode} to sign up and we'll both earn ${currency}${rewardAmount}!\n\nSign up here: ${referralLink}\n\nHappy driving!`);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">Refer & Earn</h1>
-        <p className="text-sm opacity-90 mt-1">Share SafeGo with friends and earn rewards</p>
-      </div>
-
+    <div className="bg-background">
       <div className="p-6 max-w-2xl mx-auto space-y-6">
         {/* Reward Card */}
         <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-background border-primary/20">
@@ -108,7 +98,7 @@ export default function DriverRefer() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
               <Button
                 onClick={handleCopy}
                 variant="outline"
@@ -116,15 +106,24 @@ export default function DriverRefer() {
                 data-testid="button-copy"
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Copy Link
+                Copy Code
               </Button>
               <Button
-                onClick={handleShare}
-                className="w-full"
-                data-testid="button-share"
+                onClick={handleWhatsAppShare}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                data-testid="button-share-whatsapp"
               >
-                <Share2 className="h-4 w-4 mr-2" />
-                Share
+                <SiWhatsapp className="h-4 w-4 mr-2" />
+                Share via WhatsApp
+              </Button>
+              <Button
+                onClick={handleEmailShare}
+                variant="outline"
+                className="w-full"
+                data-testid="button-share-email"
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Share via Email
               </Button>
             </div>
           </CardContent>

@@ -81,9 +81,9 @@ export default function DriverVehicle() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="bg-background">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
+      <div className="bg-primary text-primary-foreground p-6 ">
         <div className="flex items-center gap-4">
           <Link href="/driver">
             <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">

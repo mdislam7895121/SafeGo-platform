@@ -69,6 +69,67 @@ Both Customer and Driver profile experiences have been upgraded to Uber-level qu
 - Responsive grid layouts adapting from mobile to desktop
 - Hover and active states following universal design guidelines
 
+### Driver Web App with Unified Navigation Layout (November 2025)
+Built a comprehensive Driver Web App featuring a unified navigation system with top bar, sidebar, dashboard, and complete feature set while preserving backward compatibility with legacy onboarding flow:
+
+**Unified Navigation Structure**:
+- **DriverLayout Component**: Wrapper providing consistent top navigation + sidebar layout for all NEW driver pages
+- **DriverTopBar**: Sticky top bar (h-16) with SafeGo logo, notification bell, language toggle, profile dropdown, and mobile SidebarTrigger
+- **DriverSidebar**: Collapsible 12-item sidebar menu (Dashboard, Refer, Opportunity, Premium, Wallet, Documents, Vehicles, Tax Info, Account Settings, Map Theme, Dark Mode, Help Center)
+- **Mobile Responsive**: SidebarTrigger in DriverTopBar provides hamburger menu on mobile/tablet (md:hidden)
+- **Legacy Compatibility**: `/driver` route uses standalone DriverHome (preserves onboarding flow), all new routes wrapped with DriverLayout
+
+**Dashboard with Real-Time Widgets** (`/driver`):
+- **Performance Metrics**: Rating (5.0/5.0), Total Trips Completed, Daily Earnings, Weekly Earnings displayed as widget cards with icons
+- **Bonus Zones Section**: Interactive cards showing surge pricing areas (Downtown 1.5x, Airport 2.0x, Business District 1.3x) with active time indicators
+- **Analytics Placeholder**: Reserved space for future heatmap and performance trend charts
+- **Real-Time Data**: All stats pulled from `/api/driver/home` endpoint with skeleton loading states
+
+**Refer & Earn Page** (`/driver/refer`):
+- **Reward Display**: ৳500 per successful referral with gift icon
+- **Referral Code**: Auto-generated from driver profile ID (e.g., "AHMED2025" or user-specific code)
+- **Share Buttons**: Three specific share methods:
+  - Copy Code button (clipboard)
+  - Share via WhatsApp button (green, opens WhatsApp with pre-filled message)
+  - Share via Email button (opens email client with formatted invitation)
+- **How It Works**: 3-step visual guide explaining referral process
+- **Terms & Conditions**: Clear policy on earning conditions and restrictions
+
+**SafeGo Premium Page** (`/driver/premium`):
+- **Pricing**: ৳499/month (Bangladesh) or $49/month (US) with cancel-anytime policy
+- **5 Premium Benefits**: Priority trip requests, lower commission rates (5% savings), exclusive bonus zones, 24/7 premium support, advanced analytics
+- **ROI Calculator**: Visual comparison showing standard driver vs premium driver earnings with monthly profit calculation
+- **FAQ Section**: Addressing common questions about cancellation, commission savings, and priority access
+
+**Help Center Page** (`/driver/help`):
+- **4 Support Channels**: Live chat, phone support, email support, FAQ & guides
+- **Common Topics**: Quick links to frequently asked questions (vehicle documents, earnings, passenger issues, tax info)
+- **Contact Information**: Displayed support phone number and email address
+
+**Route Architecture**:
+- **Legacy Route** `/driver`: DriverHome standalone (NOT wrapped) - preserves onboarding, vehicle registration, online/offline toggle
+- **New Routes** (25+ routes wrapped with DriverLayout):
+  - `/driver/dashboard`: Dashboard with 4 performance widgets
+  - `/driver/refer`: Refer & Earn with Copy/WhatsApp/Email share
+  - `/driver/premium`: SafeGo Premium subscription page
+  - `/driver/help`: Help Center with 4 support channels
+  - `/driver/profile`: Enhanced profile with tabs
+  - `/driver/vehicle`, `/driver/wallet`, `/driver/kyc-documents`: Feature pages
+  - All `/driver/account/*` routes: Account settings and preferences
+- Page titles dynamically set per route via DriverLayout
+- Protected routes requiring driver role authentication
+- No conflicting sticky headers or double framing issues
+
+**Design Compliance**:
+- All pages use shadcn/ui primitives (Card, Button, Badge) with stock variants
+- No custom background/text classes on Badge components per SafeGo design guidelines
+- Proper icon usage from lucide-react and react-icons/si
+- Data-testid attributes on all interactive elements for E2E testing
+- Mobile-first responsive design with Tailwind utility classes
+- Single sticky DriverTopBar (no stacked headers) with clean scroll behavior
+- Removed conflicting sticky headers from 20+ driver subpages to prevent overlap
+- Avatar in sidebar: simple clickable link without hover-elevate interaction
+
 ### Driver Onboarding Backend (November 2025)
 Fixed critical driver onboarding issues to enable complete end-to-end flow:
 

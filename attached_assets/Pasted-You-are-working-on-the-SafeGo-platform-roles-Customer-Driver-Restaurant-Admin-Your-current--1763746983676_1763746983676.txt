@@ -1,0 +1,130 @@
+You are working on the SafeGo platform (roles: Customer, Driver, Restaurant, Admin).  
+Your current task is to implement the SafeGo Driver Web App UI (desktop/web) based on the specification below.  
+Do not break existing Customer, Restaurant, or Admin features.  
+This is a UI/UX update only. No business logic changes.
+
+Before coding:
+1. Scan existing driver web routes and components.
+2. Compare them with this specification.
+3. Only implement items that are missing or inconsistent.  
+4. Keep all working flows intact.
+
+================================================
+SAFEGO DRIVER WEB APP — DESIGN REQUIREMENTS
+================================================
+
+Overall Layout:
+- Top Navigation Bar
+- Left Sidebar Menu
+- Main Content Panel (dynamic per route)
+- Optional Bottom Status Bar
+
+------------------------------------------------
+1. Top Navigation Bar
+------------------------------------------------
+The top bar must include:
+
+- SafeGo Logo (left, links to driver dashboard)
+- Page Title (dynamic: Dashboard, Wallet, Vehicles, Documents, Tax Info, Account Settings, SafeGo Premium, Refer & Earn)
+- Notification Icon (bell with unread count badge, demo is fine)
+- Language Toggle (Bangla / English switch, local state only)
+- Profile Dropdown (driver name with dropdown: Profile/Settings, Logout)
+
+If similar components exist, reuse or refine.
+
+------------------------------------------------
+2. Left Sidebar Menu
+------------------------------------------------
+Implement a collapsible sidebar.  
+Items must include:
+
+- Dashboard
+- Refer a Friend
+- Opportunity
+- SafeGo Premium
+- Wallet
+- Documents
+- Vehicles
+- Tax Info
+- Account Settings
+- Map Theme
+- Dark Mode
+- Help Center
+
+Requirements:
+- Active item highlighting
+- Collapses to icons on mobile/tablet
+- Must not affect other roles’ sidebars
+
+------------------------------------------------
+3. Main Content Views
+------------------------------------------------
+
+A) SafeGo Premium Page:
+- Header: SafeGo Premium
+- Pricing: 499/month (display only)
+- Benefits List:
+  - Priority trip requests
+  - Lower commission rates
+  - Exclusive bonus zones
+  - 24/7 premium support
+  - Advanced analytics
+- Button: Subscribe Now
+
+B) Refer & Earn Page:
+- Header: Refer & Earn
+- Reward: 500 per referral
+- Referral Code: Example AHMED2025 (use real data if available)
+- Buttons: Copy Code, Share via WhatsApp, Share via Email
+
+C) Dashboard Widgets:
+Implement cards for:
+- Rating
+- Trips Completed
+- Earnings (daily/weekly)
+- Bonus Zones
+- Analytics (basic heatmap or chart placeholder)
+
+Must be responsive.
+
+------------------------------------------------
+4. Bottom Status Bar (Optional)
+------------------------------------------------
+Small footer text, e.g., “SafeGo Driver v1.0.0”.
+
+------------------------------------------------
+5. Responsive Design Rules
+------------------------------------------------
+- Mobile-first layout
+- Sidebar collapses on smaller screens
+- Top bar always visible
+- Dark mode support
+- Reuse existing design tokens (colors, spacing, typography)
+
+------------------------------------------------
+6. Platform Safety Requirements
+------------------------------------------------
+Do NOT modify:
+- KYC logic or verification
+- Tax logic
+- Wallet engine
+- Payout calculation
+- Commission or earnings logic
+- Admin/customer/restaurant routes
+
+------------------------------------------------
+7. Deliverables
+------------------------------------------------
+1. Updated components for:
+   - Top Nav Bar
+   - Sidebar Menu
+   - Dashboard widgets
+   - Premium Page
+   - Refer & Earn Page
+2. Updated routing (driver-only)
+3. Responsive styles
+4. A summary inside replit.md:
+   - Implemented features
+   - Modified files
+   - How to navigate to the driver web app
+5. Build with no TypeScript errors.

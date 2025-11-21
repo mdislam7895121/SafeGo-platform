@@ -143,9 +143,9 @@ export default function DriverProfileEnhanced() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Uber-Style Blue Gradient Header - Fixed on scroll */}
-      <div className="sticky top-0 z-40 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white shadow">
+    <div className="bg-background pb-20">
+      {/* Uber-Style Blue Gradient Header */}
+      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white shadow">
         <div className="p-4 md:p-6 max-w-6xl mx-auto">
           {/* Back Button */}
           <div className="flex items-center gap-4 mb-4">

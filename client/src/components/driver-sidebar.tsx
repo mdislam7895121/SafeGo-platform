@@ -22,18 +22,31 @@ import {
   Star,
   MapPin,
   LogOut,
+  LayoutDashboard,
+  Target,
+  FileText,
+  Car,
+  Receipt,
+  Map,
+  Moon,
+  HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
+  {
+    title: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/driver/dashboard",
+  },
   {
     title: "Refer a Friend",
     icon: Users,
     href: "/driver/refer",
   },
   {
-    title: "Promotions",
-    icon: Gift,
+    title: "Opportunity",
+    icon: Target,
     href: "/driver/promotions",
   },
   {
@@ -47,9 +60,39 @@ const menuItems = [
     href: "/driver/wallet",
   },
   {
-    title: "Account",
+    title: "Documents",
+    icon: FileText,
+    href: "/driver/kyc-documents",
+  },
+  {
+    title: "Vehicles",
+    icon: Car,
+    href: "/driver/vehicle",
+  },
+  {
+    title: "Tax Info",
+    icon: Receipt,
+    href: "/driver/account/tax-info",
+  },
+  {
+    title: "Account Settings",
     icon: Settings,
     href: "/driver/account",
+  },
+  {
+    title: "Map Theme",
+    icon: Map,
+    href: "/driver/account/map-theme",
+  },
+  {
+    title: "Dark Mode",
+    icon: Moon,
+    href: "/driver/account/dark-mode",
+  },
+  {
+    title: "Help Center",
+    icon: HelpCircle,
+    href: "/driver/help",
   },
 ];
 
@@ -77,36 +120,36 @@ export function DriverSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <Link href="/driver/profile">
-          <a data-testid="link-driver-profile" className="block">
-            <div className="flex items-center gap-3 hover-elevate active-elevate-2 rounded-lg p-2 -m-2">
-              <Avatar className="h-14 w-14 border-2 border-primary">
+        <div className="flex items-center gap-3 p-2">
+          <Link href="/driver/profile">
+            <a data-testid="link-driver-profile">
+              <Avatar className="h-14 w-14">
                 <AvatarImage src={profile?.profilePhotoUrl} alt={driverName} />
                 <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-lg">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-base truncate" data-testid="text-driver-name">
-                  {driverName}
-                </h3>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
-                    <span data-testid="text-driver-rating">{rating.toFixed(1)}</span>
-                  </div>
-                  <span>•</span>
-                  <div className="flex items-center gap-1 truncate">
-                    <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                    <span className="truncate" data-testid="text-driver-location">
-                      {cityName}, {countryCode}
-                    </span>
-                  </div>
-                </div>
+            </a>
+          </Link>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base truncate" data-testid="text-driver-name">
+              {driverName}
+            </h3>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+                <span data-testid="text-driver-rating">{rating.toFixed(1)}</span>
+              </div>
+              <span>•</span>
+              <div className="flex items-center gap-1 truncate">
+                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="truncate" data-testid="text-driver-location">
+                  {cityName}, {countryCode}
+                </span>
               </div>
             </div>
-          </a>
-        </Link>
+          </div>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
