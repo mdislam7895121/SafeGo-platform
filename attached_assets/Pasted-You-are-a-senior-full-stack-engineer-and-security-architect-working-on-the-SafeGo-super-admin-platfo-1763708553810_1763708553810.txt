@@ -1,0 +1,107 @@
+You are a senior full-stack engineer and security architect working on the SafeGo super-admin platform.
+
+Project: SafeGo – Admin Panel  
+Current phase: Step 50 – Final Admin Security Regression & Production Readiness  
+Security roadmap phase: Phase 5 – Pre-production validation and hardening
+
+High-level goal
+Run a full end-to-end security-aware regression of the entire admin panel (desktop + mobile layouts) now that:
+- Step 46 Admin Financial Suite is complete
+- Step 47 Payout scheduling & reconciliation engine is complete
+- Step 48 Admin dashboard capabilities endpoint is in place
+- Step 49 Analytics security hardening & RBAC enforcement is production-ready
+
+You must:
+- NOT remove or weaken any existing security checks, RBAC rules, validation logic, or audit logging
+- Preserve all previous steps and functionality
+- Only make additive or strictly necessary fixes
+
+Focus areas
+1) Route & RBAC coverage
+   - Enumerate all protected admin routes and sections, including at minimum:
+     - /admin (home dashboard cards)
+     - /admin/users, /admin/drivers, /admin/customers, /admin/restaurants
+     - /admin/parcels and any parcel-related stats cards
+     - /admin/analytics (all tabs: Overview, Drivers, Customers, Restaurants, Revenue, Risk)
+     - /admin/earnings (earnings analytics)
+     - /admin/payouts/schedule, /admin/payouts/manual, /admin/payouts/reports
+     - /admin/wallets or wallet settlement screens (if present)
+     - /admin/kyc, /admin/documents, /admin/complaints, /admin/notifications
+     - /admin/activity-log, /admin/settings or global settings
+   - For each route, verify:
+     - It is protected by the capabilities / RBAC system and cannot be accessed by unauthenticated users
+     - SUPER_ADMIN has full access to all data
+     - COUNTRY_ADMIN sees only their assigned country data
+     - CITY_ADMIN sees only their assigned city + country data
+     - Any non-admin roles are denied with 403 and no data is leaked in the response body
+
+2) JWT / session & capabilities behavior
+   - Confirm that:
+     - Expired / tampered JWTs result in 401/403 and DO NOT leak any partial analytics or earnings data
+     - The /api/admin/capabilities endpoint is consistently used on all admin pages that require RBAC
+     - Stale capabilities or missing roles never cause a blank white screen; the UI must show a clear error / warning state instead
+
+3) Data-safety and null-safety checks
+   - Re-confirm that all analytics and earnings endpoints:
+     - Use the safeNumber/safeArray/safeString helpers where appropriate
+     - Guard against null, undefined, or missing fields in Prisma/SQL results
+     - Return safe default values rather than throwing runtime errors
+   - On the frontend, verify:
+     - All charts can render correctly when the datasets are empty
+     - Cards and KPIs show 0, “No data”, or similar safe defaults instead of crashing
+
+4) Financial & payout security
+   - For all financial routes (earnings, revenue analytics, payouts, commission, wallet settlement):
+     - Verify that only authorized roles can see or modify these views
+     - Ensure RBAC filters prevent cross-country or cross-city financial visibility for COUNTRY_ADMIN and CITY_ADMIN
+     - Confirm there is no way to access other jurisdictions’ payout reports or commission analytics by manipulating query parameters
+
+5) Audit logging and activity tracking
+   - Inspect how admin actions are logged:
+     - Viewing sensitive analytics
+     - Triggering or modifying payouts
+     - Changing global settings
+   - Ensure that security-sensitive actions write to the audit log with:
+     - Admin user ID
+     - Role and jurisdiction (country/city)
+     - Action type and target entity
+     - Timestamp
+   - If any major security-sensitive flow is missing logging, add minimal, consistent audit events without breaking existing code
+
+6) Mobile vs desktop behavior
+   - Specifically re-test the admin dashboard, analytics, and earnings pages on:
+     - A desktop-sized viewport
+     - A typical mobile viewport
+   - Confirm:
+     - All 15+ dashboard cards appear with the correct counts
+     - No cards or sections disappear on mobile due to RBAC or layout issues
+     - The analytics and earnings pages do not show blank white screens on mobile
+
+7) Error handling and stability
+   - Confirm there are no unhandled runtime errors in the browser console when navigating:
+     - Between all major admin sections
+     - Between date ranges in analytics/earnings
+     - Between driver/customer/restaurant/revenue/risk tabs
+   - Make sure:
+     - Network errors show user-friendly banners instead of crashes
+     - Security errors (401/403) display clear “not authorized” messages, not generic failures
+
+Documentation (replit.md)
+   - Add a new section: “Step 50 – Final Admin Security Regression & Production Readiness”
+   - Document:
+     - List of admin routes tested
+     - RBAC behavior for SUPER_ADMIN, COUNTRY_ADMIN, CITY_ADMIN, and unauthorized roles
+     - How analytics, earnings, and payout pages are protected
+     - Any fixes you applied during this step (frontend or backend)
+     - A short security verification checklist for future regression runs
+
+Deliverables
+   - All necessary code changes (backend + frontend) to satisfy the checks above
+   - Clean TypeScript/React code with no new type errors or ESLint violations
+   - No breaking changes to existing functionality
+   - Updated replit.md with the Step 50 summary
+
+When you are done, restart the application, run through the key routes again, and summarize:
+   - Routes tested
+   - RBAC behaviors verified
+   - Any remaining low-risk TODOs, if you had to leave anything for later
