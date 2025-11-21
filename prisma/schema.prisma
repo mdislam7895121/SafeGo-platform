@@ -946,6 +946,18 @@ enum ReferralRewardStatus {
   paid
 }
 
+enum OpportunityBonusType {
+  trip_boost
+  surge_boost
+  peak_hour_boost
+  per_ride_bonus
+}
+
+enum OpportunityRewardStatus {
+  pending
+  paid
+}
+
 model ReferralSetting {
   id                  String             @id @default(uuid())
   countryCode         String
@@ -1000,4 +1012,63 @@ model ReferralReward {
   @@index([triggeredAt])
   @@index([isDemo])
   @@map("referral_rewards")
+}
+
+model OpportunitySetting {
+  id                    String                 @id @default(uuid())
+  bonusType             OpportunityBonusType
+  countryCode           String
+  currency              String
+  baseAmount            Decimal                @db.Decimal(10, 2)
+  promoAmount           Decimal?               @db.Decimal(10, 2)
+  promoMultiplier       Decimal?               @db.Decimal(5, 2)
+  zoneId                String?
+  startAt               DateTime?
+  endAt                 DateTime?
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  createdByAdminId      String
+  updatedByAdminId      String?
+  notes                 String?
+  isDemo                Boolean                @default(false)
+  opportunityRewards    OpportunityReward[]
+
+  @@unique([bonusType, countryCode, zoneId, isActive])
+  @@index([bonusType])
+  @@index([countryCode])
+  @@index([zoneId])
+  @@index([isActive])
+  @@index([startAt])
+  @@index([endAt])
+  @@index([isDemo])
+  @@map("opportunity_settings")
+}
+
+model OpportunityReward {
+  id                      String                   @id @default(uuid())
+  driverId                String
+  rideId                  String?
+  countryCode             String
+  bonusType               OpportunityBonusType
+  opportunitySettingId    String
+  rewardAmount            Decimal                  @db.Decimal(10, 2)
+  currency                String
+  status                  OpportunityRewardStatus  @default(pending)
+  triggeredAt             DateTime                 @default(now())
+  paidAt                  DateTime?
+  walletTransactionId     String?
+  isDemo                  Boolean                  @default(false)
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  opportunitySetting      OpportunitySetting       @relation(fields: [opportunitySettingId], references: [id])
+
+  @@index([driverId])
+  @@index([rideId])
+  @@index([opportunitySettingId])
+  @@index([bonusType])
+  @@index([status])
+  @@index([triggeredAt])
+  @@index([isDemo])
+  @@map("opportunity_rewards")
 }
