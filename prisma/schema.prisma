@@ -725,6 +725,7 @@ enum WalletTransactionReferenceType {
   payout
   manual_adjustment
   auto_settlement
+  referral_bonus
 }
 
 enum PayoutMethod {
@@ -933,4 +934,70 @@ model TaxRule {
   @@index([isActive])
   @@index([isDemo])
   @@map("tax_rules")
+}
+
+enum ReferralUserType {
+  driver
+  rider
+}
+
+enum ReferralRewardStatus {
+  pending
+  paid
+}
+
+model ReferralSetting {
+  id                  String             @id @default(uuid())
+  countryCode         String
+  userType            ReferralUserType
+  currency            String
+  baseAmount          Decimal            @db.Decimal(10, 2)
+  promoAmount         Decimal?           @db.Decimal(10, 2)
+  promoMultiplier     Decimal?           @db.Decimal(5, 2)
+  promoLabel          String?
+  startAt             DateTime?
+  endAt               DateTime?
+  isActive            Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  createdByAdminId    String
+  updatedByAdminId    String?
+  notes               String?
+  isDemo              Boolean            @default(false)
+  referralRewards     ReferralReward[]
+
+  @@unique([countryCode, userType, isActive])
+  @@index([countryCode])
+  @@index([userType])
+  @@index([isActive])
+  @@index([startAt])
+  @@index([endAt])
+  @@index([isDemo])
+  @@map("referral_settings")
+}
+
+model ReferralReward {
+  id                  String               @id @default(uuid())
+  referrerUserId      String
+  referredUserId      String
+  referralSettingId   String
+  rewardAmount        Decimal              @db.Decimal(10, 2)
+  currency            String
+  countryCode         String
+  status              ReferralRewardStatus @default(pending)
+  triggeredAt         DateTime             @default(now())
+  paidAt              DateTime?
+  walletTransactionId String?
+  isDemo              Boolean              @default(false)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  referralSetting     ReferralSetting      @relation(fields: [referralSettingId], references: [id])
+
+  @@index([referrerUserId])
+  @@index([referredUserId])
+  @@index([referralSettingId])
+  @@index([status])
+  @@index([triggeredAt])
+  @@index([isDemo])
+  @@map("referral_rewards")
 }

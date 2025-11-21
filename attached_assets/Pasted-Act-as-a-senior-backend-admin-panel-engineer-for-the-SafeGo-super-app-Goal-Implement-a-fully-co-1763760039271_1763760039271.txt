@@ -1,0 +1,167 @@
+Act as a senior backend + admin-panel engineer for the SafeGo super-app.
+
+Goal:
+Implement a fully configurable “Referral Bonus Management” system in the SafeGo Admin Panel so that admins can increase or decrease the “Refer a Friend” bonus, and optionally run special limited-time referral campaigns. This must work for existing SafeGo drivers (and future riders) without breaking current referral flows.
+
+Important SafeGo rules to respect:
+- Do NOT break or change existing core collections: users, drivers, rides, food_orders, deliveries, payouts, wallets.
+- All payout-related logic must remain auditable and stored in the database, never inferred only from UI.
+- Admin Panel is the single source of truth for all global business configuration (including referral bonuses).
+- Security: enforce RBAC, audit logging, and server-side validation for all admin changes.
+
+===================================
+1) DATA MODEL – REFERRAL SETTINGS
+===================================
+
+Create a persistent configuration model for referral bonuses. Use a single source of truth such as:
+- Collection/table: referral_settings
+
+Fields (minimum):
+- id
+- country_code (e.g., "US", "BD")
+- user_type ("driver", "rider") – start with "driver" but keep generic
+- currency (e.g., "USD", "BDT")
+- base_amount (default referral bonus)
+- promo_amount (optional higher bonus during campaign)
+- promo_multiplier (optional; e.g., 1.5x or 2x instead of promo_amount)
+- promo_label (short text like "Limited-time referral bonus")
+- start_at (datetime; campaign start, nullable)
+- end_at (datetime; campaign end, nullable)
+- is_active (boolean)
+- created_at, updated_at
+- created_by_admin_id, updated_by_admin_id
+- notes (admin-only description of why this campaign exists)
+
+Rules:
+- At any time, for a given (country_code, user_type), exactly one active setting must be used as the “current effective bonus”.
+- If a campaign is not active (outside start/end window or is_active = false), fall back to base_amount.
+- Store both base_amount and promo_amount/promo_multiplier so we can see history even after changes.
+
+===================================
+2) ADMIN PANEL – REFERRAL MANAGEMENT UI
+===================================
+
+Add a new section in the Admin Panel sidebar:
+- Menu label: Referral Bonuses
+- Location: Under Promotions/Marketing group (do not touch financial reporting or payouts UI).
+
+Referral Bonuses list page:
+- Table of referral_settings records with columns:
+  - Country
+  - User Type
+  - Effective Bonus (what drivers currently see)
+  - Base Amount
+  - Promo Amount or Multiplier
+  - Status (Active / Scheduled / Expired)
+  - Start Date
+  - End Date
+  - Last Updated By
+- Filters: by country, by user type, by status.
+
+Actions:
+- “Create Referral Rule” button:
+  - Form fields:
+    - Country
+    - User Type (driver/rider)
+    - Currency
+    - Base Amount
+    - Optional Promo Amount OR Multiplier (never both at the same time)
+    - Start Date/Time (optional)
+    - End Date/Time (optional)
+    - is_active (checkbox)
+    - Notes (internal)
+  - Validate:
+    - Base Amount must be >= 0
+    - Promo Amount must be >= Base Amount if provided
+    - End Date must be after Start Date
+- “Edit” action for existing rules:
+  - Same fields as create.
+  - Display a warning: “Changes only affect future referrals. Already-issued bonuses remain unchanged.”
+- “Deactivate” action:
+  - Sets is_active = false and recalculates which rule is now effective.
+
+Security:
+- Only roles admin/super_admin can create/edit/deactivate referral_settings.
+- Log every change in an audit trail collection:
+  - admin_id, action_type, old_value, new_value, timestamp, ip_address.
+
+===================================
+3) DRIVER “REFER & EARN” PAGE INTEGRATION
+===================================
+
+Driver web app already has a “Refer & Earn” page. Modify its backend logic so that:
+- It fetches the current effective referral setting for:
+  - the driver’s country_code
+  - user_type = "driver"
+- It computes effective_bonus as:
+  - If an active promo is within date range and is_active = true:
+    - If promo_amount is set: use promo_amount
+    - Else if promo_multiplier is set: effective_bonus = base_amount * promo_multiplier
+  - Else: effective_bonus = base_amount
+
+UI text:
+- Show: “You earn [effective_bonus][currency] for each successful referral.”
+- If a promo is active AND promo_amount > base_amount:
+  - Show a small label under the main text, e.g.:
+    - “Limited-time offer until [end_date].”
+- Do NOT hard-code the bonus amount on the frontend. Always read from the server.
+
+Do NOT change:
+- Referral code generation
+- Referral link / tracking logic
+- Wallet payout processing structure
+
+===================================
+4) PAYOUT AND WALLET LOGIC
+===================================
+
+When a referral is completed (i.e., referred driver meets the conditions we already use, such as completing X trips or being approved):
+- Create or update a referral_reward record (if it does not exist yet).
+- Fields should include:
+  - referrer_driver_id
+  - referred_user_id
+  - referral_setting_id (snapshot of the rule used)
+  - reward_amount
+  - currency
+  - country_code
+  - status (pending / paid)
+  - triggered_at (when requirement was met)
+  - paid_at (when moved into wallet)
+- reward_amount must be taken from the effective_bonus at the time the referral requirement is satisfied, not “today’s” setting.
+
+Wallet:
+- Insert a wallet transaction of type REFERRAL_BONUS when the reward is paid:
+  - amount = reward_amount
+  - metadata: { source: "referral", referral_setting_id, referred_user_id }
+
+This ensures changing referral_settings later does NOT change past payouts.
+
+===================================
+5) BUSINESS & SECURITY RULES
+===================================
+
+- No client-side overrides. The driver app must never define its own bonus amounts.
+- All sensitive payout settings are admin-only and hidden from drivers.
+- Do not introduce any new collections that conflict with existing financial or payout logic.
+- Keep backwards compatibility with any existing referral records (if they exist).
+- Cover edge cases:
+  - If no referral_settings exists for a country, return a safe default bonus of 0 and a generic message instead of failing.
+  - If promo date has expired, do not show promo label.
+
+===================================
+6) WHAT TO DELIVER
+===================================
+
+- Database model for referral_settings and audit trail entries.
+- Admin Panel pages for:
+  - Listing all referral settings
+  - Creating a new referral setting
+  - Editing and deactivating existing settings
+- Backend logic to:
+  - Select the effective referral bonus per driver
+  - Apply correct amount when generating a referral reward and wallet transaction
+- Integration of this logic into the existing driver “Refer & Earn” page without breaking anything else in the SafeGo app.
+
+Once implemented, please briefly summarize:
+- How admins can change the referral bonus for drivers in BD and US.
+- How the driver UI automatically reflects higher or lower bonuses or time-limited campaigns.
