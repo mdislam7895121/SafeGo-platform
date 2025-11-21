@@ -156,11 +156,11 @@ export function DriverSidebar() {
                 const isActive = location === item.href || location.startsWith(item.href + '/');
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive}>
+                    <SidebarMenuButton asChild isActive={isActive} className="px-4 py-3">
                       <Link href={item.href}>
-                        <a data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                          <item.icon className="h-5 w-5" />
-                          <span>{item.title}</span>
+                        <a data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`} className="flex items-center gap-3 w-full text-sm font-medium">
+                          <item.icon className="h-5 w-5 flex-shrink-0" />
+                          <span className="flex-1">{item.title}</span>
                           {item.title === "SafeGo Premium" && (
                             <Badge variant="secondary" className="ml-auto bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
                               New
@@ -180,10 +180,10 @@ export function DriverSidebar() {
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <button
           onClick={logout}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg hover-elevate active-elevate-2 text-muted-foreground hover:text-foreground"
+          className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-lg hover-elevate active-elevate-2 text-muted-foreground hover:text-foreground"
           data-testid="button-logout-sidebar"
         >
-          <LogOut className="h-5 w-5" />
+          <LogOut className="h-5 w-5 flex-shrink-0" />
           <span>Log Out</span>
         </button>
       </SidebarFooter>
