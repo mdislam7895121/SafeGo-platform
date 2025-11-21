@@ -377,6 +377,8 @@ model Ride {
   id               String            @id @default(uuid())
   customerId       String
   driverId         String?
+  countryCode      String?
+  cityCode         String?
   pickupAddress    String
   pickupLat        Float?
   pickupLng        Float?
@@ -402,6 +404,8 @@ model Ride {
   customer         CustomerProfile   @relation(fields: [customerId], references: [id])
   driver           DriverProfile?    @relation(fields: [driverId], references: [id])
 
+  @@index([countryCode])
+  @@index([cityCode])
   @@index([isDemo])
   @@map("rides")
 }

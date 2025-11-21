@@ -42,9 +42,16 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "paymentMethod must be 'cash' or 'online'" });
     }
 
-    // Get customer profile
+    // Get customer profile with user data for jurisdiction
     const customerProfile = await prisma.customerProfile.findUnique({
       where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
     });
 
     if (!customerProfile) {
@@ -55,21 +62,41 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Customer must be verified to request rides" });
     }
 
+    // Get jurisdiction from customer profile
+    const countryCode = customerProfile.user.countryCode;
+    const cityCode = customerProfile.cityCode || null;
+
     // Calculate commission (20% for now - can be made configurable later)
     const commissionRate = 0.20;
     const safegoCommission = parseFloat(serviceFare) * commissionRate;
     const driverPayout = parseFloat(serviceFare) - safegoCommission;
 
-    // Create ride - GPS coordinates are optional for future use
+    // Validate lat/lng as numbers if provided
+    const validPickupLat = pickupLat ? parseFloat(pickupLat.toString()) : null;
+    const validPickupLng = pickupLng ? parseFloat(pickupLng.toString()) : null;
+    const validDropoffLat = dropoffLat ? parseFloat(dropoffLat.toString()) : null;
+    const validDropoffLng = dropoffLng ? parseFloat(dropoffLng.toString()) : null;
+
+    // Validate that lat/lng are valid numbers if provided
+    if ((pickupLat && isNaN(validPickupLat!)) || (pickupLng && isNaN(validPickupLng!))) {
+      return res.status(400).json({ error: "Invalid pickup coordinates" });
+    }
+    if ((dropoffLat && isNaN(validDropoffLat!)) || (dropoffLng && isNaN(validDropoffLng!))) {
+      return res.status(400).json({ error: "Invalid dropoff coordinates" });
+    }
+
+    // Create ride with jurisdiction and validated coordinates
     const ride = await prisma.ride.create({
       data: {
         customerId: customerProfile.id,
+        countryCode,
+        cityCode,
         pickupAddress,
-        pickupLat: pickupLat ? parseFloat(pickupLat.toString()) : null,
-        pickupLng: pickupLng ? parseFloat(pickupLng.toString()) : null,
+        pickupLat: validPickupLat,
+        pickupLng: validPickupLng,
         dropoffAddress,
-        dropoffLat: dropoffLat ? parseFloat(dropoffLat.toString()) : null,
-        dropoffLng: dropoffLng ? parseFloat(dropoffLng.toString()) : null,
+        dropoffLat: validDropoffLat,
+        dropoffLng: validDropoffLng,
         serviceFare: parseFloat(serviceFare),
         safegoCommission,
         driverPayout,
