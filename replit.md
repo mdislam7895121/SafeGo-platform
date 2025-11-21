@@ -20,12 +20,99 @@ Key architectural features include:
 - **Admin Capabilities**: Admin panel with interactive dashboard, real-time data, Document Center, Wallet Settlement System, Global Earnings & Payout Analytics, and advanced analytics.
 - **Security & Compliance**: Admin Activity Audit Trail, Global Admin Notification Center, Global Admin Settings Panel, advanced Role-Based Access Control (RBAC) with 5 admin roles and 20 granular permissions (deny-by-default model), secure UX components, real-time threat monitoring, and a comprehensive fraud detection engine with automated incident response.
 - **Wallet & Earnings System**: Financial management system tracking earnings, commissions, negative balances, and payout processing, including automated/manual payouts and reconciliation.
+- **Tax & Fees System**: Uber-style multi-country tax management with city-level overrides, supporting 7 tax types (VAT, Sales Tax, Government Service Fee, Marketplace Facilitator Tax, Trip Fee, Local Municipality Fee, Regulatory Fee), simple stacking calculation (taxAmount = baseFare × percentRate/100 + flatFee), and tax breakdown storage in all transaction records.
 - **System Monitoring**: Real-time performance monitoring, system stability alerts, and an enterprise performance dashboard.
 - **Support Chat System**: Real-time WebSocket-integrated support chat with full CRUD and RBAC checks.
 - **Demo Mode**: Comprehensive demo data generation system with realistic multi-jurisdiction data.
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields and includes `isDemo: Boolean @default(false)`.
+
+## Tax & Fees System
+
+### Overview
+The Tax & Fees system implements Uber-style multi-country tax management with city-level overrides. It supports 7 tax types, simple stacking calculation logic, and stores complete tax breakdowns in all transaction records.
+
+### Tax Types
+1. **VAT** - Value Added Tax (common in Europe, Asia)
+2. **SALES_TAX** - Sales Tax (common in USA)
+3. **GOVERNMENT_SERVICE_FEE** - Government-mandated service fees
+4. **MARKETPLACE_FACILITATOR_TAX** - Platform facilitator taxes
+5. **TRIP_FEE** - Per-trip booking fees
+6. **LOCAL_MUNICIPALITY_FEE** - City/municipality fees
+7. **REGULATORY_FEE** - Regulatory compliance fees
+
+### Tax Rule Fields
+Each tax rule in the `TaxRule` model contains:
+- **countryCode** (required): ISO country code (e.g., "US", "BD")
+- **cityCode** (optional): City identifier for city-specific rules (e.g., "NYC", "SF", "DHK")
+- **serviceType** (required): Service the tax applies to (RIDE, FOOD, PARCEL)
+- **taxType** (required): Type of tax (see Tax Types above)
+- **percentRate** (optional): Percentage rate (e.g., 7.5 for 7.5%)
+- **flatFee** (optional): Fixed flat fee amount (e.g., 2.50 for $2.50)
+- **isActive** (default: true): Whether the rule is currently active
+- **isDemo** (default: false): Mark as demo data for testing
+
+### Tax Calculation Logic
+Taxes are calculated using simple stacking:
+```
+taxAmount = baseFare × (percentRate / 100) + flatFee
+totalTax = sum of all applicable taxAmounts
+```
+
+**Rule Priority**: City rules override country rules (not additive). If a city has a specific rule for a tax type, the country-level rule for that same tax type is ignored.
+
+### Demo Tax Rules
+The system includes 10 pre-configured demo tax rules:
+
+**USA (Country-level)**:
+- Sales Tax: 7.5% for RIDE, FOOD, PARCEL
+
+**USA - New York City (NYC)**:
+- Trip Fee: 0.5% + $2.50 flat for RIDE
+- Local Municipality Fee: $0.75 flat for FOOD
+
+**USA - San Francisco (SF)**:
+- Local Municipality Fee: $1.50 flat for RIDE
+
+**Bangladesh (Country-level)**:
+- VAT: 15% for RIDE, FOOD, PARCEL
+
+**Bangladesh - Dhaka (DHK)**:
+- Government Service Fee: 5% for RIDE
+
+### Managing Tax Rules
+
+#### Via Admin UI
+1. Navigate to Admin Settings → Tax & Fees tab
+2. Click "Add Tax Rule" to create new rules
+3. Fill in required fields (country, service type, tax type)
+4. Set either percentRate, flatFee, or both
+5. Mark isActive to enable/disable rules
+
+#### Via Seed Script
+To regenerate demo data:
+```bash
+tsx scripts/seed.ts
+```
+
+#### Safety Guidelines
+- **Validate inputs**: Always provide either percentRate or flatFee (or both)
+- **Test first**: Create rules with `isActive: false`, test calculation, then activate
+- **Use demo flag**: Mark test rules with `isDemo: true` for easy cleanup
+- **Respect RBAC**: All tax rule changes require `EDIT_SETTINGS` permission
+- **Audit trail**: All tax rule changes are automatically logged in AuditLog
+
+#### Adding New Countries/Cities
+1. Add country-level rules first (cityCode = null)
+2. Add city-specific overrides as needed (cityCode = specific city)
+3. Test calculations with sample fares
+4. Activate rules only after verification
+
+#### Tax Breakdown Storage
+All transactions (Ride, FoodOrder, Delivery) store:
+- **taxBreakdown** (Json): Array of individual tax items with type, description, and amount
+- **totalTaxAmount** (Decimal): Sum of all taxes applied
 
 ## External Dependencies
 
