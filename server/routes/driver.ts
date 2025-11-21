@@ -14,6 +14,38 @@ import {
 const router = Router();
 const prisma = new PrismaClient();
 
+// Helper functions to serialize Prisma Decimal fields to numbers
+function serializeDecimal(value: any): number {
+  if (value === null || value === undefined) return 0;
+  return parseFloat(value.toString());
+}
+
+function serializeWallet(wallet: any) {
+  return {
+    ...wallet,
+    availableBalance: serializeDecimal(wallet.availableBalance),
+    totalEarnings: serializeDecimal(wallet.totalEarnings),
+    totalPaidOut: serializeDecimal(wallet.totalPaidOut),
+    negativeBalance: serializeDecimal(wallet.negativeBalance),
+  };
+}
+
+function serializeTransaction(txn: any) {
+  return {
+    ...txn,
+    amount: serializeDecimal(txn.amount),
+    balanceSnapshot: txn.balanceSnapshot ? serializeDecimal(txn.balanceSnapshot) : undefined,
+    negativeBalanceSnapshot: txn.negativeBalanceSnapshot ? serializeDecimal(txn.negativeBalanceSnapshot) : undefined,
+  };
+}
+
+function serializePayout(payout: any) {
+  return {
+    ...payout,
+    amount: serializeDecimal(payout.amount),
+  };
+}
+
 // All routes require authentication and driver role
 router.use(authenticateToken);
 router.use(requireRole(["driver"]));
@@ -1757,9 +1789,9 @@ router.get("/wallet/summary", async (req: AuthRequest, res) => {
     });
 
     res.json({
-      currentBalance: parseFloat(wallet.availableBalance.toString()),
-      negativeBalance: parseFloat(wallet.negativeBalance.toString()),
-      pendingBalance: parseFloat(pendingPayouts._sum.amount?.toString() || "0"),
+      currentBalance: serializeDecimal(wallet.availableBalance),
+      negativeBalance: serializeDecimal(wallet.negativeBalance),
+      pendingBalance: serializeDecimal(pendingPayouts._sum.amount),
       nextScheduledPayoutDate: nextScheduledPayout?.scheduledAt || null,
       currency: wallet.currency,
     });
@@ -1822,7 +1854,7 @@ router.get("/wallet/payouts", async (req: AuthRequest, res) => {
     res.json({
       payouts: payouts.map(p => ({
         id: p.id,
-        amount: parseFloat(p.amount.toString()),
+        amount: serializeDecimal(p.amount),
         method: p.method,
         status: p.status,
         initiatedAt: p.createdAt,
@@ -1915,7 +1947,7 @@ router.get("/wallet/balance", async (req: AuthRequest, res) => {
     // Calculate summary
     const summary = transactions.reduce(
       (acc, t) => {
-        const amount = parseFloat(t.amount.toString());
+        const amount = serializeDecimal(t.amount);
         
         if (t.direction === "credit") {
           if (t.serviceType === "ride" || t.serviceType === "food" || t.serviceType === "parcel") {
@@ -1954,7 +1986,7 @@ router.get("/wallet/balance", async (req: AuthRequest, res) => {
         id: t.id,
         type: t.serviceType,
         direction: t.direction,
-        amount: parseFloat(t.amount.toString()),
+        amount: serializeDecimal(t.amount),
         description: t.description,
         referenceType: t.referenceType,
         referenceId: t.referenceId,
@@ -1963,8 +1995,8 @@ router.get("/wallet/balance", async (req: AuthRequest, res) => {
     });
 
     res.json({
-      currentBalance: parseFloat(wallet.availableBalance.toString()),
-      negativeBalance: parseFloat(wallet.negativeBalance.toString()),
+      currentBalance: serializeDecimal(wallet.availableBalance),
+      negativeBalance: serializeDecimal(wallet.negativeBalance),
       currency: wallet.currency,
       summary: {
         totalEarnings: summary.totalEarnings,
@@ -2067,18 +2099,18 @@ router.get("/wallet/transaction/:id", async (req: AuthRequest, res) => {
       id: transaction.id,
       type: transaction.serviceType,
       direction: transaction.direction,
-      amount: parseFloat(transaction.amount.toString()),
-      balanceAfter: parseFloat(transaction.balanceSnapshot.toString()),
-      negativeBalanceAfter: parseFloat(transaction.negativeBalanceSnapshot.toString()),
+      amount: serializeDecimal(transaction.amount),
+      balanceAfter: serializeDecimal(transaction.balanceSnapshot),
+      negativeBalanceAfter: serializeDecimal(transaction.negativeBalanceSnapshot),
       description: transaction.description,
       referenceType: transaction.referenceType,
       referenceId: transaction.referenceId,
       createdAt: transaction.createdAt,
       relatedDetails: relatedDetails ? {
         ...relatedDetails,
-        serviceFare: relatedDetails.serviceFare ? parseFloat(relatedDetails.serviceFare.toString()) : undefined,
-        safegoCommission: relatedDetails.safegoCommission ? parseFloat(relatedDetails.safegoCommission.toString()) : undefined,
-        driverPayout: relatedDetails.driverPayout ? parseFloat(relatedDetails.driverPayout.toString()) : undefined,
+        serviceFare: relatedDetails.serviceFare ? serializeDecimal(relatedDetails.serviceFare) : undefined,
+        safegoCommission: relatedDetails.safegoCommission ? serializeDecimal(relatedDetails.safegoCommission) : undefined,
+        driverPayout: relatedDetails.driverPayout ? serializeDecimal(relatedDetails.driverPayout) : undefined,
       } : null,
     });
   } catch (error) {
@@ -2167,8 +2199,8 @@ router.post("/wallet/cash-out", async (req: AuthRequest, res) => {
       currency,
     });
 
-    const availableBalance = parseFloat(wallet.availableBalance.toString());
-    const negativeBalance = parseFloat(wallet.negativeBalance.toString());
+    const availableBalance = serializeDecimal(wallet.availableBalance);
+    const negativeBalance = serializeDecimal(wallet.negativeBalance);
 
     // Check if there's negative balance
     if (negativeBalance > 0) {
@@ -2218,7 +2250,7 @@ router.post("/wallet/cash-out", async (req: AuthRequest, res) => {
       success: true,
       payout: {
         id: payout.id,
-        amount: parseFloat(payout.amount.toString()),
+        amount: serializeDecimal(payout.amount),
         status: payout.status,
         createdAt: payout.createdAt,
       },

@@ -32,6 +32,7 @@ import DriverDashboard from "@/pages/driver/dashboard";
 import DriverProfile from "@/pages/driver/profile";
 import DriverVehicle from "@/pages/driver/vehicle";
 import DriverWallet from "@/pages/driver/wallet";
+import DriverWalletBalance from "@/pages/driver/wallet-balance";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
 import DriverRefer from "@/pages/driver/refer";
@@ -245,6 +246,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Wallet">
             <DriverWallet />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/wallet/balance">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Balance">
+            <DriverWalletBalance />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
