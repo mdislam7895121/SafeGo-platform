@@ -287,9 +287,16 @@ model RestaurantProfile {
   userId             String             @unique
   restaurantName     String
   address            String
+  cuisineType        String?
+  description        String?
+  cityCode           String?
+  averageRating      Float?             @default(0)
+  totalRatings       Int?               @default(0)
   verificationStatus String             @default("pending")
   rejectionReason    String?
   isVerified         Boolean            @default(false)
+  isActive           Boolean            @default(true)
+  isDemo             Boolean            @default(false)
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
   isSuspended        Boolean            @default(false)
@@ -299,9 +306,14 @@ model RestaurantProfile {
   securityNotes      String?
   driverComplaints   DriverComplaint[]
   foodOrders         FoodOrder[]
+  menuCategories     MenuCategory[]
+  menuItems          MenuItem[]
   user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet   RestaurantWallet?
 
+  @@index([cityCode])
+  @@index([isActive])
+  @@index([isDemo])
   @@map("restaurant_profiles")
 }
 
@@ -315,6 +327,50 @@ model RestaurantWallet {
   restaurant      RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
   @@map("restaurant_wallets")
+}
+
+// Menu system for food ordering
+model MenuCategory {
+  id            String            @id @default(uuid())
+  restaurantId  String
+  name          String
+  description   String?
+  displayOrder  Int               @default(0)
+  isActive      Boolean           @default(true)
+  isDemo        Boolean           @default(false)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  restaurant    RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems     MenuItem[]
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@index([isDemo])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id            String            @id @default(uuid())
+  restaurantId  String
+  categoryId    String
+  name          String
+  description   String?
+  price         Decimal           @db.Decimal(10, 2)
+  imageUrl      String?
+  isAvailable   Boolean           @default(true)
+  isActive      Boolean           @default(true)
+  isDemo        Boolean           @default(false)
+  displayOrder  Int               @default(0)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  restaurant    RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category      MenuCategory      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([isDemo])
+  @@map("menu_items")
 }
 
 model Ride {
