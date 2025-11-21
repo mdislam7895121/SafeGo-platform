@@ -28,17 +28,18 @@ import { format } from "date-fns";
 
 interface PayoutRequest {
   id: string;
-  walletType: "driver" | "restaurant";
+  walletType: "driver" | "restaurant" | "customer";
   amount: string;
   status: string;
   requestedAt: string;
   processedAt: string | null;
   processedByAdminId: string | null;
   rejectionReason: string | null;
-  owner: {
-    email: string;
-    countryCode: string;
-    currency: string;
+  owner?: {
+    email?: string;
+    countryCode?: string;
+    currency?: string;
+    cityCode?: string;
     fullName?: string;
     restaurantName?: string;
   };
@@ -78,7 +79,7 @@ export default function AdminPayouts() {
   const queryString = queryParams.toString();
   const fullUrl = `/api/admin/payouts${queryString ? `?${queryString}` : ""}`;
 
-  const { data, isLoading } = useQuery<PayoutsResponse>({
+  const { data, isLoading, error } = useQuery<PayoutsResponse>({
     queryKey: [fullUrl],
     refetchInterval: 10000, // Auto-refresh every 10 seconds
   });
@@ -142,8 +143,8 @@ export default function AdminPayouts() {
     },
   });
 
-  const formatCurrency = (amount: string, currency: string) => {
-    const num = parseFloat(amount);
+  const formatCurrency = (amount: string | undefined, currency: string | undefined) => {
+    const num = parseFloat(amount || "0");
     const symbol = currency === "BDT" ? "৳" : "$";
     return `${symbol}${num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
@@ -170,11 +171,13 @@ export default function AdminPayouts() {
   };
 
   const getWalletTypeBadge = (type: string) => {
-    return type === "driver" ? (
-      <Badge className="bg-purple-500 dark:bg-purple-700">Driver</Badge>
-    ) : (
-      <Badge className="bg-orange-500 dark:bg-orange-700">Restaurant</Badge>
-    );
+    if (type === "driver") {
+      return <Badge className="bg-purple-500 dark:bg-purple-700">Driver</Badge>;
+    } else if (type === "customer") {
+      return <Badge className="bg-blue-500 dark:bg-blue-700">Customer</Badge>;
+    } else {
+      return <Badge className="bg-orange-500 dark:bg-orange-700">Restaurant</Badge>;
+    }
   };
 
   const handleApprove = (payout: PayoutRequest) => {
@@ -290,8 +293,20 @@ export default function AdminPayouts() {
       </div>
 
       <div className="p-6 space-y-4">
+        {/* Error State */}
+        {error && (
+          <Card className="border-destructive">
+            <CardContent className="p-6 text-center">
+              <p className="text-destructive font-semibold mb-2">Failed to load payout requests</p>
+              <p className="text-sm text-muted-foreground">
+                {error instanceof Error ? error.message : "An unexpected error occurred"}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Permission Warning */}
-        {!canManagePayouts && (
+        {!canManagePayouts && !error && (
           <Card className="border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
@@ -321,93 +336,101 @@ export default function AdminPayouts() {
               </Card>
             ))}
           </div>
-        ) : data?.payouts && data.payouts.length > 0 ? (
+        ) : !error && data?.payouts && data.payouts.length > 0 ? (
           <div className="space-y-3">
-            {data.payouts.map((payout) => (
-              <Card key={payout.id} className="hover-elevate" data-testid={`card-payout-${payout.id}`}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <DollarSign className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                        <p className="font-semibold truncate" data-testid={`text-owner-${payout.id}`}>
-                          {payout.walletType === "driver" 
-                            ? payout.owner.fullName || payout.owner.email
-                            : payout.owner.restaurantName || payout.owner.email
-                          }
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2 mb-3">
-                        {getWalletTypeBadge(payout.walletType)}
-                        <Badge variant="outline">{payout.owner.countryCode}</Badge>
-                        {getStatusBadge(payout.status)}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Amount</p>
-                          <p className="font-semibold text-lg text-green-600 dark:text-green-400" data-testid={`text-amount-${payout.id}`}>
-                            {formatCurrency(payout.amount, payout.owner.currency)}
+            {data.payouts.map((payout) => {
+              const ownerName = payout.walletType === "driver" || payout.walletType === "customer"
+                ? payout.owner?.fullName || payout.owner?.email || "Unknown"
+                : payout.owner?.restaurantName || payout.owner?.email || "Unknown Restaurant";
+              
+              return (
+                <Card key={payout.id} className="hover-elevate" data-testid={`card-payout-${payout.id}`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <DollarSign className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                          <p className="font-semibold truncate" data-testid={`text-owner-${payout.id}`}>
+                            {ownerName}
                           </p>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Requested At</p>
-                          <p className="font-medium">
-                            {format(new Date(payout.requestedAt), "MMM d, yyyy h:mm a")}
-                          </p>
+
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          {getWalletTypeBadge(payout.walletType)}
+                          <Badge variant="outline">{payout.owner?.countryCode || "N/A"}</Badge>
+                          {getStatusBadge(payout.status)}
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Amount</p>
+                            <p className="font-semibold text-lg text-green-600 dark:text-green-400" data-testid={`text-amount-${payout.id}`}>
+                              {formatCurrency(payout.amount, payout.owner?.currency)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Requested At</p>
+                            <p className="font-medium">
+                              {format(new Date(payout.requestedAt), "MMM d, yyyy h:mm a")}
+                            </p>
+                          </div>
+                        </div>
+
+                        {payout.processedAt && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Processed: {format(new Date(payout.processedAt), "MMM d, yyyy h:mm a")}
+                          </p>
+                        )}
+
+                        {payout.rejectionReason && (
+                          <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/20 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Rejection Reason:</p>
+                            <p className="text-sm text-red-600 dark:text-red-400">{payout.rejectionReason}</p>
+                          </div>
+                        )}
                       </div>
 
-                      {payout.processedAt && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Processed: {format(new Date(payout.processedAt), "MMM d, yyyy h:mm a")}
-                        </p>
-                      )}
-
-                      {payout.rejectionReason && (
-                        <div className="mt-2 p-2 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                          <p className="text-xs text-muted-foreground">Rejection Reason:</p>
-                          <p className="text-sm text-red-600 dark:text-red-400">{payout.rejectionReason}</p>
+                      {payout.status === "pending" && canManagePayouts && (
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleApprove(payout)}
+                            data-testid={`button-approve-${payout.id}`}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleReject(payout)}
+                            data-testid={`button-reject-${payout.id}`}
+                          >
+                            <XCircle className="h-4 w-4 mr-1" />
+                            Reject
+                          </Button>
                         </div>
                       )}
                     </div>
-
-                    {payout.status === "pending" && canManagePayouts && (
-                      <div className="flex flex-col gap-2">
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleApprove(payout)}
-                          data-testid={`button-approve-${payout.id}`}
-                        >
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => handleReject(payout)}
-                          data-testid={`button-reject-${payout.id}`}
-                        >
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Reject
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
-        ) : (
+        ) : !error ? (
           <Card>
             <CardContent className="p-8 text-center">
               <DollarSign className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">No payout requests found</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                {statusFilter !== "all" || walletTypeFilter !== "all" || countryFilter !== "all"
+                  ? "Try changing the filters"
+                  : "Payout requests will appear here when users request payouts"}
+              </p>
             </CardContent>
           </Card>
-        )}
+        ) : null}
       </div>
 
       {/* Approve Dialog */}
@@ -421,11 +444,11 @@ export default function AdminPayouts() {
           </DialogHeader>
           {selectedPayout && (
             <div className="space-y-2">
-              <p><strong>Owner:</strong> {selectedPayout.walletType === "driver" 
-                ? selectedPayout.owner.fullName || selectedPayout.owner.email
-                : selectedPayout.owner.restaurantName || selectedPayout.owner.email
+              <p><strong>Owner:</strong> {selectedPayout.walletType === "driver" || selectedPayout.walletType === "customer"
+                ? selectedPayout.owner?.fullName || selectedPayout.owner?.email || "Unknown"
+                : selectedPayout.owner?.restaurantName || selectedPayout.owner?.email || "Unknown Restaurant"
               }</p>
-              <p><strong>Amount:</strong> {formatCurrency(selectedPayout.amount, selectedPayout.owner.currency)}</p>
+              <p><strong>Amount:</strong> {formatCurrency(selectedPayout.amount, selectedPayout.owner?.currency)}</p>
               <p><strong>Type:</strong> {selectedPayout.walletType}</p>
             </div>
           )}
@@ -460,11 +483,11 @@ export default function AdminPayouts() {
           {selectedPayout && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <p><strong>Owner:</strong> {selectedPayout.walletType === "driver" 
-                  ? selectedPayout.owner.fullName || selectedPayout.owner.email
-                  : selectedPayout.owner.restaurantName || selectedPayout.owner.email
+                <p><strong>Owner:</strong> {selectedPayout.walletType === "driver" || selectedPayout.walletType === "customer"
+                  ? selectedPayout.owner?.fullName || selectedPayout.owner?.email || "Unknown"
+                  : selectedPayout.owner?.restaurantName || selectedPayout.owner?.email || "Unknown Restaurant"
                 }</p>
-                <p><strong>Amount:</strong> {formatCurrency(selectedPayout.amount, selectedPayout.owner.currency)}</p>
+                <p><strong>Amount:</strong> {formatCurrency(selectedPayout.amount, selectedPayout.owner?.currency)}</p>
               </div>
               <div>
                 <label className="text-sm font-medium mb-2 block">Rejection Reason</label>
