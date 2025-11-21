@@ -42,18 +42,22 @@ The schema uses UUID primary keys, indexed foreign keys, decimal types for monet
 **Root Cause**: The reconciliation service (`server/services/reconciliationService.ts`) was using incorrect field names that didn't match the Prisma schema, causing 500 errors when generating reconciliation reports.
 
 **Issues Fixed**:
-1. **FoodOrder Reconciliation**: Changed `completedAt` → `deliveredAt` (FoodOrder model only has `deliveredAt`)
-2. **Parcel Reconciliation**: Changed `prisma.parcel` → `prisma.delivery` (model is called `Delivery`, not `Parcel`)
-3. **Delivery Reference Type**: Changed `referenceType: "parcel"` → `referenceType: "delivery"` (matches enum)
-4. **Amount Field Corrections**:
-   - Ride: Changed `ride.fare` → `ride.serviceFare`
-   - FoodOrder: Changed `order.totalAmount` → `order.serviceFare`
-   - Delivery: Changed `delivery.deliveryFee` → `delivery.serviceFare`
+1. **FoodOrder Date Field**: Changed `completedAt` → `deliveredAt` (FoodOrder model only has `deliveredAt`)
+2. **Parcel Model Name**: Changed `prisma.parcel` → `prisma.delivery` (model is called `Delivery`, not `Parcel`)
+3. **Delivery Reference Type**: Changed `referenceType: "parcel"` → `referenceType: "delivery"` (matches `WalletTransactionReferenceType` enum)
+4. **Amount Field Logic** (Critical Fix):
+   - Ride: Changed `ride.serviceFare` → `ride.driverPayout` (correct payout amount for reconciliation)
+   - FoodOrder: Changed `order.serviceFare` → `order.restaurantPayout` (correct payout amount for reconciliation)
+   - Delivery: Changed `delivery.serviceFare` → `delivery.driverPayout` (correct payout amount for reconciliation)
+5. **RBAC Country Filtering**:
+   - `countOrdersInPeriod`: Now filters through driver/restaurant user profiles by `countryCode`
+   - `countTransactionsInPeriod`: Filters through wallet owner relations for RBAC compliance
+6. **Database Client**: Replaced `new PrismaClient()` with shared `prisma` instance from `server/db.ts`
 
 **Files Modified**:
-- `server/services/reconciliationService.ts`: Fixed all Prisma query field names to match schema
+- `server/services/reconciliationService.ts`: Fixed all Prisma query field names, payout amount logic, and RBAC filtering
 
-**Impact**: Reconciliation reports now generate successfully without 500 errors. All order types (rides, food orders, deliveries) use correct date and amount fields.
+**Impact**: Reconciliation reports now generate successfully without 500 errors. All order types use correct date fields, payout amounts for reconciliation, and RBAC filtering is properly enforced for jurisdiction-scoped admins.
 
 ### Bug Fixes - Payouts RBAC (November 21, 2025)
 

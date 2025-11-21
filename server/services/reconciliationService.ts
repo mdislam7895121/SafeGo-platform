@@ -1,7 +1,6 @@
-import { PrismaClient, WalletOwnerType } from "@prisma/client";
+import { WalletOwnerType } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db";
 
 interface ReconciliationMismatch {
   type: "missing" | "duplicate" | "amount_mismatch";
@@ -471,6 +470,7 @@ async function countTransactionsInPeriod(
   ownerType?: WalletOwnerType,
   countryCode?: string
 ): Promise<number> {
+  // Build base filters
   const filters: any = {
     createdAt: {
       gte: periodStart,
@@ -485,9 +485,55 @@ async function countTransactionsInPeriod(
     filters.ownerType = ownerType;
   }
 
-  if (countryCode) {
-    filters.countryCode = countryCode;
+  // If no country filtering needed, return count directly
+  if (!countryCode) {
+    return await prisma.walletTransaction.count({
+      where: filters,
+    });
   }
+
+  // For country filtering, build OR clauses for each owner type
+  const walletFilters: any[] = [];
+  
+  // Only filter by relevant owner types
+  const ownerTypes = ownerType ? [ownerType] : ["driver", "restaurant", "customer"];
+  
+  if (ownerTypes.includes("driver")) {
+    walletFilters.push({
+      ownerType: "driver",
+      driver: {
+        user: {
+          countryCode: countryCode,
+        },
+      },
+    });
+  }
+  
+  if (ownerTypes.includes("restaurant")) {
+    walletFilters.push({
+      ownerType: "restaurant",
+      restaurant: {
+        user: {
+          countryCode: countryCode,
+        },
+      },
+    });
+  }
+  
+  if (ownerTypes.includes("customer")) {
+    walletFilters.push({
+      ownerType: "customer",
+      customer: {
+        user: {
+          countryCode: countryCode,
+        },
+      },
+    });
+  }
+
+  filters.wallet = {
+    OR: walletFilters,
+  };
 
   return await prisma.walletTransaction.count({
     where: filters,
