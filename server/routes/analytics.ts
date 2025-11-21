@@ -12,6 +12,79 @@ const router = Router();
 router.use(rateLimitAnalytics); // Rate limiting (60 requests/min per user)
 
 // ====================================================
+// RBAC Helper - Filter data by admin role and jurisdiction
+// ====================================================
+interface RBACFilter {
+  countryCode?: string;
+  cityCode?: string;
+  isUnrestricted: boolean;
+}
+
+async function getRBACFilter(req: AuthRequest): Promise<RBACFilter> {
+  const user = req.user as any;
+  
+  if (!user || !user.id) {
+    throw new Error("Unauthorized: No user found");
+  }
+
+  const adminProfile = await prisma.adminProfile.findUnique({
+    where: { userId: user.id },
+    select: {
+      adminRole: true,
+      countryCode: true,
+      cityCode: true,
+    },
+  });
+
+  if (!adminProfile) {
+    throw new Error("Unauthorized: Not an admin");
+  }
+
+  switch (adminProfile.adminRole) {
+    case "SUPER_ADMIN":
+      return { isUnrestricted: true };
+    
+    case "COUNTRY_ADMIN":
+      if (!adminProfile.countryCode) {
+        throw new Error("Forbidden: Country admin without assigned country");
+      }
+      return {
+        countryCode: adminProfile.countryCode,
+        isUnrestricted: false,
+      };
+    
+    case "CITY_ADMIN":
+      if (!adminProfile.countryCode || !adminProfile.cityCode) {
+        throw new Error("Forbidden: City admin without assigned city");
+      }
+      return {
+        countryCode: adminProfile.countryCode,
+        cityCode: adminProfile.cityCode,
+        isUnrestricted: false,
+      };
+    
+    default:
+      throw new Error("Forbidden: Insufficient permissions for analytics");
+  }
+}
+
+// ====================================================
+// Safe data helpers - Defensive null-check patterns
+// ====================================================
+function safeNumber(value: any, defaultValue: number = 0): number {
+  const num = Number(value);
+  return isNaN(num) ? defaultValue : num;
+}
+
+function safeArray<T>(value: any, defaultValue: T[] = []): T[] {
+  return Array.isArray(value) ? value : defaultValue;
+}
+
+function safeString(value: any, defaultValue: string = ""): string {
+  return typeof value === "string" ? value : defaultValue;
+}
+
+// ====================================================
 // Input sanitization helper
 // ====================================================
 function sanitizeQueryInput(input: any): string {
@@ -46,19 +119,32 @@ function validateDateRange(dateFrom?: string, dateTo?: string): { from: Date | u
 // ====================================================
 router.get("/overview", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { dateFrom, dateTo, country } = req.query;
+    // Apply RBAC filtering
+    const rbacFilter = await getRBACFilter(req);
+    
+    const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
-    const countryFilter = country && country !== "all" ? sanitizeQueryInput(country) : undefined;
 
     // Build date filter
     const dateFilter: any = {};
     if (from) dateFilter.gte = from;
     if (to) dateFilter.lte = to;
 
-    // Build where clause for services
+    // Build where clause for services with RBAC filtering
     const whereClause: any = {};
     if (from || to) {
       whereClause.createdAt = dateFilter;
+    }
+    
+    // Apply jurisdiction filtering for non-super-admins
+    const userFilter: any = {};
+    if (!rbacFilter.isUnrestricted) {
+      if (rbacFilter.countryCode) {
+        userFilter.countryCode = rbacFilter.countryCode;
+      }
+      if (rbacFilter.cityCode) {
+        userFilter.cityCode = rbacFilter.cityCode;
+      }
     }
 
     // Get counts by service type
@@ -153,40 +239,41 @@ router.get("/overview", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), as
       actorRole: (req.user as any)?.role || "unknown",
       actionType: ActionType.VIEW_ANALYTICS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
-      description: `Viewed analytics overview${dateFrom ? ` from ${dateFrom}` : ""}${dateTo ? ` to ${dateTo}` : ""}${countryFilter ? ` for ${countryFilter}` : ""}`,
+      description: `Viewed analytics overview${dateFrom ? ` from ${dateFrom}` : ""}${dateTo ? ` to ${dateTo}` : ""}${!rbacFilter.isUnrestricted ? ` [${rbacFilter.countryCode || ""}/${rbacFilter.cityCode || ""}]` : ""}`,
       ipAddress: req.ip || req.socket.remoteAddress || null,
       success: true,
     });
 
+    // Safe response with defensive defaults
     res.json({
       overview: {
-        totalServices: totalRides + totalFoodOrders + totalDeliveries,
-        completedServices: completedRides + completedFoodOrders + completedDeliveries,
-        totalRevenue,
-        totalUsers,
-        totalDrivers,
-        totalCustomers,
-        totalRestaurants,
-        activeDrivers,
+        totalServices: safeNumber(totalRides + totalFoodOrders + totalDeliveries, 0),
+        completedServices: safeNumber(completedRides + completedFoodOrders + completedDeliveries, 0),
+        totalRevenue: safeNumber(totalRevenue, 0),
+        totalUsers: safeNumber(totalUsers, 0),
+        totalDrivers: safeNumber(totalDrivers, 0),
+        totalCustomers: safeNumber(totalCustomers, 0),
+        totalRestaurants: safeNumber(totalRestaurants, 0),
+        activeDrivers: safeNumber(activeDrivers, 0),
       },
       services: {
         rides: {
-          total: totalRides,
-          completed: completedRides,
-          completionRate: totalRides > 0 ? ((completedRides / totalRides) * 100).toFixed(2) : "0.00",
-          growth: calculateGrowth(completedRides, prevCompletedRides),
+          total: safeNumber(totalRides, 0),
+          completed: safeNumber(completedRides, 0),
+          completionRate: totalRides > 0 ? safeNumber(((completedRides / totalRides) * 100).toFixed(2), 0) : 0,
+          growth: safeNumber(calculateGrowth(completedRides, prevCompletedRides), 0),
         },
         foodOrders: {
-          total: totalFoodOrders,
-          completed: completedFoodOrders,
-          completionRate: totalFoodOrders > 0 ? ((completedFoodOrders / totalFoodOrders) * 100).toFixed(2) : "0.00",
-          growth: calculateGrowth(completedFoodOrders, prevCompletedFood),
+          total: safeNumber(totalFoodOrders, 0),
+          completed: safeNumber(completedFoodOrders, 0),
+          completionRate: totalFoodOrders > 0 ? safeNumber(((completedFoodOrders / totalFoodOrders) * 100).toFixed(2), 0) : 0,
+          growth: safeNumber(calculateGrowth(completedFoodOrders, prevCompletedFood), 0),
         },
         deliveries: {
-          total: totalDeliveries,
-          completed: completedDeliveries,
-          completionRate: totalDeliveries > 0 ? ((completedDeliveries / totalDeliveries) * 100).toFixed(2) : "0.00",
-          growth: calculateGrowth(completedDeliveries, prevCompletedDeliveries),
+          total: safeNumber(totalDeliveries, 0),
+          completed: safeNumber(completedDeliveries, 0),
+          completionRate: totalDeliveries > 0 ? safeNumber(((completedDeliveries / totalDeliveries) * 100).toFixed(2), 0) : 0,
+          growth: safeNumber(calculateGrowth(completedDeliveries, prevCompletedDeliveries), 0),
         },
       },
     });
@@ -202,7 +289,10 @@ router.get("/overview", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), as
 // ====================================================
 router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { dateFrom, dateTo, country } = req.query;
+    // Apply RBAC filtering
+    const rbacFilter = await getRBACFilter(req);
+    
+    const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
 
     // Build date filter
@@ -371,6 +461,9 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
 // ====================================================
 router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
+    // Apply RBAC filtering
+    const rbacFilter = await getRBACFilter(req);
+    
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
 
@@ -507,6 +600,9 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
 // ====================================================
 router.get("/restaurants", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
+    // Apply RBAC filtering
+    const rbacFilter = await getRBACFilter(req);
+    
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
 
@@ -596,6 +692,9 @@ router.get("/restaurants", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD),
 // ====================================================
 router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
+    // Apply RBAC filtering
+    const rbacFilter = await getRBACFilter(req);
+    
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
 
@@ -748,6 +847,9 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
 // ====================================================
 router.get("/risk", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
+    // Apply RBAC filtering
+    const rbacFilter = await getRBACFilter(req);
+    
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
 
