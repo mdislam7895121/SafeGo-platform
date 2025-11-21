@@ -312,10 +312,29 @@ router.get("/overview", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), as
       },
     };
 
+    // Previous period with RBAC filtering
     const [prevCompletedRides, prevCompletedFood, prevCompletedDeliveries] = await Promise.all([
-      prisma.ride.count({ where: { ...previousWhereClause, status: "completed" } }),
-      prisma.foodOrder.count({ where: { ...previousWhereClause, status: "delivered" } }),
-      prisma.delivery.count({ where: { ...previousWhereClause, status: "delivered" } }),
+      prisma.ride.count({
+        where: {
+          ...previousWhereClause,
+          status: "completed",
+          ...(Object.keys(userFilter).length > 0 ? { customer: { user: userFilter } } : {}),
+        },
+      }),
+      prisma.foodOrder.count({
+        where: {
+          ...previousWhereClause,
+          status: "delivered",
+          ...(Object.keys(userFilter).length > 0 ? { customer: { user: userFilter } } : {}),
+        },
+      }),
+      prisma.delivery.count({
+        where: {
+          ...previousWhereClause,
+          status: "delivered",
+          ...(Object.keys(userFilter).length > 0 ? { customer: { user: userFilter } } : {}),
+        },
+      }),
     ]);
 
     const calculateGrowth = (current: number, previous: number): number => {
@@ -382,6 +401,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
   try {
     // Apply RBAC filtering
     const rbacFilter = await getRBACFilter(req);
+    const userFilter = buildJurisdictionFilter(rbacFilter);
     
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
@@ -391,7 +411,12 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
     if (from) dateFilter.gte = from;
     if (to) dateFilter.lte = to;
 
-    // Top performing drivers
+    // Build driver jurisdiction filter
+    const driverJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { driver: { user: userFilter } } 
+      : {};
+
+    // Top performing drivers - filter by driver jurisdiction
     const [rideDrivers, foodDrivers, deliveryDrivers] = await Promise.all([
       prisma.ride.groupBy({
         by: ["driverId"],
@@ -399,6 +424,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
           status: "completed",
           driverId: { not: null },
           ...(from || to ? { completedAt: dateFilter } : {}),
+          ...driverJurisdictionFilter,
         },
         _count: { id: true },
         _sum: { driverPayout: true },
@@ -411,6 +437,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
           status: "delivered",
           driverId: { not: null },
           ...(from || to ? { deliveredAt: dateFilter } : {}),
+          ...driverJurisdictionFilter,
         },
         _count: { id: true },
         _sum: { driverPayout: true },
@@ -423,6 +450,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
           status: "delivered",
           driverId: { not: null },
           ...(from || to ? { deliveredAt: dateFilter } : {}),
+          ...driverJurisdictionFilter,
         },
         _count: { id: true },
         _sum: { driverPayout: true },
@@ -472,16 +500,21 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
       };
     });
 
-    // Driver status - active vs inactive
-    const totalDriverProfiles = await prisma.driverProfile.count();
+    // Driver status - active vs inactive (filter by jurisdiction)
+    const totalDriverProfiles = await prisma.driverProfile.count({
+      where: Object.keys(userFilter).length > 0 ? { user: userFilter } : undefined,
+    });
+    
     const activeDriversCount = await prisma.driverProfile.count({
       where: {
+        ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
         id: {
           in: await prisma.ride.findMany({
             where: {
               status: "completed",
               driverId: { not: null },
               ...(from || to ? { completedAt: dateFilter } : {}),
+              ...driverJurisdictionFilter,
             },
             select: { driverId: true },
             distinct: ["driverId"],
@@ -493,7 +526,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
     const inactiveDriversCount = Math.max(0, totalDriverProfiles - activeDriversCount);
     const retentionRate = totalDriverProfiles > 0 ? (activeDriversCount / totalDriverProfiles) * 100 : 0;
 
-    // Performance trend - trips over time (daily aggregation)
+    // Performance trend - trips over time (daily aggregation) with jurisdiction filtering
     const performanceTrend: Array<{ date: string; trips: number }> = [];
     if (from && to) {
       const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
@@ -510,12 +543,13 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
               gte: date,
               lt: nextDate,
             },
+            ...driverJurisdictionFilter,
           },
         });
         
         performanceTrend.push({
           date: date.toISOString().split('T')[0],
-          trips: dayTrips,
+          trips: safeNumber(dayTrips, 0),
         });
       }
     }
@@ -532,13 +566,18 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
       success: true,
     });
 
+    // Safe response with defensive defaults
     res.json({
-      performanceTrend: performanceTrend || [],
-      topDrivers: topDrivers || [],
-      activeDrivers: activeDriversCount || 0,
-      inactiveDrivers: inactiveDriversCount || 0,
-      retentionRate: retentionRate || 0,
-      totalDrivers: totalDriverProfiles || 0,
+      performanceTrend: safeArray(performanceTrend, []),
+      topDrivers: safeArray(topDrivers, []).map((driver) => ({
+        driverName: safeString(driver.driverName, "Unknown"),
+        revenue: safeNumber(driver.revenue, 0),
+        trips: safeNumber(driver.trips, 0),
+      })),
+      activeDrivers: safeNumber(activeDriversCount, 0),
+      inactiveDrivers: safeNumber(inactiveDriversCount, 0),
+      retentionRate: safeNumber(retentionRate, 0),
+      totalDrivers: safeNumber(totalDriverProfiles, 0),
     });
   } catch (error) {
     console.error("Driver analytics error:", error);
@@ -554,6 +593,7 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
   try {
     // Apply RBAC filtering
     const rbacFilter = await getRBACFilter(req);
+    const userFilter = buildJurisdictionFilter(rbacFilter);
     
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
@@ -562,14 +602,20 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
     const dateFilter: any = {};
     if (from) dateFilter.gte = from;
     if (to) dateFilter.lte = to;
+    
+    // Build customer jurisdiction filter
+    const customerJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { customer: { user: userFilter } } 
+      : {};
 
-    // Top customers by number of orders
+    // Top customers by number of orders - filter by customer jurisdiction
     const [rideCustomers, foodCustomers, deliveryCustomers] = await Promise.all([
       prisma.ride.groupBy({
         by: ["customerId"],
         where: {
           status: "completed",
           ...(from || to ? { completedAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
         _count: { id: true },
         _sum: { serviceFare: true },
@@ -581,6 +627,7 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
         where: {
           status: "delivered",
           ...(from || to ? { deliveredAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
         _count: { id: true },
         _sum: { serviceFare: true },
@@ -592,6 +639,7 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
         where: {
           status: "delivered",
           ...(from || to ? { deliveredAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
         _count: { id: true },
         _sum: { serviceFare: true },
@@ -643,18 +691,31 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
       };
     });
 
-    // Customer status distribution
+    // Customer status distribution - filter by jurisdiction
     const [totalCustomerProfiles, verifiedCustomers, pendingCustomers] = await Promise.all([
-      prisma.customerProfile.count(),
-      prisma.customerProfile.count({ where: { verificationStatus: "approved" } }),
-      prisma.customerProfile.count({ where: { verificationStatus: "pending" } }),
+      prisma.customerProfile.count({
+        where: Object.keys(userFilter).length > 0 ? { user: userFilter } : {},
+      }),
+      prisma.customerProfile.count({
+        where: {
+          verificationStatus: "approved",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
+      prisma.customerProfile.count({
+        where: {
+          verificationStatus: "pending",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
     ]);
 
-    // New customers (last 30 days)
+    // New customers (last 30 days) - filter by jurisdiction
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const newCustomers = await prisma.customerProfile.count({
       where: {
         createdAt: { gte: thirtyDaysAgo },
+        ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
       },
     });
 
@@ -670,13 +731,21 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
       success: true,
     });
 
+    // Safe response with defensive defaults
     res.json({
-      topCustomers,
+      topCustomers: safeArray(topCustomers, []).map((customer) => ({
+        customerId: safeString(customer.customerId, ""),
+        name: safeString(customer.name, "Unknown"),
+        email: safeString(customer.email, "unknown"),
+        country: safeString(customer.country, "unknown"),
+        totalOrders: safeNumber(customer.totalOrders, 0),
+        totalSpending: safeString(customer.totalSpending, "0.00"),
+      })),
       status: {
-        total: totalCustomerProfiles,
-        verified: verifiedCustomers,
-        pending: pendingCustomers,
-        new: newCustomers,
+        total: safeNumber(totalCustomerProfiles, 0),
+        verified: safeNumber(verifiedCustomers, 0),
+        pending: safeNumber(pendingCustomers, 0),
+        new: safeNumber(newCustomers, 0),
       },
     });
   } catch (error) {
@@ -693,6 +762,7 @@ router.get("/restaurants", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD),
   try {
     // Apply RBAC filtering
     const rbacFilter = await getRBACFilter(req);
+    const userFilter = buildJurisdictionFilter(rbacFilter);
     
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
@@ -702,12 +772,18 @@ router.get("/restaurants", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD),
     if (from) dateFilter.gte = from;
     if (to) dateFilter.lte = to;
 
-    // Top restaurants by order volume
+    // Build restaurant jurisdiction filter
+    const restaurantJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { restaurant: { user: userFilter } } 
+      : {};
+
+    // Top restaurants by order volume - filter by restaurant jurisdiction
     const topRestaurants = await prisma.foodOrder.groupBy({
       by: ["restaurantId"],
       where: {
         status: "delivered",
         ...(from || to ? { deliveredAt: dateFilter } : {}),
+        ...restaurantJurisdictionFilter,
       },
       _count: { id: true },
       _sum: { restaurantPayout: true, serviceFare: true },
@@ -742,12 +818,29 @@ router.get("/restaurants", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD),
       };
     });
 
-    // Restaurant status distribution
+    // Restaurant status distribution - filter by jurisdiction
     const [totalRestaurantProfiles, verifiedRestaurants, pendingRestaurants, rejectedRestaurants] = await Promise.all([
-      prisma.restaurantProfile.count(),
-      prisma.restaurantProfile.count({ where: { verificationStatus: "approved" } }),
-      prisma.restaurantProfile.count({ where: { verificationStatus: "pending" } }),
-      prisma.restaurantProfile.count({ where: { verificationStatus: "rejected" } }),
+      prisma.restaurantProfile.count({
+        where: Object.keys(userFilter).length > 0 ? { user: userFilter } : {},
+      }),
+      prisma.restaurantProfile.count({
+        where: {
+          verificationStatus: "approved",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
+      prisma.restaurantProfile.count({
+        where: {
+          verificationStatus: "pending",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
+      prisma.restaurantProfile.count({
+        where: {
+          verificationStatus: "rejected",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
     ]);
 
     // Audit log
@@ -762,13 +855,22 @@ router.get("/restaurants", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD),
       success: true,
     });
 
+    // Safe response with defensive defaults
     res.json({
-      topRestaurants: topRestaurantsList,
+      topRestaurants: safeArray(topRestaurantsList, []).map((restaurant) => ({
+        restaurantId: safeString(restaurant.restaurantId, ""),
+        name: safeString(restaurant.name, "Unknown"),
+        email: safeString(restaurant.email, "unknown"),
+        country: safeString(restaurant.country, "unknown"),
+        totalOrders: safeNumber(restaurant.totalOrders, 0),
+        totalRevenue: safeString(restaurant.totalRevenue, "0.00"),
+        totalEarnings: safeString(restaurant.totalEarnings, "0.00"),
+      })),
       status: {
-        total: totalRestaurantProfiles,
-        verified: verifiedRestaurants,
-        pending: pendingRestaurants,
-        rejected: rejectedRestaurants,
+        total: safeNumber(totalRestaurantProfiles, 0),
+        verified: safeNumber(verifiedRestaurants, 0),
+        pending: safeNumber(pendingRestaurants, 0),
+        rejected: safeNumber(rejectedRestaurants, 0),
       },
     });
   } catch (error) {
@@ -785,6 +887,7 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
   try {
     // Apply RBAC filtering
     const rbacFilter = await getRBACFilter(req);
+    const userFilter = buildJurisdictionFilter(rbacFilter);
     
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
@@ -793,13 +896,25 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
     const dateFilter: any = {};
     if (from) dateFilter.gte = from;
     if (to) dateFilter.lte = to;
+    
+    // Build jurisdiction filters for revenue queries
+    const customerJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { customer: { user: userFilter } } 
+      : {};
+    const driverJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { driver: { user: userFilter } } 
+      : {};
+    const restaurantJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { restaurant: { user: userFilter } } 
+      : {};
 
-    // Revenue breakdown by service
+    // Revenue breakdown by service - filter by customer jurisdiction
     const [rideRevenue, foodRevenue, deliveryRevenue] = await Promise.all([
       prisma.ride.aggregate({
         where: {
           status: "completed",
           ...(from || to ? { completedAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
         _sum: {
           serviceFare: true,
@@ -812,6 +927,7 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
         where: {
           status: "delivered",
           ...(from || to ? { deliveredAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
         _sum: {
           serviceFare: true,
@@ -825,6 +941,7 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
         where: {
           status: "delivered",
           ...(from || to ? { deliveredAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
         _sum: {
           serviceFare: true,
@@ -854,12 +971,13 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
 
     const totalRestaurantPayouts = Number(foodRevenue._sum.restaurantPayout || 0);
 
-    // Pending payouts
+    // Pending payouts - filter by jurisdiction
     const [pendingDriverPayouts, pendingRestaurantPayouts] = await Promise.all([
       prisma.payout.aggregate({
         where: {
           ownerType: "driver",
           status: "pending",
+          ...(Object.keys(userFilter).length > 0 ? { driver: { user: userFilter } } : {}),
         },
         _sum: { amount: true },
         _count: { id: true },
@@ -868,6 +986,7 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
         where: {
           ownerType: "restaurant",
           status: "pending",
+          ...(Object.keys(userFilter).length > 0 ? { restaurant: { user: userFilter } } : {}),
         },
         _sum: { amount: true },
         _count: { id: true },
@@ -886,43 +1005,44 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
       success: true,
     });
 
+    // Safe response with defensive defaults
     res.json({
       overview: {
-        totalRevenue: totalRevenue.toFixed(2),
-        totalCommission: totalCommission.toFixed(2),
-        commissionRate: totalRevenue > 0 ? ((totalCommission / totalRevenue) * 100).toFixed(2) : "0.00",
+        totalRevenue: safeString(safeNumber(totalRevenue, 0).toFixed(2), "0.00"),
+        totalCommission: safeString(safeNumber(totalCommission, 0).toFixed(2), "0.00"),
+        commissionRate: safeString(totalRevenue > 0 ? ((totalCommission / totalRevenue) * 100).toFixed(2) : "0.00", "0.00"),
       },
       byService: {
         rides: {
-          revenue: Number(rideRevenue._sum.serviceFare || 0).toFixed(2),
-          commission: Number(rideRevenue._sum.safegoCommission || 0).toFixed(2),
-          driverPayouts: Number(rideRevenue._sum.driverPayout || 0).toFixed(2),
-          completedOrders: rideRevenue._count.id,
+          revenue: safeString(safeNumber(rideRevenue._sum.serviceFare, 0).toFixed(2), "0.00"),
+          commission: safeString(safeNumber(rideRevenue._sum.safegoCommission, 0).toFixed(2), "0.00"),
+          driverPayouts: safeString(safeNumber(rideRevenue._sum.driverPayout, 0).toFixed(2), "0.00"),
+          completedOrders: safeNumber(rideRevenue._count.id, 0),
         },
         foodOrders: {
-          revenue: Number(foodRevenue._sum?.serviceFare || 0).toFixed(2),
-          commission: Number(foodRevenue._sum?.safegoCommission || 0).toFixed(2),
-          restaurantPayouts: Number(foodRevenue._sum?.restaurantPayout || 0).toFixed(2),
-          driverPayouts: Number(foodRevenue._sum?.driverPayout || 0).toFixed(2),
-          completedOrders: foodRevenue._count?.id || 0,
+          revenue: safeString(safeNumber(foodRevenue._sum?.serviceFare, 0).toFixed(2), "0.00"),
+          commission: safeString(safeNumber(foodRevenue._sum?.safegoCommission, 0).toFixed(2), "0.00"),
+          restaurantPayouts: safeString(safeNumber(foodRevenue._sum?.restaurantPayout, 0).toFixed(2), "0.00"),
+          driverPayouts: safeString(safeNumber(foodRevenue._sum?.driverPayout, 0).toFixed(2), "0.00"),
+          completedOrders: safeNumber(foodRevenue._count?.id, 0),
         },
         deliveries: {
-          revenue: Number(deliveryRevenue._sum.serviceFare || 0).toFixed(2),
-          commission: Number(deliveryRevenue._sum.safegoCommission || 0).toFixed(2),
-          driverPayouts: Number(deliveryRevenue._sum.driverPayout || 0).toFixed(2),
-          completedOrders: deliveryRevenue._count.id,
+          revenue: safeString(safeNumber(deliveryRevenue._sum.serviceFare, 0).toFixed(2), "0.00"),
+          commission: safeString(safeNumber(deliveryRevenue._sum.safegoCommission, 0).toFixed(2), "0.00"),
+          driverPayouts: safeString(safeNumber(deliveryRevenue._sum.driverPayout, 0).toFixed(2), "0.00"),
+          completedOrders: safeNumber(deliveryRevenue._count.id, 0),
         },
       },
       payouts: {
-        totalDriverPayouts: totalDriverPayouts.toFixed(2),
-        totalRestaurantPayouts: totalRestaurantPayouts.toFixed(2),
+        totalDriverPayouts: safeString(safeNumber(totalDriverPayouts, 0).toFixed(2), "0.00"),
+        totalRestaurantPayouts: safeString(safeNumber(totalRestaurantPayouts, 0).toFixed(2), "0.00"),
         pendingDriverPayouts: {
-          amount: Number(pendingDriverPayouts._sum.amount || 0).toFixed(2),
-          count: pendingDriverPayouts._count.id,
+          amount: safeString(safeNumber(pendingDriverPayouts._sum.amount, 0).toFixed(2), "0.00"),
+          count: safeNumber(pendingDriverPayouts._count.id, 0),
         },
         pendingRestaurantPayouts: {
-          amount: Number(pendingRestaurantPayouts._sum.amount || 0).toFixed(2),
-          count: pendingRestaurantPayouts._count.id,
+          amount: safeString(safeNumber(pendingRestaurantPayouts._sum.amount, 0).toFixed(2), "0.00"),
+          count: safeNumber(pendingRestaurantPayouts._count.id, 0),
         },
       },
     });
@@ -940,6 +1060,7 @@ router.get("/risk", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async 
   try {
     // Apply RBAC filtering
     const rbacFilter = await getRBACFilter(req);
+    const userFilter = buildJurisdictionFilter(rbacFilter);
     
     const { dateFrom, dateTo } = req.query;
     const { from, to } = validateDateRange(dateFrom as string, dateTo as string);
@@ -948,42 +1069,65 @@ router.get("/risk", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async 
     const dateFilter: any = {};
     if (from) dateFilter.gte = from;
     if (to) dateFilter.lte = to;
+    
+    // Build jurisdiction filters for risk queries
+    const customerJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { customer: { user: userFilter } } 
+      : {};
 
-    // Cancelled orders (potential fraud)
+    // Cancelled orders (potential fraud) - filter by customer jurisdiction
     const [cancelledRides, cancelledFood, cancelledDeliveries] = await Promise.all([
       prisma.ride.count({
         where: {
           status: { in: ["cancelled_by_customer", "cancelled_by_driver"] },
           ...(from || to ? { createdAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
       }),
       prisma.foodOrder.count({
         where: {
           status: { in: ["cancelled_by_customer", "cancelled_by_restaurant"] },
           ...(from || to ? { createdAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
       }),
       prisma.delivery.count({
         where: {
           status: { in: ["cancelled_by_customer", "cancelled_by_driver"] },
           ...(from || to ? { createdAt: dateFilter } : {}),
+          ...customerJurisdictionFilter,
         },
       }),
     ]);
 
-    // Blocked users
+    // Blocked users - filter by jurisdiction
     const [blockedUsers, blockedDrivers, blockedCustomers, blockedRestaurants] = await Promise.all([
-      prisma.user.count({ where: { isBlocked: true } }),
-      prisma.user.count({ where: { isBlocked: true, role: "driver" } }),
-      prisma.user.count({ where: { isBlocked: true, role: "customer" } }),
-      prisma.user.count({ where: { isBlocked: true, role: "restaurant" } }),
+      prisma.user.count({ where: { isBlocked: true, ...userFilter } }),
+      prisma.user.count({ where: { isBlocked: true, role: "driver", ...userFilter } }),
+      prisma.user.count({ where: { isBlocked: true, role: "customer", ...userFilter } }),
+      prisma.user.count({ where: { isBlocked: true, role: "restaurant", ...userFilter } }),
     ]);
 
-    // Rejected KYC (potential fraud)
+    // Rejected KYC (potential fraud) - filter by jurisdiction
     const [rejectedDriverKYC, rejectedCustomerKYC, rejectedRestaurantKYC] = await Promise.all([
-      prisma.driverProfile.count({ where: { verificationStatus: "rejected" } }),
-      prisma.customerProfile.count({ where: { verificationStatus: "rejected" } }),
-      prisma.restaurantProfile.count({ where: { verificationStatus: "rejected" } }),
+      prisma.driverProfile.count({
+        where: {
+          verificationStatus: "rejected",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
+      prisma.customerProfile.count({
+        where: {
+          verificationStatus: "rejected",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
+      prisma.restaurantProfile.count({
+        where: {
+          verificationStatus: "rejected",
+          ...(Object.keys(userFilter).length > 0 ? { user: userFilter } : {}),
+        },
+      }),
     ]);
 
     // High negative balances (risk of non-payment)
@@ -1000,14 +1144,25 @@ router.get("/risk", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async 
       }),
     ]);
 
-    // Low rating drivers/restaurants (quality risk)
-    const lowRatedDrivers = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(DISTINCT "driverId") as count
-      FROM rides
-      WHERE "driverRating" IS NOT NULL
-      GROUP BY "driverId"
-      HAVING AVG("driverRating") < 3.0
-    `;
+    // Low rating drivers (quality risk) - filter by jurisdiction
+    const driverJurisdictionFilter = Object.keys(userFilter).length > 0 
+      ? { driver: { user: userFilter } } 
+      : {};
+    
+    const lowRatedDriversData = await prisma.ride.groupBy({
+      by: ["driverId"],
+      where: {
+        driverId: { not: null },
+        driverRating: { not: null },
+        ...driverJurisdictionFilter,
+      },
+      _avg: { driverRating: true },
+    });
+    
+    // Count drivers with average rating < 3.0
+    const lowRatedDrivers = lowRatedDriversData.filter(
+      (driver) => driver._avg.driverRating !== null && driver._avg.driverRating < 3.0
+    ).length;
 
     // Total risk score calculation
     const totalRiskIndicators = 
@@ -1028,43 +1183,44 @@ router.get("/risk", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async 
       success: true,
     });
 
+    // Safe response with defensive defaults
     res.json({
       cancellations: {
-        total: cancelledRides + cancelledFood + cancelledDeliveries,
+        total: safeNumber(cancelledRides + cancelledFood + cancelledDeliveries, 0),
         byService: {
-          rides: cancelledRides,
-          foodOrders: cancelledFood,
-          deliveries: cancelledDeliveries,
+          rides: safeNumber(cancelledRides, 0),
+          foodOrders: safeNumber(cancelledFood, 0),
+          deliveries: safeNumber(cancelledDeliveries, 0),
         },
       },
       blockedAccounts: {
-        total: blockedUsers,
+        total: safeNumber(blockedUsers, 0),
         byRole: {
-          drivers: blockedDrivers,
-          customers: blockedCustomers,
-          restaurants: blockedRestaurants,
+          drivers: safeNumber(blockedDrivers, 0),
+          customers: safeNumber(blockedCustomers, 0),
+          restaurants: safeNumber(blockedRestaurants, 0),
         },
       },
       rejectedKYC: {
-        total: rejectedDriverKYC + rejectedCustomerKYC + rejectedRestaurantKYC,
+        total: safeNumber(rejectedDriverKYC + rejectedCustomerKYC + rejectedRestaurantKYC, 0),
         byRole: {
-          drivers: rejectedDriverKYC,
-          customers: rejectedCustomerKYC,
-          restaurants: rejectedRestaurantKYC,
+          drivers: safeNumber(rejectedDriverKYC, 0),
+          customers: safeNumber(rejectedCustomerKYC, 0),
+          restaurants: safeNumber(rejectedRestaurantKYC, 0),
         },
       },
       financialRisk: {
         highNegativeBalances: {
-          drivers: highRiskDriverWallets,
-          restaurants: highRiskRestaurantWallets,
+          drivers: safeNumber(highRiskDriverWallets, 0),
+          restaurants: safeNumber(highRiskRestaurantWallets, 0),
         },
       },
       qualityRisk: {
-        lowRatedDrivers: Number(lowRatedDrivers[0]?.count || 0),
+        lowRatedDrivers: safeNumber(lowRatedDrivers, 0),
       },
       riskScore: {
-        totalIndicators: totalRiskIndicators,
-        severity: totalRiskIndicators > 100 ? "high" : totalRiskIndicators > 50 ? "medium" : "low",
+        totalIndicators: safeNumber(totalRiskIndicators, 0),
+        severity: safeString(totalRiskIndicators > 100 ? "high" : totalRiskIndicators > 50 ? "medium" : "low", "low"),
       },
     });
   } catch (error) {
