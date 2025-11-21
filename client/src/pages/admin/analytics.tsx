@@ -36,7 +36,7 @@ import {
   RefreshCw,
   Download,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 
@@ -51,69 +51,110 @@ function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+// Convert date range shortcuts to actual date parameters
+function convertDateRange(range: string): { dateFrom: string; dateTo: string } {
+  const now = new Date();
+  const to = now.toISOString();
+  let from: Date;
+
+  switch (range) {
+    case "1d":
+      from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      break;
+    case "7d":
+      from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case "30d":
+      from = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      break;
+    case "90d":
+      from = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      break;
+    default:
+      from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  }
+
+  return {
+    dateFrom: from.toISOString(),
+    dateTo: to,
+  };
+}
+
 export default function AnalyticsDashboard() {
   const [, setLocation] = useLocation();
   const [dateRange, setDateRange] = useState("7d");
   const [country, setCountry] = useState("all");
+  const [capabilitiesError, setCapabilitiesError] = useState(false);
 
   // ====================================================
   // Capability Check & RBAC Enforcement
   // ====================================================
-  const { data: capabilities, isPending: capabilitiesLoading, error: capabilitiesError } = useQuery({
+  const { data: capabilitiesData, isLoading: capabilitiesLoading, error: capabilitiesQueryError } = useQuery({
     queryKey: ["/api/admin/capabilities"],
     retry: false,
   });
 
-  const hasAccess = (capabilities as any)?.capabilities?.includes("VIEW_ANALYTICS_DASHBOARD") || false;
-
   // Auto-logout on 401 (using useEffect to avoid React setState during render)
   useEffect(() => {
-    if (capabilitiesError && (capabilitiesError as any).status === 401) {
-      localStorage.removeItem("token");
-      setLocation("/login");
+    if (capabilitiesQueryError) {
+      const errorStatus = (capabilitiesQueryError as any)?.status;
+      if (errorStatus === 401) {
+        localStorage.removeItem("token");
+        setLocation("/login");
+      } else {
+        setCapabilitiesError(true);
+      }
     }
-  }, [capabilitiesError, setLocation]);
+  }, [capabilitiesQueryError, setLocation]);
+
+  // Check if user has VIEW_ANALYTICS_DASHBOARD permission
+  const hasAccess = capabilitiesData && 'capabilities' in capabilitiesData 
+    ? (capabilitiesData.capabilities as string[]).includes("VIEW_ANALYTICS_DASHBOARD")
+    : false;
+
+  // Convert date range to actual dates (memoized to prevent changing on every render)
+  const { dateFrom, dateTo } = useMemo(() => convertDateRange(dateRange), [dateRange]);
 
   // ====================================================
   // Data Queries (only enabled if hasAccess)
   // ====================================================
   const { data: overviewDataRaw, isLoading: overviewLoading, error: overviewError, refetch: refetchOverview } = useQuery({
-    queryKey: ["/api/admin/analytics/overview", dateRange, country],
+    queryKey: [`/api/admin/analytics/overview?dateFrom=${dateFrom}&dateTo=${dateTo}&country=${country}`],
     enabled: hasAccess,
     retry: false,
   });
   const overviewData = overviewDataRaw as any;
 
   const { data: driversDataRaw, isLoading: driversLoading, error: driversError } = useQuery({
-    queryKey: ["/api/admin/analytics/drivers", dateRange, country],
+    queryKey: [`/api/admin/analytics/drivers?dateFrom=${dateFrom}&dateTo=${dateTo}&country=${country}`],
     enabled: hasAccess,
     retry: false,
   });
   const driversData = driversDataRaw as any;
 
   const { data: customersDataRaw, isLoading: customersLoading, error: customersError } = useQuery({
-    queryKey: ["/api/admin/analytics/customers", dateRange, country],
+    queryKey: [`/api/admin/analytics/customers?dateFrom=${dateFrom}&dateTo=${dateTo}&country=${country}`],
     enabled: hasAccess,
     retry: false,
   });
   const customersData = customersDataRaw as any;
 
   const { data: restaurantsDataRaw, isLoading: restaurantsLoading, error: restaurantsError } = useQuery({
-    queryKey: ["/api/admin/analytics/restaurants", dateRange, country],
+    queryKey: [`/api/admin/analytics/restaurants?dateFrom=${dateFrom}&dateTo=${dateTo}&country=${country}`],
     enabled: hasAccess,
     retry: false,
   });
   const restaurantsData = restaurantsDataRaw as any;
 
   const { data: revenueDataRaw, isLoading: revenueLoading, error: revenueError } = useQuery({
-    queryKey: ["/api/admin/analytics/revenue", dateRange, country],
+    queryKey: [`/api/admin/analytics/revenue?dateFrom=${dateFrom}&dateTo=${dateTo}&country=${country}`],
     enabled: hasAccess,
     retry: false,
   });
   const revenueData = revenueDataRaw as any;
 
   const { data: riskDataRaw, isLoading: riskLoading, error: riskError } = useQuery({
-    queryKey: ["/api/admin/analytics/risk", dateRange],
+    queryKey: [`/api/admin/analytics/risk?dateFrom=${dateFrom}&dateTo=${dateTo}&country=${country}`],
     enabled: hasAccess,
     retry: false,
   });
@@ -141,7 +182,7 @@ export default function AnalyticsDashboard() {
   // ====================================================
   // Error State (capability fetch failed, non-401)
   // ====================================================
-  if (capabilitiesError && (capabilitiesError as any).status !== 401) {
+  if (capabilitiesError) {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto">
@@ -167,9 +208,9 @@ export default function AnalyticsDashboard() {
   }
 
   // ====================================================
-  // Access Denied State
+  // Access Denied State (only after capability data is loaded)
   // ====================================================
-  if (!hasAccess) {
+  if (!capabilitiesLoading && !hasAccess) {
     return (
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto">
