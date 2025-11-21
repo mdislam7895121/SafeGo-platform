@@ -33,3 +33,71 @@ The schema uses UUID primary keys, indexed foreign keys, decimal types for monet
 - **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 - **UI Components (shadcn/ui)**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 - **Environment Variables**: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV`, `ENCRYPTION_KEY`.
+
+## Development History
+
+### Step 49: Analytics Security Hardening & RBAC Enforcement (November 2025)
+
+**Objective**: Strengthen RBAC enforcement across all analytics endpoints and ensure defensive null-check patterns prevent runtime crashes in all analytics tabs.
+
+**Backend Improvements**:
+1. **RBAC Filtering System** (`server/routes/analytics.ts`)
+   - Added `getRBACFilter()` helper for role-based data access control
+   - **SUPER_ADMIN**: Full access to all analytics data (no filtering)
+   - **COUNTRY_ADMIN**: Limited to data from their assigned country
+   - **CITY_ADMIN**: Limited to data from their assigned city and country
+   - **Other roles**: Denied access with 403 error
+   - Applied to all 6 analytics endpoints: `/overview`, `/drivers`, `/customers`, `/restaurants`, `/revenue`, `/risk`
+
+2. **Defensive Data Patterns** (`server/routes/analytics.ts`)
+   - Added safe data helpers: `safeNumber()`, `safeArray()`, `safeString()`
+   - All numeric fields use `safeNumber(value, 0)` for guaranteed non-null defaults
+   - All array fields use `safeArray(value, [])` for guaranteed empty array defaults
+   - All financial metrics use safe fallback to `0` to prevent NaN errors
+   - Applied across all analytics endpoint responses
+
+3. **Field Naming Consistency**
+   - Fixed schema field mapping: `Ride.completedAt`, `FoodOrder.deliveredAt`, `Delivery.deliveredAt`
+   - Corrected Prisma SQL queries to use camelCase column names (e.g., `"driverId"` not `driver_id`)
+   - Aligned driver analytics response structure with frontend expectations (`driverName`, `revenue`, `performanceTrend`)
+
+**Frontend Improvements**:
+1. **Defensive Null Checks** (`client/src/pages/admin/analytics.tsx`)
+   - All analytics tabs use optional chaining: `data?.field ?? defaultValue`
+   - Numeric displays: `(data?.count ?? 0).toLocaleString()`
+   - Currency displays: `formatCurrency(data?.revenue ?? 0)`
+   - Chart data: `data?.chartData ?? []` to prevent crashes on undefined arrays
+   - Applied across all 6 tabs: Overview, Drivers, Customers, Restaurants, Revenue, Risk
+
+2. **Safe Fallback Behavior**
+   - Loading states: Skeleton components during data fetch
+   - Error states: Alert components with user-friendly messages
+   - Empty states: Default values displayed when no data available
+   - Zero runtime TypeErrors in browser console
+
+**Key Defensive Patterns**:
+```typescript
+// Backend: Safe response with defaults
+res.json({
+  totalRevenue: safeNumber(revenue, 0),
+  topDrivers: safeArray(drivers, []),
+  performanceTrend: safeArray(trend, []),
+});
+
+// Frontend: Optional chaining with defaults
+<div>{(data?.totalRevenue ?? 0).toLocaleString()}</div>
+<Chart data={data?.performanceTrend ?? []} />
+<p>{formatCurrency(data?.earnings ?? 0)}</p>
+```
+
+**Security Benefits**:
+- **RBAC Enforcement**: Prevents unauthorized cross-jurisdiction data access
+- **Audit Trail**: All analytics views logged with admin role and jurisdiction
+- **Graceful Degradation**: Missing data doesn't crash the dashboard
+- **Predictable Behavior**: All endpoints return consistent JSON structures
+
+**Testing Validation**:
+- Zero runtime crashes across all analytics tabs
+- RBAC properly restricts data by admin jurisdiction
+- All charts render without errors when data is missing
+- Safe defaults prevent blank screens and TypeErrors
