@@ -274,15 +274,15 @@ export default function AdminSettings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
-          <TabsTrigger value="kyc" data-testid="tab-kyc">KYC Rules</TabsTrigger>
-          <TabsTrigger value="commission" data-testid="tab-commission">Commission</TabsTrigger>
-          <TabsTrigger value="tax" data-testid="tab-tax">Tax & Fees</TabsTrigger>
-          <TabsTrigger value="settlement" data-testid="tab-settlement">Settlement</TabsTrigger>
-          <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
-          <TabsTrigger value="support" data-testid="tab-support">Support</TabsTrigger>
+        <TabsList className="inline-flex w-full overflow-x-auto overflow-y-hidden gap-1 justify-start">
+          <TabsTrigger value="general" data-testid="tab-general" className="whitespace-nowrap flex-shrink-0">General</TabsTrigger>
+          <TabsTrigger value="kyc" data-testid="tab-kyc" className="whitespace-nowrap flex-shrink-0">KYC Rules</TabsTrigger>
+          <TabsTrigger value="commission" data-testid="tab-commission" className="whitespace-nowrap flex-shrink-0">Commission</TabsTrigger>
+          <TabsTrigger value="tax" data-testid="tab-tax" className="whitespace-nowrap flex-shrink-0">Tax & Fees</TabsTrigger>
+          <TabsTrigger value="settlement" data-testid="tab-settlement" className="whitespace-nowrap flex-shrink-0">Settlement</TabsTrigger>
+          <TabsTrigger value="notifications" data-testid="tab-notifications" className="whitespace-nowrap flex-shrink-0">Notifications</TabsTrigger>
+          <TabsTrigger value="security" data-testid="tab-security" className="whitespace-nowrap flex-shrink-0">Security</TabsTrigger>
+          <TabsTrigger value="support" data-testid="tab-support" className="whitespace-nowrap flex-shrink-0">Support</TabsTrigger>
         </TabsList>
 
         {/* General Tab */}
