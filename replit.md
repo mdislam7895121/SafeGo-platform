@@ -56,6 +56,13 @@ Key features include:
   - `/admin/payouts/manual` - Execute one-time manual payouts for exceptional cases with wallet search and amount configuration
   - `/admin/payouts/reports` - Generate reconciliation reports with mismatch detection and detailed analysis
   All pages enforce RBAC permissions (`CREATE_MANUAL_PAYOUT`, `MANAGE_PAYOUTS`, `VIEW_PAYOUTS`), integrate with existing audit logging, and follow SafeGo's design system.
+- **Step 49 Earnings Analytics RBAC Enforcement**: Added enterprise-grade RBAC security to the existing earnings analytics page (`/admin/earnings`):
+  - **Security Implementation**: Full capability checking using `VIEW_EARNINGS_DASHBOARD` permission with three-tier security gating: loading state (spinner during capability fetch), capability error state (amber warning with retry button, hides all privileged UI), and access denied state (shows only error message for unauthorized users).
+  - **Auto-Logout on 401**: Implemented useEffect-based logout to prevent React "setState during render" errors when authentication fails.
+  - **Query Protection**: All earnings data queries (global summary, ride earnings, food earnings, parcel earnings, payout analytics) include `enabled: hasAccess` flag to prevent unauthorized data fetching.
+  - **Shared Utility Integration**: Uses `fetchAdminCapabilities` utility from queryClient.ts with proper token passing and error status propagation.
+  - **Backend Endpoints**: Existing earnings dashboard endpoints (`/api/admin/earnings/dashboard/global`, `/rides`, `/food`, `/parcels`, `/payouts`) already have RBAC enforcement via `checkPermission(Permission.VIEW_EARNINGS_DASHBOARD)` middleware.
+  - **Consistency**: Security pattern matches all other protected admin pages (home, payouts-schedule, payouts-manual, payouts-reports) ensuring uniform RBAC enforcement across the entire admin panel.
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields, driver profile photos, and vehicle documents.
