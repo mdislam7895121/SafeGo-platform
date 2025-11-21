@@ -7115,21 +7115,12 @@ router.get("/wallets/:id", checkPermission(Permission.VIEW_WALLET_SUMMARY), asyn
 router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
   try {
     const { status, walletType } = req.query;
-    const adminProfile = req.user!.adminProfile;
 
-    if (!adminProfile) {
-      console.error("[Payouts API] No admin profile found for user:", req.user!.email);
-      return res.status(403).json({ error: "Unauthorized: Admin profile required" });
-    }
-
-    const adminRole = adminProfile.adminRole;
-    const adminCountry = adminProfile.countryCode;
-    const adminCity = adminProfile.cityCode;
+    // Get RBAC filter using proven helper
+    const rbacFilter = await getRBACFilter(req);
 
     console.log("[Payouts API] Fetching payouts with RBAC context:", {
-      adminRole,
-      countryCode: adminCountry,
-      cityCode: adminCity,
+      rbacFilter,
       statusFilter: status,
       walletTypeFilter: walletType,
       adminEmail: req.user!.email,
@@ -7145,13 +7136,15 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
     }
 
     // Apply RBAC filtering based on admin role
-    if (adminRole === "COUNTRY_ADMIN" && adminCountry) {
-      where.countryCode = adminCountry;
-    } else if (adminRole === "CITY_ADMIN" && adminCountry && adminCity) {
-      where.countryCode = adminCountry;
-      where.cityCode = adminCity;
+    if (!rbacFilter.isUnrestricted) {
+      if (rbacFilter.countryCode) {
+        where.countryCode = rbacFilter.countryCode;
+      }
+      if (rbacFilter.cityCode) {
+        where.cityCode = rbacFilter.cityCode;
+      }
     }
-    // SUPER_ADMIN: no additional filter (sees all)
+    // SUPER_ADMIN (isUnrestricted=true): no additional filter (sees all)
 
     const payouts = await prisma.payout.findMany({
       where,
@@ -7263,7 +7256,7 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
         completed: enrichedPayouts.filter(p => p.status === 'completed').length,
         failed: enrichedPayouts.filter(p => p.status === 'failed').length,
       },
-      adminRole,
+      rbacFilter,
     });
 
     await logAuditEvent({
@@ -7276,7 +7269,7 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
       description: `Viewed payouts list with RBAC filtering`,
       metadata: { 
         filters: { status, walletType }, 
-        rbac: { role: adminRole, country: adminCountry, city: adminCity },
+        rbac: rbacFilter,
         total: enrichedPayouts.length 
       },
     });
