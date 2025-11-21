@@ -47,6 +47,7 @@ model AdminProfile {
 model CustomerProfile {
   id                    String            @id @default(uuid())
   userId                String            @unique
+  cityCode              String?
   fatherName            String?
   presentAddress        String?
   permanentAddress      String?
@@ -83,6 +84,7 @@ model CustomerProfile {
   foodOrders            FoodOrder[]
   rides                 Ride[]
 
+  @@index([cityCode])
   @@map("customer_profiles")
 }
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 
@@ -66,23 +66,38 @@ router.post("/", async (req: AuthRequest, res) => {
     const countryCode = customerProfile.user.countryCode;
     const cityCode = customerProfile.cityCode || null;
 
-    // Calculate commission (20% for now - can be made configurable later)
+    // Calculate commission using Prisma Decimal (20% for now - can be made configurable later)
     const commissionRate = 0.20;
-    const safegoCommission = parseFloat(serviceFare) * commissionRate;
-    const driverPayout = parseFloat(serviceFare) - safegoCommission;
+    const serviceFareDecimal = new Prisma.Decimal(serviceFare);
+    const safegoCommission = serviceFareDecimal.mul(commissionRate);
+    const driverPayout = serviceFareDecimal.sub(safegoCommission);
 
-    // Validate lat/lng as numbers if provided
-    const validPickupLat = pickupLat ? parseFloat(pickupLat.toString()) : null;
-    const validPickupLng = pickupLng ? parseFloat(pickupLng.toString()) : null;
-    const validDropoffLat = dropoffLat ? parseFloat(dropoffLat.toString()) : null;
-    const validDropoffLng = dropoffLng ? parseFloat(dropoffLng.toString()) : null;
+    // Validate and parse lat/lng - handle undefined, null, and zero correctly
+    const parseCoordinate = (value: any): number | null => {
+      // If undefined or null, return null
+      if (value === undefined || value === null || value === '') {
+        return null;
+      }
+      const parsed = parseFloat(value.toString());
+      // Validate it's a valid number (including zero)
+      if (isNaN(parsed)) {
+        throw new Error('Invalid coordinate');
+      }
+      return parsed;
+    };
 
-    // Validate that lat/lng are valid numbers if provided
-    if ((pickupLat && isNaN(validPickupLat!)) || (pickupLng && isNaN(validPickupLng!))) {
-      return res.status(400).json({ error: "Invalid pickup coordinates" });
-    }
-    if ((dropoffLat && isNaN(validDropoffLat!)) || (dropoffLng && isNaN(validDropoffLng!))) {
-      return res.status(400).json({ error: "Invalid dropoff coordinates" });
+    let validPickupLat: number | null = null;
+    let validPickupLng: number | null = null;
+    let validDropoffLat: number | null = null;
+    let validDropoffLng: number | null = null;
+
+    try {
+      validPickupLat = parseCoordinate(pickupLat);
+      validPickupLng = parseCoordinate(pickupLng);
+      validDropoffLat = parseCoordinate(dropoffLat);
+      validDropoffLng = parseCoordinate(dropoffLng);
+    } catch (error) {
+      return res.status(400).json({ error: "Invalid coordinates - must be valid numbers" });
     }
 
     // Create ride with jurisdiction and validated coordinates
@@ -97,7 +112,7 @@ router.post("/", async (req: AuthRequest, res) => {
         dropoffAddress,
         dropoffLat: validDropoffLat,
         dropoffLng: validDropoffLng,
-        serviceFare: parseFloat(serviceFare),
+        serviceFare: serviceFareDecimal,
         safegoCommission,
         driverPayout,
         paymentMethod,
