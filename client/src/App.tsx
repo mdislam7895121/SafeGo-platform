@@ -51,6 +51,7 @@ import DriverAccountPrivacy from "@/pages/driver/account/privacy";
 import DriverAccountLanguage from "@/pages/driver/account/language";
 import DriverAccountDarkMode from "@/pages/driver/account/dark-mode";
 import DriverAccountMapTheme from "@/pages/driver/account/map-theme";
+import DriverAccountMapSettings from "@/pages/driver/account/map-settings";
 import DriverAccountNavigation from "@/pages/driver/account/navigation";
 import DriverAccountBlockedUsers from "@/pages/driver/account/blocked-users";
 import DriverAccountPermissions from "@/pages/driver/account/permissions";
@@ -355,15 +356,22 @@ function Router() {
       </Route>
       <Route path="/driver/account/dark-mode">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverLayout pageTitle="Dark Mode">
+          <DriverLayout pageTitle="Appearance">
             <DriverAccountDarkMode />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/map-settings">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Map Settings">
+            <DriverAccountMapSettings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/map-theme">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverLayout pageTitle="Map Theme">
-            <DriverAccountMapTheme />
+          <DriverLayout pageTitle="Map Settings">
+            <DriverAccountMapSettings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

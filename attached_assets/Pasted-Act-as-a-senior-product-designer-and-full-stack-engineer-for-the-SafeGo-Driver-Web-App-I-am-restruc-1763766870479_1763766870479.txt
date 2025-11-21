@@ -1,0 +1,183 @@
+Act as a senior product designer and full-stack engineer for the SafeGo Driver Web App. I am restructuring the DRIVER SIDE navigation only. Do not change anything for Customer, Restaurant, or Admin flows except where explicitly mentioned.
+
+Goal: Move Documents, Vehicles, Tax Info, Dark Mode, and Map Theme into a unified “Account Settings” area and rename Map Theme to “Map Settings” with support for Google Maps, Apple Maps, and Waze. Keep all existing APIs, data models, and security rules intact.
+
+Follow all existing SafeGo conventions:
+- Four roles: customer, driver, restaurant, admin (this task is DRIVER only)
+- Keep all existing KYC, payouts, and onboarding logic unchanged
+- Do not touch ride, food, or parcel booking flows
+- Do not break any existing URLs or backend contracts
+
+========================================
+1) DRIVER SIDEBAR RESTRUCTURE
+========================================
+
+Current driver sidebar items (for reference):
+- Dashboard
+- Refer a Friend
+- Opportunity
+- SafeGo Points (or SafeGo Premium / SafeGo Points New)
+- Wallet
+- Documents
+- Vehicles
+- Tax Info
+- Account Settings
+- Map Theme
+- Dark Mode
+- Help Center
+- Log Out
+
+Update the sidebar so that it becomes:
+
+- Dashboard
+- Refer a Friend
+- Opportunity
+- SafeGo Points
+- Wallet
+- Account Settings
+- Help Center
+- Log Out
+
+Rules:
+- Remove these items from the top-level sidebar: Documents, Vehicles, Tax Info, Map Theme, Dark Mode
+- Their functionality must not be deleted; they must be accessible from inside Account Settings
+- All role-based access control stays exactly as before (driver only, authenticated, same guards)
+
+========================================
+2) ACCOUNT SETTINGS HUB (DRIVER)
+========================================
+
+Account Settings is now the central hub for all driver account-related configuration, similar to Uber’s account center. Keep the current “SafeGo Account” or “Account Settings” route but expand it with a sectioned layout.
+
+Account Settings main page should show cards or a simple list for these sections:
+
+- Personal Info
+- Security
+- Privacy & Data
+- Documents
+- Vehicles
+- Tax Info
+- Map Settings
+- Appearance (Dark Mode)
+
+Implementation details:
+- Use the same minimalist card style we already use in the driver account center (white background, grey dividers, left-aligned content)
+- Each row/card shows:
+  - Title
+  - Short description
+  - “Manage” or right arrow to open the detailed page
+- All existing pages for Personal Info, Security, Privacy & Data should remain exactly as they are and just be linked from here
+- For Documents, Vehicles, Tax Info, Map Settings, and Appearance, reuse the existing routes where possible
+
+Routing rules:
+- Account Settings main route: /driver/account (or whatever is currently used; keep it the same)
+- Documents: /driver/kyc-documents (reuse existing KYC Documents page)
+- Vehicles: reuse existing driver vehicle management page, for example /driver/vehicles or /driver/vehicle
+- Tax Info: reuse existing tax info page
+- Map Settings: new page (see section 3)
+- Appearance (Dark Mode): existing dark mode toggle, now surfaced as a setting under Account Settings
+
+On the Account Settings landing page, clicking each row should navigate to the corresponding route. Do not break deep links that may already exist.
+
+========================================
+3) MAP THEME → MAP SETTINGS
+========================================
+
+We are renaming and expanding the current “Map Theme” feature into a more powerful “Map Settings” page.
+
+Routing and naming:
+- Create a new route: /driver/account/map-settings
+- If /driver/account/map-theme currently exists, either:
+  - Redirect it to /driver/account/map-settings, or
+  - Make it an alias that renders the new Map Settings component
+- In the UI everywhere, the label should be “Map Settings” (not “Map Theme”)
+
+Map Settings page design:
+- Page title: “Map Settings”
+- Subtitle: “Choose your preferred navigation app and map display.”
+- Section 1: Navigation App
+  - Radio group or segmented control with options:
+    - Default SafeGo Map
+    - Google Maps
+    - Apple Maps
+    - Waze
+  - Only show Apple Maps if the platform or region supports it (follow any existing platform checks we already use)
+  - Store the selected navigation app in the driver’s profile or existing preferences store so that other parts of the app can read it later
+- Section 2: Map Style (optional, reuse existing Map Theme if available)
+  - Keep the existing Standard / Satellite / Terrain style if it already exists
+  - These styles should still work with the Default SafeGo Map
+- Add a Save button (if needed) or auto-save on selection, following our existing UX pattern
+
+Security and data rules:
+- Only authenticated drivers can view or change Map Settings
+- Do not expose internal identifiers
+- Respect existing localization and i18n; keep labels easy to translate
+
+========================================
+4) DOCUMENTS, VEHICLES, TAX INFO UNDER ACCOUNT SETTINGS
+========================================
+
+Documents:
+- Use the existing KYC Documents page and logic
+- Access path from Account Settings:
+  - Account Settings → Documents → existing KYC screen
+- Keep all existing document upload rules (profile photo, driver license, DMV/TLC, registration, insurance)
+
+Vehicles:
+- Use the existing vehicle management UI (vehicle list + add/edit)
+- Access path from Account Settings:
+  - Account Settings → Vehicles → existing vehicle management screen
+- Do not modify vehicle registration logic, document requirements, or backend APIs
+
+Tax Info:
+- Use the existing tax info UI and route
+- Access path from Account Settings:
+  - Account Settings → Tax Info
+- Leave all tax logic and country-specific requirements unchanged
+
+Dark Mode (Appearance):
+- Remove Dark Mode from driver sidebar
+- Create an “Appearance” or “Display” row inside Account Settings
+  - When opened, show the existing Dark Mode toggle and any future display settings
+- Keep the current dark mode implementation (theme provider, local storage, etc.) exactly as is; only move the entry point
+
+========================================
+5) UX AND TECHNICAL REQUIREMENTS
+========================================
+
+- Do not touch ride booking, job lists, or earnings flows; this task only restructures navigation and account-level settings
+- Keep all existing security phases and SafeGo security roadmap practices:
+  - Auth checks and RBAC must remain in place
+  - No debug data or sensitive identifiers in the UI
+- Keep all tests passing; update or add tests for:
+  - Sidebar items for driver role
+  - Account Settings navigation links
+  - Map Settings route and default options
+- Ensure mobile responsiveness stays correct for the new Account Settings layout
+- Make sure there are no 404 pages for any previous links:
+  - If a previous menu item pointed directly to Documents or Vehicles, those routes must still exist and be reachable
+  - Only the sidebar entry point changes; underlying routes remain valid or redirect
+
+========================================
+6) DELIVERABLES
+========================================
+
+1) Updated driver sidebar implementation reflecting the new menu:
+   Dashboard, Refer a Friend, Opportunity, SafeGo Points, Wallet, Account Settings, Help Center, Log Out.
+
+2) An Account Settings hub page that lists:
+   Personal Info, Security, Privacy & Data, Documents, Vehicles, Tax Info, Map Settings, Appearance (Dark Mode), each linking to the correct existing or new route.
+
+3) A fully working Map Settings page at /driver/account/map-settings with:
+   - Navigation app selection: Default SafeGo Map, Google Maps, Apple Maps, Waze
+   - Optional map style controls reusing current map theme logic
+   - Correct persistence in driver settings
+
+4) All navigation paths verified so that no 404 errors appear for:
+   - Documents
+   - Vehicles
+   - Tax Info
+   - Map Settings
+   - Dark Mode/Appearance
+
+Please implement these changes now, following SafeGo’s existing component library and coding standards, and keep everything backward compatible.

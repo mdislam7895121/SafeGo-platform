@@ -15,8 +15,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   Users,
-  Gift,
-  Crown,
   Wallet,
   Settings,
   Star,
@@ -24,11 +22,6 @@ import {
   LogOut,
   LayoutDashboard,
   Target,
-  FileText,
-  Car,
-  Receipt,
-  Map,
-  Moon,
   HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,34 +53,9 @@ const menuItems = [
     href: "/driver/wallet",
   },
   {
-    title: "Documents",
-    icon: FileText,
-    href: "/driver/kyc-documents",
-  },
-  {
-    title: "Vehicles",
-    icon: Car,
-    href: "/driver/vehicle",
-  },
-  {
-    title: "Tax Info",
-    icon: Receipt,
-    href: "/driver/account/tax-info",
-  },
-  {
     title: "Account Settings",
     icon: Settings,
     href: "/driver/account",
-  },
-  {
-    title: "Map Theme",
-    icon: Map,
-    href: "/driver/account/map-theme",
-  },
-  {
-    title: "Dark Mode",
-    icon: Moon,
-    href: "/driver/account/dark-mode",
   },
   {
     title: "Help Center",
