@@ -3,7 +3,9 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const error: any = new Error(`${res.status}: ${text}`);
+    error.status = res.status;
+    throw error;
   }
 }
 
@@ -58,6 +60,35 @@ export const getQueryFn: <T>(options: {
     await throwIfResNotOk(res);
     return await res.json();
   };
+
+/**
+ * Shared capability fetcher for admin pages
+ * Uses apiRequest to ensure proper error status propagation and RBAC enforcement
+ */
+export async function fetchAdminCapabilities(token: string | null): Promise<{ capabilities: string[] }> {
+  if (!token) {
+    throw new Error("No authentication token provided");
+  }
+
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+
+  const res = await fetch("/api/admin/capabilities", {
+    headers,
+    credentials: "include",
+  });
+
+  if (!res.ok) {
+    const text = (await res.text()) || res.statusText;
+    const error: any = new Error(`${res.status}: ${text}`);
+    error.status = res.status;
+    throw error;
+  }
+
+  return res.json();
+}
 
 export const queryClient = new QueryClient({
   defaultOptions: {

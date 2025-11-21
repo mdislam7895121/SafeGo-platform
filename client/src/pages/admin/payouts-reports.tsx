@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { ArrowLeft, FileText, AlertCircle, CheckCircle, RefreshCw, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, fetchAdminCapabilities } from "@/lib/queryClient";
 import { format } from "date-fns";
 import {
   Select,
@@ -54,30 +54,17 @@ export default function AdminPayoutsReports() {
   // Fetch admin capabilities for RBAC with improved error handling
   const { data: capabilitiesData, error: capabilitiesError, isPending: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
     queryKey: ["/api/admin/capabilities", token],
-    queryFn: async () => {
-      const response = await fetch("/api/admin/capabilities", {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
-      if (!response.ok) {
-        const error: any = new Error(`Failed to fetch capabilities: ${response.status}`);
-        error.status = response.status;
-        throw error;
-      }
-      
-      return response.json();
-    },
+    queryFn: () => fetchAdminCapabilities(token),
     retry: false,
     enabled: !!token,
-    onError: (error: any) => {
-      if (error?.status === 401) {
-        logout();
-      }
-    },
   });
+  
+  // Handle 401 errors by auto-logging out (using useEffect to avoid setState during render)
+  useEffect(() => {
+    if (capabilitiesError && (capabilitiesError as any)?.status === 401) {
+      logout();
+    }
+  }, [capabilitiesError, logout]);
 
   const capabilities = capabilitiesData?.capabilities || [];
   const hasAccess = capabilities.includes("VIEW_PAYOUTS");
@@ -152,8 +139,37 @@ export default function AdminPayoutsReports() {
     );
   }
 
+  // Capability error: hide all privileged UI and show only error banner with retry
+  if (hasCapabilitiesError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="max-w-md border-amber-200 dark:border-amber-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Unable to Verify Permissions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              We couldn't verify your permissions to access this page. This may be due to a temporary network issue.
+            </p>
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.reload()} data-testid="button-retry">
+                Retry
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/admin")} data-testid="button-back-to-admin">
+                Back to Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // No access (only if capabilities loaded successfully and user doesn't have permission)
-  if (!hasAccess && !hasCapabilitiesError) {
+  if (!hasAccess) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <Card className="max-w-md">

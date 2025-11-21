@@ -1,0 +1,190 @@
+You are upgrading the SafeGo admin dashboard for **Step 49 – Admin Earnings & Operations Analytics**.
+
+CONTEXT
+- SafeGo is a multi-country (USA + Bangladesh) platform for:
+  - Ride bookings
+  - Food delivery
+  - Parcel delivery
+- Core roles:
+  1) Customer – creates rides/food/parcel orders and pays
+  2) Driver – fulfills rides and deliveries, receives payouts
+  3) Restaurant – receives food orders, earns payouts after commission
+  4) Admin – manages KYC, risk, payouts, and analytics
+
+- Existing collections (do NOT break them):
+  - `rides`, `food_orders`, `deliveries` (for trips/orders)
+  - `wallets`, `transactions`, `payouts`, `settlements`
+  - `users`, `drivers`, `restaurants`
+  - `admin_audit_logs`
+- Existing admin cards on `/admin`:
+  - Earnings Analytics → `/admin/earnings` (RBAC: `VIEW_EARNINGS_DASHBOARD`)
+  - Payouts / Wallet Settlement / System Monitoring / Security Threat Center etc. are already implemented in Steps 42–48.
+- Step 46–48 already implemented:
+  - Admin financial suite (wallets, balances, commissions)
+  - Payout scheduling & auto-reconciliation engine
+  - Admin payout UI (scheduled payouts, manual payouts, reconciliation reports)
+
+YOUR GOAL (STEP 49)
+Build a **production-grade analytics experience** under `/admin/earnings` that gives Admin a clear, secure overview of:
+
+1) Earnings & Commission Analytics
+   - Total gross revenue, SafeGo commission, and partner share
+   - Breakdowns by:
+     - Service type: rides, food, parcel
+     - Country: USA vs Bangladesh
+     - Time range: today, last 7 days, last 30 days, custom range
+   - Trend charts (time-series) for:
+     - Total orders vs completed orders
+     - Revenue vs payouts
+     - Cancellation rate
+
+2) Payout Insights
+   - Aggregated totals:
+     - Total payouts sent in selected range
+     - Pending vs completed payouts
+     - Average payout per driver / restaurant
+   - High-level stats only (no raw bank details):
+     - Number of active payout recipients
+     - Failed payout count (if available from existing data)
+
+3) Operational KPIs
+   - Completed rides / food orders / deliveries
+   - Average order value (AOV) per service type
+   - Cancellation and failure rate
+   - Fraud-related indicators from existing fraud engine:
+     - Count of high-risk orders
+     - Number of accounts with elevated risk score in the range
+   - Support and disputes (if data available):
+     - Number of open complaints / resolved complaints
+
+4) Top Performers (high-level only)
+   - Top N drivers by earnings (no full PII – use masked name or driver code)
+   - Top N restaurants by earnings
+   - Option to filter by country and service type
+
+SECURITY & COMPLIANCE REQUIREMENTS
+- Respect existing RBAC:
+  - Only admins with `VIEW_EARNINGS_DASHBOARD` may access `/admin/earnings`.
+  - If permission is missing, redirect to a friendly "Access denied" state.
+- Do NOT expose PII in charts/tables:
+  - No full names, phone numbers, or emails in the main analytics view.
+  - Use IDs or masked labels (e.g., "Driver #1234").
+- Ensure all new endpoints:
+  - Are permission-gated server-side.
+  - Log access in `admin_audit_logs` with:
+    - admin_id
+    - action (e.g., "VIEW_EARNINGS_DASHBOARD", "EXPORT_EARNINGS_CSV")
+    - timestamp
+    - filters used (date range, country, service type)
+- No breaking changes to:
+  - Existing payouts logic
+  - Existing wallet/transaction schemas
+  - Prior security phases (Steps 42–48: fraud engine, threat monitoring, DevOps security, automated incident response).
+
+UI / UX REQUIREMENTS
+- Page: `/admin/earnings`
+- Layout:
+  - Responsive: must work cleanly on both laptop and mobile (single-column on small screens).
+  - Top section: global filters (date range, country, service type).
+  - Below filters:
+    - Row of KPI cards (total revenue, commission, payouts, completed orders, cancellation rate, etc.).
+    - Two main charts:
+      1) Revenue & payouts over time
+      2) Orders & cancellation rate over time
+    - Secondary area:
+      - Tabbed or two-column section for:
+        - "Top Drivers"
+        - "Top Restaurants"
+        - "Operational KPIs" (fraud flags, complaints summary)
+- UX details:
+  - Use loading skeletons/placeholders while fetching analytics data.
+  - User-friendly empty states when there is no data in the selected range.
+  - Clear error messages if analytics API fails, but keep the page rendered with a retry option.
+  - Keep the visual style consistent with the rest of the SafeGo admin dashboard cards.
+
+BACKEND & API DESIGN
+- You may create new **read-only analytics endpoints**; do not mutate business data.
+- Suggested endpoints (adjust names to match existing style):
+  - `GET /api/admin/analytics/earnings-summary`
+    - Query params: `from`, `to`, `country`, `serviceType`
+    - Returns:
+      - totalRevenue
+      - totalCommission
+      - partnerShareTotal
+      - totalOrders
+      - completedOrders
+      - cancelledOrders
+      - avgOrderValue
+  - `GET /api/admin/analytics/earnings-timeseries`
+    - Returns time-series points for charts:
+      - date
+      - revenue
+      - payouts
+      - orders
+      - cancellations
+  - `GET /api/admin/analytics/payout-insights`
+    - Returns:
+      - totalPayoutsCompleted
+      - totalPayoutsPending
+      - activeRecipientsCount
+      - failedPayoutCount (if available)
+  - `GET /api/admin/analytics/top-performers`
+    - Returns:
+      - `topDrivers`: [{ driverId, maskedNameOrCode, totalEarnings, country }]
+      - `topRestaurants`: [{ restaurantId, maskedNameOrCode, totalEarnings, country }]
+  - `GET /api/admin/analytics/operational-kpis`
+    - Returns:
+      - fraudHighRiskCount
+      - disputesOpen
+      - disputesResolved
+      - supportTicketsOpen (if available)
+
+- Every endpoint must:
+  - Validate date ranges (reject invalid or extremely large ranges).
+  - Enforce RBAC via existing auth middleware.
+  - Write an entry into `admin_audit_logs` describing the analytics view.
+
+FRONTEND IMPLEMENTATION DETAILS
+- Implement the `/admin/earnings` page in the existing React/TypeScript codebase (home file is likely `client/src/pages/admin/earnings.tsx` or similar; if it doesn’t exist, create it and wire the route from the existing "Earnings Analytics" card).
+- Use existing shared components:
+  - Card components for KPI tiles
+  - Chart components (or create small composable wrappers based on what is already used in System Monitoring / Security Threat Center, to maintain consistency).
+- Handle:
+  - Global filters via React state (or URL query parameters).
+  - Debounced API calls when filters change (avoid spamming backend).
+  - Proper cleanup on unmount (abort requests where applicable).
+
+COUNTRY & SERVICE LOGIC
+- Filters must support:
+  - Country: `ALL`, `US`, `BD`
+  - Service type: `ALL`, `RIDE`, `FOOD`, `PARCEL`
+- When `ALL` is selected, aggregate safely across collections:
+  - Combine results from `rides`, `food_orders`, `deliveries`.
+- Make sure to use the same commission and payout rules already defined in Step 46–47; do NOT recalculate business logic differently, only **read** and aggregate existing data.
+
+TESTING & VALIDATION
+- Add tests or checks to ensure:
+  - RBAC correctly blocks a user without `VIEW_EARNINGS_DASHBOARD`.
+  - Endpoints handle empty datasets and return safe defaults (0 totals, empty arrays).
+  - Time-series queries work correctly across multiple days/months.
+  - PII is not accidentally returned from analytics endpoints, or if returned, it is not displayed.
+- Run the dev server and manually verify:
+  - All analytics load correctly on both desktop and mobile.
+  - Switching filters updates charts and KPIs as expected.
+  - Errors are handled gracefully with retry.
+
+DELIVERABLES
+1) New or updated backend endpoints for analytics (read-only, RBAC enforced, audited).
+2) A fully functional `/admin/earnings` UI implementing:
+   - Filters
+   - KPI cards
+   - Charts
+   - Top performers
+   - Operational KPIs
+3) Updates to any route configuration so the "Earnings Analytics" card on `/admin` opens this page.
+4) Updates to `replit.md` documenting:
+   - The purpose of Step 49
+   - Available analytics endpoints and their parameters
+   - RBAC requirements and audit logging behavior
+
+Do NOT modify or remove any functionality from Steps 42–48. Work incrementally and keep all changes backwards-compatible. Now, implement Step 49 according to these requirements.

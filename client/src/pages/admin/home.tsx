@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "wouter";
 import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, Activity, ShieldAlert } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
+import { fetchAdminCapabilities } from "@/lib/queryClient";
 
 interface AdminStats {
   totalUsers: number;
@@ -62,35 +64,18 @@ export default function AdminHome() {
   // Fetch admin capabilities for RBAC with custom error handling
   const { data: capabilitiesData, error: capabilitiesError, isPending: isLoadingCapabilities } = useQuery<{ capabilities: string[] }>({
     queryKey: ["/api/admin/capabilities", token],
-    queryFn: async () => {
-      const response = await fetch("/api/admin/capabilities", {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
-      if (!response.ok) {
-        // Throw with status code so onError can check it
-        const error: any = new Error(`Failed to fetch capabilities: ${response.status}`);
-        error.status = response.status;
-        throw error;
-      }
-      
-      return response.json();
-    },
+    queryFn: () => fetchAdminCapabilities(token),
     retry: false, // Don't retry on auth failures
     enabled: !!token, // Only run query if token exists
-    onError: (error: any) => {
-      // Auto-logout on auth failure (invalid/expired token)
-      if (error?.status === 401) {
-        console.error("❌ Admin capabilities fetch failed (401) - auto-logging out");
-        logout();
-      } else {
-        console.error("❌ Failed to load capabilities:", error);
-      }
-    },
   });
+  
+  // Handle 401 errors by auto-logging out (using useEffect to avoid setState during render)
+  useEffect(() => {
+    if (capabilitiesError && (capabilitiesError as any)?.status === 401) {
+      console.error("❌ Admin capabilities fetch failed (401) - auto-logging out");
+      logout();
+    }
+  }, [capabilitiesError, logout]);
   
   // Use empty array as fallback only, but track if it's an error state
   const capabilities = capabilitiesData?.capabilities || [];
@@ -238,16 +223,52 @@ export default function AdminHome() {
     },
   ];
 
-  // Filter sections based on admin permissions (only after capabilities are loaded)
-  // On error (non-401), show all cards instead of hiding RBAC cards to avoid bad UX
-  const filteredSections = isLoadingCapabilities 
-    ? [] // Don't show any cards while loading capabilities
-    : hasCapabilitiesError
-    ? adminSections // Show all cards on error, display error banner separately
-    : adminSections.filter((section) => {
-        if (!section.permission) return true;
-        return capabilities.includes(section.permission);
-      });
+  // Loading state
+  if (isLoadingCapabilities) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Capability error: hide all privileged UI and show only error banner with retry
+  if (hasCapabilitiesError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="max-w-md border-amber-200 dark:border-amber-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Unable to Verify Permissions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              We couldn't verify your permissions to access the admin dashboard. This may be due to a temporary network issue.
+            </p>
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.reload()} data-testid="button-retry">
+                Retry
+              </Button>
+              <Button variant="outline" onClick={logout} data-testid="button-logout">
+                Logout
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Filter sections based on admin permissions (capabilities loaded successfully)
+  const filteredSections = adminSections.filter((section) => {
+    if (!section.permission) return true;
+    return capabilities.includes(section.permission);
+  });
 
   return (
     <div className="min-h-screen bg-background pb-6">
