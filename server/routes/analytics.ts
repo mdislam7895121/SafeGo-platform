@@ -229,7 +229,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
         where: {
           status: "delivered",
           driverId: { not: null },
-          ...(from || to ? { completedAt: dateFilter } : {}),
+          ...(from || to ? { deliveredAt: dateFilter } : {}),
         },
         _count: { id: true },
         _sum: { driverPayout: true },
@@ -241,7 +241,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
         where: {
           status: "delivered",
           driverId: { not: null },
-          ...(from || to ? { completedAt: dateFilter } : {}),
+          ...(from || to ? { deliveredAt: dateFilter } : {}),
         },
         _count: { id: true },
         _sum: { driverPayout: true },
@@ -384,7 +384,7 @@ router.get("/customers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), a
         by: ["customerId"],
         where: {
           status: "delivered",
-          ...(from || to ? { completedAt: dateFilter } : {}),
+          ...(from || to ? { deliveredAt: dateFilter } : {}),
         },
         _count: { id: true },
         _sum: { serviceFare: true },
@@ -611,7 +611,7 @@ router.get("/revenue", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), asy
       prisma.delivery.aggregate({
         where: {
           status: "delivered",
-          ...(from || to ? { completedAt: dateFilter } : {}),
+          ...(from || to ? { deliveredAt: dateFilter } : {}),
         },
         _sum: {
           serviceFare: true,
@@ -786,11 +786,11 @@ router.get("/risk", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async 
 
     // Low rating drivers/restaurants (quality risk)
     const lowRatedDrivers = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(DISTINCT driver_id) as count
+      SELECT COUNT(DISTINCT "driverId") as count
       FROM rides
-      WHERE driver_rating IS NOT NULL
-      GROUP BY driver_id
-      HAVING AVG(driver_rating) < 3.0
+      WHERE "driverRating" IS NOT NULL
+      GROUP BY "driverId"
+      HAVING AVG("driverRating") < 3.0
     `;
 
     // Total risk score calculation
