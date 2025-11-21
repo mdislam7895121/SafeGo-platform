@@ -1,20 +1,25 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Car, Plus, FileText, Calendar, CheckCircle2, AlertCircle, Clock, XCircle, Edit, ArrowLeft } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { 
+  Car, Plus, FileText, Calendar, CheckCircle2, AlertCircle, 
+  Clock, XCircle, Edit, ArrowLeft, ChevronRight, Shield, 
+  FileCheck, CreditCard, Diamond 
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { cn } from "@/lib/utils";
 
 const getStatusBadge = (status: string) => {
   const config = {
-    completed: { variant: "default" as const, icon: CheckCircle2, label: "Completed", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-    expiring_soon: { variant: "outline" as const, icon: AlertCircle, label: "Expiring Soon", className: "border-yellow-500 text-yellow-700 dark:text-yellow-500" },
+    approved: { variant: "default" as const, icon: CheckCircle2, label: "Approved", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
+    expiring: { variant: "outline" as const, icon: AlertCircle, label: "Expiring Soon", className: "border-yellow-500 text-yellow-700 dark:text-yellow-500" },
     pending: { variant: "outline" as const, icon: Clock, label: "Pending", className: "border-gray-400 text-gray-700 dark:text-gray-400" },
     rejected: { variant: "destructive" as const, icon: XCircle, label: "Rejected", className: "" },
+    under_review: { variant: "outline" as const, icon: Clock, label: "Under Review", className: "border-blue-500 text-blue-700 dark:text-blue-500" },
   };
   
   const statusConfig = config[status as keyof typeof config] || config.pending;
@@ -23,21 +28,24 @@ const getStatusBadge = (status: string) => {
 
 export default function DriverVehicles() {
   const { toast } = useToast();
+  const [_, navigate] = useLocation();
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
   });
 
-  const { data: vehicleDocuments, isLoading: docsLoading } = useQuery({
-    queryKey: ["/api/driver/vehicle-documents"],
-  });
-
   const vehicle = (driverData as any)?.vehicle;
-  const documents = (vehicleDocuments as any)?.documents || [];
+  const profile = (driverData as any)?.profile;
 
-  if (isLoading || docsLoading) {
+  // Check if driver is in NYC market (include various NYC city name variations)
+  const nycCityVariations = ["New York", "New York City", "NYC", "Brooklyn", "Queens", "Manhattan", "Bronx", "Staten Island"];
+  const isNYCDriver = nycCityVariations.some(city => 
+    profile?.usaCity?.toLowerCase().includes(city.toLowerCase())
+  );
+
+  if (isLoading) {
     return (
-      <div className="bg-background">
+      <div className="bg-background min-h-screen">
         <div className="p-6 space-y-4">
           <Skeleton className="h-12 w-full" />
           <Skeleton className="h-48 w-full" />
@@ -46,10 +54,16 @@ export default function DriverVehicles() {
     );
   }
 
+  // Use backend-provided status values directly
+  const registrationStatus = vehicle?.registrationStatus || "pending";
+  const insuranceStatus = vehicle?.insuranceStatus || "pending";
+  const inspectionStatus = vehicle?.inspectionStatus || "pending";
+  const tlcStatus = vehicle?.tlcLicenseStatus || "pending";
+
   return (
-    <div className="bg-background">
+    <div className="bg-background min-h-screen">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 ">
+      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <Link href="/driver/account">
             <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-back">
@@ -77,32 +91,26 @@ export default function DriverVehicles() {
                     <CardTitle data-testid="text-vehicle-model">{vehicle.vehicleModel}</CardTitle>
                     <CardDescription className="mt-1">
                       <span className="font-medium">{vehicle.vehicleType}</span>
-                      {" • "}
-                      <span data-testid="text-vehicle-plate">{vehicle.vehiclePlate}</span>
+                      {vehicle.licensePlate && (
+                        <>
+                          {" • "}
+                          <span data-testid="text-vehicle-plate">{vehicle.licensePlate}</span>
+                        </>
+                      )}
                     </CardDescription>
                   </div>
                 </div>
-                <Link href="/driver/vehicle">
-                  <Button variant="outline" size="sm" data-testid="button-edit-vehicle">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                </Link>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground mb-1">Status</p>
-                  <Badge variant={vehicle.isOnline ? "default" : "outline"} className={vehicle.isOnline ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" : ""}>
-                    {vehicle.isOnline ? "Online" : "Offline"}
-                  </Badge>
+                  <p className="text-muted-foreground mb-1">Make & Year</p>
+                  <p className="font-medium">{vehicle.make || "N/A"} {vehicle.year || ""}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground mb-1">Total Earnings</p>
-                  <p className="font-semibold" data-testid="text-vehicle-earnings">
-                    ${parseFloat(vehicle.totalEarnings || "0").toFixed(2)}
-                  </p>
+                  <p className="text-muted-foreground mb-1">Color</p>
+                  <p className="font-medium capitalize">{vehicle.color || "N/A"}</p>
                 </div>
               </div>
             </CardContent>
@@ -125,89 +133,118 @@ export default function DriverVehicles() {
           </Card>
         )}
 
-        {/* Vehicle Documents */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Vehicle Documents</CardTitle>
-            <CardDescription>Required documents for your vehicle</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Registration */}
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Vehicle Registration</p>
-                  <p className="text-xs text-muted-foreground">Required for verification</p>
-                </div>
-              </div>
-              {documents.find((d: any) => d.documentType === "registration") ? (
-                <Badge {...getStatusBadge("completed")}>
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Uploaded
-                </Badge>
-              ) : (
-                <Badge {...getStatusBadge("pending")}>
-                  <Clock className="h-3 w-3 mr-1" />
-                  Pending
-                </Badge>
-              )}
-            </div>
-
-            {/* Insurance */}
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <div className="flex items-center gap-3">
-                <FileText className="h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Vehicle Insurance</p>
-                  <p className="text-xs text-muted-foreground">Required for verification</p>
-                </div>
-              </div>
-              {documents.find((d: any) => d.documentType === "insurance") ? (
-                <Badge {...getStatusBadge("completed")}>
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Uploaded
-                </Badge>
-              ) : (
-                <Badge {...getStatusBadge("pending")}>
-                  <Clock className="h-3 w-3 mr-1" />
-                  Pending
-                </Badge>
-              )}
-            </div>
-
-            <Link href="/driver/kyc-documents">
-              <Button className="w-full mt-4" variant="outline" data-testid="button-upload-documents">
-                <FileText className="h-4 w-4 mr-2" />
-                Upload Documents
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        {/* All Vehicle Documents */}
-        {documents.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Uploaded Documents</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {documents.map((doc: any) => (
-                <div key={doc.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium capitalize">{doc.documentType.replace('_', ' ')}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}
-                    </p>
+        {vehicle && (
+          <>
+            {/* Vehicle Documents Section */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Vehicle Documents</CardTitle>
+                <CardDescription>Required documents for your vehicle</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {/* Vehicle Registration */}
+                <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 text-primary flex-shrink-0">
+                      <FileText className="h-6 w-6" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">Vehicle Registration</p>
+                      <p className="text-xs text-muted-foreground">Required for verification</p>
+                    </div>
                   </div>
-                  <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 ml-2">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Verified
+                  <Badge {...getStatusBadge(registrationStatus)} className={cn(getStatusBadge(registrationStatus).className, "flex-shrink-0")}>
+                    {getStatusBadge(registrationStatus).label}
                   </Badge>
                 </div>
-              ))}
-            </CardContent>
-          </Card>
+
+                {/* Vehicle Insurance */}
+                <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 text-primary flex-shrink-0">
+                      <Shield className="h-6 w-6" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">Vehicle Insurance</p>
+                      <p className="text-xs text-muted-foreground">Required for verification</p>
+                    </div>
+                  </div>
+                  <Badge {...getStatusBadge(insuranceStatus)} className={cn(getStatusBadge(insuranceStatus).className, "flex-shrink-0")}>
+                    {getStatusBadge(insuranceStatus).label}
+                  </Badge>
+                </div>
+
+                {/* Vehicle Inspection */}
+                <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 text-primary flex-shrink-0">
+                      <FileCheck className="h-6 w-6" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">Vehicle Inspection</p>
+                      <p className="text-xs text-muted-foreground">DMV/NYS Inspection</p>
+                    </div>
+                  </div>
+                  <Badge {...getStatusBadge(inspectionStatus)} className={cn(getStatusBadge(inspectionStatus).className, "flex-shrink-0")}>
+                    {getStatusBadge(inspectionStatus).label}
+                  </Badge>
+                </div>
+
+                {/* License Plate Number */}
+                <div className="flex items-center justify-between p-4 bg-background border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 text-primary flex-shrink-0">
+                      <CreditCard className="h-6 w-6" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">License Plate Number</p>
+                      <p className="text-xs text-muted-foreground">Required for all vehicles</p>
+                    </div>
+                  </div>
+                  {vehicle.licensePlate ? (
+                    <Badge {...getStatusBadge("approved")} className={cn(getStatusBadge("approved").className, "flex-shrink-0")}>
+                      {vehicle.licensePlate}
+                    </Badge>
+                  ) : (
+                    <Badge {...getStatusBadge("pending")} className={cn(getStatusBadge("pending").className, "flex-shrink-0")}>
+                      Pending
+                    </Badge>
+                  )}
+                </div>
+
+                {/* TLC License (NYC only) */}
+                {isNYCDriver && (
+                  <div className="flex items-center justify-between p-4 bg-background border-2 border-primary/20 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary text-primary-foreground flex-shrink-0">
+                        <Diamond className="h-6 w-6" />
+                      </div>
+                      <div className="text-left">
+                        <p className="font-medium">TLC License</p>
+                        <p className="text-xs text-muted-foreground">Required for NYC drivers</p>
+                      </div>
+                    </div>
+                    {vehicle.tlcLicenseNumber ? (
+                      <Badge {...getStatusBadge(tlcStatus)} className={cn(getStatusBadge(tlcStatus).className, "flex-shrink-0")}>
+                        {vehicle.tlcLicenseNumber.slice(-4).padStart(vehicle.tlcLicenseNumber.length, '*')}
+                      </Badge>
+                    ) : (
+                      <Badge {...getStatusBadge("pending")} className={cn(getStatusBadge("pending").className, "flex-shrink-0")}>
+                        Pending
+                      </Badge>
+                    )}
+                  </div>
+                )}
+
+                <Link href="/driver/kyc-documents">
+                  <Button className="w-full mt-4" variant="outline" data-testid="button-upload-documents">
+                    <FileText className="h-4 w-4 mr-2" />
+                    Upload Documents
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </>
         )}
       </div>
     </div>

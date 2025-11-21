@@ -7,12 +7,6 @@ import { useToast } from "@/hooks/use-toast";
 
 const navigationApps = [
   { 
-    id: "safego", 
-    name: "Default SafeGo Map", 
-    description: "Built-in navigation with real-time traffic",
-    available: true 
-  },
-  { 
     id: "google", 
     name: "Google Maps", 
     description: "Navigate with Google Maps app",
@@ -41,7 +35,7 @@ const mapStyles = [
 
 export default function MapSettings() {
   const { toast } = useToast();
-  const [selectedNav, setSelectedNav] = useState("safego");
+  const [selectedNav, setSelectedNav] = useState("google");
   const [selectedStyle, setSelectedStyle] = useState("standard");
 
   // Load saved preferences from localStorage on mount
@@ -51,6 +45,9 @@ export default function MapSettings() {
     
     if (savedNav && navigationApps.some(app => app.id === savedNav)) {
       setSelectedNav(savedNav);
+    } else {
+      // Default to Google Maps if no preference saved
+      setSelectedNav("google");
     }
     
     if (savedStyle && mapStyles.some(style => style.id === savedStyle)) {
@@ -136,51 +133,12 @@ export default function MapSettings() {
           </CardContent>
         </Card>
 
-        {/* Map Style Selection (only shown for SafeGo default map) */}
-        {selectedNav === "safego" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Map className="h-5 w-5" />
-                Map Display Style
-              </CardTitle>
-              <CardDescription>Choose your preferred map appearance</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {mapStyles.map((style) => (
-                <button
-                  key={style.id}
-                  onClick={() => handleStyleChange(style.id)}
-                  className={`flex items-center justify-between w-full p-4 rounded-lg hover-elevate active-elevate-2 ${
-                    style.id === selectedStyle 
-                      ? "bg-primary/10 border-2 border-primary" 
-                      : "border-2 border-transparent"
-                  }`}
-                  data-testid={`button-style-${style.id}`}
-                >
-                  <div className="text-left">
-                    <p className="font-medium">{style.name}</p>
-                    <p className="text-sm text-muted-foreground">{style.description}</p>
-                  </div>
-                  {style.id === selectedStyle && (
-                    <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                      <Check className="h-4 w-4 text-primary-foreground" />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        {selectedNav !== "safego" && (
-          <div className="bg-muted/50 p-4 rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              <strong>Note:</strong> When you tap navigation during a trip, the selected app will open automatically. 
-              Make sure you have {navigationApps.find(n => n.id === selectedNav)?.name} installed on your device.
-            </p>
-          </div>
-        )}
+        <div className="bg-muted/50 p-4 rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            <strong>Note:</strong> When you tap navigation during a trip, the selected app will open automatically. 
+            Make sure you have {navigationApps.find(n => n.id === selectedNav)?.name} installed on your device.
+          </p>
+        </div>
       </div>
     </div>
   );

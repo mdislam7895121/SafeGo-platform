@@ -23,6 +23,16 @@ enum SecurityStatus {
   needs_review
 }
 
+enum DocumentStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  EXPIRING_SOON
+  EXPIRED
+  REJECTED
+  NEEDS_UPDATE
+}
+
 model AdminProfile {
   id                           String    @id @default(uuid())
   userId                       String    @unique
@@ -504,8 +514,12 @@ model Vehicle {
   licensePlate            String?
   registrationDocumentUrl String?
   registrationExpiry      DateTime?
+  registrationStatus      DocumentStatus    @default(PENDING)
+  registrationLastUpdated DateTime?
   insuranceDocumentUrl    String?
   insuranceExpiry         DateTime?
+  insuranceStatus         DocumentStatus    @default(PENDING)
+  insuranceLastUpdated    DateTime?
   dmvInspectionType                String?
   dmvInspectionDate                DateTime?
   dmvInspectionExpiry              DateTime?
@@ -515,6 +529,13 @@ model Vehicle {
   dmvInspectionVerificationStatus  String?              @default("pending_review")
   dmvInspectionRejectionReason     String?
   dmvInspectionStatus              DmvInspectionStatus?
+  inspectionStatus        DocumentStatus    @default(PENDING)
+  inspectionLastUpdated   DateTime?
+  plateCountry            String?
+  plateState              String?
+  plateStatus             DocumentStatus    @default(PENDING)
+  tlcLicenseNumber        String?
+  tlcLicenseStatus        DocumentStatus    @default(PENDING)
   isPrimary                        Boolean              @default(true)
   vehicleDocuments        VehicleDocument[]
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
