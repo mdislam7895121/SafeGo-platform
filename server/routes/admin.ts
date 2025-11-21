@@ -6705,67 +6705,12 @@ router.post("/wallets/:id/settle", checkPermission(Permission.PROCESS_WALLET_SET
 });
 
 // ====================================================
-// PAYOUT MANAGEMENT API
+// DEPRECATED PAYOUT ROUTES - MOVED BELOW WITH RBAC
 // ====================================================
+// The payout routes are now implemented with proper RBAC filtering
+// See PAYOUT MANAGEMENT API section below
 
-// Get all payouts with filters
-router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
-  try {
-    const { ownerType, ownerId, status, countryCode, page = "1", limit = "50", startDate, endDate } = req.query;
-
-    const pageNum = parseInt(page as string);
-    const limitNum = parseInt(limit as string);
-    const offset = (pageNum - 1) * limitNum;
-
-    const filters: any = {};
-    if (ownerType) filters.ownerType = ownerType as "driver" | "restaurant";
-    if (ownerId) filters.ownerId = ownerId as string;
-    if (status) filters.status = status;
-    if (countryCode) filters.countryCode = countryCode as string;
-    if (startDate) filters.startDate = new Date(startDate as string);
-    if (endDate) filters.endDate = new Date(endDate as string);
-
-    const payouts = await walletPayoutService.listWalletPayouts({
-      ...filters,
-      limit: limitNum,
-      offset,
-    });
-
-    const total = await walletPayoutService.getWalletPayoutCount(filters);
-
-    res.json({
-      payouts,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
-      },
-    });
-  } catch (error: any) {
-    console.error("Get payouts error:", error);
-    res.status(500).json({ error: error.message || "Failed to fetch payouts" });
-  }
-});
-
-// Get specific payout by ID
-router.get("/payouts/:id", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const payout = await walletPayoutService.getWalletPayoutById(id);
-
-    if (!payout) {
-      return res.status(404).json({ error: "Payout not found" });
-    }
-
-    res.json(payout);
-  } catch (error: any) {
-    console.error("Get payout error:", error);
-    res.status(500).json({ error: error.message || "Failed to fetch payout" });
-  }
-});
-
-// Update payout status (approve/reject)
+// Update payout status (approve/reject) - DEPRECATED, use /approve or /reject endpoints below
 router.patch("/payouts/:id/status", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -7166,11 +7111,31 @@ router.get("/wallets/:id", checkPermission(Permission.VIEW_WALLET_SUMMARY), asyn
 // PAYOUT MANAGEMENT API
 // ====================================================
 
-// Get all payouts with filters
+// Get all payouts with filters - RBAC-aware
 router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
   try {
-    const { status, walletType, country } = req.query;
+    const { status, walletType } = req.query;
+    const adminProfile = req.user!.adminProfile;
 
+    if (!adminProfile) {
+      console.error("[Payouts API] No admin profile found for user:", req.user!.email);
+      return res.status(403).json({ error: "Unauthorized: Admin profile required" });
+    }
+
+    const adminRole = adminProfile.adminRole;
+    const adminCountry = adminProfile.countryCode;
+    const adminCity = adminProfile.cityCode;
+
+    console.log("[Payouts API] Fetching payouts with RBAC context:", {
+      adminRole,
+      countryCode: adminCountry,
+      cityCode: adminCity,
+      statusFilter: status,
+      walletTypeFilter: walletType,
+      adminEmail: req.user!.email,
+    });
+
+    // Build base filter
     const where: any = {};
     if (status && status !== "all") {
       where.status = status as string;
@@ -7178,9 +7143,15 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
     if (walletType && walletType !== "all") {
       where.ownerType = walletType as string;
     }
-    if (country && country !== "all") {
-      where.countryCode = country as string;
+
+    // Apply RBAC filtering based on admin role
+    if (adminRole === "COUNTRY_ADMIN" && adminCountry) {
+      where.countryCode = adminCountry;
+    } else if (adminRole === "CITY_ADMIN" && adminCountry && adminCity) {
+      where.countryCode = adminCountry;
+      where.cityCode = adminCity;
     }
+    // SUPER_ADMIN: no additional filter (sees all)
 
     const payouts = await prisma.payout.findMany({
       where,
@@ -7188,40 +7159,82 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
         wallet: true,
       },
       orderBy: { createdAt: "desc" },
+      take: 100, // Limit for performance
     });
 
-    // Enrich with owner information
-    const enrichedPayouts = await Promise.all(
-      payouts.map(async (payout) => {
-        let owner: any = { email: "Unknown", countryCode: payout.countryCode, currency: payout.wallet.currency };
+    // Batch fetch all users for drivers and customers (ownerId = user.id)
+    const driverCustomerOwnerIds = payouts
+      .filter(p => p.ownerType === "driver" || p.ownerType === "customer")
+      .map(p => p.ownerId);
+
+    const restaurantOwnerIds = payouts
+      .filter(p => p.ownerType === "restaurant")
+      .map(p => p.ownerId);
+
+    const [users, restaurants] = await Promise.all([
+      driverCustomerOwnerIds.length > 0
+        ? prisma.user.findMany({
+            where: { id: { in: driverCustomerOwnerIds } },
+            include: {
+              driverProfile: true,
+              customerProfile: true,
+            },
+          })
+        : [],
+      restaurantOwnerIds.length > 0
+        ? prisma.restaurantProfile.findMany({
+            where: { id: { in: restaurantOwnerIds } },
+            include: { user: true },
+          })
+        : [],
+    ]);
+
+    // Build owner lookup maps
+    const userMap = new Map(users.map(u => [u.id, u]));
+    const restaurantMap = new Map(restaurants.map(r => [r.id, r]));
+
+    // Enrich payouts with owner information
+    const enrichedPayouts = payouts
+      .map((payout) => {
+        let owner: any = null;
 
         if (payout.ownerType === "driver") {
-          const driver = await prisma.driverProfile.findFirst({
-            where: { id: payout.ownerId },
-            include: { user: true },
-          });
-          if (driver) {
+          const user = userMap.get(payout.ownerId);
+          if (user) {
             owner = {
-              email: driver.user.email,
-              countryCode: driver.user.countryCode,
+              email: user.email,
+              countryCode: user.countryCode || payout.countryCode,
+              cityCode: user.cityCode,
               currency: payout.wallet.currency,
-              fullName: driver.fullName || `${driver.firstName || ""} ${driver.lastName || ""}`.trim(),
+              fullName: user.driverProfile?.fullName || user.email,
+            };
+          }
+        } else if (payout.ownerType === "customer") {
+          const user = userMap.get(payout.ownerId);
+          if (user) {
+            owner = {
+              email: user.email,
+              countryCode: user.countryCode || payout.countryCode,
+              cityCode: user.cityCode,
+              currency: payout.wallet.currency,
+              fullName: user.customerProfile?.fullName || user.email,
             };
           }
         } else if (payout.ownerType === "restaurant") {
-          const restaurant = await prisma.restaurantProfile.findFirst({
-            where: { id: payout.ownerId },
-            include: { user: true },
-          });
+          const restaurant = restaurantMap.get(payout.ownerId);
           if (restaurant) {
             owner = {
-              email: restaurant.user.email,
-              countryCode: restaurant.user.countryCode,
+              email: restaurant.user?.email || "Unknown",
+              countryCode: restaurant.user?.countryCode || payout.countryCode,
+              cityCode: restaurant.user?.cityCode,
               currency: payout.wallet.currency,
-              restaurantName: restaurant.restaurantName,
+              restaurantName: restaurant.restaurantName || "Unknown Restaurant",
             };
           }
         }
+
+        // Skip if owner not found (RBAC filtered out or data issue)
+        if (!owner) return null;
 
         return {
           id: payout.id,
@@ -7235,7 +7248,23 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
           owner,
         };
       })
-    );
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+
+    console.log("[Payouts API] RBAC filtering results:", {
+      totalPayouts: enrichedPayouts.length,
+      byOwnerType: {
+        driver: enrichedPayouts.filter(p => p.walletType === 'driver').length,
+        customer: enrichedPayouts.filter(p => p.walletType === 'customer').length,
+        restaurant: enrichedPayouts.filter(p => p.walletType === 'restaurant').length,
+      },
+      byStatus: {
+        pending: enrichedPayouts.filter(p => p.status === 'pending').length,
+        processing: enrichedPayouts.filter(p => p.status === 'processing').length,
+        completed: enrichedPayouts.filter(p => p.status === 'completed').length,
+        failed: enrichedPayouts.filter(p => p.status === 'failed').length,
+      },
+      adminRole,
+    });
 
     await logAuditEvent({
       actorId: req.user!.id,
@@ -7244,13 +7273,17 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
       ipAddress: getClientIp(req),
       actionType: ActionType.VIEW_PAYOUT_REQUESTS,
       entityType: EntityType.PAYOUT,
-      description: `Viewed payouts list`,
-      metadata: { filters: { status, walletType, country }, total: enrichedPayouts.length },
+      description: `Viewed payouts list with RBAC filtering`,
+      metadata: { 
+        filters: { status, walletType }, 
+        rbac: { role: adminRole, country: adminCountry, city: adminCity },
+        total: enrichedPayouts.length 
+      },
     });
 
     res.json({ payouts: enrichedPayouts, total: enrichedPayouts.length });
   } catch (error: any) {
-    console.error("Get payouts error:", error);
+    console.error("[Payouts API] Error fetching payouts:", error);
     res.status(500).json({ error: error.message || "Failed to fetch payouts" });
   }
 });
