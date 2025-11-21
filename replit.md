@@ -69,6 +69,52 @@ Both Customer and Driver profile experiences have been upgraded to Uber-level qu
 - Responsive grid layouts adapting from mobile to desktop
 - Hover and active states following universal design guidelines
 
+### Driver Onboarding Backend (November 2025)
+Fixed critical driver onboarding issues to enable complete end-to-end flow:
+
+**Backend Fixes**:
+- **Vehicle Registration** (`POST /api/driver/vehicle`): Now properly creates vehicle records with all required fields (id, updatedAt), preventing 500 errors
+- **Document Upload** (`POST /api/driver/upload/vehicle-document`): Fixed to handle profile photos, driver licenses, and vehicle documents with proper UUID generation
+- **Driver Home API** (`GET /api/driver/home`): Refactored to separately query user, vehicle, stats, and wallet data to avoid Prisma include errors
+- **Vehicle Documents Query** (`GET /api/driver/vehicle-documents`): Corrected field names (vehicleModel vs model) to match schema
+
+**Security & Validation**:
+- All endpoints require authentication with driver role
+- RBAC filters ensure drivers can only access their own data
+- Proper validation for file uploads (5MB profile photos, 10MB documents)
+- Clear error messages for validation failures (400) vs server errors (500)
+
+**Driver Onboarding QA Testing**:
+
+1. **Login as Demo Driver**:
+   - Email: `demo_driver@safego.com` (or register as new driver)
+   - Password: `password123`
+   - Navigate to `/driver` after login
+
+2. **Vehicle Registration Flow**:
+   - Go to Driver Home → Click "Register Vehicle" button
+   - Fill in form: Vehicle Type (e.g., "Sedan"), Model (e.g., "Toyota Camry"), License Plate (e.g., "ABC123")
+   - Submit form → Should see success toast "Vehicle registered successfully"
+   - Vehicle tab should now show vehicle details instead of "No vehicle registered"
+   - Onboarding Progress: "Vehicle Added" step should change from Pending to Completed
+
+3. **Document Upload Flow**:
+   - Navigate to Driver Profile → Documents tab
+   - Upload Profile Photo: Select image (max 5MB) → Should see "Uploaded" status
+   - Upload Driver License: Select image/PDF (max 10MB) → Should see "Uploaded" status
+   - Upload Vehicle Documents: Select document → Should see count update to "1 uploaded"
+   - Onboarding Progress: "KYC Documents" and "Vehicle Documents" steps should update accordingly
+
+4. **Verify Dashboard Updates**:
+   - Check Driver Home → Overview tab shows vehicle and stats
+   - Check onboarding progress percentage increases with each step
+   - Verify all 5 steps track correctly: Personal Info, KYC Documents, Vehicle Added, Vehicle Documents, Account Approval
+
+5. **Error Handling**:
+   - Try uploading file >10MB → Should see clear error message
+   - Try registering vehicle twice → Should see "Vehicle already registered" message
+   - Try uploading without selecting file → Should see "No file uploaded" error
+
 ## External Dependencies
 
 - **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.
