@@ -66,6 +66,101 @@ async function seed() {
 
   console.log("└─────────────┴─────────┴─────────────────────────┴──────────┘");
   console.log("\n✅ Demo users seeded successfully!\n");
+
+  // Seed demo tax rules
+  console.log("\n🏛️  Seeding demo tax rules...\n");
+  
+  const demoTaxRules = [
+    // US Sales Tax - Customer pays
+    {
+      countryCode: "US",
+      stateCode: null,
+      cityCode: null,
+      taxName: "Sales Tax",
+      taxRatePercent: 7.5,
+      appliesTo: "ALL",
+      payeeType: "CUSTOMER",
+      isInclusive: false,
+      isActive: true,
+      effectiveFrom: new Date("2024-01-01"),
+      effectiveTo: null,
+      isDemo: true,
+    },
+    // US Self-Employment Tax - Driver pays
+    {
+      countryCode: "US",
+      stateCode: null,
+      cityCode: null,
+      taxName: "Self-Employment Tax",
+      taxRatePercent: 15.3,
+      appliesTo: "RIDE",
+      payeeType: "DRIVER",
+      isInclusive: true,
+      isActive: true,
+      effectiveFrom: new Date("2024-01-01"),
+      effectiveTo: null,
+      isDemo: true,
+    },
+    // Bangladesh VAT - Customer pays
+    {
+      countryCode: "BD",
+      stateCode: null,
+      cityCode: null,
+      taxName: "VAT",
+      taxRatePercent: 15.0,
+      appliesTo: "ALL",
+      payeeType: "CUSTOMER",
+      isInclusive: true,
+      isActive: true,
+      effectiveFrom: new Date("2024-01-01"),
+      effectiveTo: null,
+      isDemo: true,
+    },
+    // New York City Tax - Additional city tax
+    {
+      countryCode: "US",
+      stateCode: "NY",
+      cityCode: "NYC",
+      taxName: "NYC Local Tax",
+      taxRatePercent: 4.5,
+      appliesTo: "RIDE",
+      payeeType: "CUSTOMER",
+      isInclusive: false,
+      isActive: true,
+      effectiveFrom: new Date("2024-01-01"),
+      effectiveTo: null,
+      isDemo: true,
+    },
+  ];
+
+  for (const taxRule of demoTaxRules) {
+    try {
+      const existing = await prisma.taxRule.findFirst({
+        where: {
+          countryCode: taxRule.countryCode,
+          stateCode: taxRule.stateCode,
+          cityCode: taxRule.cityCode,
+          taxName: taxRule.taxName,
+          isDemo: true,
+        },
+      });
+
+      if (existing) {
+        console.log(`  ✓ ${taxRule.taxName} (${taxRule.countryCode}) - exists`);
+        continue;
+      }
+
+      await prisma.taxRule.create({
+        data: taxRule as any,
+      });
+
+      console.log(`  ✓ ${taxRule.taxName} (${taxRule.countryCode}) - created`);
+    } catch (error: any) {
+      console.error(`  ✗ ${taxRule.taxName} - error: ${error.message}`);
+    }
+  }
+
+  console.log("\n✅ Demo tax rules seeded successfully!\n");
 }
 
 seed()

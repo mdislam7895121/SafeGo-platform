@@ -274,10 +274,11 @@ export default function AdminSettings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="general" data-testid="tab-general">General</TabsTrigger>
           <TabsTrigger value="kyc" data-testid="tab-kyc">KYC Rules</TabsTrigger>
           <TabsTrigger value="commission" data-testid="tab-commission">Commission</TabsTrigger>
+          <TabsTrigger value="tax" data-testid="tab-tax">Tax & Fees</TabsTrigger>
           <TabsTrigger value="settlement" data-testid="tab-settlement">Settlement</TabsTrigger>
           <TabsTrigger value="notifications" data-testid="tab-notifications">Notifications</TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security">Security</TabsTrigger>
@@ -1292,7 +1293,400 @@ export default function AdminSettings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Tax & Fees Tab */}
+        <TabsContent value="tax" className="space-y-4">
+          <TaxFeesManagement />
+        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+// Tax & Fees Management Component
+function TaxFeesManagement() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingRule, setEditingRule] = useState<any>(null);
+  
+  //Fetch tax rules
+  const { data: taxData, isLoading } = useQuery({
+    queryKey: ["/api/admin/tax"],
+  });
+  
+  const taxRules = taxData?.taxRules || [];
+  
+  // Delete mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest(`/api/admin/tax/${id}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tax"] });
+      toast({
+        title: "Tax Rule Deleted",
+        description: "The tax rule has been deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete tax rule",
+        variant: "destructive",
+      });
+    },
+  });
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Tax & Fees Configuration</CardTitle>
+              <CardDescription>
+                Configure tax rules for different services, jurisdictions, and payee types
+              </CardDescription>
+            </div>
+            <Button
+              onClick={() => setIsCreating(true)}
+              data-testid="button-create-tax-rule"
+            >
+              Add Tax Rule
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {taxRules.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No tax rules configured yet. Click "Add Tax Rule" to create one.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {taxRules.map((rule: any) => (
+                <div
+                  key={rule.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover-elevate"
+                  data-testid={`tax-rule-${rule.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="font-semibold">{rule.taxName}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {rule.taxRatePercent}% • {rule.appliesTo} • {rule.payeeType} •{" "}
+                      {rule.isInclusive ? "Inclusive" : "Exclusive"}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {rule.countryCode}
+                      {rule.stateCode && ` / ${rule.stateCode}`}
+                      {rule.cityCode && ` / ${rule.cityCode}`} •{" "}
+                      From: {new Date(rule.effectiveFrom).toLocaleDateString()}
+                      {rule.effectiveTo && ` - To: ${new Date(rule.effectiveTo).toLocaleDateString()}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setEditingRule(rule)}
+                      data-testid={`button-edit-${rule.id}`}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => deleteMutation.mutate(rule.id)}
+                      disabled={deleteMutation.isPending}
+                      data-testid={`button-delete-${rule.id}`}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Create/Edit Dialog */}
+      {(isCreating || editingRule) && (
+        <TaxRuleDialog
+          rule={editingRule}
+          onClose={() => {
+            setIsCreating(false);
+            setEditingRule(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Tax Rule Dialog Component
+function TaxRuleDialog({ rule, onClose }: { rule: any; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const isEditing = !!rule;
+  
+  const [formData, setFormData] = useState({
+    countryCode: rule?.countryCode || "US",
+    stateCode: rule?.stateCode || "",
+    cityCode: rule?.cityCode || "",
+    taxName: rule?.taxName || "",
+    taxRatePercent: rule?.taxRatePercent || "0",
+    appliesTo: rule?.appliesTo || "ALL",
+    payeeType: rule?.payeeType || "CUSTOMER",
+    isInclusive: rule?.isInclusive ?? false,
+    isActive: rule?.isActive ?? true,
+    effectiveFrom: rule?.effectiveFrom ? new Date(rule.effectiveFrom).toISOString().split("T")[0] : new Date().toISOString().split("T")[0],
+    effectiveTo: rule?.effectiveTo ? new Date(rule.effectiveTo).toISOString().split("T")[0] : "",
+  });
+  
+  const saveMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const url = isEditing ? `/api/admin/tax/${rule.id}` : "/api/admin/tax";
+      const method = isEditing ? "PATCH" : "POST";
+      return apiRequest(url, {
+        method,
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tax"] });
+      toast({
+        title: isEditing ? "Tax Rule Updated" : "Tax Rule Created",
+        description: `The tax rule has been ${isEditing ? "updated" : "created"} successfully.`,
+      });
+      onClose();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || `Failed to ${isEditing ? "update" : "create"} tax rule`,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const submitData = {
+      ...formData,
+      stateCode: formData.stateCode || null,
+      cityCode: formData.cityCode || null,
+      taxRatePercent: parseFloat(formData.taxRatePercent),
+      effectiveTo: formData.effectiveTo || null,
+    };
+    saveMutation.mutate(submitData);
+  };
+  
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <CardHeader>
+          <CardTitle>{isEditing ? "Edit" : "Create"} Tax Rule</CardTitle>
+          <CardDescription>
+            Configure tax rates for specific jurisdictions and services
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="taxName">Tax Name *</Label>
+                <Input
+                  id="taxName"
+                  value={formData.taxName}
+                  onChange={(e) => setFormData({ ...formData, taxName: e.target.value })}
+                  placeholder="e.g., Sales Tax, VAT"
+                  required
+                  data-testid="input-tax-name"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="taxRate">Tax Rate (%) *</Label>
+                <Input
+                  id="taxRate"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  value={formData.taxRatePercent}
+                  onChange={(e) => setFormData({ ...formData, taxRatePercent: e.target.value })}
+                  required
+                  data-testid="input-tax-rate"
+                />
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Country *</Label>
+                <Select
+                  value={formData.countryCode}
+                  onValueChange={(value) => setFormData({ ...formData, countryCode: value })}
+                >
+                  <SelectTrigger data-testid="select-country">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="US">United States</SelectItem>
+                    <SelectItem value="BD">Bangladesh</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="stateCode">State/Province (Optional)</Label>
+                <Input
+                  id="stateCode"
+                  value={formData.stateCode}
+                  onChange={(e) => setFormData({ ...formData, stateCode: e.target.value })}
+                  placeholder="e.g., NY, CA"
+                  data-testid="input-state-code"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="cityCode">City (Optional)</Label>
+                <Input
+                  id="cityCode"
+                  value={formData.cityCode}
+                  onChange={(e) => setFormData({ ...formData, cityCode: e.target.value })}
+                  placeholder="e.g., NYC, LA"
+                  data-testid="input-city-code"
+                />
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Applies To *</Label>
+                <Select
+                  value={formData.appliesTo}
+                  onValueChange={(value) => setFormData({ ...formData, appliesTo: value })}
+                >
+                  <SelectTrigger data-testid="select-applies-to">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">All Services</SelectItem>
+                    <SelectItem value="RIDE">Ride</SelectItem>
+                    <SelectItem value="FOOD">Food Delivery</SelectItem>
+                    <SelectItem value="PARCEL">Parcel Delivery</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Payee Type *</Label>
+                <Select
+                  value={formData.payeeType}
+                  onValueChange={(value) => setFormData({ ...formData, payeeType: value })}
+                >
+                  <SelectTrigger data-testid="select-payee-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CUSTOMER">Customer</SelectItem>
+                    <SelectItem value="DRIVER">Driver</SelectItem>
+                    <SelectItem value="RESTAURANT">Restaurant</SelectItem>
+                    <SelectItem value="PLATFORM">Platform</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="effectiveFrom">Effective From *</Label>
+                <Input
+                  id="effectiveFrom"
+                  type="date"
+                  value={formData.effectiveFrom}
+                  onChange={(e) => setFormData({ ...formData, effectiveFrom: e.target.value })}
+                  required
+                  data-testid="input-effective-from"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="effectiveTo">Effective To (Optional)</Label>
+                <Input
+                  id="effectiveTo"
+                  type="date"
+                  value={formData.effectiveTo}
+                  onChange={(e) => setFormData({ ...formData, effectiveTo: e.target.value })}
+                  data-testid="input-effective-to"
+                />
+              </div>
+            </div>
+            
+            <Separator />
+            
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isInclusive"
+                  checked={formData.isInclusive}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isInclusive: checked as boolean })}
+                  data-testid="checkbox-inclusive"
+                />
+                <Label htmlFor="isInclusive">Inclusive Tax</Label>
+              </div>
+              <p className="text-sm text-muted-foreground ml-6">
+                When enabled, tax is already included in the price. When disabled, tax is added on top.
+              </p>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isActive"
+                  checked={formData.isActive}
+                  onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked as boolean })}
+                  data-testid="checkbox-active"
+                />
+                <Label htmlFor="isActive">Active</Label>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                data-testid="button-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={saveMutation.isPending}
+                data-testid="button-save-tax-rule"
+              >
+                {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isEditing ? "Update" : "Create"} Tax Rule
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
