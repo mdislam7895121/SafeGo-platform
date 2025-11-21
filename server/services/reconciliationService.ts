@@ -477,7 +477,7 @@ async function countTransactionsInPeriod(
       lte: periodEnd,
     },
     referenceType: {
-      in: ["ride", "food_order", "parcel"],
+      in: ["ride", "food_order", "delivery"],
     },
   };
 
