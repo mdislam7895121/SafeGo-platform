@@ -1695,4 +1695,548 @@ router.get("/points/history", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// WALLET APIs
+// ====================================================
+
+// ====================================================
+// GET /api/driver/wallet/summary
+// Get wallet summary for driver home page
+// ====================================================
+router.get("/wallet/summary", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const countryCode = req.user!.countryCode;
+    
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get or create wallet using the walletService
+    const { walletService } = await import("../services/walletService");
+    const currency = countryCode === "BD" ? "BDT" : "USD";
+    
+    const wallet = await walletService.getOrCreateWallet({
+      ownerId: driverProfile.id,
+      ownerType: "driver",
+      countryCode,
+      currency,
+    });
+
+    // Get next scheduled weekly payout
+    const nextScheduledPayout = await prisma.payout.findFirst({
+      where: {
+        ownerId: driverProfile.id,
+        ownerType: "driver",
+        method: "auto_weekly",
+        status: "pending",
+        scheduledAt: {
+          gte: new Date(),
+        },
+      },
+      orderBy: { scheduledAt: "asc" },
+    });
+
+    // Get pending payouts total
+    const pendingPayouts = await prisma.payout.aggregate({
+      where: {
+        ownerId: driverProfile.id,
+        ownerType: "driver",
+        status: {
+          in: ["pending", "processing"],
+        },
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    res.json({
+      currentBalance: parseFloat(wallet.availableBalance.toString()),
+      negativeBalance: parseFloat(wallet.negativeBalance.toString()),
+      pendingBalance: parseFloat(pendingPayouts._sum.amount?.toString() || "0"),
+      nextScheduledPayoutDate: nextScheduledPayout?.scheduledAt || null,
+      currency: wallet.currency,
+    });
+  } catch (error) {
+    console.error("Error fetching wallet summary:", error);
+    res.status(500).json({ error: "Failed to fetch wallet summary" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/wallet/payouts
+// Get recent payouts with pagination
+// ====================================================
+router.get("/wallet/payouts", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    // Parse pagination
+    const limitParam = parseInt(req.query.limit as string);
+    const offsetParam = parseInt(req.query.offset as string);
+    
+    const limit = Number.isInteger(limitParam) && limitParam > 0 
+      ? Math.min(100, limitParam) 
+      : 10;
+    const offset = Number.isInteger(offsetParam) && offsetParam >= 0 
+      ? offsetParam 
+      : 0;
+    
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get payouts
+    const [payouts, total] = await Promise.all([
+      prisma.payout.findMany({
+        where: {
+          ownerId: driverProfile.id,
+          ownerType: "driver",
+        },
+        orderBy: [
+          { createdAt: "desc" },
+          { id: "desc" },
+        ],
+        skip: offset,
+        take: limit,
+      }),
+      prisma.payout.count({
+        where: {
+          ownerId: driverProfile.id,
+          ownerType: "driver",
+        },
+      }),
+    ]);
+
+    res.json({
+      payouts: payouts.map(p => ({
+        id: p.id,
+        amount: parseFloat(p.amount.toString()),
+        method: p.method,
+        status: p.status,
+        initiatedAt: p.createdAt,
+        completedAt: p.processedAt,
+        scheduledAt: p.scheduledAt,
+        failureReason: p.failureReason,
+      })),
+      pagination: {
+        limit,
+        offset,
+        total,
+        hasMore: offset + limit < total,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching payouts:", error);
+    res.status(500).json({ error: "Failed to fetch payouts" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/wallet/balance
+// Get transaction timeline with filters
+// ====================================================
+router.get("/wallet/balance", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const countryCode = req.user!.countryCode;
+    
+    // Parse filters
+    const fromDate = req.query.from ? new Date(req.query.from as string) : undefined;
+    const toDate = req.query.to ? new Date(req.query.to as string) : undefined;
+    const type = req.query.type as string | undefined;
+    
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get or create wallet
+    const { walletService } = await import("../services/walletService");
+    const currency = countryCode === "BD" ? "BDT" : "USD";
+    
+    const wallet = await walletService.getOrCreateWallet({
+      ownerId: driverProfile.id,
+      ownerType: "driver",
+      countryCode,
+      currency,
+    });
+
+    // Build where clause for transactions
+    const where: any = {
+      walletId: wallet.id,
+    };
+
+    if (fromDate || toDate) {
+      where.createdAt = {};
+      if (fromDate) where.createdAt.gte = fromDate;
+      if (toDate) where.createdAt.lte = toDate;
+    }
+
+    if (type && type !== "all") {
+      // Map type filter to serviceType
+      const serviceTypeMap: Record<string, string[]> = {
+        trips: ["ride", "food", "parcel"],
+        bonuses: ["adjustment"], // Bonuses typically come as adjustments
+        adjustments: ["adjustment"],
+        payouts: ["payout"],
+      };
+      
+      if (serviceTypeMap[type]) {
+        where.serviceType = { in: serviceTypeMap[type] };
+      }
+    }
+
+    // Get transactions
+    const transactions = await prisma.walletTransaction.findMany({
+      where,
+      orderBy: [
+        { createdAt: "desc" },
+        { id: "desc" },
+      ],
+      take: 100, // Limit to last 100 transactions
+    });
+
+    // Calculate summary
+    const summary = transactions.reduce(
+      (acc, t) => {
+        const amount = parseFloat(t.amount.toString());
+        
+        if (t.direction === "credit") {
+          if (t.serviceType === "ride" || t.serviceType === "food" || t.serviceType === "parcel") {
+            acc.totalEarnings += amount;
+          } else if (t.serviceType === "adjustment") {
+            acc.bonuses += amount;
+          }
+        } else if (t.direction === "debit") {
+          if (t.serviceType === "payout") {
+            // Don't count payouts in fees
+          } else if (t.serviceType === "commission") {
+            acc.platformFees += amount;
+          } else {
+            acc.adjustments += amount;
+          }
+        }
+        
+        return acc;
+      },
+      {
+        totalEarnings: 0,
+        bonuses: 0,
+        adjustments: 0,
+        platformFees: 0,
+      }
+    );
+
+    // Group transactions by date
+    const groupedByDate: Record<string, any[]> = {};
+    transactions.forEach(t => {
+      const date = t.createdAt.toISOString().split('T')[0];
+      if (!groupedByDate[date]) {
+        groupedByDate[date] = [];
+      }
+      groupedByDate[date].push({
+        id: t.id,
+        type: t.serviceType,
+        direction: t.direction,
+        amount: parseFloat(t.amount.toString()),
+        description: t.description,
+        referenceType: t.referenceType,
+        referenceId: t.referenceId,
+        createdAt: t.createdAt,
+      });
+    });
+
+    res.json({
+      currentBalance: parseFloat(wallet.availableBalance.toString()),
+      negativeBalance: parseFloat(wallet.negativeBalance.toString()),
+      currency: wallet.currency,
+      summary: {
+        totalEarnings: summary.totalEarnings,
+        bonuses: summary.bonuses,
+        adjustments: summary.adjustments,
+        platformFees: summary.platformFees,
+        netPayout: summary.totalEarnings + summary.bonuses - summary.adjustments - summary.platformFees,
+      },
+      transactionsByDate: Object.entries(groupedByDate).map(([date, txns]) => ({
+        date,
+        transactions: txns,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching wallet balance:", error);
+    res.status(500).json({ error: "Failed to fetch wallet balance" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/wallet/transaction/:id
+// Get single transaction details
+// ====================================================
+router.get("/wallet/transaction/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const transactionId = req.params.id;
+    
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get transaction with wallet check
+    const transaction = await prisma.walletTransaction.findFirst({
+      where: {
+        id: transactionId,
+        wallet: {
+          ownerId: driverProfile.id,
+          ownerType: "driver",
+        },
+      },
+      include: {
+        wallet: true,
+      },
+    });
+
+    if (!transaction) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    // Get related entity details if available
+    let relatedDetails = null;
+    if (transaction.referenceId) {
+      if (transaction.referenceType === "ride") {
+        const ride = await prisma.ride.findUnique({
+          where: { id: transaction.referenceId },
+          select: {
+            id: true,
+            pickupAddress: true,
+            dropoffAddress: true,
+            serviceFare: true,
+            safegoCommission: true,
+            driverPayout: true,
+            completedAt: true,
+          },
+        });
+        relatedDetails = ride;
+      } else if (transaction.referenceType === "food_order") {
+        const foodOrder = await prisma.foodOrder.findUnique({
+          where: { id: transaction.referenceId },
+          select: {
+            id: true,
+            deliveryAddress: true,
+            driverPayout: true,
+            deliveredAt: true,
+          },
+        });
+        relatedDetails = foodOrder;
+      } else if (transaction.referenceType === "delivery") {
+        const delivery = await prisma.delivery.findUnique({
+          where: { id: transaction.referenceId },
+          select: {
+            id: true,
+            pickupAddress: true,
+            dropoffAddress: true,
+            driverPayout: true,
+            deliveredAt: true,
+          },
+        });
+        relatedDetails = delivery;
+      }
+    }
+
+    res.json({
+      id: transaction.id,
+      type: transaction.serviceType,
+      direction: transaction.direction,
+      amount: parseFloat(transaction.amount.toString()),
+      balanceAfter: parseFloat(transaction.balanceSnapshot.toString()),
+      negativeBalanceAfter: parseFloat(transaction.negativeBalanceSnapshot.toString()),
+      description: transaction.description,
+      referenceType: transaction.referenceType,
+      referenceId: transaction.referenceId,
+      createdAt: transaction.createdAt,
+      relatedDetails: relatedDetails ? {
+        ...relatedDetails,
+        serviceFare: relatedDetails.serviceFare ? parseFloat(relatedDetails.serviceFare.toString()) : undefined,
+        safegoCommission: relatedDetails.safegoCommission ? parseFloat(relatedDetails.safegoCommission.toString()) : undefined,
+        driverPayout: relatedDetails.driverPayout ? parseFloat(relatedDetails.driverPayout.toString()) : undefined,
+      } : null,
+    });
+  } catch (error) {
+    console.error("Error fetching transaction details:", error);
+    res.status(500).json({ error: "Failed to fetch transaction details" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/payout-method
+// Get driver's default payout method
+// ====================================================
+router.get("/payout-method", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get default payout account
+    const payoutAccount = await prisma.payoutAccount.findFirst({
+      where: {
+        ownerId: driverProfile.id,
+        ownerType: "driver",
+        isDefault: true,
+        status: "active",
+      },
+    });
+
+    if (!payoutAccount) {
+      return res.json({
+        hasPayoutMethod: false,
+        method: null,
+      });
+    }
+
+    res.json({
+      hasPayoutMethod: true,
+      method: {
+        id: payoutAccount.id,
+        type: payoutAccount.payoutType,
+        provider: payoutAccount.provider,
+        displayName: payoutAccount.displayName,
+        maskedAccount: payoutAccount.maskedAccount,
+        accountHolderName: payoutAccount.accountHolderName,
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching payout method:", error);
+    res.status(500).json({ error: "Failed to fetch payout method" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/wallet/cash-out
+// Request instant payout (manual payout)
+// ====================================================
+router.post("/wallet/cash-out", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const countryCode = req.user!.countryCode;
+    
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get wallet
+    const { walletService } = await import("../services/walletService");
+    const currency = countryCode === "BD" ? "BDT" : "USD";
+    
+    const wallet = await walletService.getOrCreateWallet({
+      ownerId: driverProfile.id,
+      ownerType: "driver",
+      countryCode,
+      currency,
+    });
+
+    const availableBalance = parseFloat(wallet.availableBalance.toString());
+    const negativeBalance = parseFloat(wallet.negativeBalance.toString());
+
+    // Check if there's negative balance
+    if (negativeBalance > 0) {
+      return res.status(400).json({
+        error: "Cannot cash out with outstanding commission debt",
+        negativeBalance,
+      });
+    }
+
+    // Check minimum balance
+    const minCashout = countryCode === "BD" ? 100 : 5;
+    if (availableBalance < minCashout) {
+      return res.status(400).json({
+        error: `Minimum cash out amount is ${currency} ${minCashout}`,
+        currentBalance: availableBalance,
+      });
+    }
+
+    // Check if driver has a payout method
+    const payoutAccount = await prisma.payoutAccount.findFirst({
+      where: {
+        ownerId: driverProfile.id,
+        ownerType: "driver",
+        isDefault: true,
+        status: "active",
+      },
+    });
+
+    if (!payoutAccount) {
+      return res.status(400).json({
+        error: "Please add a payout method before requesting cash out",
+      });
+    }
+
+    // Create manual payout request using WalletPayoutService
+    const { WalletPayoutService } = await import("../services/payoutService");
+    const payoutService = new WalletPayoutService();
+
+    const payout = await payoutService.createWalletPayout({
+      ownerId: driverProfile.id,
+      ownerType: "driver",
+      amount: availableBalance,
+      method: "manual_request",
+    });
+
+    res.json({
+      success: true,
+      payout: {
+        id: payout.id,
+        amount: parseFloat(payout.amount.toString()),
+        status: payout.status,
+        createdAt: payout.createdAt,
+      },
+      message: "Cash out request submitted successfully. Funds will be processed within 1-2 business days.",
+    });
+  } catch (error: any) {
+    console.error("Error processing cash out:", error);
+    
+    // Handle specific errors from payout service
+    if (error.message?.includes("Insufficient balance")) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (error.message?.includes("Outstanding commission debt")) {
+      return res.status(400).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: "Failed to process cash out request" });
+  }
+});
+
 export default router;
