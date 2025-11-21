@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { fetchAdminCapabilities } from "@/lib/queryClient";
 import {
   ArrowLeft,
   DollarSign,
@@ -16,6 +18,7 @@ import {
   Download,
   Filter,
   CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -177,9 +180,35 @@ interface PayoutAnalytics {
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 export default function AdminEarnings() {
+  const [, navigate] = useLocation();
+  const { token, logout } = useAuth();
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [country, setCountry] = useState<string>("all");
+
+  // Capability check for RBAC
+  const {
+    data: capabilitiesData,
+    isPending: isLoadingCapabilities,
+    error: capabilitiesError,
+  } = useQuery<{ capabilities: string[] }>({
+    queryKey: ["/api/admin/capabilities", token],
+    queryFn: () => fetchAdminCapabilities(token),
+    retry: false,
+    enabled: !!token,
+  });
+
+  const capabilities = capabilitiesData?.capabilities || [];
+  const hasCapabilitiesError = !!capabilitiesError;
+  const hasAccess = capabilities.includes("VIEW_EARNINGS_DASHBOARD");
+
+  // Auto-logout on 401
+  useEffect(() => {
+    if (capabilitiesError && "status" in capabilitiesError && capabilitiesError.status === 401) {
+      console.log("🔴 401 error detected, logging out...");
+      logout();
+    }
+  }, [capabilitiesError, logout]);
 
   const buildQueryString = () => {
     const params = new URLSearchParams();
@@ -193,22 +222,27 @@ export default function AdminEarnings() {
 
   const { data: globalData, isLoading: globalLoading } = useQuery<GlobalSummary>({
     queryKey: [`/api/admin/earnings/dashboard/global${queryString}`],
+    enabled: hasAccess,
   });
 
   const { data: rideData, isLoading: rideLoading } = useQuery<RideEarnings>({
     queryKey: [`/api/admin/earnings/dashboard/rides${queryString}`],
+    enabled: hasAccess,
   });
 
   const { data: foodData, isLoading: foodLoading } = useQuery<FoodEarnings>({
     queryKey: [`/api/admin/earnings/dashboard/food${queryString}`],
+    enabled: hasAccess,
   });
 
   const { data: parcelData, isLoading: parcelLoading } = useQuery<ParcelEarnings>({
     queryKey: [`/api/admin/earnings/dashboard/parcels${queryString}`],
+    enabled: hasAccess,
   });
 
   const { data: payoutData, isLoading: payoutLoading } = useQuery<PayoutAnalytics>({
     queryKey: [`/api/admin/earnings/dashboard/payouts${queryString}`],
+    enabled: hasAccess,
   });
 
   const formatCurrency = (amount: number, countryCode?: string) => {
@@ -216,6 +250,68 @@ export default function AdminEarnings() {
     const symbol = currency === "BDT" ? "৳" : "$";
     return `${symbol}${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
+
+  // Loading state
+  if (isLoadingCapabilities) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Capability error: hide all privileged UI
+  if (hasCapabilitiesError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="max-w-md border-amber-200 dark:border-amber-800">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              Unable to Verify Permissions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              We couldn't verify your permissions to access this page. This may be due to a temporary network issue.
+            </p>
+            <div className="flex gap-2">
+              <Button onClick={() => window.location.reload()} data-testid="button-retry">
+                Retry
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/admin")} data-testid="button-back-to-admin">
+                Back to Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // No access
+  if (!hasAccess) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">
+              You don't have permission to view earnings analytics. Please contact your administrator.
+            </p>
+            <Button onClick={() => navigate("/admin")} data-testid="button-back-to-admin">
+              Back to Admin Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
