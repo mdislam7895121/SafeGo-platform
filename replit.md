@@ -28,6 +28,47 @@ Key architectural features include:
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields and an `isDemo` flag.
 
+### Profile UX Upgrade (November 2025)
+Both Customer and Driver profile experiences have been upgraded to Uber-level quality with modern UI, enhanced features, and comprehensive information architecture:
+
+**Customer Profile Enhancements** (`/customer/profile`):
+- Modern profile header card with circular avatar, full name, location (country flag + city), email with verified badge, star rating, and total trip count
+- Quick action row with 4 shortcuts: Payment Methods, Saved Places, Safety/KYC Status, and Edit Profile
+- Structured sections:
+  - **Personal Information**: Full name, phone number, email, date of birth displayed in a clean grid layout
+  - **Addresses & Saved Places**: Home, Work, and Favorites with icons, edit buttons, and placeholder support
+  - **KYC & Verification**: Visual verification status card with badges, review dates, and action buttons
+  - **Preferences**: Language selection and notification settings management
+- Mobile-first responsive design with bottom navigation bar
+- Skeleton loading states for better perceived performance
+- Integration with existing KYC system and wallet functionality
+
+**Driver Profile Enhancements** (`/driver/profile`):
+- Uber-style header with driver avatar, name, location, star rating, total trips, and daily/weekly earnings summary
+- Online/Offline status badge with quick "Go Online" button
+- **Onboarding Progress Component** (shown for unverified drivers):
+  - 5-step progress tracker: Personal Info, KYC Documents, Vehicle Added, Vehicle Documents, Account Approval
+  - Visual progress bar with percentage completion
+  - Color-coded status badges: Completed (green), In Progress (gray), Needs Attention (red), Pending (outline)
+- **Tabbed Navigation** with 5 sections:
+  - **Overview**: Account status, verification badge, total balance, and total trips summary cards
+  - **Vehicle**: Active vehicle details (type, model, plate, earnings) with edit functionality
+  - **Documents**: Required documents checklist (profile photo, driver license, vehicle documents) with upload status indicators
+  - **Payouts**: Wallet summary showing available balance and negative balance with link to full wallet page
+  - **Account & Security**: Profile editing, password change, email, and membership date
+- Clean information hierarchy with icons, badges, and visual status indicators
+- Fully backward compatible with existing driver onboarding and document upload systems
+
+**Key Design Features**:
+- Consistent use of SafeGo's design system (shadcn/ui components, custom color palette)
+- Avatar components with fallback initials
+- Country-specific data display (Bangladesh 🇧🇩 vs United States 🇺🇸)
+- Demo statistics for rating and trips (ready for real API integration)
+- Non-breaking changes - all existing backend logic and security features remain intact
+- Data-testid attributes on all interactive elements for testing
+- Responsive grid layouts adapting from mobile to desktop
+- Hover and active states following universal design guidelines
+
 ## External Dependencies
 
 - **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.
