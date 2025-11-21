@@ -829,3 +829,44 @@ model AdminSession {
   @@index([createdAt])
   @@map("admin_sessions")
 }
+
+enum ServiceType {
+  RIDE
+  FOOD
+  PARCEL
+  ALL
+}
+
+enum PayeeType {
+  DRIVER
+  RESTAURANT
+  CUSTOMER
+  PLATFORM
+}
+
+model TaxRule {
+  id              String       @id @default(cuid())
+  countryCode     String
+  stateCode       String?
+  cityCode        String?
+  taxName         String
+  taxRatePercent  Decimal      @db.Decimal(5, 2)
+  appliesTo       ServiceType
+  payeeType       PayeeType
+  isInclusive     Boolean      @default(false)
+  isActive        Boolean      @default(true)
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  isDemo          Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([countryCode])
+  @@index([stateCode])
+  @@index([cityCode])
+  @@index([appliesTo])
+  @@index([payeeType])
+  @@index([isActive])
+  @@index([isDemo])
+  @@map("tax_rules")
+}
