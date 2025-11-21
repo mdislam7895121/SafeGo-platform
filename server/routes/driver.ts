@@ -2,6 +2,7 @@ import { Router } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone } from "../utils/encryption";
 import {
   uploadProfilePhoto,
@@ -25,62 +26,81 @@ router.get("/home", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
 
-    // Get driver profile
+    // Get driver profile with all relationships
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
-      include: {
-        user: {
-          select: {
-            email: true,
-            countryCode: true,
-            isBlocked: true,
-          },
-        },
-        vehicle: true,
-        stats: true,
-        driverWallet: true,
-      },
     });
 
     if (!driverProfile) {
       return res.status(404).json({ error: "Driver profile not found" });
     }
 
+    // Get user data separately
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        countryCode: true,
+        isBlocked: true,
+      },
+    });
+
+    // Get vehicle
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { driverId: driverProfile.id },
+    });
+
+    // Get stats
+    const stats = await prisma.driverStats.findUnique({
+      where: { driverId: driverProfile.id },
+    });
+
+    // Get wallet
+    const wallet = await prisma.driverWallet.findUnique({
+      where: { driverId: driverProfile.id },
+    });
+
     res.json({
       profile: {
         id: driverProfile.id,
-        email: driverProfile.user.email,
-        countryCode: driverProfile.user.countryCode,
+        email: user?.email,
+        countryCode: user?.countryCode,
         verificationStatus: driverProfile.verificationStatus,
         isVerified: driverProfile.isVerified,
         rejectionReason: driverProfile.rejectionReason,
+        createdAt: driverProfile.createdAt,
         // Common KYC fields
         profilePhotoUrl: driverProfile.profilePhotoUrl,
         // USA structured name fields
         firstName: driverProfile.firstName,
         middleName: driverProfile.middleName,
         lastName: driverProfile.lastName,
+        fullName: driverProfile.fullName,
         // License images
         dmvLicenseImageUrl: driverProfile.dmvLicenseImageUrl,
         tlcLicenseImageUrl: driverProfile.tlcLicenseImageUrl,
+        driverLicenseImageUrl: driverProfile.driverLicenseImageUrl,
         // USA state (for TLC requirement check)
         usaState: driverProfile.usaState,
+        usaCity: driverProfile.usaCity,
+        // NID for encrypted check
+        nidEncrypted: driverProfile.nidEncrypted,
       },
-      vehicle: driverProfile.vehicle ? {
-        id: driverProfile.vehicle.id,
-        vehicleType: driverProfile.vehicle.vehicleType,
-        vehicleModel: driverProfile.vehicle.vehicleModel,
-        vehiclePlate: driverProfile.vehicle.vehiclePlate,
-        isOnline: driverProfile.vehicle.isOnline,
-        totalEarnings: driverProfile.vehicle.totalEarnings,
+      vehicle: vehicle ? {
+        id: vehicle.id,
+        vehicleType: vehicle.vehicleType,
+        vehicleModel: vehicle.vehicleModel,
+        vehiclePlate: vehicle.vehiclePlate,
+        isOnline: vehicle.isOnline,
+        totalEarnings: vehicle.totalEarnings,
       } : null,
-      stats: driverProfile.stats ? {
-        rating: driverProfile.stats.rating,
-        totalTrips: driverProfile.stats.totalTrips,
+      stats: stats ? {
+        rating: stats.rating,
+        totalTrips: stats.totalTrips,
       } : null,
-      wallet: driverProfile.driverWallet ? {
-        balance: driverProfile.driverWallet.balance,
-        negativeBalance: driverProfile.driverWallet.negativeBalance,
+      wallet: wallet ? {
+        balance: wallet.balance,
+        negativeBalance: wallet.negativeBalance,
       } : null,
     });
   } catch (error) {
@@ -221,10 +241,12 @@ router.post("/vehicle", async (req: AuthRequest, res) => {
     // Create vehicle
     const vehicle = await prisma.vehicle.create({
       data: {
+        id: randomUUID(),
         driverId: driverProfile.id,
         vehicleType,
         vehicleModel,
         vehiclePlate,
+        updatedAt: new Date(),
       },
     });
 
@@ -898,12 +920,14 @@ router.post("/upload/vehicle-document", uploadVehicleDocument, async (req: AuthR
     // Create vehicle document record
     const document = await prisma.vehicleDocument.create({
       data: {
+        id: randomUUID(),
         driverId: driverProfile.id,
         vehicleId: vehicleId || null,
         documentType,
         fileUrl,
         description: description || null,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
+        updatedAt: new Date(),
       },
     });
 
@@ -942,9 +966,9 @@ router.get("/vehicle-documents", async (req: AuthRequest, res) => {
           select: {
             id: true,
             make: true,
-            model: true,
+            vehicleModel: true,
             year: true,
-            licensePlate: true,
+            vehiclePlate: true,
           },
         },
       },

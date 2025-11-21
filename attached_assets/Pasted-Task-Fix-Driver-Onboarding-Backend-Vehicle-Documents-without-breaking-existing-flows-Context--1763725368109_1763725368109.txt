@@ -1,0 +1,114 @@
+Task: Fix Driver Onboarding Backend (Vehicle + Documents) without breaking existing flows
+
+Context:
+- SafeGo is a multi-role platform (customer, driver, restaurant, admin).
+- Admin side is stable (wallets, payouts, reconciliation, tax & fees, analytics).
+- Customer side: registration, KYC, login, ride request, and food browsing are working.
+- Driver dashboard has these tabs: Overview, Vehicle, Documents, Payouts, Account.
+
+Current issues (driver side):
+1) Vehicle registration
+   - When submitting the "Register Vehicle" form from Driver > Vehicle tab,
+     we get a red toast:
+       500: {"error":"Failed to register vehicle"}
+   - UI stays on the same page; no vehicle is created.
+   - Driver Overview still shows "No vehicle registered" and onboarding progress
+     does not move forward.
+
+2) Driver documents upload
+   - On Driver > Documents tab (Profile Photo, Driver License, Vehicle Documents),
+     uploading any document shows:
+       500: {"error":"Failed to upload vehicle document"}
+   - No document records are created; the "Required Documents" list stays as
+     "Not uploaded" or "0 uploaded".
+
+Goal:
+- Make the entire driver onboarding backend work end-to-end:
+  - A driver can register a vehicle.
+  - A driver can upload required documents.
+  - The dashboard and onboarding progress reflect the correct state.
+
+Requirements & Expected Behaviour:
+
+1. Vehicle registration
+   - Use the existing data model for vehicles; do NOT introduce breaking schema changes.
+   - On successful registration:
+     - Create or update a vehicle record linked to the authenticated driver.
+     - Fields: make, model, year (if present), licensePlate, color/bodyType if the form sends it,
+       countryCode and city/jurisdiction if available.
+     - Mark the vehicle status appropriately (e.g., "pending_review" initially).
+   - Driver > Vehicle tab should then show the registered vehicle instead of "No vehicle registered".
+   - Onboarding progress:
+     - "Vehicle Added" step should switch from Pending to Completed once a vehicle exists.
+
+2. Driver documents upload
+   - Use the existing storage approach (local/replit file storage or in-DB blobs) already used
+     elsewhere in the app; do not introduce external storage providers.
+   - For each document upload:
+     - Create a document record associated with the driver (and vehicle where applicable).
+     - Types:
+       - profile_photo
+       - driver_license
+       - vehicle_registration
+       - insurance
+       - other_vehicle_document
+     - Store at minimum: id, driverId, vehicleId (nullable), type, filename, mimeType,
+       size, storagePath/url, createdAt.
+   - After a successful upload:
+     - The corresponding item in Driver > Documents should update from
+       "Not uploaded" to something like "1 uploaded" or show a check/icon.
+     - Onboarding progress:
+       - "KYC Documents" and "Vehicle Documents" steps should update as documents are added.
+
+3. Security & Validation
+   - All driver onboarding endpoints must:
+     - Require authentication.
+     - Use the existing RBAC / getRBACFilter / driver scope helpers.
+     - Ensure a driver can only access their own vehicle and documents.
+   - Add sensible validation:
+     - Reject empty or invalid payloads.
+     - Enforce max file size limits consistent with UI (5MB profile photo, 10MB docs).
+   - For invalid payloads or file issues, return a 400 with a clear JSON error message
+     and show a friendly toast to the user. 500 should be reserved for real server errors.
+
+4. Error handling & logging
+   - Replace the generic "Failed to register vehicle" / "Failed to upload vehicle document"
+     with:
+       - Logged error details on the server (console or logger).
+       - Clean JSON responses (e.g., { error: "Invalid file type" }).
+   - Make sure customer and admin flows are not impacted.
+
+5. UI wiring (minimal)
+   - Reuse existing forms and components; do not redesign the UI here.
+   - Just ensure:
+     - Forms call the correct fixed endpoints.
+     - Loading states & success toasts work.
+     - The Driver Overview page correctly reflects:
+       - Vehicle added / not added.
+       - Documents status (warnings only when something is truly missing).
+
+6. Demo / seed data
+   - Optionally add seed/demo data for:
+     - One driver with a demo vehicle and documents,
+     to help quickly verify the flow in preview.
+   - Document in replit.md how to test:
+     1) How to login as demo driver.
+     2) How to register a new vehicle.
+     3) How to upload driver and vehicle documents.
+     4) How to see the updated onboarding progress and dashboard.
+
+Constraints:
+- Do not change any working customer or admin behaviour.
+- No breaking Prisma migrations; prefer additive or compatible changes.
+- Preserve existing naming conventions for services, routes, and models.
+- Keep changes focused on driver onboarding (vehicle + documents).
+
+Acceptance Criteria:
+- Registering a vehicle as a driver completes successfully (no 500) and appears on the
+  Vehicle tab and Overview.
+- Uploading profile photo, driver license, and at least one vehicle document works
+  without 500 errors, and the Documents tab reflects the uploads.
+- Onboarding Progress updates its steps correctly for Vehicle Added, Vehicle Documents,
+  and KYC Documents.
+- All relevant endpoints are authenticated and restricted to the current driver.
+- replit.md contains an updated "Driver Onboarding QA" section with clear test steps.
