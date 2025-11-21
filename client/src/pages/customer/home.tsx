@@ -79,28 +79,88 @@ export default function CustomerHome() {
         </div>
       </div>
 
+      {/* KYC Verification Alert */}
+      {!isLoading && !profile?.isVerified && (
+        <div className="p-6">
+          <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
+            <CardContent className="p-6">
+              <div className="flex gap-4">
+                <div className="flex-shrink-0">
+                  <div className="h-10 w-10 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                    <HelpCircle className="h-5 w-5 text-yellow-700 dark:text-yellow-400" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-yellow-900 dark:text-yellow-200">
+                    {profile?.verificationStatus === "rejected" 
+                      ? "Verification Rejected" 
+                      : "Verification Pending"}
+                  </h3>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-300 mt-1">
+                    {profile?.verificationStatus === "rejected"
+                      ? "Your KYC documents were rejected. Please update your information and contact support."
+                      : "Your account is under review. You'll be able to use services once verification is complete."}
+                  </p>
+                  <Link href="/customer/profile/kyc">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="mt-3"
+                      data-testid="button-view-kyc"
+                    >
+                      View KYC Details
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Services Grid */}
       <div className="p-6 space-y-6">
         <h2 className="text-lg font-semibold">Services</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {services.map((service) => (
-            <Link key={service.name} href={service.href}>
-              <Card className="hover-elevate cursor-pointer" data-testid={`card-service-${service.name.toLowerCase().replace(' ', '-')}`}>
+        {profile?.isVerified ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {services.map((service) => (
+              <Link key={service.name} href={service.href}>
+                <Card className="hover-elevate cursor-pointer" data-testid={`card-service-${service.name.toLowerCase().replace(' ', '-')}`}>
+                  <CardContent className="p-6">
+                    <div className={`h-16 w-16 rounded-2xl ${service.bgColor} flex items-center justify-center mb-4`}>
+                      <service.icon className={`h-8 w-8 ${service.color}`} />
+                    </div>
+                    <h3 className="font-semibold text-lg">{service.name}</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {service.name === "Request Ride" && "Book a ride to your destination"}
+                      {service.name === "Order Food" && "Order from local restaurants"}
+                      {service.name === "Send Parcel" && "Deliver packages quickly"}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {services.map((service) => (
+              <Card key={service.name} className="opacity-50" data-testid={`card-service-${service.name.toLowerCase().replace(' ', '-')}-disabled`}>
                 <CardContent className="p-6">
                   <div className={`h-16 w-16 rounded-2xl ${service.bgColor} flex items-center justify-center mb-4`}>
                     <service.icon className={`h-8 w-8 ${service.color}`} />
                   </div>
                   <h3 className="font-semibold text-lg">{service.name}</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {service.name === "Request Ride" && "Book a ride to your destination"}
-                    {service.name === "Order Food" && "Order from local restaurants"}
-                    {service.name === "Send Parcel" && "Deliver packages quickly"}
+                    Requires verification
                   </p>
+                  <Badge variant="secondary" className="mt-2">
+                    Locked
+                  </Badge>
                 </CardContent>
               </Card>
-            </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Bottom Navigation */}

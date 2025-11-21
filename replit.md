@@ -28,6 +28,47 @@ Key architectural features include:
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, and `PaymentMethod`. It supports country-specific identity fields and includes `isDemo: Boolean @default(false)`.
 
+### Customer Web App (Step 47.1 - In Progress)
+The customer-facing web application provides multi-step onboarding, country-specific KYC management, and service booking capabilities.
+
+**Implemented Features:**
+1. **Multi-Step Registration Flow** (`/customer-register`):
+   - Step 1: Basic Info (full name, email, password, phone, country)
+   - Step 2: Address (BD: present/permanent addresses, district, thana; US: home address)
+   - Step 3: KYC Documents (BD: NID with photos; US: government ID type + last 4 digits)
+   - Step 4: Emergency Contact (name + phone)
+
+2. **KYC Management Page** (`/customer/profile/kyc`):
+   - Displays masked NID/government ID numbers (only last 4 digits visible)
+   - Document preview for uploaded NID images
+   - Verification status tracking (pending/approved/rejected)
+   - Rejection reason display
+   - Country-specific field display (BD vs US)
+
+3. **Service Tracking**:
+   - Ride Tracking (`/customer/rides/:id`): Live status updates, driver info, cancel functionality
+   - Wallet Page (`/customer/wallet`): Balance display, transaction history aggregated from rides/food/deliveries
+   - Notifications Center (`/customer/notifications`): Real-time updates, read/unread states
+
+4. **KYC Verification Gate**:
+   - Dashboard blocks access to services (ride/food/parcel) until KYC verified
+   - Warning banner for pending/rejected verification
+   - Visual indication of locked services
+
+**Backend API Endpoints Added:**
+- `GET /api/customer/wallet` - Aggregates transactions from rides, food orders, and deliveries
+- `GET /api/customer/notifications` - Returns user-specific notifications
+- `PATCH /api/customer/profile` - Updated to handle fullName, phoneNumber, and all Bangladesh address fields (district, thana, postOffice, postalCode, village)
+
+**Security:**
+- Server-side KYC verification enforced in all booking endpoints (`POST /api/rides`, `POST /api/food-orders`, `POST /api/deliveries`)
+- Frontend KYC gate provides UX feedback while backend enforces access control
+
+**Pending Implementation:**
+- Food ordering flow (restaurant listing, menu, cart, order placement)
+- Food order tracking page
+- Enhanced parcel tracking with sender/receiver details
+
 ## Tax & Fees System
 
 ### Overview

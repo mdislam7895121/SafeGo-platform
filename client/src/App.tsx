@@ -9,15 +9,20 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 // Auth pages
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
+import CustomerRegister from "@/pages/customer-register";
 
 // Customer pages
 import CustomerHome from "@/pages/customer/home";
 import CustomerProfile from "@/pages/customer/profile";
+import CustomerKYC from "@/pages/customer/kyc";
 import CustomerActivity from "@/pages/customer/activity";
 import RideRequest from "@/pages/customer/ride-request";
+import RideDetails from "@/pages/customer/ride-details";
 import FoodOrder from "@/pages/customer/food-order";
 import ParcelRequest from "@/pages/customer/parcel-request";
 import CustomerSupport from "@/pages/customer/support";
+import CustomerWallet from "@/pages/customer/wallet";
+import CustomerNotifications from "@/pages/customer/notifications";
 
 // Driver pages
 import DriverHome from "@/pages/driver/home";
@@ -97,6 +102,7 @@ function Router() {
       <Route path="/" component={HomeRedirect} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/customer-register" component={CustomerRegister} />
 
       {/* Customer routes */}
       <Route path="/customer">
@@ -132,6 +138,26 @@ function Router() {
       <Route path="/customer/support">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerSupport />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/profile/kyc">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerKYC />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/rides/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RideDetails />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/wallet">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerWallet />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/notifications">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerNotifications />
         </ProtectedRoute>
       </Route>
 
