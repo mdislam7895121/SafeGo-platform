@@ -46,6 +46,7 @@ export enum Permission {
   MANAGE_SUPPORT_SETTINGS = 'MANAGE_SUPPORT_SETTINGS',
   VIEW_EARNINGS_DASHBOARD = 'VIEW_EARNINGS_DASHBOARD',
   VIEW_ANALYTICS_DASHBOARD = 'VIEW_ANALYTICS_DASHBOARD',
+  VIEW_PERFORMANCE_DASHBOARD = 'VIEW_PERFORMANCE_DASHBOARD',
 }
 
 type RolePermissions = {
@@ -93,6 +94,7 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_SUPPORT_SETTINGS,
     Permission.VIEW_EARNINGS_DASHBOARD,
     Permission.VIEW_ANALYTICS_DASHBOARD,
+    Permission.VIEW_PERFORMANCE_DASHBOARD,
   ]),
 
   [AdminRole.COMPLIANCE_ADMIN]: new Set([
@@ -117,6 +119,7 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SUPPORT_CONVERSATIONS,
     Permission.VIEW_EARNINGS_DASHBOARD,
     Permission.VIEW_ANALYTICS_DASHBOARD,
+    Permission.VIEW_PERFORMANCE_DASHBOARD,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([

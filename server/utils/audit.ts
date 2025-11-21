@@ -77,6 +77,10 @@ export const ActionType = {
   // Analytics
   VIEW_EARNINGS_DASHBOARD: "VIEW_EARNINGS_DASHBOARD",
   VIEW_ANALYTICS_DASHBOARD: "VIEW_ANALYTICS_DASHBOARD",
+  
+  // Performance & Telemetry
+  VIEW_PERFORMANCE_DASHBOARD: "VIEW_PERFORMANCE_DASHBOARD",
+  STABILITY_ALERT_TRIGGERED: "STABILITY_ALERT_TRIGGERED",
 } as const;
 
 // Entity type constants
@@ -93,6 +97,7 @@ export const EntityType = {
   AUTH: "auth",
   SUPPORT_CONVERSATION: "support_conversation",
   ANALYTICS: "analytics",
+  PERFORMANCE: "performance",
 } as const;
 
 interface AuditLogParams {

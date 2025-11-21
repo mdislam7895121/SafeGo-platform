@@ -16,6 +16,7 @@ import { scheduleAutomaticPayouts, runManualPayout } from "../services/payoutSch
 import { reconcileWalletTransactions } from "../services/reconciliationService";
 import { format } from "date-fns";
 import analyticsRouter from "./analytics";
+import performanceRouter from "./performance";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -8147,5 +8148,10 @@ router.post("/fraud/check-multi-account", checkPermission(Permission.VIEW_DASHBO
 // Mount Analytics Routes
 // ====================================================
 router.use("/analytics", analyticsRouter);
+
+// ====================================================
+// Mount Performance Routes
+// ====================================================
+router.use("/performance", performanceRouter);
 
 export default router;
