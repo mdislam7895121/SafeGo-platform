@@ -1439,4 +1439,179 @@ router.get("/referral-bonus", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/driver/points
+// Get driver's current points, tier, and progress
+// ====================================================
+router.get("/points", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get or create driver points
+    let driverPoints = await prisma.driverPoints.findUnique({
+      where: { driverId: driverProfile.id },
+      include: {
+        tier: {
+          include: {
+            benefits: {
+              where: { isActive: true },
+              orderBy: { displayOrder: "asc" },
+            },
+          },
+        },
+      },
+    });
+
+    // If driver has no points record, create one with Blue tier
+    if (!driverPoints) {
+      const blueTier = await prisma.driverTier.findFirst({
+        where: { name: "Blue" },
+        include: {
+          benefits: {
+            where: { isActive: true },
+            orderBy: { displayOrder: "asc" },
+          },
+        },
+      });
+
+      if (!blueTier) {
+        return res.status(500).json({ error: "Default tier not found" });
+      }
+
+      driverPoints = await prisma.driverPoints.create({
+        data: {
+          driverId: driverProfile.id,
+          currentTierId: blueTier.id,
+          totalPoints: 0,
+          lifetimePoints: 0,
+        },
+        include: {
+          tier: {
+            include: {
+              benefits: {
+                where: { isActive: true },
+                orderBy: { displayOrder: "asc" },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // Get all active tiers ordered by required points
+    const allTiers = await prisma.driverTier.findMany({
+      where: { isActive: true },
+      orderBy: { requiredPoints: "asc" },
+    });
+
+    // Calculate next tier and progress
+    const currentTierIndex = allTiers.findIndex(t => t.id === driverPoints.currentTierId);
+    const nextTier = currentTierIndex < allTiers.length - 1 ? allTiers[currentTierIndex + 1] : null;
+    
+    let progressPercentage = 100;
+    let pointsToNextTier = 0;
+    
+    if (nextTier) {
+      const currentTierPoints = allTiers[currentTierIndex].requiredPoints;
+      const nextTierPoints = nextTier.requiredPoints;
+      const pointsInCurrentTier = driverPoints.totalPoints - currentTierPoints;
+      const pointsNeededForNextTier = nextTierPoints - currentTierPoints;
+      progressPercentage = Math.min(100, Math.round((pointsInCurrentTier / pointsNeededForNextTier) * 100));
+      pointsToNextTier = Math.max(0, nextTierPoints - driverPoints.totalPoints);
+    }
+
+    res.json({
+      currentTier: {
+        id: driverPoints.tier.id,
+        name: driverPoints.tier.name,
+        color: driverPoints.tier.color,
+        description: driverPoints.tier.description,
+        requiredPoints: driverPoints.tier.requiredPoints,
+        benefits: driverPoints.tier.benefits.map(b => ({
+          id: b.id,
+          text: b.benefitText,
+        })),
+      },
+      totalPoints: driverPoints.totalPoints,
+      lifetimePoints: driverPoints.lifetimePoints,
+      lastEarnedAt: driverPoints.lastEarnedAt,
+      nextTier: nextTier ? {
+        name: nextTier.name,
+        requiredPoints: nextTier.requiredPoints,
+        color: nextTier.color,
+      } : null,
+      progressPercentage,
+      pointsToNextTier,
+      allTiers: allTiers.map(t => ({
+        name: t.name,
+        requiredPoints: t.requiredPoints,
+        color: t.color,
+        isCurrentTier: t.id === driverPoints.currentTierId,
+        isUnlocked: driverPoints.totalPoints >= t.requiredPoints,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching driver points:", error);
+    res.status(500).json({ error: "Failed to fetch driver points" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/points/history
+// Get points transaction history
+// ====================================================
+router.get("/points/history", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get driver points
+    const driverPoints = await prisma.driverPoints.findUnique({
+      where: { driverId: driverProfile.id },
+    });
+
+    if (!driverPoints) {
+      return res.json({ transactions: [] });
+    }
+
+    // Get points transaction history
+    const transactions = await prisma.pointsTransaction.findMany({
+      where: { driverPointsId: driverPoints.id },
+      orderBy: { createdAt: "desc" },
+      take: 100, // Limit to last 100 transactions
+    });
+
+    res.json({
+      transactions: transactions.map(t => ({
+        id: t.id,
+        points: t.points,
+        reason: t.reason,
+        referenceType: t.referenceType,
+        referenceId: t.referenceId,
+        createdAt: t.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching points history:", error);
+    res.status(500).json({ error: "Failed to fetch points history" });
+  }
+});
+
 export default router;

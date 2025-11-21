@@ -35,7 +35,7 @@ import DriverWallet from "@/pages/driver/wallet";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
 import DriverRefer from "@/pages/driver/refer";
-import DriverPremium from "@/pages/driver/premium";
+import DriverPoints from "@/pages/driver/points";
 import DriverPromotions from "@/pages/driver/promotions";
 import DriverHelp from "@/pages/driver/help";
 import DriverAccount from "@/pages/driver/account";
@@ -255,11 +255,17 @@ function Router() {
           </DriverLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/driver/points">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="SafeGo Points">
+            <DriverPoints />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      {/* Legacy redirect from old premium page */}
       <Route path="/driver/premium">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverLayout pageTitle="SafeGo Premium">
-            <DriverPremium />
-          </DriverLayout>
+          <Redirect to="/driver/points" />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/promotions">

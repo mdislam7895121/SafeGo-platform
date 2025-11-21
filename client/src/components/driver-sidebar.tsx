@@ -50,9 +50,9 @@ const menuItems = [
     href: "/driver/promotions",
   },
   {
-    title: "SafeGo Premium",
-    icon: Crown,
-    href: "/driver/premium",
+    title: "SafeGo Points",
+    icon: Star,
+    href: "/driver/points",
   },
   {
     title: "Wallet",
