@@ -44,9 +44,11 @@ export default function AdminReferralSettings() {
   const [selectedUserType, setSelectedUserType] = useState<string>("all");
 
   // Fetch referral settings
-  const { data: settings, isLoading } = useQuery<ReferralSetting[]>({
+  const { data, isLoading } = useQuery<{ settings: ReferralSetting[] }>({
     queryKey: ["/api/admin/referral-settings"],
   });
+
+  const settings = data?.settings;
 
   // Filter settings
   const filteredSettings = settings?.filter((setting) => {
