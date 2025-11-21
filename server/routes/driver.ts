@@ -1287,4 +1287,85 @@ router.get("/payouts", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/driver/referral-bonus
+// Get current effective referral bonus for driver
+// ====================================================
+router.get("/referral-bonus", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver's country code
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { countryCode: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const countryCode = user.countryCode || "US";
+    const now = new Date();
+
+    // Fetch active referral setting for this country and driver type
+    const setting = await prisma.referralSetting.findFirst({
+      where: {
+        countryCode,
+        userType: "driver",
+        isActive: true,
+        isDemo: false,
+      },
+    });
+
+    // Default fallback if no setting exists
+    if (!setting) {
+      const defaultAmount = countryCode === "BD" ? 500 : 50;
+      const defaultCurrency = countryCode === "BD" ? "BDT" : "USD";
+      return res.json({
+        baseAmount: defaultAmount.toString(),
+        effectiveBonus: defaultAmount.toString(),
+        currency: defaultCurrency,
+        currencySymbol: countryCode === "BD" ? "৳" : "$",
+        isPromoActive: false,
+        promoLabel: null,
+        promoEndDate: null,
+      });
+    }
+
+    // Calculate effective bonus
+    const isWithinDateRange =
+      (!setting.startAt || new Date(setting.startAt) <= now) &&
+      (!setting.endAt || new Date(setting.endAt) >= now);
+
+    let effectiveBonus = setting.baseAmount;
+    let isPromoActive = false;
+
+    if (isWithinDateRange) {
+      if (setting.promoAmount && setting.promoAmount.gt(setting.baseAmount)) {
+        effectiveBonus = setting.promoAmount;
+        isPromoActive = true;
+      } else if (setting.promoMultiplier) {
+        effectiveBonus = setting.baseAmount.mul(setting.promoMultiplier);
+        isPromoActive = true;
+      }
+    }
+
+    const currencySymbol = setting.currency === "BDT" ? "৳" : "$";
+
+    res.json({
+      baseAmount: setting.baseAmount.toString(),
+      effectiveBonus: effectiveBonus.toString(),
+      currency: setting.currency,
+      currencySymbol,
+      isPromoActive,
+      promoLabel: isPromoActive ? setting.promoLabel : null,
+      promoEndDate: isPromoActive && setting.endAt ? setting.endAt : null,
+    });
+  } catch (error) {
+    console.error("Error fetching referral bonus:", error);
+    res.status(500).json({ error: "Failed to fetch referral bonus" });
+  }
+});
+
 export default router;

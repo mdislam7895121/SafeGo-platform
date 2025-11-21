@@ -15,11 +15,20 @@ export default function DriverRefer() {
     queryKey: ["/api/driver/home"],
   });
 
+  const { data: bonusData } = useQuery({
+    queryKey: ["/api/driver/referral-bonus"],
+  });
+
   const profile = (driverData as any)?.profile;
   const referralCode = profile?.id?.slice(0, 8).toUpperCase() || "SAFEGO123";
   const referralLink = `https://safego.app/driver/register?ref=${referralCode}`;
-  const currency = profile?.countryCode === "BD" ? "৳" : "$";
-  const rewardAmount = profile?.countryCode === "BD" ? "500" : "50";
+  
+  // Dynamic referral bonus from API
+  const currency = bonusData?.currencySymbol || (profile?.countryCode === "BD" ? "৳" : "$");
+  const rewardAmount = bonusData?.effectiveBonus || (profile?.countryCode === "BD" ? "500" : "50");
+  const isPromoActive = bonusData?.isPromoActive || false;
+  const promoLabel = bonusData?.promoLabel;
+  const promoEndDate = bonusData?.promoEndDate;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink);
@@ -57,6 +66,18 @@ export default function DriverRefer() {
             <p className="text-muted-foreground">
               Earn for each friend who becomes a driver
             </p>
+            {isPromoActive && promoLabel && (
+              <div className="mt-3 px-4 py-2 bg-yellow-500/20 border border-yellow-500/30 rounded-lg inline-block">
+                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                  {promoLabel}
+                </p>
+                {promoEndDate && (
+                  <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-1">
+                    Limited-time offer until {new Date(promoEndDate).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
