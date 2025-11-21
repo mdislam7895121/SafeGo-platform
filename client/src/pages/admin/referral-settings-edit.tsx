@@ -66,7 +66,7 @@ export default function AdminReferralSettingsEdit() {
   const id = params?.id;
 
   // Fetch the referral setting
-  const { data, isLoading } = useQuery<{ setting: ReferralSetting }>({
+  const { data, isLoading, isError, error } = useQuery<{ setting: ReferralSetting }>({
     queryKey: ["/api/admin/referral-settings", id],
     enabled: !!id,
   });
@@ -180,6 +180,50 @@ export default function AdminReferralSettingsEdit() {
             </CardContent>
           </Card>
         </div>
+      </div>
+    );
+  }
+
+  if (isError) {
+    // Get HTTP status code from error object (ApiError has .status property)
+    const statusCode = (error as any)?.status || null;
+
+    const is404 = statusCode === 404;
+    const isUnauthorized = statusCode === 401 || statusCode === 403;
+
+    const displayMessage = is404
+      ? "Setting not found"
+      : isUnauthorized
+      ? "You don't have permission to view this setting"
+      : "Failed to load setting. Please try again.";
+
+    if (!is404) {
+      toast({
+        title: "Error",
+        description: displayMessage,
+        variant: "destructive",
+      });
+
+      if (isUnauthorized) {
+        setTimeout(() => setLocation("/admin/referral-settings"), 2000);
+      }
+    }
+
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="pt-6">
+            <p className="text-center text-muted-foreground">{displayMessage}</p>
+            <Button
+              onClick={handleCancel}
+              variant="outline"
+              className="mt-4 w-full"
+              data-testid="button-back"
+            >
+              Back to List
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
