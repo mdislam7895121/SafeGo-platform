@@ -14,13 +14,13 @@ router.use(rateLimitAnalytics); // Rate limiting (60 requests/min per user)
 // ====================================================
 // RBAC Helper - Filter data by admin role and jurisdiction
 // ====================================================
-interface RBACFilter {
+export interface RBACFilter {
   countryCode?: string;
   cityCode?: string;
   isUnrestricted: boolean;
 }
 
-async function getRBACFilter(req: AuthRequest): Promise<RBACFilter> {
+export async function getRBACFilter(req: AuthRequest): Promise<RBACFilter> {
   const user = req.user as any;
   
   if (!user || !user.id) {
@@ -71,21 +71,21 @@ async function getRBACFilter(req: AuthRequest): Promise<RBACFilter> {
 // ====================================================
 // Safe data helpers - Defensive null-check patterns
 // ====================================================
-function safeNumber(value: any, defaultValue: number = 0): number {
+export function safeNumber(value: any, defaultValue: number = 0): number {
   const num = Number(value);
   return isNaN(num) ? defaultValue : num;
 }
 
-function safeArray<T>(value: any, defaultValue: T[] = []): T[] {
+export function safeArray<T>(value: any, defaultValue: T[] = []): T[] {
   return Array.isArray(value) ? value : defaultValue;
 }
 
-function safeString(value: any, defaultValue: string = ""): string {
+export function safeString(value: any, defaultValue: string = ""): string {
   return typeof value === "string" ? value : defaultValue;
 }
 
 // Helper to build jurisdiction filter for Prisma queries
-function buildJurisdictionFilter(rbacFilter: RBACFilter) {
+export function buildJurisdictionFilter(rbacFilter: RBACFilter) {
   if (rbacFilter.isUnrestricted) {
     return {};
   }

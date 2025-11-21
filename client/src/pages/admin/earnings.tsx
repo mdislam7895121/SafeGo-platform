@@ -49,132 +49,30 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 
+// Backend response types (match earningsService.ts)
 interface GlobalSummary {
-  totalServices: number;
-  totalGrossRevenue: number;
-  totalSafegoCommission: number;
-  totalDriverPayouts: number;
-  totalRestaurantPayouts: number;
-  serviceBreakdown: {
-    rides: { count: number; revenue: number; commission: number; driverPayout: number };
-    foodOrders: { count: number; revenue: number; commission: number; restaurantPayout: number; driverPayout: number };
-    parcelDeliveries: { count: number; revenue: number; commission: number; driverPayout: number };
-  };
-  countryBreakdown: Array<{
-    country: string;
-    count: number;
-    revenue: number;
-    commission: number;
-  }>;
+  totalRidesEarnings: number;
+  totalFoodEarnings: number;
+  totalParcelEarnings: number;
+  totalCommission: number;
+  payoutsCompleted: number;
+  payoutsPending: number;
 }
 
-interface RideEarnings {
-  totalRides: number;
-  totalRevenue: number;
-  totalCommission: number;
-  totalDriverPayout: number;
-  avgFarePerRide: number;
-  avgCommissionPerRide: number;
-  topDrivers: Array<{
-    driverId: string;
-    driverName: string;
-    email: string;
-    rides: number;
-    revenue: number;
-    commission: number;
-    payout: number;
-  }>;
-  countryBreakdown: Array<{
-    country: string;
-    rides: number;
-    revenue: number;
-    commission: number;
-  }>;
-}
-
-interface FoodEarnings {
-  totalOrders: number;
-  totalRevenue: number;
-  totalCommission: number;
-  totalRestaurantPayout: number;
-  totalDriverPayout: number;
-  avgOrderValue: number;
-  topRestaurants: Array<{
-    restaurantId: string;
-    restaurantName: string;
-    email: string;
-    orders: number;
-    revenue: number;
-    commission: number;
-    payout: number;
-  }>;
-  topDeliveryDrivers: Array<{
-    driverId: string;
-    driverName: string;
-    email: string;
-    deliveries: number;
-    earnings: number;
-  }>;
-  countryBreakdown: Array<{
-    country: string;
-    orders: number;
-    revenue: number;
-    commission: number;
-  }>;
-}
-
-interface ParcelEarnings {
-  totalDeliveries: number;
-  totalRevenue: number;
-  totalCommission: number;
-  totalDriverPayout: number;
-  avgDeliveryFee: number;
-  topDrivers: Array<{
-    driverId: string;
-    driverName: string;
-    email: string;
-    deliveries: number;
-    revenue: number;
-    commission: number;
-    payout: number;
-  }>;
-  countryBreakdown: Array<{
-    country: string;
-    deliveries: number;
-    revenue: number;
-    commission: number;
-  }>;
+interface ServiceEarnings {
+  gross: number;
+  commission: number;
+  net: number;
+  count: number;
+  chartData: Array<{ date: string; amount: number }>;
 }
 
 interface PayoutAnalytics {
-  totalPayouts: number;
-  totalAmount: number;
-  avgPayoutAmount: number;
-  statusBreakdown: {
-    pending: { count: number; amount: number };
-    processing: { count: number; amount: number };
-    completed: { count: number; amount: number };
-    failed: { count: number; amount: number };
-    rejected: { count: number; amount: number };
-  };
-  methodBreakdown: Array<{
-    method: string;
-    count: number;
-    amount: number;
-  }>;
-  topRecipients: Array<{
-    walletId: string;
-    ownerName: string;
-    email: string;
-    walletType: string;
-    payouts: number;
-    totalAmount: number;
-  }>;
-  countryBreakdown: Array<{
-    country: string;
-    payouts: number;
-    amount: number;
-  }>;
+  weeklyAutoPayouts: number;
+  manualCashouts: number;
+  pending: number;
+  completed: number;
+  failed: Array<{ id: string; amount: number; reason: string; date: string }>;
 }
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
@@ -225,17 +123,17 @@ export default function AdminEarnings() {
     enabled: hasAccess,
   });
 
-  const { data: rideData, isLoading: rideLoading } = useQuery<RideEarnings>({
+  const { data: rideData, isLoading: rideLoading } = useQuery<ServiceEarnings>({
     queryKey: [`/api/admin/earnings/dashboard/rides${queryString}`],
     enabled: hasAccess,
   });
 
-  const { data: foodData, isLoading: foodLoading } = useQuery<FoodEarnings>({
+  const { data: foodData, isLoading: foodLoading } = useQuery<ServiceEarnings>({
     queryKey: [`/api/admin/earnings/dashboard/food${queryString}`],
     enabled: hasAccess,
   });
 
-  const { data: parcelData, isLoading: parcelLoading } = useQuery<ParcelEarnings>({
+  const { data: parcelData, isLoading: parcelLoading } = useQuery<ServiceEarnings>({
     queryKey: [`/api/admin/earnings/dashboard/parcels${queryString}`],
     enabled: hasAccess,
   });
@@ -411,8 +309,8 @@ export default function AdminEarnings() {
 
           <TabsContent value="overview" className="space-y-6">
             {globalLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {[...Array(4)].map((_, i) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[...Array(3)].map((_, i) => (
                   <Card key={i}>
                     <CardHeader>
                       <Skeleton className="h-4 w-24" />
@@ -425,27 +323,25 @@ export default function AdminEarnings() {
               </div>
             ) : globalData ? (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Services</CardTitle>
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-total-services">
-                        {globalData.totalServices.toLocaleString()}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Gross Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Total Gross Revenue</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-gross-revenue">
-                        {formatCurrency(globalData.totalGrossRevenue)}
+                      <div className="text-2xl font-bold" data-testid="stat-total-revenue">
+                        {formatCurrency((globalData?.totalRidesEarnings ?? 0) + (globalData?.totalFoodEarnings ?? 0) + (globalData?.totalParcelEarnings ?? 0))}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Rides: {formatCurrency(globalData?.totalRidesEarnings ?? 0)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Food: {formatCurrency(globalData?.totalFoodEarnings ?? 0)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Parcels: {formatCurrency(globalData?.totalParcelEarnings ?? 0)}
+                      </p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -455,141 +351,65 @@ export default function AdminEarnings() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-primary" data-testid="stat-commission">
-                        {formatCurrency(globalData.totalSafegoCommission)}
+                        {formatCurrency(globalData?.totalCommission ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Payouts</CardTitle>
+                      <CardTitle className="text-sm font-medium">Payouts Status</CardTitle>
                       <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-total-payouts">
-                        {formatCurrency(globalData.totalDriverPayouts + globalData.totalRestaurantPayouts)}
+                      <div className="text-sm font-medium">
+                        Completed: {formatCurrency(globalData?.payoutsCompleted ?? 0)}
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Service Breakdown</CardTitle>
-                      <CardDescription>Revenue distribution by service type</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={[
-                              { name: "Rides", value: globalData.serviceBreakdown.rides.revenue },
-                              { name: "Food Orders", value: globalData.serviceBreakdown.foodOrders.revenue },
-                              { name: "Parcels", value: globalData.serviceBreakdown.parcelDeliveries.revenue },
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {[0, 1, 2].map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Revenue by Country</CardTitle>
-                      <CardDescription>Geographic revenue distribution</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={globalData.countryBreakdown}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="country" />
-                          <YAxis />
-                          <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                          <Legend />
-                          <Bar dataKey="revenue" fill="hsl(var(--chart-1))" name="Revenue" />
-                          <Bar dataKey="commission" fill="hsl(var(--chart-2))" name="Commission" />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <div className="text-sm text-muted-foreground">
+                        Pending: {formatCurrency(globalData?.payoutsPending ?? 0)}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Service Performance Summary</CardTitle>
+                    <CardTitle>Revenue Breakdown by Service Type</CardTitle>
+                    <CardDescription>Distribution of earnings across ride-hailing, food delivery, and parcel services</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Service</TableHead>
-                          <TableHead className="text-right">Count</TableHead>
-                          <TableHead className="text-right">Revenue</TableHead>
-                          <TableHead className="text-right">Commission</TableHead>
-                          <TableHead className="text-right">Avg per Service</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow data-testid="row-rides">
-                          <TableCell className="font-medium flex items-center gap-2">
-                            <Car className="h-4 w-4" />
-                            Rides
-                          </TableCell>
-                          <TableCell className="text-right">{globalData.serviceBreakdown.rides.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(globalData.serviceBreakdown.rides.revenue)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(globalData.serviceBreakdown.rides.commission)}</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(globalData.serviceBreakdown.rides.count > 0 
-                              ? globalData.serviceBreakdown.rides.revenue / globalData.serviceBreakdown.rides.count 
-                              : 0)}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow data-testid="row-food">
-                          <TableCell className="font-medium flex items-center gap-2">
-                            <UtensilsCrossed className="h-4 w-4" />
-                            Food Orders
-                          </TableCell>
-                          <TableCell className="text-right">{globalData.serviceBreakdown.foodOrders.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(globalData.serviceBreakdown.foodOrders.revenue)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(globalData.serviceBreakdown.foodOrders.commission)}</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(globalData.serviceBreakdown.foodOrders.count > 0 
-                              ? globalData.serviceBreakdown.foodOrders.revenue / globalData.serviceBreakdown.foodOrders.count 
-                              : 0)}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow data-testid="row-parcels">
-                          <TableCell className="font-medium flex items-center gap-2">
-                            <Package className="h-4 w-4" />
-                            Parcel Deliveries
-                          </TableCell>
-                          <TableCell className="text-right">{globalData.serviceBreakdown.parcelDeliveries.count.toLocaleString()}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(globalData.serviceBreakdown.parcelDeliveries.revenue)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(globalData.serviceBreakdown.parcelDeliveries.commission)}</TableCell>
-                          <TableCell className="text-right">
-                            {formatCurrency(globalData.serviceBreakdown.parcelDeliveries.count > 0 
-                              ? globalData.serviceBreakdown.parcelDeliveries.revenue / globalData.serviceBreakdown.parcelDeliveries.count 
-                              : 0)}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: "Rides", value: globalData?.totalRidesEarnings ?? 0 },
+                            { name: "Food Orders", value: globalData?.totalFoodEarnings ?? 0 },
+                            { name: "Parcels", value: globalData?.totalParcelEarnings ?? 0 },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {[0, 1, 2].map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(Number(value) ?? 0)} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </CardContent>
                 </Card>
               </>
-            ) : null}
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-center text-muted-foreground">No earnings data available</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="rides" className="space-y-6">
@@ -616,18 +436,18 @@ export default function AdminEarnings() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="stat-rides-count">
-                        {rideData.totalRides.toLocaleString()}
+                        {(rideData?.count ?? 0).toLocaleString()}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Gross Revenue</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="stat-rides-revenue">
-                        {formatCurrency(rideData.totalRevenue)}
+                        {formatCurrency(rideData?.gross ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -638,75 +458,49 @@ export default function AdminEarnings() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-primary" data-testid="stat-rides-commission">
-                        {formatCurrency(rideData.totalCommission)}
+                        {formatCurrency(rideData?.commission ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Fare</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Net Payout</CardTitle>
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-rides-avg">
-                        {formatCurrency(rideData.avgFarePerRide)}
+                      <div className="text-2xl font-bold" data-testid="stat-rides-net">
+                        {formatCurrency(rideData?.net ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Revenue by Country</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={rideData.countryBreakdown}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="country" />
-                          <YAxis />
-                          <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                          <Legend />
-                          <Bar dataKey="revenue" fill="hsl(var(--chart-1))" name="Revenue" />
-                          <Bar dataKey="commission" fill="hsl(var(--chart-2))" name="Commission" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top Drivers</CardTitle>
-                      <CardDescription>By total revenue generated</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Driver</TableHead>
-                            <TableHead className="text-right">Rides</TableHead>
-                            <TableHead className="text-right">Revenue</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {rideData.topDrivers.slice(0, 5).map((driver) => (
-                            <TableRow key={driver.driverId} data-testid={`row-driver-${driver.driverId}`}>
-                              <TableCell>
-                                <div className="font-medium">{driver.driverName || driver.email}</div>
-                                <div className="text-xs text-muted-foreground">{driver.email}</div>
-                              </TableCell>
-                              <TableCell className="text-right">{driver.rides}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(driver.revenue)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue Trend</CardTitle>
+                    <CardDescription>Daily ride earnings over time</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={rideData?.chartData ?? []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value) ?? 0)} />
+                        <Legend />
+                        <Line type="monotone" dataKey="amount" stroke="hsl(var(--chart-1))" name="Revenue" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
               </>
-            ) : null}
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-center text-muted-foreground">No ride earnings data available</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="food" className="space-y-6">
@@ -733,18 +527,18 @@ export default function AdminEarnings() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="stat-food-count">
-                        {foodData.totalOrders.toLocaleString()}
+                        {(foodData?.count ?? 0).toLocaleString()}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Gross Revenue</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="stat-food-revenue">
-                        {formatCurrency(foodData.totalRevenue)}
+                        {formatCurrency(foodData?.gross ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -755,86 +549,49 @@ export default function AdminEarnings() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-primary" data-testid="stat-food-commission">
-                        {formatCurrency(foodData.totalCommission)}
+                        {formatCurrency(foodData?.commission ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Order</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Net Payout</CardTitle>
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-food-avg">
-                        {formatCurrency(foodData.avgOrderValue)}
+                      <div className="text-2xl font-bold" data-testid="stat-food-net">
+                        {formatCurrency(foodData?.net ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top Restaurants</CardTitle>
-                      <CardDescription>By total revenue generated</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Restaurant</TableHead>
-                            <TableHead className="text-right">Orders</TableHead>
-                            <TableHead className="text-right">Revenue</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {foodData.topRestaurants.slice(0, 5).map((restaurant) => (
-                            <TableRow key={restaurant.restaurantId} data-testid={`row-restaurant-${restaurant.restaurantId}`}>
-                              <TableCell>
-                                <div className="font-medium">{restaurant.restaurantName}</div>
-                                <div className="text-xs text-muted-foreground">{restaurant.email}</div>
-                              </TableCell>
-                              <TableCell className="text-right">{restaurant.orders}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(restaurant.revenue)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Top Delivery Drivers</CardTitle>
-                      <CardDescription>By number of deliveries</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Driver</TableHead>
-                            <TableHead className="text-right">Deliveries</TableHead>
-                            <TableHead className="text-right">Earnings</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {foodData.topDeliveryDrivers.slice(0, 5).map((driver) => (
-                            <TableRow key={driver.driverId} data-testid={`row-delivery-driver-${driver.driverId}`}>
-                              <TableCell>
-                                <div className="font-medium">{driver.driverName || driver.email}</div>
-                                <div className="text-xs text-muted-foreground">{driver.email}</div>
-                              </TableCell>
-                              <TableCell className="text-right">{driver.deliveries}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(driver.earnings)}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                </div>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Revenue Trend</CardTitle>
+                    <CardDescription>Daily food order earnings over time</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={foodData?.chartData ?? []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value) ?? 0)} />
+                        <Legend />
+                        <Line type="monotone" dataKey="amount" stroke="hsl(var(--chart-2))" name="Revenue" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
               </>
-            ) : null}
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-center text-muted-foreground">No food earnings data available</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="parcels" className="space-y-6">
@@ -861,18 +618,18 @@ export default function AdminEarnings() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="stat-parcel-count">
-                        {parcelData.totalDeliveries.toLocaleString()}
+                        {(parcelData?.count ?? 0).toLocaleString()}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                      <CardTitle className="text-sm font-medium">Gross Revenue</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold" data-testid="stat-parcel-revenue">
-                        {formatCurrency(parcelData.totalRevenue)}
+                        {formatCurrency(parcelData?.gross ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -883,18 +640,18 @@ export default function AdminEarnings() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-primary" data-testid="stat-parcel-commission">
-                        {formatCurrency(parcelData.totalCommission)}
+                        {formatCurrency(parcelData?.commission ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Fee</CardTitle>
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Net Payout</CardTitle>
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-parcel-avg">
-                        {formatCurrency(parcelData.avgDeliveryFee)}
+                      <div className="text-2xl font-bold" data-testid="stat-parcel-net">
+                        {formatCurrency(parcelData?.net ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
@@ -902,39 +659,30 @@ export default function AdminEarnings() {
 
                 <Card>
                   <CardHeader>
-                    <CardTitle>Top Delivery Drivers</CardTitle>
-                    <CardDescription>By total deliveries and revenue</CardDescription>
+                    <CardTitle>Revenue Trend</CardTitle>
+                    <CardDescription>Daily parcel delivery earnings over time</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Driver</TableHead>
-                          <TableHead className="text-right">Deliveries</TableHead>
-                          <TableHead className="text-right">Revenue</TableHead>
-                          <TableHead className="text-right">Commission</TableHead>
-                          <TableHead className="text-right">Payout</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {parcelData.topDrivers.map((driver) => (
-                          <TableRow key={driver.driverId} data-testid={`row-parcel-driver-${driver.driverId}`}>
-                            <TableCell>
-                              <div className="font-medium">{driver.driverName || driver.email}</div>
-                              <div className="text-xs text-muted-foreground">{driver.email}</div>
-                            </TableCell>
-                            <TableCell className="text-right">{driver.deliveries}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(driver.revenue)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(driver.commission)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(driver.payout)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <LineChart data={parcelData?.chartData ?? []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(Number(value) ?? 0)} />
+                        <Legend />
+                        <Line type="monotone" dataKey="amount" stroke="hsl(var(--chart-3))" name="Revenue" />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </CardContent>
                 </Card>
               </>
-            ) : null}
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-center text-muted-foreground">No parcel earnings data available</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="payouts" className="space-y-6">
@@ -956,137 +704,88 @@ export default function AdminEarnings() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Payouts</CardTitle>
+                      <CardTitle className="text-sm font-medium">Weekly Auto Payouts</CardTitle>
                       <CreditCard className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-payout-count">
-                        {payoutData.totalPayouts.toLocaleString()}
+                      <div className="text-2xl font-bold" data-testid="stat-payout-weekly">
+                        {formatCurrency(payoutData?.weeklyAutoPayouts ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
+                      <CardTitle className="text-sm font-medium">Manual Cashouts</CardTitle>
                       <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-payout-amount">
-                        {formatCurrency(payoutData.totalAmount)}
+                      <div className="text-2xl font-bold" data-testid="stat-payout-manual">
+                        {formatCurrency(payoutData?.manualCashouts ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Avg Payout</CardTitle>
-                      <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                      <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                      <AlertCircle className="h-4 w-4 text-amber-500" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold" data-testid="stat-payout-avg">
-                        {formatCurrency(payoutData.avgPayoutAmount)}
+                      <div className="text-2xl font-bold text-amber-600" data-testid="stat-payout-pending">
+                        {formatCurrency(payoutData?.pending ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
                       <CardTitle className="text-sm font-medium">Completed</CardTitle>
-                      <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                      <CheckCircle className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-primary" data-testid="stat-payout-completed">
-                        {payoutData.statusBreakdown.completed.count.toLocaleString()}
+                      <div className="text-2xl font-bold text-green-600" data-testid="stat-payout-completed">
+                        {formatCurrency(payoutData?.completed ?? 0)}
                       </div>
                     </CardContent>
                   </Card>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {(payoutData?.failed?.length ?? 0) > 0 && (
                   <Card>
                     <CardHeader>
-                      <CardTitle>Payout Status Breakdown</CardTitle>
+                      <CardTitle>Failed Payouts</CardTitle>
+                      <CardDescription>Recent payout failures requiring attention</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={[
-                              { name: "Completed", value: payoutData.statusBreakdown.completed.amount },
-                              { name: "Pending", value: payoutData.statusBreakdown.pending.amount },
-                              { name: "Processing", value: payoutData.statusBreakdown.processing.amount },
-                              { name: "Failed", value: payoutData.statusBreakdown.failed.amount },
-                              { name: "Rejected", value: payoutData.statusBreakdown.rejected.amount },
-                            ]}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="value"
-                          >
-                            {[0, 1, 2, 3, 4].map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Payment Methods</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={payoutData.methodBreakdown}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="method" />
-                          <YAxis />
-                          <Tooltip formatter={(value) => formatCurrency(Number(value))} />
-                          <Bar dataKey="amount" fill="hsl(var(--chart-1))" name="Amount" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top Recipients</CardTitle>
-                    <CardDescription>By total payout amount</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Recipient</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead className="text-right">Payouts</TableHead>
-                          <TableHead className="text-right">Total Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {payoutData.topRecipients.map((recipient) => (
-                          <TableRow key={recipient.walletId} data-testid={`row-recipient-${recipient.walletId}`}>
-                            <TableCell>
-                              <div className="font-medium">{recipient.ownerName || recipient.email}</div>
-                              <div className="text-xs text-muted-foreground">{recipient.email}</div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{recipient.walletType}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">{recipient.payouts}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(recipient.totalAmount)}</TableCell>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>ID</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead>Reason</TableHead>
+                            <TableHead>Date</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
+                        </TableHeader>
+                        <TableBody>
+                          {(payoutData?.failed ?? []).slice(0, 10).map((payout) => (
+                            <TableRow key={payout?.id ?? ""} data-testid={`row-failed-payout-${payout?.id ?? ""}`}>
+                              <TableCell className="font-mono text-xs">{payout?.id ?? "N/A"}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(payout?.amount ?? 0)}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{payout?.reason ?? "Unknown"}</TableCell>
+                              <TableCell className="text-sm">{payout?.date ? new Date(payout.date).toLocaleString() : "N/A"}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
               </>
-            ) : null}
+            ) : (
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-center text-muted-foreground">No payout analytics data available</p>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
         </Tabs>
       </div>

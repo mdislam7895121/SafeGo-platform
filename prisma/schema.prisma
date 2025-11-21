@@ -9,6 +9,8 @@ datasource db {
 
 enum AdminRole {
   SUPER_ADMIN
+  COUNTRY_ADMIN
+  CITY_ADMIN
   COMPLIANCE_ADMIN
   SUPPORT_ADMIN
   FINANCE_ADMIN
@@ -33,8 +35,12 @@ model AdminProfile {
   pending2FASecret_encrypted   String?
   pending2FAExpiresAt          DateTime?
   country                      String?
+  countryCode                  String?
+  cityCode                     String?
   user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([countryCode])
+  @@index([cityCode])
   @@map("admin_profiles")
 }
 

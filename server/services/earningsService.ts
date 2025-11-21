@@ -31,16 +31,150 @@ interface PayoutAnalytics {
   failed: Array<{ id: string; amount: number; reason: string; date: string }>;
 }
 
+interface RBACFilter {
+  isUnrestricted: boolean;
+  countryCode?: string | null;
+  cityCode?: string | null;
+}
+
 interface EarningsFilters {
   dateFrom?: Date;
   dateTo?: Date;
-  country?: string;
+  rbacFilter?: RBACFilter;
 }
 
 const decimalToNumber = (value: Decimal | null): number => {
   if (!value) return 0;
   return Number(value.toString());
 };
+
+// Safe wrapper helpers for defensive null handling
+const safeNumber = (value: any, defaultValue: number = 0): number => {
+  if (value === null || value === undefined || isNaN(Number(value))) {
+    return defaultValue;
+  }
+  return Number(value);
+};
+
+const safeArray = <T>(value: any, defaultValue: T[] = []): T[] => {
+  if (!Array.isArray(value)) {
+    return defaultValue;
+  }
+  return value;
+};
+
+const safeString = (value: any, defaultValue: string = ""): string => {
+  if (value === null || value === undefined) {
+    return defaultValue;
+  }
+  return String(value);
+};
+
+// Build jurisdiction filter from RBAC filter
+function buildJurisdictionFilter(rbacFilter?: RBACFilter): any {
+  if (!rbacFilter || rbacFilter.isUnrestricted) {
+    return {};
+  }
+  
+  const filter: any = {};
+  if (rbacFilter.countryCode) {
+    filter.countryCode = rbacFilter.countryCode;
+  }
+  if (rbacFilter.cityCode) {
+    filter.cityCode = rbacFilter.cityCode;
+  }
+  
+  return filter;
+}
+
+// Build comprehensive payout RBAC filter for ALL owner types (driver, restaurant, customer)
+async function buildPayoutRBACFilter(rbacFilter?: RBACFilter): Promise<any> {
+  if (!rbacFilter || rbacFilter.isUnrestricted) {
+    return {};
+  }
+  
+  // For COUNTRY_ADMIN: Filter by payout.countryCode directly (simple and efficient)
+  if (rbacFilter.countryCode && !rbacFilter.cityCode) {
+    return {
+      countryCode: rbacFilter.countryCode,
+    };
+  }
+  
+  // For CITY_ADMIN: Need to filter by both country and city
+  // Since cityCode is on the user profile, we need to pre-fetch owner IDs in the jurisdiction
+  if (rbacFilter.countryCode && rbacFilter.cityCode) {
+    // Pre-fetch driver IDs in the city
+    const driversInCity = await db.driverProfile.findMany({
+      where: {
+        user: {
+          countryCode: rbacFilter.countryCode,
+          cityCode: rbacFilter.cityCode,
+        },
+      },
+      select: { id: true },
+    });
+    const driverIds = driversInCity.map(d => d.id);
+
+    // Pre-fetch restaurant IDs in the city
+    const restaurantsInCity = await db.restaurantProfile.findMany({
+      where: {
+        user: {
+          countryCode: rbacFilter.countryCode,
+          cityCode: rbacFilter.cityCode,
+        },
+      },
+      select: { id: true },
+    });
+    const restaurantIds = restaurantsInCity.map(r => r.id);
+
+    // Pre-fetch customer IDs in the city (for refunds, referrals, etc.)
+    const customersInCity = await db.customerProfile.findMany({
+      where: {
+        user: {
+          countryCode: rbacFilter.countryCode,
+          cityCode: rbacFilter.cityCode,
+        },
+      },
+      select: { id: true },
+    });
+    const customerIds = customersInCity.map(c => c.id);
+
+    // Build OR filter for all owner types in the city
+    const ownerFilters = [];
+    if (driverIds.length > 0) {
+      ownerFilters.push({
+        ownerType: 'driver',
+        ownerId: { in: driverIds },
+      });
+    }
+    if (restaurantIds.length > 0) {
+      ownerFilters.push({
+        ownerType: 'restaurant',
+        ownerId: { in: restaurantIds },
+      });
+    }
+    if (customerIds.length > 0) {
+      ownerFilters.push({
+        ownerType: 'customer',
+        ownerId: { in: customerIds },
+      });
+    }
+
+    // If no owners found in city, use impossible condition to guarantee empty results
+    if (ownerFilters.length === 0) {
+      return {
+        walletId: { in: [] },
+      };
+    }
+
+    return {
+      countryCode: rbacFilter.countryCode,
+      OR: ownerFilters,
+    };
+  }
+  
+  return {};
+}
 
 const cache: Map<string, { data: unknown; timestamp: number }> = new Map();
 const CACHE_TTL = 30000;
@@ -67,18 +201,27 @@ export async function getGlobalSummary(filters: EarningsFilters = {}): Promise<G
   if (filters.dateFrom) dateFilter.gte = filters.dateFrom;
   if (filters.dateTo) dateFilter.lte = filters.dateTo;
 
-  const countryFilter = filters.country && filters.country !== 'all' 
-    ? { countryCode: filters.country } 
+  // Build jurisdiction filter from RBAC
+  const userFilter = buildJurisdictionFilter(filters.rbacFilter);
+  const customerJurisdictionFilter = Object.keys(userFilter).length > 0 
+    ? { customer: { user: userFilter } } 
     : {};
+  const driverJurisdictionFilter = Object.keys(userFilter).length > 0 
+    ? { driver: { user: userFilter } } 
+    : {};
+  const restaurantJurisdictionFilter = Object.keys(userFilter).length > 0 
+    ? { restaurant: { user: userFilter } } 
+    : {};
+
+  // Build comprehensive payout RBAC filter for all owner types
+  const payoutRBACFilter = await buildPayoutRBACFilter(filters.rbacFilter);
 
   const [ridesAgg, foodAgg, parcelAgg, payoutsAgg] = await Promise.all([
     db.ride.aggregate({
       where: {
         status: "completed",
-        completedAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          driver: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { completedAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       _sum: {
         serviceFare: true,
@@ -91,10 +234,8 @@ export async function getGlobalSummary(filters: EarningsFilters = {}): Promise<G
     db.foodOrder.aggregate({
       where: {
         status: "delivered",
-        deliveredAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          restaurant: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { deliveredAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       _sum: {
         serviceFare: true,
@@ -108,10 +249,8 @@ export async function getGlobalSummary(filters: EarningsFilters = {}): Promise<G
     db.delivery.aggregate({
       where: {
         status: "delivered",
-        deliveredAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          driver: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { deliveredAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       _sum: {
         serviceFare: true,
@@ -124,8 +263,8 @@ export async function getGlobalSummary(filters: EarningsFilters = {}): Promise<G
     db.payout.groupBy({
       by: ['status'],
       where: {
-        createdAt: dateFilter,
-        ...countryFilter,
+        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        ...payoutRBACFilter,
       },
       _sum: {
         amount: true,
@@ -138,15 +277,17 @@ export async function getGlobalSummary(filters: EarningsFilters = {}): Promise<G
   const payoutsPending = payoutsAgg.find(p => p.status === 'pending')?._sum.amount ?? null;
 
   const result: GlobalSummary = {
-    totalRidesEarnings: decimalToNumber(ridesAgg._sum.serviceFare),
-    totalFoodEarnings: decimalToNumber(foodAgg._sum.serviceFare),
-    totalParcelEarnings: decimalToNumber(parcelAgg._sum.serviceFare),
-    totalCommission: 
+    totalRidesEarnings: safeNumber(decimalToNumber(ridesAgg._sum.serviceFare), 0),
+    totalFoodEarnings: safeNumber(decimalToNumber(foodAgg._sum.serviceFare), 0),
+    totalParcelEarnings: safeNumber(decimalToNumber(parcelAgg._sum.serviceFare), 0),
+    totalCommission: safeNumber(
       decimalToNumber(ridesAgg._sum.safegoCommission) +
       decimalToNumber(foodAgg._sum.safegoCommission) +
       decimalToNumber(parcelAgg._sum.safegoCommission),
-    payoutsCompleted: decimalToNumber(payoutsCompleted),
-    payoutsPending: decimalToNumber(payoutsPending),
+      0
+    ),
+    payoutsCompleted: safeNumber(decimalToNumber(payoutsCompleted), 0),
+    payoutsPending: safeNumber(decimalToNumber(payoutsPending), 0),
   };
 
   setCache(cacheKey, result);
@@ -180,14 +321,18 @@ export async function getRideEarnings(filters: EarningsFilters = {}): Promise<Se
   if (filters.dateFrom) dateFilter.gte = filters.dateFrom;
   if (filters.dateTo) dateFilter.lte = filters.dateTo;
 
+  // Build jurisdiction filter from RBAC
+  const userFilter = buildJurisdictionFilter(filters.rbacFilter);
+  const customerJurisdictionFilter = Object.keys(userFilter).length > 0 
+    ? { customer: { user: userFilter } } 
+    : {};
+
   const [agg, chartRawData] = await Promise.all([
     db.ride.aggregate({
       where: {
         status: "completed",
-        completedAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          driver: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { completedAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       _sum: {
         serviceFare: true,
@@ -200,10 +345,8 @@ export async function getRideEarnings(filters: EarningsFilters = {}): Promise<Se
     db.ride.findMany({
       where: {
         status: "completed",
-        completedAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          driver: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { completedAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       select: {
         completedAt: true,
@@ -223,11 +366,11 @@ export async function getRideEarnings(filters: EarningsFilters = {}): Promise<Se
   );
 
   const result: ServiceEarnings = {
-    gross: decimalToNumber(agg._sum.serviceFare),
-    commission: decimalToNumber(agg._sum.safegoCommission),
-    net: decimalToNumber(agg._sum.driverPayout),
-    count: agg._count,
-    chartData,
+    gross: safeNumber(decimalToNumber(agg._sum.serviceFare), 0),
+    commission: safeNumber(decimalToNumber(agg._sum.safegoCommission), 0),
+    net: safeNumber(decimalToNumber(agg._sum.driverPayout), 0),
+    count: safeNumber(agg._count, 0),
+    chartData: safeArray(chartData, []),
   };
 
   setCache(cacheKey, result);
@@ -243,14 +386,18 @@ export async function getFoodEarnings(filters: EarningsFilters = {}): Promise<Se
   if (filters.dateFrom) dateFilter.gte = filters.dateFrom;
   if (filters.dateTo) dateFilter.lte = filters.dateTo;
 
+  // Build jurisdiction filter from RBAC
+  const userFilter = buildJurisdictionFilter(filters.rbacFilter);
+  const customerJurisdictionFilter = Object.keys(userFilter).length > 0 
+    ? { customer: { user: userFilter } } 
+    : {};
+
   const [agg, chartRawData] = await Promise.all([
     db.foodOrder.aggregate({
       where: {
         status: "delivered",
-        deliveredAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          restaurant: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { deliveredAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       _sum: {
         serviceFare: true,
@@ -263,10 +410,8 @@ export async function getFoodEarnings(filters: EarningsFilters = {}): Promise<Se
     db.foodOrder.findMany({
       where: {
         status: "delivered",
-        deliveredAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          restaurant: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { deliveredAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       select: {
         deliveredAt: true,
@@ -286,11 +431,11 @@ export async function getFoodEarnings(filters: EarningsFilters = {}): Promise<Se
   );
 
   const result: ServiceEarnings = {
-    gross: decimalToNumber(agg._sum.serviceFare),
-    commission: decimalToNumber(agg._sum.safegoCommission),
-    net: decimalToNumber(agg._sum.restaurantPayout),
-    count: agg._count,
-    chartData,
+    gross: safeNumber(decimalToNumber(agg._sum.serviceFare), 0),
+    commission: safeNumber(decimalToNumber(agg._sum.safegoCommission), 0),
+    net: safeNumber(decimalToNumber(agg._sum.restaurantPayout), 0),
+    count: safeNumber(agg._count, 0),
+    chartData: safeArray(chartData, []),
   };
 
   setCache(cacheKey, result);
@@ -306,14 +451,18 @@ export async function getParcelEarnings(filters: EarningsFilters = {}): Promise<
   if (filters.dateFrom) dateFilter.gte = filters.dateFrom;
   if (filters.dateTo) dateFilter.lte = filters.dateTo;
 
+  // Build jurisdiction filter from RBAC
+  const userFilter = buildJurisdictionFilter(filters.rbacFilter);
+  const customerJurisdictionFilter = Object.keys(userFilter).length > 0 
+    ? { customer: { user: userFilter } } 
+    : {};
+
   const [agg, chartRawData] = await Promise.all([
     db.delivery.aggregate({
       where: {
         status: "delivered",
-        deliveredAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          driver: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { deliveredAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       _sum: {
         serviceFare: true,
@@ -326,10 +475,8 @@ export async function getParcelEarnings(filters: EarningsFilters = {}): Promise<
     db.delivery.findMany({
       where: {
         status: "delivered",
-        deliveredAt: dateFilter,
-        ...(filters.country && filters.country !== 'all' && {
-          driver: { user: { countryCode: filters.country } }
-        })
+        ...(Object.keys(dateFilter).length > 0 ? { deliveredAt: dateFilter } : {}),
+        ...customerJurisdictionFilter,
       },
       select: {
         deliveredAt: true,
@@ -349,11 +496,11 @@ export async function getParcelEarnings(filters: EarningsFilters = {}): Promise<
   );
 
   const result: ServiceEarnings = {
-    gross: decimalToNumber(agg._sum.serviceFare),
-    commission: decimalToNumber(agg._sum.safegoCommission),
-    net: decimalToNumber(agg._sum.driverPayout),
-    count: agg._count,
-    chartData,
+    gross: safeNumber(decimalToNumber(agg._sum.serviceFare), 0),
+    commission: safeNumber(decimalToNumber(agg._sum.safegoCommission), 0),
+    net: safeNumber(decimalToNumber(agg._sum.driverPayout), 0),
+    count: safeNumber(agg._count, 0),
+    chartData: safeArray(chartData, []),
   };
 
   setCache(cacheKey, result);
@@ -369,17 +516,16 @@ export async function getPayoutAnalytics(filters: EarningsFilters = {}): Promise
   if (filters.dateFrom) dateFilter.gte = filters.dateFrom;
   if (filters.dateTo) dateFilter.lte = filters.dateTo;
 
-  const countryFilter = filters.country && filters.country !== 'all' 
-    ? { countryCode: filters.country } 
-    : {};
+  // Build comprehensive payout RBAC filter for all owner types
+  const payoutRBACFilter = await buildPayoutRBACFilter(filters.rbacFilter);
 
   const [methodGroups, statusGroups, failedPayouts] = await Promise.all([
     db.payout.groupBy({
       by: ['method'],
       where: {
-        createdAt: dateFilter,
+        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
         status: 'completed',
-        ...countryFilter,
+        ...payoutRBACFilter,
       },
       _sum: {
         amount: true,
@@ -389,8 +535,8 @@ export async function getPayoutAnalytics(filters: EarningsFilters = {}): Promise
     db.payout.groupBy({
       by: ['status'],
       where: {
-        createdAt: dateFilter,
-        ...countryFilter,
+        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        ...payoutRBACFilter,
       },
       _sum: {
         amount: true,
@@ -400,8 +546,8 @@ export async function getPayoutAnalytics(filters: EarningsFilters = {}): Promise
     db.payout.findMany({
       where: {
         status: 'failed',
-        createdAt: dateFilter,
-        ...countryFilter,
+        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        ...payoutRBACFilter,
       },
       select: {
         id: true,
@@ -421,16 +567,16 @@ export async function getPayoutAnalytics(filters: EarningsFilters = {}): Promise
   const manualAdmin = methodGroups.find(m => m.method === 'manual_admin_settlement')?._sum.amount ?? null;
   
   const result: PayoutAnalytics = {
-    weeklyAutoPayouts: decimalToNumber(weeklyAuto),
-    manualCashouts: decimalToNumber(manualRequest) + decimalToNumber(manualAdmin),
-    pending: decimalToNumber(statusGroups.find(s => s.status === 'pending')?._sum.amount ?? null),
-    completed: decimalToNumber(statusGroups.find(s => s.status === 'completed')?._sum.amount ?? null),
-    failed: failedPayouts.map(p => ({
-      id: p.id,
-      amount: decimalToNumber(p.amount),
-      reason: p.failureReason || 'Unknown error',
-      date: p.createdAt.toISOString(),
-    })),
+    weeklyAutoPayouts: safeNumber(decimalToNumber(weeklyAuto), 0),
+    manualCashouts: safeNumber(decimalToNumber(manualRequest) + decimalToNumber(manualAdmin), 0),
+    pending: safeNumber(decimalToNumber(statusGroups.find(s => s.status === 'pending')?._sum.amount ?? null), 0),
+    completed: safeNumber(decimalToNumber(statusGroups.find(s => s.status === 'completed')?._sum.amount ?? null), 0),
+    failed: safeArray(failedPayouts.map(p => ({
+      id: safeString(p.id, ""),
+      amount: safeNumber(decimalToNumber(p.amount), 0),
+      reason: safeString(p.failureReason, 'Unknown error'),
+      date: safeString(p.createdAt.toISOString(), ""),
+    })), []),
   };
 
   setCache(cacheKey, result);

@@ -15,7 +15,7 @@ import * as fraudDetectionService from "../services/fraudDetectionService";
 import { scheduleAutomaticPayouts, runManualPayout } from "../services/payoutSchedulingService";
 import { reconcileWalletTransactions } from "../services/reconciliationService";
 import { format } from "date-fns";
-import analyticsRouter from "./analytics";
+import analyticsRouter, { getRBACFilter } from "./analytics";
 import performanceRouter from "./performance";
 
 const router = Router();
@@ -7582,12 +7582,14 @@ router.get("/payouts/reconciliation", checkPermission(Permission.VIEW_PAYOUTS), 
 // Get global earnings summary
 router.get("/earnings/dashboard/global", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { dateFrom, dateTo, country } = req.query;
+    const { dateFrom, dateTo } = req.query;
+    
+    // Apply RBAC filtering (SUPER_ADMIN, COUNTRY_ADMIN, CITY_ADMIN)
+    const rbacFilter = await getRBACFilter(req);
 
-    const filters: any = {};
+    const filters: any = { rbacFilter };
     if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
     if (dateTo) filters.dateTo = new Date(dateTo as string);
-    if (country) filters.country = country as string;
 
     const summary = await earningsService.getGlobalSummary(filters);
 
@@ -7599,7 +7601,7 @@ router.get("/earnings/dashboard/global", checkPermission(Permission.VIEW_EARNING
       actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
       description: `Viewed global earnings dashboard`,
-      metadata: { section: 'global', filters },
+      metadata: { section: 'global', filters: { dateFrom, dateTo }, rbac: rbacFilter },
     });
 
     res.json(summary);
@@ -7612,12 +7614,14 @@ router.get("/earnings/dashboard/global", checkPermission(Permission.VIEW_EARNING
 // Get ride earnings
 router.get("/earnings/dashboard/rides", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { dateFrom, dateTo, country } = req.query;
+    const { dateFrom, dateTo } = req.query;
+    
+    // Apply RBAC filtering (SUPER_ADMIN, COUNTRY_ADMIN, CITY_ADMIN)
+    const rbacFilter = await getRBACFilter(req);
 
-    const filters: any = {};
+    const filters: any = { rbacFilter };
     if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
     if (dateTo) filters.dateTo = new Date(dateTo as string);
-    if (country) filters.country = country as string;
 
     const earnings = await earningsService.getRideEarnings(filters);
 
@@ -7629,7 +7633,7 @@ router.get("/earnings/dashboard/rides", checkPermission(Permission.VIEW_EARNINGS
       actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
       description: `Viewed ride earnings analytics`,
-      metadata: { section: 'rides', filters },
+      metadata: { section: 'rides', filters: { dateFrom, dateTo }, rbac: rbacFilter },
     });
 
     res.json(earnings);
@@ -7642,12 +7646,14 @@ router.get("/earnings/dashboard/rides", checkPermission(Permission.VIEW_EARNINGS
 // Get food earnings
 router.get("/earnings/dashboard/food", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { dateFrom, dateTo, country } = req.query;
+    const { dateFrom, dateTo } = req.query;
+    
+    // Apply RBAC filtering (SUPER_ADMIN, COUNTRY_ADMIN, CITY_ADMIN)
+    const rbacFilter = await getRBACFilter(req);
 
-    const filters: any = {};
+    const filters: any = { rbacFilter };
     if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
     if (dateTo) filters.dateTo = new Date(dateTo as string);
-    if (country) filters.country = country as string;
 
     const earnings = await earningsService.getFoodEarnings(filters);
 
@@ -7659,7 +7665,7 @@ router.get("/earnings/dashboard/food", checkPermission(Permission.VIEW_EARNINGS_
       actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
       description: `Viewed food earnings analytics`,
-      metadata: { section: 'food', filters },
+      metadata: { section: 'food', filters: { dateFrom, dateTo }, rbac: rbacFilter },
     });
 
     res.json(earnings);
@@ -7672,12 +7678,14 @@ router.get("/earnings/dashboard/food", checkPermission(Permission.VIEW_EARNINGS_
 // Get parcel earnings
 router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { dateFrom, dateTo, country } = req.query;
+    const { dateFrom, dateTo } = req.query;
+    
+    // Apply RBAC filtering (SUPER_ADMIN, COUNTRY_ADMIN, CITY_ADMIN)
+    const rbacFilter = await getRBACFilter(req);
 
-    const filters: any = {};
+    const filters: any = { rbacFilter };
     if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
     if (dateTo) filters.dateTo = new Date(dateTo as string);
-    if (country) filters.country = country as string;
 
     const earnings = await earningsService.getParcelEarnings(filters);
 
@@ -7689,7 +7697,7 @@ router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNIN
       actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
       description: `Viewed parcel earnings analytics`,
-      metadata: { section: 'parcels', filters },
+      metadata: { section: 'parcels', filters: { dateFrom, dateTo }, rbac: rbacFilter },
     });
 
     res.json(earnings);
@@ -7702,12 +7710,14 @@ router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNIN
 // Get payout analytics
 router.get("/earnings/dashboard/payouts", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { dateFrom, dateTo, country } = req.query;
+    const { dateFrom, dateTo } = req.query;
+    
+    // Apply RBAC filtering (SUPER_ADMIN, COUNTRY_ADMIN, CITY_ADMIN)
+    const rbacFilter = await getRBACFilter(req);
 
-    const filters: any = {};
+    const filters: any = { rbacFilter };
     if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
     if (dateTo) filters.dateTo = new Date(dateTo as string);
-    if (country) filters.country = country as string;
 
     const analytics = await earningsService.getPayoutAnalytics(filters);
 
@@ -7719,7 +7729,7 @@ router.get("/earnings/dashboard/payouts", checkPermission(Permission.VIEW_EARNIN
       actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
       entityType: EntityType.ANALYTICS,
       description: `Viewed payout analytics`,
-      metadata: { section: 'payouts', filters },
+      metadata: { section: 'payouts', filters: { dateFrom, dateTo }, rbac: rbacFilter },
     });
 
     res.json(analytics);
