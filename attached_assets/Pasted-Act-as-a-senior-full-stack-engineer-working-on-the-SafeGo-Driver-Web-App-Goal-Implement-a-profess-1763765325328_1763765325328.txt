@@ -1,0 +1,208 @@
+Act as a senior full-stack engineer working on the SafeGo Driver Web App.
+
+Goal: Implement a professional, dynamic “SafeGo Wallet” experience for drivers, modeled on Uber’s Wallet UI and Balance screen, but with SafeGo branding (Option B: Uber layout + SafeGo colors).
+
+Important global SafeGo rules:
+- Four user roles must always remain consistent: customer, driver, restaurant, admin.
+- Do not break or alter existing ride/food/parcel flows.
+- Do not modify core collections such as rides, food_orders, deliveries; only extend wallet/payout data if absolutely needed.
+- All sensitive information (bank accounts, card numbers, etc.) must be masked in the UI.
+- No emojis anywhere in the UI or copy.
+- Do not add any online/offline toggle, trip management, or earnings dashboard logic into this Wallet work. This is strictly about payout and transaction display for drivers.
+
+Current context:
+- The driver web app already uses a SafeGo blue top bar and white background with light grey dividers.
+- There is an existing driver layout with sidebar navigation and top header (SafeGo logo, notifications, language, profile dropdown).
+- Wallet is a driver feature, not an admin page. Admin payout controls exist separately in the Admin Panel and must not be broken.
+
+Your task is to build or refine the following for the DRIVER web app:
+
+1) ROUTES AND LAYOUT
+
+Create or confirm these driver routes, all wrapped in the existing DriverLayout:
+
+- /driver/wallet        -> Wallet Home (Uber “Wallet” screen)
+- /driver/wallet/balance -> Balance Details and history view (Uber “Balance” screen)
+
+Requirements:
+- Reuse the existing DriverLayout (same sidebar, same header) so navigation stays consistent.
+- Ensure these routes do not conflict with existing earnings, dashboard, or account center routes.
+- If placeholder components exist for /driver/wallet, replace them cleanly but keep the route path unchanged.
+
+2) SAFEGO BRANDING STYLE (OPTION B)
+
+Implement the Wallet pages using:
+- Background: white (#FFFFFF) with very light grey section dividers.
+- Accent color: SafeGo primary blue (reuse existing design token from the app, do not hard-code a new one if a token already exists).
+- Typography: follow existing app typography; large bold amount for balance, medium weight for labels, small for captions.
+- Components: reuse existing button, card, and list primitives (for example, shadcn/ui or equivalent) to keep the design system consistent.
+- No emojis in any label or copy.
+
+3) WALLET HOME PAGE: /driver/wallet
+
+This page should visually correspond to Uber’s Wallet screen but in SafeGo style.
+
+Top section: Balance Card
+- Large balance amount (for example: “$750.35” or “৳7,503.50”), formatted using the driver’s currency (USD for US drivers, BDT for Bangladesh drivers).
+- Subtitle: “Payout scheduled: {NextScheduledPayoutDate}” if a weekly payout is scheduled; if none, show “No payout scheduled”.
+- Primary button: “Cash out”
+- Secondary button or link: “View balance details” or “Summary” that routes to /driver/wallet/balance.
+
+Below: Payout Activity
+- Section title: “Payout activity”
+- Right-aligned “See all” link that also routes to /driver/wallet/balance with filters applied.
+- List of recent payouts (Uber-style list):
+  - Each row shows:
+    - Payout type: “Instant Pay”, “Weekly payout”, or “Adjustment”
+    - Initiated date (e.g., “Initiated Nov 17”)
+    - Status badge: “Completed”, “Processing”, or “Failed”
+    - Amount right-aligned.
+  - Clicking a row opens a slide-over or modal with full payout details (see data model section).
+
+Bottom: Payout Method
+- A card titled “Payout method”.
+- Summary text like “Weekly to Bank Account ••••30” or “bKash ••••1234”.
+- Right-aligned chevron or “Manage payout method” button that opens an edit screen or routes to an existing payout method management page for drivers.
+- If no method is set, show a clear CTA: “Add payout method”.
+
+Bottom: Help section
+- A simple link row “Help” that navigates to the existing driver Help Center route (do not create a new help backend).
+- Use the same styling as other settings list items.
+
+4) BALANCE DETAILS PAGE: /driver/wallet/balance
+
+This screen corresponds to Uber’s “Balance” screen and is focused on earnings and payout breakdown, not the driver dashboard.
+
+Top:
+- Title: “Balance”.
+- Large balance amount same as Wallet home.
+- Subtitle: “Payout scheduled: {NextScheduledPayoutDate}”.
+- Two buttons aligned horizontally:
+  - “Cash out”
+  - “Summary” (which toggles or scrolls to a breakdown section).
+
+Below: Earnings Timeline
+- Group transactions by date (e.g., “Nov 21”, “Nov 20”).
+- Under each date, show a list of earning entries:
+  - Icon placeholder (car icon or generic trip icon from existing icon set).
+  - Label: trip type or earning type (for example: “Ride”, “Trip Boost”, “Surge Bonus”, “Referral Bonus”).
+  - Time: “10:33 PM”.
+  - Amount: right-aligned (positive or negative).
+- Clicking an entry opens a modal panel showing:
+  - Trip or reward ID
+  - Type (trip earning, promotion, bonus, adjustment)
+  - Gross amount
+  - Platform fee or commission
+  - Net amount
+  - Related ride ID or campaign ID.
+
+Summary / Breakdown Section:
+- Either at the top under the buttons, or at the bottom with an anchor the “Summary” button scrolls to.
+- Show a card with a simple breakdown:
+  - Total earnings (selected period)
+  - Promotions and bonuses
+  - Adjustments
+  - Platform fees
+  - Net payout
+
+Filters:
+- Provide basic filters above the timeline:
+  - Date range selector (for example: “Last 7 days”, “This week”, “Custom”).
+  - Type filter (“All types”, “Trips”, “Bonuses”, “Adjustments”).
+- Filters should be fully functional and wired to the data model, not only UI placeholders.
+
+5) DATA MODEL AND API INTEGRATION
+
+Use existing backend and database conventions. Only add what is missing and do not break any existing payout logic.
+
+If a unified wallet data source already exists, reuse it. If not, introduce a minimal, clear model such as:
+
+Collection: wallet_transactions
+- id
+- driver_id
+- type: "trip_earning" | "bonus" | "surge" | "referral" | "adjustment" | "payout"
+- direction: "credit" | "debit"
+- amount
+- currency: "USD" | "BDT"
+- created_at
+- related_ride_id (optional)
+- related_campaign_id (optional)
+- meta (JSON)
+
+Collection: payouts
+- id
+- driver_id
+- payout_type: "weekly" | "instant" | "manual"
+- amount
+- currency
+- status: "processing" | "completed" | "failed"
+- initiated_at
+- completed_at (nullable)
+- method_summary (for example: "Bank Account ••••30")
+- external_reference_id
+- meta (JSON)
+
+Important:
+- All wallet and payout computations should happen server-side. Frontend only reads prepared, safe data.
+- Do not alter core payment settlement logic; only expose data via secure APIs.
+- Make sure driver_id is taken from the authenticated driver session, not from the client side.
+
+APIs to expose (if not already present):
+- GET /api/driver/wallet/summary
+  - Returns: current_balance, pending_balance, next_scheduled_payout_date, currency.
+- GET /api/driver/wallet/payouts?limit=&offset=
+  - Returns: recent payout rows for the Wallet home page.
+- GET /api/driver/wallet/balance?from=&to=&type=
+  - Returns: transaction timeline for the Balance page, grouped or groupable by date.
+- GET /api/driver/wallet/transaction/:id
+  - Returns: full details for a single transaction.
+- GET /api/driver/payout-method
+  - Returns: current payout method summary for the driver.
+
+Ensure:
+- All endpoints enforce authentication and only return data for the logged-in driver.
+- Currency formatting is correct per driver profile (USD for US, BDT for BD).
+- Sensitive bank data is masked on the server before being sent to the client.
+
+6) CASH OUT FLOW (FRONTEND ONLY HOOK)
+
+For now, implement the “Cash out” button with a safe, non-destructive UX:
+
+- When driver clicks “Cash out”, open a confirmation modal:
+  - Show current available balance.
+  - Show chosen payout method.
+  - Simple confirm/cancel buttons.
+- On confirm, call a placeholder endpoint POST /api/driver/wallet/cash-out and show a toast based on the response.
+- Do not implement complex business rules in the frontend. Assume the backend enforces limits like daily caps, fees, and fraud checks.
+
+7) RESPONSIVE BEHAVIOR
+
+- Ensure Wallet pages are fully responsive:
+  - Large desktop: cards centered with max width for readability.
+  - Tablet: stacked cards with clean spacing.
+  - Mobile: single-column layout, no horizontal scroll.
+- Reuse the global responsive utilities already used in the driver app.
+
+8) SECURITY AND AUDIT
+
+- Never render raw bank account numbers. Only masked formats like “••••1234”.
+- Ensure the Wallet pages do not expose any internal IDs that could be abused; use opaque IDs when needed.
+- Do not allow client-side tampering with driver_id; always derive it from the authenticated session.
+- If you add any new backend endpoints, ensure they log operations for auditing, but keep audit log implementation minimal and consistent with existing logging.
+
+9) NON-GOALS FOR THIS TASK
+
+Do not:
+- Change the SafeGo Driver Dashboard, trip list, or earnings calculation logic.
+- Add any new features to the Admin payout system in this task.
+- Implement customer or restaurant wallet logic here; this task is strictly driver-side Wallet UI and its necessary APIs.
+- Introduce any map, navigation, or ride controls into the Wallet screens.
+
+Deliverables:
+
+1) Implement the /driver/wallet and /driver/wallet/balance pages as described above, using SafeGo branding and Uber-style layout.
+2) Wire both pages to the appropriate backend APIs, creating minimal, safe endpoints only if required.
+3) Ensure that the DriverLayout, driver sidebar, and all other existing driver features continue to work exactly as before.
+4) Add a short internal code comment or docstring describing the Wallet module structure for future developers.
+
+When you are done, summarize exactly what changed (files, routes, and API endpoints), and confirm that no existing behavior for rides, food orders, deliveries, or admin payouts was broken.
