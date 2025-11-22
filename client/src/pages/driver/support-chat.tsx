@@ -59,6 +59,11 @@ export default function DriverSupportChat() {
     }
   };
   
+  // CRITICAL: Single source of truth for conversation active state
+  // Only true when BOTH conversationId exists AND ref shows active status
+  // This eliminates race windows where state/ref might diverge
+  const conversationActive = conversationId !== null && conversationStatusRef.current === "active";
+  
   // Keep ref in sync with state
   useEffect(() => {
     lastMessageTimeRef.current = lastMessageTime;
@@ -396,7 +401,7 @@ export default function DriverSupportChat() {
               <p className="whitespace-pre-wrap">{msg.content}</p>
             </div>
             
-            {msg.senderType === "bot" && !feedbackGiven.has(msg.id) && conversationStatus === "active" && conversationStatusRef.current === "active" && (
+            {msg.senderType === "bot" && !feedbackGiven.has(msg.id) && conversationActive && (
               <div className="flex gap-2 mt-2">
                 <Button
                   variant="outline"
@@ -428,7 +433,7 @@ export default function DriverSupportChat() {
       </div>
 
       <div className="border-t bg-card p-4 space-y-4">
-        {conversationStatus === "active" && conversationStatusRef.current === "active" && quickTopics.length > 0 && (
+        {conversationActive && quickTopics.length > 0 && (
           <div className="flex flex-wrap gap-2" data-testid="quick-replies-container">
             {quickTopics.map((topic) => (
               <Button
@@ -456,12 +461,12 @@ export default function DriverSupportChat() {
               }
             }}
             placeholder="Type a message..."
-            disabled={sendMessageMutation.isPending || conversationStatus !== "active" || conversationStatusRef.current !== "active"}
+            disabled={sendMessageMutation.isPending || !conversationActive}
             data-testid="input-message"
           />
           <Button
             onClick={handleSend}
-            disabled={!messageInput.trim() || sendMessageMutation.isPending || conversationStatus !== "active" || conversationStatusRef.current !== "active"}
+            disabled={!messageInput.trim() || sendMessageMutation.isPending || !conversationActive}
             size="icon"
             data-testid="button-send-message"
           >
@@ -470,7 +475,7 @@ export default function DriverSupportChat() {
         </div>
 
         <div className="flex items-center justify-between">
-          {conversationStatus === "active" && conversationStatusRef.current === "active" && (
+          {conversationActive && (
             <Button
               variant="ghost"
               onClick={() => escalateMutation.mutate()}
