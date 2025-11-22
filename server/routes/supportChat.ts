@@ -188,6 +188,8 @@ router.post("/chat/start", authenticateToken, async (req: AuthRequest, res) => {
         status: result.conversation.status,
         createdAt: result.conversation.createdAt,
         updatedAt: result.conversation.updatedAt,
+        escalatedAt: result.conversation.escalatedAt,
+        isEscalated: result.conversation.isEscalated,
       },
       messages: result.messages.map((msg) => ({
         id: msg.id,
@@ -206,6 +208,7 @@ router.post("/chat/start", authenticateToken, async (req: AuthRequest, res) => {
 router.get("/chat/messages", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
+    const { db } = await import("../db");
     const { conversationId, since } = req.query;
 
     if (!conversationId || typeof conversationId !== "string") {
@@ -216,6 +219,17 @@ router.get("/chat/messages", authenticateToken, async (req: AuthRequest, res) =>
 
     const messages = await getMessages(conversationId, userId, sinceDate);
 
+    // Include conversation status for real-time UI updates
+    const conversation = await db.supportConversation.findUnique({
+      where: { id: conversationId },
+      select: {
+        status: true,
+        isEscalated: true,
+        escalatedAt: true,
+        closedAt: true,
+      },
+    });
+
     res.json({
       messages: messages.map((msg) => ({
         id: msg.id,
@@ -223,6 +237,7 @@ router.get("/chat/messages", authenticateToken, async (req: AuthRequest, res) =>
         content: msg.body,
         createdAt: msg.createdAt,
       })),
+      conversation: conversation || undefined,
     });
   } catch (error: any) {
     console.error("Error getting messages:", error);
@@ -354,6 +369,14 @@ router.post("/chat/bot-unhelpful", authenticateToken, async (req: AuthRequest, r
       return res.status(404).json({ error: "Conversation not found" });
     }
 
+    // SECURITY: Reject bot feedback for closed, escalated, or assigned conversations
+    if (conversation.status === "closed" || conversation.status === "pending" || conversation.status === "assigned" || conversation.status === "escalated" || conversation.isEscalated) {
+      return res.status(400).json({ 
+        error: "Bot feedback not allowed",
+        message: "Cannot provide bot feedback for this conversation status"
+      });
+    }
+
     // Increment unresolved count
     await EscalationService.incrementUnresolvedCount(conversationId);
 
@@ -365,14 +388,17 @@ router.post("/chat/bot-unhelpful", authenticateToken, async (req: AuthRequest, r
       await EscalationService.escalateConversation(conversationId, "auto_unresolved");
       
       return res.json({ 
-        success: true, 
-        message: "Feedback recorded",
+        success: true,
         escalated: true,
-        escalationMessage: escalationCheck.message
+        escalationMessage: "You've been connected to a live support agent who will assist you shortly."
       });
     }
 
-    res.json({ success: true, message: "Feedback recorded", escalated: false });
+    res.json({ 
+      success: true, 
+      escalated: false,
+      escalationMessage: ""
+    });
   } catch (error: any) {
     console.error("Error recording bot feedback:", error);
     res.status(500).json({ error: "Failed to record feedback" });
@@ -399,9 +425,21 @@ router.post("/chat/bot-helpful", authenticateToken, async (req: AuthRequest, res
       return res.status(404).json({ error: "Conversation not found" });
     }
 
+    // SECURITY: Reject bot feedback for closed, escalated, or assigned conversations
+    if (conversation.status === "closed" || conversation.status === "pending" || conversation.status === "assigned" || conversation.status === "escalated" || conversation.isEscalated) {
+      return res.status(400).json({ 
+        error: "Bot feedback not allowed",
+        message: "Cannot provide bot feedback for this conversation status"
+      });
+    }
+
     await EscalationService.resetUnresolvedCount(conversationId);
 
-    res.json({ success: true, message: "Feedback recorded" });
+    res.json({ 
+      success: true, 
+      escalated: false,
+      escalationMessage: ""
+    });
   } catch (error: any) {
     console.error("Error recording bot feedback:", error);
     res.status(500).json({ error: "Failed to record feedback" });
