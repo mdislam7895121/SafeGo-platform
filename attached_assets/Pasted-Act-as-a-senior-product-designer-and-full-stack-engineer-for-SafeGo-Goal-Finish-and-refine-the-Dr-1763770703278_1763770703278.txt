@@ -1,0 +1,115 @@
+Act as a senior product designer and full-stack engineer for SafeGo.
+
+Goal: Finish and refine the Driver KYC Documents page so that every required document has its own upload box directly under the document name, consistent with Uber’s document UX.
+
+Follow all existing SafeGo conventions:
+- Four roles: customer, driver, restaurant, admin.
+- Keep all existing KYC, payouts, rides, and vehicle logic intact.
+- Do NOT touch ride, food, or parcel flows.
+- Do NOT break any existing URLs, APIs, or database collections.
+- Collections such as drivers, vehicles, documents, payouts, rides, food_orders, deliveries must remain compatible.
+
+Scope: Driver Account Center → Account Settings → Driver Requirements → Documents
+Route: /driver/kyc-documents (do not change the route)
+
+Current behavior:
+- “Documents” card opens the KYC page.
+- DMV Driver License section already exists with a single upload box.
+- Vehicle Documents section currently has only:
+  - Registration Document (upload box)
+  - Insurance Document (upload box)
+
+Required changes:
+
+1) Keep existing layout
+- Keep the page header, section titles, spacing, and typography exactly as they are.
+- Maintain the white background, grey dividers, and card-style layout.
+- Do not change any existing copy unless explicitly specified.
+
+2) Driver License section
+- Section title: “DMV Driver License”
+- Keep the existing upload area but ensure:
+  - The upload box is visually and structurally tied to the “DMV License Image” label.
+  - Max file size text stays below the box (5MB).
+- For all future driver-identity documents, follow the same pattern:
+  - Document label
+  - Helper text (if needed)
+  - Directly under it: one upload box with dashed border, icon, and “Click to upload …” text.
+
+3) Vehicle Documents section – expand and align
+
+Under the “Vehicle Documents” section, we now need the following document types, each with its own upload area:
+
+A. Registration Document
+- Label: “Registration Document”
+- Helper: “Upload vehicle registration”
+- Keep the existing upload box and align it directly under this label.
+
+B. Insurance Document
+- Label: “Insurance Document”
+- Helper: “Upload insurance certificate”
+- Keep the existing upload box and align it directly under this label.
+
+C. Vehicle Inspection
+- Label: “Vehicle Inspection”
+- Helper: “Upload official inspection report”
+- New upload box under this label (same style, same component as Registration/Insurance).
+- Max size: 10MB.
+
+D. Driver License (Vehicle Section)
+- Label: “Driver License”
+- Helper: “Upload a clear photo of your driver license”
+- New upload box under this label (same component).
+- This is separate from the DMV License section, because this card is grouped under Vehicle Documents.
+
+E. License Plate
+- Label: “License Plate”
+- Helper: “Upload a clear photo showing the plate number”
+- New upload box under this label.
+
+F. TLC License (NYC only)
+- Label: “TLC License”
+- Helper: “Required for New York TLC drivers”
+- New upload box under this label.
+- Visibility rule:
+  - Show and require this document only for drivers whose operating city is New York (or a TLC-eligible city flag).
+  - Hide it for other countries/cities.
+
+G. TLC Diamond (NYC only)
+- Label: “TLC Diamond”
+- Helper: “Upload a clear photo of the TLC Diamond/medallion”
+- New upload box under this label.
+- Same visibility rule as TLC License (NYC drivers only).
+
+Implementation rules for all document upload boxes:
+- Each document type must have:
+  - Title (document name)
+  - Optional helper/description text
+  - Directly below it: one upload area with:
+    - Dashed border card
+    - Image/file icon
+    - Text: “Click to upload [document name]”
+    - Max size text (5MB or 10MB, consistent with current implementation)
+- Use the existing SafeGo document upload component (do NOT invent a new uploader).
+- Preserve the existing document status system (Pending / Approved / Rejected) if already implemented.
+- Do not introduce any modal-only uploads; uploads should be accessible from this page directly.
+
+4) Data model and backend
+- Reuse the existing driver document collection and schema if possible.
+- Add new document types (vehicleInspection, driverLicenseVehicle, licensePlate, tlcLicense, tlcDiamond) using the same pattern as registration/insurance.
+- Ensure:
+  - Each new document type is linked to the correct driver and, where relevant, to the specific vehicle.
+  - Country/city conditions (for TLC License and TLC Diamond) are enforced server-side as well.
+  - Existing uploads and statuses for Registration and Insurance remain untouched.
+
+5) Validation and UX
+- At least one registration document must be required (keep current rule).
+- For NYC drivers:
+  - Require TLC License and TLC Diamond before allowing KYC completion.
+- Show inline errors below the corresponding upload box if a required document is missing or exceeds file size.
+- Keep navigation breadcrumbs and “Back to Profile” link exactly as-is.
+
+Deliverable:
+- Updated /driver/kyc-documents page with all the above document types.
+- All document labels with their own directly-attached upload boxes.
+- No broken routes, no changes to ride/payout logic, and full compatibility with existing SafeGo KYC and document systems.
