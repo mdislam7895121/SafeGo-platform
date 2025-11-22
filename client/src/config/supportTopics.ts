@@ -6,7 +6,7 @@ export interface QuickTopic {
 }
 
 export interface RoleTopics {
-  role: "driver" | "customer" | "restaurant";
+  role: "driver" | "customer" | "restaurant" | "parcel";
   title: string;
   subtitle: string;
   topics: QuickTopic[];
@@ -127,6 +127,37 @@ export const ROLE_SUPPORT_TOPICS: RoleTopics[] = [
         label: "Account & documents",
         userMessage: "I need help with account or business documents",
         botResponse: "Document and account help:\n• Business license verification\n• Tax documentation\n• Restaurant information updates\n• KYC status\n• Account settings\n\nWhat account or document question do you have? Type 'agent' for human help.",
+      },
+    ],
+  },
+  {
+    role: "parcel",
+    title: "SafeGo Delivery Partner Support",
+    subtitle: "We're here to help with your parcel delivery experience",
+    topics: [
+      {
+        key: "pickup",
+        label: "Pickup & drop-off issues",
+        userMessage: "I'm having issues with pickup or drop-off",
+        botResponse: "I can help with delivery issues:\n• Pickup location problems\n• Drop-off address verification\n• Recipient not available\n• Access code or gate issues\n• Delivery instructions\n\nWhat delivery issue are you experiencing? Type 'agent' for immediate support.",
+      },
+      {
+        key: "verification",
+        label: "Parcel verification",
+        userMessage: "I have questions about parcel verification",
+        botResponse: "Parcel verification help:\n• Package size/weight verification\n• Prohibited items check\n• Photo documentation requirements\n• Package condition disputes\n• Verification code issues\n\nWhat verification question do you have? Type 'agent' to speak with support.",
+      },
+      {
+        key: "payments",
+        label: "Payments & earnings",
+        userMessage: "I need help with payments or earnings",
+        botResponse: "I can assist with payment questions:\n• Delivery earnings breakdown\n• Cash-on-delivery handling\n• Payout methods and schedule\n• Transaction history\n• Missing payments\n\nWhat payment issue are you experiencing? Type 'agent' for financial support.",
+      },
+      {
+        key: "account",
+        label: "Account & login",
+        userMessage: "I'm having issues with my account or login",
+        botResponse: "I can help with account issues:\n• Password reset\n• Account verification\n• Profile information updates\n• Account suspension or restrictions\n• Background check status\n\nDescribe your account issue, or type 'agent' for immediate human support.",
       },
     ],
   },
