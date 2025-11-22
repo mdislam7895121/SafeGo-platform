@@ -21,6 +21,10 @@ export default function DriverKYCDocuments() {
     lastName: "",
   });
   const [formInitialized, setFormInitialized] = useState(false);
+  const [nidNumber, setNidNumber] = useState("");
+  const [ssnNumber, setSsnNumber] = useState("");
+  const [isEditingNID, setIsEditingNID] = useState(false);
+  const [isEditingSSN, setIsEditingSSN] = useState(false);
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
@@ -115,6 +119,82 @@ export default function DriverKYCDocuments() {
     },
   });
 
+  const uploadNIDImageMutation = useMutation({
+    mutationFn: async (file: File) => uploadFile("/api/driver/upload/nid-image", "licenseImage", file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+    },
+  });
+
+  const uploadSSNCardMutation = useMutation({
+    mutationFn: async (file: File) => uploadFile("/api/driver/upload/ssn-card", "licenseImage", file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+    },
+  });
+
+  const updateNIDMutation = useMutation({
+    mutationFn: async (nidNumber: string) => {
+      const response = await apiRequest("PUT", "/api/driver/identity/nid", { nidNumber });
+      if (response.status === 204 || response.status === 200) {
+        return { success: true };
+      }
+      try {
+        const text = await response.text();
+        return text ? JSON.parse(text) : { success: true };
+      } catch {
+        return { success: true };
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "NID number updated successfully",
+      });
+      setIsEditingNID(false);
+      setNidNumber("");
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update NID number",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateSSNMutation = useMutation({
+    mutationFn: async (ssn: string) => {
+      const response = await apiRequest("PUT", "/api/driver/identity/ssn", { ssn });
+      if (response.status === 204 || response.status === 200) {
+        return { success: true };
+      }
+      try {
+        const text = await response.text();
+        return text ? JSON.parse(text) : { success: true };
+      } catch {
+        return { success: true };
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "SSN updated successfully",
+      });
+      setIsEditingSSN(false);
+      setSsnNumber("");
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update SSN",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updateUSANameMutation = useMutation({
     mutationFn: async (data: typeof usaNameForm) => {
       // Validate required fields
@@ -180,6 +260,15 @@ export default function DriverKYCDocuments() {
     if (!profile?.lastName) missingFields.push("Last name");
     if (!profile?.dmvLicenseImageUrl) missingFields.push("DMV license");
     if (isNY && !profile?.tlcLicenseImageUrl) missingFields.push("TLC license");
+    // Identity documents for USA
+    if (!profile?.hasSSN) missingFields.push("Social Security Number");
+    if (!profile?.ssnCardImageUrl) missingFields.push("SSN card image");
+  }
+
+  if (isBD) {
+    // Identity documents for Bangladesh
+    if (!profile?.hasNID) missingFields.push("National ID Number");
+    if (!profile?.nidImageUrl) missingFields.push("NID image");
   }
 
   const vehicleDocs = (vehicleDocuments as any)?.documents || [];
@@ -378,6 +467,175 @@ export default function DriverKYCDocuments() {
               </Card>
             )}
           </>
+        )}
+
+        {/* Identity Documents Section */}
+        {(isBD || isUSA) && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Identity Documents</CardTitle>
+              <CardDescription>Country-specific identity verification documents</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Bangladesh - NID */}
+              {isBD && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="nidNumber">National ID Number (NID)</Label>
+                    {profile?.hasNID && !isEditingNID ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="nidNumber"
+                          value={profile?.nidNumber || ""}
+                          disabled
+                          data-testid="input-nid-masked"
+                          className="bg-muted"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditingNID(true)}
+                          data-testid="button-edit-nid"
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="nidNumber"
+                          value={nidNumber}
+                          onChange={(e) => setNidNumber(e.target.value.replace(/\D/g, ""))}
+                          placeholder="Enter 10-17 digit NID"
+                          maxLength={17}
+                          data-testid="input-nid"
+                        />
+                        <Button
+                          onClick={() => updateNIDMutation.mutate(nidNumber)}
+                          disabled={!nidNumber || nidNumber.length < 10 || updateNIDMutation.isPending}
+                          data-testid="button-save-nid"
+                        >
+                          {updateNIDMutation.isPending ? "Saving..." : "Save"}
+                        </Button>
+                        {isEditingNID && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              setIsEditingNID(false);
+                              setNidNumber("");
+                            }}
+                            data-testid="button-cancel-nid"
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Enter your 10-17 digit National ID number
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium">NID Image</h4>
+                    <p className="text-sm text-muted-foreground">Upload a clear photo of your National ID card</p>
+                    <FileUpload
+                      label=""
+                      accept="image/*"
+                      maxSizeMB={5}
+                      currentFileUrl={profile?.nidImageUrl}
+                      onUpload={async (file) => {
+                        const result = await uploadNIDImageMutation.mutateAsync(file);
+                        return { url: result.nidImageUrl };
+                      }}
+                      testId="nid-image"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* USA - SSN */}
+              {isUSA && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="ssnNumber">Social Security Number (SSN)</Label>
+                    {profile?.hasSSN && !isEditingSSN ? (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="ssnNumber"
+                          value={profile?.ssnMasked || ""}
+                          disabled
+                          data-testid="input-ssn-masked"
+                          className="bg-muted"
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditingSSN(true)}
+                          data-testid="button-edit-ssn"
+                        >
+                          Edit
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="ssnNumber"
+                          value={ssnNumber}
+                          onChange={(e) => {
+                            // Allow digits and dashes only
+                            const value = e.target.value.replace(/[^\d-]/g, "");
+                            setSsnNumber(value);
+                          }}
+                          placeholder="XXX-XX-XXXX"
+                          maxLength={11}
+                          data-testid="input-ssn"
+                        />
+                        <Button
+                          onClick={() => updateSSNMutation.mutate(ssnNumber)}
+                          disabled={!ssnNumber || ssnNumber.replace(/\D/g, "").length !== 9 || updateSSNMutation.isPending}
+                          data-testid="button-save-ssn"
+                        >
+                          {updateSSNMutation.isPending ? "Saving..." : "Save"}
+                        </Button>
+                        {isEditingSSN && (
+                          <Button
+                            variant="ghost"
+                            onClick={() => {
+                              setIsEditingSSN(false);
+                              setSsnNumber("");
+                            }}
+                            data-testid="button-cancel-ssn"
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Enter your 9-digit Social Security Number (format: XXX-XX-XXXX or XXXXXXXXX)
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h4 className="font-medium">SSN Card Image</h4>
+                    <p className="text-sm text-muted-foreground">Upload a clear photo of your Social Security card</p>
+                    <FileUpload
+                      label=""
+                      accept="image/*"
+                      maxSizeMB={5}
+                      currentFileUrl={profile?.ssnCardImageUrl}
+                      onUpload={async (file) => {
+                        const result = await uploadSSNCardMutation.mutateAsync(file);
+                        return { url: result.ssnCardImageUrl };
+                      }}
+                      testId="ssn-card"
+                    />
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Vehicle Documents */}

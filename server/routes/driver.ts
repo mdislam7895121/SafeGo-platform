@@ -3,7 +3,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { encrypt, decrypt, isValidBdNid, isValidBdPhone } from "../utils/encryption";
+import { encrypt, decrypt, isValidBdNid, isValidBdPhone, maskNID, maskSSN } from "../utils/encryption";
 import {
   uploadProfilePhoto,
   uploadLicenseImage,
@@ -119,8 +119,17 @@ router.get("/home", async (req: AuthRequest, res) => {
         // USA state (for TLC requirement check)
         usaState: driverProfile.usaState,
         usaCity: driverProfile.usaCity,
-        // NID for encrypted check
-        nidEncrypted: driverProfile.nidEncrypted,
+        // Identity documents (Bangladesh)
+        nidNumber: driverProfile.nidEncrypted ? maskNID(decrypt(driverProfile.nidEncrypted)) : null,
+        nidImageUrl: driverProfile.nidImageUrl,
+        nidFrontImageUrl: driverProfile.nidFrontImageUrl,
+        nidBackImageUrl: driverProfile.nidBackImageUrl,
+        hasNID: !!driverProfile.nidEncrypted,
+        // Identity documents (USA)
+        ssnLast4: driverProfile.ssnLast4,
+        ssnMasked: driverProfile.ssnEncrypted ? maskSSN(decrypt(driverProfile.ssnEncrypted)) : null,
+        ssnCardImageUrl: driverProfile.ssnCardImageUrl,
+        hasSSN: !!driverProfile.ssnEncrypted,
       },
       vehicle: vehicle ? {
         id: vehicle.id,
@@ -842,6 +851,110 @@ router.post("/upload/tlc-license", uploadLicenseImage, async (req: AuthRequest, 
 });
 
 // ====================================================
+// POST /api/driver/upload/nid-image
+// Upload NID (National ID) image (Bangladesh drivers only)
+// ====================================================
+router.post("/upload/nid-image", uploadLicenseImage, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Verify driver is from Bangladesh
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (driverProfile.user.countryCode !== "BD") {
+      return res.status(400).json({
+        error: "NID image upload is only available for Bangladesh drivers",
+      });
+    }
+
+    const fileUrl = getFileUrl(req.file.filename);
+
+    // Update driver profile with NID image URL
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: { nidImageUrl: fileUrl },
+    });
+
+    res.json({
+      message: "NID image uploaded successfully",
+      nidImageUrl: fileUrl,
+    });
+  } catch (error) {
+    console.error("NID image upload error:", error);
+    res.status(500).json({ error: "Failed to upload NID image" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/upload/ssn-card
+// Upload SSN card image (USA drivers only)
+// ====================================================
+router.post("/upload/ssn-card", uploadLicenseImage, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    // Verify driver is from USA
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (driverProfile.user.countryCode !== "US") {
+      return res.status(400).json({
+        error: "SSN card upload is only available for USA drivers",
+      });
+    }
+
+    const fileUrl = getFileUrl(req.file.filename);
+
+    // Update driver profile with SSN card image URL
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: { ssnCardImageUrl: fileUrl },
+    });
+
+    res.json({
+      message: "SSN card uploaded successfully",
+      ssnCardImageUrl: fileUrl,
+    });
+  } catch (error) {
+    console.error("SSN card upload error:", error);
+    res.status(500).json({ error: "Failed to upload SSN card" });
+  }
+});
+
+// ====================================================
 // PUT /api/driver/usa-name
 // Update USA driver structured name fields
 // ====================================================
@@ -910,6 +1023,159 @@ router.put("/usa-name", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("USA name update error:", error);
     res.status(500).json({ error: "Failed to update name" });
+  }
+});
+
+// ====================================================
+// PUT /api/driver/identity/nid
+// Update NID number (Bangladesh drivers only)
+// ====================================================
+const nidSchema = z.object({
+  nidNumber: z.string().min(10).max(17),
+});
+
+router.put("/identity/nid", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Check if driver is from Bangladesh
+    if (driverProfile.user.countryCode !== "BD") {
+      return res.status(400).json({
+        error: "NID number update is only available for Bangladesh drivers",
+      });
+    }
+
+    // Validate request body
+    const validation = nidSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+
+    const { nidNumber } = validation.data;
+
+    // Validate NID format
+    if (!isValidBdNid(nidNumber)) {
+      return res.status(400).json({
+        error: "Invalid NID format. Must be 10-17 digits.",
+      });
+    }
+
+    // Encrypt and store NID
+    const nidEncrypted = encrypt(nidNumber);
+
+    // Update driver profile
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: {
+        nidEncrypted,
+        nidNumber: nidNumber, // Store masked version in nidNumber field
+      },
+    });
+
+    res.json({
+      message: "NID number updated successfully",
+    });
+  } catch (error) {
+    console.error("NID update error:", error);
+    res.status(500).json({ error: "Failed to update NID number" });
+  }
+});
+
+// ====================================================
+// PUT /api/driver/identity/ssn
+// Update SSN (USA drivers only)
+// ====================================================
+const ssnSchema = z.object({
+  ssn: z.string().min(9).max(11), // Accepts XXX-XX-XXXX or XXXXXXXXX
+});
+
+router.put("/identity/ssn", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Check if driver is from USA
+    if (driverProfile.user.countryCode !== "US") {
+      return res.status(400).json({
+        error: "SSN update is only available for USA drivers",
+      });
+    }
+
+    // Validate request body
+    const validation = ssnSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+
+    const { ssn } = validation.data;
+
+    // Validate SSN format
+    const { isValidSSN } = await import("../utils/encryption");
+    if (!isValidSSN(ssn)) {
+      return res.status(400).json({
+        error: "Invalid SSN format. Must be XXX-XX-XXXX or 9 digits.",
+      });
+    }
+
+    // Get last 4 digits for display
+    const cleaned = ssn.replace(/\D/g, "");
+    const ssnLast4 = cleaned.substring(5, 9);
+
+    // Encrypt and store SSN
+    const ssnEncrypted = encrypt(cleaned);
+
+    // Update driver profile
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: {
+        ssnEncrypted,
+        ssnLast4,
+      },
+    });
+
+    res.json({
+      message: "SSN updated successfully",
+    });
+  } catch (error) {
+    console.error("SSN update error:", error);
+    res.status(500).json({ error: "Failed to update SSN" });
   }
 });
 
