@@ -23,7 +23,128 @@ interface AuthRequest extends express.Request {
 }
 
 // ====================================================
-// DRIVER CHAT ENDPOINTS
+// VERIFICATION ENDPOINTS (ALL ROLES)
+// ====================================================
+
+router.get("/chat/verification", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const userType = req.user!.role;
+    const { db } = await import("../db");
+
+    if (userType === "driver") {
+      const driver = await db.driverProfile.findUnique({
+        where: { userId },
+        include: {
+          user: { select: { email: true } },
+          driverStats: true,
+          vehicle: true,
+        },
+      });
+
+      if (!driver) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+
+      return res.json({
+        name: driver.fullName || driver.user.email,
+        country: driver.usaState ? "US" : "BD",
+        city: driver.usaCity || driver.district || "Unknown",
+        phone: driver.phoneNumber || driver.usaPhoneNumber || "",
+        email: driver.user.email,
+        rating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 5.0,
+        totalTrips: driver.driverStats?.totalTrips || 0,
+        kycStatus: driver.isVerified ? "Verified" : "Pending",
+        vehicle: driver.vehicle ? `${driver.vehicle.make} ${driver.vehicle.model}` : null,
+      });
+    }
+
+    if (userType === "customer") {
+      const customer = await db.customerProfile.findUnique({
+        where: { userId },
+        include: {
+          user: { select: { email: true } },
+          rides: { select: { id: true } },
+        },
+      });
+
+      if (!customer) {
+        return res.status(404).json({ error: "Customer profile not found" });
+      }
+
+      return res.json({
+        name: customer.fullName || customer.user.email,
+        city: customer.district || "Unknown",
+        phone: customer.phoneNumber || "",
+        email: customer.user.email,
+        totalTrips: customer.rides.length,
+      });
+    }
+
+    if (userType === "restaurant") {
+      const restaurant = await db.restaurantProfile.findUnique({
+        where: { userId },
+        include: {
+          user: { select: { email: true } },
+        },
+      });
+
+      if (!restaurant) {
+        return res.status(404).json({ error: "Restaurant profile not found" });
+      }
+
+      return res.json({
+        restaurantName: restaurant.restaurantName || "Unknown Restaurant",
+        city: restaurant.city || "Unknown",
+        ownerName: restaurant.ownerName || restaurant.user.email,
+        phone: restaurant.phone || "",
+        email: restaurant.user.email,
+        restaurantId: restaurant.id,
+      });
+    }
+
+    return res.status(400).json({ error: "Invalid user type" });
+  } catch (error: any) {
+    console.error("Error fetching verification data:", error);
+    res.status(500).json({ error: "Failed to fetch verification data" });
+  }
+});
+
+router.post("/chat/verify", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const userType = req.user!.role;
+    const { db } = await import("../db");
+
+    // Find or create conversation and mark as verified
+    const conversation = await db.supportConversation.upsert({
+      where: {
+        userId_userType_status: {
+          userId,
+          userType,
+          status: "open",
+        },
+      },
+      create: {
+        userId,
+        userType,
+        status: "open",
+        verifiedAt: new Date(),
+      },
+      update: {
+        verifiedAt: new Date(),
+      },
+    });
+
+    res.json({ success: true, conversationId: conversation.id });
+  } catch (error: any) {
+    console.error("Error verifying user:", error);
+    res.status(500).json({ error: "Failed to verify user" });
+  }
+});
+
+// ====================================================
+// CHAT ENDPOINTS (ALL ROLES)
 // ====================================================
 
 const sendMessageSchema = z.object({
@@ -35,10 +156,7 @@ router.post("/chat/start", authenticateToken, async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const userType = req.user!.role;
 
-    if (userType !== "driver") {
-      return res.status(403).json({ error: "Only drivers can access this endpoint" });
-    }
-
+    // All roles (driver, customer, restaurant) can start a chat
     const result = await startOrGetChat(userId, userType);
 
     res.json({

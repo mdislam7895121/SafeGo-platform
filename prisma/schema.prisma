@@ -819,6 +819,9 @@ model SupportConversation {
   userType          String                      // "driver" | "customer" | "restaurant"
   status            SupportConversationStatus   @default(open)
   assignedAdminId   String?                     // Reference to User.id (admin)
+  verifiedAt        DateTime?                   // When user confirmed their details
+  topic             String?                     // payments | trips | documents | tax | account_settings | other
+  entryContext      Json?                       // Device info, channel, etc.
   escalatedAt       DateTime?
   createdAt         DateTime                    @default(now())
   updatedAt         DateTime                    @updatedAt

@@ -1,0 +1,223 @@
+Act as a senior product + full-stack engineer for the SafeGo platform.
+
+GOAL  
+Upgrade the SafeGo Support live chat so that:
+- It looks professional on web and mobile.
+- It works for ALL SafeGo roles: driver, customer (rider), restaurant owner, and admin.
+- Every chat is VERIFIED before it starts (no anonymous or unlinked conversations).
+
+Follow all existing SafeGo conventions and rules:
+- Four roles: customer, driver, restaurant, admin
+- Global app logic: rides, food delivery, parcel delivery
+- Country-specific KYC: US (DMV + SSN last 4), BD (NID), plus any existing SafeGo KYC rules
+- Do NOT break existing login/auth, payouts, KYC, tax, or wallet flows
+- Do NOT break or change any existing URLs; keep /driver/support (and similar) working
+- Apply SafeGo security roadmap Phase 2: strict access control, logging, masking sensitive fields
+
+=============================
+1. OVERALL LIVE CHAT FLOW
+=============================
+
+Replace any old ticket-based UX with a proper live chat experience:
+
+1) Entry point  
+   - Driver: /driver/support
+   - Rider/Customer: /customer/support (or existing rider support route)
+   - Restaurant: /restaurant/support (or existing restaurant support route)
+   - Each route should auto-detect userType based on the logged-in session.
+
+2) Pre-Chat Verification (MANDATORY for all roles)  
+   Before the user can send any message, show a “Verify details” step inside the chat panel:
+
+   For ALL roles:
+   - Read the logged-in user from existing auth/session.
+   - If not authenticated, redirect to normal login page (do not allow guest chat).
+   - Show a compact “Verification card” at the top:
+
+     Driver example:
+     - Name
+     - Country + city (e.g. New York, US / Dhaka, BD)
+     - Masked phone or email (e.g. ***-***-9016 or m***@gmail.com)
+     - Current rating and total trips (if available)
+     - KYC status (Verified / Pending)
+     - Primary vehicle (if any)
+
+     Rider example:
+     - Name
+     - City
+     - Masked phone/email
+     - Total trips / order count
+
+     Restaurant owner example:
+     - Restaurant name
+     - City
+     - Owner/manager name
+     - Restaurant ID
+
+   - Below the card, show a short text:
+     “We’ll share this information with SafeGo Support to verify your account and help you faster.”
+   - Buttons:
+     - [Confirm and start chat]  (enabled)
+     - [Update my info]         (optional link to account/profile page)
+
+   - Until the user clicks “Confirm and start chat”:
+     - The message input must be disabled.
+     - Bot can show guidance messages, but no message is stored as a real conversation.
+
+   - Once confirmed:
+     - Create (or re-use) a SupportConversation row in the database with:
+       - userId
+       - userType (driver | customer | restaurant)
+       - verifiedAt timestamp
+       - entryContext (selected topic, channel, device info, etc.)
+       - status = "open"
+
+3) Topic selection (Quick categories)  
+   After verification, immediately show quick topic buttons at the bottom or under the first bot message:
+
+   Shared categories across all roles:
+   - Payments & Wallet
+   - Trips & Riders
+   - Documents & Vehicle
+   - Tax Information
+   - Account Settings
+
+   The existing quick reply buttons (“Payments & Wallet”, “Trips & Riders”, “Documents & Vehicle”, “Tax Information”, “Account Settings”) should remain, but now:
+   - When user clicks a category, tag the SupportConversation with topic = "<category>".
+   - First bot message should be tailored based on the selected topic and userType.
+
+4) Bot first layer (FAQ assistant)  
+   - Bot reads: userType + topic + country.
+   - Answer common questions automatically (using existing SafeGo logic and text).
+   - For example:
+     - Drivers: payout delays, wallet balance, trip issues, KYC verification status, document uploads.
+     - Riders: trip fare issues, lost items, cancellation fees.
+     - Restaurants: order flow, menu, payout cycle.
+
+   - All bot messages are stored in SupportMessages with:
+     - role = "bot"
+     - visibleTo = "admin+user"
+
+5) Human agent escalation (second layer)  
+   - If the bot sends 2–3 messages and problem is still not solved OR user presses “Contact live support”:
+     - Set conversation.status = "pending_agent"
+     - Notify support/admin panel (existing admin role) about a new live conversation.
+     - When an admin/support agent joins, set status = "assigned" and show “You are now chatting with SafeGo Support” message to the user.
+
+6) Ending the chat  
+   - Add a clear “End chat” / “Close conversation” button or link at the bottom/right.
+   - On click:
+     - Ask: “Are you sure you want to end this chat?” (Yes/No).
+     - If Yes:
+       - Set conversation.status = "resolved"
+       - Lock the input for the user.
+       - Show a small feedback prompt (1–5 stars + optional comments) — optional if time is short.
+   - User should still be able to view past messages later in read-only mode.
+
+===================================
+2. PROFESSIONAL UI LAYOUT (ALL ROLES)
+===================================
+
+Make the chat visually professional and consistent for driver, rider, and restaurant:
+
+1) Layout
+   - Desktop:
+     - Background: light grey or white.
+     - Center a single chat panel with:
+       - max-width: 500–540px
+       - margin: 24px auto
+       - border-radius: 16px
+       - background: #FFFFFF
+       - subtle box-shadow
+   - Mobile:
+     - Full width, but keep the same header and message styles.
+
+2) Top bar (inside panel)
+   - Left: Back button → goes back to the help overview page for that role (driver/help, customer/help, restaurant/help).
+   - Center: "SafeGo Support"
+   - Right: small status pill: “Bot”, “Active”, or “Agent”.
+
+3) Messages
+   - Incoming (bot/agent) bubbles: light grey
+   - User bubbles: primary SafeGo blue
+   - Timestamps small and subtle
+   - Scrollable message area with auto-scroll to latest
+
+4) Input area
+   - Single line input with “Type a message…”
+   - Send button (icon or text)
+   - While not verified, this input is visually disabled and shows hint “Confirm your details above to start chat.”
+
+5) Quick topic buttons
+   - Horizontal row of pill-style buttons ("Payments & Wallet", etc.)
+   - They appear after verification, and can be re-shown via a small “Change topic” link.
+
+=================================
+3. DATA MODEL & SECURITY RULES
+=================================
+
+1) Database / collections
+   - support_conversations:
+     - id
+     - userId
+     - userType (driver | customer | restaurant)
+     - verifiedAt
+     - topic (payments | trips | documents | tax | account_settings | other)
+     - status (open | pending_agent | assigned | resolved | closed)
+     - createdAt, updatedAt
+
+   - support_messages:
+     - id
+     - conversationId
+     - senderType (user | bot | agent)
+     - senderId (for agent/user; null for bot)
+     - messageText
+     - metadata (optional JSON for quick replies, actions, etc.)
+     - createdAt
+
+2) Security & privacy
+   - Only the logged-in user can access their own conversations.
+   - Only admins/support staff can view conversations for support purposes.
+   - Log all support access in an audit_log table (who viewed which conversation, when).
+   - Mask all sensitive fields in chat:
+     - NID, SSN, bank account, routing numbers, card numbers: only last 4 digits visible.
+   - Never send raw passwords, full SSN/NID, or full bank details in the chat.
+
+3) Role-based checks
+   - A driver must not be able to open rider or restaurant conversations.
+   - A restaurant owner must not see driver or rider conversations.
+   - Admin can see everything but actions must be logged.
+
+================================
+4. ADMIN SUPPORT PANEL (SUMMARY)
+================================
+
+If not already present, add or extend an admin support page:
+
+- List all support_conversations with filters:
+  - status
+  - userType
+  - topic
+  - country
+- Show basic info:
+  - Conversation ID
+  - User name + role
+  - VerifiedAt
+  - Current status
+  - Last message preview
+- Clicking an item opens a read/write view with the full conversation and an input to respond as “agent”.
+- All agent messages store senderType="agent" and senderId=adminId.
+
+=============================
+5. IMPLEMENTATION NOTES
+=============================
+
+- Reuse existing auth/session middleware; DO NOT create any new login flow.
+- Keep all current SafeGo routes, KYC, wallet, payouts, and tax logic unchanged.
+- The main work is:
+  - Add pre-chat verification step.
+  - Center and professionalize the chat UI.
+  - Ensure the system works equally for drivers, riders, and restaurant owners.
+  - Maintain full audit trail and role-based access control.
+
+Please implement this step-by-step, updating both frontend and backend where needed, and keep all changes consistent with the current SafeGo codebase and security standards.
