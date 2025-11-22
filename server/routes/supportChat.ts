@@ -55,7 +55,7 @@ router.get("/chat/verification", authenticateToken, async (req: AuthRequest, res
         rating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 5.0,
         totalTrips: driver.driverStats?.totalTrips || 0,
         kycStatus: driver.isVerified ? "Verified" : "Pending",
-        vehicle: driver.vehicle ? `${driver.vehicle.make} ${driver.vehicle.model}` : null,
+        vehicle: driver.vehicle ? `${driver.vehicle.vehicleModel || "Vehicle"}` : null,
       });
     }
 
@@ -116,25 +116,31 @@ router.post("/chat/verify", authenticateToken, async (req: AuthRequest, res) => 
     const userType = req.user!.role;
     const { db } = await import("../db");
 
-    // Find or create conversation and mark as verified
-    const conversation = await db.supportConversation.upsert({
+    // Find existing open conversation or create new one
+    let conversation = await db.supportConversation.findFirst({
       where: {
-        userId_userType_status: {
-          userId,
-          userType,
-          status: "open",
-        },
-      },
-      create: {
         userId,
         userType,
         status: "open",
-        verifiedAt: new Date(),
-      },
-      update: {
-        verifiedAt: new Date(),
       },
     });
+
+    if (!conversation) {
+      conversation = await db.supportConversation.create({
+        data: {
+          userId,
+          userType,
+          status: "open",
+          verifiedAt: new Date(),
+        },
+      });
+    } else {
+      // Update existing conversation with verification timestamp
+      conversation = await db.supportConversation.update({
+        where: { id: conversation.id },
+        data: { verifiedAt: new Date() },
+      });
+    }
 
     res.json({ success: true, conversationId: conversation.id });
   } catch (error: any) {
@@ -212,10 +218,7 @@ router.post("/chat/messages", authenticateToken, async (req: AuthRequest, res) =
     const userId = req.user!.userId;
     const userType = req.user!.role;
 
-    if (userType !== "driver") {
-      return res.status(403).json({ error: "Only drivers can access this endpoint" });
-    }
-
+    // All roles (driver, customer, restaurant) can send messages
     const { conversationId, content } = req.body;
 
     const validationResult = sendMessageSchema.safeParse({ content });
