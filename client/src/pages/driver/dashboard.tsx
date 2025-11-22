@@ -121,7 +121,7 @@ export default function DriverDashboard() {
           <CardContent>
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-950/30 flex items-center justify-center">
-                <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <DollarSign className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
               <div>
                 <div className="text-3xl font-bold text-purple-600" data-testid="text-weekly-earnings">
