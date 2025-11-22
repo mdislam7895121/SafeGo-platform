@@ -35,7 +35,7 @@ import DriverVehicle from "@/pages/driver/vehicle";
 import DriverWallet from "@/pages/driver/wallet";
 import DriverWalletBalance from "@/pages/driver/wallet-balance";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
-import DriverSupport from "@/pages/driver/support";
+import DriverSupportChat from "@/pages/driver/support-chat";
 import DriverRefer from "@/pages/driver/refer";
 import DriverPoints from "@/pages/driver/points";
 import DriverPromotions from "@/pages/driver/promotions";
@@ -248,9 +248,7 @@ function Router() {
       </Route>
       <Route path="/driver/support">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverLayout pageTitle="Support">
-            <DriverSupport />
-          </DriverLayout>
+          <DriverSupportChat />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/wallet">

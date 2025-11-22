@@ -9,7 +9,7 @@ import adminRoutes from "./routes/admin";
 import rideRoutes from "./routes/rides";
 import foodOrderRoutes from "./routes/food-orders";
 import deliveryRoutes from "./routes/deliveries";
-import supportRoutes from "./routes/support";
+import supportChatRoutes from "./routes/supportChat";
 import documentRoutes from "./routes/documents";
 import twoFactorRoutes from "./routes/twoFactor";
 import referralSettingsRoutes from "./routes/referral-settings";
@@ -29,7 +29,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rides", rideRoutes);
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
-  app.use("/api/support", supportRoutes);
+  app.use("/api/support", supportChatRoutes);
   app.use("/api", documentRoutes);
   app.use("/api/admin/auth/2fa", twoFactorRoutes);
 

@@ -795,6 +795,8 @@ model PaymentMethod {
 enum SupportSenderType {
   user
   admin
+  bot
+  system
 }
 
 enum SupportMessageType {
@@ -803,18 +805,30 @@ enum SupportMessageType {
   file
 }
 
+enum SupportConversationStatus {
+  open
+  bot
+  pending
+  assigned
+  closed
+}
+
 model SupportConversation {
-  id             String            @id @default(uuid())
-  userId         String
-  userType       String            // "driver" | "customer" | "restaurant"
-  adminUserId    String?           // Reference to User.id (admin)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  messages       SupportMessage[]
-  attachments    SupportAttachment[]
+  id                String                      @id @default(uuid())
+  userId            String
+  userType          String                      // "driver" | "customer" | "restaurant"
+  status            SupportConversationStatus   @default(open)
+  assignedAdminId   String?                     // Reference to User.id (admin)
+  escalatedAt       DateTime?
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  messages          SupportMessage[]
+  attachments       SupportAttachment[]
 
   @@index([userId, userType, createdAt])
-  @@index([adminUserId])
+  @@index([assignedAdminId])
+  @@index([status, createdAt])
+  @@index([userId, userType, status])
   @@map("support_conversations")
 }
 
