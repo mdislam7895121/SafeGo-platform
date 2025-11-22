@@ -102,6 +102,7 @@ export const EntityType = {
   PARCEL: "parcel",
   WALLET: "wallet",
   PAYOUT: "payout",
+  PAYOUT_ACCOUNT: "payout_account",
   KYC: "kyc",
   DOCUMENT: "document",
   SETTINGS: "settings",

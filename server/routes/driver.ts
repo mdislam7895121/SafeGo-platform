@@ -2636,6 +2636,98 @@ router.get("/payout-method", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/driver/payout-methods
+// List all payout methods for driver
+// ====================================================
+router.get("/payout-methods", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const countryCode = req.user!.countryCode;
+
+    const { listPayoutMethods } = await import("../services/payoutMethodService");
+    const methods = await listPayoutMethods(userId, countryCode);
+
+    res.json({ methods });
+  } catch (error: any) {
+    console.error("Error listing payout methods:", error);
+    res.status(500).json({ error: error.message || "Failed to list payout methods" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/payout-methods
+// Create a new payout method with Zod validation
+// ====================================================
+router.post("/payout-methods", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const countryCode = req.user!.countryCode;
+
+    // Import Zod schema
+    const { createPayoutMethodSchema, createPayoutMethod } = await import("../services/payoutMethodService");
+    
+    // Validate input with Zod
+    const validationResult = createPayoutMethodSchema.safeParse({
+      userId,
+      countryCode,
+      ...req.body,
+    });
+
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.flatten().fieldErrors,
+      });
+    }
+
+    const method = await createPayoutMethod(validationResult.data);
+
+    res.status(201).json(method);
+  } catch (error: any) {
+    console.error("Error creating payout method:", error);
+    res.status(500).json({ error: error.message || "Failed to create payout method" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/payout-methods/:id/set-default
+// Set a payout method as default
+// ====================================================
+router.patch("/payout-methods/:id/set-default", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const { setDefaultPayoutMethod } = await import("../services/payoutMethodService");
+    await setDefaultPayoutMethod(id, userId);
+
+    res.json({ success: true, message: "Default payout method updated" });
+  } catch (error: any) {
+    console.error("Error setting default payout method:", error);
+    res.status(500).json({ error: error.message || "Failed to set default payout method" });
+  }
+});
+
+// ====================================================
+// DELETE /api/driver/payout-methods/:id
+// Delete a payout method
+// ====================================================
+router.delete("/payout-methods/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const { deletePayoutMethod } = await import("../services/payoutMethodService");
+    await deletePayoutMethod(id, userId);
+
+    res.json({ success: true, message: "Payout method deleted" });
+  } catch (error: any) {
+    console.error("Error deleting payout method:", error);
+    res.status(500).json({ error: error.message || "Failed to delete payout method" });
+  }
+});
+
+// ====================================================
 // POST /api/driver/wallet/cash-out
 // Request instant payout (manual payout)
 // ====================================================

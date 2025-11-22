@@ -44,6 +44,7 @@ import DriverAccount from "@/pages/driver/account";
 import DriverAccountVehicles from "@/pages/driver/account/vehicles";
 import DriverAccountWorkHub from "@/pages/driver/account/work-hub";
 import DriverAccountPayment from "@/pages/driver/account/payment";
+import DriverAccountPayoutMethods from "@/pages/driver/account/payout-methods";
 import DriverAccountTaxInfo from "@/pages/driver/account/tax-info";
 import DriverAccountTaxInfoEdit from "@/pages/driver/account/tax-info-edit";
 import DriverAccountManage from "@/pages/driver/account/manage";
@@ -319,6 +320,11 @@ function Router() {
           <DriverLayout pageTitle="Payment Methods">
             <DriverAccountPayment />
           </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/payout-methods">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverAccountPayoutMethods />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/tax-info">

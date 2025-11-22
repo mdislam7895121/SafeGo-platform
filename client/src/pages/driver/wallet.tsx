@@ -271,7 +271,7 @@ export default function DriverWallet() {
         <Card>
           <CardContent className="p-0">
             <button
-              onClick={() => navigate("/driver/account")}
+              onClick={() => navigate("/driver/account/payout-methods")}
               className="flex items-center justify-between w-full p-6 hover-elevate active-elevate-2 rounded-lg"
               data-testid="button-payout-method"
             >

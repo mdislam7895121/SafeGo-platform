@@ -1,19 +1,35 @@
 import { db } from "../db";
 import { encryptSensitive, decryptSensitive, maskSensitive } from "../utils/crypto";
 import { logAuditEvent, ActionType, EntityType } from "../utils/audit";
+import { z } from "zod";
 
 const prisma = db;
 
-export interface CreatePayoutMethodInput {
-  userId: string;
-  countryCode: string;
-  payoutType: "mobile_wallet" | "bank_account";
-  provider?: string;
-  accountHolderName: string;
-  accountNumber: string;
-  routingNumber?: string;
-  bankName?: string;
-}
+// Zod validation schemas
+export const createPayoutMethodSchema = z.object({
+  userId: z.string().uuid("Invalid user ID"),
+  countryCode: z.enum(["US", "BD"], { required_error: "Country code is required" }),
+  payoutType: z.enum(["mobile_wallet", "bank_account"], { required_error: "Payout type is required" }),
+  provider: z.string().min(1, "Provider is required for mobile wallets").optional(),
+  accountHolderName: z.string().min(2, "Account holder name must be at least 2 characters").max(100, "Account holder name too long"),
+  accountNumber: z.string().min(4, "Account number too short").max(50, "Account number too long"),
+  routingNumber: z.string().min(9, "Routing number must be at least 9 digits").max(9, "Routing number must be 9 digits").regex(/^\d{9}$/, "Routing number must be 9 digits").optional(),
+  bankName: z.string().min(2, "Bank name must be at least 2 characters").max(100, "Bank name too long").optional(),
+}).refine((data) => {
+  // Mobile wallets require provider
+  if (data.payoutType === "mobile_wallet" && !data.provider) {
+    return false;
+  }
+  // US bank accounts require routing number
+  if (data.payoutType === "bank_account" && data.countryCode === "US" && !data.routingNumber) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Invalid payout method configuration",
+});
+
+export type CreatePayoutMethodInput = z.infer<typeof createPayoutMethodSchema>;
 
 export interface UpdatePayoutMethodInput {
   accountHolderName?: string;
