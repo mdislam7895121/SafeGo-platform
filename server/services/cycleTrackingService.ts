@@ -9,9 +9,7 @@
  * - Handle cycle transitions and tier recalculation
  */
 
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db"; // Use shared Prisma client singleton
 
 interface CycleStatus {
   isActive: boolean;

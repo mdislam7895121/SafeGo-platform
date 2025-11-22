@@ -18,8 +18,8 @@ interface Tier {
 interface PointsData {
   hasNoTier: boolean;
   currentTier: Tier | null;
-  totalPoints: number;
-  lifetimePoints: number;
+  totalPoints: number; // 90-day status points
+  lifetimePoints: number; // All-time points
   lastEarnedAt: string | null;
   nextTier: {
     id: string;
@@ -41,6 +41,13 @@ interface PointsData {
     isUnlocked: boolean;
     benefits: { id: string; text: string }[];
   }[];
+  cycleStatus: {
+    daysRemaining: number;
+    daysElapsed: number;
+    totalDays: number;
+    cycleProgress: number;
+    cycleEndDate: string;
+  } | null;
 }
 
 export default function DriverPoints() {
@@ -75,7 +82,7 @@ export default function DriverPoints() {
     );
   }
 
-  const { hasNoTier, currentTier, totalPoints, nextTier, progressPercentage, pointsToNextTier, allTiers } = data;
+  const { hasNoTier, currentTier, totalPoints, lifetimePoints, nextTier, progressPercentage, pointsToNextTier, allTiers, cycleStatus } = data;
 
   return (
     <div className="bg-background min-h-screen">
@@ -93,7 +100,7 @@ export default function DriverPoints() {
                     </h1>
                   </div>
                   <p className="text-muted-foreground">
-                    Earn 500 points to unlock {nextTier?.name} tier
+                    Earn 1000 points to unlock {nextTier?.name} tier
                   </p>
                 </div>
                 <Badge
@@ -126,7 +133,7 @@ export default function DriverPoints() {
                     data-testid="progress-next-tier"
                   />
                   <p className="text-xs text-muted-foreground text-right">
-                    {Math.round(progressPercentage)}% complete ({totalPoints}/500)
+                    {Math.round(progressPercentage)}% complete ({totalPoints}/{nextTier.requiredPoints})
                   </p>
                 </div>
               )}
@@ -202,6 +209,51 @@ export default function DriverPoints() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* 90-Day Cycle Status */}
+        {cycleStatus && (
+          <Card className="border-primary/20 bg-primary/5">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5" />
+                90-Day Points Cycle
+              </CardTitle>
+              <CardDescription>
+                Points reset every 90 days. Earn consistently to maintain your tier!
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="text-center p-4 bg-background rounded-lg">
+                  <div className="text-3xl font-bold text-primary">{cycleStatus.daysRemaining}</div>
+                  <div className="text-sm text-muted-foreground">days remaining</div>
+                </div>
+                <div className="text-center p-4 bg-background rounded-lg">
+                  <div className="text-3xl font-bold">{totalPoints}</div>
+                  <div className="text-sm text-muted-foreground">status points</div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Cycle Progress</span>
+                  <span className="font-medium">{cycleStatus.cycleProgress}% ({cycleStatus.daysElapsed}/{cycleStatus.totalDays} days)</span>
+                </div>
+                <Progress value={cycleStatus.cycleProgress} className="h-2" />
+              </div>
+
+              <div className="bg-muted p-3 rounded-lg space-y-2">
+                <p className="text-xs font-medium">How It Works:</p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Points earned in the last 90 days count toward your tier</li>
+                  <li>Lifetime points ({lifetimePoints}) are saved for your records</li>
+                  <li>Maintain 1000+ points to keep Blue tier, 1500+ for Gold, 2500+ for Premium</li>
+                  <li>Points reset every 90 days - keep earning to stay in your tier!</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Tier Roadmap */}
         <Card>
