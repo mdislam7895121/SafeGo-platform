@@ -1,48 +1,20 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Car, DollarSign, TrendingUp, Settings, User, Power, Wallet, MessageCircle } from "lucide-react";
+import { Car, DollarSign, TrendingUp, Settings, User, Wallet, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function DriverHome() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const [isOnline, setIsOnline] = useState(false);
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
     refetchInterval: 5000,
-  });
-
-  const toggleStatusMutation = useMutation({
-    mutationFn: async (online: boolean) => {
-      const res = await apiRequest("PATCH", "/api/driver/status", { isOnline: online });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      if (data.vehicle) {
-        setIsOnline(data.vehicle.isOnline);
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
-      toast({
-        title: data.message,
-        description: data.vehicle?.isOnline ? "You can now receive ride requests" : "You won't receive new requests",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Status update failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
   });
 
   if (isLoading) {
@@ -63,7 +35,7 @@ export default function DriverHome() {
     <div className="min-h-screen bg-background pb-6">
       {/* Header */}
       <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Driver Dashboard</h1>
             <p className="text-sm opacity-90">{user?.email}</p>
@@ -78,29 +50,6 @@ export default function DriverHome() {
             Logout
           </Button>
         </div>
-
-        {/* Online/Offline Toggle */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Power className={`h-6 w-6 ${vehicle?.isOnline ? "text-green-600" : "text-gray-400"}`} />
-                <div>
-                  <p className="font-semibold">{vehicle?.isOnline ? "Online" : "Offline"}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {vehicle?.isOnline ? "Ready for requests" : "Not accepting requests"}
-                  </p>
-                </div>
-              </div>
-              <Switch
-                checked={vehicle?.isOnline || false}
-                onCheckedChange={(checked) => toggleStatusMutation.mutate(checked)}
-                disabled={toggleStatusMutation.isPending || !vehicle}
-                data-testid="switch-online-status"
-              />
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       <div className="p-6 space-y-6">

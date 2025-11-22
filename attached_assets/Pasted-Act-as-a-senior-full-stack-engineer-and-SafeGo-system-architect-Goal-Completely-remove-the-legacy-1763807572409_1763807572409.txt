@@ -1,0 +1,37 @@
+Act as a senior full-stack engineer and SafeGo system architect.
+
+Goal: Completely remove the legacy "Online/Offline status card" from the Driver Dashboard UI – and only that card. Do not change any other dashboard content or layout.
+
+Context:
+- Existing Driver Dashboard route: /driver/dashboard
+- Legacy status card currently shows:
+  - Title: "Offline"
+  - Subtitle: "Not accepting requests"
+  - Power icon and toggle switch on the right
+- The rest of the dashboard (warnings, vehicle notice, stats cards, etc.) must remain exactly as is.
+
+SafeGo rules you must follow:
+- Preserve all four roles: customer, driver, restaurant, admin.
+- Do not touch ride, food, or parcel matching logic.
+- Do not modify payouts, wallet balance, or tax features.
+- Do not break any existing URLs or navigation links.
+- Keep all existing KYC, document, and SafeGo Points logic untouched.
+- No new online/offline logic should be added anywhere else.
+
+Implementation steps:
+1) Find the component(s) that render the legacy status card on the Driver Dashboard. Search for any of:
+   - "Offline"
+   - "Not accepting requests"
+   - the toggle switch related to driver online status on the dashboard.
+2) Remove only that status card UI block from the JSX/HTML. Make sure the surrounding dashboard layout (header, warnings, register vehicle notice, balance/owed/trips/rating widgets) stays aligned and responsive.
+3) If there is any dead code or state related only to that card (e.g., isOnline, handleToggle, old onlineStatus hooks) and it is not used anywhere else, safely delete it to keep the code clean.
+4) Confirm that:
+   - /driver/dashboard still loads successfully.
+   - Warnings, “Register Vehicle” card, and the four stat widgets still display correctly.
+   - No console errors occur from removed props, state, or handlers.
+5) Do not introduce any new UI or redesign. The goal is only to remove the online/offline status card.
+
+When you are done, briefly summarize:
+- Which file(s) were changed.
+- Which code block was removed.
+- That the dashboard now loads without the online/offline card and with no errors.
