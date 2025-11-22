@@ -34,7 +34,6 @@ export async function createConversation(payload: ConversationPayload) {
     data: {
       userId,
       userType,
-      adminUserId: undefined,
     },
   });
 

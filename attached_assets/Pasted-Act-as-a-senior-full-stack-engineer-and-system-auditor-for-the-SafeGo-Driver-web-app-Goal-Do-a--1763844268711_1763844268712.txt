@@ -1,0 +1,189 @@
+Act as a senior full-stack engineer and system auditor for the SafeGo Driver web app.
+
+Goal: Do a **full system pass** and make sure every driver-side feature you previously touched is now **fully working end-to-end**, with no dead buttons, no stubbed APIs, and no hidden errors.
+
+You must **not** stop after “it compiles” – verify behavior in the real UI (Preview) and finish each feature completely before moving on.
+
+====================================================
+1) CONTEXT & SCOPE
+====================================================
+1. SafeGo has four roles: customer, driver, restaurant, admin.  
+   – This task is focused on the **Driver Web** (driver dashboard + account + support).  
+   – Do not change customer, restaurant, or admin flows unless absolutely required for a driver feature to work.
+
+2. Core SafeGo rules you must keep:
+   – Rides, payouts, tax logic, KYC, and fraud rules must remain **correct and secure**.  
+   – Never bypass validation or security just to “make it work.”  
+   – Use existing patterns (Zod validation, Prisma, TanStack Query, etc.) consistently.
+
+3. You already added a lot of new logic (account settings, tax info, documents, help center, support chat, fraud logging, etc.).  
+   – Some parts are fully working, others are half-finished or throwing runtime errors.  
+   – This task is to **find and fix all the broken or incomplete pieces you created**.
+
+====================================================
+2) GLOBAL AUDIT STRATEGY
+====================================================
+Work in this exact order and **do not skip steps**:
+
+1. **Scan the codebase for stubs and TODOs**
+   – Search for:
+     - `TODO`, `FIXME`, `stub`, `// temp`, `throw new Error("Not implemented")`, etc.
+     - Any API routes or React components you added recently (support, documents, account, points, tax, wallet).
+   – Make a quick mental list of all places that look incomplete, especially:
+     - Support chat / support tickets
+     - Help Center actions
+     - Driver Account Settings (personal info, address, tax info, documents, vehicles)
+     - Blocked Users / rider blocking
+     - Payment methods & wallet integration
+     - Vehicle registration & vehicle documents (DMV, insurance, TLC, etc.)
+     - SafeGo Points & Tier logic (Blue/Gold/Premium)
+
+2. **Verify all linked routes exist and work**
+   – For every `<Link>` or navigation button you added:
+     - Confirm that the target route exists in the router.
+     - Confirm that the page actually renders and doesn’t show 404.
+   – Fix any mismatch like `/driver/account/...` vs `/driver/...` vs `/admin/...`.
+
+3. **Check API endpoints vs. UI usage**
+   – For each feature, confirm:
+     - There is a real API endpoint.
+     - The client is calling the correct URL with the correct method and payload.
+     – Zod schema on the server matches what the client sends.
+   – If you see `any` or loose typing that can hide bugs, tighten it using the existing patterns.
+
+4. **Run the app and click through**
+   – Use Preview and manually:
+     - Open every driver menu item.
+     - Click every primary button.
+     - Try basic flows (create / update / delete when applicable).
+   – When you see an error toast or red error block (500, Zod validation error, Prisma error, etc.), fix the root cause in this pass – do not leave it “for later”.
+
+====================================================
+3) PRIORITY FIXES (BROKEN FEATURES)
+====================================================
+The user already saw specific problems. These MUST be fully fixed and verified:
+
+1. **Support Chat / Create Ticket**
+   – Problem: Clicking “Create New Ticket” shows a 500 error with Prisma complaining about missing fields (e.g., `adminUserId`, `userId`, or similar).  
+   – Required behavior:
+     - A driver can click “Create New Ticket” and the system:
+       1) Creates a `supportConversation` (or equivalent model) with a valid driver reference and assigned admin or queue.
+       2) Opens the conversation UI without crashing.
+     - No critical field in Prisma should be `undefined`.  
+   – Fix:
+     - Inspect the Prisma schema for support conversations/tickets.
+     - Ensure all required fields are provided (e.g., `userId`, `userType = "driver"`, default `status = "open"`, etc.).
+     - Add proper Zod validation for the request body.
+     - Handle errors gracefully with user-friendly messages and no raw stack traces in the UI.
+
+2. **Help Center / Start Chat + Email Support**
+   – Ensure the “Start Chat” button properly:
+     - Either reuses the Support Chat ticket flow above, or opens a conversation list.
+   – “Email Support” or FAQ actions:
+     - If they are meant to be placeholders, mark them clearly as “Coming soon” with disabled state.
+     - Otherwise, wire them to functional behavior (e.g., pre-filled mailto or backend endpoint).
+
+3. **Account Settings – Address Edit**
+   – Problem: “Save Address” button currently does nothing / does not persist.  
+   – Required behavior:
+     - `/driver/account` → “Address” tile → edit page.
+     - Changing address fields and clicking “Save Address” must:
+       1) Call the correct API endpoint.
+       2) Update the driver’s address in the database.
+       3) Show a success toast.
+       4) Navigate back to `/driver/account` or reflect the new values immediately.
+   – Fix:
+     - Confirm the API route exists (e.g., `PATCH /api/driver/account/address` or whichever pattern you’re using).
+     - Hook the form submit to that API using TanStack Query mutation or your existing fetch helper.
+     - Maintain proper loading/disabled states on the button.
+     - Handle validation errors (invalid ZIP, missing city, etc.) with clear field-level feedback.
+
+4. **Tax Info – “Update Tax Information”**
+   – Ensure the new US 1099 vs Bangladesh tax summary logic works:
+     - US drivers: show 1099-K / tax summaries and open the correct update flow when clicking “Update Tax Information”.
+     - BD drivers: show the Bangladesh tax summary and a relevant “Update Tax Information” screen.
+   – The update button must:
+     - Navigate to a real route or open a functional modal.
+     - Not be a dead button.
+   – Validate that country selection / detection is correctly wired and resilient to missing data.
+
+5. **Vehicle Documents & Registration**
+   – Make sure:
+     - Vehicle registration, insurance, inspection, driver license, TLC license, etc., all have working upload flows.
+     - Clicking upload opens a real file upload component.
+     - Uploaded files are associated with the correct vehicle and document type.
+   – Verify that:
+     - Status badges (Pending / Approved / Expiring) display correctly based on stored data.
+     - No unused or dead “Upload” buttons remain.
+
+6. **Payment Methods & Wallet**
+   – Ensure that all buttons related to:
+     - Adding / editing payout methods.
+     - Viewing payout history.
+   – are either:
+     - Fully functional with backend, or
+     - Clearly disabled with a tooltip or label saying “Coming soon”.
+   – Do not leave clickable UI that results in 404 or 500.
+
+7. **Blocked Users / Block rider feature**
+   – Confirm that the “Blocked Users” / rider block UI:
+     - Either works end-to-end (block/unblock using the correct API & models), or
+     - Is explicitly marked as disabled if not yet implemented.
+   – No runtime errors when visiting that screen.
+
+====================================================
+4) QUALITY & SAFETY REQUIREMENTS
+====================================================
+While doing all this:
+
+1. **Do not break working features**
+   – Before modifying a working endpoint or component, think:
+     - Is there a smaller fix (e.g., wiring a missing field) instead of refactoring everything?
+   – Run the app and re-test after each major change.
+
+2. **Consistent validation & security**
+   – All new/updated endpoints must:
+     - Use Zod schemas.
+     - Use `safeParse` (or your existing pattern) for input validation.
+     - Enforce auth and role checks (driver cannot see/administer other drivers’ data).
+   – Sensitive data rules:
+     - Mask NID / SSN except last 4 digits.
+     - Never leak another user’s documents or IDs.
+
+3. **Error handling**
+   – Replace any raw error printing with:
+     - User-friendly toasts on the client.
+     - Logged server-side details (where appropriate) for debugging.
+   – No red JSON error dumps visible in the UI.
+
+4. **Code cleanliness**
+   – Remove temporary debug logs and unused code.
+   – Keep naming consistent with existing SafeGo patterns.
+
+====================================================
+5) ACCEPTANCE CRITERIA
+====================================================
+You are done only when:
+
+1. Every driver-visible button and link in:
+   – Dashboard
+   – Wallet
+   – SafeGo Points
+   – Account Settings (Personal Info, Address, Tax Info, Documents, Vehicles, App Preferences)
+   – Help Center / Support
+   works without 404 or 500.
+
+2. Creating a support ticket and starting a chat **succeeds without Prisma errors**.
+
+3. Address save and tax information update work and persist to the database.
+
+4. Vehicle document uploads work, and each document is saved against the correct vehicle and type.
+
+5. No dead or misleading UI remains; any not-yet-implemented feature is clearly marked and non-clickable.
+
+6. The app runs cleanly in Preview with no uncaught exceptions in the console for normal driver flows.
+
+When finished, give me a short, bullet-point summary of:
+– What you audited.  
+– What was broken and how you fixed it.  
+– Any remaining items you intentionally left as “Coming soon” and how they are marked in the UI.

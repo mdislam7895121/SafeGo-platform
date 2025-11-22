@@ -33,13 +33,11 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
         {/* Mobile Menu Trigger + Logo */}
         <div className="flex items-center gap-2">
           <SidebarTrigger className="md:hidden" data-testid="button-sidebar-trigger" />
-          <Link href="/driver">
-            <a className="flex items-center gap-2" data-testid="link-logo">
-              <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">SG</span>
-              </div>
-              <span className="hidden md:inline-block font-bold text-lg">SafeGo</span>
-            </a>
+          <Link href="/driver" className="flex items-center gap-2" data-testid="link-logo">
+            <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">SG</span>
+            </div>
+            <span className="hidden md:inline-block font-bold text-lg">SafeGo</span>
           </Link>
         </div>
 
