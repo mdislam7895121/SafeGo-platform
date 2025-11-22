@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star, DollarSign, Car, TrendingUp, MapPin, Calendar } from "lucide-react";
+import { Star, DollarSign, Car, MapPin } from "lucide-react";
 
 export default function DriverDashboard() {
   const { data: driverData, isLoading } = useQuery({
@@ -161,28 +161,6 @@ export default function DriverDashboard() {
               <h4 className="font-semibold mb-1">Business District</h4>
               <p className="text-sm text-muted-foreground mb-2">1.3x surge</p>
               <p className="text-xs text-muted-foreground">Peak hours only</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Analytics Placeholder */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Analytics
-          </CardTitle>
-          <CardDescription>
-            Your performance trends (heatmap placeholder)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/20">
-            <div className="text-center">
-              <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <p className="text-muted-foreground">Analytics chart coming soon</p>
-              <p className="text-sm text-muted-foreground mt-1">Heatmap and performance graphs will be displayed here</p>
             </div>
           </div>
         </CardContent>
