@@ -6,13 +6,14 @@ export async function seedDriverTiers() {
   try {
     console.log("🌱 Seeding default driver tier system...");
 
-    // Define the 4 tiers
+    // Define the 4 tiers (NO Basic tier - drivers below 500 points have no tier)
+    // Order: Blue → Gold → Premium → Diamond (enforced by displayOrder)
     const tiers = [
       {
         name: "Blue",
-        requiredPoints: 0,
+        requiredPoints: 500,
         color: "#3B82F6",
-        description: "Entry level tier for new drivers",
+        description: "First tier for dedicated drivers (500-999 points)",
         displayOrder: 1,
         benefits: [
           "Access to SafeGo platform",
@@ -23,9 +24,9 @@ export async function seedDriverTiers() {
       },
       {
         name: "Gold",
-        requiredPoints: 500,
+        requiredPoints: 1000,
         color: "#F59E0B",
-        description: "Intermediate tier with enhanced benefits",
+        description: "Intermediate tier with enhanced benefits (1000-1999 points)",
         displayOrder: 2,
         benefits: [
           "All Blue tier benefits",
@@ -37,9 +38,9 @@ export async function seedDriverTiers() {
       },
       {
         name: "Premium",
-        requiredPoints: 1500,
+        requiredPoints: 2000,
         color: "#8B5CF6",
-        description: "Premium tier with exclusive perks",
+        description: "Premium tier with exclusive perks (2000-2999 points)",
         displayOrder: 3,
         benefits: [
           "All Gold tier benefits",
@@ -54,7 +55,7 @@ export async function seedDriverTiers() {
         name: "Diamond",
         requiredPoints: 3000,
         color: "#06B6D4",
-        description: "Elite tier with maximum benefits",
+        description: "Elite tier with maximum benefits (3000+ points)",
         displayOrder: 4,
         benefits: [
           "All Premium tier benefits",

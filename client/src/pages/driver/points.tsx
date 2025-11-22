@@ -11,27 +11,35 @@ interface Tier {
   color: string;
   description: string;
   requiredPoints: number;
+  displayOrder: number;
   benefits: { id: string; text: string }[];
 }
 
 interface PointsData {
-  currentTier: Tier;
+  hasNoTier: boolean;
+  currentTier: Tier | null;
   totalPoints: number;
   lifetimePoints: number;
   lastEarnedAt: string | null;
   nextTier: {
+    id: string;
     name: string;
     requiredPoints: number;
     color: string;
+    description: string;
   } | null;
   progressPercentage: number;
   pointsToNextTier: number;
   allTiers: {
+    id: string;
     name: string;
     requiredPoints: number;
     color: string;
+    description: string;
+    displayOrder: number;
     isCurrentTier: boolean;
     isUnlocked: boolean;
+    benefits: { id: string; text: string }[];
   }[];
 }
 
@@ -67,80 +75,133 @@ export default function DriverPoints() {
     );
   }
 
-  const { currentTier, totalPoints, nextTier, progressPercentage, pointsToNextTier, allTiers } = data;
+  const { hasNoTier, currentTier, totalPoints, nextTier, progressPercentage, pointsToNextTier, allTiers } = data;
 
   return (
     <div className="bg-background min-h-screen">
       <div className="p-6 max-w-4xl mx-auto space-y-6">
-        {/* Current Tier Card */}
-        <Card 
-          className="border-2"
-          style={{ 
-            borderColor: currentTier.color,
-            "--tier-color": currentTier.color
-          } as React.CSSProperties}
-        >
-          <CardContent className="p-8">
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <Award 
-                    className="h-8 w-8" 
-                    style={{ color: currentTier.color }}
+        {/* Current Status Card - Shows "No Tier Yet" or Current Tier */}
+        {hasNoTier ? (
+          <Card className="border-2 border-muted">
+            <CardContent className="p-8">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <Star className="h-8 w-8 text-muted-foreground" />
+                    <h1 className="text-3xl font-bold text-foreground">
+                      No Tier Yet
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Earn 500 points to unlock {nextTier?.name} tier
+                  </p>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-4 py-2"
+                  data-testid="badge-total-points"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  {totalPoints} points
+                </Badge>
+              </div>
+
+              {/* Progress to Blue Tier */}
+              {nextTier && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Progress to {nextTier.name} tier
+                    </span>
+                    <span 
+                      className="font-semibold"
+                      style={{ color: nextTier.color }}
+                    >
+                      {pointsToNextTier} points needed
+                    </span>
+                  </div>
+                  <Progress
+                    value={progressPercentage}
+                    className="h-3"
+                    data-testid="progress-next-tier"
                   />
-                  <h1 
-                    className="text-3xl font-bold"
-                    style={{ color: currentTier.color }}
-                  >
-                    {currentTier.name} Tier
-                  </h1>
+                  <p className="text-xs text-muted-foreground text-right">
+                    {Math.round(progressPercentage)}% complete ({totalPoints}/500)
+                  </p>
                 </div>
-                <p className="text-muted-foreground">{currentTier.description}</p>
-              </div>
-              <Badge
-                variant="outline"
-                className="text-lg px-4 py-2"
-                style={{ borderColor: currentTier.color, color: currentTier.color }}
-                data-testid="badge-total-points"
-              >
-                <Star className="h-4 w-4 mr-2" />
-                {totalPoints} points
-              </Badge>
-            </div>
-
-            {/* Progress to Next Tier */}
-            {nextTier && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Progress to {nextTier.name} tier
-                  </span>
-                  <span 
-                    className="font-semibold"
-                    style={{ color: nextTier.color }}
-                  >
-                    {pointsToNextTier} points needed
-                  </span>
+              )}
+            </CardContent>
+          </Card>
+        ) : currentTier ? (
+          <Card 
+            className="border-2"
+            style={{ 
+              borderColor: currentTier.color,
+              "--tier-color": currentTier.color
+            } as React.CSSProperties}
+          >
+            <CardContent className="p-8">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <Award 
+                      className="h-8 w-8" 
+                      style={{ color: currentTier.color }}
+                    />
+                    <h1 
+                      className="text-3xl font-bold"
+                      style={{ color: currentTier.color }}
+                    >
+                      {currentTier.name} Tier
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground">{currentTier.description}</p>
                 </div>
-                <Progress
-                  value={progressPercentage}
-                  className="h-3"
-                  data-testid="progress-next-tier"
-                />
-                <p className="text-xs text-muted-foreground text-right">
-                  {progressPercentage}% complete
-                </p>
+                <Badge
+                  variant="outline"
+                  className="text-lg px-4 py-2"
+                  style={{ borderColor: currentTier.color, color: currentTier.color }}
+                  data-testid="badge-total-points"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  {totalPoints} points
+                </Badge>
               </div>
-            )}
 
-            {!nextTier && (
-              <div className="bg-muted p-4 rounded-lg flex items-center justify-center gap-2">
-                <Trophy className="h-5 w-5 text-primary" />
-                <p className="text-sm font-medium">You have reached the highest tier!</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              {/* Progress to Next Tier */}
+              {nextTier && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Progress to {nextTier.name} tier
+                    </span>
+                    <span 
+                      className="font-semibold"
+                      style={{ color: nextTier.color }}
+                    >
+                      {pointsToNextTier} points needed
+                    </span>
+                  </div>
+                  <Progress
+                    value={progressPercentage}
+                    className="h-3"
+                    data-testid="progress-next-tier"
+                  />
+                  <p className="text-xs text-muted-foreground text-right">
+                    {Math.round(progressPercentage)}% complete
+                  </p>
+                </div>
+              )}
+
+              {!nextTier && (
+                <div className="bg-muted p-4 rounded-lg flex items-center justify-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  <p className="text-sm font-medium">You have reached the highest tier!</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Tier Roadmap */}
         <Card>
@@ -219,35 +280,70 @@ export default function DriverPoints() {
         </Card>
 
         {/* Current Tier Benefits */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Your Benefits</CardTitle>
-            <CardDescription>Perks you enjoy at {currentTier.name} tier</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {currentTier.benefits.length > 0 ? (
-              <div className="space-y-3">
-                {currentTier.benefits.map((benefit) => (
-                  <div
-                    key={benefit.id}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-muted"
-                    data-testid={`benefit-${benefit.id}`}
-                  >
-                    <Check 
-                      className="h-5 w-5 flex-shrink-0 mt-0.5"
-                      style={{ color: currentTier.color }}
-                    />
-                    <p className="text-sm">{benefit.text}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No benefits available for this tier
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        {currentTier && !hasNoTier && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Your Benefits</CardTitle>
+              <CardDescription>Perks you enjoy at {currentTier.name} tier</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {currentTier.benefits.length > 0 ? (
+                <div className="space-y-3">
+                  {currentTier.benefits.map((benefit) => (
+                    <div
+                      key={benefit.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted"
+                      data-testid={`benefit-${benefit.id}`}
+                    >
+                      <Check 
+                        className="h-5 w-5 flex-shrink-0 mt-0.5"
+                        style={{ color: currentTier.color }}
+                      />
+                      <p className="text-sm">{benefit.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No benefits available for this tier
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Show Next Tier Benefits for drivers with no tier */}
+        {hasNoTier && nextTier && allTiers.find(t => t.id === nextTier.id) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl">Unlock {nextTier.name} Tier Benefits</CardTitle>
+              <CardDescription>Earn {pointsToNextTier} more points to unlock these perks</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {allTiers.find(t => t.id === nextTier.id)?.benefits.length ?? 0 > 0 ? (
+                <div className="space-y-3">
+                  {allTiers.find(t => t.id === nextTier.id)?.benefits.map((benefit) => (
+                    <div
+                      key={benefit.id}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted opacity-70"
+                      data-testid={`benefit-${benefit.id}`}
+                    >
+                      <Check 
+                        className="h-5 w-5 flex-shrink-0 mt-0.5"
+                        style={{ color: nextTier.color }}
+                      />
+                      <p className="text-sm">{benefit.text}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No benefits information available
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* How to Earn Points */}
         <Card>

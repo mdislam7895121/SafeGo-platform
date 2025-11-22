@@ -1863,6 +1863,8 @@ router.get("/referral-bonus", async (req: AuthRequest, res) => {
 // ====================================================
 // GET /api/driver/points
 // Get driver's current points, tier, and progress
+// Updated to support "no tier yet" state for drivers < 500 points
+// Ensures Premium always appears before Diamond via displayOrder
 // ====================================================
 router.get("/points", async (req: AuthRequest, res) => {
   try {
@@ -1877,7 +1879,7 @@ router.get("/points", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Driver profile not found" });
     }
 
-    // Get or create driver points using transaction for safety
+    // Get or create driver points
     let driverPoints = await prisma.driverPoints.findUnique({
       where: { driverId: driverProfile.id },
       include: {
@@ -1892,140 +1894,141 @@ router.get("/points", async (req: AuthRequest, res) => {
       },
     });
 
-    // If driver has no points record, create one with lowest tier atomically
+    // If no record exists, create one with NO TIER (null) since new drivers have 0 points
     if (!driverPoints) {
-      try {
-        driverPoints = await prisma.$transaction(async (tx) => {
-          // Get lowest tier (by required points) as fallback
-          const lowestTier = await tx.driverTier.findFirst({
-            where: { isActive: true },
-            orderBy: { requiredPoints: "asc" },
+      driverPoints = await prisma.driverPoints.create({
+        data: {
+          driverId: driverProfile.id,
+          currentTierId: undefined, // Explicitly undefined - drivers need 500 points to unlock Blue tier
+          totalPoints: 0,
+          lifetimePoints: 0,
+        },
+        include: {
+          tier: {
             include: {
               benefits: {
                 where: { isActive: true },
                 orderBy: { displayOrder: "asc" },
               },
             },
-          });
-
-          if (!lowestTier) {
-            throw new Error("No active tiers found. Please contact support.");
-          }
-
-          // Create driver points record
-          const newDriverPoints = await tx.driverPoints.create({
-            data: {
-              driverId: driverProfile.id,
-              currentTierId: lowestTier.id,
-              totalPoints: 0,
-              lifetimePoints: 0,
-            },
-            include: {
-              tier: {
-                include: {
-                  benefits: {
-                    where: { isActive: true },
-                    orderBy: { displayOrder: "asc" },
-                  },
-                },
-              },
-            },
-          });
-
-          // Create initial transaction record
-          await tx.pointsTransaction.create({
-            data: {
-              driverPointsId: newDriverPoints.id,
-              points: 0,
-              reason: "Account initialized",
-              referenceType: "system",
-            },
-          });
-
-          return newDriverPoints;
-        });
-      } catch (error: any) {
-        console.error("Error initializing driver points:", error);
-        if (error.message?.includes("No active tiers")) {
-          return res.status(503).json({ 
-            error: "Loyalty program is currently unavailable. Please try again later." 
-          });
-        }
-        // Handle unique constraint violation (race condition)
-        if (error.code === "P2002") {
-          // Retry fetching - another request created it
-          driverPoints = await prisma.driverPoints.findUnique({
-            where: { driverId: driverProfile.id },
-            include: {
-              tier: {
-                include: {
-                  benefits: {
-                    where: { isActive: true },
-                    orderBy: { displayOrder: "asc" },
-                  },
-                },
-              },
-            },
-          });
-          if (!driverPoints) {
-            return res.status(500).json({ error: "Failed to initialize points system" });
-          }
-        } else {
-          return res.status(500).json({ error: "Failed to initialize points system" });
-        }
-      }
+          },
+        },
+      });
     }
 
-    // Get all active tiers ordered by required points
+    // Safety check after creation
+    if (!driverPoints) {
+      return res.status(500).json({ error: "Failed to create driver points record" });
+    }
+
+    // Get all active tiers ordered by displayOrder (CRITICAL: ensures Blue→Gold→Premium→Diamond order)
     const allTiers = await prisma.driverTier.findMany({
       where: { isActive: true },
-      orderBy: { requiredPoints: "asc" },
+      orderBy: { displayOrder: "asc" },
+      include: {
+        benefits: {
+          where: { isActive: true },
+          orderBy: { displayOrder: "asc" },
+        },
+      },
     });
 
-    // Calculate next tier and progress
-    const currentTierIndex = allTiers.findIndex(t => t.id === driverPoints.currentTierId);
+    const totalPoints = driverPoints.totalPoints;
+    const hasNoTier = totalPoints < 500;
+
+    // Build response based on tier status
+    if (hasNoTier) {
+      // Driver has no tier yet (< 500 points)
+      const blueTier = allTiers.find(t => t.displayOrder === 1);
+      const pointsToBlue = blueTier ? blueTier.requiredPoints - totalPoints : 500;
+      const progressPercentage = blueTier ? (totalPoints / blueTier.requiredPoints) * 100 : 0;
+
+      return res.json({
+        hasNoTier: true,
+        currentTier: null,
+        totalPoints,
+        lifetimePoints: driverPoints.lifetimePoints,
+        lastEarnedAt: driverPoints.lastEarnedAt,
+        nextTier: blueTier ? {
+          id: blueTier.id,
+          name: blueTier.name,
+          requiredPoints: blueTier.requiredPoints,
+          color: blueTier.color,
+          description: blueTier.description,
+        } : null,
+        progressPercentage: Math.min(progressPercentage, 100),
+        pointsToNextTier: pointsToBlue,
+        allTiers: allTiers.map(t => ({
+          id: t.id,
+          name: t.name,
+          requiredPoints: t.requiredPoints,
+          color: t.color,
+          description: t.description,
+          displayOrder: t.displayOrder,
+          isCurrentTier: false,
+          isUnlocked: false,
+          benefits: t.benefits.map(b => ({
+            id: b.id,
+            text: b.benefitText,
+          })),
+        })),
+      });
+    }
+
+    // Driver has a tier (>= 500 points)
+    const currentTier = driverPoints.tier;
+    const currentTierIndex = allTiers.findIndex(t => t.id === currentTier?.id);
     const nextTier = currentTierIndex < allTiers.length - 1 ? allTiers[currentTierIndex + 1] : null;
     
     let progressPercentage = 100;
     let pointsToNextTier = 0;
     
-    if (nextTier) {
-      const currentTierPoints = allTiers[currentTierIndex].requiredPoints;
-      const nextTierPoints = nextTier.requiredPoints;
-      const pointsInCurrentTier = driverPoints.totalPoints - currentTierPoints;
-      const pointsNeededForNextTier = nextTierPoints - currentTierPoints;
-      progressPercentage = Math.min(100, Math.round((pointsInCurrentTier / pointsNeededForNextTier) * 100));
-      pointsToNextTier = Math.max(0, nextTierPoints - driverPoints.totalPoints);
+    if (nextTier && currentTier) {
+      const pointsInCurrentTier = totalPoints - currentTier.requiredPoints;
+      const pointsNeededForNextTier = nextTier.requiredPoints - currentTier.requiredPoints;
+      progressPercentage = Math.min(100, (pointsInCurrentTier / pointsNeededForNextTier) * 100);
+      pointsToNextTier = Math.max(0, nextTier.requiredPoints - totalPoints);
     }
 
     res.json({
-      currentTier: {
-        id: driverPoints.tier.id,
-        name: driverPoints.tier.name,
-        color: driverPoints.tier.color,
-        description: driverPoints.tier.description,
-        requiredPoints: driverPoints.tier.requiredPoints,
-        benefits: driverPoints.tier.benefits.map(b => ({
+      hasNoTier: false,
+      currentTier: currentTier ? {
+        id: currentTier.id,
+        name: currentTier.name,
+        color: currentTier.color,
+        description: currentTier.description,
+        requiredPoints: currentTier.requiredPoints,
+        displayOrder: currentTier.displayOrder,
+        benefits: currentTier.benefits.map(b => ({
           id: b.id,
           text: b.benefitText,
         })),
-      },
-      totalPoints: driverPoints.totalPoints,
+      } : null,
+      totalPoints,
       lifetimePoints: driverPoints.lifetimePoints,
       lastEarnedAt: driverPoints.lastEarnedAt,
       nextTier: nextTier ? {
+        id: nextTier.id,
         name: nextTier.name,
         requiredPoints: nextTier.requiredPoints,
         color: nextTier.color,
+        description: nextTier.description,
       } : null,
       progressPercentage,
       pointsToNextTier,
       allTiers: allTiers.map(t => ({
+        id: t.id,
         name: t.name,
         requiredPoints: t.requiredPoints,
         color: t.color,
-        isCurrentTier: t.id === driverPoints.currentTierId,
-        isUnlocked: driverPoints.totalPoints >= t.requiredPoints,
+        description: t.description,
+        displayOrder: t.displayOrder,
+        isCurrentTier: t.id === currentTier?.id,
+        isUnlocked: totalPoints >= t.requiredPoints,
+        benefits: t.benefits.map(b => ({
+          id: b.id,
+          text: b.benefitText,
+        })),
       })),
     });
   } catch (error) {

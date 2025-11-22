@@ -8477,6 +8477,125 @@ router.delete("/tax/:id", checkPermission(Permission.EDIT_SETTINGS), async (req:
 });
 
 // ====================================================
+// SafeGo Points Management
+// ====================================================
+
+// GET /api/admin/points/tiers - Get all tiers (Blue → Gold → Premium → Diamond)
+router.get("/points/tiers", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const tiers = await prisma.driverTier.findMany({
+      orderBy: { displayOrder: "asc" }, // CRITICAL: ensures Premium before Diamond
+      include: {
+        benefits: {
+          where: { isActive: true },
+          orderBy: { displayOrder: "asc" },
+        },
+      },
+    });
+
+    res.json(tiers);
+  } catch (error) {
+    console.error("Error fetching tiers:", error);
+    res.status(500).json({ error: "Failed to fetch tiers" });
+  }
+});
+
+// PUT /api/admin/points/tiers/:id - Update tier (displayOrder is read-only)
+router.put("/points/tiers/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { requiredPoints, color, description, isActive } = req.body;
+
+    const tier = await prisma.driverTier.update({
+      where: { id },
+      data: {
+        requiredPoints,
+        color,
+        description,
+        isActive,
+        // displayOrder excluded to prevent manual reordering
+      },
+    });
+
+    // Audit log
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.EDIT_SETTINGS,
+      entityType: EntityType.PLATFORM_SETTINGS,
+      entityId: id,
+      description: `Updated tier: ${tier.name}`,
+      metadata: { changes: { requiredPoints, color, description, isActive } },
+    });
+
+    res.json(tier);
+  } catch (error) {
+    console.error("Error updating tier:", error);
+    res.status(500).json({ error: "Failed to update tier" });
+  }
+});
+
+// GET /api/admin/points/rules - Get all points rules
+router.get("/points/rules", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const rules = await prisma.pointsRule.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(rules);
+  } catch (error) {
+    console.error("Error fetching points rules:", error);
+    res.status(500).json({ error: "Failed to fetch points rules" });
+  }
+});
+
+// GET /api/admin/points/drivers - Get all drivers with points
+router.get("/points/drivers", checkPermission(Permission.VIEW_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const skip = (page - 1) * limit;
+
+    const [drivers, total] = await Promise.all([
+      prisma.driverPoints.findMany({
+        orderBy: { totalPoints: "desc" },
+        take: limit,
+        skip,
+        include: {
+          tier: true,
+          driver: {
+            include: {
+              user: {
+                select: {
+                  email: true,
+                  phoneNumber: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+      prisma.driverPoints.count(),
+    ]);
+
+    res.json({
+      drivers,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching driver points:", error);
+    res.status(500).json({ error: "Failed to fetch driver points" });
+  }
+});
+
+// ====================================================
 // Mount Analytics Routes
 // ====================================================
 router.use("/analytics", analyticsRouter);

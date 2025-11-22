@@ -590,14 +590,14 @@ model TierBenefit {
 model DriverPoints {
   id               String             @id @default(uuid())
   driverId         String             @unique
-  currentTierId    String
+  currentTierId    String?
   totalPoints      Int                @default(0)
   lifetimePoints   Int                @default(0)
   lastEarnedAt     DateTime?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   driver           DriverProfile      @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  tier             DriverTier         @relation(fields: [currentTierId], references: [id])
+  tier             DriverTier?        @relation(fields: [currentTierId], references: [id])
   transactions     PointsTransaction[]
 
   @@index([driverId])
