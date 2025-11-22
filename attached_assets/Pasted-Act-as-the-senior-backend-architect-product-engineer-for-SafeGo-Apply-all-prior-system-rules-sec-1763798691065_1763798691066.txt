@@ -1,0 +1,150 @@
+Act as the senior backend architect & product engineer for SafeGo.
+Apply all prior system rules, security rules, admin logic, and driver
+tier restrictions exactly as documented earlier. DO NOT change any
+previously built modules except where explicitly instructed here.
+
+We are now updating and finalizing the SafeGo Driver Tier System.
+
+===============================================================
+1. REMOVE DIAMOND TIER COMPLETELY
+===============================================================
+The Diamond tier is removed. The system must now support only:
+- Blue
+- Gold
+- Premium
+
+Every existing reference to Diamond must be deleted:
+- UI
+- backend checks
+- admin panel
+- driver app
+- reward screens
+- status upgrade flows
+- notification triggers
+
+Make sure nothing calls Diamond anymore.
+
+===============================================================
+2. NEW TIER THRESHOLDS (STRICT 90-DAY CYCLE)
+===============================================================
+Update tier thresholds to:
+
+• Blue tier unlocks at: 1000 points  
+• Gold tier unlocks at: 1500 points  
+• Premium tier unlocks at: 2500 points  
+
+Strict rule:
+If a driver ends the 90-day cycle with even 1 point less than the target,
+they do NOT get promoted.
+
+Examples:
+- 1499 = NOT Gold  
+- 2499 = NOT Premium  
+
+Keep separate:
+- 90-day status points (tier calculation)
+- lifetime points (analytics only)
+
+Remove all old numbers: 500 / 1000 / 2000.
+
+===============================================================
+3. TIME-BASED POINT ENGINE (CRITICAL)
+===============================================================
+Point earning must follow this daily time-slot model:
+
+• 12:00 AM – 8:00 AM → 1 point  
+• 8:00 AM – 3:00 PM → 1 point  
+• 3:00 PM – 5:00 PM → 3 points  
+• 5:00 PM – 12:00 AM → 5 points  
+
+Time-slot logic must be:
+- server-validated
+- tamper-proof
+- device-time manipulation safe
+
+===============================================================
+4. NYC RULE: TIER-LOCKED DESTINATION VISIBILITY
+===============================================================
+This must match Uber-NYC regulation behavior.
+
+Rule:
+A driver cannot see rider destination details until they reach GOLD tier.
+
+Meaning:
+• Blue drivers → no destination preview  
+• Gold drivers → see ETA minutes before accepting  
+• Premium drivers → see ETA + traffic condition + higher accuracy  
+
+Also apply:
+NYC five boroughs enforced rule:
+A driver must complete enough rides INSIDE NYC’s 5 boroughs to qualify.
+
+===============================================================
+5. STRICT FRAUD PROTECTION (KEEP EXISTING)
+===============================================================
+Do NOT change these:
+- duplicate driver accounts check
+- impossible travel validation
+- device integrity checks
+- multi-account detection
+- GPS spoofing detection
+- auto-suspicious-flag engine
+- reset logic every 90 days
+
+===============================================================
+6. ADMIN PANEL (UNCHANGED)
+===============================================================
+All admin pages must continue working:
+- Tier monitoring
+- Manual tier review
+- Fraud dashboard
+- Manual adjustments (with event logs)
+- Payouts
+- Wallet
+- KYC
+
+Do NOT break any of these pages.
+
+===============================================================
+7. DO NOT MODIFY ANY LIVE PRODUCTION MODULES
+===============================================================
+These must remain untouched:
+- Wallets
+- Payout system
+- Ride matching
+- Parcel
+- Food
+- KYC
+- Live chat
+- Security Phase 1 & Phase 2
+- Driver onboarding flow
+- Account Center pages already built
+
+===============================================================
+8. FINAL SYSTEM CHECK AFTER UPDATE
+===============================================================
+After updating tiers:
+
+❏ Ensure:
+- Blue = 1000+
+- Gold = 1500+
+- Premium = 2500+
+
+❏ Ensure NYC rule activates correctly  
+❏ Ensure destination visibility shifts only at 1500 points  
+❏ Ensure all fraud modules still run  
+❏ Ensure admin dashboard shows new tiers  
+❏ Ensure no page references Diamond tier  
+
+===============================================================
+ALL CHANGES MUST BE BACKWARD-SAFE AND NON-BREAKING.
+===============================================================
+
+Deliverables:
+- Updated backend tier engine
+- Updated point thresholds
+- Updated time-slot logic
+- Updated NYC visibility rules
+- Removed Diamond tier entirely
+- Updated UI labels in driver app + web
+- Complete regression check

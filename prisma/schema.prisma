@@ -591,8 +591,10 @@ model DriverPoints {
   id               String             @id @default(uuid())
   driverId         String             @unique
   currentTierId    String?
-  totalPoints      Int                @default(0)
-  lifetimePoints   Int                @default(0)
+  totalPoints      Int                @default(0) // 90-day status points for tier calculation
+  lifetimePoints   Int                @default(0) // All-time points for analytics
+  cycleStartDate   DateTime?          // Current 90-day cycle start
+  cycleEndDate     DateTime?          // Current 90-day cycle end
   lastEarnedAt     DateTime?
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
@@ -603,6 +605,7 @@ model DriverPoints {
   @@index([driverId])
   @@index([currentTierId])
   @@index([totalPoints])
+  @@index([cycleEndDate]) // For finding cycles needing reset
   @@map("driver_points")
 }
 

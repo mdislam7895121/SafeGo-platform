@@ -1,20 +1,22 @@
 import { prisma } from "../db";
+import { TimeSlotPointEngine } from "./timeSlotPointEngine";
+import { CycleTrackingService } from "./cycleTrackingService";
 
 /**
- * SafeGo Points Service
+ * SafeGo Points Service - 3-Tier System with 90-Day Cycles
  * Handles tier calculation with order_index enforcement
- * Ensures Premium always appears before Diamond
+ * Only 3 tiers: Blue (1000+), Gold (1500+), Premium (2500+)
  */
 
 export class PointsService {
   /**
-   * Calculate driver's current tier based on total points
-   * Returns null if points < 500 (no tier yet)
-   * Always sorts by displayOrder ascending to ensure Premium before Diamond
+   * Calculate driver's current tier based on total points (90-day status points)
+   * Returns null if points < 1000 (no tier yet)
+   * Always sorts by displayOrder ascending to ensure correct order: Blue → Gold → Premium
    */
   async calculateCurrentTier(totalPoints: number, countryCode?: string) {
-    // If less than 500 points, no tier yet
-    if (totalPoints < 500) {
+    // If less than 1000 points, no tier yet
+    if (totalPoints < 1000) {
       return null;
     }
 
@@ -24,11 +26,12 @@ export class PointsService {
         isActive: true,
       },
       orderBy: {
-        displayOrder: "asc", // CRITICAL: This ensures Premium (3) comes before Diamond (4)
+        displayOrder: "asc", // CRITICAL: This ensures correct order: Blue (1) → Gold (2) → Premium (3)
       },
     });
 
     // Find the highest tier where totalPoints >= requiredPoints
+    // Strict enforcement: must have EXACTLY the required points (1499 ≠ Gold)
     let currentTier = null;
     for (const tier of tiers) {
       if (totalPoints >= tier.requiredPoints) {
@@ -43,7 +46,7 @@ export class PointsService {
 
   /**
    * Get next tier for progression
-   * Returns null if already at Diamond tier
+   * Returns null if already at Premium tier (max tier)
    */
   async getNextTier(currentTierDisplayOrder: number | null) {
     if (currentTierDisplayOrder === null) {
@@ -69,7 +72,7 @@ export class PointsService {
   }
 
   /**
-   * Get all tiers ordered by displayOrder (Blue → Gold → Premium → Diamond)
+   * Get all tiers ordered by displayOrder (Blue → Gold → Premium only)
    */
   async getAllTiers() {
     return await prisma.driverTier.findMany({
@@ -77,7 +80,7 @@ export class PointsService {
         isActive: true,
       },
       orderBy: {
-        displayOrder: "asc", // Ensures correct order: Blue, Gold, Premium, Diamond
+        displayOrder: "asc", // Ensures correct order: Blue, Gold, Premium
       },
       include: {
         benefits: {
@@ -94,6 +97,7 @@ export class PointsService {
 
   /**
    * Get or create driver points record
+   * Initializes 90-day cycle if needed
    */
   async getOrCreateDriverPoints(driverId: string) {
     let driverPoints = await prisma.driverPoints.findUnique({
@@ -104,18 +108,34 @@ export class PointsService {
     });
 
     if (!driverPoints) {
-      // Create new points record with no tier (undefined for Prisma)
+      // Initialize 90-day cycle for new driver
+      const { cycleStartDate, cycleEndDate } = await CycleTrackingService.initializeCycle(driverId);
+
+      // Create new points record with no tier and cycle dates
       driverPoints = await prisma.driverPoints.create({
         data: {
           driverId,
-          // No tier until 500 points - don't set currentTierId
-          totalPoints: 0,
+          // No tier until 1000 points - don't set currentTierId
+          totalPoints: 0, // 90-day status points
           lifetimePoints: 0,
+          cycleStartDate,
+          cycleEndDate,
         },
         include: {
           tier: true,
         },
       });
+    } else {
+      // Check if existing driver needs cycle initialization
+      const needsInit = await CycleTrackingService.needsCycleInitialization(driverId);
+      if (needsInit) {
+        const { cycleStartDate, cycleEndDate } = await CycleTrackingService.initializeCycle(driverId);
+        // Reload to get updated data
+        driverPoints = await prisma.driverPoints.findUnique({
+          where: { driverId },
+          include: { tier: true },
+        }) || driverPoints;
+      }
     }
 
     return driverPoints;
@@ -123,6 +143,7 @@ export class PointsService {
 
   /**
    * Award points to driver and update tier if needed
+   * Uses time-slot based calculation for trip completions
    */
   async awardPoints(
     driverId: string,
@@ -134,11 +155,11 @@ export class PointsService {
   ) {
     const driverPoints = await this.getOrCreateDriverPoints(driverId);
 
-    // Calculate new total
+    // Calculate new total (90-day status points + lifetime points)
     const newTotal = driverPoints.totalPoints + points;
     const newLifetime = driverPoints.lifetimePoints + points;
 
-    // Calculate new tier
+    // Calculate new tier based on new 90-day status points
     const newTier = await this.calculateCurrentTier(newTotal);
 
     // Create transaction record
@@ -155,8 +176,8 @@ export class PointsService {
 
     // Update driver points with proper null handling
     const updateData: any = {
-      totalPoints: newTotal,
-      lifetimePoints: newLifetime,
+      totalPoints: newTotal, // 90-day status points
+      lifetimePoints: newLifetime, // All-time points
       lastEarnedAt: new Date(),
     };
 
@@ -164,7 +185,7 @@ export class PointsService {
     if (newTier) {
       updateData.currentTierId = newTier.id;
     } else {
-      // Explicitly unset tier if points < 500
+      // Explicitly unset tier if points < 1000
       updateData.currentTierId = undefined;
     }
 
@@ -186,13 +207,73 @@ export class PointsService {
   }
 
   /**
+   * Award points for trip completion using time-slot based calculation
+   * Points vary by time of day:
+   * - 12:00 AM – 8:00 AM → 1 point
+   * - 8:00 AM – 3:00 PM → 1 point
+   * - 3:00 PM – 5:00 PM → 3 points
+   * - 5:00 PM – 12:00 AM → 5 points
+   */
+  async awardPointsForTripCompletion(
+    driverId: string,
+    tripId: string,
+    tripCompletionTime?: Date,
+    driverTimezone?: string,
+    countryCode?: string
+  ) {
+    // Calculate points using time-slot engine (server-validated, tamper-proof)
+    const calculation = TimeSlotPointEngine.calculatePoints(
+      tripCompletionTime,
+      driverTimezone,
+      countryCode
+    );
+
+    // Log suspicious timing patterns
+    if (calculation.isSuspicious) {
+      console.warn(
+        `[PointsService] Suspicious trip completion detected for driver ${driverId}:`,
+        calculation.suspicionReasons
+      );
+      // Future: Trigger fraud detection alert
+    }
+
+    // Award calculated points
+    const result = await this.awardPoints(
+      driverId,
+      calculation.points,
+      `Trip completion (${calculation.timeSlot})`,
+      "trip",
+      tripId,
+      {
+        timeSlot: calculation.timeSlot,
+        calculatedAt: calculation.calculatedAt,
+        tripCompletionTime: calculation.tripCompletionTime,
+        timezone: calculation.timezone,
+        isSuspicious: calculation.isSuspicious,
+        suspicionReasons: calculation.suspicionReasons,
+      }
+    );
+
+    return {
+      ...result,
+      pointsAwarded: calculation.points,
+      timeSlot: calculation.timeSlot,
+      isSuspicious: calculation.isSuspicious,
+    };
+  }
+
+  /**
    * Get driver points data for UI
+   * Includes 90-day cycle information
    */
   async getDriverPointsData(driverId: string) {
     const driverPoints = await this.getOrCreateDriverPoints(driverId);
     const allTiers = await this.getAllTiers();
 
-    // Get current tier (might be null if < 500 points)
+    // Get cycle status
+    const cycleStatus = await CycleTrackingService.getCycleStatus(driverId);
+
+    // Get current tier (might be null if < 1000 points)
     const currentTier = driverPoints.tier;
     const currentDisplayOrder = currentTier?.displayOrder || 0;
 
@@ -204,7 +285,7 @@ export class PointsService {
     let pointsToNextTier = 0;
 
     if (!currentTier) {
-      // No tier yet, show progress to Blue (500 points)
+      // No tier yet, show progress to Blue (1000 points)
       const blueTier = allTiers.find(t => t.displayOrder === 1);
       if (blueTier) {
         pointsToNextTier = blueTier.requiredPoints - driverPoints.totalPoints;
@@ -217,7 +298,7 @@ export class PointsService {
       progressPercentage = (pointsInCurrentTier / pointsNeededForNextTier) * 100;
       pointsToNextTier = nextTier.requiredPoints - driverPoints.totalPoints;
     } else {
-      // At max tier (Diamond)
+      // At max tier (Premium)
       progressPercentage = 100;
       pointsToNextTier = 0;
     }
@@ -242,14 +323,22 @@ export class PointsService {
 
     return {
       currentTier,
-      totalPoints: driverPoints.totalPoints,
-      lifetimePoints: driverPoints.lifetimePoints,
+      totalPoints: driverPoints.totalPoints, // 90-day status points
+      lifetimePoints: driverPoints.lifetimePoints, // All-time points
       nextTier,
       progressPercentage: Math.min(progressPercentage, 100),
       pointsToNextTier: Math.max(pointsToNextTier, 0),
       allTiers: tiersWithStatus,
       transactions,
-      hasNoTier: !currentTier && driverPoints.totalPoints < 500,
+      hasNoTier: !currentTier && driverPoints.totalPoints < 1000,
+      // 90-day cycle information
+      cycleStatus: cycleStatus ? {
+        daysRemaining: cycleStatus.daysRemaining,
+        daysElapsed: cycleStatus.daysElapsed,
+        totalDays: cycleStatus.totalDays,
+        cycleProgress: cycleStatus.cycleProgress,
+        cycleEndDate: cycleStatus.cycleEndDate,
+      } : null,
     };
   }
 

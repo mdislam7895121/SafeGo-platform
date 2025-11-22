@@ -6,14 +6,15 @@ export async function seedDriverTiers() {
   try {
     console.log("🌱 Seeding default driver tier system...");
 
-    // Define the 4 tiers (NO Basic tier - drivers below 500 points have no tier)
-    // Order: Blue → Gold → Premium → Diamond (enforced by displayOrder)
+    // Define the 3 tiers (NO Basic/Diamond - drivers below 1000 points have no tier)
+    // Order: Blue → Gold → Premium (enforced by displayOrder)
+    // New 90-day cycle thresholds: 1000 / 1500 / 2500
     const tiers = [
       {
         name: "Blue",
-        requiredPoints: 500,
+        requiredPoints: 1000,
         color: "#3B82F6",
-        description: "First tier for dedicated drivers (500-999 points)",
+        description: "First tier for dedicated drivers (1000-1499 points)",
         displayOrder: 1,
         benefits: [
           "Access to SafeGo platform",
@@ -24,12 +25,13 @@ export async function seedDriverTiers() {
       },
       {
         name: "Gold",
-        requiredPoints: 1000,
+        requiredPoints: 1500,
         color: "#F59E0B",
-        description: "Intermediate tier with enhanced benefits (1000-1999 points)",
+        description: "Intermediate tier with enhanced benefits (1500-2499 points)",
         displayOrder: 2,
         benefits: [
           "All Blue tier benefits",
+          "NYC: See destination ETA before accepting",
           "Priority support access",
           "Higher trip visibility",
           "Exclusive bonus opportunities",
@@ -38,33 +40,18 @@ export async function seedDriverTiers() {
       },
       {
         name: "Premium",
-        requiredPoints: 2000,
+        requiredPoints: 2500,
         color: "#8B5CF6",
-        description: "Premium tier with exclusive perks (2000-2999 points)",
+        description: "Premium tier with exclusive perks (2500+ points)",
         displayOrder: 3,
         benefits: [
           "All Gold tier benefits",
+          "NYC: See ETA + traffic condition + higher accuracy",
           "Lower commission rates (2% reduction)",
           "Premium surge zone access",
           "24/7 dedicated support line",
           "Advanced trip planning tools",
           "Monthly performance bonuses",
-        ],
-      },
-      {
-        name: "Diamond",
-        requiredPoints: 3000,
-        color: "#06B6D4",
-        description: "Elite tier with maximum benefits (3000+ points)",
-        displayOrder: 4,
-        benefits: [
-          "All Premium tier benefits",
-          "Lowest commission rates (5% reduction)",
-          "First access to high-value trips",
-          "VIP support with account manager",
-          "Exclusive partnership rewards",
-          "Annual recognition awards",
-          "Beta access to new features",
         ],
       },
     ];
