@@ -1,0 +1,63 @@
+Act as a senior product designer and full-stack engineer for the SafeGo project.
+
+Goal: Fix the "Update Tax Information" button behavior on the driver Tax Info page so that it opens the correct tax update flow, following all existing SafeGo conventions.
+
+Context:
+- Current route: /driver/account/tax-info
+- The page shows:
+  - "Tax Documents" section (Download 2024 Tax Summary, 2023 1099-K)
+  - "Taxpayer Information" section (Tax ID Status, W-9 Form)
+  - Primary button: "Update Tax Information"
+- The button visually appears but does nothing when tapped (no navigation, no modal, no API call).
+- SafeGo uses four roles: customer, driver, restaurant, admin. This feature is only for the driver web app, inside Account Settings.
+- Do not add any emojis in the UI or text.
+- Do not touch ride, food, parcel, or payout logic.
+- Do not break any existing URLs or layouts.
+
+Requirements:
+
+1) Button behavior
+- Make the "Update Tax Information" button fully functional.
+- When the driver clicks/taps it, open the tax update flow using one of these patterns (choose the one that best matches the existing SafeGo account architecture):
+  a) Navigate to a dedicated edit page: /driver/account/tax-info/edit
+  OR
+  b) Open a tax update modal/panel on the same page with a form.
+
+2) Tax update form (UI and behavior)
+If you choose a dedicated edit page or modal, include these fields:
+
+- Country (read-only, taken from driver profile)
+- Full legal name (pre-filled, editable)
+- Tax ID / SSN / NID (masked input)
+- Tax classification (e.g., Individual, Sole proprietor)
+- Address (Street, City, State/Region, Postal code)
+- W-9 or local equivalent status (checkbox or selector)
+
+Form rules:
+- Mask the tax ID value on screen (show only last 4 digits when editing existing data).
+- New entries can be typed fully, but after save the value should display as masked (e.g., ***-**-1234).
+- Client-side validation: required fields cannot be empty, show inline error messages.
+- Include primary button "Save Tax Information" and secondary "Cancel" that returns to /driver/account/tax-info without saving.
+
+3) Security and authorization
+- Ensure only the authenticated driver can see and edit their own tax info.
+- Do not allow any way to access another driver’s tax data by changing IDs in the URL.
+- Keep all tax data behind existing authentication and follow SafeGo security conventions.
+- Do not log full tax IDs in the console or analytics; log only masked values if needed.
+
+4) Integration with existing page
+- After a successful save:
+  - Redirect back to /driver/account/tax-info.
+  - Refresh the "Tax ID Status" and "W-9 Form" labels if they are driven by backend data.
+  - Show a lightweight success state (e.g., inline confirmation text) that matches existing SafeGo account styling.
+- Make sure the "Update Tax Information" button now triggers the new flow both on desktop and mobile.
+
+5) Technical notes
+- Reuse existing SafeGo account layout components and typography.
+- Keep the Tax Info page structure and download buttons unchanged.
+- Do not introduce any breaking changes to routing or API contracts that other features depend on.
+
+When you are done, summarize:
+- What routing or modal changes you made for the button.
+- What validations and masking rules you implemented.
+- Any backend/API updates you added or reused.

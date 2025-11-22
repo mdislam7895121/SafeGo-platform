@@ -1,10 +1,29 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, FileText, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export default function TaxInfo() {
+  const [_, navigate] = useLocation();
+
+  const { data: driverData } = useQuery({
+    queryKey: ["/api/driver/home"],
+  });
+
+  const profile = (driverData as any)?.profile;
+  
+  // Determine W-9 status badge
+  const w9Status = profile?.w9Status || "pending";
+  const w9StatusConfig = {
+    pending: { label: "Pending", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
+    submitted: { label: "Submitted", className: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
+    approved: { label: "On File", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
+  };
+  
+  const taxIdStatus = profile?.hasSSN || profile?.hasNID ? "Verified" : "Pending";
+
   return (
     <div className="bg-background">
       <div className="bg-primary text-primary-foreground p-6 ">
@@ -63,17 +82,31 @@ export default function TaxInfo() {
           <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Tax ID Status</span>
-              <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                Verified
+              <Badge 
+                variant="outline" 
+                className={taxIdStatus === "Verified" 
+                  ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                  : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
+                }
+              >
+                {taxIdStatus}
               </Badge>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">W-9 Form</span>
-              <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                On File
+              <Badge 
+                variant="outline" 
+                className={w9StatusConfig[w9Status as keyof typeof w9StatusConfig]?.className}
+              >
+                {w9StatusConfig[w9Status as keyof typeof w9StatusConfig]?.label}
               </Badge>
             </div>
-            <Button variant="outline" className="w-full mt-4" data-testid="button-update-tax">
+            <Button 
+              variant="outline" 
+              className="w-full mt-4" 
+              data-testid="button-update-tax"
+              onClick={() => navigate("/driver/account/tax-info/edit")}
+            >
               <Upload className="h-4 w-4 mr-2" />
               Update Tax Information
             </Button>

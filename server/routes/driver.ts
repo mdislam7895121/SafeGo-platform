@@ -1180,6 +1180,106 @@ router.put("/identity/ssn", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// PUT /api/driver/tax-info
+// Update driver tax information
+// ====================================================
+const taxInfoSchema = z.object({
+  fullLegalName: z.string().min(1),
+  taxId: z.string().optional(),
+  taxClassification: z.string().min(1),
+  street: z.string().min(1),
+  city: z.string().min(1),
+  state: z.string().min(1),
+  postalCode: z.string().min(1),
+  w9Status: z.string().optional(),
+});
+
+router.put("/tax-info", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body
+    const validation = taxInfoSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+
+    const { fullLegalName, taxId, taxClassification, street, city, state, postalCode, w9Status } = validation.data;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const updateData: any = {
+      usaFullLegalName: fullLegalName,
+      taxClassification,
+      usaStreet: street,
+      usaCity: city,
+      usaState: state,
+      usaZipCode: postalCode,
+      w9Status: w9Status || "pending",
+      w9SubmittedAt: w9Status === "submitted" || w9Status === "approved" ? new Date() : null,
+    };
+
+    // If taxId is provided and not masked, encrypt and store it
+    if (taxId && !taxId.includes("*")) {
+      const cleaned = taxId.replace(/\D/g, "");
+      
+      // Validate based on country
+      if (driverProfile.user.countryCode === "US") {
+        const { isValidSSN } = await import("../utils/encryption");
+        if (!isValidSSN(taxId)) {
+          return res.status(400).json({
+            error: "Invalid SSN format. Must be XXX-XX-XXXX or 9 digits.",
+          });
+        }
+        
+        const ssnLast4 = cleaned.substring(5, 9);
+        updateData.ssnEncrypted = encrypt(cleaned);
+        updateData.ssnLast4 = ssnLast4;
+      } else if (driverProfile.user.countryCode === "BD") {
+        const { isValidBdNid } = await import("../utils/encryption");
+        if (!isValidBdNid(taxId)) {
+          return res.status(400).json({
+            error: "Invalid NID format. Must be 10-17 digits.",
+          });
+        }
+        
+        updateData.nidEncrypted = encrypt(cleaned);
+      }
+    }
+
+    // Update driver profile
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Tax information updated successfully",
+    });
+  } catch (error) {
+    console.error("Tax info update error:", error);
+    res.status(500).json({ error: "Failed to update tax information" });
+  }
+});
+
+// ====================================================
 // POST /api/driver/upload/vehicle-document
 // Upload vehicle document (registration or insurance)
 // ====================================================

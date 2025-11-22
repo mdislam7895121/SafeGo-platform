@@ -44,6 +44,7 @@ import DriverAccountVehicles from "@/pages/driver/account/vehicles";
 import DriverAccountWorkHub from "@/pages/driver/account/work-hub";
 import DriverAccountPayment from "@/pages/driver/account/payment";
 import DriverAccountTaxInfo from "@/pages/driver/account/tax-info";
+import DriverAccountTaxInfoEdit from "@/pages/driver/account/tax-info-edit";
 import DriverAccountManage from "@/pages/driver/account/manage";
 import DriverAccountAddress from "@/pages/driver/account/address";
 import DriverAccountNotifications from "@/pages/driver/account/notifications";
@@ -316,6 +317,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Tax Info">
             <DriverAccountTaxInfo />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/account/tax-info/edit">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Edit Tax Information">
+            <DriverAccountTaxInfoEdit />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

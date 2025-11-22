@@ -214,6 +214,9 @@ model DriverProfile {
   tlcLicenseBackUrl     String?
   tlcLicenseExpiry      DateTime?
   tlcLicenseNumber      String?
+  taxClassification     String?            // Individual, Sole proprietor, etc.
+  w9Status              String?            // pending, submitted, approved
+  w9SubmittedAt         DateTime?
   securityStatus        SecurityStatus     @default(normal)
   securityNotes         String?
   deliveries            Delivery[]
