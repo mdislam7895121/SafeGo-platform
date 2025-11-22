@@ -2794,4 +2794,140 @@ router.get("/tax-documents/:type", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// Bangladesh Tax Endpoints
+// ====================================================
+
+// ====================================================
+// GET /api/driver/bd-tax-summary
+// Get Bangladesh tax summary for current year and available years
+// ====================================================
+router.get("/bd-tax-summary", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // BD drivers only
+    if (driverProfile.user.countryCode !== "BD") {
+      return res.status(403).json({ error: "BD tax summary is only available for Bangladesh drivers" });
+    }
+
+    // Import BD tax service
+    const { bdTaxService } = await import("../services/bdTaxService");
+
+    // Get current year summary (use userId for wallet lookup)
+    const currentYear = new Date().getFullYear();
+    const currentYearSummary = await bdTaxService.getBDTaxSummary(userId, currentYear);
+
+    // Get available tax years
+    const availableYears = await bdTaxService.getAvailableTaxYears(userId);
+
+    res.json({
+      currentYear: currentYearSummary,
+      availableYears,
+    });
+  } catch (error) {
+    console.error("BD tax summary error:", error);
+    res.status(500).json({ error: "Failed to get BD tax summary" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/bd-tax-documents/:year
+// Download Bangladesh tax document for a specific year
+// ====================================================
+router.get("/bd-tax-documents/:year", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const year = parseInt(req.params.year);
+
+    // Validate year
+    if (isNaN(year) || year < 2020 || year > new Date().getFullYear()) {
+      return res.status(400).json({ error: "Invalid year" });
+    }
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            email: true,
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // BD drivers only
+    if (driverProfile.user.countryCode !== "BD") {
+      return res.status(403).json({ error: "BD tax documents are only available for Bangladesh drivers" });
+    }
+
+    // Import BD tax service
+    const { bdTaxService } = await import("../services/bdTaxService");
+
+    // Get tax summary for the year (use userId for wallet lookup)
+    const summary = await bdTaxService.getBDTaxSummary(userId, year);
+
+    // Return JSON document (can be converted to PDF later)
+    res.json({
+      documentType: "BD Tax Summary",
+      country: "BD",
+      year,
+      generatedAt: new Date(),
+      driver: {
+        name: `${driverProfile.firstName || ""} ${driverProfile.lastName || ""}`.trim(),
+        email: driverProfile.user.email,
+        driverId: driverProfile.id,
+      },
+      payer: {
+        name: "SafeGo Bangladesh",
+        company: "SafeGo Inc.",
+      },
+      earnings: {
+        totalTripEarnings: summary.total_trip_earnings,
+        safegoCommissionTotal: summary.safego_commission_total,
+        driverNetPayout: summary.driver_net_payout,
+        anyWithheldTax: summary.any_withheld_tax,
+      },
+      currency: "BDT",
+      notes: [
+        "This is an annual income summary provided by SafeGo to assist with your personal tax reporting in Bangladesh.",
+        "SafeGo does not file or submit tax returns on your behalf.",
+        "For exact tax calculations and filing, please consult a local tax professional or follow NBR (National Board of Revenue) guidelines.",
+        "All amounts are in Bangladesh Taka (BDT).",
+      ],
+      taxInfo: {
+        country: "Bangladesh",
+        taxpayerType: "Self-employed / Independent Driver",
+        nbrDisclaimer: "SafeGo provides annual income summaries to help with your personal tax reporting in Bangladesh. SafeGo does not file or submit tax returns on your behalf. For exact tax calculations and filing, please consult a local tax professional or follow NBR (National Board of Revenue) guidelines.",
+      },
+      disclaimer: "SafeGo provides this summary for informational purposes only. The driver is responsible for all tax reporting and compliance with Bangladesh tax laws.",
+    });
+  } catch (error) {
+    console.error("BD tax document error:", error);
+    res.status(500).json({ error: "Failed to generate BD tax document" });
+  }
+});
+
 export default router;

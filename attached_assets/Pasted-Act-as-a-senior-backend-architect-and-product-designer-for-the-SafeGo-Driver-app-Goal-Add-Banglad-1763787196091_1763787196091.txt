@@ -1,0 +1,86 @@
+Act as a senior backend architect and product designer for the SafeGo Driver app.
+
+Goal: Add Bangladesh-specific tax reporting inside the existing Tax Info section, without turning SafeGo into a tax-filing service.
+
+Follow all existing SafeGo conventions:
+- Four roles: customer, driver, restaurant, admin
+- Keep all existing US 1099/Tax Summary logic intact
+- Do not touch rides, food, or parcel flows
+- Do not break any existing URLs or APIs
+- Security first: no extra PII exposure, no cross-user access
+
+Scope of work (Bangladesh Tax Info):
+
+1) Country-aware Tax Info
+- If driver country is US, keep showing the current 1099 / Tax Summary layout.
+- If driver country is BD (Bangladesh), show a Bangladesh-specific tax view instead of US forms.
+- Country should be resolved from the driver profile / KYC that already exists in SafeGo.
+
+2) Bangladesh Tax Documents section
+For BD drivers, Tax Info page should show:
+
+Card: "BD Tax Documents"
+- 2024 BD Tax Summary (Year-to-date) – Download button
+- 2023 BD Tax Summary (Complete year) – Download button
+- (Use the same download pattern as the existing US forms)
+
+BD Tax Summary data model (per year):
+- driver_id
+- country = "BD"
+- year
+- total_trip_earnings (gross fares before SafeGo commission)
+- safego_commission_total
+- driver_net_payout (total_trip_earnings - safego_commission_total - any_withheld_tax)
+- any_withheld_tax (keep this field for future use, default 0 for now)
+- generated_at timestamp
+
+The system should:
+- Reuse the existing earnings data source already used for Wallet / payouts
+- Aggregate per year for each BD driver
+- Expose a server-side endpoint to generate and download a simple PDF/HTML summary using this data
+- Never show trip-level details on this page (only aggregated numbers)
+
+3) Bangladesh Taxpayer Information section
+
+Below the document list, add a card:
+
+Title: "Taxpayer Information (Bangladesh)"
+Fields (read-only for now):
+- Country: Bangladesh
+- Taxpayer Type: Self-employed / independent driver
+- Note text:
+  "SafeGo provides annual income summaries to help with your personal tax reporting in Bangladesh. SafeGo does not file or submit tax returns on your behalf. For exact tax calculations and filing, please consult a local tax professional or follow NBR guidelines."
+
+We are NOT building NBR filing or any local tax calculation engine. This is only a reporting helper.
+
+4) Permissions and security
+
+- Drivers can only see their own BD Tax Summary and never any other driver’s documents.
+- Admins can view BD Tax Summary for support purposes through existing admin tools, respecting current RBAC rules.
+- No extra PII fields are added beyond what already exists in SafeGo.
+- All downloads should require an authenticated driver session and cannot be guessed by URL.
+
+5) UX and routing
+
+- Keep the existing /driver/account/tax-info route.
+- Inside that page, switch between "US view" and "BD view" based on driver country.
+- Use the same SafeGo design system: white cards, left-aligned text, primary button style for downloads.
+- Do not add any new navigation tabs.
+
+6) Non-goals (must NOT do)
+
+- Do not implement automatic tax filing for Bangladesh.
+- Do not attempt to calculate NBR tax slabs or payable amounts.
+- Do not mix BD and US forms on the same screen.
+
+Please implement this Bangladesh Tax Info flow end-to-end:
+- Data model changes
+- Aggregation logic
+- API endpoints
+- UI components and conditional rendering
+- Basic tests to confirm that:
+  - US drivers still see the existing 1099/Tax Summary view
+  - BD drivers see the new BD Tax Summary view
+  - Access is restricted to the authenticated driver
+
+When you are done, summarize what you implemented and confirm that existing US behavior remains unchanged.
