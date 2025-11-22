@@ -250,8 +250,22 @@ model DriverProfile {
   rides                 Ride[]
   vehicleDocuments      VehicleDocument[]
   vehicle               Vehicle?
+  blockedRiders         BlockedRider[]
 
   @@map("driver_profiles")
+}
+
+model BlockedRider {
+  id         String        @id @default(uuid())
+  driverId   String
+  customerId String
+  reason     String?
+  blockedAt  DateTime      @default(now())
+  driver     DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, customerId])
+  @@index([driverId])
+  @@map("blocked_riders")
 }
 
 model DriverStats {

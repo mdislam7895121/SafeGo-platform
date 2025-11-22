@@ -3496,4 +3496,193 @@ router.patch("/preferences/theme", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/driver/blocked-riders
+// Get list of riders blocked by this driver
+// ====================================================
+router.get("/blocked-riders", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get all blocked riders
+    const blockedRiders = await prisma.blockedRider.findMany({
+      where: { driverId: driverProfile.id },
+      include: {
+        driver: {
+          include: {
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { blockedAt: "desc" },
+    });
+
+    // Get customer details for each blocked rider
+    const blockedRidersWithDetails = await Promise.all(
+      blockedRiders.map(async (blocked) => {
+        const customer = await prisma.customerProfile.findUnique({
+          where: { id: blocked.customerId },
+          include: {
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        });
+
+        return {
+          id: blocked.id,
+          customerId: blocked.customerId,
+          customerEmail: customer?.user.email || "Unknown",
+          customerName: customer?.fullName || "Unknown Rider",
+          reason: blocked.reason,
+          blockedAt: blocked.blockedAt,
+        };
+      })
+    );
+
+    res.json({ blockedRiders: blockedRidersWithDetails });
+  } catch (error) {
+    console.error("Get blocked riders error:", error);
+    res.status(500).json({ error: "Failed to fetch blocked riders" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/blocked-riders
+// Block a rider (customer)
+// ====================================================
+const blockRiderSchema = z.object({
+  customerId: z.string().uuid("Invalid customer ID"),
+  reason: z.string().max(500).optional(),
+});
+
+router.post("/blocked-riders", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body
+    const validation = blockRiderSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.issues,
+      });
+    }
+
+    const { customerId, reason } = validation.data;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Verify customer exists
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Check if already blocked
+    const existingBlock = await prisma.blockedRider.findUnique({
+      where: {
+        driverId_customerId: {
+          driverId: driverProfile.id,
+          customerId,
+        },
+      },
+    });
+
+    if (existingBlock) {
+      return res.status(400).json({ error: "Rider is already blocked" });
+    }
+
+    // Create blocked rider record
+    const blockedRider = await prisma.blockedRider.create({
+      data: {
+        driverId: driverProfile.id,
+        customerId,
+        reason: reason || null,
+      },
+    });
+
+    res.status(201).json({
+      message: "Rider blocked successfully",
+      blockedRider: {
+        id: blockedRider.id,
+        customerId: blockedRider.customerId,
+        reason: blockedRider.reason,
+        blockedAt: blockedRider.blockedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Block rider error:", error);
+    res.status(500).json({ error: "Failed to block rider" });
+  }
+});
+
+// ====================================================
+// DELETE /api/driver/blocked-riders/:id
+// Unblock a rider
+// ====================================================
+router.delete("/blocked-riders/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Verify the blocked rider record exists and belongs to this driver
+    const blockedRider = await prisma.blockedRider.findUnique({
+      where: { id },
+    });
+
+    if (!blockedRider) {
+      return res.status(404).json({ error: "Blocked rider not found" });
+    }
+
+    if (blockedRider.driverId !== driverProfile.id) {
+      return res.status(403).json({ error: "You can only unblock riders you have blocked" });
+    }
+
+    // Delete the blocked rider record
+    await prisma.blockedRider.delete({
+      where: { id },
+    });
+
+    res.json({ message: "Rider unblocked successfully" });
+  } catch (error) {
+    console.error("Unblock rider error:", error);
+    res.status(500).json({ error: "Failed to unblock rider" });
+  }
+});
+
 export default router;

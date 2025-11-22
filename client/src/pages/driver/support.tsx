@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Send } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface SupportConversation {
   id: string;
@@ -25,6 +27,7 @@ interface SupportMessage {
 }
 
 export default function DriverSupportChat() {
+  const { toast } = useToast();
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messageBody, setMessageBody] = useState("");
 
@@ -36,6 +39,29 @@ export default function DriverSupportChat() {
     queryKey: selectedConversation ? ["/api/support/conversations", selectedConversation] : [],
     enabled: !!selectedConversation,
   }) as { data: SupportConversation | undefined };
+
+  // Mutation to create new support ticket
+  const createTicketMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/support/conversations", {});
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support/conversations"] });
+      setSelectedConversation(data.id);
+      toast({
+        title: "Support ticket created",
+        description: "You can now chat with our support team",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error creating ticket",
+        description: error.message || "Unable to create support ticket. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const sendMessageMutation = useMutation({
     mutationFn: async (body: string) => {
@@ -59,24 +85,37 @@ export default function DriverSupportChat() {
       <div className="p-6 space-y-4" data-testid="driver-support-chat">
         <h2 className="text-2xl font-bold">Support Chat</h2>
         {conversations.length === 0 ? (
-          <Button onClick={() => {}} data-testid="button-create-support-ticket">
-            Create New Ticket
+          <Button 
+            onClick={() => createTicketMutation.mutate()} 
+            disabled={createTicketMutation.isPending}
+            data-testid="button-create-support-ticket"
+          >
+            {createTicketMutation.isPending ? "Creating..." : "Create New Ticket"}
           </Button>
         ) : (
-          <div className="space-y-2">
-            {conversations.map((conv) => (
-              <Card
-                key={conv.id}
-                className="p-4 cursor-pointer hover:bg-muted"
-                onClick={() => setSelectedConversation(conv.id)}
-                data-testid={`card-conversation-${conv.id}`}
-              >
-                <p className="font-medium">Support Conversation</p>
-                <p className="text-sm text-muted-foreground">
-                  {new Date(conv.createdAt).toLocaleDateString()}
-                </p>
-              </Card>
-            ))}
+          <div className="space-y-4">
+            <Button 
+              onClick={() => createTicketMutation.mutate()} 
+              disabled={createTicketMutation.isPending}
+              data-testid="button-create-support-ticket"
+            >
+              {createTicketMutation.isPending ? "Creating..." : "Create New Ticket"}
+            </Button>
+            <div className="space-y-2">
+              {conversations.map((conv) => (
+                <Card
+                  key={conv.id}
+                  className="p-4 cursor-pointer hover:bg-muted"
+                  onClick={() => setSelectedConversation(conv.id)}
+                  data-testid={`card-conversation-${conv.id}`}
+                >
+                  <p className="font-medium">Support Conversation</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(conv.createdAt).toLocaleDateString()}
+                  </p>
+                </Card>
+              ))}
+            </div>
           </div>
         )}
       </div>

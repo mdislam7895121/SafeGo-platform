@@ -1,8 +1,29 @@
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { HelpCircle, MessageCircle, Phone, Mail, FileText } from "lucide-react";
+import { MessageCircle, Phone, Mail, FileText } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DriverHelp() {
+  const { toast } = useToast();
+
+  const handleCallClick = () => {
+    // Open phone dialer
+    window.location.href = "tel:+18001234567";
+  };
+
+  const handleEmailClick = () => {
+    // Open email client
+    window.location.href = "mailto:support@safego.com?subject=SafeGo%20Driver%20Support%20Request";
+  };
+
+  const handleFAQClick = () => {
+    toast({
+      title: "FAQ Section",
+      description: "Comprehensive FAQ documentation coming soon!",
+    });
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-4xl mx-auto">
       <div>
@@ -22,9 +43,11 @@ export default function DriverHelp() {
             <CardDescription>Chat with our support team in real-time</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button className="w-full" data-testid="button-live-chat">
-              Start Chat
-            </Button>
+            <Link href="/driver/support">
+              <Button className="w-full" data-testid="button-live-chat">
+                Start Chat
+              </Button>
+            </Link>
           </CardContent>
         </Card>
 
@@ -37,8 +60,13 @@ export default function DriverHelp() {
             <CardDescription>Speak to a support representative</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full" data-testid="button-call">
-              +880 1XXX-XXXXXX
+            <Button 
+              variant="outline" 
+              className="w-full" 
+              onClick={handleCallClick}
+              data-testid="button-call"
+            >
+              +1-800-123-4567
             </Button>
           </CardContent>
         </Card>
@@ -52,7 +80,12 @@ export default function DriverHelp() {
             <CardDescription>Send us an email</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full" data-testid="button-email">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={handleEmailClick}
+              data-testid="button-email"
+            >
               support@safego.com
             </Button>
           </CardContent>
@@ -67,7 +100,12 @@ export default function DriverHelp() {
             <CardDescription>Browse common questions and guides</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full" data-testid="button-faq">
+            <Button 
+              variant="outline" 
+              className="w-full"
+              onClick={handleFAQClick}
+              data-testid="button-faq"
+            >
               View FAQs
             </Button>
           </CardContent>
