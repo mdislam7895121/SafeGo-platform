@@ -108,28 +108,23 @@ export class PointsService {
     });
 
     if (!driverPoints) {
-      // Initialize 90-day cycle for new driver
-      const { cycleStartDate, cycleEndDate } = await CycleTrackingService.initializeCycle(driverId);
+      // Initialize 90-day cycle for new driver (creates record via upsert)
+      await CycleTrackingService.initializeCycle(driverId);
 
-      // Create new points record with no tier and cycle dates
-      driverPoints = await prisma.driverPoints.create({
-        data: {
-          driverId,
-          // No tier until 1000 points - don't set currentTierId
-          totalPoints: 0, // 90-day status points
-          lifetimePoints: 0,
-          cycleStartDate,
-          cycleEndDate,
-        },
-        include: {
-          tier: true,
-        },
+      // Fetch the newly created record
+      driverPoints = await prisma.driverPoints.findUnique({
+        where: { driverId },
+        include: { tier: true },
       });
+
+      if (!driverPoints) {
+        throw new Error(`Failed to initialize driver points for ${driverId}`);
+      }
     } else {
       // Check if existing driver needs cycle initialization
       const needsInit = await CycleTrackingService.needsCycleInitialization(driverId);
       if (needsInit) {
-        const { cycleStartDate, cycleEndDate } = await CycleTrackingService.initializeCycle(driverId);
+        await CycleTrackingService.initializeCycle(driverId);
         // Reload to get updated data
         driverPoints = await prisma.driverPoints.findUnique({
           where: { driverId },
