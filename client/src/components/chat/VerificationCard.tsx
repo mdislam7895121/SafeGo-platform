@@ -40,6 +40,7 @@ type VerificationData = DriverVerificationData | CustomerVerificationData | Rest
 
 interface VerificationCardProps {
   onVerified: () => void;
+  compact?: boolean;
 }
 
 const maskPhone = (phone: string): string => {
@@ -53,7 +54,7 @@ const maskEmail = (email: string): string => {
   return `${local.charAt(0)}***@${domain}`;
 };
 
-export function VerificationCard({ onVerified }: VerificationCardProps) {
+export function VerificationCard({ onVerified, compact = false }: VerificationCardProps) {
   const { user } = useAuth();
   const [isConfirming, setIsConfirming] = useState(false);
 
@@ -75,7 +76,7 @@ export function VerificationCard({ onVerified }: VerificationCardProps) {
 
   if (isLoading) {
     return (
-      <Card className="mx-4 mb-4" data-testid="card-verification-loading">
+      <Card className={compact ? "" : "mx-4 mb-4"} data-testid="card-verification-loading">
         <CardContent className="p-6 flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
@@ -88,117 +89,119 @@ export function VerificationCard({ onVerified }: VerificationCardProps) {
   const verificationData = data as VerificationData;
 
   return (
-    <Card className="mx-4 mb-4 border-primary/20" data-testid="card-verification">
-      <CardContent className="p-6 space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-            <Check className="h-5 w-5 text-primary" />
+    <Card className={compact ? "border-primary/20" : "mx-4 mb-4 border-primary/20"} data-testid="card-verification">
+      <CardContent className={compact ? "p-4 space-y-3" : "p-6 space-y-4"}>
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`${compact ? "h-8 w-8" : "h-10 w-10"} rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0`}>
+            <Check className={`${compact ? "h-4 w-4" : "h-5 w-5"} text-primary`} />
           </div>
-          <div>
-            <h3 className="font-semibold text-base" data-testid="text-verification-title">
+          <div className="flex-1 min-w-0">
+            <h3 className={`font-semibold ${compact ? "text-sm" : "text-base"}`} data-testid="text-verification-title">
               Verify Your Details
             </h3>
-            <p className="text-sm text-muted-foreground">
-              Confirm your information to start chatting
+            <p className="text-xs text-muted-foreground truncate">
+              {compact ? "Confirm to start" : "Confirm your information to start chatting"}
             </p>
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className={compact ? "space-y-2" : "space-y-3"}>
           {user.role === "driver" && "rating" in verificationData && (
             <>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Name</span>
-                <span className="text-sm font-medium" data-testid="text-driver-name">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Name</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-driver-name">
                   {verificationData.name}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> Location
-                </span>
-                <span className="text-sm font-medium" data-testid="text-driver-location">
-                  {verificationData.city}, {verificationData.country}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Phone className="h-3 w-3" /> Phone
-                </span>
-                <span className="text-sm font-medium" data-testid="text-driver-phone">
-                  {maskPhone(verificationData.phone)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Mail className="h-3 w-3" /> Email
-                </span>
-                <span className="text-sm font-medium" data-testid="text-driver-email">
-                  {maskEmail(verificationData.email)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Star className="h-3 w-3" /> Rating
-                </span>
-                <span className="text-sm font-medium" data-testid="text-driver-rating">
-                  {verificationData.rating.toFixed(1)} ★ ({verificationData.totalTrips} trips)
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">KYC Status</span>
-                <Badge variant={verificationData.kycStatus === "Verified" ? "default" : "secondary"} data-testid="badge-driver-kyc">
-                  {verificationData.kycStatus}
-                </Badge>
-              </div>
-              {verificationData.vehicle && (
-                <div className="flex items-center justify-between">
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
                   <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Car className="h-3 w-3" /> Vehicle
+                    <MapPin className="h-3 w-3" /> Location
                   </span>
-                  <span className="text-sm font-medium" data-testid="text-driver-vehicle">
-                    {verificationData.vehicle}
+                  <span className="text-sm font-medium" data-testid="text-driver-location">
+                    {verificationData.city}, {verificationData.country}
                   </span>
                 </div>
               )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
+                  <Phone className="h-3 w-3" /> Phone
+                </span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-driver-phone">
+                  {maskPhone(verificationData.phone)}
+                </span>
+              </div>
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3 w-3" /> Email
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-driver-email">
+                    {maskEmail(verificationData.email)}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
+                  <Star className="h-3 w-3" /> Rating
+                </span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-driver-rating">
+                  {verificationData.rating.toFixed(1)} ★
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>KYC Status</span>
+                <Badge 
+                  variant={verificationData.kycStatus === "Verified" ? "default" : "secondary"} 
+                  className={compact ? "text-xs h-5" : ""}
+                  data-testid="badge-driver-kyc"
+                >
+                  {verificationData.kycStatus}
+                </Badge>
+              </div>
             </>
           )}
 
           {user.role === "customer" && "totalTrips" in verificationData && !("rating" in verificationData) && (
             <>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Name</span>
-                <span className="text-sm font-medium" data-testid="text-customer-name">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Name</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-customer-name">
                   {verificationData.name}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> City
-                </span>
-                <span className="text-sm font-medium" data-testid="text-customer-city">
-                  {verificationData.city}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> City
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-customer-city">
+                    {verificationData.city}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
                   <Phone className="h-3 w-3" /> Phone
                 </span>
-                <span className="text-sm font-medium" data-testid="text-customer-phone">
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-customer-phone">
                   {maskPhone(verificationData.phone)}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Mail className="h-3 w-3" /> Email
-                </span>
-                <span className="text-sm font-medium" data-testid="text-customer-email">
-                  {maskEmail(verificationData.email)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total Trips</span>
-                <span className="text-sm font-medium" data-testid="text-customer-trips">
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-3 w-3" /> Email
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-customer-email">
+                    {maskEmail(verificationData.email)}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Total Trips</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-customer-trips">
                   {verificationData.totalTrips}
                 </span>
               </div>
@@ -207,37 +210,39 @@ export function VerificationCard({ onVerified }: VerificationCardProps) {
 
           {user.role === "restaurant" && "restaurantName" in verificationData && (
             <>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Restaurant</span>
-                <span className="text-sm font-medium" data-testid="text-restaurant-name">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Restaurant</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-restaurant-name">
                   {verificationData.restaurantName}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
-                  <MapPin className="h-3 w-3" /> City
-                </span>
-                <span className="text-sm font-medium" data-testid="text-restaurant-city">
-                  {verificationData.city}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Owner/Manager</span>
-                <span className="text-sm font-medium" data-testid="text-restaurant-owner">
+              {!compact && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> City
+                  </span>
+                  <span className="text-sm font-medium" data-testid="text-restaurant-city">
+                    {verificationData.city}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>Owner</span>
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium truncate`} data-testid="text-restaurant-owner">
                   {verificationData.ownerName}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground flex items-center gap-1`}>
                   <Phone className="h-3 w-3" /> Phone
                 </span>
-                <span className="text-sm font-medium" data-testid="text-restaurant-phone">
+                <span className={`${compact ? "text-xs" : "text-sm"} font-medium`} data-testid="text-restaurant-phone">
                   {maskPhone(verificationData.phone)}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Restaurant ID</span>
-                <span className="text-sm font-mono text-xs" data-testid="text-restaurant-id">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`${compact ? "text-xs" : "text-sm"} text-muted-foreground`}>ID</span>
+                <span className={`font-mono ${compact ? "text-[10px]" : "text-xs"}`} data-testid="text-restaurant-id">
                   {verificationData.restaurantId}
                 </span>
               </div>
@@ -245,33 +250,30 @@ export function VerificationCard({ onVerified }: VerificationCardProps) {
           )}
         </div>
 
-        <div className="pt-4 border-t">
-          <p className="text-xs text-muted-foreground mb-4">
-            We'll share this information with SafeGo Support to verify your account and help you faster.
+        <div className={compact ? "pt-3 border-t" : "pt-4 border-t"}>
+          <p className="text-xs text-muted-foreground mb-3">
+            {compact 
+              ? "Verify to start chatting with support" 
+              : "We'll share this information with SafeGo Support to verify your account and help you faster."}
           </p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              className="flex-1"
-              onClick={() => {
-                setIsConfirming(true);
-                confirmMutation.mutate();
-              }}
-              disabled={confirmMutation.isPending || isConfirming}
-              data-testid="button-confirm-chat"
-            >
-              {confirmMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Starting...
-                </>
-              ) : (
-                "Confirm and Start Chat"
-              )}
-            </Button>
-            <Button variant="outline" className="flex-1" data-testid="button-update-info">
-              Update My Info
-            </Button>
-          </div>
+          <Button
+            className="w-full"
+            onClick={() => {
+              setIsConfirming(true);
+              confirmMutation.mutate();
+            }}
+            disabled={confirmMutation.isPending || isConfirming}
+            data-testid="button-confirm-chat"
+          >
+            {confirmMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Starting...
+              </>
+            ) : (
+              compact ? "Start Chat" : "Confirm and Start Chat"
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>

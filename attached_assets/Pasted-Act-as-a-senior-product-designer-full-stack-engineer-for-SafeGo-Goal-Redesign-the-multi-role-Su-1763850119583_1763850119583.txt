@@ -1,0 +1,149 @@
+Act as a senior product designer + full-stack engineer for SafeGo.
+
+Goal:
+Redesign the multi-role Support chat UI so that:
+- The chat panel sits on one side (right) in a clean, professional layout
+- The left side shows role-specific topics / quick questions and verification info
+- Drivers, riders, restaurant owners, and parcel couriers all get role-based quick questions
+- All existing backend verification, logging, and live chat logic stays intact
+
+Very important SafeGo rules (do NOT break these):
+- Four roles: customer (rider), driver, restaurant, admin (plus parcel/delivery if already in code)
+- Keep all existing KYC, payouts, tax, wallet, and support verification logic
+- Keep all existing Prisma models, Zod validation, auth middleware, and API routes
+- Do NOT remove server-side verification or 403 “verification required” checks
+- Do NOT break any existing URLs (/driver/support, /rider/support, /restaurant/support, etc.)
+- Do NOT re-introduce the old ticket system. We only use live chat.
+
+### 1. Page scope and layout
+
+Apply this redesign to all existing support pages for logged-in users:
+- Driver support page (current path: /driver/support)
+- Rider support page (whatever the current rider support path is)
+- Restaurant support page (restaurant support path)
+- Parcel / delivery support page (if present)
+
+On desktop and tablet:
+- Use a two-column layout inside the existing SafeGo container.
+- LEFT COLUMN (about 35–40% width):
+  - A compact "Support overview + verification" card:
+    - Title: “SafeGo [Role] Support” (e.g., SafeGo Driver Support, SafeGo Rider Support, etc.)
+    - Subtext: “We’re here to help with your [role-specific text].”
+    - A small verified row that reuses the existing verification data (name, masked phone/email, last verified timestamp).
+  - Below that, a “Quick topics” / FAQ section with role-based chips or buttons (see section 2).
+- RIGHT COLUMN (about 60–65% width):
+  - The live chat conversation:
+    - Header bar with: SafeGo logo, “Live Support”, a small badge “Bot” / “Agent” depending on who last replied.
+    - Scrollable message history.
+    - Message input box at the bottom.
+    - A visible “End chat” / “Close conversation” button or link (top-right of chat header) which:
+      - Soft-closes the UI (clears current conversation from the view or shows a “Conversation closed – Start new chat” state).
+      - Does NOT delete DB records or break logging.
+
+On mobile:
+- Use a stacked layout:
+  - First show the verification + quick topics section.
+  - Below that, the chat panel full-width.
+- Keep everything readable and touch-friendly.
+
+### 2. Role-based quick topics / auto questions
+
+Use the existing role detection (from auth/session) to show different quick topics.  
+Implement them as clickable chips or buttons under the verification card, above the chat.
+
+When the user taps a quick topic:
+- Automatically send a pre-defined user message into the chat (as if the user typed it).
+- Immediately show a bot reply using the existing bot pipeline or a simple canned text answer.
+- Also tag the conversation topic internally (for future analytics / escalation).
+
+Suggested topics (you can adjust wording slightly but keep the intent):
+
+Driver:
+- “Payments & Wallet”
+- “Payout methods or cash-out”
+- “Trips & riders issues”
+- “Documents & vehicle”
+- “Tax information”
+- “Account & login”
+
+Rider (customer):
+- “Payments & refunds”
+- “Trip or ride issues”
+- “Promotions & credits”
+- “Safety & security”
+- “Account & login”
+
+Restaurant:
+- “Orders & delivery issues”
+- “Menu & pricing updates”
+- “Payouts & earnings”
+- “Device / tablet issues”
+- “Account & documents”
+
+Parcel / delivery (if applicable):
+- “Pickup or dropoff issues”
+- “Lost or damaged items”
+- “Delivery delays”
+- “Address or location problems”
+
+For each quick topic, wire a simple mapping:
+- topicKey → userMessageTemplate → initialBotReplyTemplate
+
+Keep these templates in a separate config file (e.g., supportTopics.ts) so they are easy to extend later without touching core logic.
+
+### 3. Verification behaviour (before chat)
+
+We already have verification in place. Reuse it exactly, but surface it more clearly in the UI:
+
+- When the support page loads:
+  - Fetch the existing verification data (user id, role, country, basic KYC/tax status if already exposed).
+  - Show a small “Verified” pill or status text in the left column card.
+- When user clicks “Start chat” or the first quick topic:
+  - Ensure verification is still valid server-side using the existing checks.
+  - If verification fails, return 403 and show a friendly message:
+    - “We need to confirm your account details before chat. Please update your documents or contact support by email.”
+  - Otherwise, allow the chat to open and save verification timestamp (as it does now).
+
+Do NOT relax any security checks. Only reuse the existing endpoints.
+
+### 4. Chat UX details
+
+- Make sure the chat input area always stays visible above the keyboard on mobile.
+- Add a small “Topics” strip just above the message input:
+  - Show the same role-based quick topics there as compact chips (especially useful once the user scrolls).
+- Add a “Back to Help Center” link or button aligned with existing navigation patterns so the user can easily exit the support page.
+- Keep the new live chat implementation (no more “Create New Ticket” code).
+- Ensure only one active conversation per user/role as currently implemented.
+
+### 5. Technical constraints
+
+- Keep all existing backend:
+  - Prisma models and migrations
+  - Zod validation
+  - API routes and auth middleware
+  - Fraud, logging, or audit events
+- Only adjust or extend:
+  - React components for the Support pages
+  - Layout / CSS / UI state
+  - A small topic-mapping config for quick questions
+- Make sure you don’t introduce any console or TypeScript errors.
+- Reuse existing components (buttons, cards, layout grid) to keep SafeGo visual consistency.
+
+### 6. What to show me when you’re done
+
+When you finish, please:
+- List which files you changed (front-end + any small config).
+- Summarize how the layout behaves on:
+  - Desktop driver support page
+  - Mobile driver support page
+  - One other role (rider or restaurant)
+- Confirm that:
+  - Verification and 403 behaviour still works.
+  - Live chat works end-to-end with quick topics.
+  - “End chat / Close conversation” works without breaking history.
+
+Do NOT start any other new feature. Focus only on:
+- Side-by-side professional layout for Support
+- Role-based quick topics
+- Clean start / end chat flow
+- Keeping all security and verification rules intact

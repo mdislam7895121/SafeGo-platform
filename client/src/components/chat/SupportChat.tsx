@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { VerificationCard } from "./VerificationCard";
-import { ArrowLeft, Send, Loader2, HelpCircle, X } from "lucide-react";
+import { getTopicsForRole } from "@/config/supportTopics";
+import { ArrowLeft, Send, Loader2, HelpCircle, X, MessageCircle, Shield } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface ChatMessage {
@@ -18,20 +19,12 @@ interface ChatMessage {
   createdAt: string;
 }
 
-const QUICK_TOPICS = [
-  { label: "Payments & Wallet", value: "payments", icon: "💰" },
-  { label: "Trips & Rides", value: "trips", icon: "🚗" },
-  { label: "Documents & Vehicle", value: "documents", icon: "📄" },
-  { label: "Tax Information", value: "tax", icon: "📊" },
-  { label: "Account Settings", value: "account_settings", icon: "⚙️" },
-];
-
 interface SupportChatProps {
   backRoute: string;
   pageTitle?: string;
 }
 
-export function SupportChat({ backRoute, pageTitle = "SafeGo Support" }: SupportChatProps) {
+export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -40,13 +33,16 @@ export function SupportChat({ backRoute, pageTitle = "SafeGo Support" }: Support
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [lastMessageTime, setLastMessageTime] = useState<string | null>(null);
-  const [showTopics, setShowTopics] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const roleTopics = user ? getTopicsForRole(user.role) : undefined;
+  const title = pageTitle || roleTopics?.title || "SafeGo Support";
+  const subtitle = roleTopics?.subtitle || "We're here to help";
 
   const getStatusLabel = () => {
     if (!isVerified) return "Not Started";
-    const conversation = messages.find(m => m.senderType === "agent");
-    if (conversation) return "Agent";
+    const hasAgent = messages.find(m => m.senderType === "agent");
+    if (hasAgent) return "Agent";
     return "Bot";
   };
 
@@ -116,10 +112,22 @@ export function SupportChat({ backRoute, pageTitle = "SafeGo Support" }: Support
     sendMessageMutation.mutate(trimmed);
   };
 
-  const handleQuickReply = (topicLabel: string) => {
-    if (!conversationId) return;
-    setShowTopics(false);
-    sendMessageMutation.mutate(`I need help with: ${topicLabel}`);
+  const handleQuickTopic = (userMessage: string, botResponse: string) => {
+    if (!conversationId || sendMessageMutation.isPending) return;
+    
+    sendMessageMutation.mutate(userMessage, {
+      onSuccess: () => {
+        setTimeout(() => {
+          const botMessage: ChatMessage = {
+            id: `bot-${Date.now()}`,
+            senderType: "bot",
+            content: botResponse,
+            createdAt: new Date().toISOString(),
+          };
+          setMessages(prev => [...prev, botMessage]);
+        }, 500);
+      },
+    });
   };
 
   const handleVerified = () => {
@@ -133,7 +141,6 @@ export function SupportChat({ backRoute, pageTitle = "SafeGo Support" }: Support
       setConversationId(null);
       setMessages([]);
       setLastMessageTime(null);
-      setShowTopics(true);
       queryClient.invalidateQueries({ queryKey: ["/api/support/chat"] });
       toast({
         title: "Chat ended",
@@ -174,166 +181,203 @@ export function SupportChat({ backRoute, pageTitle = "SafeGo Support" }: Support
   }, [messages]);
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      <div className="max-w-[540px] mx-auto py-6">
-        {/* Top Bar */}
-        <Card className="mb-4 mx-4">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setLocation(backRoute)}
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="font-semibold text-base" data-testid="text-page-title">
-                  {pageTitle}
-                </h1>
-                <p className="text-xs text-muted-foreground">
-                  Get help from our support team
-                </p>
-              </div>
+    <div className="min-h-screen bg-background">
+      {/* Header Bar */}
+      <div className="border-b bg-card">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation(backRoute)}
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="font-semibold text-lg" data-testid="text-page-title">
+                {title}
+              </h1>
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
             </div>
-            <Badge variant={getStatusVariant()} data-testid="badge-chat-status">
-              {getStatusLabel()}
-            </Badge>
-          </CardContent>
-        </Card>
+          </div>
+          <Badge variant={getStatusVariant()} data-testid="badge-chat-status">
+            {getStatusLabel()}
+          </Badge>
+        </div>
+      </div>
 
-        {/* Verification Card (shown only if not verified) */}
-        {!isVerified && <VerificationCard onVerified={handleVerified} />}
-
-        {/* Chat Panel (shown only after verification) */}
-        {isVerified && (
-          <Card className="mx-4 mb-4" data-testid="card-chat-panel">
-            <CardContent className="p-0">
-              {/* Messages Area */}
-              <div className="h-[500px] overflow-y-auto p-4 space-y-3" data-testid="div-messages">
-                {messages.length === 0 && (
-                  <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-                    <HelpCircle className="h-12 w-12 mb-3 opacity-50" />
-                    <p className="text-sm">
-                      Start the conversation by selecting a topic below
-                    </p>
-                  </div>
-                )}
-
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.senderType === "user" ? "justify-end" : "justify-start"}`}
-                    data-testid={`message-${msg.id}`}
-                  >
-                    <div
-                      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                        msg.senderType === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      }`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      <p className="text-xs opacity-70 mt-1">
-                        {new Date(msg.createdAt).toLocaleTimeString([], {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+      {/* Main Content: Two-Column Layout */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* LEFT COLUMN: Verification + Quick Topics */}
+          <div className="lg:col-span-1 space-y-4">
+            {/* Verification Overview Card */}
+            {!isVerified ? (
+              <VerificationCard onVerified={handleVerified} compact={true} />
+            ) : (
+              <Card data-testid="card-verified-status">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <Shield className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-sm">Verified</h3>
+                      <p className="text-xs text-muted-foreground">
+                        {user?.email && user.email.includes("@") 
+                          ? `${user.email.charAt(0)}***@${user.email.split("@")[1]}`
+                          : "Account verified"}
                       </p>
                     </div>
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </div>
+                </CardContent>
+              </Card>
+            )}
 
-              {/* Quick Topic Buttons */}
-              {showTopics && messages.length > 0 && (
-                <div className="px-4 pb-3 border-t pt-3">
-                  <p className="text-xs text-muted-foreground mb-2">Quick topics:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {QUICK_TOPICS.map((topic) => (
-                      <Button
-                        key={topic.value}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleQuickReply(topic.label)}
-                        disabled={sendMessageMutation.isPending}
-                        data-testid={`button-topic-${topic.value}`}
-                      >
-                        <span className="mr-1">{topic.icon}</span>
-                        {topic.label}
-                      </Button>
-                    ))}
+            {/* Quick Topics Section */}
+            {isVerified && roleTopics && (
+              <Card data-testid="card-quick-topics">
+                <CardHeader className="pb-3">
+                  <h3 className="font-semibold text-sm">Quick Topics</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Select a topic to get instant help
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {roleTopics.topics.map((topic) => (
+                    <Button
+                      key={topic.key}
+                      variant="outline"
+                      className="w-full justify-start hover-elevate active-elevate-2"
+                      onClick={() => handleQuickTopic(topic.userMessage, topic.botResponse)}
+                      disabled={sendMessageMutation.isPending}
+                      data-testid={`button-topic-${topic.key}`}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                      <span className="text-left text-sm">{topic.label}</span>
+                    </Button>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Help Info */}
+            {isVerified && (
+              <div className="text-center px-2">
+                <p className="text-xs text-muted-foreground">
+                  Type 'agent' anytime to speak with a human support specialist
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT COLUMN: Live Chat */}
+          <div className="lg:col-span-2">
+            {!isVerified ? (
+              <Card className="h-[600px] flex items-center justify-center" data-testid="card-chat-placeholder">
+                <CardContent className="text-center">
+                  <HelpCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <h3 className="font-semibold text-lg mb-2">Start Live Support</h3>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    Verify your account details to begin chatting with our support team. 
+                    We're available 24/7 to help you.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="h-[600px] flex flex-col" data-testid="card-chat-panel">
+                {/* Chat Header */}
+                <CardHeader className="border-b flex flex-row items-center justify-between py-3">
+                  <div className="flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold text-base">Live Support</h3>
                   </div>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="mt-2 w-full"
-                    onClick={() => setShowTopics(false)}
-                    data-testid="button-hide-topics"
-                  >
-                    Hide topics
-                  </Button>
-                </div>
-              )}
-
-              {/* Input Area */}
-              <div className="border-t p-4">
-                <div className="flex gap-2">
-                  <Input
-                    value={messageInput}
-                    onChange={(e) => setMessageInput(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
-                    placeholder="Type a message..."
-                    disabled={sendMessageMutation.isPending}
-                    data-testid="input-message"
-                  />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={!messageInput.trim() || sendMessageMutation.isPending}
-                    size="icon"
-                    data-testid="button-send"
-                  >
-                    {sendMessageMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                <div className="flex items-center justify-between mt-3">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs text-muted-foreground p-0 h-auto"
-                    onClick={() => setShowTopics(!showTopics)}
-                    data-testid="button-toggle-topics"
-                  >
-                    {showTopics ? "Hide topics" : "Show topics"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-xs"
                     onClick={handleEndChat}
                     data-testid="button-end-chat"
                   >
-                    <X className="h-3 w-3 mr-1" />
+                    <X className="h-4 w-4 mr-1" />
                     End Chat
                   </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </CardHeader>
 
-        {/* Info Footer */}
-        <div className="mx-4 text-center">
-          <p className="text-xs text-muted-foreground">
-            SafeGo Support is available 24/7 to help you with any questions
-          </p>
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-3" data-testid="div-messages">
+                  {messages.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                      <MessageCircle className="h-12 w-12 mb-3 opacity-50" />
+                      <p className="text-sm">
+                        Select a quick topic or type your message below
+                      </p>
+                    </div>
+                  )}
+
+                  {messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.senderType === "user" ? "justify-end" : "justify-start"}`}
+                      data-testid={`message-${msg.id}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                          msg.senderType === "user"
+                            ? "bg-primary text-primary-foreground rounded-br-sm"
+                            : "bg-muted rounded-bl-sm"
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                        <p className="text-xs opacity-70 mt-1.5">
+                          {new Date(msg.createdAt).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input Area */}
+                <div className="border-t p-4">
+                  <div className="flex gap-2">
+                    <Input
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                      onKeyPress={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()}
+                      placeholder="Type your message..."
+                      disabled={sendMessageMutation.isPending}
+                      className="flex-1"
+                      data-testid="input-message"
+                    />
+                    <Button
+                      onClick={handleSendMessage}
+                      disabled={!messageInput.trim() || sendMessageMutation.isPending}
+                      size="icon"
+                      data-testid="button-send"
+                    >
+                      {sendMessageMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+          </div>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="max-w-7xl mx-auto px-4 pb-6">
+        <p className="text-xs text-center text-muted-foreground">
+          SafeGo Support is available 24/7 · Typical response time: under 2 minutes
+        </p>
       </div>
     </div>
   );
