@@ -334,6 +334,137 @@ router.post("/chat/escalate", authenticateToken, async (req: AuthRequest, res) =
   }
 });
 
+// Mark bot response as unhelpful (increments unresolvedCount for auto-escalation)
+router.post("/chat/bot-unhelpful", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { db } = await import("../db");
+    const { EscalationService } = await import("../services/escalationService");
+    const { conversationId } = req.body;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "conversationId is required" });
+    }
+
+    const conversation = await db.supportConversation.findFirst({
+      where: { id: conversationId, userId },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    // Increment unresolved count
+    await EscalationService.incrementUnresolvedCount(conversationId);
+
+    // Check if auto-escalation threshold reached (3 unresolved attempts)
+    const escalationCheck = await EscalationService.checkAutoEscalation(conversationId);
+    
+    if (escalationCheck && escalationCheck.escalated) {
+      // Immediately escalate to human agent
+      await EscalationService.escalateConversation(conversationId, "auto_unresolved");
+      
+      return res.json({ 
+        success: true, 
+        message: "Feedback recorded",
+        escalated: true,
+        escalationMessage: escalationCheck.message
+      });
+    }
+
+    res.json({ success: true, message: "Feedback recorded", escalated: false });
+  } catch (error: any) {
+    console.error("Error recording bot feedback:", error);
+    res.status(500).json({ error: "Failed to record feedback" });
+  }
+});
+
+// Mark bot response as helpful (resets unresolvedCount)
+router.post("/chat/bot-helpful", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { db } = await import("../db");
+    const { EscalationService } = await import("../services/escalationService");
+    const { conversationId } = req.body;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "conversationId is required" });
+    }
+
+    const conversation = await db.supportConversation.findFirst({
+      where: { id: conversationId, userId },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    await EscalationService.resetUnresolvedCount(conversationId);
+
+    res.json({ success: true, message: "Feedback recorded" });
+  } catch (error: any) {
+    console.error("Error recording bot feedback:", error);
+    res.status(500).json({ error: "Failed to record feedback" });
+  }
+});
+
+// End chat with optional rating and feedback
+const endChatSchema = z.object({
+  rating: z.number().min(1).max(5).optional(),
+  feedback: z.string().max(500).optional(),
+});
+
+router.post("/chat/end", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { db } = await import("../db");
+    const { conversationId, rating, feedback } = req.body;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "conversationId is required" });
+    }
+
+    const validationResult = endChatSchema.safeParse({ rating, feedback });
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.flatten().fieldErrors,
+      });
+    }
+
+    const conversation = await db.supportConversation.findFirst({
+      where: { id: conversationId, userId },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    const updatedConversation = await db.supportConversation.update({
+      where: { id: conversationId },
+      data: {
+        status: "closed",
+        closedAt: new Date(),
+        rating: validationResult.data.rating,
+        feedback: validationResult.data.feedback,
+      },
+    });
+
+    res.json({
+      success: true,
+      conversation: {
+        id: updatedConversation.id,
+        status: updatedConversation.status,
+        closedAt: updatedConversation.closedAt,
+        rating: updatedConversation.rating,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error ending chat:", error);
+    res.status(500).json({ error: "Failed to end chat" });
+  }
+});
+
 // ====================================================
 // ADMIN SUPPORT ENDPOINTS
 // ====================================================
