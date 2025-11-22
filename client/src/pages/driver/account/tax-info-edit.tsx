@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Save } from "lucide-react";
@@ -35,10 +35,10 @@ export default function TaxInfoEdit() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Initialize form when data loads
-  useState(() => {
+  useEffect(() => {
     if (profile) {
       setFullLegalName(profile.usaFullLegalName || `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || "");
-      setTaxId(profile.ssnMasked || "");
+      setTaxId(profile.ssnMasked || profile.nidNumber || "");
       setTaxClassification(profile.taxClassification || "");
       setStreet(profile.usaStreet || "");
       setCity(profile.usaCity || "");
@@ -46,7 +46,7 @@ export default function TaxInfoEdit() {
       setPostalCode(profile.usaZipCode || "");
       setW9Status(profile.w9Status || "pending");
     }
-  });
+  }, [profile]);
 
   const updateTaxInfoMutation = useMutation({
     mutationFn: async (data: any) => {
