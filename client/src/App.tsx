@@ -30,6 +30,7 @@ import { DriverLayout } from "@/layouts/DriverLayout";
 import DriverHome from "@/pages/driver/home";
 import DriverDashboard from "@/pages/driver/dashboard";
 import DriverProfile from "@/pages/driver/profile";
+import DriverPublicProfile from "@/pages/driver/profile-public";
 import DriverVehicle from "@/pages/driver/vehicle";
 import DriverWallet from "@/pages/driver/wallet";
 import DriverWalletBalance from "@/pages/driver/wallet-balance";
@@ -220,6 +221,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Vehicles">
             <DriverVehicle />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/profile/public">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Public Profile">
+            <DriverPublicProfile />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

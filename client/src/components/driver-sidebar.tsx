@@ -88,32 +88,34 @@ export function DriverSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-3 p-2">
-          <Avatar className="h-14 w-14 cursor-pointer" onClick={() => window.location.href = '/driver/profile'}>
-            <AvatarImage src={profile?.profilePhotoUrl} alt={driverName} />
-            <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-lg">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base truncate" data-testid="text-driver-name">
-              {driverName}
-            </h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
-                <span data-testid="text-driver-rating">{rating.toFixed(1)}</span>
-              </div>
-              <span>•</span>
-              <div className="flex items-center gap-1 truncate">
-                <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                <span className="truncate" data-testid="text-driver-location">
-                  {cityName}, {countryCode}
-                </span>
+        <Link href="/driver/profile">
+          <div className="flex items-center gap-3 p-2 cursor-pointer hover-elevate rounded-lg">
+            <Avatar className="h-14 w-14">
+              <AvatarImage src={profile?.profilePhotoUrl} alt={driverName} />
+              <AvatarFallback className="bg-primary text-primary-foreground font-semibold text-lg">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-base truncate" data-testid="text-driver-name">
+                {driverName}
+              </h3>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
+                  <span data-testid="text-driver-rating">{rating.toFixed(1)}</span>
+                </div>
+                <span>•</span>
+                <div className="flex items-center gap-1 truncate">
+                  <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                  <span className="truncate" data-testid="text-driver-location">
+                    {cityName}, {countryCode}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent>
