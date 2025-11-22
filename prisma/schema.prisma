@@ -217,6 +217,11 @@ model DriverProfile {
   taxClassification     String?            // Individual, Sole proprietor, etc.
   w9Status              String?            // pending, submitted, approved
   w9SubmittedAt         DateTime?
+  taxCertificationAccepted Boolean?        // W-9 certification checkbox
+  taxCertificationDate  DateTime?          // When driver certified tax info
+  tripRevenueTotalYtd   Decimal?           @db.Decimal(12, 2) // 1099-K: Trip revenue
+  nonTripIncomeTotalYtd Decimal?           @db.Decimal(12, 2) // 1099-NEC: Bonuses, promos
+  taxYear               Int?               // Current tax year being tracked
   securityStatus        SecurityStatus     @default(normal)
   securityNotes         String?
   deliveries            Delivery[]

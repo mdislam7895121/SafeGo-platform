@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -30,6 +31,7 @@ export default function TaxInfoEdit() {
   const [state, setState] = useState("");
   const [postalCode, setPostalCode] = useState("");
   const [w9Status, setW9Status] = useState("");
+  const [certificationAccepted, setCertificationAccepted] = useState(false);
 
   // Validation errors
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -45,6 +47,7 @@ export default function TaxInfoEdit() {
       setState(profile.usaState || "");
       setPostalCode(profile.usaZipCode || "");
       setW9Status(profile.w9Status || "pending");
+      setCertificationAccepted(profile.taxCertificationAccepted || false);
     }
   }, [profile]);
 
@@ -120,6 +123,10 @@ export default function TaxInfoEdit() {
       newErrors.postalCode = "Postal code is required";
     }
 
+    if (!certificationAccepted) {
+      newErrors.certificationAccepted = "You must certify that the information is accurate";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -143,6 +150,7 @@ export default function TaxInfoEdit() {
       state,
       postalCode,
       w9Status,
+      taxCertificationAccepted: certificationAccepted,
     };
 
     // Only include taxId if it's not masked (user entered a new value)
@@ -419,6 +427,48 @@ export default function TaxInfoEdit() {
                   <SelectItem value="approved">Approved</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Certification */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Certification</CardTitle>
+            <CardDescription>
+              Under penalties of perjury, certify that your tax information is accurate
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="certification"
+                checked={certificationAccepted}
+                onCheckedChange={(checked) => {
+                  setCertificationAccepted(checked as boolean);
+                  if (errors.certificationAccepted) {
+                    setErrors({ ...errors, certificationAccepted: "" });
+                  }
+                }}
+                data-testid="checkbox-certification"
+                className={errors.certificationAccepted ? "border-destructive" : ""}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label
+                  htmlFor="certification"
+                  className="text-sm font-medium leading-relaxed cursor-pointer"
+                >
+                  I certify that the information provided above is accurate and complete
+                  <span className="text-destructive ml-1">*</span>
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  By checking this box, you confirm that all tax information provided is truthful 
+                  and correct to the best of your knowledge.
+                </p>
+                {errors.certificationAccepted && (
+                  <p className="text-sm text-destructive">{errors.certificationAccepted}</p>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>

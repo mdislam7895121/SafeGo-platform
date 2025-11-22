@@ -1192,6 +1192,7 @@ const taxInfoSchema = z.object({
   state: z.string().min(1),
   postalCode: z.string().min(1),
   w9Status: z.string().optional(),
+  taxCertificationAccepted: z.boolean().optional(),
 });
 
 router.put("/tax-info", async (req: AuthRequest, res) => {
@@ -1207,7 +1208,7 @@ router.put("/tax-info", async (req: AuthRequest, res) => {
       });
     }
 
-    const { fullLegalName, taxId, taxClassification, street, city, state, postalCode, w9Status } = validation.data;
+    const { fullLegalName, taxId, taxClassification, street, city, state, postalCode, w9Status, taxCertificationAccepted } = validation.data;
 
     // Get driver profile
     const driverProfile = await prisma.driverProfile.findUnique({
@@ -1234,6 +1235,9 @@ router.put("/tax-info", async (req: AuthRequest, res) => {
       usaZipCode: postalCode,
       w9Status: w9Status || "pending",
       w9SubmittedAt: w9Status === "submitted" || w9Status === "approved" ? new Date() : null,
+      taxCertificationAccepted: taxCertificationAccepted || false,
+      taxCertificationDate: taxCertificationAccepted ? new Date() : null,
+      taxYear: taxCertificationAccepted ? new Date().getFullYear() : null,
     };
 
     // If taxId is provided and not masked, encrypt and store it
@@ -2653,6 +2657,140 @@ router.post("/wallet/cash-out", async (req: AuthRequest, res) => {
     }
     
     res.status(500).json({ error: "Failed to process cash out request" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/tax-summary
+// Get year-to-date tax summary (1099-K and 1099-NEC totals)
+// ====================================================
+router.get("/tax-summary", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Import tax service
+    const { taxService } = await import("../services/taxService");
+
+    // Get tax summary
+    const summary = await taxService.getTaxSummary(driverProfile.id, year);
+
+    res.json({
+      year,
+      tripRevenue1099K: summary.tripRevenue1099K,
+      nonTripIncome1099NEC: summary.nonTripIncome1099NEC,
+      totalEarnings: summary.totalEarnings,
+      requires1099K: summary.requires1099K,
+      requires1099NEC: summary.requires1099NEC,
+      driverInfo: {
+        fullLegalName: summary.driverInfo?.usaFullLegalName,
+        address: summary.driverInfo?.usaStreet
+          ? `${summary.driverInfo.usaStreet}, ${summary.driverInfo.usaCity}, ${summary.driverInfo.usaState} ${summary.driverInfo.usaZipCode}`
+          : null,
+        ssnLast4: summary.driverInfo?.ssnLast4,
+        taxClassification: summary.driverInfo?.taxClassification,
+        w9Status: summary.driverInfo?.w9Status,
+        taxCertificationAccepted: summary.driverInfo?.taxCertificationAccepted,
+      },
+    });
+  } catch (error) {
+    console.error("Tax summary error:", error);
+    res.status(500).json({ error: "Failed to get tax summary" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/tax-documents/:type
+// Get tax document (1099-K, 1099-NEC, or year-to-date summary)
+// type: '1099-K', '1099-NEC', or 'ytd-summary'
+// ====================================================
+router.get("/tax-documents/:type", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { type } = req.params;
+    const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+
+    // Validate document type
+    if (!["1099-K", "1099-NEC", "ytd-summary"].includes(type)) {
+      return res.status(400).json({ error: "Invalid document type" });
+    }
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            email: true,
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // US drivers only
+    if (driverProfile.user.countryCode !== "US") {
+      return res.status(403).json({ error: "Tax documents are only available for US drivers" });
+    }
+
+    // Import tax service
+    const { taxService } = await import("../services/taxService");
+
+    // Get tax summary and transactions
+    const summary = await taxService.getTaxSummary(driverProfile.id, year);
+    const transactions = await taxService.getYearTransactions(driverProfile.id, year);
+
+    // For now, return JSON data (later can be converted to PDF)
+    // This provides all the data needed to generate proper 1099 forms
+    res.json({
+      documentType: type,
+      year,
+      generatedAt: new Date(),
+      driver: {
+        name: summary.driverInfo?.usaFullLegalName || `${driverProfile.firstName || ""} ${driverProfile.lastName || ""}`.trim(),
+        address: summary.driverInfo?.usaStreet
+          ? `${summary.driverInfo.usaStreet}, ${summary.driverInfo.usaCity}, ${summary.driverInfo.usaState} ${summary.driverInfo.usaZipCode}`
+          : null,
+        ssnLast4: summary.driverInfo?.ssnLast4,
+        taxClassification: summary.driverInfo?.taxClassification,
+        email: driverProfile.user.email,
+      },
+      payer: {
+        name: "SafeGo Inc.",
+        address: "123 SafeGo Street, New York, NY 10001",
+        ein: "XX-XXXXXXX", // Placeholder - should be real EIN
+      },
+      earnings: {
+        tripRevenue1099K: summary.tripRevenue1099K,
+        nonTripIncome1099NEC: summary.nonTripIncome1099NEC,
+        totalEarnings: summary.totalEarnings,
+      },
+      transactions:
+        type === "ytd-summary"
+          ? transactions
+          : transactions.filter((tx) => tx.category === type),
+      thresholdMet: type === "1099-K" ? summary.requires1099K : type === "1099-NEC" ? summary.requires1099NEC : true,
+      notes:
+        type === "ytd-summary"
+          ? "This is a year-to-date summary of all earnings. Official 1099 forms will be available after year-end."
+          : `This document shows ${type} income. You will receive an official ${type} form if you meet IRS reporting requirements.`,
+    });
+  } catch (error) {
+    console.error("Tax document error:", error);
+    res.status(500).json({ error: "Failed to generate tax document" });
   }
 });
 
