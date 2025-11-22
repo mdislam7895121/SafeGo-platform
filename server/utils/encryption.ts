@@ -224,3 +224,26 @@ export function formatSSN(ssn: string): string {
   
   return `${cleaned.substring(0, 3)}-${cleaned.substring(3, 5)}-${cleaned.substring(5, 9)}`;
 }
+
+/**
+ * Masks NID for display, showing only last 4 digits
+ * Example: "1234567890" becomes "******7890"
+ * 
+ * @param nid - Plain NID string
+ * @returns Masked NID showing only last 4 digits
+ */
+export function maskNID(nid: string): string {
+  if (!nid) return "";
+  
+  // Remove all non-digit characters
+  const cleaned = nid.replace(/\D/g, "");
+  
+  // Must be valid length (10-17 digits for BD NID)
+  if (cleaned.length < 4) {
+    return "*".repeat(cleaned.length); // Return fully masked if too short
+  }
+  
+  const last4 = cleaned.substring(cleaned.length - 4);
+  const masked = "*".repeat(cleaned.length - 4);
+  return `${masked}${last4}`;
+}
