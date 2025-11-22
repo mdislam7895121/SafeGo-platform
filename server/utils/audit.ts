@@ -194,7 +194,7 @@ export async function logAuditEvent(params: AuditLogParams): Promise<void> {
         entityType,
         entityId,
         description,
-        metadata: safeMetadata,
+        metadata: safeMetadata || undefined,
         success,
       },
     });

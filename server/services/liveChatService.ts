@@ -56,6 +56,8 @@ export async function startOrGetChat(userId: string, userType: string, userName?
     entityId: newConversation.id,
     actorId: userId,
     actorEmail: "",
+    actorRole: userType,
+    description: `Support conversation created for ${userType}`,
     metadata: {
       userType,
       status: "open",
@@ -197,6 +199,8 @@ export async function escalateToHuman(
     entityId: conversationId,
     actorId: userId,
     actorEmail: "",
+    actorRole: conversation.userType,
+    description: `Support conversation escalated to human agent`,
     metadata: {
       action: "escalated_to_human",
       previousStatus: conversation.status,
@@ -232,7 +236,7 @@ export async function getAdminConversations(
   });
 
   const conversationsWithDetails = await Promise.all(
-    conversations.map(async (conv) => {
+    conversations.map(async (conv: any) => {
       const lastMessage = await prisma.supportMessage.findFirst({
         where: { conversationId: conv.id },
         orderBy: { createdAt: "desc" },
@@ -300,6 +304,8 @@ export async function sendAdminReply(
     entityId: conversationId,
     actorId: adminUserId,
     actorEmail: "",
+    actorRole: "admin",
+    description: `Admin replied to support conversation`,
     metadata: {
       action: "admin_reply",
       assignedAdminId: conversation.assignedAdminId || adminUserId,
@@ -335,6 +341,8 @@ export async function closeConversation(
     entityId: conversationId,
     actorId: adminUserId,
     actorEmail: "",
+    actorRole: "admin",
+    description: `Support conversation closed by admin`,
     metadata: {
       action: "conversation_closed",
     },
