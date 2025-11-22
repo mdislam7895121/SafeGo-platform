@@ -927,10 +927,20 @@ router.post("/upload/vehicle-document", uploadVehicleDocument, async (req: AuthR
 
     const { documentType, vehicleId, description, expiresAt } = req.body;
 
-    // Validate document type
-    if (!["registration", "insurance"].includes(documentType)) {
+    // Validate document type - expanded to include all required vehicle documents
+    const validDocTypes = [
+      "registration",
+      "insurance",
+      "vehicleInspection",
+      "driverLicenseVehicle",
+      "licensePlate",
+      "tlcLicense",
+      "tlcDiamond",
+    ];
+
+    if (!validDocTypes.includes(documentType)) {
       return res.status(400).json({
-        error: "Invalid document type. Must be 'registration' or 'insurance'",
+        error: `Invalid document type. Must be one of: ${validDocTypes.join(", ")}`,
       });
     }
 

@@ -34,6 +34,18 @@ export default function DriverKYCDocuments() {
   const isUSA = profile?.countryCode === "US";
   const isBD = profile?.countryCode === "BD";
   const isNY = profile?.usaState === "NY";
+  
+  // Check if driver is in NYC (for TLC requirements)
+  const cityLower = (profile?.usaCity || "").toLowerCase();
+  const isNYC = isNY && (
+    cityLower.includes("new york") ||
+    cityLower.includes("nyc") ||
+    cityLower.includes("brooklyn") ||
+    cityLower.includes("queens") ||
+    cityLower.includes("manhattan") ||
+    cityLower.includes("bronx") ||
+    cityLower.includes("staten island")
+  );
 
   // Initialize USA name form when driver data loads
   useEffect(() => {
@@ -172,8 +184,36 @@ export default function DriverKYCDocuments() {
 
   const vehicleDocs = (vehicleDocuments as any)?.documents || [];
   const hasVehicleRegistration = vehicleDocs.some((doc: any) => doc.documentType === "registration");
+  const hasVehicleInsurance = vehicleDocs.some((doc: any) => doc.documentType === "insurance");
+  const hasVehicleInspection = vehicleDocs.some((doc: any) => doc.documentType === "vehicleInspection");
+  const hasDriverLicenseVehicle = vehicleDocs.some((doc: any) => doc.documentType === "driverLicenseVehicle");
+  const hasLicensePlate = vehicleDocs.some((doc: any) => doc.documentType === "licensePlate");
+  const hasTLCDiamond = vehicleDocs.some((doc: any) => doc.documentType === "tlcDiamond");
+
+  // Check all required vehicle documents
   if (!hasVehicleRegistration) {
     missingFields.push("Vehicle registration document");
+  }
+  
+  if (!hasVehicleInsurance) {
+    missingFields.push("Vehicle insurance document");
+  }
+  
+  if (!hasVehicleInspection) {
+    missingFields.push("Vehicle inspection document");
+  }
+  
+  if (!hasDriverLicenseVehicle) {
+    missingFields.push("Driver license document");
+  }
+  
+  if (!hasLicensePlate) {
+    missingFields.push("License plate document");
+  }
+  
+  // NYC-specific requirements
+  if (isNYC && !hasTLCDiamond) {
+    missingFields.push("TLC Diamond document");
   }
 
   const isKYCComplete = missingFields.length === 0;
@@ -344,12 +384,15 @@ export default function DriverKYCDocuments() {
         <Card>
           <CardHeader>
             <CardTitle>Vehicle Documents</CardTitle>
-            <CardDescription>At least one registration document is required</CardDescription>
+            <CardDescription>Upload all required documents for your vehicle</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <CardContent className="space-y-6">
+            {/* Registration Document */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Registration Document</h4>
+              <p className="text-sm text-muted-foreground">Upload vehicle registration</p>
               <FileUpload
-                label="Registration Document"
+                label=""
                 accept="image/*,application/pdf"
                 maxSizeMB={10}
                 onUpload={async (file) => {
@@ -359,12 +402,16 @@ export default function DriverKYCDocuments() {
                   });
                   return { url: result.document.fileUrl };
                 }}
-                description="Upload vehicle registration"
                 testId="registration-doc"
               />
+            </div>
 
+            {/* Insurance Document */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Insurance Document</h4>
+              <p className="text-sm text-muted-foreground">Upload insurance certificate</p>
               <FileUpload
-                label="Insurance Document"
+                label=""
                 accept="image/*,application/pdf"
                 maxSizeMB={10}
                 onUpload={async (file) => {
@@ -374,15 +421,93 @@ export default function DriverKYCDocuments() {
                   });
                   return { url: result.document.fileUrl };
                 }}
-                description="Upload insurance certificate"
                 testId="insurance-doc"
               />
             </div>
 
+            {/* Vehicle Inspection */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Vehicle Inspection</h4>
+              <p className="text-sm text-muted-foreground">Upload official inspection report</p>
+              <FileUpload
+                label=""
+                accept="image/*,application/pdf"
+                maxSizeMB={10}
+                onUpload={async (file) => {
+                  const result = await uploadVehicleDocMutation.mutateAsync({
+                    file,
+                    documentType: "vehicleInspection",
+                  });
+                  return { url: result.document.fileUrl };
+                }}
+                testId="vehicle-inspection-doc"
+              />
+            </div>
+
+            {/* Driver License (Vehicle Section) */}
+            <div className="space-y-2">
+              <h4 className="font-medium">Driver License</h4>
+              <p className="text-sm text-muted-foreground">Upload a clear photo of your driver license</p>
+              <FileUpload
+                label=""
+                accept="image/*"
+                maxSizeMB={10}
+                onUpload={async (file) => {
+                  const result = await uploadVehicleDocMutation.mutateAsync({
+                    file,
+                    documentType: "driverLicenseVehicle",
+                  });
+                  return { url: result.document.fileUrl };
+                }}
+                testId="driver-license-vehicle-doc"
+              />
+            </div>
+
+            {/* License Plate */}
+            <div className="space-y-2">
+              <h4 className="font-medium">License Plate</h4>
+              <p className="text-sm text-muted-foreground">Upload a clear photo showing the plate number</p>
+              <FileUpload
+                label=""
+                accept="image/*"
+                maxSizeMB={10}
+                onUpload={async (file) => {
+                  const result = await uploadVehicleDocMutation.mutateAsync({
+                    file,
+                    documentType: "licensePlate",
+                  });
+                  return { url: result.document.fileUrl };
+                }}
+                testId="license-plate-doc"
+              />
+            </div>
+
+            {/* TLC Diamond (NYC only) */}
+            {isNYC && (
+              <div className="space-y-2 p-4 bg-primary/5 border-2 border-primary/20 rounded-lg">
+                <h4 className="font-medium">TLC Diamond</h4>
+                <p className="text-sm text-muted-foreground">Upload a clear photo of the TLC Diamond/medallion</p>
+                <FileUpload
+                  label=""
+                  accept="image/*"
+                  maxSizeMB={10}
+                  onUpload={async (file) => {
+                    const result = await uploadVehicleDocMutation.mutateAsync({
+                      file,
+                      documentType: "tlcDiamond",
+                    });
+                    return { url: result.document.fileUrl };
+                  }}
+                  testId="tlc-diamond-doc"
+                />
+              </div>
+            )}
+
+            {/* Uploaded Documents List */}
             {docsLoading ? (
               <Skeleton className="h-20 w-full" />
             ) : vehicleDocs.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-2 pt-4 border-t">
                 <h4 className="text-sm font-medium">Uploaded Documents</h4>
                 <div className="space-y-2">
                   {vehicleDocs.map((doc: any) => (
@@ -394,7 +519,15 @@ export default function DriverKYCDocuments() {
                       <div className="flex items-center gap-3">
                         <FileText className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium capitalize">{doc.documentType}</p>
+                          <p className="text-sm font-medium">
+                            {doc.documentType === "vehicleInspection" ? "Vehicle Inspection" :
+                             doc.documentType === "driverLicenseVehicle" ? "Driver License" :
+                             doc.documentType === "licensePlate" ? "License Plate" :
+                             doc.documentType === "tlcDiamond" ? "TLC Diamond" :
+                             doc.documentType === "registration" ? "Registration" :
+                             doc.documentType === "insurance" ? "Insurance" :
+                             doc.documentType.charAt(0).toUpperCase() + doc.documentType.slice(1)}
+                          </p>
                           <p className="text-xs text-muted-foreground">
                             Uploaded {new Date(doc.uploadedAt).toLocaleDateString()}
                           </p>
