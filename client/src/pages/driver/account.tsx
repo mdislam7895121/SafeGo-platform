@@ -76,23 +76,25 @@ export default function DriverAccount() {
             <h2 className="text-lg font-semibold mb-3 px-1">{section.title}</h2>
             <div className="space-y-2">
               {section.items.map((item, index) => (
-                <Link key={index} href={item.href}>
-                  <a data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                    <Card className="hover-elevate active-elevate-2">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 text-primary flex-shrink-0">
-                            <item.icon className="h-6 w-6" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="font-semibold">{item.title}</h3>
-                            <p className="text-sm text-muted-foreground truncate">{item.description}</p>
-                          </div>
-                          <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <Link 
+                  key={index} 
+                  href={item.href}
+                  data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <Card className="hover-elevate active-elevate-2">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center h-12 w-12 rounded-full bg-primary/10 text-primary flex-shrink-0">
+                          <item.icon className="h-6 w-6" />
                         </div>
-                      </CardContent>
-                    </Card>
-                  </a>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold">{item.title}</h3>
+                          <p className="text-sm text-muted-foreground truncate">{item.description}</p>
+                        </div>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                      </div>
+                    </CardContent>
+                  </Card>
                 </Link>
               ))}
             </div>
