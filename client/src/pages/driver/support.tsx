@@ -65,10 +65,9 @@ export default function DriverSupportChat() {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (body: string) => {
-      const res = await fetch(`/api/support/conversations/${selectedConversation}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ body, messageType: "text" }),
+      const res = await apiRequest("POST", `/api/support/conversations/${selectedConversation}/messages`, {
+        body,
+        messageType: "text"
       });
       return res.json();
     },

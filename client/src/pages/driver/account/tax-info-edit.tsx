@@ -53,20 +53,7 @@ export default function TaxInfoEdit() {
 
   const updateTaxInfoMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await fetch("/api/driver/tax-info", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("safego_token")}`,
-        },
-        body: JSON.stringify(data),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update tax information");
-      }
-      
+      const response = await apiRequest("PUT", "/api/driver/tax-info", data);
       return response.json();
     },
     onSuccess: () => {
