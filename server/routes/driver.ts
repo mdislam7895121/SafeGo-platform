@@ -408,12 +408,24 @@ router.patch("/profile", async (req: AuthRequest, res) => {
     // US-specific fields
     if (driverProfile.user.countryCode === "US") {
       if (profileData.homeAddress) updateData.homeAddress = profileData.homeAddress;
+      if (profileData.usaStreet) updateData.usaStreet = profileData.usaStreet;
+      if (profileData.usaCity) updateData.usaCity = profileData.usaCity;
+      if (profileData.usaState) updateData.usaState = profileData.usaState;
+      if (profileData.usaZipCode) updateData.usaZipCode = profileData.usaZipCode;
       if (profileData.governmentIdType) updateData.governmentIdType = profileData.governmentIdType;
       if (profileData.governmentIdLast4) updateData.governmentIdLast4 = profileData.governmentIdLast4;
       if (profileData.driverLicenseNumber) updateData.driverLicenseNumber = profileData.driverLicenseNumber;
       if (profileData.driverLicenseImageUrl) updateData.driverLicenseImageUrl = profileData.driverLicenseImageUrl;
       if (profileData.driverLicenseExpiry) updateData.driverLicenseExpiry = new Date(profileData.driverLicenseExpiry);
       if (profileData.ssnLast4) updateData.ssnLast4 = profileData.ssnLast4;
+    }
+    
+    // International address fields (for non-US, non-BD drivers)
+    if (driverProfile.user.countryCode !== "US" && driverProfile.user.countryCode !== "BD") {
+      if (profileData.streetAddress) updateData.streetAddress = profileData.streetAddress;
+      if (profileData.city) updateData.city = profileData.city;
+      if (profileData.state) updateData.state = profileData.state;
+      if (profileData.zipCode) updateData.zipCode = profileData.zipCode;
     }
 
     // Update profile
