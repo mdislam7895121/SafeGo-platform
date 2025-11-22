@@ -816,13 +816,18 @@ enum SupportConversationStatus {
 model SupportConversation {
   id                String                      @id @default(uuid())
   userId            String
-  userType          String                      // "driver" | "customer" | "restaurant"
+  userType          String                      // "driver" | "customer" | "restaurant" | "parcel"
   status            SupportConversationStatus   @default(open)
   assignedAdminId   String?                     // Reference to User.id (admin)
   verifiedAt        DateTime?                   // When user confirmed their details
   topic             String?                     // payments | trips | documents | tax | account_settings | other
   entryContext      Json?                       // Device info, channel, etc.
   escalatedAt       DateTime?
+  isEscalated       Boolean                     @default(false)
+  unresolvedCount   Int                         @default(0) // Track bot failures for auto-escalation
+  closedAt          DateTime?                   // When conversation ended
+  rating            Int?                        // 1-5 stars rating after end chat
+  feedback          String?                     @db.Text // Optional feedback after end chat
   createdAt         DateTime                    @default(now())
   updatedAt         DateTime                    @updatedAt
   messages          SupportMessage[]
