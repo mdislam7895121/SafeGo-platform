@@ -159,6 +159,7 @@ model DriverProfile {
   nidNumber             String?
   nidFrontImageUrl      String?
   nidBackImageUrl       String?
+  nidImageUrl           String?
   homeAddress           String?
   governmentIdType      String?
   governmentIdLast4     String?
@@ -166,6 +167,7 @@ model DriverProfile {
   driverLicenseImageUrl String?
   driverLicenseExpiry   DateTime?
   ssnLast4              String?
+  ssnCardImageUrl       String?
   dateOfBirth           DateTime?
   emergencyContactName  String?
   emergencyContactPhone String?

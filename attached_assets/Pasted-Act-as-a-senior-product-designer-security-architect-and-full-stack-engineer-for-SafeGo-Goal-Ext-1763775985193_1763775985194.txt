@@ -1,0 +1,145 @@
+Act as a senior product designer, security architect, and full-stack engineer for SafeGo.
+
+Goal: Extend the Driver Account Center → Documents so that:
+- Bangladesh drivers must provide NID number + NID image.
+- USA drivers must provide Social Security number (SSN) + SSN card image.
+- Each driver can only see and manage their own documents.
+- NID/SSN numbers are always masked except for last 4 digits.
+
+Follow all existing SafeGo conventions:
+- Four roles: customer, driver, restaurant, admin.
+- Keep all existing KYC, payouts, trips, vehicles, and wallet logic intact.
+- Do NOT touch ride, food, or parcel booking flows.
+- Do NOT break any existing URLs, API contracts, or database collections.
+- Collections such as drivers, vehicles, documents, payouts, rides, food_orders, deliveries must remain compatible.
+- Driver Account Center routes (like /driver/kyc-documents, /driver/account, etc.) must remain unchanged.
+
+Scope:
+- Driver web app → Account Settings → Driver Requirements → Documents
+- Route: /driver/kyc-documents (do not rename)
+
+High-level UX requirement:
+- Inside the Documents page, add a new section for “Identity Documents”.
+- The section and fields must respect country rules:
+  - Bangladesh: National ID (NID)
+  - USA: Social Security Number (SSN)
+- The UI must continue to use SafeGo’s minimalist white cards, grey dividers, and left-aligned layout.
+- No emojis.
+
+1) New “Identity Documents” section
+
+Add a new card on the /driver/kyc-documents page:
+
+Section title: “Identity Documents”
+
+A) For Bangladesh drivers (country = BD or profile.country = "BD"):
+   - Field 1: NID Number
+     - Label: “National ID Number (NID)”
+     - Input: text field
+     - Validation:
+       - Accept digits only (with basic length rules consistent with typical NID formats).
+       - Show inline error for invalid or too-short values.
+     - Masking behavior:
+       - When the value is saved and displayed back to the driver, show only the last 4 digits.
+       - Example display: “********1234”
+   - Field 2: NID Image
+     - Label: “NID Image”
+     - Helper: “Upload a clear photo of your National ID card”
+     - Upload box directly under the label (use the same upload component used for other identity documents).
+     - Max size: 5MB or follow current image limits.
+
+B) For USA drivers (country = US or profile.country = "US"):
+   - Field 1: Social Security Number
+     - Label: “Social Security Number (SSN)”
+     - Input: text field with formatting/validation for SSN (###-##-#### or digits only).
+     - Masking behavior:
+       - When displayed, show only last 4 digits.
+       - Example display: “***-**-6789” or “*******6789”.
+   - Field 2: Social Security Card Image
+     - Label: “SSN Card Image”
+     - Helper: “Upload a clear photo of your Social Security card”
+     - Upload box directly under the label (same upload component).
+     - Max size: 5MB or follow current image limits.
+
+C) Visibility rules:
+   - Only show NID fields for Bangladesh drivers.
+   - Only show SSN fields for USA drivers.
+   - For other countries, hide the entire Identity Documents section, unless we later add rules for them.
+   - Use existing country metadata already stored on the driver profile.
+
+2) Security and masking rules (very important)
+
+Backend and frontend must both enforce masking and access control:
+
+- Storage:
+  - Store full NID/SSN in a secure, encrypted field (e.g., using existing SafeGo encryption helpers).
+  - Never store NID/SSN in plain text logs or analytics.
+
+- API responses:
+  - For driver-facing APIs, only return a masked version of NID/SSN (last 4 digits visible).
+  - Admin tools may use a separate, secured endpoint if full values are required, but that is outside this scope.
+  - Ensure that network responses (JSON) for drivers never contain the full unmasked number.
+
+- Masking logic:
+  - Implement a shared utility to mask identity numbers consistently:
+    - Input: raw number string.
+    - Output: masked string with only last 4 characters visible.
+  - Use this utility both on the server and in the UI where needed.
+
+- Access control:
+  - A driver can only:
+    - View their own NID/SSN (masked) and identity document images.
+    - Upload/update/replace/delete their own identity documents.
+  - A driver must never be able to see any other driver’s documents or identity numbers.
+  - Enforce this with server-side checks:
+    - The authenticated driver ID must match the owner of the document record.
+    - Reject any cross-driver access with proper authorization errors.
+
+3) Document management capabilities for drivers
+
+For Identity Documents (NID/SSN) and their images:
+
+- Drivers can:
+  - Upload if empty.
+  - Edit/update the number (with validation).
+  - Replace the uploaded image.
+  - Delete the image and/or clear the number, IF business rules allow (follow existing KYC logic).
+- Add clear actions:
+  - “Edit” or inline editable fields for the number.
+  - “Replace” and “Remove” actions for the image (if consistent with current document UX).
+- After any change:
+  - Show a confirmation toast/snackbar.
+  - Optionally update document status to “Pending review” if such a workflow exists.
+
+4) Integration with existing KYC flow
+
+- Identity Documents must participate in the KYC completeness check:
+  - For Bangladesh drivers: NID Number + NID Image must be present (and valid).
+  - For USA drivers: SSN + SSN Card Image must be present (and valid).
+- Keep the existing status badges (Pending / Approved / Rejected) logic if already present for other documents.
+- If the system has an “Onboarding Progress” or “Driver Requirements” checklist, ensure that:
+  - Identity Documents requirement is added and marked as complete only when mandatory fields are satisfied.
+
+5) UI and layout details
+
+- Do not change the existing header, breadcrumbs, or navigation on /driver/kyc-documents.
+- Place the new “Identity Documents” card above or below the existing “DMV Driver License” section, whichever is most consistent with the current layout.
+- Use the same card spacing, fonts, and input styles as other sections on this page.
+- All labels and helper texts should be left-aligned with clear spacing.
+
+6) Testing and safeguards
+
+- Test with:
+  - Bangladesh driver profile (country BD).
+  - USA driver profile (country US).
+  - A third country profile (section must not be shown).
+- Verify:
+  - Masking of identity numbers in all driver-facing views and API responses.
+  - Drivers cannot access or query any other driver’s identity documents by ID or URL.
+  - KYC completeness logic works as expected.
+  - Existing documents (license, vehicle registration, insurance, etc.) remain unaffected.
+
+Deliverable:
+- Updated /driver/kyc-documents page with a new “Identity Documents” section.
+- Country-specific NID/SSN fields and images, with full masking and strict access control.
+- No broken routes, no changes to ride/payout logic, and full compatibility with existing SafeGo KYC and document systems.
