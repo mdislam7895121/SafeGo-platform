@@ -161,8 +161,25 @@ router.post("/chat/start", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const userType = req.user!.role;
+    const { db } = await import("../db");
 
-    // All roles (driver, customer, restaurant) can start a chat
+    // SECURITY: Verify user has completed pre-chat verification
+    const existingConversation = await db.supportConversation.findFirst({
+      where: {
+        userId,
+        userType,
+        status: "open",
+      },
+    });
+
+    if (!existingConversation || !existingConversation.verifiedAt) {
+      return res.status(403).json({ 
+        error: "Verification required",
+        message: "You must complete verification before starting chat" 
+      });
+    }
+
+    // All roles (driver, customer, restaurant) can start a chat after verification
     const result = await startOrGetChat(userId, userType);
 
     res.json({
@@ -217,8 +234,8 @@ router.post("/chat/messages", authenticateToken, async (req: AuthRequest, res) =
   try {
     const userId = req.user!.userId;
     const userType = req.user!.role;
+    const { db } = await import("../db");
 
-    // All roles (driver, customer, restaurant) can send messages
     const { conversationId, content } = req.body;
 
     const validationResult = sendMessageSchema.safeParse({ content });
@@ -233,6 +250,27 @@ router.post("/chat/messages", authenticateToken, async (req: AuthRequest, res) =
       return res.status(400).json({ error: "conversationId is required" });
     }
 
+    // SECURITY: Verify conversation exists and user completed verification
+    const conversation = await db.supportConversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    if (conversation.userId !== userId || conversation.userType !== userType) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    if (!conversation.verifiedAt) {
+      return res.status(403).json({ 
+        error: "Verification required",
+        message: "You must complete verification before sending messages" 
+      });
+    }
+
+    // All roles (driver, customer, restaurant) can send messages after verification
     const result = await sendMessage(conversationId, userId, validationResult.data.content);
 
     res.json({
@@ -252,10 +290,32 @@ router.post("/chat/messages", authenticateToken, async (req: AuthRequest, res) =
 router.post("/chat/escalate", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
+    const userType = req.user!.role;
+    const { db } = await import("../db");
     const { conversationId } = req.body;
 
     if (!conversationId) {
       return res.status(400).json({ error: "conversationId is required" });
+    }
+
+    // SECURITY: Verify conversation exists and user completed verification
+    const conversation = await db.supportConversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    if (conversation.userId !== userId || conversation.userType !== userType) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+
+    if (!conversation.verifiedAt) {
+      return res.status(403).json({ 
+        error: "Verification required",
+        message: "You must complete verification before escalating to human support" 
+      });
     }
 
     const result = await escalateToHuman(conversationId, userId);
