@@ -95,9 +95,9 @@ router.get("/chat/verification", authenticateToken, async (req: AuthRequest, res
 
       return res.json({
         restaurantName: restaurant.restaurantName || "Unknown Restaurant",
-        city: restaurant.city || "Unknown",
-        ownerName: restaurant.ownerName || restaurant.user.email,
-        phone: restaurant.phone || "",
+        city: restaurant.cityCode || "Unknown",
+        ownerName: restaurant.user.email,
+        phone: "",
         email: restaurant.user.email,
         restaurantId: restaurant.id,
       });

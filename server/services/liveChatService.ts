@@ -1,6 +1,8 @@
 import { db } from "../db";
 import { getBotResponse, createBotMessage, createSystemMessage } from "./supportBotService";
 import { logAuditEvent, ActionType } from "../utils/audit";
+import { BotService } from "./botService";
+import { EscalationService } from "./escalationService";
 
 const prisma = db;
 
@@ -107,7 +109,8 @@ export async function sendMessage(
   conversationId: string,
   userId: string,
   content: string,
-  userName?: string
+  userName?: string,
+  userType?: string
 ) {
   const conversation = await prisma.supportConversation.findFirst({
     where: {
@@ -124,6 +127,7 @@ export async function sendMessage(
     throw new Error("Cannot send messages to closed conversations");
   }
 
+  // Create user message
   const userMessage = await prisma.supportMessage.create({
     data: {
       conversationId,
@@ -134,15 +138,50 @@ export async function sendMessage(
     },
   });
 
+  // Only bot responds if conversation is still in bot mode (not escalated to human)
   if (conversation.status === "open" || conversation.status === "bot") {
-    const botResponse = getBotResponse(content, userName);
+    // Check for manual escalation keywords first
+    const wantsAgent = BotService.detectEscalationIntent(content);
+    
+    if (wantsAgent) {
+      // Escalate immediately
+      await EscalationService.escalateConversation(conversation.id, "keywords");
+      
+      const allMessages = await prisma.supportMessage.findMany({
+        where: { conversationId },
+        orderBy: { createdAt: "asc" },
+      });
+
+      // Refresh conversation to get updated status
+      const updatedConv = await prisma.supportConversation.findUnique({
+        where: { id: conversationId },
+      });
+
+      return {
+        userMessage,
+        conversation: updatedConv!,
+        allMessages,
+        escalated: true,
+      };
+    }
+
+    // Generate bot response using comprehensive BotService
+    const botResponse = BotService.generateResponse(content, userType || conversation.userType);
 
     await createBotMessage(conversationId, botResponse.message);
 
+    // Update conversation status
     await prisma.supportConversation.update({
       where: { id: conversationId },
       data: { status: "bot", updatedAt: new Date() },
     });
+
+    // Check for automatic escalation (after 3 failed attempts)
+    const escalationCheck = await EscalationService.checkAutoEscalation(conversation.id);
+    
+    if (escalationCheck && escalationCheck.escalated) {
+      await EscalationService.escalateConversation(conversation.id, "auto_unresolved");
+    }
   }
 
   const allMessages = await prisma.supportMessage.findMany({
@@ -154,6 +193,7 @@ export async function sendMessage(
     userMessage,
     conversation,
     allMessages,
+    escalated: false,
   };
 }
 
