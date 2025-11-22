@@ -11,7 +11,14 @@ SafeGo is a production-ready, full-stack multi-service super-app platform offeri
 ## System Architecture
 
 ### UI/UX Decisions
-The frontend uses React 18, TypeScript, Vite 5, shadcn/ui (Radix UI), Tailwind CSS 3, TanStack Query v5, wouter, and React Hook Form with Zod. It features a custom HSL color palette, Inter/Manrope typography, mobile-first responsive design, skeleton loading states, toast notifications, error boundaries, protected routes with role-based access control, and a unified payout/payment section. The Customer Web App includes multi-step onboarding, country-specific KYC, service booking, and a dedicated Food System. Profile experiences for customers and drivers are designed to Uber-level quality with modern UI and enhanced features. The Driver Web App incorporates a unified navigation layout.
+The frontend uses React 18, TypeScript, Vite 5, shadcn/ui (Radix UI), Tailwind CSS 3, TanStack Query v5, wouter, and React Hook Form with Zod. It features a custom HSL color palette, Inter/Manrope typography, mobile-first responsive design, skeleton loading states, toast notifications, error boundaries, protected routes with role-based access control, and a unified payout/payment section. The Customer Web App includes multi-step onboarding, country-specific KYC, service booking, and a dedicated Food System. Profile experiences for customers and drivers are designed to Uber-level quality with modern UI and enhanced features. The Driver Web App incorporates a unified navigation layout with clickable sidebar profile header.
+
+**Driver Profile System**: Three-page profile experience mirroring Uber's layout:
+1. **Main Profile** (/driver/profile): Uber-style profile with large avatar, tier pill, name, email, location, SafeGo Points card with tier progress, driving performance stats (acceptance rate, cancellation rate, star rating, driving score), lifetime highlights (total trips, journey time), and achievement badges. Includes "View public profile" button. Read-only view; all editing in Account Center.
+2. **Public Profile** (/driver/profile/public): Driver-facing view showing avatar, name, clickable tier badge pill (links to /driver/points), About section (city, country, languages, trips summary), Compliments section with 7 seed types (Excellent Service, Late Night Hero, Great Conversation, Expert Navigation, Neat and Tidy, Great Amenities, Above and Beyond), and Achievements section (total trips, years with SafeGo, five-star trips). Privacy-compliant: no NID, SSN, phone, email, or bank details shown.
+3. **Compliments Detail** (/driver/profile/compliments): Placeholder for detailed compliments view.
+
+Sidebar profile header is clickable and navigates to /driver/profile using wouter Link component.
 
 ### Technical Implementations
 The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with PostgreSQL 14+. It supports multi-role authentication, country-specific KYC, and comprehensive service lifecycle management. Core features include:
