@@ -224,6 +224,22 @@ model DriverProfile {
   taxYear               Int?               // Current tax year being tracked
   securityStatus        SecurityStatus     @default(normal)
   securityNotes         String?
+  // Driver Preferences
+  preferredNavigationApp String?           @default("google") // google, waze, apple, builtin
+  autoAcceptRides       Boolean?           @default(false)
+  acceptLongTrips       Boolean?           @default(true)
+  acceptSharedRides     Boolean?           @default(true)
+  shareLocationHistory  Boolean?           @default(true)
+  shareUsageAnalytics   Boolean?           @default(false)
+  personalizedExperience Boolean?          @default(true)
+  notifyRideRequests    Boolean?           @default(true)
+  notifyPromotions      Boolean?           @default(true)
+  notifyEarnings        Boolean?           @default(true)
+  notifySupport         Boolean?           @default(true)
+  notifyEmailWeekly     Boolean?           @default(true)
+  notifyEmailTips       Boolean?           @default(false)
+  preferredLanguage     String?            @default("en") // en, bn, es, fr, ar
+  themePreference       String?            @default("system") // light, dark, system
   deliveries            Delivery[]
   driverComplaints      DriverComplaint[]
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)

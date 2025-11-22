@@ -2,6 +2,9 @@ import { Link } from "wouter";
 import { ArrowLeft, Moon, Sun, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 const themes = [
   { id: "light", name: "Light", description: "Light theme", icon: Sun },
@@ -10,11 +13,41 @@ const themes = [
 ];
 
 export default function DarkModeSettings() {
-  const currentTheme = "system";
+  const { toast } = useToast();
+
+  const { data: preferences } = useQuery({
+    queryKey: ["/api/driver/preferences"],
+  });
+
+  const currentTheme = preferences?.themePreference || "system";
+
+  const updateThemeMutation = useMutation({
+    mutationFn: async (themePreference: string) => {
+      const res = await apiRequest("PATCH", "/api/driver/preferences/theme", { themePreference });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });
+      toast({ title: "Theme preference updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update theme preference",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectTheme = (themeId: string) => {
+    if (themeId !== currentTheme) {
+      updateThemeMutation.mutate(themeId);
+    }
+  };
 
   return (
     <div className="bg-background">
-      <div className="bg-primary text-primary-foreground p-6 ">
+      <div className="bg-primary text-primary-foreground p-6">
         <div className="flex items-center gap-4">
           <Link href="/driver/account">
             <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-back">
@@ -35,6 +68,8 @@ export default function DarkModeSettings() {
             {themes.map((theme) => (
               <button
                 key={theme.id}
+                onClick={() => handleSelectTheme(theme.id)}
+                disabled={updateThemeMutation.isPending}
                 className={`flex items-center gap-4 w-full p-4 rounded-lg hover-elevate active-elevate-2 ${
                   theme.id === currentTheme ? "bg-primary/10 border-2 border-primary" : "border-2 border-transparent"
                 }`}

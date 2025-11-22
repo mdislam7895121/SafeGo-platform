@@ -3,6 +3,7 @@ import { PrismaClient, Prisma } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import bcrypt from "bcrypt";
 import { encrypt, decrypt, isValidBdNid, isValidBdPhone, maskNID, maskSSN } from "../utils/encryption";
 import {
   uploadProfilePhoto,
@@ -46,6 +47,66 @@ function serializePayout(payout: any) {
     amount: serializeDecimal(payout.amount),
   };
 }
+
+// Zod validation schemas for account management and preferences
+const updateNameSchema = z.object({
+  firstName: z.string().min(1, "First name is required").max(50),
+  lastName: z.string().min(1, "Last name is required").max(50),
+}).or(z.object({
+  fullName: z.string().min(1, "Full name is required").max(100),
+}));
+
+const updateEmailSchema = z.object({
+  email: z.string().email("Invalid email format"),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+const deleteAccountSchema = z.object({
+  password: z.string().min(1, "Password is required for account deletion"),
+});
+
+const navigationPreferenceSchema = z.object({
+  preferredNavigationApp: z.enum(["google", "waze", "apple", "builtin"]),
+});
+
+const workPreferencesSchema = z.object({
+  autoAcceptRides: z.boolean().optional(),
+  acceptLongTrips: z.boolean().optional(),
+  acceptSharedRides: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: "At least one preference must be provided",
+});
+
+const privacyPreferencesSchema = z.object({
+  shareLocationHistory: z.boolean().optional(),
+  shareUsageAnalytics: z.boolean().optional(),
+  personalizedExperience: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: "At least one preference must be provided",
+});
+
+const notificationPreferencesSchema = z.object({
+  notifyRideRequests: z.boolean().optional(),
+  notifyPromotions: z.boolean().optional(),
+  notifyEarnings: z.boolean().optional(),
+  notifySupport: z.boolean().optional(),
+  notifyEmailWeekly: z.boolean().optional(),
+  notifyEmailTips: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: "At least one preference must be provided",
+});
+
+const languagePreferenceSchema = z.object({
+  preferredLanguage: z.enum(["en", "bn", "es", "fr", "ar"]),
+});
+
+const themePreferenceSchema = z.object({
+  themePreference: z.enum(["light", "dark", "system"]),
+});
 
 // All routes require authentication and driver role
 router.use(authenticateToken);
@@ -2942,6 +3003,496 @@ router.get("/bd-tax-documents/:year", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("BD tax document error:", error);
     res.status(500).json({ error: "Failed to generate BD tax document" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/profile/name
+// Update driver name
+// ====================================================
+router.patch("/profile/name", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = updateNameSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+
+    // For US drivers, use structured name fields
+    if ("firstName" in data && "lastName" in data) {
+      if (driverProfile.user.countryCode !== "US") {
+        return res.status(400).json({ error: "Use fullName for non-US drivers" });
+      }
+      updateData.firstName = data.firstName.trim();
+      updateData.lastName = data.lastName.trim();
+      if ((data as any).middleName) updateData.middleName = (data as any).middleName.trim();
+      // Also update fullName for consistency
+      updateData.fullName = updateData.middleName 
+        ? `${updateData.firstName} ${updateData.middleName} ${updateData.lastName}` 
+        : `${updateData.firstName} ${updateData.lastName}`;
+    } else if ("fullName" in data) {
+      if (driverProfile.user.countryCode === "US") {
+        return res.status(400).json({ error: "Use firstName and lastName for US drivers" });
+      }
+      updateData.fullName = data.fullName.trim();
+    }
+
+    // Update profile
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Name updated successfully",
+      profile: {
+        firstName: updatedProfile.firstName,
+        middleName: updatedProfile.middleName,
+        lastName: updatedProfile.lastName,
+        fullName: updatedProfile.fullName,
+      },
+    });
+  } catch (error) {
+    console.error("Name update error:", error);
+    res.status(500).json({ error: "Failed to update name" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/email
+// Update driver email
+// ====================================================
+router.patch("/email", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = updateEmailSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { email } = validationResult.data;
+
+    // Check if email is already taken
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
+    if (existingUser && existingUser.id !== userId) {
+      return res.status(400).json({ error: "Email is already in use" });
+    }
+
+    // Update user email
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: { email },
+    });
+
+    res.json({
+      message: "Email updated successfully",
+      email: updatedUser.email,
+    });
+  } catch (error) {
+    console.error("Email update error:", error);
+    res.status(500).json({ error: "Failed to update email" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/password
+// Change driver password
+// ====================================================
+router.patch("/password", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = changePasswordSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { currentPassword, newPassword } = validationResult.data;
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: "Current password is incorrect" });
+    }
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update password
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Password change error:", error);
+    res.status(500).json({ error: "Failed to change password" });
+  }
+});
+
+// ====================================================
+// DELETE /api/driver/account
+// Delete driver account (soft delete)
+// ====================================================
+router.delete("/account", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = deleteAccountSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { password } = validationResult.data;
+
+    // Get user
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      return res.status(401).json({ error: "Incorrect password" });
+    }
+
+    // Soft delete: block the account instead of hard delete
+    await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        isBlocked: true,
+      },
+    });
+
+    // Also suspend the driver profile
+    await prisma.driverProfile.update({
+      where: { userId },
+      data: {
+        isSuspended: true,
+        suspendedAt: new Date(),
+        suspensionReason: "Account deletion requested by driver",
+      },
+    });
+
+    res.json({ message: "Account deleted successfully" });
+  } catch (error) {
+    console.error("Account deletion error:", error);
+    res.status(500).json({ error: "Failed to delete account" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/preferences
+// Get all driver preferences
+// ====================================================
+router.get("/preferences", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      select: {
+        preferredNavigationApp: true,
+        autoAcceptRides: true,
+        acceptLongTrips: true,
+        acceptSharedRides: true,
+        shareLocationHistory: true,
+        shareUsageAnalytics: true,
+        personalizedExperience: true,
+        notifyRideRequests: true,
+        notifyPromotions: true,
+        notifyEarnings: true,
+        notifySupport: true,
+        notifyEmailWeekly: true,
+        notifyEmailTips: true,
+        preferredLanguage: true,
+        themePreference: true,
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    res.json(driverProfile);
+  } catch (error) {
+    console.error("Get preferences error:", error);
+    res.status(500).json({ error: "Failed to get preferences" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/preferences/navigation
+// Update navigation app preference
+// ====================================================
+router.patch("/preferences/navigation", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = navigationPreferenceSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { preferredNavigationApp } = validationResult.data;
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: { preferredNavigationApp },
+    });
+
+    res.json({ message: "Navigation preference updated successfully", preferredNavigationApp: updatedProfile.preferredNavigationApp });
+  } catch (error) {
+    console.error("Update navigation error:", error);
+    res.status(500).json({ error: "Failed to update navigation preference" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/preferences/work
+// Update work hub preferences
+// ====================================================
+router.patch("/preferences/work", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = workPreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+    const updateData: any = {};
+    if (data.autoAcceptRides !== undefined) updateData.autoAcceptRides = data.autoAcceptRides;
+    if (data.acceptLongTrips !== undefined) updateData.acceptLongTrips = data.acceptLongTrips;
+    if (data.acceptSharedRides !== undefined) updateData.acceptSharedRides = data.acceptSharedRides;
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Work preferences updated successfully",
+      autoAcceptRides: updatedProfile.autoAcceptRides,
+      acceptLongTrips: updatedProfile.acceptLongTrips,
+      acceptSharedRides: updatedProfile.acceptSharedRides,
+    });
+  } catch (error) {
+    console.error("Update work preferences error:", error);
+    res.status(500).json({ error: "Failed to update work preferences" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/preferences/privacy
+// Update privacy preferences
+// ====================================================
+router.patch("/preferences/privacy", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = privacyPreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+    const updateData: any = {};
+    if (data.shareLocationHistory !== undefined) updateData.shareLocationHistory = data.shareLocationHistory;
+    if (data.shareUsageAnalytics !== undefined) updateData.shareUsageAnalytics = data.shareUsageAnalytics;
+    if (data.personalizedExperience !== undefined) updateData.personalizedExperience = data.personalizedExperience;
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Privacy preferences updated successfully",
+      shareLocationHistory: updatedProfile.shareLocationHistory,
+      shareUsageAnalytics: updatedProfile.shareUsageAnalytics,
+      personalizedExperience: updatedProfile.personalizedExperience,
+    });
+  } catch (error) {
+    console.error("Update privacy preferences error:", error);
+    res.status(500).json({ error: "Failed to update privacy preferences" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/preferences/notifications
+// Update notification preferences
+// ====================================================
+router.patch("/preferences/notifications", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = notificationPreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+    const updateData: any = {};
+    if (data.notifyRideRequests !== undefined) updateData.notifyRideRequests = data.notifyRideRequests;
+    if (data.notifyPromotions !== undefined) updateData.notifyPromotions = data.notifyPromotions;
+    if (data.notifyEarnings !== undefined) updateData.notifyEarnings = data.notifyEarnings;
+    if (data.notifySupport !== undefined) updateData.notifySupport = data.notifySupport;
+    if (data.notifyEmailWeekly !== undefined) updateData.notifyEmailWeekly = data.notifyEmailWeekly;
+    if (data.notifyEmailTips !== undefined) updateData.notifyEmailTips = data.notifyEmailTips;
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Notification preferences updated successfully",
+      notifyRideRequests: updatedProfile.notifyRideRequests,
+      notifyPromotions: updatedProfile.notifyPromotions,
+      notifyEarnings: updatedProfile.notifyEarnings,
+      notifySupport: updatedProfile.notifySupport,
+      notifyEmailWeekly: updatedProfile.notifyEmailWeekly,
+      notifyEmailTips: updatedProfile.notifyEmailTips,
+    });
+  } catch (error) {
+    console.error("Update notification preferences error:", error);
+    res.status(500).json({ error: "Failed to update notification preferences" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/preferences/language
+// Update language preference
+// ====================================================
+router.patch("/preferences/language", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = languagePreferenceSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { preferredLanguage } = validationResult.data;
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: { preferredLanguage },
+    });
+
+    res.json({ message: "Language preference updated successfully", preferredLanguage: updatedProfile.preferredLanguage });
+  } catch (error) {
+    console.error("Update language error:", error);
+    res.status(500).json({ error: "Failed to update language preference" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/preferences/theme
+// Update theme preference
+// ====================================================
+router.patch("/preferences/theme", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = themePreferenceSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { themePreference } = validationResult.data;
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: { themePreference },
+    });
+
+    res.json({ message: "Theme preference updated successfully", themePreference: updatedProfile.themePreference });
+  } catch (error) {
+    console.error("Update theme error:", error);
+    res.status(500).json({ error: "Failed to update theme preference" });
   }
 });
 

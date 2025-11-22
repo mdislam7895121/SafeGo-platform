@@ -4,11 +4,42 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 export default function PrivacySettings() {
+  const { toast } = useToast();
+
+  const { data: preferences } = useQuery({
+    queryKey: ["/api/driver/preferences"],
+  });
+
+  const updatePrivacyMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("PATCH", "/api/driver/preferences/privacy", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });
+      toast({ title: "Privacy preferences updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update privacy preferences",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggle = (field: string, value: boolean) => {
+    updatePrivacyMutation.mutate({ [field]: value });
+  };
+
   return (
     <div className="bg-background">
-      <div className="bg-primary text-primary-foreground p-6 ">
+      <div className="bg-primary text-primary-foreground p-6">
         <div className="flex items-center gap-4">
           <Link href="/driver/account">
             <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-back">
@@ -31,21 +62,39 @@ export default function PrivacySettings() {
                 <Label htmlFor="location-sharing">Share Location History</Label>
                 <p className="text-sm text-muted-foreground">Help improve route suggestions</p>
               </div>
-              <Switch id="location-sharing" defaultChecked data-testid="switch-location" />
+              <Switch 
+                id="location-sharing" 
+                checked={preferences?.shareLocationHistory || false}
+                onCheckedChange={(checked) => handleToggle("shareLocationHistory", checked)}
+                disabled={updatePrivacyMutation.isPending}
+                data-testid="switch-location" 
+              />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <Label htmlFor="analytics">Usage Analytics</Label>
                 <p className="text-sm text-muted-foreground">Share app usage data</p>
               </div>
-              <Switch id="analytics" data-testid="switch-analytics" />
+              <Switch 
+                id="analytics" 
+                checked={preferences?.shareUsageAnalytics || false}
+                onCheckedChange={(checked) => handleToggle("shareUsageAnalytics", checked)}
+                disabled={updatePrivacyMutation.isPending}
+                data-testid="switch-analytics" 
+              />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex-1">
                 <Label htmlFor="personalized">Personalized Experience</Label>
                 <p className="text-sm text-muted-foreground">Use data to improve your experience</p>
               </div>
-              <Switch id="personalized" defaultChecked data-testid="switch-personalized" />
+              <Switch 
+                id="personalized" 
+                checked={preferences?.personalizedExperience || false}
+                onCheckedChange={(checked) => handleToggle("personalizedExperience", checked)}
+                disabled={updatePrivacyMutation.isPending}
+                data-testid="switch-personalized" 
+              />
             </div>
           </CardContent>
         </Card>

@@ -2,6 +2,9 @@ import { Link } from "wouter";
 import { ArrowLeft, Globe, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 const languages = [
   { code: "en", name: "English", nativeName: "English" },
@@ -12,11 +15,41 @@ const languages = [
 ];
 
 export default function LanguageSettings() {
-  const currentLang = "en";
+  const { toast } = useToast();
+
+  const { data: preferences } = useQuery({
+    queryKey: ["/api/driver/preferences"],
+  });
+
+  const currentLang = preferences?.preferredLanguage || "en";
+
+  const updateLanguageMutation = useMutation({
+    mutationFn: async (preferredLanguage: string) => {
+      const res = await apiRequest("PATCH", "/api/driver/preferences/language", { preferredLanguage });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });
+      toast({ title: "Language preference updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update language preference",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSelectLanguage = (langCode: string) => {
+    if (langCode !== currentLang) {
+      updateLanguageMutation.mutate(langCode);
+    }
+  };
 
   return (
     <div className="bg-background">
-      <div className="bg-primary text-primary-foreground p-6 ">
+      <div className="bg-primary text-primary-foreground p-6">
         <div className="flex items-center gap-4">
           <Link href="/driver/account">
             <Button variant="ghost" size="icon" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-back">
@@ -36,6 +69,8 @@ export default function LanguageSettings() {
             {languages.map((lang) => (
               <button
                 key={lang.code}
+                onClick={() => handleSelectLanguage(lang.code)}
+                disabled={updateLanguageMutation.isPending}
                 className="flex items-center justify-between w-full p-4 hover-elevate active-elevate-2 rounded-lg text-left"
                 data-testid={`button-lang-${lang.code}`}
               >
