@@ -86,6 +86,7 @@ import AnalyticsDrivers from "@/pages/restaurant/analytics-drivers";
 import Reviews from "@/pages/restaurant/reviews";
 import ReviewsComplaints from "@/pages/restaurant/reviews-complaints";
 import RestaurantBranding from "@/pages/restaurant/branding";
+import RestaurantGallery from "@/pages/restaurant/gallery";
 import SettingsProfile from "@/pages/restaurant/settings-profile";
 import SettingsHours from "@/pages/restaurant/settings-hours";
 import SettingsDelivery from "@/pages/restaurant/settings-delivery";
@@ -127,6 +128,7 @@ import AdminReferralSettingsEdit from "@/pages/admin/referral-settings-edit";
 import AdminOpportunityBonuses from "@/pages/admin/opportunity-bonuses";
 import AdminOpportunityBonusesEdit from "@/pages/admin/opportunity-bonuses-edit";
 import AdminReviews from "@/pages/admin/reviews";
+import AdminMedia from "@/pages/admin/media";
 import AdminSupportChat from "@/pages/admin/support-chat";
 import AdminWallets from "@/pages/admin/wallets";
 import AdminWalletDetails from "@/pages/admin/wallet-details";
@@ -680,6 +682,15 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      {/* Gallery - Phase 9 */}
+      <Route path="/restaurant/gallery">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantGallery />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
       {/* Settings */}
       <Route path="/restaurant/settings/profile">
         <ProtectedRoute allowedRoles={["restaurant"]}>
@@ -898,6 +909,11 @@ function Router() {
       <Route path="/admin/reviews">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminReviews />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/media">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminMedia />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-chat">
