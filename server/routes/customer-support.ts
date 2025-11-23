@@ -71,6 +71,24 @@ router.post("/tickets", authenticateToken, async (req: AuthRequest, res: Respons
       return res.status(400).json({ error: "Invalid service type" });
     }
 
+    // Check rate limiting: max 3 open tickets per service type
+    const openTicketsCount = await prisma.supportTicket.count({
+      where: {
+        customerId: customer.id,
+        serviceType,
+        customerVisibleStatus: {
+          in: ["open", "in_review", "awaiting_customer"]
+        }
+      }
+    });
+
+    if (openTicketsCount >= 3) {
+      return res.status(429).json({ 
+        error: "Rate limit exceeded",
+        message: `You can have a maximum of 3 open tickets per service type. Please wait for existing tickets to be resolved before creating new ones.`
+      });
+    }
+
     // Verify service ownership and get details
     let service: any = null;
     let restaurantId: string | null = null;

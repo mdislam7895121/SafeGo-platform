@@ -24,6 +24,9 @@ import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import CustomerMyReviews from "@/pages/customer/my-reviews";
 import ParcelRequest from "@/pages/customer/parcel-request";
 import CustomerSupport from "@/pages/customer/support";
+import MySupportTickets from "@/pages/customer/my-support-tickets";
+import CreateSupportTicket from "@/pages/customer/create-support-ticket";
+import SupportTicketDetail from "@/pages/customer/support-ticket-detail";
 import CustomerWallet from "@/pages/customer/wallet";
 import CustomerNotifications from "@/pages/customer/notifications";
 
@@ -233,6 +236,21 @@ function Router() {
       <Route path="/customer/support">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerSupport />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/my-support-tickets">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <MySupportTickets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/create-support-ticket">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CreateSupportTicket />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-tickets/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <SupportTicketDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/profile/kyc">

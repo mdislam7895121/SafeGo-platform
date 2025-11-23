@@ -139,15 +139,10 @@ router.get("/support/tickets/:id", async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Restaurant profile not found" });
     }
 
-    // Get ticket
+    // Get ticket (DO NOT include customer relation to prevent privacy leaks)
     const ticket = await prisma.supportTicket.findUnique({
       where: { id: ticketId },
       include: {
-        customer: {
-          select: {
-            fullName: true
-          }
-        },
         messages: {
           where: {
             OR: [
@@ -178,12 +173,20 @@ router.get("/support/tickets/:id", async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Mask customer identity
+    // Get customer for masked display only (separate query to control exposure)
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id: ticket.customerId },
+      select: { fullName: true }
+    });
+
+    // Sanitize response - NEVER expose real customer identity to restaurants
     const sanitizedTicket = {
       ...ticket,
       customer: {
-        maskedName: ticket.customer.fullName ? ticket.customer.fullName[0] + "***" : "***"
-      }
+        maskedName: customer?.fullName ? customer.fullName[0] + "***" : "C***"
+      },
+      // Remove customerId from response
+      customerId: undefined
     };
 
     return res.json({ ticket: sanitizedTicket });
@@ -201,11 +204,17 @@ router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Respo
   try {
     const userId = req.user!.userId;
     const ticketId = req.params.id;
+    // NOTE: actorRole is NEVER accepted from request body - always server-derived for security
     const { messageBody, attachmentUrls = [], messageType = "public" } = req.body;
 
     // Validate input
     if (!messageBody || messageBody.trim().length === 0) {
       return res.status(400).json({ error: "Message body is required" });
+    }
+
+    // Validate messageType
+    if (messageType !== "public" && messageType !== "internal") {
+      return res.status(400).json({ error: "Invalid message type" });
     }
 
     // Get restaurant profile and user

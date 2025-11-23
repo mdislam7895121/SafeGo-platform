@@ -263,11 +263,17 @@ router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Respo
     const adminUserId = req.adminUser!.id;
     const adminEmail = req.adminUser!.email;
     const ticketId = req.params.id;
+    // NOTE: actorRole is ALWAYS "admin" for admin messages - never accept from request
     const { messageBody, messageType = "public", attachmentUrls = [] } = req.body;
 
     // Validate input
     if (!messageBody || messageBody.trim().length === 0) {
       return res.status(400).json({ error: "Message body is required" });
+    }
+
+    // Validate messageType
+    if (messageType !== "public" && messageType !== "internal") {
+      return res.status(400).json({ error: "Invalid message type" });
     }
 
     // Get ticket
