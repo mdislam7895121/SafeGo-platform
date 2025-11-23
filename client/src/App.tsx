@@ -563,24 +563,24 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Promotions */}
+      {/* Promotions - OWNER ONLY */}
       <Route path="/restaurant/promotions/campaigns">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantLayout>
+          <RestaurantLayout userRole="OWNER">
             <PromotionsCampaigns />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/promotions/coupons">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantLayout>
+          <RestaurantLayout userRole="OWNER">
             <PromotionsCoupons />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/promotions/featured">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantLayout>
+          <RestaurantLayout userRole="OWNER">
             <PromotionsFeatured />
           </RestaurantLayout>
         </ProtectedRoute>

@@ -111,6 +111,7 @@ export const restaurantNavigation: NavItem[] = [
     label: "Promotions",
     icon: Tag,
     section: "marketing",
+    requiredRole: ["OWNER"],
     children: [
       {
         label: "Campaigns",
