@@ -1,5 +1,5 @@
 import { Bell, Package, AlertCircle, MessageSquare, ExternalLink } from "lucide-react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,6 +34,7 @@ export function RestaurantNotificationDropdown({
   onNotificationClick,
   className
 }: RestaurantNotificationDropdownProps) {
+  const [, setLocation] = useLocation();
   
   // Group notifications by type
   const orderNotifications = notifications.filter(n => n.type === "order");
@@ -53,9 +54,9 @@ export function RestaurantNotificationDropdown({
 
   const handleNotificationClick = (notification: NotificationItem) => {
     onNotificationClick?.(notification.id);
-    // Navigate to link if provided
+    // Navigate using SPA routing if link provided
     if (notification.link) {
-      window.location.href = notification.link;
+      setLocation(notification.link);
     }
   };
 
@@ -289,28 +290,26 @@ export function RestaurantNotificationDropdown({
         {/* Footer with Quick Links */}
         <Separator />
         <div className="p-3 space-y-1">
-          <Link href="/restaurant/orders/live">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-between hover-elevate active-elevate-2"
-              data-testid="notification-link-orders"
-            >
-              <span className="text-xs">View all orders</span>
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-          </Link>
-          <Link href="/restaurant/support/help">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-between hover-elevate active-elevate-2"
-              data-testid="notification-link-support"
-            >
-              <span className="text-xs">Help Center</span>
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-between hover-elevate active-elevate-2"
+            onClick={() => setLocation("/restaurant/orders/live")}
+            data-testid="notification-link-orders"
+          >
+            <span className="text-xs">View all orders</span>
+            <ExternalLink className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-between hover-elevate active-elevate-2"
+            onClick={() => setLocation("/restaurant/support/help")}
+            data-testid="notification-link-support"
+          >
+            <span className="text-xs">Help Center</span>
+            <ExternalLink className="h-3 w-3" />
+          </Button>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

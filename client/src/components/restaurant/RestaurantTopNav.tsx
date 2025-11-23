@@ -60,7 +60,51 @@ export function RestaurantTopNav({
     unread: boolean;
     link?: string;
   }> = [
-    // You can add mock notifications here for demo, or leave empty
+    {
+      id: "notif-1",
+      type: "order",
+      title: "New Order Received",
+      message: "Order #12345 - 2 items worth $45.99",
+      time: "2 min ago",
+      unread: true,
+      link: "/restaurant/orders/live"
+    },
+    {
+      id: "notif-2",
+      type: "order",
+      title: "Order Ready for Pickup",
+      message: "Order #12340 is ready - Customer waiting",
+      time: "15 min ago",
+      unread: true,
+      link: "/restaurant/orders/live"
+    },
+    {
+      id: "notif-3",
+      type: "system",
+      title: "Payout Processed",
+      message: "Weekly payout of $1,245.50 has been sent to your account",
+      time: "1 hour ago",
+      unread: false,
+      link: "/restaurant/payouts/overview"
+    },
+    {
+      id: "notif-4",
+      type: "support",
+      title: "Support Ticket Updated",
+      message: "Your ticket #TKT-789 has a new response",
+      time: "3 hours ago",
+      unread: true,
+      link: "/restaurant/support/tickets"
+    },
+    {
+      id: "notif-5",
+      type: "system",
+      title: "Menu Item Low Stock",
+      message: "Chicken Burger is running low on inventory",
+      time: "5 hours ago",
+      unread: false,
+      link: "/restaurant/menu/all-items"
+    }
   ];
   const unreadNotificationCount = mockNotifications.filter(n => n.unread).length;
 
