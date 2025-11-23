@@ -1,6 +1,5 @@
-import { PrismaClient, Prisma, PromotionType, CouponDiscountType } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { Prisma, PromotionType, CouponDiscountType } from "@prisma/client";
+import { prisma } from "../db";
 
 // ====================================================
 // PROMOTION VALIDATION UTILITIES
@@ -61,10 +60,12 @@ export function isWithinTimeWindow(promotion: any): boolean {
 export async function validatePromotionForOrder(
   promotionId: string,
   customerId: string,
-  orderAmount: Prisma.Decimal,
+  orderAmount: Prisma.Decimal | number,
   restaurantId: string,
   orderItems?: any[]
 ): Promise<PromotionValidationResult> {
+  // Ensure orderAmount is a Prisma.Decimal
+  const amount = typeof orderAmount === 'number' ? new Prisma.Decimal(orderAmount) : orderAmount;
   try {
     const promotion = await prisma.promotion.findUnique({
       where: { id: promotionId },
@@ -90,7 +91,7 @@ export async function validatePromotionForOrder(
     }
 
     // Check minimum order amount
-    if (promotion.minOrderAmount && orderAmount.lessThan(promotion.minOrderAmount)) {
+    if (promotion.minOrderAmount && amount.lessThan(promotion.minOrderAmount)) {
       return {
         isValid: false,
         error: `Minimum order amount of ${promotion.minOrderAmount} required`,
@@ -128,13 +129,13 @@ export async function validatePromotionForOrder(
     }
 
     // Calculate discount based on promotion type
-    const discountAmount = calculatePromotionDiscount(promotion, orderAmount, orderItems);
+    const discountAmount = calculatePromotionDiscount(promotion, amount, orderItems);
 
     if (discountAmount.lessThanOrEqualTo(0)) {
       return { isValid: false, error: "No discount applicable" };
     }
 
-    const finalAmount = Prisma.Decimal.max(orderAmount.minus(discountAmount), new Prisma.Decimal(0));
+    const finalAmount = Prisma.Decimal.max(amount.minus(discountAmount), new Prisma.Decimal(0));
 
     return {
       isValid: true,
@@ -152,21 +153,28 @@ export async function validatePromotionForOrder(
  */
 export function calculatePromotionDiscount(
   promotion: any,
-  orderAmount: Prisma.Decimal,
+  orderAmount: Prisma.Decimal | number,
   orderItems?: any[]
 ): Prisma.Decimal {
+  // Ensure orderAmount is a Prisma.Decimal
+  const amount = typeof orderAmount === 'number' ? new Prisma.Decimal(orderAmount) : orderAmount;
   let discountAmount = new Prisma.Decimal(0);
 
   switch (promotion.promoType) {
     case "percentage_discount":
       if (promotion.discountPercentage) {
-        discountAmount = orderAmount.mul(promotion.discountPercentage).div(100);
+        const percentage = typeof promotion.discountPercentage === 'number' 
+          ? new Prisma.Decimal(promotion.discountPercentage) 
+          : promotion.discountPercentage;
+        discountAmount = amount.mul(percentage).div(100);
       }
       break;
 
     case "fixed_discount":
       if (promotion.discountValue) {
-        discountAmount = promotion.discountValue;
+        discountAmount = typeof promotion.discountValue === 'number'
+          ? new Prisma.Decimal(promotion.discountValue)
+          : promotion.discountValue;
       }
       break;
 
@@ -175,7 +183,7 @@ export function calculatePromotionDiscount(
       // This is simplified - actual implementation would need item details
       if (promotion.buyQuantity && promotion.getQuantity && orderItems) {
         // Calculate average item price and apply get_quantity discount
-        const avgItemPrice = orderAmount.div(orderItems.length);
+        const avgItemPrice = amount.div(orderItems.length);
         discountAmount = avgItemPrice.mul(promotion.getQuantity);
       }
       break;
@@ -185,16 +193,26 @@ export function calculatePromotionDiscount(
     case "first_time_customer":
       // Apply percentage or fixed discount
       if (promotion.discountPercentage) {
-        discountAmount = orderAmount.mul(promotion.discountPercentage).div(100);
+        const percentage = typeof promotion.discountPercentage === 'number' 
+          ? new Prisma.Decimal(promotion.discountPercentage) 
+          : promotion.discountPercentage;
+        discountAmount = amount.mul(percentage).div(100);
       } else if (promotion.discountValue) {
-        discountAmount = promotion.discountValue;
+        discountAmount = typeof promotion.discountValue === 'number'
+          ? new Prisma.Decimal(promotion.discountValue)
+          : promotion.discountValue;
       }
       break;
   }
 
   // Apply max discount cap if set
-  if (promotion.maxDiscountCap && discountAmount.greaterThan(promotion.maxDiscountCap)) {
-    discountAmount = promotion.maxDiscountCap;
+  if (promotion.maxDiscountCap) {
+    const maxCap = typeof promotion.maxDiscountCap === 'number'
+      ? new Prisma.Decimal(promotion.maxDiscountCap)
+      : promotion.maxDiscountCap;
+    if (discountAmount.greaterThan(maxCap)) {
+      discountAmount = maxCap;
+    }
   }
 
   return discountAmount;
@@ -206,9 +224,11 @@ export function calculatePromotionDiscount(
 export async function validateCouponCode(
   code: string,
   customerId: string,
-  orderAmount: Prisma.Decimal,
+  orderAmount: Prisma.Decimal | number,
   restaurantId: string
 ): Promise<CouponValidationResult> {
+  // Ensure orderAmount is a Prisma.Decimal
+  const amount = typeof orderAmount === 'number' ? new Prisma.Decimal(orderAmount) : orderAmount;
   try {
     const coupon = await prisma.coupon.findFirst({
       where: {
@@ -264,7 +284,7 @@ export async function validateCouponCode(
     }
 
     // Check minimum order amount
-    if (coupon.minOrderAmount && orderAmount.lessThan(coupon.minOrderAmount)) {
+    if (coupon.minOrderAmount && amount.lessThan(coupon.minOrderAmount)) {
       return {
         isValid: false,
         error: `Minimum order amount of ${coupon.minOrderAmount} required for this coupon`,
@@ -275,21 +295,31 @@ export async function validateCouponCode(
     let discountAmount = new Prisma.Decimal(0);
 
     if (coupon.discountType === "percentage" && coupon.discountPercentage) {
-      discountAmount = orderAmount.mul(coupon.discountPercentage).div(100);
+      const percentage = typeof coupon.discountPercentage === 'number'
+        ? new Prisma.Decimal(coupon.discountPercentage)
+        : coupon.discountPercentage;
+      discountAmount = amount.mul(percentage).div(100);
     } else if (coupon.discountType === "fixed_amount" && coupon.discountValue) {
-      discountAmount = coupon.discountValue;
+      discountAmount = typeof coupon.discountValue === 'number'
+        ? new Prisma.Decimal(coupon.discountValue)
+        : coupon.discountValue;
     }
 
     // Apply max discount cap if set
-    if (coupon.maxDiscountCap && discountAmount.greaterThan(coupon.maxDiscountCap)) {
-      discountAmount = coupon.maxDiscountCap;
+    if (coupon.maxDiscountCap) {
+      const maxCap = typeof coupon.maxDiscountCap === 'number'
+        ? new Prisma.Decimal(coupon.maxDiscountCap)
+        : coupon.maxDiscountCap;
+      if (discountAmount.greaterThan(maxCap)) {
+        discountAmount = maxCap;
+      }
     }
 
     if (discountAmount.lessThanOrEqualTo(0)) {
       return { isValid: false, error: "No discount applicable from this coupon" };
     }
 
-    const finalAmount = Prisma.Decimal.max(orderAmount.minus(discountAmount), new Prisma.Decimal(0));
+    const finalAmount = Prisma.Decimal.max(amount.minus(discountAmount), new Prisma.Decimal(0));
 
     return {
       isValid: true,
