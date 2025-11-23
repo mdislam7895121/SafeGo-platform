@@ -57,8 +57,11 @@ export default function DeliveryZonesPage() {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (zoneData: Partial<DeliveryZone>) => {
-      const res = await apiRequest("POST", "/api/restaurant/settings/zones", zoneData);
-      return res.json();
+      return await apiRequest("/api/restaurant/settings/zones", {
+        method: "POST",
+        body: JSON.stringify(zoneData),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/settings/zones"] });
@@ -81,8 +84,9 @@ export default function DeliveryZonesPage() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (zoneId: string) => {
-      const res = await apiRequest("DELETE", `/api/restaurant/settings/zones/${zoneId}`, undefined);
-      return res.json();
+      return await apiRequest(`/api/restaurant/settings/zones/${zoneId}`, {
+        method: "DELETE",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/settings/zones"] });

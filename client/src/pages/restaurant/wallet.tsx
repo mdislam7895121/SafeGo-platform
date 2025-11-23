@@ -63,7 +63,11 @@ export default function RestaurantWallet() {
 
   const payoutMutation = useMutation({
     mutationFn: async (amount: number) => {
-      const res = await apiRequest("POST", "/api/restaurant/payout/request", { amount });
+      const res = await apiRequest("/api/restaurant/payout/request", {
+        method: "POST",
+        body: JSON.stringify({ amount }),
+        headers: { "Content-Type": "application/json" },
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -144,71 +148,56 @@ export default function RestaurantWallet() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-6">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/restaurant")}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">My Wallet</h1>
-            <p className="text-sm opacity-90">Manage your earnings</p>
-          </div>
-        </div>
-
-        {/* Wallet Balance */}
-        {isLoading ? (
-          <Card>
-            <CardContent className="p-4">
-              <Skeleton className="h-40 w-full" />
-            </CardContent>
-          </Card>
-        ) : data?.wallet ? (
-          <Card>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Available Balance</p>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400" data-testid="text-available-balance">
-                    {formatCurrency(data.wallet.availableBalance, data.wallet.currency)}
-                  </p>
-                </div>
-                <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg">
-                  <p className="text-xs text-muted-foreground mb-1">Commission Owed</p>
-                  <p className="text-3xl font-bold text-red-600 dark:text-red-400" data-testid="text-negative-balance">
-                    {formatCurrency(data.wallet.negativeBalance, data.wallet.currency)}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                className="w-full"
-                onClick={() => setPayoutDialogOpen(true)}
-                disabled={parseFloat(data.wallet.availableBalance) <= 0 || parseFloat(data.wallet.negativeBalance) > 0}
-                data-testid="button-request-payout"
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Request Payout
-              </Button>
-
-              {parseFloat(data.wallet.negativeBalance) > 0 && (
-                <p className="text-xs text-red-600 dark:text-red-400 mt-2 text-center">
-                  Clear commission debt before requesting payout
+    <div className="space-y-6">
+      {/* Wallet Balance Card */}
+      {isLoading ? (
+        <Card>
+          <CardContent className="p-6">
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
+      ) : data?.wallet ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-5 w-5" />
+              My Wallet
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                <p className="text-xs text-muted-foreground mb-1">Available Balance</p>
+                <p className="text-3xl font-bold text-green-600 dark:text-green-400" data-testid="text-available-balance">
+                  {formatCurrency(data.wallet.availableBalance, data.wallet.currency)}
                 </p>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+              </div>
+              <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="text-xs text-muted-foreground mb-1">Commission Owed</p>
+                <p className="text-3xl font-bold text-red-600 dark:text-red-400" data-testid="text-negative-balance">
+                  {formatCurrency(data.wallet.negativeBalance, data.wallet.currency)}
+                </p>
+              </div>
+            </div>
 
-      <div className="p-6 space-y-4">
+            <Button
+              className="w-full"
+              onClick={() => setPayoutDialogOpen(true)}
+              disabled={parseFloat(data.wallet.availableBalance) <= 0 || parseFloat(data.wallet.negativeBalance) > 0}
+              data-testid="button-request-payout"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Request Payout
+            </Button>
+
+            {parseFloat(data.wallet.negativeBalance) > 0 && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-2 text-center">
+                Clear commission debt before requesting payout
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
         {/* Transaction History */}
         <Card>
           <CardHeader>
@@ -263,7 +252,6 @@ export default function RestaurantWallet() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Payout Request Dialog */}
       <Dialog open={payoutDialogOpen} onOpenChange={setPayoutDialogOpen}>

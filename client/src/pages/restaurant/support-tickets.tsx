@@ -67,10 +67,10 @@ export default function RestaurantSupportTickets() {
     },
   });
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-6">
-        <Card className="w-full max-w-md">
+  return (
+    <div className="space-y-6">
+      {error ? (
+        <Card className="w-full max-w-md mx-auto">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center gap-4">
               <AlertCircle className="h-12 w-12 text-destructive" />
@@ -83,24 +83,16 @@ export default function RestaurantSupportTickets() {
             </div>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex flex-col gap-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      ) : (
+        <>
           <div>
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">
-              Support Tickets
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Manage customer support requests for your food orders
-            </p>
-          </div>
-        </div>
+        <h1 className="text-3xl font-bold" data-testid="text-page-title">
+          Support Tickets
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Manage customer support requests for your food orders
+        </p>
+      </div>
 
         {/* Filters */}
         <Card>
@@ -240,15 +232,16 @@ export default function RestaurantSupportTickets() {
           </div>
         )}
 
-        {/* Pagination */}
-        {data && data.pagination.totalPages > 1 && (
-          <div className="flex justify-center gap-2">
-            <p className="text-sm text-muted-foreground">
-              Showing {data.tickets.length} of {data.pagination.total} tickets
-            </p>
-          </div>
-        )}
-      </div>
+          {/* Pagination */}
+          {data && data.pagination.totalPages > 1 && (
+            <div className="flex justify-center gap-2">
+              <p className="text-sm text-muted-foreground">
+                Showing {data.tickets.length} of {data.pagination.total} tickets
+              </p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

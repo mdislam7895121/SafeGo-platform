@@ -104,7 +104,11 @@ export default function PromotionsCoupons() {
   // Create coupon mutation
   const createCoupon = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("POST", "/api/restaurant/coupons", data);
+      return apiRequest("/api/restaurant/coupons", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/coupons"] });

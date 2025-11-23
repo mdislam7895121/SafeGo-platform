@@ -34,12 +34,10 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from "@/contexts/AuthContext";
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 
 export default function RestaurantOrders() {
-  const { logout } = useAuth();
 
   // Filters state
   const [statusFilter, setStatusFilter] = useState("all");
@@ -134,36 +132,7 @@ export default function RestaurantOrders() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b sticky top-0 z-10">
-        <div className="container mx-auto p-4 lg:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Package className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-2xl font-bold">Orders History</h1>
-                <p className="text-sm text-muted-foreground">
-                  View and manage all orders ({pagination.total} total)
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link href="/restaurant">
-                <Button variant="outline" size="sm" data-testid="button-back-dashboard">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-              </Link>
-              <Button size="sm" onClick={logout}>
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto p-4 lg:p-6 space-y-6">
+    <div className="space-y-6">
         {/* Filter Bar */}
         <Card>
           <CardHeader>
@@ -457,7 +426,6 @@ export default function RestaurantOrders() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       {/* Order Details Drawer */}
       <Sheet open={!!selectedOrderId} onOpenChange={(open) => !open && setSelectedOrderId(null)}>

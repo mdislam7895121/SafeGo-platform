@@ -21,29 +21,31 @@ async function throwIfResNotOk(res: Response) {
 }
 
 export async function apiRequest(
-  method: string,
   url: string,
-  data?: unknown | FormData | undefined,
-): Promise<Response> {
+  options?: RequestInit & { method?: string; body?: string | FormData | BodyInit; headers?: HeadersInit },
+): Promise<any> {
   const token = localStorage.getItem("safego_token");
-  const isFormData = data instanceof FormData;
-  
-  // Don't set Content-Type for FormData - browser will set it with boundary
-  const headers: HeadersInit = data && !isFormData ? { "Content-Type": "application/json" } : {};
+  const headers: HeadersInit = { ...options?.headers };
   
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
 
   const res = await fetch(url, {
-    method,
+    ...options,
     headers,
-    body: isFormData ? data : (data ? JSON.stringify(data) : undefined),
     credentials: "include",
   });
 
   await throwIfResNotOk(res);
-  return res;
+  
+  // For DELETE requests or empty responses, return null
+  const contentType = res.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    return null;
+  }
+  
+  return await res.json();
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

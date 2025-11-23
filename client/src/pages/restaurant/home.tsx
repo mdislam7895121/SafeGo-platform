@@ -97,7 +97,7 @@ export default function RestaurantHome() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-6 space-y-4">
+      <div className="space-y-6">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-40 w-full" />
       </div>
@@ -267,76 +267,7 @@ export default function RestaurantHome() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* TOP HEADER - SafeGo Eats Branding */}
-      <div className="bg-card border-b">
-        <div className="container mx-auto p-4 lg:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            {/* Left Side - Restaurant Info */}
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <UtensilsCrossed className="h-8 w-8 text-primary" />
-                <div>
-                  <h1 className="text-2xl font-bold" data-testid="text-restaurant-name">
-                    {profile?.restaurantName || "Restaurant"}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <span>{profile?.address?.split(',')[1]?.trim() || "Location pending"}</span>
-                    <span>•</span>
-                    <span className="font-mono text-xs" data-testid="text-restaurant-id">
-                      ID: {profile?.id?.substring(0, 8) || "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Status Chip */}
-              <Badge 
-                variant={profile?.isVerified ? "default" : "secondary"}
-                className="font-medium"
-                data-testid="badge-verification-status"
-              >
-                {profile?.isVerified ? "✓ Verified & Active" : 
-                 profile?.verificationStatus === 'pending' ? "Pending Verification" : 
-                 "Inactive"}
-              </Badge>
-            </div>
-
-            {/* Right Side - Controls */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {/* Online/Offline Toggle */}
-              <div className="flex items-center gap-3 p-3 border rounded-lg bg-background">
-                <div className="flex-1">
-                  <p className="font-medium text-sm">
-                    {isOnline ? "You're receiving orders" : "Not receiving orders right now"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {isOnline ? "ONLINE" : "OFFLINE"}
-                  </p>
-                </div>
-                <Switch 
-                  checked={isOnline} 
-                  onCheckedChange={setIsOnline}
-                  data-testid="switch-online-status"
-                />
-              </div>
-
-              {/* Logout Button */}
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={logout}
-                data-testid="button-logout"
-              >
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* KPI SUMMARY ROW - 4 Cards */}
-      <div className="container mx-auto p-4 lg:p-6">
+    <div className="space-y-6">
         {/* KYC Verification Banner */}
         <KYCBanner />
 
@@ -939,7 +870,6 @@ export default function RestaurantHome() {
             </CardContent>
           </Card>
         )}
-      </div>
 
       {/* Reject Order Confirmation Dialog */}
       <AlertDialog open={!!rejectOrderId} onOpenChange={() => setRejectOrderId(null)}>

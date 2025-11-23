@@ -50,7 +50,11 @@ export default function RestaurantBrandingPage() {
   // Update branding mutation
   const updateBrandingMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest<RestaurantBranding>("/api/restaurant/branding", "PATCH", data);
+      return await apiRequest("/api/restaurant/branding", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/branding"] });

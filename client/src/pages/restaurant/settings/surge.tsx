@@ -66,8 +66,11 @@ export default function SurgePricingPage() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (updateData: Partial<SurgeSettings>) => {
-      const res = await apiRequest("PATCH", "/api/restaurant/settings/surge", updateData);
-      return res.json();
+      return await apiRequest("/api/restaurant/settings/surge", {
+        method: "PATCH",
+        body: JSON.stringify(updateData),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/settings/surge"] });

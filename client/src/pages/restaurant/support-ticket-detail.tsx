@@ -94,9 +94,13 @@ export default function RestaurantSupportTicketDetail() {
 
   const replyMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/restaurant/support/tickets/${ticketId}/messages`, {
-        messageBody: replyMessage,
-        messageType,
+      return apiRequest(`/api/restaurant/support/tickets/${ticketId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({
+          messageBody: replyMessage,
+          messageType,
+        }),
+        headers: { "Content-Type": "application/json" },
       });
     },
     onSuccess: () => {
@@ -118,8 +122,12 @@ export default function RestaurantSupportTicketDetail() {
 
   const statusMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("PATCH", `/api/restaurant/support/tickets/${ticketId}/status`, {
-        customerVisibleStatus: newStatus,
+      return apiRequest(`/api/restaurant/support/tickets/${ticketId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          customerVisibleStatus: newStatus,
+        }),
+        headers: { "Content-Type": "application/json" },
       });
     },
     onSuccess: () => {
@@ -141,10 +149,14 @@ export default function RestaurantSupportTicketDetail() {
 
   const proposedResolutionMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/restaurant/support/tickets/${ticketId}/proposed-resolution`, {
-        proposedResolution,
-        proposedAmount: proposedAmount ? parseFloat(proposedAmount) : null,
-        proposedNote,
+      return apiRequest(`/api/restaurant/support/tickets/${ticketId}/proposed-resolution`, {
+        method: "POST",
+        body: JSON.stringify({
+          proposedResolution,
+          proposedAmount: proposedAmount ? parseFloat(proposedAmount) : null,
+          proposedNote,
+        }),
+        headers: { "Content-Type": "application/json" },
       });
     },
     onSuccess: () => {

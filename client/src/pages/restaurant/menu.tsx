@@ -27,13 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAuth } from "@/contexts/AuthContext";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function RestaurantMenu() {
-  const { logout } = useAuth();
   const { toast } = useToast();
   
   // State
@@ -185,35 +183,7 @@ export default function RestaurantMenu() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b sticky top-0 z-10">
-        <div className="container mx-auto p-4 lg:p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <UtensilsCrossed className="h-8 w-8 text-primary" />
-              <div>
-                <h1 className="text-2xl font-bold">Menu Management</h1>
-                <p className="text-sm text-muted-foreground">
-                  Manage your restaurant menu items ({filteredItems.length} items)
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link href="/restaurant">
-                <Button variant="outline" size="sm">
-                  Back to Dashboard
-                </Button>
-              </Link>
-              <Button size="sm" onClick={logout}>
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto p-4 lg:p-6 space-y-6">
+    <div className="space-y-6">
         {/* Search and Filters */}
         <Card>
           <CardContent className="p-4">
@@ -525,7 +495,6 @@ export default function RestaurantMenu() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

@@ -72,7 +72,11 @@ export default function RestaurantGalleryPage() {
   // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest<RestaurantMedia>("/api/restaurant/gallery/upload", "POST", data);
+      return await apiRequest("/api/restaurant/gallery/upload", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/gallery"] });
@@ -96,7 +100,11 @@ export default function RestaurantGalleryPage() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return await apiRequest<RestaurantMedia>(`/api/restaurant/gallery/${id}`, "PATCH", data);
+      return await apiRequest(`/api/restaurant/gallery/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/gallery"] });
@@ -118,7 +126,9 @@ export default function RestaurantGalleryPage() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest(`/api/restaurant/gallery/${id}`, "DELETE");
+      return await apiRequest(`/api/restaurant/gallery/${id}`, {
+        method: "DELETE",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/gallery"] });

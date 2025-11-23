@@ -51,8 +51,11 @@ export default function RestaurantHoursPage() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (hoursData: Partial<RestaurantHours>[]) => {
-      const res = await apiRequest("PATCH", "/api/restaurant/settings/hours", { hours: hoursData });
-      return res.json();
+      return await apiRequest("/api/restaurant/settings/hours", {
+        method: "PATCH",
+        body: JSON.stringify({ hours: hoursData }),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/settings/hours"] });

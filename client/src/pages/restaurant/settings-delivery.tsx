@@ -68,8 +68,11 @@ export default function DeliverySettingsPage() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (updateData: Partial<OperationalSettings>) => {
-      const res = await apiRequest("PATCH", "/api/restaurant/settings/operational", updateData);
-      return res.json();
+      return await apiRequest("/api/restaurant/settings/operational", {
+        method: "PATCH",
+        body: JSON.stringify(updateData),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/settings/operational"] });

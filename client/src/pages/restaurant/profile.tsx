@@ -13,7 +13,7 @@ export default function RestaurantProfile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-6 space-y-4">
+      <div className="space-y-6">
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-40 w-full" />
       </div>
@@ -23,20 +23,7 @@ export default function RestaurantProfile() {
   const profile = (restaurantData as any)?.profile;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Link href="/restaurant">
-            <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold">Profile</h1>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-6">
+    <div className="space-y-6">
         {/* Account Info */}
         <Card>
           <CardHeader>
@@ -117,7 +104,6 @@ export default function RestaurantProfile() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }

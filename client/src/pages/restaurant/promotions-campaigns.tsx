@@ -125,7 +125,11 @@ export default function PromotionsCampaigns() {
   // Create promotion mutation
   const createPromotion = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("POST", "/api/restaurant/promotions", data);
+      return apiRequest("/api/restaurant/promotions", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/promotions"] });
@@ -145,7 +149,11 @@ export default function PromotionsCampaigns() {
   // Update promotion mutation
   const updatePromotion = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return apiRequest("PATCH", `/api/restaurant/promotions/${id}`, data);
+      return apiRequest(`/api/restaurant/promotions/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/promotions"] });
@@ -165,7 +173,9 @@ export default function PromotionsCampaigns() {
   // Delete promotion mutation
   const deletePromotion = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/restaurant/promotions/${id}`, {});
+      return apiRequest(`/api/restaurant/promotions/${id}`, {
+        method: "DELETE",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/promotions"] });
@@ -184,7 +194,11 @@ export default function PromotionsCampaigns() {
   // Toggle active status mutation
   const toggleActiveStatus = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest("PATCH", `/api/restaurant/promotions/${id}`, { isActive });
+      return apiRequest(`/api/restaurant/promotions/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive }),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/promotions"] });

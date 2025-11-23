@@ -97,7 +97,11 @@ export default function StaffManagementPage() {
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: AddStaffFormData) => {
-      return await apiRequest("POST", "/api/restaurant/staff", data);
+      return await apiRequest("/api/restaurant/staff", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({
@@ -133,7 +137,11 @@ export default function StaffManagementPage() {
 
   const updatePermissionsMutation = useMutation({
     mutationFn: async ({ staffId, permissions }: { staffId: string; permissions: any }) => {
-      return await apiRequest("PATCH", `/api/restaurant/staff/${staffId}`, { permissions });
+      return await apiRequest(`/api/restaurant/staff/${staffId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ permissions }),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({
@@ -154,7 +162,11 @@ export default function StaffManagementPage() {
 
   const blockStaffMutation = useMutation({
     mutationFn: async ({ staffId, block, reason }: { staffId: string; block: boolean; reason?: string }) => {
-      return await apiRequest("POST", `/api/restaurant/staff/${staffId}/block`, { block, reason });
+      return await apiRequest(`/api/restaurant/staff/${staffId}/block`, {
+        method: "POST",
+        body: JSON.stringify({ block, reason }),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: (_, variables) => {
       toast({

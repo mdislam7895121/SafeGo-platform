@@ -121,7 +121,7 @@ export default function Reviews() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold mb-2">Customer Reviews</h1>
         <p className="text-muted-foreground">View feedback from your customers</p>
