@@ -1,0 +1,230 @@
+PHASE 12 — SAFEGO GLOBAL SUPPORT SYSTEM  
+(Create & Manage Support Tickets for Rides, Food Orders, and Parcel Deliveries)
+
+A) USER ROLES (Always Required)
+Include **Customer, Driver, Restaurant, Admin** with separate permissions:
+
+1. CUSTOMER:
+   - Can create support tickets for:
+     • rides (from rides collection)
+     • food orders (from food_orders collection)
+     • parcel deliveries (from deliveries collection)
+   - Can view ticket status, replies, history
+   - Can upload images (signed URLs)
+   - Can only access their own tickets
+   - Must have completed country-specific KYC
+
+2. DRIVER:
+   - Can view only tickets assigned to their rides/deliveries
+   - Cannot see customer private data (security rule)
+   - Cannot modify customer’s ticket
+   - Can respond only when admin assigns ticket to driver (optional workflow)
+
+3. RESTAURANT (OWNER + STAFF):
+   - OWNER can reply to support tickets related to their food_orders
+   - STAFF can reply only if permission "CAN_REPLY_SUPPORT" is enabled
+   - Cannot see customer documents
+   - Cannot view tickets from other restaurants
+
+4. ADMIN:
+   - Full Support Center:
+     • view all tickets
+     • assign tickets to staff/driver
+     • change ticket status
+     • block/unblock users
+     • see rejection_reason
+     • audit logs for all actions
+   - No breaking changes to existing admin dashboard
+
+---------------------------------------------------------------------
+
+B) GLOBAL SERVICES — MUST COVER ALL THREE
+Support ticket creation must work for:
+1. Ride-hailing issues
+2. Food delivery issues
+3. Parcel delivery problems
+
+---------------------------------------------------------------------
+
+C) COUNTRY-SPECIFIC KYC (Must Enforce)
+
+BANGLADESH (BD):
+- Must verify: father_name, date_of_birth, present_address,
+  permanent_address, NID (number + images), emergency contact,
+  verification_status + is_verified before ticket creation.
+
+UNITED STATES (US):
+- Must verify: date_of_birth, home_address, emergency contact,
+  government_id_type, government_id_last4, driver license (for drivers),
+  ssn_last4 (optional), verification_status + is_verified.
+
+Customers CANNOT create tickets if KYC incomplete.
+
+---------------------------------------------------------------------
+
+D) SUPPORT SYSTEM DATABASE STRUCTURE (Additive Only)
+Create new collection:
+
+support_tickets
+- id (uuid)
+- customer_id
+- driver_id (nullable)
+- restaurant_id (nullable)
+- order_type: "ride" | "food" | "parcel"
+- order_id (reference to rides, food_orders, deliveries)
+- issue_type (dropdown: payment, delivery, driver behavior, restaurant issue, delay, other)
+- description
+- attachments (array of signed URLs)
+- priority (low/medium/high)
+- status (open → in_review → awaiting_customer → awaiting_provider → resolved → closed)
+- messages[]:
+    • sender_role (customer/driver/restaurant/admin)
+    • message
+    • timestamp
+- timestamps
+
+This does NOT modify any existing schema.
+
+---------------------------------------------------------------------
+
+E) ENDPOINTS (Must Include All Roles)
+
+CUSTOMER ENDPOINTS:
+POST /api/support/customer/create
+GET  /api/support/customer/my-tickets
+GET  /api/support/customer/ticket/:id
+POST /api/support/customer/ticket/:id/reply
+
+RESTAURANT ENDPOINTS:
+GET  /api/support/restaurant/tickets
+POST /api/support/restaurant/ticket/:id/reply
+
+DRIVER ENDPOINTS:
+GET  /api/support/driver/tickets
+POST /api/support/driver/ticket/:id/reply
+
+ADMIN ENDPOINTS:
+GET    /api/admin/support/tickets
+POST   /api/admin/support/ticket/:id/assign
+POST   /api/admin/support/ticket/:id/status
+POST   /api/admin/support/ticket/:id/reply
+POST   /api/admin/support/ticket/:id/close
+
+All must include RBAC + KYC gating.
+
+---------------------------------------------------------------------
+
+F) COLLECTION INTEGRATION (Mandatory)
+Each ticket must connect to:
+
+rides collection:
+- ride_id
+- customer_id
+- driver_id
+- route, timestamps, fare, payment details
+
+food_orders collection:
+- order_id
+- customer_id
+- restaurant_id
+- items, fees, timestamps
+
+deliveries collection:
+- delivery_id
+- customer_id
+- driver_id
+- pickup/dropoff, fees
+
+---------------------------------------------------------------------
+
+G) COMMISSION & WALLET RULES (Must Enforce)
+If issue results in refund or adjustment:
+- Cash ride → driver negative balance increases
+- Cash food order → restaurant negative balance increases
+- Online payments → SafeGo adjusts wallet automatically
+- Admin has settlement tools (already built)
+
+Support module must log refund actions in admin audit.
+
+---------------------------------------------------------------------
+
+H) NOTIFICATIONS (Required)
+Send notifications for:
+- new ticket
+- new reply
+- status change
+- admin assignment
+- resolution update
+
+Customer notifications use locale settings.
+
+---------------------------------------------------------------------
+
+I) SECURITY RULES (Mandatory)
+- Drivers CANNOT see customer address or documents.
+- Restaurants CANNOT see other restaurants’ tickets.
+- Customers CANNOT see driver identity documents.
+- Admin actions must have audit logs.
+- Signed URLs for attachments only.
+- No internal file paths exposed.
+
+---------------------------------------------------------------------
+
+J) SUPPORT STATUS FLOW (Required)
+open → in_review → awaiting_customer → awaiting_provider → resolved → closed
+
+---------------------------------------------------------------------
+
+K) ONBOARDING BLOCKS
+Users must complete full onboarding:
+- Basic info
+- Address
+- Country-specific KYC
+- Emergency contact
+- verification_status = pending until admin approval
+- Cannot use support system until verified
+
+---------------------------------------------------------------------
+
+L) FRONTEND PAGES
+Customer:
+- Report Issue
+- My Issues
+- Ticket Details (chat UI)
+
+Restaurant:
+- Support Dashboard
+- Ticket Reply Page
+
+Driver:
+- My Support Tickets
+- Reply Page
+
+Admin:
+- Support Center Dashboard
+- Ticket Assign Panel
+- Ticket Detail View
+- Audit History Panel
+
+---------------------------------------------------------------------
+
+M) TESTING + DATA-TESTID
+Add test IDs for:
+- fields
+- buttons
+- messages
+- attachments
+- status changes
+
+---------------------------------------------------------------------
+
+N) NON-BREAKING GUARANTEE
+- Additive only
+- No existing fields modified
+- No existing routes removed
+- No existing UI broken
+
+---------------------------------------------------------------------
+
+TASK:
+Implement the ENTIRE Phase 12 Support System exactly as specified above.

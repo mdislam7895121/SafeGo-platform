@@ -1,6 +1,6 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { prisma } from "../db";
-import { authenticateToken } from "../middleware/auth";
+import { authenticateToken, type AuthRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -31,7 +31,7 @@ function maskCustomerName(name: string): string {
  * POST /api/customer/support/tickets
  * Create a new support ticket
  */
-router.post("/tickets", authenticateToken, async (req, res) => {
+router.post("/tickets", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
 
@@ -248,7 +248,7 @@ router.post("/tickets", authenticateToken, async (req, res) => {
  * GET /api/customer/support/tickets/my
  * List customer's support tickets
  */
-router.get("/tickets/my", authenticateToken, async (req, res) => {
+router.get("/tickets/my", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
 
@@ -316,7 +316,7 @@ router.get("/tickets/my", authenticateToken, async (req, res) => {
  * GET /api/customer/support/tickets/:id
  * Get ticket details with messages
  */
-router.get("/tickets/:id", authenticateToken, async (req, res) => {
+router.get("/tickets/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
 
@@ -376,7 +376,7 @@ router.get("/tickets/:id", authenticateToken, async (req, res) => {
  * POST /api/customer/support/tickets/:id/messages
  * Add a message/reply to a ticket
  */
-router.post("/tickets/:id/messages", authenticateToken, async (req, res) => {
+router.post("/tickets/:id/messages", authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
 
