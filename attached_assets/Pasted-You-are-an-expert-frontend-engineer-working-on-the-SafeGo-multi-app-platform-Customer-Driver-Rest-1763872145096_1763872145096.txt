@@ -1,0 +1,174 @@
+You are an expert frontend engineer working on the SafeGo multi-app platform (Customer, Driver, Restaurant, Admin). Your current task is:
+
+SafeGo Eats – Restaurant Dashboard
+Phase 1: Navigation System (Top Nav + Left Sidebar)
+
+GOAL (Step 1 of Restaurant Dashboard V1)
+1. Implement a clean, production-ready navigation system for the SafeGo Eats Restaurant Dashboard:
+   - A fixed top navigation bar.
+   - A collapsible left sidebar navigation.
+2. Keep ALL existing restaurant features working:
+   - Home Page (Module A)
+   - Orders Page (Module B)
+   - Menu Management (Module C) for 500+ items
+   - Orders History page
+3. Do NOT break or remove existing pages, APIs, or business logic. Only extend the UI and routing.
+
+CONTEXT
+- This dashboard is for the RESTAURANT role in the SafeGo ecosystem.
+- Other roles (Customer, Driver, Admin) exist in the platform but are NOT rendered in this dashboard. We only reference them where needed for naming and future navigation.
+- The dashboard must be scalable and clean enough for real restaurants handling many orders.
+
+TECH & DESIGN INSTRUCTIONS
+1. Use the same frontend stack, routing library, and design system already used in the project.
+2. Follow the existing typography, spacing, and button styles so the new navigation looks native, not bolted on.
+3. Ensure responsive behavior:
+   - Desktop: fixed sidebar + fixed top bar.
+   - Tablet/mobile: sidebar collapsible or hidden behind a menu icon; top bar remains.
+
+TOP NAVIGATION BAR – REQUIREMENTS
+Create a global top nav that is visible on all restaurant pages.
+
+A. Left section:
+   - SafeGo Eats logo or text title.
+   - Current restaurant name.
+   - Small badge for restaurant status: [Open] or [Closed].
+   - Toggle switch: “Open / Closed” that hooks into existing status logic if available, otherwise create a stub function for future wiring.
+
+B. Center (optional but prepare layout):
+   - Placeholder area for future global search (e.g., search orders/menu items). For now, show a non-functional search box component.
+
+C. Right section:
+   - Notifications icon (bell) with unread indicator count (pull from any existing notifications logic if available; if not, implement dummy state and clear interface for future integration).
+   - Language selector dropdown (for now options: English, Bangla, more can be added later; switching does not need to be functional yet, just UI).
+   - Profile avatar + dropdown:
+       * Restaurant Profile
+       * Payouts & Statements
+       * Store Settings
+       * Help & Support
+       * Logout
+   - Keep the existing logout action fully working. If there is an existing logout button, migrate its logic into the dropdown’s Logout item without breaking it.
+
+LEFT SIDEBAR NAVIGATION – REQUIREMENTS
+Create a left sidebar with clear sections and icons. It must support an “expanded” and “collapsed” mode.
+
+A. Basic behavior:
+   - Fixed to the left.
+   - Scrollable if the menu is taller than the viewport.
+   - Shows icons + labels when expanded.
+   - Shows icons only (with tooltip on hover) when collapsed.
+   - Highlight the currently active route.
+   - Use a simple toggle button (e.g., “<” / “>”) to expand/collapse the sidebar.
+
+B. Menu structure (top-level items):
+
+1. Dashboard
+   - Path: /restaurant/dashboard
+   - Purpose: summary view pointing to the existing Home page (Module A).
+
+2. Orders
+   - Sub-items:
+       * Live Orders – /restaurant/orders/live
+       * Scheduled Orders – /restaurant/orders/scheduled
+       * Order History – /restaurant/orders/history   (link existing Orders History page)
+   - These should reuse existing orders components where possible.
+
+3. Menu Management
+   - Sub-items:
+       * All Items – /restaurant/menu/items       (existing Module C list)
+       * Categories – /restaurant/menu/categories
+       * Add New Item – /restaurant/menu/new
+   - Keep it optimized for 500+ items (pagination/search must remain intact).
+
+4. Promotions (Module D, future pages)
+   - Sub-items:
+       * Campaigns – /restaurant/promotions/campaigns
+       * Coupons & Discounts – /restaurant/promotions/coupons
+       * Featured Items – /restaurant/promotions/featured
+   - For now, create placeholder pages/components with simple “Coming soon” text so navigation doesn’t break.
+
+5. Payouts & Finance (Module E)
+   - Sub-items:
+       * Earnings Overview – /restaurant/payouts/overview
+       * Payout History – /restaurant/payouts/history
+       * Bank & Tax Info – /restaurant/payouts/bank-info
+   - Create simple placeholder pages. Do NOT implement business logic yet; just routing + basic layout.
+
+6. Insights & Analytics (Module F)
+   - Sub-items:
+       * Sales Analytics – /restaurant/analytics/sales
+       * Order Performance – /restaurant/analytics/orders
+       * Menu Performance – /restaurant/analytics/menu
+   - Again, create basic placeholder pages with simple text and a base layout ready for charts later.
+
+7. Ratings & Reviews (Module G)
+   - Sub-items:
+       * All Reviews – /restaurant/reviews
+       * Complaints / Issues – /restaurant/reviews/complaints
+   - Use placeholder components for now.
+
+8. Store Settings (Module H)
+   - Sub-items:
+       * Store Profile – /restaurant/settings/profile
+       * Business Hours – /restaurant/settings/hours
+       * Delivery & Pickup Rules – /restaurant/settings/delivery
+       * Staff & Roles – /restaurant/settings/staff
+       * Devices & Printers – /restaurant/settings/devices
+
+9. Documents & Compliance
+   - Sub-items:
+       * Business Documents – /restaurant/documents/business
+       * Health & Safety – /restaurant/documents/health
+       * KYC / Verification – /restaurant/documents/kyc
+   - NOTE: The KYC structure must be compatible with future country-specific flows (Bangladesh NID/passport, US EIN/SSN, etc.), but here we only build navigation and placeholder pages.
+
+10. Support
+   - Sub-items:
+       * Help Center – /restaurant/support/help
+       * Contact Support – /restaurant/support/contact
+       * System Status – /restaurant/support/status
+
+ROUTING & INTEGRATION
+1. Wire each menu item to a distinct route using the existing routing system.
+2. For pages that already exist (Home, Orders, Menu, Orders History), simply connect the new routes to the existing components.
+3. For future modules (Promotions, Payouts, Analytics, Reviews, Store Settings, Documents, Support), create lightweight placeholder components with:
+   - Page title
+   - Short description: “This is a placeholder for [Module Name]. Do not remove; will be implemented in later phases.”
+4. Ensure there is a single, central navigation config/map that defines:
+   - Label
+   - Icon
+   - Path
+   - Section/group
+   - Required role (e.g., OWNER vs STAFF, even if role logic is basic for now)
+   This will make it easier to apply role-based access later.
+
+ROLE & PERMISSION PREP (Restaurant-side only)
+1. Assume two restaurant-side roles for now:
+   - OWNER
+   - STAFF
+2. Navigation visibility rules:
+   - OWNER sees all items.
+   - STAFF cannot see:
+       * Bank & Tax Info
+       * Staff & Roles
+       * Documents & Compliance
+   Implement this with a simple role check. If real auth is not yet implemented, create a mock role state with easy hooks for future integration.
+
+SECURITY & STABILITY REQUIREMENTS (Phase 1)
+1. Do NOT change authentication flows, tokens, or backend APIs in this phase.
+2. Do NOT expose any sensitive keys or credentials on the frontend.
+3. Ensure there are no navigation paths that point to non-existent components (every path should render something, even if it is a placeholder).
+4. If you refactor shared layout components, keep them backwards-compatible so existing pages continue to render without errors.
+
+DELIVERABLES
+1. A working top navigation bar and left sidebar for the SafeGo Eats Restaurant Dashboard.
+2. All defined routes created and wired to either:
+   - Existing pages (Home, Orders, Menu, Orders History), or
+   - New placeholder components for future modules.
+3. Role-based visibility on navigation items for OWNER vs STAFF (even if roles are mocked).
+4. Clean, well-structured code with clear comments on:
+   - Where navigation config lives.
+   - How to add a new menu item in future phases.
+   - Where to plug in real KYC, payouts, analytics, and review logic later.
+
+Do not move to later phases (Promotions logic, Payout calculations, Analytics charts, etc.) in this task. Only complete Phase 1 Navigation System as described above.

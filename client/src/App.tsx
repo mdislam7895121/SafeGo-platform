@@ -61,12 +61,39 @@ import DriverAccountPermissions from "@/pages/driver/account/permissions";
 import DriverAccountAbout from "@/pages/driver/account/about";
 
 // Restaurant pages
+import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
 import RestaurantHome from "@/pages/restaurant/home";
+import LiveOrders from "@/pages/restaurant/orders-live";
+import ScheduledOrders from "@/pages/restaurant/orders-scheduled";
+import RestaurantOrders from "@/pages/restaurant/orders";
+import RestaurantMenu from "@/pages/restaurant/menu";
+import MenuCategories from "@/pages/restaurant/menu-categories";
+import AddMenuItem from "@/pages/restaurant/menu-new";
+import PromotionsCampaigns from "@/pages/restaurant/promotions-campaigns";
+import PromotionsCoupons from "@/pages/restaurant/promotions-coupons";
+import PromotionsFeatured from "@/pages/restaurant/promotions-featured";
+import PayoutsOverview from "@/pages/restaurant/payouts-overview";
+import PayoutsHistory from "@/pages/restaurant/payouts-history";
+import PayoutsBankInfo from "@/pages/restaurant/payouts-bank";
+import AnalyticsSales from "@/pages/restaurant/analytics-sales";
+import AnalyticsOrders from "@/pages/restaurant/analytics-orders";
+import AnalyticsMenu from "@/pages/restaurant/analytics-menu";
+import Reviews from "@/pages/restaurant/reviews";
+import ReviewsComplaints from "@/pages/restaurant/reviews-complaints";
+import SettingsProfile from "@/pages/restaurant/settings-profile";
+import SettingsHours from "@/pages/restaurant/settings-hours";
+import SettingsDelivery from "@/pages/restaurant/settings-delivery";
+import SettingsStaff from "@/pages/restaurant/settings-staff";
+import SettingsDevices from "@/pages/restaurant/settings-devices";
+import DocumentsBusiness from "@/pages/restaurant/documents-business";
+import DocumentsHealth from "@/pages/restaurant/documents-health";
+import DocumentsKYC from "@/pages/restaurant/documents-kyc";
+import SupportHelp from "@/pages/restaurant/support-help";
+import SupportContact from "@/pages/restaurant/support-contact";
+import SupportStatus from "@/pages/restaurant/support-status";
 import RestaurantProfile from "@/pages/restaurant/profile";
 import RestaurantSupport from "@/pages/restaurant/support";
 import RestaurantWallet from "@/pages/restaurant/wallet";
-import RestaurantMenu from "@/pages/restaurant/menu";
-import RestaurantOrders from "@/pages/restaurant/orders";
 
 // Admin pages
 import AdminHome from "@/pages/admin/home";
@@ -433,35 +460,269 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Restaurant routes */}
+      {/* Restaurant routes - All wrapped with RestaurantLayout */}
+      {/* Dashboard - Home */}
+      <Route path="/restaurant/dashboard">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantHome />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/restaurant">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantHome />
+          <RestaurantLayout>
+            <RestaurantHome />
+          </RestaurantLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/restaurant/profile">
+
+      {/* Orders */}
+      <Route path="/restaurant/orders/live">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantProfile />
+          <RestaurantLayout>
+            <LiveOrders />
+          </RestaurantLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/restaurant/support">
+      <Route path="/restaurant/orders/scheduled">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantSupport />
+          <RestaurantLayout>
+            <ScheduledOrders />
+          </RestaurantLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/restaurant/wallet">
+      <Route path="/restaurant/orders/history">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantWallet />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/restaurant/menu">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantMenu />
+          <RestaurantLayout>
+            <RestaurantOrders />
+          </RestaurantLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/restaurant/orders">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantOrders />
+          <RestaurantLayout>
+            <RestaurantOrders />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Menu Management */}
+      <Route path="/restaurant/menu/items">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantMenu />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/menu/categories">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <MenuCategories />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/menu/new">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <AddMenuItem />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/menu">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantMenu />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Promotions */}
+      <Route path="/restaurant/promotions/campaigns">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <PromotionsCampaigns />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/promotions/coupons">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <PromotionsCoupons />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/promotions/featured">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <PromotionsFeatured />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Payouts & Finance */}
+      <Route path="/restaurant/payouts/overview">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <PayoutsOverview />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/payouts/history">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <PayoutsHistory />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/payouts/bank-info">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <PayoutsBankInfo />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Analytics */}
+      <Route path="/restaurant/analytics/sales">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <AnalyticsSales />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/analytics/orders">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <AnalyticsOrders />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/analytics/menu">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <AnalyticsMenu />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Reviews */}
+      <Route path="/restaurant/reviews/complaints">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <ReviewsComplaints />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/reviews">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <Reviews />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Settings */}
+      <Route path="/restaurant/settings/profile">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SettingsProfile />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/settings/hours">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SettingsHours />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/settings/delivery">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SettingsDelivery />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/settings/staff">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <SettingsStaff />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/settings/devices">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SettingsDevices />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Documents & Compliance (Owner only) */}
+      <Route path="/restaurant/documents/business">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <DocumentsBusiness />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/documents/health">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <DocumentsHealth />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/documents/kyc">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <DocumentsKYC />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Support */}
+      <Route path="/restaurant/support/help">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SupportHelp />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/support/contact">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SupportContact />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/support/status">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SupportStatus />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/support">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <Redirect to="/restaurant/support/help" />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Legacy routes - keep for backward compatibility */}
+      <Route path="/restaurant/profile">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantProfile />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/wallet">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantWallet />
+          </RestaurantLayout>
         </ProtectedRoute>
       </Route>
 
