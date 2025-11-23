@@ -12,47 +12,46 @@ export function RestaurantReceivingOrdersButton({
   return (
     <button
       onClick={() => onToggle(!isReceivingOrders)}
-      className={`
-        inline-flex items-center gap-2 h-9 px-4 rounded-full font-medium text-sm
-        bg-black dark:bg-black transition-all duration-200
-        border-2 cursor-pointer
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
-        ${isReceivingOrders 
-          ? 'border-green-600 text-green-600 hover:border-green-500 hover:text-green-500 focus-visible:ring-green-600' 
-          : 'border-red-600 text-red-600 hover:border-red-500 hover:text-red-500 focus-visible:ring-red-600'
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onToggle(!isReceivingOrders);
         }
-      `}
-      aria-pressed={isReceivingOrders}
+      }}
+      role="switch"
+      aria-checked={isReceivingOrders}
       aria-label={
         isReceivingOrders 
-          ? "Restaurant is online. Tap to go offline." 
-          : "Restaurant is offline. Tap to go online."
+          ? "Restaurant is online. Press to go offline." 
+          : "Restaurant is offline. Press to go online."
       }
       data-testid="button-receiving-orders-toggle"
+      style={{
+        backgroundColor: isReceivingOrders ? '#0CCE6B' : '#E5E7EB',
+        color: isReceivingOrders ? 'white' : '#374151',
+        border: isReceivingOrders ? 'none' : '1px solid #D1D5DB',
+      }}
+      className={`
+        inline-flex items-center justify-center gap-3 min-h-[46px] h-[46px] px-5 rounded-full font-semibold text-[15px]
+        transition-all duration-150 cursor-pointer
+        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B9EFF] focus-visible:ring-offset-2
+        active:scale-[0.98]
+        hover:opacity-90
+      `}
     >
-      {/* Power Icon in Circle */}
-      <div 
+      {/* Power Icon - No circle wrapper */}
+      <Power 
         className={`
-          flex items-center justify-center w-5 h-5 rounded-full border-2 transition-all duration-200
-          ${isReceivingOrders 
-            ? 'border-green-600' 
-            : 'border-red-600'
-          }
+          w-[22px] h-[22px] flex-shrink-0 transition-all duration-150
+          ${isReceivingOrders ? 'drop-shadow-[0_0_4px_rgba(255,255,255,0.5)]' : ''}
         `}
-      >
-        <Power 
-          className={`
-            h-3 w-3 transition-all duration-200
-            ${isReceivingOrders 
-              ? 'text-green-600' 
-              : 'text-red-600'
-            }
-          `}
-        />
-      </div>
+        style={{
+          color: isReceivingOrders ? 'white' : '#374151'
+        }}
+      />
       
-      {/* Label Text - Show on sm and larger screens */}
-      <span className="hidden sm:inline whitespace-nowrap">
+      {/* Label Text - Always visible with responsive handling */}
+      <span className="whitespace-nowrap">
         {isReceivingOrders ? "Online" : "Offline"}
       </span>
     </button>
