@@ -106,6 +106,8 @@ import SupportContact from "@/pages/restaurant/support-contact";
 import SupportStatus from "@/pages/restaurant/support-status";
 import RestaurantProfile from "@/pages/restaurant/profile";
 import RestaurantSupport from "@/pages/restaurant/support";
+import RestaurantSupportTickets from "@/pages/restaurant/support-tickets";
+import RestaurantSupportTicketDetail from "@/pages/restaurant/support-ticket-detail";
 import RestaurantWallet from "@/pages/restaurant/wallet";
 import StaffManagement from "@/pages/restaurant/staff";
 import StaffActivity from "@/pages/restaurant/staff-activity";
@@ -787,6 +789,21 @@ function Router() {
       </Route>
 
       {/* Support */}
+      {/* Phase 12: Support Tickets */}
+      <Route path="/restaurant/support-tickets/:id">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantSupportTicketDetail />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/support-tickets">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantSupportTickets />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/restaurant/support/help">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
