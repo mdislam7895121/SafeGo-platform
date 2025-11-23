@@ -1,11 +1,12 @@
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Camera } from "lucide-react";
+import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import GalleryModal from "@/components/customer/GalleryModal";
 
 interface MenuItem {
@@ -66,6 +67,48 @@ interface BrandingResponse {
   media: MediaItem[];
 }
 
+interface OperationalStatusResponse {
+  status: {
+    isOpen: boolean;
+    isTemporarilyClosed: boolean;
+    temporaryCloseReason: string | null;
+    canAcceptOrders: boolean;
+    isThrottled: boolean;
+    activeOrderCount: number;
+    maxConcurrentOrders: number | null;
+  };
+  todayHours: {
+    isClosed: boolean;
+    openTime1: string | null;
+    closeTime1: string | null;
+    openTime2: string | null;
+    closeTime2: string | null;
+  } | null;
+  hours: Array<{
+    dayOfWeek: string;
+    isClosed: boolean;
+    openTime1: string | null;
+    closeTime1: string | null;
+    openTime2: string | null;
+    closeTime2: string | null;
+  }>;
+  operational: {
+    deliveryEnabled: boolean;
+    pickupEnabled: boolean;
+    preparationTimeMinutes: number;
+    minOrderAmount: number | null;
+  } | null;
+  surgePricing: {
+    isActive: boolean;
+    multiplier: number;
+  };
+  deliveryZone: {
+    inZone: boolean;
+    deliveryFee: number | null;
+    estimatedTimeMinutes: number | null;
+  } | null;
+}
+
 export default function FoodRestaurantDetails() {
   const { id } = useParams() as { id: string };
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -86,10 +129,16 @@ export default function FoodRestaurantDetails() {
     retry: 1,
   });
 
+  const { data: operationalData, isLoading: operationalLoading } = useQuery<OperationalStatusResponse>({
+    queryKey: [`/api/customer/restaurants/${id}/status`],
+    retry: 1,
+  });
+
   const restaurant = restaurantData?.restaurant;
   const categories = menuData?.categories || [];
   const branding = brandingData?.branding;
   const media = brandingData?.media || [];
+  const operational = operationalData;
   const isLoading = restaurantLoading || menuLoading;
   const error = restaurantError || menuError;
 
@@ -101,6 +150,53 @@ export default function FoodRestaurantDetails() {
     setGalleryStartIndex(index);
     setIsGalleryOpen(true);
   };
+
+  // Helper function to format time (24hr to 12hr)
+  const formatTime = (time: string): string => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+
+  // Helper function to get status badge info
+  const getStatusBadge = () => {
+    if (!operational?.status) return null;
+
+    const { isOpen, isTemporarilyClosed, canAcceptOrders, isThrottled } = operational.status;
+
+    if (isTemporarilyClosed) {
+      return {
+        variant: "destructive" as const,
+        text: "Temporarily Closed",
+        icon: AlertCircle,
+      };
+    }
+
+    if (!isOpen) {
+      return {
+        variant: "secondary" as const,
+        text: "Closed",
+        icon: Clock,
+      };
+    }
+
+    if (isThrottled || !canAcceptOrders) {
+      return {
+        variant: "outline" as const,
+        text: "Busy",
+        icon: AlertCircle,
+      };
+    }
+
+    return {
+      variant: "default" as const,
+      text: "Open",
+      icon: CheckCircle,
+    };
+  };
+
+  const statusBadge = getStatusBadge();
 
   if (error) {
     return (
@@ -254,6 +350,174 @@ export default function FoodRestaurantDetails() {
                   <Badge variant="outline" className="text-xs ml-auto">
                     {restaurant.cityCode}
                   </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* Operational Status Section */}
+        {operationalLoading ? (
+          <Card className="mt-4">
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-32 mb-4" />
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardContent>
+          </Card>
+        ) : operational && statusBadge ? (
+          <Card className="mt-4">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-lg">Restaurant Status</h3>
+                <Badge variant={statusBadge.variant} className="gap-1" data-testid="badge-restaurant-status">
+                  <statusBadge.icon className="h-3 w-3" />
+                  {statusBadge.text}
+                </Badge>
+              </div>
+
+              {/* Temporary Closure Notice */}
+              {operational.status.isTemporarilyClosed && operational.status.temporaryCloseReason && (
+                <div className="mb-4 p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <p className="text-sm text-destructive" data-testid="text-closure-reason">
+                    {operational.status.temporaryCloseReason}
+                  </p>
+                </div>
+              )}
+
+              {/* Today's Hours */}
+              {operational.todayHours && !operational.todayHours.isClosed && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 text-sm mb-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">Today's Hours:</span>
+                  </div>
+                  <div className="ml-6 space-y-1">
+                    {operational.todayHours.openTime1 && operational.todayHours.closeTime1 && (
+                      <p className="text-sm" data-testid="text-hours-shift1">
+                        {formatTime(operational.todayHours.openTime1)} - {formatTime(operational.todayHours.closeTime1)}
+                      </p>
+                    )}
+                    {operational.todayHours.openTime2 && operational.todayHours.closeTime2 && (
+                      <p className="text-sm" data-testid="text-hours-shift2">
+                        {formatTime(operational.todayHours.openTime2)} - {formatTime(operational.todayHours.closeTime2)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {operational.todayHours?.isClosed && (
+                <div className="mb-4">
+                  <p className="text-sm text-muted-foreground" data-testid="text-closed-today">
+                    Closed today
+                  </p>
+                </div>
+              )}
+
+              <Separator className="my-4" />
+
+              {/* Service Options & Info */}
+              <div className="space-y-3">
+                {/* Delivery/Pickup Status */}
+                {operational.operational && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Service Options:</span>
+                    <div className="flex gap-2">
+                      {operational.operational.deliveryEnabled && (
+                        <Badge variant="outline" className="text-xs" data-testid="badge-delivery-enabled">
+                          Delivery
+                        </Badge>
+                      )}
+                      {operational.operational.pickupEnabled && (
+                        <Badge variant="outline" className="text-xs" data-testid="badge-pickup-enabled">
+                          Pickup
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Preparation Time */}
+                {operational.operational?.preparationTimeMinutes && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Prep Time:</span>
+                    <span className="text-sm font-medium" data-testid="text-prep-time">
+                      {operational.operational.preparationTimeMinutes} min
+                    </span>
+                  </div>
+                )}
+
+                {/* Min Order Amount */}
+                {operational.operational?.minOrderAmount && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Min Order:</span>
+                    <span className="text-sm font-medium" data-testid="text-min-order">
+                      ${Number(operational.operational.minOrderAmount).toFixed(2)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Surge Pricing Indicator */}
+                {operational.surgePricing.isActive && (
+                  <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      <span className="text-sm font-medium text-orange-900 dark:text-orange-200">
+                        High Demand
+                      </span>
+                    </div>
+                    <p className="text-xs text-orange-800 dark:text-orange-300" data-testid="text-surge-multiplier">
+                      Prices increased by {((operational.surgePricing.multiplier - 1) * 100).toFixed(0)}% due to high demand
+                    </p>
+                  </div>
+                )}
+
+                {/* Throttling Notice */}
+                {operational.status.isThrottled && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <p className="text-sm text-amber-900 dark:text-amber-200" data-testid="text-throttling-notice">
+                        Restaurant is currently at capacity. Accepting limited orders.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Delivery Zone Info */}
+                {operational.deliveryZone && operational.operational?.deliveryEnabled && (
+                  <>
+                    {operational.deliveryZone.inZone ? (
+                      <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-2 mb-1">
+                          <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <span className="text-sm font-medium text-green-900 dark:text-green-200">
+                            Delivers to your area
+                          </span>
+                        </div>
+                        {operational.deliveryZone.deliveryFee !== null && (
+                          <p className="text-xs text-green-800 dark:text-green-300" data-testid="text-delivery-fee">
+                            Delivery fee: ${Number(operational.deliveryZone.deliveryFee).toFixed(2)}
+                          </p>
+                        )}
+                        {operational.deliveryZone.estimatedTimeMinutes && (
+                          <p className="text-xs text-green-800 dark:text-green-300" data-testid="text-delivery-eta">
+                            Estimated delivery: {operational.deliveryZone.estimatedTimeMinutes} min
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-muted rounded-lg border">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <p className="text-sm text-muted-foreground" data-testid="text-no-delivery">
+                            Delivery not available in your area
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </CardContent>
