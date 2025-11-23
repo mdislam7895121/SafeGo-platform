@@ -135,20 +135,9 @@ export const restaurantNavigation: NavItem[] = [
     section: "finance",
     children: [
       {
-        label: "Earnings Overview",
+        label: "Payouts Dashboard",
         icon: DollarSign,
-        path: "/restaurant/payouts/overview"
-      },
-      {
-        label: "Payout History",
-        icon: History,
-        path: "/restaurant/payouts/history"
-      },
-      {
-        label: "Bank & Tax Info",
-        icon: Building,
-        path: "/restaurant/payouts/bank-info",
-        requiredRole: ["OWNER"]
+        path: "/restaurant/payouts"
       }
     ]
   },

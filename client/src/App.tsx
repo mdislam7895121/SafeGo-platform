@@ -75,9 +75,8 @@ import MenuBulkActions from "@/pages/restaurant/menu-bulk";
 import PromotionsCampaigns from "@/pages/restaurant/promotions-campaigns";
 import PromotionsCoupons from "@/pages/restaurant/promotions-coupons";
 import PromotionsFeatured from "@/pages/restaurant/promotions-featured";
-import PayoutsOverview from "@/pages/restaurant/payouts-overview";
-import PayoutsHistory from "@/pages/restaurant/payouts-history";
-import PayoutsBankInfo from "@/pages/restaurant/payouts-bank";
+import RestaurantPayouts from "@/pages/restaurant/payouts";
+import AdminRestaurantPayouts from "@/pages/admin/restaurant-payouts";
 import AnalyticsOverview from "@/pages/restaurant/analytics-overview";
 import AnalyticsItems from "@/pages/restaurant/analytics-items";
 import AnalyticsCustomers from "@/pages/restaurant/analytics-customers";
@@ -638,6 +637,15 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      {/* Payouts - Phase 5 */}
+      <Route path="/restaurant/payouts">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantPayouts />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
       {/* Reviews */}
       <Route path="/restaurant/reviews/complaints">
         <ProtectedRoute allowedRoles={["restaurant"]}>
@@ -902,6 +910,11 @@ function Router() {
       <Route path="/admin/payouts/reports">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminPayoutsReports />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payouts/restaurants">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminRestaurantPayouts />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts">
