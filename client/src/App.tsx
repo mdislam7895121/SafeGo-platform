@@ -66,6 +66,7 @@ import RestaurantProfile from "@/pages/restaurant/profile";
 import RestaurantSupport from "@/pages/restaurant/support";
 import RestaurantWallet from "@/pages/restaurant/wallet";
 import RestaurantMenu from "@/pages/restaurant/menu";
+import RestaurantOrders from "@/pages/restaurant/orders";
 
 // Admin pages
 import AdminHome from "@/pages/admin/home";
@@ -456,6 +457,11 @@ function Router() {
       <Route path="/restaurant/menu">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantMenu />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/orders">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantOrders />
         </ProtectedRoute>
       </Route>
 

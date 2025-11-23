@@ -708,6 +708,9 @@ router.get("/orders", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const status = req.query.status as string;
+    const orderType = req.query.orderType as string;
+    const paymentStatus = req.query.paymentStatus as string;
+    const timeRange = req.query.timeRange as string;
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
@@ -720,8 +723,44 @@ router.get("/orders", async (req: AuthRequest, res) => {
     }
 
     const where: any = { restaurantId: restaurantProfile.id };
+    
+    // Status filter
     if (status) {
       where.status = status;
+    }
+
+    // Order type filter (delivery/pickup)
+    if (orderType) {
+      where.orderType = orderType;
+    }
+
+    // Payment status filter
+    if (paymentStatus) {
+      where.paymentStatus = paymentStatus;
+    }
+
+    // Time range filter
+    if (timeRange) {
+      const now = new Date();
+      let startDate: Date;
+
+      switch (timeRange) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'last7days':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'last30days':
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          startDate = new Date(0); // All time
+      }
+
+      where.createdAt = {
+        gte: startDate,
+      };
     }
 
     const orders = await prisma.foodOrder.findMany({
