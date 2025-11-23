@@ -1,6 +1,7 @@
 import { Router, type Response } from "express";
 import { prisma } from "../db";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
+import { notifyTicketReply, notifyTicketStatusChange } from "../services/support-notifications";
 
 const router = Router();
 

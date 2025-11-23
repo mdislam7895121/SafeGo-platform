@@ -150,6 +150,8 @@ import AdminAnalytics from "@/pages/admin/analytics";
 import AdminPerformance from "@/pages/admin/performance";
 import AdminMonitoring from "@/pages/admin/monitoring";
 import AdminSecurityCenter from "@/pages/admin/security-center";
+import AdminSupportCenter from "@/pages/admin/support-center";
+import AdminSupportTicketDetail from "@/pages/admin/support-ticket-detail";
 
 import NotFound from "@/pages/not-found";
 
@@ -976,6 +978,16 @@ function Router() {
       <Route path="/admin/support-chat">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSupportChat />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support/:ticketId">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportTicketDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportCenter />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/wallets/:id">

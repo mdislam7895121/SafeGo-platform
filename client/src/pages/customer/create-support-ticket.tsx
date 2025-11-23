@@ -35,13 +35,42 @@ export default function CreateSupportTicket() {
   // Fetch recent orders/rides/deliveries
   const { data: foodOrders = [] } = useQuery<Service[]>({
     queryKey: ["/api/customer/food/orders"],
+    enabled: serviceType === "food_order",
     select: (data: any) => {
       if (!Array.isArray(data.orders)) return [];
       return data.orders.slice(0, 10).map((order: any) => ({
         id: order.id,
         type: "food_order",
-        label: `Food Order from ${order.restaurant?.restaurantName || "Unknown"} - ${order.totalAmount || "0.00"}`,
+        label: `Food Order from ${order.restaurant?.restaurantName || "Unknown"} - $${order.totalAmount || "0.00"}`,
         date: order.createdAt
+      }));
+    }
+  });
+
+  const { data: rides = [] } = useQuery<Service[]>({
+    queryKey: ["/api/customer/rides"],
+    enabled: serviceType === "ride",
+    select: (data: any) => {
+      if (!Array.isArray(data.rides)) return [];
+      return data.rides.slice(0, 10).map((ride: any) => ({
+        id: ride.id,
+        type: "ride",
+        label: `Ride on ${new Date(ride.createdAt).toLocaleDateString()} - $${ride.totalFare || "0.00"}`,
+        date: ride.createdAt
+      }));
+    }
+  });
+
+  const { data: deliveries = [] } = useQuery<Service[]>({
+    queryKey: ["/api/customer/deliveries"],
+    enabled: serviceType === "delivery",
+    select: (data: any) => {
+      if (!Array.isArray(data.deliveries)) return [];
+      return data.deliveries.slice(0, 10).map((delivery: any) => ({
+        id: delivery.id,
+        type: "delivery",
+        label: `Parcel to ${delivery.dropoffAddress || "Unknown"} - $${delivery.totalFare || "0.00"}`,
+        date: delivery.createdAt
       }));
     }
   });
@@ -92,6 +121,10 @@ export default function CreateSupportTicket() {
     switch (serviceType) {
       case "food_order":
         return foodOrders;
+      case "ride":
+        return rides;
+      case "delivery":
+        return deliveries;
       default:
         return [];
     }

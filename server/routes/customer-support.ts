@@ -1,6 +1,12 @@
 import { Router, type Response } from "express";
 import { prisma } from "../db";
 import { authenticateToken, type AuthRequest } from "../middleware/auth";
+import {
+  notifyCustomerTicketCreated,
+  notifyRestaurantTicketCreated,
+  notifyDriverTicketCreated,
+  notifyAdminHighPriorityTicket,
+} from "../services/support-notifications";
 
 const router = Router();
 
@@ -245,7 +251,28 @@ router.post("/tickets", authenticateToken, async (req: AuthRequest, res: Respons
       },
     });
 
-    // TODO: Send notifications to restaurant/admin
+    // Send notifications (non-blocking)
+    const ticketData = {
+      id: ticket.id,
+      ticketCode: ticket.ticketCode,
+      serviceType: ticket.serviceType,
+      customerId: customer.id,
+      restaurantId: ticket.restaurantId,
+      driverId: ticket.driverId,
+      issueCategory: ticket.issueCategory,
+      internalStatus: ticket.internalStatus,
+      priority: ticket.priority,
+      country: ticket.countryCode,
+    };
+    
+    Promise.all([
+      notifyCustomerTicketCreated(ticketData),
+      restaurantId ? notifyRestaurantTicketCreated(ticketData) : null,
+      driverId ? notifyDriverTicketCreated(ticketData) : null,
+      notifyAdminHighPriorityTicket(ticketData),
+    ]).catch((error) => {
+      console.error("Failed to send support ticket notifications:", error);
+    });
 
     return res.status(201).json({
       id: ticket.id,
