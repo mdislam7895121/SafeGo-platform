@@ -1,8 +1,10 @@
 import { prisma } from "../db";
+import { Prisma } from "@prisma/client";
 
 /**
  * Financial Adjustments Service for Support Ticket Refunds
  * Handles refund processing without breaking existing commission logic
+ * Follows the same patterns as walletService.ts
  */
 
 interface RefundAdjustment {
@@ -17,6 +19,8 @@ interface RefundAdjustment {
   driverId?: string | null;
   adminNote?: string;
   adminId: string;
+  adminEmail: string;
+  countryCode: string;
 }
 
 /**
@@ -38,6 +42,8 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
     driverId,
     adminNote,
     adminId,
+    adminEmail,
+    countryCode,
   } = data;
 
   try {
@@ -45,6 +51,7 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
     let affectedWalletId: string | null = null;
     let adjustmentType: string;
     let adjustmentReason: string;
+    let ownerType: "driver" | "restaurant" | null = null;
 
     if (serviceType === "food_order") {
       // Food orders: restaurant bears the cost
@@ -52,48 +59,63 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
         throw new Error("Restaurant ID required for food order refunds");
       }
 
-      const restaurant = await prisma.restaurantProfile.findUnique({
-        where: { id: restaurantId },
-        select: { wallet: { select: { id: true } } },
+      // Find restaurant wallet
+      const wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: restaurantId,
+            ownerType: "restaurant",
+          },
+        },
       });
 
-      if (!restaurant?.wallet) {
+      if (!wallet) {
         throw new Error("Restaurant wallet not found");
       }
 
-      affectedWalletId = restaurant.wallet.id;
+      affectedWalletId = wallet.id;
+      ownerType = "restaurant";
       adjustmentType = paymentMethod === "cash" ? "cash_refund_deduction" : "online_refund_deduction";
       adjustmentReason = `Refund approved for support ticket ${ticketCode}`;
 
-      // Create negative balance transaction for restaurant
-      await prisma.walletTransaction.create({
-        data: {
-          walletId: affectedWalletId,
-          transactionType: "adjustment",
-          amount: -refundAmount,
-          currency: "USD",
-          status: "completed",
-          description: adjustmentReason,
-          metadata: {
-            ticketId,
-            ticketCode,
-            serviceType,
-            serviceId,
-            paymentMethod,
-            adminNote,
-            adminId,
-          },
-        },
-      });
+      // Create negative balance transaction using Prisma transaction
+      await prisma.$transaction(async (tx) => {
+        const currentWallet = await tx.wallet.findUnique({
+          where: { id: affectedWalletId! },
+        });
 
-      // Update restaurant wallet balance
-      await prisma.wallet.update({
-        where: { id: affectedWalletId },
-        data: {
-          balance: {
-            decrement: refundAmount,
+        if (!currentWallet) {
+          throw new Error("Wallet not found in transaction");
+        }
+
+        // Increase negative balance by refund amount
+        const newNegativeBalance = new Prisma.Decimal(currentWallet.negativeBalance.toString())
+          .plus(refundAmount);
+
+        await tx.wallet.update({
+          where: { id: affectedWalletId! },
+          data: {
+            negativeBalance: newNegativeBalance,
           },
-        },
+        });
+
+        // Create transaction record
+        await tx.walletTransaction.create({
+          data: {
+            walletId: affectedWalletId!,
+            ownerType: "restaurant",
+            countryCode,
+            serviceType: "refund",
+            direction: "debit",
+            amount: new Prisma.Decimal(refundAmount),
+            balanceSnapshot: currentWallet.availableBalance,
+            negativeBalanceSnapshot: newNegativeBalance,
+            referenceType: "support_ticket",
+            referenceId: ticketId,
+            description: adjustmentReason,
+            createdByAdminId: adminId,
+          },
+        });
       });
 
     } else if (serviceType === "ride" && paymentMethod === "cash") {
@@ -102,48 +124,63 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
         throw new Error("Driver ID required for cash ride refunds");
       }
 
-      const driver = await prisma.driverProfile.findUnique({
-        where: { id: driverId },
-        select: { wallet: { select: { id: true } } },
+      // Find driver wallet
+      const wallet = await prisma.wallet.findUnique({
+        where: {
+          ownerId_ownerType: {
+            ownerId: driverId,
+            ownerType: "driver",
+          },
+        },
       });
 
-      if (!driver?.wallet) {
+      if (!wallet) {
         throw new Error("Driver wallet not found");
       }
 
-      affectedWalletId = driver.wallet.id;
+      affectedWalletId = wallet.id;
+      ownerType = "driver";
       adjustmentType = "cash_refund_deduction";
       adjustmentReason = `Cash ride refund approved for support ticket ${ticketCode}`;
 
-      // Create negative balance transaction for driver
-      await prisma.walletTransaction.create({
-        data: {
-          walletId: affectedWalletId,
-          transactionType: "adjustment",
-          amount: -refundAmount,
-          currency: "USD",
-          status: "completed",
-          description: adjustmentReason,
-          metadata: {
-            ticketId,
-            ticketCode,
-            serviceType,
-            serviceId,
-            paymentMethod,
-            adminNote,
-            adminId,
-          },
-        },
-      });
+      // Create negative balance transaction
+      await prisma.$transaction(async (tx) => {
+        const currentWallet = await tx.wallet.findUnique({
+          where: { id: affectedWalletId! },
+        });
 
-      // Update driver wallet balance
-      await prisma.wallet.update({
-        where: { id: affectedWalletId },
-        data: {
-          balance: {
-            decrement: refundAmount,
+        if (!currentWallet) {
+          throw new Error("Wallet not found in transaction");
+        }
+
+        // Increase negative balance by refund amount
+        const newNegativeBalance = new Prisma.Decimal(currentWallet.negativeBalance.toString())
+          .plus(refundAmount);
+
+        await tx.wallet.update({
+          where: { id: affectedWalletId! },
+          data: {
+            negativeBalance: newNegativeBalance,
           },
-        },
+        });
+
+        // Create transaction record
+        await tx.walletTransaction.create({
+          data: {
+            walletId: affectedWalletId!,
+            ownerType: "driver",
+            countryCode,
+            serviceType: "refund",
+            direction: "debit",
+            amount: new Prisma.Decimal(refundAmount),
+            balanceSnapshot: currentWallet.availableBalance,
+            negativeBalanceSnapshot: newNegativeBalance,
+            referenceType: "support_ticket",
+            referenceId: ticketId,
+            description: adjustmentReason,
+            createdByAdminId: adminId,
+          },
+        });
       });
 
     } else {
@@ -159,6 +196,7 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
     await prisma.auditLog.create({
       data: {
         actorId: adminId,
+        actorEmail: adminEmail,
         actorRole: "admin",
         ipAddress: "",
         actionType: "refund_processed",
@@ -174,7 +212,7 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
           paymentMethod,
           adjustmentType,
           affectedWalletId,
-          adminNote,
+          adminNote: adminNote || "",
         },
         success: true,
       },
@@ -194,6 +232,7 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
     await prisma.auditLog.create({
       data: {
         actorId: adminId,
+        actorEmail: adminEmail,
         actorRole: "admin",
         ipAddress: "",
         actionType: "refund_failed",
@@ -219,10 +258,8 @@ export async function processRefundAdjustment(data: RefundAdjustment) {
 export async function getTicketFinancialHistory(ticketId: string) {
   const transactions = await prisma.walletTransaction.findMany({
     where: {
-      metadata: {
-        path: ["ticketId"],
-        equals: ticketId,
-      },
+      referenceType: "support_ticket",
+      referenceId: ticketId,
     },
     orderBy: {
       createdAt: "desc",
