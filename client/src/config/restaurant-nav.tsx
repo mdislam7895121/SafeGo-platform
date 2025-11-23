@@ -220,9 +220,19 @@ export const restaurantNavigation: NavItem[] = [
         path: "/restaurant/settings/hours"
       },
       {
-        label: "Delivery & Pickup Rules",
+        label: "Delivery & Pickup",
         icon: MapPin,
         path: "/restaurant/settings/delivery"
+      },
+      {
+        label: "Delivery Zones",
+        icon: MapPin,
+        path: "/restaurant/settings/zones"
+      },
+      {
+        label: "Surge Pricing",
+        icon: TrendingUp,
+        path: "/restaurant/settings/surge"
       },
       {
         label: "Staff & Roles",

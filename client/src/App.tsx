@@ -90,6 +90,8 @@ import RestaurantGallery from "@/pages/restaurant/gallery";
 import SettingsProfile from "@/pages/restaurant/settings-profile";
 import SettingsHours from "@/pages/restaurant/settings-hours";
 import SettingsDelivery from "@/pages/restaurant/settings-delivery";
+import SettingsZones from "@/pages/restaurant/settings/zones";
+import SettingsSurge from "@/pages/restaurant/settings/surge";
 import SettingsStaff from "@/pages/restaurant/settings-staff";
 import SettingsDevices from "@/pages/restaurant/settings-devices";
 import DocumentsBusiness from "@/pages/restaurant/documents-business";
@@ -710,6 +712,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <SettingsDelivery />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/settings/zones">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SettingsZones />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/settings/surge">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SettingsSurge />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
