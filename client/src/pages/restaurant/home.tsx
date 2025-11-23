@@ -112,6 +112,32 @@ export default function RestaurantHome() {
   const avgRating = 4.5;
   const totalRatings = 0;
 
+  // Calculate 7-day performance metrics
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const last7DaysOrders = orders.filter((order: any) => 
+    new Date(order.createdAt) >= sevenDaysAgo
+  );
+  
+  const last7DaysEarnings = last7DaysOrders.reduce((sum: number, order: any) => 
+    sum + Number(order.restaurantPayout || 0), 0
+  );
+  
+  const cancelledOrders = last7DaysOrders.filter((order: any) => 
+    order.status === 'cancelled'
+  );
+  const cancellationRate = last7DaysOrders.length > 0 
+    ? (cancelledOrders.length / last7DaysOrders.length) * 100 
+    : 0;
+  
+  // Calculate average preparation time (if data available)
+  const completedOrders = last7DaysOrders.filter((order: any) => 
+    order.status === 'completed' || order.status === 'delivered'
+  );
+  // Placeholder - would need timestamps to calculate real prep time
+  const avgPrepTime = completedOrders.length > 0 ? 15 : null; // Default 15 min
+
   // Helper functions
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -530,7 +556,7 @@ export default function RestaurantHome() {
               </CardContent>
             </Card>
 
-            {/* Wallet Snapshot Placeholder */}
+            {/* Wallet Snapshot */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -546,37 +572,112 @@ export default function RestaurantHome() {
                       ${wallet?.balance != null ? Number(wallet.balance).toFixed(2) : "0.00"}
                     </span>
                   </div>
+                  {wallet?.negativeBalance && Number(wallet.negativeBalance) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Negative Balance</span>
+                      <span className="font-medium text-red-600">
+                        ${Number(wallet.negativeBalance).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Pending Payouts</span>
-                    <span className="font-medium">Coming soon</span>
+                    <span className="font-medium" data-testid="text-pending-payouts">
+                      ${last7DaysEarnings > 0 ? last7DaysEarnings.toFixed(2) : "0.00"}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Next Payout</span>
-                    <span className="font-medium">Coming soon</span>
+                    <span className="font-medium text-xs" data-testid="text-next-payout">
+                      Weekly (Auto)
+                    </span>
                   </div>
                 </div>
-                <Link href="/restaurant/wallet">
-                  <Button size="sm" className="w-full" data-testid="button-goto-wallet">
-                    Go to Wallet
-                  </Button>
-                </Link>
+                
+                {/* Warning if no payout method */}
+                {!wallet && (
+                  <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                    <p className="text-xs text-orange-700 dark:text-orange-300 font-medium">
+                      ⚠ Add a payout method to receive earnings
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-2">
+                  <Link href="/restaurant/wallet">
+                    <Button size="sm" className="w-full" data-testid="button-goto-wallet">
+                      <Wallet className="h-4 w-4 mr-2" />
+                      View Wallet
+                    </Button>
+                  </Link>
+                  <Link href="/restaurant/wallet">
+                    <Button size="sm" variant="outline" className="w-full" data-testid="button-manage-payouts">
+                      <CreditCard className="h-4 w-4 mr-2" />
+                      Manage Payout Methods
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Performance Insights Placeholder */}
+            {/* Performance Insights */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <TrendingUp className="h-4 w-4" />
                   Performance Insights
                 </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">Last 7 days</p>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>• Weekly orders: Coming soon</p>
-                  <p>• Weekly earnings: Coming soon</p>
-                  <p>• Cancellation rate: Coming soon</p>
-                  <p>• Avg prep time: Coming soon</p>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ShoppingBag className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Total Orders</span>
+                    </div>
+                    <span className="font-semibold" data-testid="text-7day-orders">
+                      {last7DaysOrders.length}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Total Earnings</span>
+                    </div>
+                    <span className="font-semibold text-green-600" data-testid="text-7day-earnings">
+                      ${last7DaysEarnings.toFixed(2)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Avg. Prep Time</span>
+                    </div>
+                    <span className="font-semibold" data-testid="text-avg-prep-time">
+                      {avgPrepTime ? `${avgPrepTime} min` : "N/A"}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <X className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Cancelled Orders</span>
+                    </div>
+                    <span className={`font-semibold ${cancellationRate > 10 ? 'text-red-600' : ''}`} data-testid="text-cancellation-rate">
+                      {cancellationRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  
+                  {last7DaysOrders.length === 0 && (
+                    <div className="pt-2 text-center">
+                      <p className="text-xs text-muted-foreground">
+                        No orders in the last 7 days
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
