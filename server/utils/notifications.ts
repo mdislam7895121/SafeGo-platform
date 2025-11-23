@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db";
 
 // Notification type constants
 export const NotificationType = {
@@ -22,6 +21,10 @@ export const NotificationType = {
   
   // Parcel
   PARCEL_STATUS_ISSUE: "PARCEL_STATUS_ISSUE",
+  
+  // Food Orders
+  FOOD_ORDER_STATUS: "FOOD_ORDER_STATUS",
+  RESTAURANT_ISSUE_ESCALATED: "RESTAURANT_ISSUE_ESCALATED",
   
   // Wallet
   WALLET_SETTLEMENT_PENDING: "WALLET_SETTLEMENT_PENDING",
@@ -503,6 +506,123 @@ export async function notifyParcelStatusIssue(params: {
       parcelId: params.parcelId,
       customerId: params.customerId,
       issue: params.issue,
+    },
+  });
+}
+
+/**
+ * Helper function to determine notification severity based on order status
+ */
+function getSeverityForOrderStatus(status: string): string {
+  const highSeverity = ["cancelled", "cancelled_restaurant", "cancelled_customer", "cancelled_driver"];
+  const mediumSeverity = ["placed", "accepted", "ready_for_pickup"];
+  
+  if (highSeverity.includes(status)) return NotificationSeverity.CRITICAL;
+  if (mediumSeverity.includes(status)) return NotificationSeverity.WARNING;
+  return NotificationSeverity.INFO;
+}
+
+/**
+ * Create notifications for all parties when food order status changes
+ * Notifies: restaurant, customer, and driver (if assigned)
+ */
+export async function notifyFoodOrderStatusChange(params: {
+  orderId: string;
+  orderCode?: string;
+  restaurantId: string;
+  customerId: string;
+  driverId?: string | null;
+  oldStatus: string;
+  newStatus: string;
+  updatedBy: string;
+  countryCode?: string;
+}) {
+  const { orderId, orderCode, restaurantId, customerId, driverId, oldStatus, newStatus, updatedBy, countryCode } = params;
+  const orderRef = orderCode || orderId.substring(0, 8);
+  const severity = getSeverityForOrderStatus(newStatus);
+
+  const notifications = [];
+
+  // Notification for restaurant
+  notifications.push(
+    logNotification({
+      type: NotificationType.FOOD_ORDER_STATUS,
+      severity,
+      actorId: updatedBy,
+      entityType: NotificationEntityType.RESTAURANT,
+      entityId: restaurantId,
+      countryCode: countryCode || null,
+      title: `Order ${orderRef} - Status Updated`,
+      message: `Order status changed from ${oldStatus} to ${newStatus}`,
+      metadata: { orderId, orderCode, oldStatus, newStatus },
+    })
+  );
+
+  // Notification for customer
+  notifications.push(
+    logNotification({
+      type: NotificationType.FOOD_ORDER_STATUS,
+      severity,
+      actorId: updatedBy,
+      entityType: NotificationEntityType.CUSTOMER,
+      entityId: customerId,
+      countryCode: countryCode || null,
+      title: `Order ${orderRef} - Status Updated`,
+      message: `Your order status changed to ${newStatus}`,
+      metadata: { orderId, orderCode, oldStatus, newStatus },
+    })
+  );
+
+  // Notification for driver (if assigned)
+  if (driverId) {
+    notifications.push(
+      logNotification({
+        type: NotificationType.FOOD_ORDER_STATUS,
+        severity,
+        actorId: updatedBy,
+        entityType: NotificationEntityType.DRIVER,
+        entityId: driverId,
+        countryCode: countryCode || null,
+        title: `Delivery Order ${orderRef} - Status Updated`,
+        message: `Order status changed to ${newStatus}`,
+        metadata: { orderId, orderCode, oldStatus, newStatus },
+      })
+    );
+  }
+
+  // Execute all notification creations in parallel
+  await Promise.all(notifications);
+}
+
+/**
+ * Create admin notification when restaurant issue is escalated
+ */
+export async function notifyRestaurantIssueEscalated(params: {
+  restaurantId: string;
+  orderId: string;
+  orderCode?: string;
+  issueType: string;
+  issueDescription: string;
+  reportedBy: string;
+  countryCode?: string;
+}) {
+  const { restaurantId, orderId, orderCode, issueType, issueDescription, reportedBy, countryCode } = params;
+
+  await logNotification({
+    type: NotificationType.RESTAURANT_ISSUE_ESCALATED,
+    severity: NotificationSeverity.CRITICAL,
+    actorId: reportedBy,
+    entityType: NotificationEntityType.RESTAURANT,
+    entityId: restaurantId,
+    countryCode: countryCode || null,
+    title: `Restaurant Issue Escalated - ${issueType}`,
+    message: issueDescription,
+    metadata: {
+      restaurantId,
+      orderId,
+      orderCode: orderCode || orderId.substring(0, 8),
+      issueType,
+      reportedBy,
     },
   });
 }

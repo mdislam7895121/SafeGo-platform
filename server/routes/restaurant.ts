@@ -1,14 +1,52 @@
 import { Router } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
+import { validateRestaurantKYC } from "../utils/kyc-validator";
+import { notifyFoodOrderStatusChange, notifyRestaurantIssueEscalated } from "../utils/notifications";
+import { prisma } from "../db";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // All routes require authentication and restaurant role
 router.use(authenticateToken);
 router.use(requireRole(["restaurant"]));
+
+// Middleware to check KYC completion for critical operations
+async function requireKYCCompletion(req: AuthRequest, res: any, next: any) {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Use user's countryCode as fallback if not set on profile
+    const profileWithCountry = {
+      ...restaurantProfile,
+      countryCode: restaurantProfile.countryCode || restaurantProfile.user.countryCode,
+    };
+
+    const kycValidation = validateRestaurantKYC(profileWithCountry);
+    if (!kycValidation.isComplete) {
+      return res.status(403).json({
+        error: "KYC verification required",
+        message: "Please complete your KYC verification to perform this action",
+        missingFields: kycValidation.missingFields,
+        countryCode: kycValidation.countryCode,
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("KYC check error:", error);
+    return res.status(500).json({ error: "Failed to verify KYC status" });
+  }
+}
 
 // ====================================================
 // PATCH /api/restaurant/profile
@@ -101,41 +139,6 @@ router.get("/home", async (req: AuthRequest, res) => {
 // ====================================================
 // WALLET & PAYOUT API
 // ====================================================
-
-// GET /api/restaurant/wallet
-// Get restaurant wallet details
-router.get("/wallet", async (req: AuthRequest, res) => {
-  try {
-    const userId = req.user!.userId;
-
-    const restaurantProfile = await prisma.restaurantProfile.findUnique({
-      where: { userId },
-      include: { user: true },
-    });
-
-    if (!restaurantProfile) {
-      return res.status(404).json({ error: "Restaurant profile not found" });
-    }
-
-    const wallet = await prisma.wallet.findUnique({
-      where: {
-        ownerId_ownerType: {
-          ownerId: restaurantProfile.id,
-          ownerType: "restaurant",
-        },
-      },
-    });
-
-    if (!wallet) {
-      return res.status(404).json({ error: "Wallet not found" });
-    }
-
-    res.json(wallet);
-  } catch (error) {
-    console.error("Get wallet error:", error);
-    res.status(500).json({ error: "Failed to fetch wallet" });
-  }
-});
 
 // GET /api/restaurant/wallet/transactions
 // Get restaurant wallet transaction history
@@ -703,8 +706,8 @@ router.delete("/menu/items/:id", async (req: AuthRequest, res) => {
 // ====================================================
 
 // GET /api/restaurant/orders/overview
-// Get restaurant orders overview with today's stats
-router.get("/orders/overview", async (req: AuthRequest, res) => {
+// Get restaurant orders overview with today's stats (requires KYC completion)
+router.get("/orders/overview", requireKYCCompletion, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
 
@@ -778,8 +781,8 @@ router.get("/orders/overview", async (req: AuthRequest, res) => {
 });
 
 // GET /api/restaurant/orders/live
-// Get live orders board (Kanban-style)
-router.get("/orders/live", async (req: AuthRequest, res) => {
+// Get live orders board (Kanban-style) (requires KYC completion)
+router.get("/orders/live", requireKYCCompletion, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
 
@@ -1012,8 +1015,8 @@ router.get("/orders/:id", async (req: AuthRequest, res) => {
 });
 
 // POST /api/restaurant/orders/:id/status
-// Update order status with audit logging
-router.post("/orders/:id/status", async (req: AuthRequest, res) => {
+// Update order status with audit logging (requires KYC completion)
+router.post("/orders/:id/status", requireKYCCompletion, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
@@ -1100,6 +1103,19 @@ router.post("/orders/:id/status", async (req: AuthRequest, res) => {
       return updated;
     });
 
+    // Send notifications to all parties (restaurant, customer, driver)
+    await notifyFoodOrderStatusChange({
+      orderId: id,
+      orderCode: order.orderCode || undefined,
+      restaurantId: restaurantProfile.id,
+      customerId: order.customerId,
+      driverId: order.driverId || undefined,
+      oldStatus: order.status,
+      newStatus: status,
+      updatedBy: userId,
+      countryCode: restaurantProfile.countryCode || undefined,
+    });
+
     res.json({
       message: "Order status updated successfully",
       order: {
@@ -1114,8 +1130,8 @@ router.post("/orders/:id/status", async (req: AuthRequest, res) => {
 });
 
 // POST /api/restaurant/orders/:id/issue
-// Report an issue with an order
-router.post("/orders/:id/issue", async (req: AuthRequest, res) => {
+// Report an issue with an order (requires KYC completion)
+router.post("/orders/:id/issue", requireKYCCompletion, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
@@ -1172,6 +1188,17 @@ router.post("/orders/:id/issue", async (req: AuthRequest, res) => {
       },
     });
 
+    // Create admin notification for escalated issue
+    await notifyRestaurantIssueEscalated({
+      restaurantId: restaurantProfile.id,
+      orderId: id,
+      orderCode: order.orderCode || undefined,
+      issueType,
+      issueDescription: description,
+      reportedBy: userId,
+      countryCode: restaurantProfile.countryCode || undefined,
+    });
+
     res.json({
       message: "Issue reported successfully. Our team will review and contact you soon.",
       issueId: id,
@@ -1179,6 +1206,88 @@ router.post("/orders/:id/issue", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Report order issue error:", error);
     res.status(500).json({ error: "Failed to report issue" });
+  }
+});
+
+// GET /api/restaurant/wallet
+// Get restaurant wallet information (requires KYC completion)
+router.get("/wallet", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Get or create wallet
+    let wallet = await prisma.wallet.findUnique({
+      where: {
+        ownerId_ownerType: {
+          ownerId: restaurantProfile.id,
+          ownerType: "RESTAURANT",
+        },
+      },
+    });
+
+    if (!wallet) {
+      // Create wallet if it doesn't exist
+      wallet = await prisma.wallet.create({
+        data: {
+          ownerId: restaurantProfile.id,
+          ownerType: "RESTAURANT",
+          countryCode: restaurantProfile.countryCode || "US",
+          availableBalance: 0,
+          negativeBalance: 0,
+          currency: restaurantProfile.countryCode === "BD" ? "BDT" : "USD",
+          isDemo: restaurantProfile.isDemo,
+        },
+      });
+    }
+
+    // Format wallet data to match frontend expectations
+    const formattedWallet = {
+      availableBalance: wallet.availableBalance.toString(),
+      negativeBalance: wallet.negativeBalance.toString(),
+      currency: wallet.currency,
+    };
+
+    res.json({ wallet: formattedWallet });
+  } catch (error) {
+    console.error("Get wallet error:", error);
+    res.status(500).json({ error: "Failed to fetch wallet information" });
+  }
+});
+
+// GET /api/restaurant/kyc-status
+// Get KYC verification status
+router.get("/kyc-status", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const kycValidation = validateRestaurantKYC(restaurantProfile);
+
+    res.json({
+      isComplete: kycValidation.isComplete,
+      missingFields: kycValidation.missingFields,
+      countryCode: kycValidation.countryCode,
+      verificationStatus: restaurantProfile.verificationStatus,
+      isVerified: restaurantProfile.isVerified,
+    });
+  } catch (error) {
+    console.error("Get KYC status error:", error);
+    res.status(500).json({ error: "Failed to fetch KYC status" });
   }
 });
 

@@ -16,11 +16,18 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { KYCBanner } from "@/components/restaurant/KYCBanner";
+import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
 
 export default function OrdersOverview() {
   const { data: overviewData, isLoading } = useQuery({
     queryKey: ["/api/restaurant/orders/overview"],
     refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  const { data: walletData, isLoading: walletLoading } = useQuery({
+    queryKey: ["/api/restaurant/wallet"],
+    refetchInterval: 30000,
   });
 
   if (isLoading) {
@@ -51,6 +58,9 @@ export default function OrdersOverview() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* KYC Verification Banner */}
+      <KYCBanner />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -67,8 +77,11 @@ export default function OrdersOverview() {
         </Link>
       </div>
 
-      {/* Today's Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Stats Cards */}
+        <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Total Orders */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -230,11 +243,29 @@ export default function OrdersOverview() {
           )}
         </CardContent>
       </Card>
+        </div>
 
-      <Separator />
+        {/* Right Column: Payout Summary */}
+        <div>
+          <PayoutSummaryWidget
+            wallet={walletData?.wallet || null}
+            earnings={{
+              totalEarnings: today.totalRevenue.toFixed(2),
+              commission: today.totalCommission.toFixed(2),
+              netPayout: today.netRevenue.toFixed(2),
+            }}
+            nextSettlementDate="Weekly on Monday"
+            isLoading={walletLoading}
+          />
+        </div>
+      </div>
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Bottom Section */}
+      <div className="space-y-6">
+        <Separator />
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link href="/restaurant/orders/live">
           <Card className="hover-elevate cursor-pointer" data-testid="card-live-orders">
             <CardContent className="pt-6">
@@ -282,6 +313,7 @@ export default function OrdersOverview() {
             </CardContent>
           </Card>
         </Link>
+        </div>
       </div>
     </div>
   );

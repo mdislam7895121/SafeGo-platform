@@ -40,6 +40,8 @@ import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
+import { KYCBanner } from "@/components/restaurant/KYCBanner";
+import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
 
 export default function RestaurantHome() {
   const { user, logout } = useAuth();
@@ -57,11 +59,16 @@ export default function RestaurantHome() {
     refetchInterval: 10000, // Poll every 10 seconds for live updates
   });
 
+  const { data: walletData, isLoading: walletLoading } = useQuery({
+    queryKey: ["/api/restaurant/wallet"],
+    refetchInterval: 30000, // Poll every 30 seconds
+  });
+
   // Mutation for updating order status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
-      return await apiRequest(`/api/food-orders/${orderId}/status`, {
-        method: "PATCH",
+      return await apiRequest(`/api/restaurant/orders/${orderId}/status`, {
+        method: "POST",
         body: JSON.stringify({ status }),
         headers: { "Content-Type": "application/json" },
       });
@@ -287,6 +294,9 @@ export default function RestaurantHome() {
 
       {/* KPI SUMMARY ROW - 4 Cards */}
       <div className="container mx-auto p-4 lg:p-6">
+        {/* KYC Verification Banner */}
+        <KYCBanner />
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {/* Today's Orders */}
           <Card>
@@ -528,6 +538,18 @@ export default function RestaurantHome() {
 
           {/* RIGHT COLUMN - Info + Wallet + Quick Actions (1/3 width on desktop) */}
           <div className="space-y-4">
+            {/* Payout Summary */}
+            <PayoutSummaryWidget
+              wallet={walletData?.wallet || null}
+              earnings={{
+                totalEarnings: todayEarnings.toFixed(2),
+                commission: (todayEarnings * 0.15).toFixed(2), // Assuming 15% commission
+                netPayout: (todayEarnings * 0.85).toFixed(2),
+              }}
+              nextSettlementDate="Weekly on Monday"
+              isLoading={walletLoading}
+            />
+
             {/* Restaurant Information */}
             <Card>
               <CardHeader>
