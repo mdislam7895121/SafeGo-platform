@@ -9409,6 +9409,337 @@ router.post(
 );
 
 // ====================================================
+// PHASE 7: PROMOTION MODERATION ENDPOINTS
+// ====================================================
+
+// GET /api/admin/promotions - List all promotions
+router.get(
+  "/promotions",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { restaurantId, isActive, isFlagged, promoType, page = "1", limit = "50" } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+
+      const where: any = {};
+      if (restaurantId) where.restaurantId = restaurantId as string;
+      if (isActive !== undefined) where.isActive = isActive === "true";
+      if (isFlagged !== undefined) where.isFlagged = isFlagged === "true";
+      if (promoType) where.promoType = promoType as string;
+
+      const [promotions, total] = await Promise.all([
+        prisma.promotion.findMany({
+          where,
+          include: {
+            restaurant: {
+              select: {
+                id: true,
+                businessName: true,
+                user: { select: { email: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limitNum,
+        }),
+        prisma.promotion.count({ where }),
+      ]);
+
+      res.json({
+        promotions: promotions.map(p => ({
+          ...p,
+          discountPercentage: p.discountPercentage ? Number(p.discountPercentage) : null,
+          discountValue: p.discountValue ? Number(p.discountValue) : null,
+          minOrderAmount: p.minOrderAmount ? Number(p.minOrderAmount) : null,
+          maxDiscountCap: p.maxDiscountCap ? Number(p.maxDiscountCap) : null,
+        })),
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error: any) {
+      console.error("Get promotions error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch promotions" });
+    }
+  }
+);
+
+// POST /api/admin/promotions/:id/flag - Flag a promotion
+router.post(
+  "/promotions/:id/flag",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const adminId = req.user!.userId;
+
+      if (!reason) {
+        return res.status(400).json({ error: "Reason is required" });
+      }
+
+      const promotion = await prisma.promotion.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      const updatedPromotion = await prisma.promotion.update({
+        where: { id },
+        data: { isFlagged: true },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.FLAG_PROMOTION,
+        entityType: EntityType.PROMOTION,
+        entityId: id,
+        description: `Flagged promotion "${promotion.title}" from restaurant ${promotion.restaurant.businessName}. Reason: ${reason}`,
+        metadata: {
+          promotion_id: id,
+          promotion_title: promotion.title,
+          restaurant_id: promotion.restaurantId,
+          restaurant_name: promotion.restaurant.businessName,
+          reason,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: promotion.restaurant.userId,
+          type: "alert",
+          title: "Promotion Flagged by Admin",
+          body: `Your promotion "${promotion.title}" has been flagged by administration. Reason: ${reason}`,
+        },
+      });
+
+      res.json({
+        message: "Promotion flagged successfully",
+        promotion: updatedPromotion,
+      });
+    } catch (error: any) {
+      console.error("Flag promotion error:", error);
+      res.status(500).json({ error: error.message || "Failed to flag promotion" });
+    }
+  }
+);
+
+// POST /api/admin/promotions/:id/disable - Disable a promotion
+router.post(
+  "/promotions/:id/disable",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const adminId = req.user!.userId;
+
+      if (!reason) {
+        return res.status(400).json({ error: "Reason is required" });
+      }
+
+      const promotion = await prisma.promotion.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      const updatedPromotion = await prisma.promotion.update({
+        where: { id },
+        data: { isActive: false },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.DISABLE_PROMOTION,
+        entityType: EntityType.PROMOTION,
+        entityId: id,
+        description: `Disabled promotion "${promotion.title}" from restaurant ${promotion.restaurant.businessName}. Reason: ${reason}`,
+        metadata: {
+          promotion_id: id,
+          promotion_title: promotion.title,
+          restaurant_id: promotion.restaurantId,
+          restaurant_name: promotion.restaurant.businessName,
+          reason,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: promotion.restaurant.userId,
+          type: "alert",
+          title: "Promotion Disabled by Admin",
+          body: `Your promotion "${promotion.title}" has been disabled by administration. Reason: ${reason}`,
+        },
+      });
+
+      res.json({
+        message: "Promotion disabled successfully",
+        promotion: updatedPromotion,
+      });
+    } catch (error: any) {
+      console.error("Disable promotion error:", error);
+      res.status(500).json({ error: error.message || "Failed to disable promotion" });
+    }
+  }
+);
+
+// GET /api/admin/coupons - List all coupons
+router.get(
+  "/coupons",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { restaurantId, isActive, isFlagged, page = "1", limit = "50" } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+
+      const where: any = {};
+      if (restaurantId) where.restaurantId = restaurantId as string;
+      if (isActive !== undefined) where.isActive = isActive === "true";
+      if (isFlagged !== undefined) where.isFlagged = isFlagged === "true";
+
+      const [coupons, total] = await Promise.all([
+        prisma.coupon.findMany({
+          where,
+          include: {
+            restaurant: {
+              select: {
+                id: true,
+                businessName: true,
+                user: { select: { email: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limitNum,
+        }),
+        prisma.coupon.count({ where }),
+      ]);
+
+      res.json({
+        coupons: coupons.map(c => ({
+          ...c,
+          discountPercentage: c.discountPercentage ? Number(c.discountPercentage) : null,
+          discountValue: c.discountValue ? Number(c.discountValue) : null,
+          minOrderAmount: c.minOrderAmount ? Number(c.minOrderAmount) : null,
+          maxDiscountCap: c.maxDiscountCap ? Number(c.maxDiscountCap) : null,
+        })),
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error: any) {
+      console.error("Get coupons error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch coupons" });
+    }
+  }
+);
+
+// POST /api/admin/coupons/:id/flag - Flag a coupon
+router.post(
+  "/coupons/:id/flag",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const adminId = req.user!.userId;
+
+      if (!reason) {
+        return res.status(400).json({ error: "Reason is required" });
+      }
+
+      const coupon = await prisma.coupon.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!coupon) {
+        return res.status(404).json({ error: "Coupon not found" });
+      }
+
+      const updatedCoupon = await prisma.coupon.update({
+        where: { id },
+        data: { isFlagged: true },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.FLAG_COUPON,
+        entityType: EntityType.COUPON,
+        entityId: id,
+        description: `Flagged coupon "${coupon.code}" from restaurant ${coupon.restaurant.businessName}. Reason: ${reason}`,
+        metadata: {
+          coupon_id: id,
+          coupon_code: coupon.code,
+          restaurant_id: coupon.restaurantId,
+          restaurant_name: coupon.restaurant.businessName,
+          reason,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: coupon.restaurant.userId,
+          type: "alert",
+          title: "Coupon Flagged by Admin",
+          body: `Your coupon "${coupon.code}" has been flagged by administration. Reason: ${reason}`,
+        },
+      });
+
+      res.json({
+        message: "Coupon flagged successfully",
+        coupon: updatedCoupon,
+      });
+    } catch (error: any) {
+      console.error("Flag coupon error:", error);
+      res.status(500).json({ error: error.message || "Failed to flag coupon" });
+    }
+  }
+);
+
+// ====================================================
 // Mount Analytics Routes
 // ====================================================
 router.use("/analytics", analyticsRouter);

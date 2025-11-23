@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
-import { validatePromotion, validateCoupon } from "../promotions/validationUtils";
+import { validatePromotionForOrder, validateCouponCode } from "../promotions/validationUtils";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -413,16 +413,15 @@ router.post("/promotions/validate", async (req: AuthRequest, res) => {
 
     // Validate coupon if provided
     if (couponCode) {
-      const couponResult = await validateCoupon(
+      const couponResult = await validateCouponCode(
         couponCode,
-        restaurantId,
         userId,
-        subtotal,
-        itemIds
+        new Prisma.Decimal(subtotal),
+        restaurantId
       );
 
-      if (couponResult.valid) {
-        discountAmount = couponResult.discountAmount;
+      if (couponResult.isValid) {
+        discountAmount = Number(couponResult.discountAmount || 0);
         appliedCouponCode = couponCode;
       } else {
         validationError = couponResult.error;
@@ -430,16 +429,16 @@ router.post("/promotions/validate", async (req: AuthRequest, res) => {
     }
     // Validate promotion if provided
     else if (promotionId) {
-      const promotionResult = await validatePromotion(
+      const promotionResult = await validatePromotionForOrder(
         promotionId,
-        restaurantId,
         userId,
-        subtotal,
+        new Prisma.Decimal(subtotal),
+        restaurantId,
         itemIds
       );
 
-      if (promotionResult.valid) {
-        discountAmount = promotionResult.discountAmount;
+      if (promotionResult.isValid) {
+        discountAmount = Number(promotionResult.discountAmount || 0);
         appliedPromotionId = promotionId;
       } else {
         validationError = promotionResult.error;
