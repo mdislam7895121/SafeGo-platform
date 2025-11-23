@@ -33,18 +33,18 @@ interface SupportTicket {
 }
 
 const statusColors: Record<string, string> = {
-  open: "bg-blue-500",
-  in_review: "bg-yellow-500",
-  awaiting_customer: "bg-orange-500",
-  resolved: "bg-green-500",
-  closed: "bg-gray-500",
+  open: "bg-blue-500 dark:bg-blue-600",
+  in_review: "bg-yellow-500 dark:bg-yellow-600",
+  awaiting_customer: "bg-orange-500 dark:bg-orange-600",
+  resolved: "bg-green-500 dark:bg-green-600",
+  closed: "bg-gray-500 dark:bg-gray-600",
 };
 
 const priorityColors: Record<string, string> = {
-  low: "bg-gray-500",
-  medium: "bg-blue-500",
-  high: "bg-orange-500",
-  urgent: "bg-red-500",
+  low: "bg-gray-500 dark:bg-gray-600",
+  medium: "bg-blue-500 dark:bg-blue-600",
+  high: "bg-orange-500 dark:bg-orange-600",
+  urgent: "bg-red-500 dark:bg-red-600",
 };
 
 export default function RestaurantSupportTickets() {
@@ -142,7 +142,7 @@ export default function RestaurantSupportTickets() {
 
         {/* Tickets List */}
         {isLoading ? (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {[1, 2, 3].map((i) => (
               <Card key={i}>
                 <CardContent className="pt-6">
@@ -166,7 +166,7 @@ export default function RestaurantSupportTickets() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {data?.tickets.map((ticket) => (
               <Link
                 key={ticket.id}
