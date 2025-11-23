@@ -16,9 +16,18 @@ interface RestaurantSidebarProps {
   onCollapsedChange?: (collapsed: boolean) => void;
   isMobileDrawer?: boolean;
   onNavigate?: () => void;
+  isTabletOrLarger?: boolean;
+  isDesktop?: boolean;
 }
 
-export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange, isMobileDrawer = false, onNavigate }: RestaurantSidebarProps) {
+export function RestaurantSidebar({ 
+  userRole = "OWNER", 
+  onCollapsedChange, 
+  isMobileDrawer = false, 
+  onNavigate,
+  isTabletOrLarger = true,
+  isDesktop = true 
+}: RestaurantSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Orders", "Menu Management"]);
   const [location] = useLocation();
@@ -166,16 +175,23 @@ export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange, isMob
     );
   }
 
+  // Calculate sidebar width: Desktop 256px (w-64), Tablet 192px (w-48), Collapsed 64px (w-16)
+  const sidebarWidth = collapsed ? "w-16" : (isDesktop ? "w-64" : "w-48");
+
   return (
     <aside
       className={cn(
         "fixed left-0 top-0 h-screen bg-card border-r flex flex-col transition-all duration-300 z-40",
-        "hidden lg:flex", // Hidden on mobile/tablet, visible on desktop
-        collapsed ? "w-16" : "w-64"
+        // R-ENHANCE Task 3: Visible on tablet+ (≥768px), hidden on mobile (<768px)
+        isTabletOrLarger ? "flex" : "hidden",
+        sidebarWidth
       )}
     >
       {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between">
+      <div className={cn(
+        "p-4 border-b flex items-center",
+        collapsed ? "justify-center" : "justify-between"
+      )}>
         {!collapsed && (
           <div>
             <h2 className="font-bold text-lg">SafeGo Eats</h2>
@@ -186,8 +202,9 @@ export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange, isMob
           variant="ghost"
           size="icon"
           onClick={handleToggleCollapsed}
-          className="hover-elevate active-elevate-2"
+          className="hover-elevate active-elevate-2 shrink-0"
           data-testid="button-toggle-sidebar"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>

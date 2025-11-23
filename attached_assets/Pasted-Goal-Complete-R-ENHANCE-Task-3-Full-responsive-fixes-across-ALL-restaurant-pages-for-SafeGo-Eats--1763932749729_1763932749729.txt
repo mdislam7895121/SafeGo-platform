@@ -1,0 +1,189 @@
+Goal: Complete R-ENHANCE Task 3 (Full responsive fixes across ALL restaurant pages) for SafeGo Eats Restaurant Portal. Make the entire restaurant web app feel production-ready on laptop, tablet, and mobile, without breaking any existing backend logic or flows.
+
+Context:
+- The restaurant portal is already feature-complete for Phases 1–12.
+- R-ENHANCE Task 1 (Restaurant Header Redesign) and Task 2 (Unified Placeholder System) are complete.
+- Now Task 3 must apply a consistent responsive layout and clean structure across all restaurant pages, including the new planned-feature placeholder views.
+
+Key Requirements (do NOT break anything):
+- Keep all existing routes, API calls, RBAC rules, KYC gating, and business logic exactly as they are.
+- Changes must be additive, layout-focused, and safe to deploy.
+- Use existing design tokens (colors, typography, spacing) where possible instead of inventing a new design system.
+
+1) Global Layout & Breakpoints
+- Implement a robust responsive layout framework for all restaurant pages with at least these breakpoints:
+  - Desktop: ≥ 1280px
+  - Tablet: 768px–1279px
+  - Mobile: < 768px
+- Ensure:
+  - The main layout never overflows off-screen on mobile (no horizontal scroll).
+  - Content area has consistent padding on all pages (e.g. 16–24px on mobile, 24–32px on desktop).
+  - Typography scales reasonably by breakpoint (no tiny text on mobile, no huge text on desktop).
+  - Any fixed widths are replaced with responsive widths (flex, max-width, min-width, percentage).
+
+2) Header Responsive Behavior (rows 1–3)
+The current header is a 3-row structure (brand/top bar, restaurant identity row, search row). Make it fully responsive:
+
+Desktop:
+- Row 1 (Top Bar):
+  - Left: “SafeGo Eats” brand.
+  - Right: notifications, language picker (if present), profile avatar/menu.
+- Row 2 (Restaurant Identity):
+  - Left: restaurant name + verified badge + ID + city/country.
+  - Middle/Right: “Accepting Orders” status, online capsule button, any state badges.
+- Row 3 (Search):
+  - Single full-width search bar with consistent height and padding.
+
+Tablet:
+- Compact the header:
+  - Top bar remains similar to desktop, but reduce padding and possibly icon sizes.
+  - Restaurant identity row may wrap to two lines, but should not overflow off-screen.
+  - Search bar still full-width below, but with slightly reduced top/bottom margin.
+
+Mobile:
+- Top bar:
+  - Left: SafeGo Eats.
+  - Right: notifications + profile menu (icons only).
+- Restaurant identity:
+  - Show restaurant name + verified badge on first line.
+  - On second line, show city/country and ID if space permits, otherwise truncate with ellipsis.
+- Search bar:
+  - Stays full-width, with enough tap area.
+- All header content must stack cleanly without overlapping or causing horizontal scrolling.
+
+3) Sidebar / Navigation Responsive Rules
+Desktop:
+- Maintain current left sidebar with text + icons.
+- Ensure active state, hover, and nested sections (Orders, Menu Management, Promotions, Payouts & Finance, Staff Management, Insights & Analytics, Ratings & Reviews, Store Settings, Documents & Compliance, Support) remain consistent.
+
+Tablet:
+- Slightly narrow sidebar width, but keep labels visible.
+- Ensure that collapsing/expanding sections does not push content off-screen.
+
+Mobile:
+- Convert the sidebar into a collapsible/drawer-style navigation:
+  - Show a hamburger or “Menu” trigger in the header.
+  - When opened, show navigation as a vertical panel with scroll if needed.
+- Make sure all main groups remain accessible:
+  - Dashboard, Orders (Live, Scheduled, Order History)
+  - Menu Management (All Items, Categories, Add New Item, Bulk Actions)
+  - Promotions (Campaigns, Coupons & Discounts, Featured Items)
+  - Payouts & Finance
+  - Staff Management
+  - Insights & Analytics
+  - Ratings & Reviews
+  - Store Settings (Store Profile, Business Hours, Delivery & Pickup, Delivery Zones, Surge Pricing, Staff & Roles, Devices & Printers)
+  - Documents & Compliance (Business Documents, Health & Safety, KYC/Verification)
+  - Support (Help Center, Contact Support, System Status)
+- Avoid double scrollbars and horizontal scrolling on any device.
+
+4) “You’re receiving orders” Online/Offline Capsule Button
+Update the restaurant online status control to match this behavior:
+
+Design:
+- Capsule-style button (rounded-pill) similar to:
+  - Green “Go Online” look when active.
+  - Red “Go Offline” look when inactive.
+- Left side: power icon.
+- Right side: label text.
+
+Desktop:
+- When ONLINE:
+  - Background: green.
+  - Icon: white power symbol.
+  - Text: “Online” (white text).
+- When OFFLINE:
+  - Background: red.
+  - Icon: white power symbol (or outline).
+  - Text: “Offline” (white text).
+- Cursor pointer, hover state with slight brightness change.
+
+Mobile/Tablet:
+- Same semantic behavior, but:
+  - Slightly smaller height.
+  - Ensure full tappable area (min 40–44px height).
+- The status must remain in the restaurant header row consistently across all pages.
+
+Logic:
+- Reuse existing online/offline state handling; do NOT change backend logic.
+- Only update the UI component and any classes/styles around it.
+- Use accessible aria-attributes to reflect state change (e.g. aria-pressed).
+
+5) Planned-Feature Placeholder Pages (Store & Documents & Support)
+For the following pages:
+- Store Settings → Store Profile
+- Documents & Compliance → Business Documents
+- Documents & Compliance → Health & Safety
+- Documents & Compliance → KYC / Verification
+- Support → Help Center
+- Support → Contact Support
+- Support → System Status
+- Promotions → Featured Items
+- Orders → Scheduled Orders
+- Ratings & Reviews → Complaints / Issues
+
+Apply a consistent, professional planned-feature layout:
+
+Structure:
+- Center the content in the main panel with max-width (e.g. 720–960px).
+- Top: icon in a subtle circle.
+- Title (e.g. “Store Profile”, “Business Documents”) in heading style.
+- Subtitle: “Manage your restaurant identity, branding, and public details.” or similar – already present from Task 2; reuse and refine text only if needed.
+- Status label (e.g. “Planned feature”, “Future release”, “In planning”) with a subtle badge style.
+- Section: “What you’ll be able to do here:” followed by a bullet list of 4–6 capabilities (these are already present; ensure bullets and spacing look consistent).
+- Remove duplicate “Coming Soon” text where no longer needed, or restyle “Coming Soon” as a subheading instead of a large block if it appears twice.
+
+Responsive rules:
+- On desktop: center column with balanced left/right whitespace.
+- On tablet: reduce margins but keep everything readable.
+- On mobile:
+  - Reduce heading size slightly.
+  - Stack icon, title, subtitle, badge, and bullets vertically.
+  - Ensure bullets wrap nicely and do not overflow.
+
+6) General Layout Cleanup Across Restaurant Pages
+- Apply consistent spacing system:
+  - Section titles, subtitles, and content blocks should have predictable top/bottom margins.
+- Ensure lists, tables, and cards on restaurant pages:
+  - Do not overflow horizontally on mobile.
+  - Have scrollable containers only when necessary (e.g. wide tables), with clear visual indication.
+- Align typography:
+  - Heading levels (h1/h2/h3) look consistent across different restaurant pages.
+  - Avoid mixed font sizes for similar sections.
+- Check these key pages explicitly:
+  - Dashboard
+  - Orders (Live, Scheduled, Order History)
+  - Menu Management (All Items, Categories, Add New Item, Bulk Actions)
+  - Promotions (Campaigns, Coupons & Discounts, Featured Items)
+  - Payouts & Finance main view
+  - Staff Management overview
+  - Insights & Analytics main overview
+  - Ratings & Reviews section
+  - Store Settings section root
+  - Documents & Compliance section root
+  - Support section root and children
+
+7) Accessibility & Testing
+- Ensure buttons and interactive controls meet minimum tap size on mobile.
+- Maintain adequate contrast ratios using the existing design tokens.
+- Verify keyboard focus does not break with the new layout.
+- Add or keep data-testid attributes where they already exist; do not remove test IDs.
+
+8) Acceptance Criteria
+- All restaurant pages are usable and visually clean on:
+  - Desktop (full browser width),
+  - Tablet-sized window,
+  - Mobile viewport in the browser dev tools.
+- No horizontal scrollbars are introduced.
+- The online/offline capsule button works correctly and clearly shows green when online and red when offline.
+- All planned-feature pages are consistent in layout, typography, and spacing, and clearly indicate what the feature will do later.
+- No backend behavior, routes, or RBAC rules are changed.
+- Replit logs should remain free of new runtime errors.
+
+Please:
+1) Implement these responsive fixes and layout adjustments as R-ENHANCE Task 3.
+2) Update replit.md to document:
+   - What was changed for Task 3.
+   - Which pages were checked.
+   - Any remaining UI enhancements you suggest for later phases.
+3) Then restart the app and give me a summary of the completed work and any screenshots you capture.

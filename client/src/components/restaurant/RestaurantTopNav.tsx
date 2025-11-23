@@ -29,6 +29,7 @@ interface RestaurantTopNavProps {
   isOpen?: boolean;
   onToggleStatus?: (status: boolean) => void;
   sidebarCollapsed?: boolean;
+  isTabletOrLarger?: boolean;
   isDesktop?: boolean;
   userRole?: UserRole;
 }
@@ -39,6 +40,7 @@ export function RestaurantTopNav({
   isOpen = true,
   onToggleStatus,
   sidebarCollapsed = false,
+  isTabletOrLarger = true,
   isDesktop = true,
   userRole = "OWNER"
 }: RestaurantTopNavProps) {
@@ -47,11 +49,19 @@ export function RestaurantTopNav({
   const [notificationCount] = useState(3);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  // Calculate header left offset based on sidebar width
+  const getHeaderLeftOffset = () => {
+    if (!isTabletOrLarger) return "0"; // Mobile: full width
+    if (sidebarCollapsed) return "4rem"; // Collapsed: 64px
+    if (isDesktop) return "16rem"; // Desktop: 256px
+    return "12rem"; // Tablet: 192px
+  };
+
   return (
     <header
       className="fixed top-0 right-0 bg-card border-b z-30 transition-all duration-300 shadow-sm"
       style={{
-        left: isDesktop ? (sidebarCollapsed ? "4rem" : "16rem") : "0"
+        left: getHeaderLeftOffset()
       }}
       data-testid="header-restaurant-topnav"
     >
@@ -66,7 +76,7 @@ export function RestaurantTopNav({
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden"
+                className={isTabletOrLarger ? "hidden" : "block"}
                 data-testid="button-mobile-menu"
               >
                 <Menu className="h-5 w-5" />
@@ -223,41 +233,43 @@ export function RestaurantTopNav({
       </div>
 
       {/* ROW 2: RESTAURANT IDENTITY + STATUS */}
-      <div className="h-14 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-2">
+      <div className="min-h-[56px] px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-2">
         {/* Left: Restaurant Name + Verified Badge + ID/Location */}
-        <div className="flex flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
             <h1 
-              className="font-bold text-base md:text-lg truncate" 
+              className="font-bold text-base sm:text-lg truncate" 
               data-testid="text-restaurant-name-topnav"
             >
               {restaurantName}
             </h1>
             <Badge
               variant="outline"
-              className="text-xs gap-1 px-1.5 py-0.5 border-green-500/50 text-green-700 dark:text-green-400"
+              className="text-xs gap-1 px-1.5 py-0.5 border-green-500/50 text-green-700 dark:text-green-400 shrink-0"
               data-testid="badge-verified"
             >
               <ShieldCheck className="h-3 w-3" />
-              Verified
+              <span className="hidden sm:inline">Verified</span>
+              <span className="sm:hidden">✓</span>
             </Badge>
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
             {restaurantId && (
-              <span className="truncate max-w-[200px] sm:max-w-none" data-testid="text-restaurant-id">
+              <span className="truncate" data-testid="text-restaurant-id">
                 ID: {restaurantId}
               </span>
             )}
             <span className="hidden sm:inline">•</span>
-            <span className="flex items-center gap-1 hidden sm:flex">
+            <span className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
-              New York, USA
+              <span className="hidden sm:inline">New York, USA</span>
+              <span className="sm:hidden">NY, USA</span>
             </span>
           </div>
         </div>
 
         {/* Right: Capsule-Style Receiving Orders Button */}
-        <div className="shrink-0">
+        <div className="shrink-0 w-full sm:w-auto">
           <RestaurantReceivingOrdersButton
             isReceivingOrders={isOpen}
             onToggle={onToggleStatus || (() => {})}
@@ -267,11 +279,11 @@ export function RestaurantTopNav({
 
       {/* ROW 3: SEARCH BAR */}
       <div className="h-12 px-4 flex items-center border-t border-border/40">
-        <div className="relative w-full max-w-3xl mx-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="relative w-full max-w-4xl mx-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             placeholder="Search orders, menu items, customers..."
-            className="pl-10 h-9 bg-background w-full"
+            className="pl-10 h-9 bg-background w-full text-sm"
             disabled
             data-testid="input-global-search"
           />
