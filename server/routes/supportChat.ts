@@ -507,51 +507,267 @@ router.post("/chat/end", authenticateToken, async (req: AuthRequest, res) => {
 // ADMIN SUPPORT ENDPOINTS
 // ====================================================
 
-router.get("/admin/conversations", authenticateToken, async (req: AuthRequest, res) => {
+// Middleware to check SUPPORT_ADMIN role
+async function requireSupportAdmin(req: AuthRequest, res: express.Response, next: express.NextFunction) {
   try {
+    const userId = req.user!.userId;
     const userRole = req.user!.role;
 
     if (userRole !== "admin") {
       return res.status(403).json({ error: "Admin access required" });
     }
 
-    const { status, limit } = req.query;
-    const limitNum = limit && typeof limit === "string" ? parseInt(limit, 10) : 50;
+    const { db } = await import("../db");
+    const adminProfile = await db.adminProfile.findUnique({
+      where: { userId },
+    });
 
-    const conversations = await getAdminConversations(
-      typeof status === "string" ? status : undefined,
-      limitNum
+    if (!adminProfile || adminProfile.adminRole !== "SUPPORT_ADMIN") {
+      return res.status(403).json({ error: "SUPPORT_ADMIN role required" });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error checking admin role:", error);
+    res.status(500).json({ error: "Authorization check failed" });
+  }
+}
+
+router.get("/admin/conversations", authenticateToken, requireSupportAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { status, userType, search, limit = "50", cursor } = req.query;
+    const limitNum = parseInt(limit as string, 10);
+    const { db } = await import("../db");
+
+    const where: any = {};
+
+    if (status && typeof status === "string") {
+      where.status = status;
+    } else {
+      where.status = { in: ["pending", "assigned", "open", "bot"] };
+    }
+
+    if (userType && typeof userType === "string") {
+      where.userType = userType;
+    }
+
+    if (cursor && typeof cursor === "string") {
+      where.id = { lt: cursor };
+    }
+
+    const conversations = await db.supportConversation.findMany({
+      where,
+      orderBy: [
+        { status: "asc" },
+        { updatedAt: "desc" },
+      ],
+      take: limitNum + 1,
+      include: {
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+        _count: {
+          select: { messages: true },
+        },
+      },
+    });
+
+    const hasMore = conversations.length > limitNum;
+    const items = hasMore ? conversations.slice(0, -1) : conversations;
+
+    const conversationsWithUserInfo = await Promise.all(
+      items.map(async (conv: any) => {
+        let userInfo: any = {};
+
+        if (conv.userType === "driver") {
+          const driver = await db.driverProfile.findFirst({
+            where: { userId: conv.userId },
+            include: { user: { select: { email: true } } },
+          });
+          userInfo = {
+            name: driver?.fullName || driver?.user.email || "Unknown",
+            email: driver?.user.email,
+            phone: driver?.phoneNumber || driver?.usaPhoneNumber,
+          };
+        } else if (conv.userType === "customer") {
+          const customer = await db.customerProfile.findFirst({
+            where: { userId: conv.userId },
+            include: { user: { select: { email: true } } },
+          });
+          userInfo = {
+            name: customer?.fullName || customer?.user.email || "Unknown",
+            email: customer?.user.email,
+            phone: customer?.phoneNumber,
+          };
+        } else if (conv.userType === "restaurant") {
+          const restaurant = await db.restaurantProfile.findFirst({
+            where: { userId: conv.userId },
+            include: { user: { select: { email: true } } },
+          });
+          userInfo = {
+            name: restaurant?.restaurantName || "Unknown",
+            email: restaurant?.user.email,
+          };
+        }
+
+        const unreadCount = conv.adminLastSeenAt
+          ? await db.supportMessage.count({
+              where: {
+                conversationId: conv.id,
+                createdAt: { gt: conv.adminLastSeenAt },
+                senderType: "user",
+              },
+            })
+          : conv._count.messages;
+
+        return {
+          id: conv.id,
+          userId: conv.userId,
+          userType: conv.userType,
+          status: conv.status,
+          topic: conv.topic,
+          assignedAdminId: conv.assignedAdminId,
+          escalatedAt: conv.escalatedAt,
+          closedAt: conv.closedAt,
+          createdAt: conv.createdAt,
+          updatedAt: conv.updatedAt,
+          lastMessage: conv.messages[0]?.body?.substring(0, 100) || "",
+          messageCount: conv._count.messages,
+          unreadCount,
+          userInfo,
+        };
+      })
     );
 
-    res.json({ conversations });
+    res.json({
+      conversations: conversationsWithUserInfo,
+      hasMore,
+      nextCursor: hasMore ? items[items.length - 1].id : null,
+    });
   } catch (error: any) {
     console.error("Error getting admin conversations:", error);
     res.status(500).json({ error: "Failed to get conversations" });
   }
 });
 
-router.get("/admin/conversations/:id/messages", authenticateToken, async (req: AuthRequest, res) => {
+router.get("/admin/conversations/:id", authenticateToken, requireSupportAdmin, async (req: AuthRequest, res) => {
   try {
-    const userRole = req.user!.role;
+    const { id } = req.params;
+    const adminUserId = req.user!.userId;
+    const { db } = await import("../db");
 
-    if (userRole !== "admin") {
-      return res.status(403).json({ error: "Admin access required" });
+    const conversation = await db.supportConversation.findUnique({
+      where: { id },
+      include: {
+        messages: {
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
     }
 
-    const { id } = req.params;
-    const messages = await getAdminMessages(id);
+    await db.supportConversation.update({
+      where: { id },
+      data: { adminLastSeenAt: new Date() },
+    });
+
+    let userInfo: any = {};
+    if (conversation.userType === "driver") {
+      const driver = await db.driverProfile.findFirst({
+        where: { userId: conversation.userId },
+        include: {
+          user: { select: { email: true } },
+          driverStats: true,
+        },
+      });
+      userInfo = {
+        name: driver?.fullName || driver?.user.email || "Unknown",
+        email: driver?.user.email,
+        phone: driver?.phoneNumber || driver?.usaPhoneNumber,
+        rating: driver?.driverStats?.rating ? Number(driver.driverStats.rating) : 5.0,
+        totalTrips: driver?.driverStats?.totalTrips || 0,
+      };
+    } else if (conversation.userType === "customer") {
+      const customer = await db.customerProfile.findFirst({
+        where: { userId: conversation.userId },
+        include: { user: { select: { email: true } } },
+      });
+      userInfo = {
+        name: customer?.fullName || customer?.user.email || "Unknown",
+        email: customer?.user.email,
+        phone: customer?.phoneNumber,
+      };
+    } else if (conversation.userType === "restaurant") {
+      const restaurant = await db.restaurantProfile.findFirst({
+        where: { userId: conversation.userId },
+        include: { user: { select: { email: true } } },
+      });
+      userInfo = {
+        name: restaurant?.restaurantName || "Unknown",
+        email: restaurant?.user.email,
+      };
+    }
 
     res.json({
-      messages: messages.map((msg) => ({
+      conversation: {
+        ...conversation,
+        userInfo,
+      },
+      messages: conversation.messages.map((msg) => ({
         id: msg.id,
         senderType: msg.senderType,
-        content: msg.body,
+        messageType: msg.messageType,
+        body: msg.body,
         createdAt: msg.createdAt,
       })),
     });
   } catch (error: any) {
-    console.error("Error getting admin messages:", error);
-    res.status(500).json({ error: "Failed to get messages" });
+    console.error("Error getting conversation:", error);
+    res.status(500).json({ error: "Failed to get conversation" });
+  }
+});
+
+router.post("/admin/conversations/:id/assign", authenticateToken, requireSupportAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const adminUserId = req.user!.userId;
+    const { db } = await import("../db");
+
+    const conversation = await db.supportConversation.findUnique({
+      where: { id },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({ error: "Conversation not found" });
+    }
+
+    if (conversation.status !== "pending" && conversation.status !== "assigned") {
+      return res.status(400).json({ error: "Conversation cannot be assigned in current state" });
+    }
+
+    const updated = await db.supportConversation.update({
+      where: { id },
+      data: {
+        assignedAdminId: adminUserId,
+        status: "assigned",
+        adminLastSeenAt: new Date(),
+      },
+    });
+
+    res.json({
+      conversation: {
+        id: updated.id,
+        status: updated.status,
+        assignedAdminId: updated.assignedAdminId,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error assigning conversation:", error);
+    res.status(500).json({ error: "Failed to assign conversation" });
   }
 });
 
@@ -559,15 +775,9 @@ const adminReplySchema = z.object({
   content: z.string().min(1, "Reply cannot be empty").max(2000, "Reply too long"),
 });
 
-router.post("/admin/conversations/:id/reply", authenticateToken, async (req: AuthRequest, res) => {
+router.post("/admin/conversations/:id/reply", authenticateToken, requireSupportAdmin, async (req: AuthRequest, res) => {
   try {
-    const userRole = req.user!.role;
     const adminUserId = req.user!.userId;
-
-    if (userRole !== "admin") {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-
     const { id } = req.params;
     const { content } = req.body;
 
@@ -600,15 +810,9 @@ router.post("/admin/conversations/:id/reply", authenticateToken, async (req: Aut
   }
 });
 
-router.post("/admin/conversations/:id/close", authenticateToken, async (req: AuthRequest, res) => {
+router.post("/admin/conversations/:id/close", authenticateToken, requireSupportAdmin, async (req: AuthRequest, res) => {
   try {
-    const userRole = req.user!.role;
     const adminUserId = req.user!.userId;
-
-    if (userRole !== "admin") {
-      return res.status(403).json({ error: "Admin access required" });
-    }
-
     const { id } = req.params;
     const conversation = await closeConversation(id, adminUserId);
 
