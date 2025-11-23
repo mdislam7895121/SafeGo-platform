@@ -158,19 +158,24 @@ export const restaurantNavigation: NavItem[] = [
     section: "analytics",
     children: [
       {
-        label: "Sales Analytics",
+        label: "Overview",
         icon: BarChart3,
-        path: "/restaurant/analytics/sales"
+        path: "/restaurant/analytics/overview"
       },
       {
-        label: "Order Performance",
-        icon: PieChart,
-        path: "/restaurant/analytics/orders"
-      },
-      {
-        label: "Menu Performance",
+        label: "Item Performance",
         icon: Activity,
-        path: "/restaurant/analytics/menu"
+        path: "/restaurant/analytics/items"
+      },
+      {
+        label: "Customer Insights",
+        icon: Users,
+        path: "/restaurant/analytics/customers"
+      },
+      {
+        label: "Driver Performance",
+        icon: Gauge,
+        path: "/restaurant/analytics/drivers"
       }
     ]
   },

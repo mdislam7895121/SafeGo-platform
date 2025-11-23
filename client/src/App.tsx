@@ -78,9 +78,10 @@ import PromotionsFeatured from "@/pages/restaurant/promotions-featured";
 import PayoutsOverview from "@/pages/restaurant/payouts-overview";
 import PayoutsHistory from "@/pages/restaurant/payouts-history";
 import PayoutsBankInfo from "@/pages/restaurant/payouts-bank";
-import AnalyticsSales from "@/pages/restaurant/analytics-sales";
-import AnalyticsOrders from "@/pages/restaurant/analytics-orders";
-import AnalyticsMenu from "@/pages/restaurant/analytics-menu";
+import AnalyticsOverview from "@/pages/restaurant/analytics-overview";
+import AnalyticsItems from "@/pages/restaurant/analytics-items";
+import AnalyticsCustomers from "@/pages/restaurant/analytics-customers";
+import AnalyticsDrivers from "@/pages/restaurant/analytics-drivers";
 import Reviews from "@/pages/restaurant/reviews";
 import ReviewsComplaints from "@/pages/restaurant/reviews-complaints";
 import SettingsProfile from "@/pages/restaurant/settings-profile";
@@ -607,25 +608,32 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Analytics */}
-      <Route path="/restaurant/analytics/sales">
+      {/* Analytics - Phase 4 */}
+      <Route path="/restaurant/analytics/overview">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
-            <AnalyticsSales />
+            <AnalyticsOverview />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/restaurant/analytics/orders">
+      <Route path="/restaurant/analytics/items">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
-            <AnalyticsOrders />
+            <AnalyticsItems />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/restaurant/analytics/menu">
+      <Route path="/restaurant/analytics/customers">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
-            <AnalyticsMenu />
+            <AnalyticsCustomers />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/analytics/drivers">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <AnalyticsDrivers />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
