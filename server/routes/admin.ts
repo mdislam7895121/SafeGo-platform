@@ -10052,6 +10052,318 @@ router.post(
 );
 
 // ====================================================
+// PHASE 9: Restaurant Media Gallery Moderation
+// ====================================================
+
+// GET /api/admin/media - Get all restaurant media with filters
+router.get("/media", async (req: AuthRequest, res) => {
+  try {
+    const adminId = req.user!.userId;
+    const { 
+      category, 
+      isHidden, 
+      isFlagged, 
+      restaurantId,
+      page = "1", 
+      limit = "20" 
+    } = req.query;
+
+    const where: any = {};
+
+    if (category && category !== "all") {
+      where.category = category;
+    }
+    
+    if (isHidden === "hidden") {
+      where.isHidden = true;
+    } else if (isHidden === "visible") {
+      where.isHidden = false;
+    }
+
+    if (isFlagged === "flagged") {
+      where.isFlagged = true;
+    } else if (isFlagged === "unflagged") {
+      where.isFlagged = false;
+    }
+
+    if (restaurantId && restaurantId !== "all") {
+      where.restaurantId = restaurantId;
+    }
+
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const [media, total] = await Promise.all([
+      prisma.restaurantMedia.findMany({
+        where,
+        include: {
+          restaurant: {
+            include: {
+              user: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limitNum,
+      }),
+      prisma.restaurantMedia.count({ where }),
+    ]);
+
+    const formattedMedia = media.map((m: any) => ({
+      id: m.id,
+      restaurantId: m.restaurantId,
+      restaurantName: m.restaurant.restaurantName,
+      restaurantEmail: m.restaurant.user.email,
+      filePath: m.filePath,
+      fileUrl: m.fileUrl,
+      fileType: m.fileType,
+      category: m.category,
+      displayOrder: m.displayOrder,
+      isHidden: m.isHidden,
+      hiddenByAdminId: m.hiddenByAdminId,
+      hiddenAt: m.hiddenAt,
+      hideReason: m.hideReason,
+      isFlagged: m.isFlagged,
+      flaggedByAdminId: m.flaggedByAdminId,
+      flaggedAt: m.flaggedAt,
+      flagReason: m.flagReason,
+      createdAt: m.createdAt,
+    }));
+
+    res.json({
+      media: formattedMedia,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error: any) {
+    console.error("Get media error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch media" });
+  }
+});
+
+// POST /api/admin/media/:id/hide - Hide media
+router.post(
+  "/media/:id/hide",
+  async (req: AuthRequest, res) => {
+    try {
+      const adminId = req.user!.userId;
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ error: "Hide reason is required" });
+      }
+
+      const media = await prisma.restaurantMedia.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!media) {
+        return res.status(404).json({ error: "Media not found" });
+      }
+
+      const updatedMedia = await prisma.restaurantMedia.update({
+        where: { id },
+        data: {
+          isHidden: true,
+          hiddenByAdminId: adminId,
+          hiddenAt: new Date(),
+          hideReason: reason,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.MODERATE_CONTENT,
+        entityType: EntityType.RESTAURANT,
+        entityId: media.restaurantId,
+        description: `Hid restaurant media (${media.category}) for ${media.restaurant.restaurantName}. Reason: ${reason}`,
+        metadata: {
+          media_id: id,
+          restaurant_id: media.restaurantId,
+          restaurant_name: media.restaurant.restaurantName,
+          category: media.category,
+          reason,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: media.restaurant.userId,
+          type: "alert",
+          title: "Media Hidden by Admin",
+          body: `One of your gallery images has been hidden by administration. Reason: ${reason}`,
+        },
+      });
+
+      res.json({
+        message: "Media hidden successfully",
+        media: updatedMedia,
+      });
+    } catch (error: any) {
+      console.error("Hide media error:", error);
+      res.status(500).json({ error: error.message || "Failed to hide media" });
+    }
+  }
+);
+
+// POST /api/admin/media/:id/unhide - Unhide media
+router.post(
+  "/media/:id/unhide",
+  async (req: AuthRequest, res) => {
+    try {
+      const adminId = req.user!.userId;
+      const { id } = req.params;
+
+      const media = await prisma.restaurantMedia.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!media) {
+        return res.status(404).json({ error: "Media not found" });
+      }
+
+      const updatedMedia = await prisma.restaurantMedia.update({
+        where: { id },
+        data: {
+          isHidden: false,
+          hiddenByAdminId: null,
+          hiddenAt: null,
+          hideReason: null,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.MODERATE_CONTENT,
+        entityType: EntityType.RESTAURANT,
+        entityId: media.restaurantId,
+        description: `Restored restaurant media (${media.category}) for ${media.restaurant.restaurantName}`,
+        metadata: {
+          media_id: id,
+          restaurant_id: media.restaurantId,
+          restaurant_name: media.restaurant.restaurantName,
+          category: media.category,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: media.restaurant.userId,
+          type: "info",
+          title: "Media Restored",
+          body: `One of your gallery images has been restored and is now visible again.`,
+        },
+      });
+
+      res.json({
+        message: "Media restored successfully",
+        media: updatedMedia,
+      });
+    } catch (error: any) {
+      console.error("Unhide media error:", error);
+      res.status(500).json({ error: error.message || "Failed to unhide media" });
+    }
+  }
+);
+
+// POST /api/admin/media/:id/flag - Flag media
+router.post(
+  "/media/:id/flag",
+  async (req: AuthRequest, res) => {
+    try {
+      const adminId = req.user!.userId;
+      const { id } = req.params;
+      const { reason } = req.body;
+
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ error: "Flag reason is required" });
+      }
+
+      const media = await prisma.restaurantMedia.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!media) {
+        return res.status(404).json({ error: "Media not found" });
+      }
+
+      const updatedMedia = await prisma.restaurantMedia.update({
+        where: { id },
+        data: {
+          isFlagged: true,
+          flaggedByAdminId: adminId,
+          flaggedAt: new Date(),
+          flagReason: reason,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.MODERATE_CONTENT,
+        entityType: EntityType.RESTAURANT,
+        entityId: media.restaurantId,
+        description: `Flagged restaurant media (${media.category}) for ${media.restaurant.restaurantName}. Reason: ${reason}`,
+        metadata: {
+          media_id: id,
+          restaurant_id: media.restaurantId,
+          restaurant_name: media.restaurant.restaurantName,
+          category: media.category,
+          reason,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: media.restaurant.userId,
+          type: "alert",
+          title: "Media Flagged by Admin",
+          body: `One of your gallery images has been flagged by administration. Reason: ${reason}`,
+        },
+      });
+
+      res.json({
+        message: "Media flagged successfully",
+        media: updatedMedia,
+      });
+    } catch (error: any) {
+      console.error("Flag media error:", error);
+      res.status(500).json({ error: error.message || "Failed to flag media" });
+    }
+  }
+);
+
+// ====================================================
 // Mount Analytics Routes
 // ====================================================
 router.use("/analytics", analyticsRouter);

@@ -3589,4 +3589,388 @@ router.get("/reviews/stats", requireKYCCompletion, async (req: AuthRequest, res)
   }
 });
 
+// ====================================================
+// PHASE 9: Restaurant Branding & Media Gallery
+// ====================================================
+
+// GET /api/restaurant/branding - Get restaurant branding settings
+router.get("/branding", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, ownerRole: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check if STAFF has analytics permission (read-only access)
+    const role = restaurantProfile.ownerRole || "OWNER";
+    if (role === "STAFF") {
+      const fullProfile = await prisma.restaurantProfile.findUnique({
+        where: { id: restaurantProfile.id },
+        select: { canViewAnalytics: true },
+      });
+      
+      if (!fullProfile?.canViewAnalytics) {
+        return res.status(403).json({
+          error: "Insufficient permissions",
+          message: "You need analytics permission to view branding settings",
+        });
+      }
+    }
+
+    // Get or create branding settings
+    let branding = await prisma.restaurantBranding.findUnique({
+      where: { restaurantId: restaurantProfile.id },
+    });
+
+    // If no branding exists, create default
+    if (!branding) {
+      branding = await prisma.restaurantBranding.create({
+        data: {
+          restaurantId: restaurantProfile.id,
+          themeMode: "light",
+        },
+      });
+    }
+
+    res.json(branding);
+  } catch (error: any) {
+    console.error("Get branding error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch branding settings" });
+  }
+});
+
+// PATCH /api/restaurant/branding - Update restaurant branding settings (OWNER-only)
+router.patch("/branding", requireKYCCompletion, requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Validate input
+    const updateSchema = z.object({
+      logoUrl: z.string().url().optional().nullable(),
+      coverPhotoUrl: z.string().url().optional().nullable(),
+      primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+      secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional().nullable(),
+      themeMode: z.enum(["light", "dark", "auto"]).optional(),
+    });
+
+    const validatedData = updateSchema.parse(req.body);
+
+    // Get or create branding
+    let branding = await prisma.restaurantBranding.findUnique({
+      where: { restaurantId: restaurantProfile.id },
+    });
+
+    if (!branding) {
+      // Create new branding
+      branding = await prisma.restaurantBranding.create({
+        data: {
+          restaurantId: restaurantProfile.id,
+          ...validatedData,
+        },
+      });
+    } else {
+      // Update existing branding
+      branding = await prisma.restaurantBranding.update({
+        where: { restaurantId: restaurantProfile.id },
+        data: validatedData,
+      });
+    }
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantProfile.id,
+      userId,
+      action: ActionType.UPDATE,
+      details: `Updated branding settings`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json(branding);
+  } catch (error: any) {
+    console.error("Update branding error:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid branding data", details: error.errors });
+    }
+    res.status(500).json({ error: error.message || "Failed to update branding settings" });
+  }
+});
+
+// GET /api/restaurant/gallery - Get restaurant media gallery
+router.get("/gallery", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, ownerRole: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check if STAFF has analytics permission (read-only access)
+    const role = restaurantProfile.ownerRole || "OWNER";
+    if (role === "STAFF") {
+      const fullProfile = await prisma.restaurantProfile.findUnique({
+        where: { id: restaurantProfile.id },
+        select: { canViewAnalytics: true },
+      });
+      
+      if (!fullProfile?.canViewAnalytics) {
+        return res.status(403).json({
+          error: "Insufficient permissions",
+          message: "You need analytics permission to view gallery",
+        });
+      }
+    }
+
+    // Get media gallery (exclude admin-hidden items for STAFF)
+    const where: any = { restaurantId: restaurantProfile.id };
+    if (role === "STAFF") {
+      where.isHidden = false;
+    }
+
+    const media = await prisma.restaurantMedia.findMany({
+      where,
+      orderBy: [
+        { displayOrder: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json(media);
+  } catch (error: any) {
+    console.error("Get gallery error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch gallery" });
+  }
+});
+
+// POST /api/restaurant/gallery/upload - Upload media to gallery
+router.post("/gallery/upload", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, ownerRole: true, canViewAnalytics: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check permissions - OWNER always has access, STAFF needs canViewAnalytics
+    const role = restaurantProfile.ownerRole || "OWNER";
+    if (role === "STAFF" && !restaurantProfile.canViewAnalytics) {
+      return res.status(403).json({
+        error: "Insufficient permissions",
+        message: "You need analytics permission to upload media",
+      });
+    }
+
+    // Validate input
+    const uploadSchema = z.object({
+      filePath: z.string().min(1),
+      fileUrl: z.string().url().optional().nullable(),
+      fileType: z.string().default("image"),
+      category: z.enum(["food", "ambience", "team", "kitchen", "other"]),
+    });
+
+    const validatedData = uploadSchema.parse(req.body);
+
+    // Check gallery limit (max 50 photos)
+    const mediaCount = await prisma.restaurantMedia.count({
+      where: { restaurantId: restaurantProfile.id },
+    });
+
+    if (mediaCount >= 50) {
+      return res.status(400).json({ error: "Gallery limit reached (50 photos maximum)" });
+    }
+
+    // Get next display order
+    const lastMedia = await prisma.restaurantMedia.findFirst({
+      where: { restaurantId: restaurantProfile.id },
+      orderBy: { displayOrder: "desc" },
+      select: { displayOrder: true },
+    });
+
+    const displayOrder = (lastMedia?.displayOrder ?? -1) + 1;
+
+    // Create media entry
+    const media = await prisma.restaurantMedia.create({
+      data: {
+        restaurantId: restaurantProfile.id,
+        filePath: validatedData.filePath,
+        fileUrl: validatedData.fileUrl,
+        fileType: validatedData.fileType,
+        category: validatedData.category,
+        displayOrder,
+      },
+    });
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantProfile.id,
+      userId,
+      action: ActionType.CREATE,
+      details: `Uploaded media to gallery (${validatedData.category})`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json(media);
+  } catch (error: any) {
+    console.error("Upload media error:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid media data", details: error.errors });
+    }
+    res.status(500).json({ error: error.message || "Failed to upload media" });
+  }
+});
+
+// PATCH /api/restaurant/gallery/:id - Update media (category, displayOrder)
+router.patch("/gallery/:id", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, ownerRole: true, canViewAnalytics: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check permissions
+    const role = restaurantProfile.ownerRole || "OWNER";
+    if (role === "STAFF" && !restaurantProfile.canViewAnalytics) {
+      return res.status(403).json({
+        error: "Insufficient permissions",
+        message: "You need analytics permission to update media",
+      });
+    }
+
+    // Verify media belongs to this restaurant
+    const media = await prisma.restaurantMedia.findFirst({
+      where: {
+        id,
+        restaurantId: restaurantProfile.id,
+      },
+    });
+
+    if (!media) {
+      return res.status(404).json({ error: "Media not found" });
+    }
+
+    // Validate input
+    const updateSchema = z.object({
+      category: z.enum(["food", "ambience", "team", "kitchen", "other"]).optional(),
+      displayOrder: z.number().int().min(0).optional(),
+    });
+
+    const validatedData = updateSchema.parse(req.body);
+
+    // Update media
+    const updatedMedia = await prisma.restaurantMedia.update({
+      where: { id },
+      data: validatedData,
+    });
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantProfile.id,
+      userId,
+      action: ActionType.UPDATE,
+      details: `Updated gallery media ${id}`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json(updatedMedia);
+  } catch (error: any) {
+    console.error("Update media error:", error);
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid media data", details: error.errors });
+    }
+    res.status(500).json({ error: error.message || "Failed to update media" });
+  }
+});
+
+// DELETE /api/restaurant/gallery/:id - Delete media (soft delete)
+router.delete("/gallery/:id", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, ownerRole: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Only OWNER can delete
+    const role = restaurantProfile.ownerRole || "OWNER";
+    if (role !== "OWNER") {
+      return res.status(403).json({
+        error: "Insufficient permissions",
+        message: "Only restaurant owners can delete media",
+      });
+    }
+
+    // Verify media belongs to this restaurant
+    const media = await prisma.restaurantMedia.findFirst({
+      where: {
+        id,
+        restaurantId: restaurantProfile.id,
+      },
+    });
+
+    if (!media) {
+      return res.status(404).json({ error: "Media not found" });
+    }
+
+    // Delete media (hard delete for Phase 9, can be converted to soft delete later)
+    await prisma.restaurantMedia.delete({
+      where: { id },
+    });
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantProfile.id,
+      userId,
+      action: ActionType.DELETE,
+      details: `Deleted gallery media ${id}`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json({ success: true, message: "Media deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete media error:", error);
+    res.status(500).json({ error: error.message || "Failed to delete media" });
+  }
+});
+
 export default router;

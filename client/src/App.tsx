@@ -85,6 +85,7 @@ import AnalyticsCustomers from "@/pages/restaurant/analytics-customers";
 import AnalyticsDrivers from "@/pages/restaurant/analytics-drivers";
 import Reviews from "@/pages/restaurant/reviews";
 import ReviewsComplaints from "@/pages/restaurant/reviews-complaints";
+import RestaurantBranding from "@/pages/restaurant/branding";
 import SettingsProfile from "@/pages/restaurant/settings-profile";
 import SettingsHours from "@/pages/restaurant/settings-hours";
 import SettingsDelivery from "@/pages/restaurant/settings-delivery";
@@ -666,6 +667,15 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <Reviews />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Branding - Phase 9 (OWNER only) */}
+      <Route path="/restaurant/branding">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <RestaurantBranding />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
