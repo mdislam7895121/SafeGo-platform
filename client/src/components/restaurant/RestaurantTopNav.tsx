@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Bell, Globe, ChevronDown, Search, Menu, ShieldCheck } from "lucide-react";
+import { Bell, Globe, ChevronDown, Search, Menu, ShieldCheck, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -49,15 +49,17 @@ export function RestaurantTopNav({
 
   return (
     <header
-      className="fixed top-0 right-0 min-h-16 bg-card border-b z-30 transition-all duration-300 shadow-sm"
+      className="fixed top-0 right-0 bg-card border-b z-30 transition-all duration-300 shadow-sm"
       style={{
         left: isDesktop ? (sidebarCollapsed ? "4rem" : "16rem") : "0"
       }}
       data-testid="header-restaurant-topnav"
     >
-      <div className="min-h-16 px-4 flex flex-wrap items-center gap-3 md:gap-4 lg:gap-6 py-2">
-        {/* LEFT SECTION: Mobile Menu + Branding + Restaurant Info */}
-        <div className="flex items-center gap-3 md:gap-4">
+      {/* R-ENHANCE: 3-ROW CLEAN STRUCTURE */}
+      
+      {/* ROW 1: TOP BAR - Brand + Notifications + Profile */}
+      <div className="h-12 px-4 flex items-center justify-between border-b border-border/40">
+        <div className="flex items-center gap-3">
           {/* Mobile Menu Button */}
           <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
             <SheetTrigger asChild>
@@ -80,77 +82,15 @@ export function RestaurantTopNav({
           </Sheet>
           
           {/* SafeGo Eats Branding */}
-          <div className="hidden md:flex items-center gap-2 pr-4 lg:pr-6 border-r">
-            <div className="flex items-center gap-1">
-              <span className="text-lg font-bold text-primary">SafeGo</span>
-              <span className="text-lg font-bold">Eats</span>
-            </div>
-          </div>
-          
-          {/* Restaurant Info - R-ENHANCE: Redesigned layout */}
-          <div className="flex flex-col gap-0.5 min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 
-                className="font-semibold text-sm md:text-base truncate" 
-                data-testid="text-restaurant-name-topnav"
-              >
-                {restaurantName}
-              </h1>
-              <Badge
-                variant="outline"
-                className="text-xs gap-1 px-1.5 py-0 border-green-500/50 text-green-700 dark:text-green-400 hidden sm:flex"
-                data-testid="badge-verified"
-              >
-                <ShieldCheck className="h-3 w-3" />
-                Verified
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              {restaurantId && (
-                <span className="hidden sm:inline" data-testid="text-restaurant-id">
-                  ID: {restaurantId}
-                </span>
-              )}
-              <Badge
-                variant={isOpen ? "default" : "secondary"}
-                className="text-xs px-1.5 py-0"
-                data-testid="badge-store-status"
-              >
-                {isOpen ? "Active" : "Inactive"}
-              </Badge>
-            </div>
+          <div className="flex items-center gap-1">
+            <span className="text-base font-bold text-primary">SafeGo</span>
+            <span className="text-base font-bold">Eats</span>
           </div>
         </div>
 
-        {/* CENTER SECTION: Search Bar - R-ENHANCE: Full-width on larger screens */}
-        <div className="flex-1 max-w-2xl hidden lg:block">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search orders, menu items, customers..."
-              className="pl-10 h-9 bg-background"
-              disabled
-              data-testid="input-global-search"
-            />
-          </div>
-        </div>
-
-        {/* RIGHT SECTION: Toggle + Notifications + Language + Profile */}
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* R-ENHANCE: Redesigned Order Receiving Toggle (Bigger, Clearer) */}
-          <div className="flex items-center gap-2.5 px-3 py-1.5 border rounded-lg bg-background shadow-sm">
-            <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">
-              {isOpen ? "Accepting Orders" : "Not Accepting"}
-            </span>
-            <Switch
-              checked={isOpen}
-              onCheckedChange={onToggleStatus}
-              data-testid="switch-store-status"
-              className="scale-110"
-            />
-          </div>
-
-          {/* R-ENHANCE: Notifications with Improved Badge Positioning */}
+        {/* Right: Notifications + Language + Profile */}
+        <div className="flex items-center gap-1">
+          {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -159,11 +99,11 @@ export function RestaurantTopNav({
                 className="relative"
                 data-testid="button-notifications"
               >
-                <Bell className="h-5 w-5" />
+                <Bell className="h-4 w-4" />
                 {notificationCount > 0 && (
                   <Badge
                     variant="destructive"
-                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs rounded-full"
+                    className="absolute -top-0.5 -right-0.5 h-4 w-4 p-0 flex items-center justify-center text-[10px] rounded-full"
                     data-testid="badge-notification-count"
                   >
                     {notificationCount > 9 ? '9+' : notificationCount}
@@ -195,7 +135,7 @@ export function RestaurantTopNav({
                 className="hidden md:flex"
                 data-testid="button-language"
               >
-                <Globe className="h-5 w-5" />
+                <Globe className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -218,20 +158,20 @@ export function RestaurantTopNav({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* R-ENHANCE: Modern Profile Menu Dropdown */}
+          {/* Profile Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="gap-2 px-2"
+                className="gap-1.5 px-2 h-9"
                 data-testid="button-profile-menu"
               >
-                <Avatar className="h-8 w-8">
+                <Avatar className="h-7 w-7">
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
                     {restaurantName.substring(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <ChevronDown className="h-4 w-4 hidden sm:block" />
+                <ChevronDown className="h-3.5 w-3.5 hidden sm:block" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64">
@@ -244,9 +184,6 @@ export function RestaurantTopNav({
                   <div className="flex items-center gap-1.5 pt-1">
                     <Badge variant="outline" className="text-xs px-1.5 py-0">
                       {userRole}
-                    </Badge>
-                    <Badge variant="outline" className="text-xs px-1.5 py-0 border-green-500/50 text-green-700 dark:text-green-400">
-                      Verified
                     </Badge>
                   </div>
                 </div>
@@ -282,6 +219,79 @@ export function RestaurantTopNav({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+      </div>
+
+      {/* ROW 2: RESTAURANT IDENTITY + STATUS */}
+      <div className="h-14 px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-2">
+        {/* Left: Restaurant Name + Verified Badge + ID/Location */}
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 
+              className="font-bold text-base md:text-lg truncate" 
+              data-testid="text-restaurant-name-topnav"
+            >
+              {restaurantName}
+            </h1>
+            <Badge
+              variant="outline"
+              className="text-xs gap-1 px-1.5 py-0.5 border-green-500/50 text-green-700 dark:text-green-400"
+              data-testid="badge-verified"
+            >
+              <ShieldCheck className="h-3 w-3" />
+              Verified
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            {restaurantId && (
+              <span className="truncate max-w-[200px] sm:max-w-none" data-testid="text-restaurant-id">
+                ID: {restaurantId}
+              </span>
+            )}
+            <span className="hidden sm:inline">•</span>
+            <span className="flex items-center gap-1 hidden sm:flex">
+              <MapPin className="h-3 w-3" />
+              New York, USA
+            </span>
+          </div>
+        </div>
+
+        {/* Right: Status Pills - Accepting Orders + Active */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Accepting Orders Toggle */}
+          <div className="flex items-center gap-2 px-2.5 py-1.5 border rounded-md bg-background h-8">
+            <span className="text-xs font-medium whitespace-nowrap">
+              {isOpen ? "Accepting orders" : "Not accepting"}
+            </span>
+            <Switch
+              checked={isOpen}
+              onCheckedChange={onToggleStatus}
+              data-testid="switch-store-status"
+              className="scale-90"
+            />
+          </div>
+          
+          {/* Active Status Pill */}
+          <Badge
+            variant={isOpen ? "default" : "secondary"}
+            className="text-xs px-2 py-1 h-8 flex items-center"
+            data-testid="badge-store-status"
+          >
+            {isOpen ? "Active" : "Inactive"}
+          </Badge>
+        </div>
+      </div>
+
+      {/* ROW 3: SEARCH BAR */}
+      <div className="h-12 px-4 flex items-center border-t border-border/40">
+        <div className="relative w-full max-w-3xl mx-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search orders, menu items, customers..."
+            className="pl-10 h-9 bg-background w-full"
+            disabled
+            data-testid="input-global-search"
+          />
         </div>
       </div>
     </header>

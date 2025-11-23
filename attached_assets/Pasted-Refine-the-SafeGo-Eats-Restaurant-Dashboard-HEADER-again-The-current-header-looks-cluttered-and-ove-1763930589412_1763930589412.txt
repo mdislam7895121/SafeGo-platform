@@ -1,0 +1,70 @@
+Refine the SafeGo Eats Restaurant Dashboard HEADER again. The current header looks cluttered and overloaded in a single row (brand, restaurant name, ID, badges, toggles, search bar all together). I want a cleaner, simpler, more professional layout with clear visual grouping.
+
+GOAL:
+- Clean, minimal, well-organized header
+- Desktop, tablet, and mobile friendly
+- No backend, routing, RBAC, or KYC changes
+- Restaurant portal only; do not affect customer, driver, or admin portals
+
+NEW HEADER LAYOUT (DESKTOP)
+
+Use a 3-row structure:
+
+ROW 1 (TOP BAR):
+- LEFT: "SafeGo Eats" brand logo/title only
+- RIGHT: notification icon with badge + profile avatar/menu (MO)
+- Keep this row slim and simple
+
+ROW 2 (RESTAURANT IDENTITY + STATUS):
+- LEFT SIDE:
+    • Restaurant name (e.g. "mohammad") in bold
+    • Next to it: small "Verified" badge
+    • BELOW (small text, muted): "ID: 8cf32da7-d108-41b3-8fb4-051c7e694fa4" and location text
+- RIGHT SIDE:
+    • One combined status pill, e.g. "Accepting orders" (ON/OFF)
+    • Next to it: small "Active" pill
+    • Make both pills compact, same height, same style
+
+Important: DO NOT repeat "Verified & Active" again in a separate big blue chip under the header. Keep verification and active status only in row 2, small and neat.
+
+ROW 3 (SEARCH):
+- One full-width search bar: "Search orders, menu items, customers…"
+- Centered horizontally with proper margins
+- On mobile, this can be directly under row 1
+
+MOBILE/TABLET BEHAVIOR:
+
+Mobile:
+- Row 1: SafeGo Eats (left) + notifications + avatar (right)
+- Row 2: Restaurant name + verified badge + small status text
+- Row 3: full-width search bar
+- Row 4 (if needed): small "Accepting orders" toggle + "Active" pill stacked, not in the same long row
+
+Tablet:
+- Top bar same as mobile
+- Row 2: Restaurant name + badges left, status pills right
+- Row 3: full-width search
+
+CLEANUP:
+- Remove any duplicate badges (no “Verified & Active” pill floating alone in the content area)
+- Align everything to a clear grid (use flexbox with justify-between and consistent gaps)
+- Ensure there is enough whitespace between groups so the header does NOT look crowded
+- Keep fonts and sizes consistent with the design system
+
+TEST:
+- Verify header layout on:
+    • Desktop viewport
+    • Tablet viewport
+    • Mobile viewport
+- Confirm:
+    • No overlapping text
+    • No wrapped long ID in the middle of the header
+    • Search bar is always clearly visible and usable
+
+CONSTRAINTS:
+- Do NOT touch any backend logic, APIs, routes, or database schema.
+- Do NOT modify customer, driver, or admin portals.
+- Keep all KYC and RBAC checks unchanged for all 4 roles.
+- Do not change rides, food_orders, or deliveries flows.
+
+After updating, show me screenshots or a description of the new header layout on desktop and mobile, and confirm that the old “cluttered” row has been simplified into the 3-row structure described above.

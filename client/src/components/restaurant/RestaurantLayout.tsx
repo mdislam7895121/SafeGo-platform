@@ -102,7 +102,7 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
       />
       
       <main
-        className="transition-all duration-300 pt-16"
+        className="transition-all duration-300 pt-[152px]"
         style={{
           marginLeft: isDesktop ? (sidebarCollapsed ? "4rem" : "16rem") : "0"
         }}
