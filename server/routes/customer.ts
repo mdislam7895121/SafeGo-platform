@@ -568,6 +568,68 @@ router.post("/reviews", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/customer/food-orders
+// Get all food orders for this customer with review status
+// ====================================================
+router.get("/food-orders", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get customer profile
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Get all food orders for this customer
+    const orders = await prisma.foodOrder.findMany({
+      where: {
+        customerId: customerProfile.id,
+      },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            restaurantName: true,
+          },
+        },
+        review: {
+          select: {
+            id: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json({
+      orders: orders.map((order: any) => ({
+        id: order.id,
+        restaurantId: order.restaurantId,
+        restaurantName: order.restaurant.restaurantName,
+        deliveryAddress: order.deliveryAddress,
+        items: order.items,
+        serviceFare: Number(order.serviceFare),
+        status: order.status,
+        paymentMethod: order.paymentMethod,
+        createdAt: order.createdAt,
+        deliveredAt: order.deliveredAt,
+        hasReview: !!order.review,
+      })),
+      total: orders.length,
+    });
+  } catch (error: any) {
+    console.error("Get food orders error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch food orders" });
+  }
+});
+
+// ====================================================
 // GET /api/customer/reviews/my
 // Get all reviews submitted by this customer
 // ====================================================

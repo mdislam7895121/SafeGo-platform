@@ -20,6 +20,7 @@ import RideRequest from "@/pages/customer/ride-request";
 import RideDetails from "@/pages/customer/ride-details";
 import FoodRestaurants from "@/pages/customer/food-restaurants";
 import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
+import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import ParcelRequest from "@/pages/customer/parcel-request";
 import CustomerSupport from "@/pages/customer/support";
 import CustomerWallet from "@/pages/customer/wallet";
@@ -194,6 +195,11 @@ function Router() {
       <Route path="/customer/ride-request">
         <ProtectedRoute allowedRoles={["customer"]}>
           <RideRequest />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/food/orders">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <FoodOrdersHistory />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/food/:id">
