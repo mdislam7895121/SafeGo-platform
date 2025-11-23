@@ -394,6 +394,17 @@ model RestaurantProfile {
   businessLicenseUrl    String?
   healthCertificateUrl  String?
   ownerRole             String?            // OWNER | STAFF
+  // Phase 6: Staff Permissions (only applicable when ownerRole = STAFF)
+  canEditCategories     Boolean            @default(false)
+  canEditItems          Boolean            @default(false)
+  canToggleAvailability Boolean            @default(false)
+  canUseBulkTools       Boolean            @default(false)
+  canViewAnalytics      Boolean            @default(false)
+  canViewPayouts        Boolean            @default(false)
+  canManageOrders       Boolean            @default(false)
+  staffActive           Boolean            @default(true)
+  managedByOwnerId      String?            // Restaurant ID of the OWNER who manages this STAFF
+  lastLoginAt           DateTime?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   isSuspended           Boolean            @default(false)
