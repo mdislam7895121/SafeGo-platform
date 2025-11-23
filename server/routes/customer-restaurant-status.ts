@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db";
+import { authenticateToken } from "../middleware/auth";
 import type { AuthRequest } from "../middleware/auth";
 
 const router = Router();
@@ -67,26 +68,60 @@ function calculateSurgePricing(surge: any, currentTime: Date): { isActive: boole
 }
 
 // ====================================================
-// GET /api/customer/restaurants/:id/operational-status
+// GET /api/customer/restaurants/:id/status
 // Get operational status for a restaurant (customer-facing)
+// Security: Requires authenticated, verified customer with city match
 // ====================================================
-router.get("/:id/operational-status", async (req: AuthRequest, res) => {
+router.get("/:id/status", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { lat, lng } = req.query; // Customer's delivery location
+    const userId = req.user?.userId;
 
-    // Get restaurant basic info
+    if (!userId) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+
+    // Get customer profile with KYC and location verification
+    const customer = await prisma.customer.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        isVerified: true,
+        cityCode: true,
+        countryCode: true,
+      },
+    });
+
+    if (!customer) {
+      return res.status(403).json({ error: "Customer profile not found" });
+    }
+
+    if (!customer.isVerified) {
+      return res.status(403).json({ error: "Customer verification required to view restaurant status" });
+    }
+
+    // Get restaurant with location
     const restaurant = await prisma.restaurantProfile.findUnique({
       where: { id },
       select: {
         id: true,
         restaurantName: true,
         isVerified: true,
+        cityCode: true,
+        countryCode: true,
       },
     });
 
     if (!restaurant) {
       return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Enforce country/city matching - hide restaurants in different cities
+    if (customer.countryCode !== restaurant.countryCode || customer.cityCode !== restaurant.cityCode) {
+      return res.status(403).json({ 
+        error: "Restaurant not available in your area",
+        reason: "location_mismatch" 
+      });
     }
 
     // Get operational settings
@@ -135,37 +170,23 @@ router.get("/:id/operational-status", async (req: AuthRequest, res) => {
     // Calculate surge pricing
     const surgePricing = calculateSurgePricing(surge, currentTime);
 
-    // Check delivery zone (if lat/lng provided)
+    // Check delivery zone - simplified for now (returns first zone if delivery enabled)
+    // In production: would check customer's actual delivery address coordinates
     let deliveryZoneInfo = null;
-    if (lat && lng) {
-      const customerLat = parseFloat(lat as string);
-      const customerLng = parseFloat(lng as string);
-
-      // For now, use simple radius-based checking
-      // In production, you'd use proper geospatial queries
-      const matchingZone = zones.find((zone: any) => {
-        if (!zone.radiusKm) return false;
-        
-        // Simple distance calculation (Haversine would be better)
-        // This is approximate and assumes small distances
-        const R = 6371; // Earth's radius in km
-        const dLat = ((customerLat - (restaurant as any).latitude) * Math.PI) / 180;
-        const dLng = ((customerLng - (restaurant as any).longitude) * Math.PI) / 180;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const distance = R * c;
-
-        return distance <= zone.radiusKm;
-      });
-
-      if (matchingZone) {
-        deliveryZoneInfo = {
-          zoneName: matchingZone.zoneName,
-          baseFee: matchingZone.baseFee,
-          feePerKm: matchingZone.feePerKm,
-          estimatedMinutes: matchingZone.estimatedMinutes,
-        };
-      }
+    if (operational?.deliveryEnabled && zones.length > 0) {
+      const defaultZone = zones[0]; // Use first zone as default
+      deliveryZoneInfo = {
+        inZone: true, // Simplified - in production, check actual location
+        deliveryFee: defaultZone.baseFee,
+        estimatedTimeMinutes: defaultZone.estimatedMinutes,
+      };
+    } else if (operational?.deliveryEnabled) {
+      // Delivery enabled but no zones configured
+      deliveryZoneInfo = {
+        inZone: false,
+        deliveryFee: null,
+        estimatedTimeMinutes: null,
+      };
     }
 
     // Final status calculation
@@ -176,16 +197,14 @@ router.get("/:id/operational-status", async (req: AuthRequest, res) => {
       !isThrottled &&
       (operational?.deliveryEnabled || operational?.pickupEnabled);
 
+    // Customer-facing response - no internal fields exposed
     res.json({
       status: {
-        isVerified: restaurant.isVerified,
         isOpen,
         isTemporarilyClosed,
         temporaryCloseReason,
         canAcceptOrders,
-        isThrottled,
-        activeOrderCount,
-        maxConcurrentOrders,
+        isThrottled, // Show if busy, but not internal counts
       },
       todayHours: todayHours ? {
         isClosed: todayHours.isClosed,

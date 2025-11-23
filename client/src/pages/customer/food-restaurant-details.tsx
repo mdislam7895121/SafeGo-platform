@@ -74,8 +74,6 @@ interface OperationalStatusResponse {
     temporaryCloseReason: string | null;
     canAcceptOrders: boolean;
     isThrottled: boolean;
-    activeOrderCount: number;
-    maxConcurrentOrders: number | null;
   };
   todayHours: {
     isClosed: boolean;
@@ -109,6 +107,11 @@ interface OperationalStatusResponse {
   } | null;
 }
 
+interface OperationalStatusError {
+  error: string;
+  reason?: string;
+}
+
 export default function FoodRestaurantDetails() {
   const { id } = useParams() as { id: string };
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -129,9 +132,13 @@ export default function FoodRestaurantDetails() {
     retry: 1,
   });
 
-  const { data: operationalData, isLoading: operationalLoading } = useQuery<OperationalStatusResponse>({
+  const { 
+    data: operationalData, 
+    isLoading: operationalLoading,
+    error: operationalError 
+  } = useQuery<OperationalStatusResponse>({
     queryKey: [`/api/customer/restaurants/${id}/status`],
-    retry: 1,
+    retry: false, // Don't retry on auth/verification errors
   });
 
   const restaurant = restaurantData?.restaurant;
@@ -363,6 +370,21 @@ export default function FoodRestaurantDetails() {
               <Skeleton className="h-6 w-32 mb-4" />
               <Skeleton className="h-4 w-full mb-2" />
               <Skeleton className="h-4 w-3/4" />
+            </CardContent>
+          </Card>
+        ) : operationalError ? (
+          <Card className="mt-4">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm" data-testid="text-status-error">
+                  {(operationalError as any)?.message?.includes("location_mismatch") || (operationalError as any)?.message?.includes("not available in your area")
+                    ? "This restaurant is not available in your area"
+                    : (operationalError as any)?.message?.includes("verification")
+                    ? "Please complete account verification to view restaurant status"
+                    : "Unable to load restaurant status"}
+                </p>
+              </div>
             </CardContent>
           </Card>
         ) : operational && statusBadge ? (
