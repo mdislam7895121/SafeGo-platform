@@ -1,0 +1,113 @@
+You are the lead engineer responsible for preparing the SafeGo platform for publish/production.
+
+Goal:
+Give me a clear, honest RELEASE READINESS REPORT for the entire SafeGo app and then fix only the blocking issues for a first public launch (MVP). Do NOT break any working features.
+
+Context (what already exists – verify all of this):
+1) Driver side
+   - Driver dashboard (stats, warnings, trips, rating, earnings widgets)
+   - Driver profile + public profile view
+   - Account Settings: personal info, address (edit + save), documents, tax info
+   - Wallet: balance, payouts list, payout methods (bank, debit card, checking/savings)
+   - Tax Info: US 1099 + Bangladesh tax summaries (auto based on driver country)
+   - Identity & documents: USA (SSN last 4, license, background, etc), BD (NID last 4, docs)
+   - SafeGo Points & Tiers (Blue / Gold / Premium) with 90-day rules and time-based points
+   - Online/offline card removed from dashboard as per latest spec
+   - Live Support chat (bot-first, full intent engine) for driver
+
+2) Customer / rider side (if present in this repo)
+   - Booking / trips flow
+   - Wallet / payments
+   - Support chat
+
+3) Restaurant / parcel / courier (if present)
+   - Basic dashboards
+   - Orders / deliveries
+   - Support chat
+
+4) Global support system (very important)
+   - Bot-first support chat with full intent engine (payouts, trips, account, safety, etc.)
+   - Fallback + escalation rules (manual & auto)
+   - Conversation rating and “bot helpful / not helpful” tracking
+   - Multi-role support: driver, rider, restaurant, parcel
+   - Admin Live Support Console:
+     - Route: /admin/support-chat
+     - 2-panel layout: inbox + live chat
+     - Filters: status (bot/open/pending/assigned/closed), userType
+     - Assign → Reply → Close flow
+     - Real-time polling
+     - RBAC: SUPPORT_ADMIN only
+
+Your job now:
+
+STEP 1 – Full system scan and summary
+1. Scan the entire codebase (backend + frontend).
+2. List ALL major modules that are currently implemented and working, grouped by:
+   - Driver
+   - Rider
+   - Restaurant
+   - Courier
+   - Admin
+   - Shared systems (auth, database, payments, support, tax, points/tiers)
+3. For each module, label status exactly as:
+   - “Production-ready”
+   - “Works but needs polish”
+   - “Implemented but broken”
+   - “Not implemented”
+4. Output this as a clear RELEASE READINESS REPORT so a non-programmer can understand:
+   - What is finished
+   - What is partially done
+   - What is still missing for a basic public launch
+
+STEP 2 – Identify BLOCKERS for publishing
+From that report, identify ONLY the true blocking issues for a first public MVP, such as:
+   - Buttons that do nothing (Address Save, Add payout method, etc.)
+   - Broken flows (wallet add/edit/delete not saving, support chat not escalating correctly, etc.)
+   - Missing validations that can cause data corruption
+   - Security issues (role checks missing, unsafe endpoints)
+   - Routing issues (404s on important pages like /driver/support or /admin/support-chat)
+   - Fatal errors in console / server logs
+
+Create a short “BLOCKERS LIST” with:
+   - Module
+   - Problem
+   - Root cause (short)
+   - Fix plan (1–2 sentences)
+
+STEP 3 – Fix BLOCKERS (without changing specs)
+1. Systematically fix each blocker:
+   - Payout methods: make sure bank + debit card + checking/savings all save, edit, and delete correctly per driver, with encryption.
+   - Address page: Save button must update DB and show success state.
+   - Support chat: 
+     - Bot must use the full SafeGo Intent Engine prompt already provided.
+     - Escalation to human must work (manual keyword + 3x not-helpful).
+     - ConversationActive rules must be respected (no messages after closed).
+   - Admin Live Support:
+     - /admin/support-chat must open and show conversations.
+     - Filters, assign, reply, end/close must work end-to-end.
+2. Preserve all existing working behavior. Do NOT rename routes or API paths unless absolutely necessary. If you must change something, explain why in your summary.
+3. Keep security tight:
+   - All admin endpoints must require SUPPORT_ADMIN.
+   - Users must only see their own data (wallet, payouts, documents, chats, etc.).
+   - Sensitive info (SSN/NID) must be masked (show last 4 only).
+
+STEP 4 – Final Publish Checklist
+After fixes, output a final “READY TO PUBLISH” checklist including:
+   - Frontend build status (no TypeScript/LSP errors, no console errors on main flows)
+   - Backend status (server running cleanly, DB migrations applied)
+   - Required environment variables and how they should be set for production
+   - Any 3rd-party services mentioned (payments, email, SMS) and their current status
+   - Basic monitoring/logging recommendations for production
+
+Constraints:
+- Do not refactor for style; focus on release stability and correctness.
+- Do not remove any working feature (especially support chat, wallet, payouts, tax, points).
+- Explain any major architectural change before applying it.
+- All changes must be backward compatible with the current working flows.
+
+Deliverables to me:
+1) RELEASE READINESS REPORT (modules + status)
+2) BLOCKERS LIST + what you fixed
+3) Final “READY TO PUBLISH” checklist and any remaining non-blocking TODOs (nice-to-have only)
+
+Start by scanning the system and producing the RELEASE READINESS REPORT, then proceed with fixes.
