@@ -20,7 +20,7 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 -   **Wallet & Earnings System**: Manages earnings, commissions, negative balances, and automated/manual payouts.
 -   **Tax & Fees System**: Uber-style multi-country tax management with city-level overrides and 7 tax types, storing detailed breakdowns.
 -   **System Monitoring**: Real-time performance monitoring, stability alerts, and an enterprise performance dashboard.
--   **Bot-First Support System**: AI-first support chat with 4-role support, pre-chat verification, two-tier escalation (bot to human), and production-ready race condition prevention.
+-   **Bot-First Support System**: AI-first support chat with 4-role support (driver, customer, restaurant, parcel), pre-chat verification, two-tier escalation (bot FAQ → human agent escalation), automatic escalation after 3 unresolved attempts, manual escalation, end-chat rating system, and production-ready race condition prevention. Includes **Admin Live Support Console** for SUPPORT_ADMIN agents with real-time conversation management, assignment system, unread tracking, user info panel, filters (status, role), and full RBAC access control.
 -   **Demo Mode**: Comprehensive demo data generation for multi-jurisdiction scenarios.
 -   **Opportunity Bonus Management System**: Admin-managed ride incentives with country-specific amounts, campaigns, and zone-based targeting for drivers.
 -   **SafeGo Points System**: Uber Pro-style gamified loyalty program with 3 exclusive tiers (Blue, Gold, Premium) and 90-day cycles based on time-based trip points (Night/Morning, Peak Evening, Evening shifts). Includes a Driver UI, a `TimeSlotPointEngine` for tamper-proof calculation, and `CycleTrackingService`.
