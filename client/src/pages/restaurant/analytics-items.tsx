@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { TrendingUp, TrendingDown, AlertCircle, Clock } from "lucide-react";
 
 interface ItemAnalytics {
-  topItems: { itemName: string; orderCount: number; revenue: number }[];
-  worstItems: { itemName: string; orderCount: number; revenue: number }[];
-  highCancellationItems: { itemName: string; cancellationCount: number; cancellationRate: number }[];
+  topItems: { itemName: string; orderCount: number; totalAttempts: number; revenue: number }[];
+  worstItems: { itemName: string; orderCount: number; totalAttempts: number; revenue: number }[];
+  highCancellationItems: { itemName: string; totalAttempts: number; cancellationCount: number; cancellationRate: number }[];
   avgPrepTimeByItem: { itemName: string; avgPrepTime: number }[];
 }
 
@@ -89,7 +89,7 @@ export default function AnalyticsItems() {
                     <div className="flex-1">
                       <div className="font-medium">{item.itemName}</div>
                       <div className="text-sm text-muted-foreground">
-                        {item.orderCount} orders
+                        {item.orderCount} delivered ({item.totalAttempts} total)
                       </div>
                     </div>
                     <div className="text-lg font-bold text-green-600">
@@ -126,7 +126,7 @@ export default function AnalyticsItems() {
                     <div className="flex-1">
                       <div className="font-medium">{item.itemName}</div>
                       <div className="text-sm text-muted-foreground">
-                        {item.orderCount} orders
+                        {item.orderCount} delivered ({item.totalAttempts} total)
                       </div>
                     </div>
                     <div className="text-lg font-bold text-destructive">
@@ -163,7 +163,7 @@ export default function AnalyticsItems() {
                     <div className="flex-1">
                       <div className="font-medium">{item.itemName}</div>
                       <div className="text-sm text-muted-foreground">
-                        {item.cancellationCount} cancellations
+                        {item.cancellationCount} cancelled ({item.totalAttempts} total)
                       </div>
                     </div>
                     <div className="text-lg font-bold text-orange-600">

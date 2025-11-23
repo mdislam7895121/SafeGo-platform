@@ -21,9 +21,9 @@ export interface OverviewMetrics {
 }
 
 export interface ItemAnalytics {
-  topItems: { itemName: string; orderCount: number; revenue: number }[];
-  worstItems: { itemName: string; orderCount: number; revenue: number }[];
-  highCancellationItems: { itemName: string; cancellationCount: number; cancellationRate: number }[];
+  topItems: { itemName: string; orderCount: number; totalAttempts: number; revenue: number }[];
+  worstItems: { itemName: string; orderCount: number; totalAttempts: number; revenue: number }[];
+  highCancellationItems: { itemName: string; totalAttempts: number; cancellationCount: number; cancellationRate: number }[];
   avgPrepTimeByItem: { itemName: string; avgPrepTime: number }[];
 }
 
@@ -236,6 +236,7 @@ export async function getItemAnalytics(
     return {
       itemName: name,
       orderCount: stat.deliveredCount,
+      totalAttempts,
       revenue: Math.round(stat.revenue * 100) / 100,
       cancellationCount: stat.cancellations,
       cancellationRate:
@@ -248,22 +249,24 @@ export async function getItemAnalytics(
   });
 
   const topItems = itemArray
+    .filter((i) => i.totalAttempts >= 3)
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10)
-    .map((i) => ({ itemName: i.itemName, orderCount: i.orderCount, revenue: i.revenue }));
+    .map((i) => ({ itemName: i.itemName, orderCount: i.orderCount, totalAttempts: i.totalAttempts, revenue: i.revenue }));
 
   const worstItems = itemArray
-    .filter((i) => i.orderCount >= 3)
+    .filter((i) => i.totalAttempts >= 3)
     .sort((a, b) => a.revenue - b.revenue)
     .slice(0, 10)
-    .map((i) => ({ itemName: i.itemName, orderCount: i.orderCount, revenue: i.revenue }));
+    .map((i) => ({ itemName: i.itemName, orderCount: i.orderCount, totalAttempts: i.totalAttempts, revenue: i.revenue }));
 
   const highCancellationItems = itemArray
-    .filter((i) => i.cancellationCount > 0)
+    .filter((i) => i.totalAttempts >= 3)
     .sort((a, b) => b.cancellationRate - a.cancellationRate)
     .slice(0, 10)
     .map((i) => ({
       itemName: i.itemName,
+      totalAttempts: i.totalAttempts,
       cancellationCount: i.cancellationCount,
       cancellationRate: i.cancellationRate,
     }));
