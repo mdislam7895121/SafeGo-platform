@@ -9740,6 +9740,318 @@ router.post(
 );
 
 // ====================================================
+// PHASE 8: Restaurant Review & Rating Management System
+// ====================================================
+
+// GET /api/admin/reviews - Get all reviews with filters
+router.get(
+  "/reviews",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { page = "1", limit = "20", restaurantId, rating, isHidden, isFlagged } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+
+      const where: any = {};
+      if (restaurantId) where.restaurantId = restaurantId;
+      if (rating) where.rating = parseInt(rating as string);
+      if (isHidden !== undefined) where.isHidden = isHidden === "true";
+      if (isFlagged !== undefined) where.isFlagged = isFlagged === "true";
+
+      const [reviews, total] = await Promise.all([
+        prisma.review.findMany({
+          where,
+          include: {
+            restaurant: {
+              select: {
+                id: true,
+                restaurantName: true,
+                // No email included - only needed for moderation actions, not listing
+              },
+            },
+            customer: {
+              include: {
+                user: { select: { email: true } },
+              },
+            },
+            order: {
+              select: {
+                id: true,
+                createdAt: true,
+                deliveredAt: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limitNum,
+        }),
+        prisma.review.count({ where }),
+      ]);
+
+      res.json({
+        reviews: reviews.map((r: any) => ({
+          id: r.id,
+          orderId: r.orderId,
+          orderDate: r.order.createdAt,
+          deliveredAt: r.order.deliveredAt,
+          restaurantId: r.restaurantId,
+          restaurantName: r.restaurant.restaurantName,
+          // JUSTIFICATION: Customer email required for admin moderation (audit logs, identifying problem users)
+          customerId: r.customerId,
+          customerEmail: r.customer.user.email,
+          rating: r.rating,
+          reviewText: r.reviewText,
+          images: r.images,
+          isHidden: r.isHidden,
+          hiddenByAdminId: r.hiddenByAdminId,
+          hiddenAt: r.hiddenAt,
+          hideReason: r.hideReason,
+          isFlagged: r.isFlagged,
+          flaggedByAdminId: r.flaggedByAdminId,
+          flaggedAt: r.flaggedAt,
+          flagReason: r.flagReason,
+          createdAt: r.createdAt,
+        })),
+        pagination: {
+          total,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error: any) {
+      console.error("Get reviews error:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch reviews" });
+    }
+  }
+);
+
+// POST /api/admin/reviews/:id/hide - Hide a review
+router.post(
+  "/reviews/:id/hide",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const adminId = req.user!.userId;
+
+      if (!reason) {
+        return res.status(400).json({ error: "Reason is required" });
+      }
+
+      const review = await prisma.review.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+          customer: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!review) {
+        return res.status(404).json({ error: "Review not found" });
+      }
+
+      if (review.isHidden) {
+        return res.status(400).json({ error: "Review is already hidden" });
+      }
+
+      const updatedReview = await prisma.review.update({
+        where: { id },
+        data: {
+          isHidden: true,
+          hiddenByAdminId: adminId,
+          hiddenAt: new Date(),
+          hideReason: reason,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.HIDE_REVIEW,
+        entityType: EntityType.REVIEW,
+        entityId: id,
+        description: `Hid review from ${review.customer.user.email} for restaurant ${review.restaurant.restaurantName}. Reason: ${reason}`,
+        metadata: {
+          review_id: id,
+          restaurant_id: review.restaurantId,
+          restaurant_name: review.restaurant.restaurantName,
+          customer_email: review.customer.user.email,
+          rating: review.rating,
+          reason,
+        },
+      });
+
+      res.json({
+        message: "Review hidden successfully",
+        review: updatedReview,
+      });
+    } catch (error: any) {
+      console.error("Hide review error:", error);
+      res.status(500).json({ error: error.message || "Failed to hide review" });
+    }
+  }
+);
+
+// POST /api/admin/reviews/:id/restore - Restore a hidden review
+router.post(
+  "/reviews/:id/restore",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user!.userId;
+
+      const review = await prisma.review.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+          customer: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!review) {
+        return res.status(404).json({ error: "Review not found" });
+      }
+
+      if (!review.isHidden) {
+        return res.status(400).json({ error: "Review is not hidden" });
+      }
+
+      const updatedReview = await prisma.review.update({
+        where: { id },
+        data: {
+          isHidden: false,
+          hiddenByAdminId: null,
+          hiddenAt: null,
+          hideReason: null,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.RESTORE_REVIEW,
+        entityType: EntityType.REVIEW,
+        entityId: id,
+        description: `Restored review from ${review.customer.user.email} for restaurant ${review.restaurant.restaurantName}`,
+        metadata: {
+          review_id: id,
+          restaurant_id: review.restaurantId,
+          restaurant_name: review.restaurant.restaurantName,
+          customer_email: review.customer.user.email,
+          rating: review.rating,
+        },
+      });
+
+      res.json({
+        message: "Review restored successfully",
+        review: updatedReview,
+      });
+    } catch (error: any) {
+      console.error("Restore review error:", error);
+      res.status(500).json({ error: error.message || "Failed to restore review" });
+    }
+  }
+);
+
+// POST /api/admin/reviews/:id/flag - Flag a review
+router.post(
+  "/reviews/:id/flag",
+  checkPermission(Permission.MODERATE_PROMOTIONS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const adminId = req.user!.userId;
+
+      if (!reason) {
+        return res.status(400).json({ error: "Reason is required" });
+      }
+
+      const review = await prisma.review.findUnique({
+        where: { id },
+        include: {
+          restaurant: {
+            include: { user: true },
+          },
+          customer: {
+            include: { user: true },
+          },
+        },
+      });
+
+      if (!review) {
+        return res.status(404).json({ error: "Review not found" });
+      }
+
+      const updatedReview = await prisma.review.update({
+        where: { id },
+        data: {
+          isFlagged: true,
+          flaggedByAdminId: adminId,
+          flaggedAt: new Date(),
+          flagReason: reason,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId,
+        actorEmail: req.user!.email,
+        actorRole: "super_admin",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.FLAG_REVIEW,
+        entityType: EntityType.REVIEW,
+        entityId: id,
+        description: `Flagged review from ${review.customer.user.email} for restaurant ${review.restaurant.restaurantName}. Reason: ${reason}`,
+        metadata: {
+          review_id: id,
+          restaurant_id: review.restaurantId,
+          restaurant_name: review.restaurant.restaurantName,
+          customer_email: review.customer.user.email,
+          rating: review.rating,
+          reason,
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: review.restaurant.userId,
+          type: "alert",
+          title: "Review Flagged by Admin",
+          body: `A review for your restaurant has been flagged by administration. Reason: ${reason}`,
+        },
+      });
+
+      res.json({
+        message: "Review flagged successfully",
+        review: updatedReview,
+      });
+    } catch (error: any) {
+      console.error("Flag review error:", error);
+      res.status(500).json({ error: error.message || "Failed to flag review" });
+    }
+  }
+);
+
+// ====================================================
 // Mount Analytics Routes
 // ====================================================
 router.use("/analytics", analyticsRouter);

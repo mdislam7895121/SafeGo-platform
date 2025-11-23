@@ -50,6 +50,11 @@ export const ActionType = {
   DELETE_COUPON: "DELETE_COUPON",
   FLAG_COUPON: "FLAG_COUPON",
   
+  // Review Management (Phase 8)
+  HIDE_REVIEW: "HIDE_REVIEW",
+  RESTORE_REVIEW: "RESTORE_REVIEW",
+  FLAG_REVIEW: "FLAG_REVIEW",
+  
   // Document Management
   DOCUMENT_REVIEW_APPROVED: "DOCUMENT_REVIEW_APPROVED",
   DOCUMENT_REVIEW_REJECTED: "DOCUMENT_REVIEW_REJECTED",
@@ -137,6 +142,7 @@ export const EntityType = {
   MENU_OPTION: "menu_option",
   PROMOTION: "promotion",
   COUPON: "coupon",
+  REVIEW: "review",
 } as const;
 
 interface AuditLogParams {

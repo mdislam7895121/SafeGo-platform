@@ -3410,4 +3410,183 @@ router.post("/promotions/coupons", requireOwnerRole, async (req: AuthRequest, re
   }
 });
 
+// ====================================================
+// PHASE 8: Restaurant Review & Rating Management System
+// ====================================================
+
+// ====================================================
+// GET /api/restaurant/reviews
+// Get all reviews for this restaurant
+// ====================================================
+router.get("/reviews", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, ownerRole: true, canViewAnalytics: true, managedByOwnerId: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // RBAC: Allow OWNER or STAFF with canViewAnalytics permission
+    const role = restaurantProfile.ownerRole || "OWNER";
+    if (role === "STAFF" && !restaurantProfile.canViewAnalytics) {
+      return res.status(403).json({
+        error: "Insufficient permissions",
+        message: "You need analytics permission to view reviews",
+      });
+    }
+
+    // Parse query parameters for filtering
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const rating = req.query.rating ? parseInt(req.query.rating as string) : undefined;
+    const includeHidden = req.query.includeHidden === "true";
+
+    // Build where clause
+    const where: any = {
+      restaurantId: restaurantProfile.id,
+    };
+
+    // Filter by rating if specified
+    if (rating && rating >= 1 && rating <= 5) {
+      where.rating = rating;
+    }
+
+    // Filter hidden reviews (default: exclude hidden)
+    if (!includeHidden) {
+      where.isHidden = false;
+    }
+
+    // Get reviews with pagination - NO customer data included for privacy
+    const [reviews, totalCount] = await Promise.all([
+      prisma.review.findMany({
+        where,
+        include: {
+          order: {
+            select: {
+              id: true,
+              createdAt: true,
+              deliveredAt: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.review.count({ where }),
+    ]);
+
+    res.json({
+      reviews: reviews.map((review: any, index: number) => ({
+        id: review.id,
+        // NO orderId, restaurantId, or customer data - privacy protection
+        orderDate: review.order.createdAt,
+        deliveredAt: review.order.deliveredAt,
+        // Anonymous reviewer identifier (sequential per page)
+        reviewerLabel: `Reviewer #${(page - 1) * limit + index + 1}`,
+        rating: review.rating,
+        reviewText: review.reviewText,
+        images: review.images,
+        isHidden: review.isHidden,
+        isFlagged: review.isFlagged,
+        createdAt: review.createdAt,
+      })),
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error("Get reviews error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch reviews" });
+  }
+});
+
+// ====================================================
+// GET /api/restaurant/reviews/stats
+// Get review statistics for this restaurant
+// ====================================================
+router.get("/reviews/stats", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, ownerRole: true, canViewAnalytics: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // RBAC: Allow OWNER or STAFF with canViewAnalytics permission
+    const role = restaurantProfile.ownerRole || "OWNER";
+    if (role === "STAFF" && !restaurantProfile.canViewAnalytics) {
+      return res.status(403).json({
+        error: "Insufficient permissions",
+        message: "You need analytics permission to view review statistics",
+      });
+    }
+
+    // Get all non-hidden reviews for this restaurant
+    const reviews = await prisma.review.findMany({
+      where: {
+        restaurantId: restaurantProfile.id,
+        isHidden: false,
+      },
+      select: {
+        rating: true,
+      },
+    });
+
+    // Calculate statistics
+    const totalReviews = reviews.length;
+    let averageRating = 0;
+    const ratingDistribution = {
+      1: 0,
+      2: 0,
+      3: 0,
+      4: 0,
+      5: 0,
+    };
+
+    if (totalReviews > 0) {
+      let sum = 0;
+      reviews.forEach((review: any) => {
+        sum += review.rating;
+        ratingDistribution[review.rating as keyof typeof ratingDistribution]++;
+      });
+      averageRating = sum / totalReviews;
+    }
+
+    // Calculate percentages for distribution
+    const ratingDistributionPercentage = {
+      1: totalReviews > 0 ? (ratingDistribution[1] / totalReviews) * 100 : 0,
+      2: totalReviews > 0 ? (ratingDistribution[2] / totalReviews) * 100 : 0,
+      3: totalReviews > 0 ? (ratingDistribution[3] / totalReviews) * 100 : 0,
+      4: totalReviews > 0 ? (ratingDistribution[4] / totalReviews) * 100 : 0,
+      5: totalReviews > 0 ? (ratingDistribution[5] / totalReviews) * 100 : 0,
+    };
+
+    res.json({
+      totalReviews,
+      averageRating: Number(averageRating.toFixed(2)),
+      ratingDistribution,
+      ratingDistributionPercentage,
+    });
+  } catch (error: any) {
+    console.error("Get review stats error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch review statistics" });
+  }
+});
+
 export default router;

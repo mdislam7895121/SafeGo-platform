@@ -466,4 +466,168 @@ router.post("/promotions/validate", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// PHASE 8: Restaurant Review & Rating Management System
+// ====================================================
+
+// ====================================================
+// POST /api/customer/reviews
+// Submit a review for a delivered order
+// ====================================================
+router.post("/reviews", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Input validation
+    const schema = z.object({
+      orderId: z.string().uuid(),
+      rating: z.number().int().min(1).max(5),
+      reviewText: z.string().optional(),
+      images: z.array(z.string().url()).max(5).optional(),
+    });
+
+    const validationResult = schema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Invalid input",
+        details: validationResult.error.errors,
+      });
+    }
+
+    const { orderId, rating, reviewText, images } = validationResult.data;
+
+    // Get customer profile
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify order exists and belongs to this customer
+    const order = await prisma.foodOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        review: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (order.customerId !== customerProfile.id) {
+      return res.status(403).json({ error: "This order does not belong to you" });
+    }
+
+    // Verify order is delivered
+    if (order.status !== "delivered") {
+      return res.status(400).json({ error: "Can only review delivered orders" });
+    }
+
+    // Verify no existing review for this order
+    if (order.review) {
+      return res.status(400).json({ error: "This order has already been reviewed" });
+    }
+
+    // Create the review
+    const review = await prisma.review.create({
+      data: {
+        orderId,
+        restaurantId: order.restaurantId,
+        customerId: customerProfile.id,
+        rating,
+        reviewText: reviewText || null,
+        images: images || [],
+      },
+      include: {
+        restaurant: {
+          select: {
+            restaurantName: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json({
+      id: review.id,
+      orderId: review.orderId,
+      restaurantId: review.restaurantId,
+      restaurantName: review.restaurant.restaurantName,
+      rating: review.rating,
+      reviewText: review.reviewText,
+      images: review.images,
+      createdAt: review.createdAt,
+      message: "Review submitted successfully",
+    });
+  } catch (error: any) {
+    console.error("Submit review error:", error);
+    res.status(500).json({ error: error.message || "Failed to submit review" });
+  }
+});
+
+// ====================================================
+// GET /api/customer/reviews/my
+// Get all reviews submitted by this customer
+// ====================================================
+router.get("/reviews/my", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get customer profile
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Get all reviews by this customer
+    const reviews = await prisma.review.findMany({
+      where: {
+        customerId: customerProfile.id,
+      },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            restaurantName: true,
+          },
+        },
+        order: {
+          select: {
+            id: true,
+            createdAt: true,
+            deliveredAt: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    res.json({
+      reviews: reviews.map((review: any) => ({
+        id: review.id,
+        orderId: review.orderId,
+        orderDate: review.order.createdAt,
+        deliveredAt: review.order.deliveredAt,
+        restaurantId: review.restaurantId,
+        restaurantName: review.restaurant.restaurantName,
+        rating: review.rating,
+        reviewText: review.reviewText,
+        images: review.images,
+        isHidden: review.isHidden,
+        createdAt: review.createdAt,
+      })),
+    });
+  } catch (error: any) {
+    console.error("Get my reviews error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch reviews" });
+  }
+});
+
 export default router;
