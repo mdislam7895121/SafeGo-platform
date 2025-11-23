@@ -263,7 +263,7 @@ export default function AnalyticsDrivers() {
             </div>
 
             <div className="p-4 bg-muted rounded">
-              <div className="text-sm text-muted-foreground mb-1">Low Cancellation (<5%)</div>
+              <div className="text-sm text-muted-foreground mb-1">Low Cancellation (below 5%)</div>
               <div className="text-2xl font-bold">
                 {
                   drivers.filter(
