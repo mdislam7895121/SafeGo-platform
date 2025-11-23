@@ -393,6 +393,235 @@ router.get("/payouts", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// RESTAURANT PAYOUTS & SETTLEMENT SYSTEM (Phase 5)
+// ====================================================
+
+// GET /api/restaurant/payouts/overview
+// Get comprehensive payout overview with wallet balance, settlements, etc.
+router.get("/payouts/overview", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const { getRestaurantPayoutOverview } = await import("../payouts/restaurantPayouts");
+    const overview = await getRestaurantPayoutOverview(restaurantProfile.id);
+
+    res.json(overview);
+  } catch (error: any) {
+    console.error("Get payout overview error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payout overview" });
+  }
+});
+
+// GET /api/restaurant/payouts/ledger
+// Get detailed wallet transaction ledger
+router.get("/payouts/ledger", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const { getRestaurantLedger } = await import("../payouts/restaurantPayouts");
+    const result = await getRestaurantLedger(restaurantProfile.id, limit, offset);
+
+    res.json({
+      ledger: result.ledger,
+      pagination: {
+        total: result.total,
+        limit,
+        offset,
+        hasMore: offset + limit < result.total,
+      },
+    });
+  } catch (error: any) {
+    console.error("Get ledger error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch ledger" });
+  }
+});
+
+// GET /api/restaurant/payouts/settlements
+// Get settlement cycles (weekly settlements)
+router.get("/payouts/settlements", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const { getRestaurantSettlements } = await import("../payouts/restaurantPayouts");
+    const settlements = await getRestaurantSettlements(restaurantProfile.id);
+
+    res.json({ settlements });
+  } catch (error: any) {
+    console.error("Get settlements error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch settlements" });
+  }
+});
+
+// POST /api/restaurant/payouts/request-enhanced
+// Enhanced payout request with OWNER-only access and comprehensive validation
+router.post("/payouts/request-enhanced", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { amount: rawAmount } = req.body;
+
+    // Check if user is RESTAURANT_OWNER (not STAFF)
+    const { isRestaurantOwner } = await import("../payouts/restaurantPayouts");
+    const isOwner = await isRestaurantOwner(userId);
+
+    if (!isOwner) {
+      return res.status(403).json({
+        error: "Only restaurant owners can request payouts",
+      });
+    }
+
+    // Validate amount
+    if (rawAmount === undefined || rawAmount === null) {
+      return res.status(400).json({ error: "Amount is required" });
+    }
+
+    let amountDecimal: Prisma.Decimal;
+    try {
+      amountDecimal = new Prisma.Decimal(rawAmount);
+    } catch {
+      return res.status(400).json({ error: "Amount must be a valid number" });
+    }
+
+    if (!amountDecimal.isPositive()) {
+      return res.status(400).json({ error: "Amount must be greater than zero" });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check if restaurant is verified
+    if (!restaurantProfile.isVerified) {
+      return res.status(403).json({
+        error: "KYC verification required to request payouts",
+      });
+    }
+
+    const wallet = await prisma.wallet.findUnique({
+      where: {
+        ownerId_ownerType: {
+          ownerId: restaurantProfile.id,
+          ownerType: "RESTAURANT",
+        },
+      },
+    });
+
+    if (!wallet) {
+      return res.status(404).json({ error: "Wallet not found" });
+    }
+
+    // Check minimum payout threshold
+    const minPayoutThreshold = restaurantProfile.countryCode === "BD" ? 500 : 10;
+    if (amountDecimal.lt(minPayoutThreshold)) {
+      return res.status(400).json({
+        error: `Minimum payout amount is ${minPayoutThreshold} ${wallet.currency}`,
+      });
+    }
+
+    // Check if restaurant has negative balance
+    if (!wallet.negativeBalance.isZero()) {
+      return res.status(400).json({
+        error: `Cannot request payout while debt exists. Outstanding commission: ${wallet.negativeBalance} ${wallet.currency}`,
+      });
+    }
+
+    // Check if restaurant has sufficient available balance
+    if (wallet.availableBalance.lt(amountDecimal)) {
+      return res.status(400).json({
+        error: `Insufficient balance. Available: ${wallet.availableBalance} ${wallet.currency}`,
+      });
+    }
+
+    // Create payout request atomically
+    const payout = await prisma.$transaction(async (tx) => {
+      // Deduct from wallet balance
+      const updatedWallet = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          availableBalance: { decrement: amountDecimal },
+        },
+      });
+
+      // Verify balance didn't go negative (concurrency protection)
+      if (updatedWallet.availableBalance.isNegative()) {
+        throw new Error("Insufficient funds - concurrent payout detected");
+      }
+
+      // Create payout record
+      const newPayout = await tx.payout.create({
+        data: {
+          walletId: wallet.id,
+          countryCode: wallet.countryCode,
+          ownerType: "RESTAURANT",
+          ownerId: restaurantProfile.id,
+          amount: amountDecimal,
+          method: "bank_transfer",
+          status: "pending",
+          isDemo: restaurantProfile.isDemo,
+        },
+      });
+
+      // Create wallet transaction record
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          ownerType: "RESTAURANT",
+          countryCode: wallet.countryCode,
+          serviceType: "payout",
+          direction: "debit",
+          amount: amountDecimal,
+          balanceSnapshot: updatedWallet.availableBalance,
+          negativeBalanceSnapshot: updatedWallet.negativeBalance,
+          referenceType: "payout",
+          referenceId: newPayout.id,
+          description: `Payout request #${newPayout.id.substring(0, 8)}`,
+        },
+      });
+
+      return newPayout;
+    });
+
+    res.status(201).json({
+      message: "Payout request created successfully",
+      payout,
+    });
+  } catch (error: any) {
+    console.error("Request payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to create payout request" });
+  }
+});
+
+// ====================================================
 // MENU MANAGEMENT API
 // ====================================================
 

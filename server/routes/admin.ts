@@ -7840,6 +7840,497 @@ router.post("/restaurant-analytics/generate-insights", checkPermission(Permissio
   }
 });
 
+// ====================================================
+// RESTAURANT PAYOUTS & SETTLEMENT MANAGEMENT (Phase 5)
+// ====================================================
+
+// GET /api/admin/payouts/restaurants
+// List all restaurants with payout status and balances
+router.get("/payouts/restaurants", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { hasNegativeBalance, hasPendingPayouts, countryCode } = req.query;
+
+    const filters: any = {};
+    if (hasNegativeBalance === "true") filters.hasNegativeBalance = true;
+    if (hasPendingPayouts === "true") filters.hasPendingPayouts = true;
+    if (countryCode) filters.countryCode = countryCode as string;
+
+    const { getAllRestaurantPayouts } = await import("../payouts/restaurantPayouts");
+    const restaurants = await getAllRestaurantPayouts(filters);
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      entityType: EntityType.PAYOUT,
+      description: `Viewed restaurant payouts list`,
+      metadata: { filters },
+    });
+
+    res.json({ restaurants });
+  } catch (error: any) {
+    console.error("Get restaurant payouts error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch restaurant payouts" });
+  }
+});
+
+// GET /api/admin/payouts/pending
+// Get all pending payout requests
+router.get("/payouts/pending", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const pendingPayouts = await prisma.payout.findMany({
+      where: {
+        ownerType: "RESTAURANT",
+        status: "pending",
+      },
+      include: {
+        wallet: {
+          select: {
+            ownerId: true,
+            currency: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "asc",
+      },
+    });
+
+    // Enrich with restaurant details
+    const enrichedPayouts = await Promise.all(
+      pendingPayouts.map(async (payout) => {
+        const restaurant = await prisma.restaurantProfile.findUnique({
+          where: { id: payout.wallet.ownerId },
+          select: {
+            businessName: true,
+            user: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        });
+
+        return {
+          ...payout,
+          restaurantName: restaurant?.businessName || "Unknown",
+          restaurantEmail: restaurant?.user.email || "Unknown",
+        };
+      })
+    );
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      entityType: EntityType.PAYOUT,
+      description: `Viewed pending payouts`,
+      metadata: { count: pendingPayouts.length },
+    });
+
+    res.json({ payouts: enrichedPayouts });
+  } catch (error: any) {
+    console.error("Get pending payouts error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch pending payouts" });
+  }
+});
+
+// POST /api/admin/payouts/:payoutId/approve
+// Approve a payout request
+router.post("/payouts/:payoutId/approve", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { payoutId } = req.params;
+    const { scheduledAt } = req.body;
+
+    const payout = await prisma.payout.findUnique({
+      where: { id: payoutId },
+      include: {
+        wallet: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!payout) {
+      return res.status(404).json({ error: "Payout not found" });
+    }
+
+    if (payout.ownerType !== "RESTAURANT") {
+      return res.status(400).json({ error: "Invalid payout type" });
+    }
+
+    if (payout.status !== "pending") {
+      return res.status(400).json({ error: `Cannot approve payout with status: ${payout.status}` });
+    }
+
+    // Update payout status
+    const updatedPayout = await prisma.payout.update({
+      where: { id: payoutId },
+      data: {
+        status: "processing",
+        scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(),
+        createdByAdminId: req.user!.id,
+      },
+    });
+
+    // Create notification for restaurant owner
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: payout.wallet.ownerId },
+      select: {
+        user: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (restaurant) {
+      await prisma.notification.create({
+        data: {
+          userId: restaurant.user.id,
+          type: "payout",
+          title: "Payout Approved",
+          body: `Your payout request of ${payout.amount} ${payout.countryCode === "BD" ? "BDT" : "USD"} has been approved and is being processed.`,
+        },
+      });
+    }
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.APPROVE_PAYOUT,
+      entityType: EntityType.PAYOUT,
+      description: `Approved payout #${payoutId.substring(0, 8)} for ${payout.amount} ${payout.countryCode === "BD" ? "BDT" : "USD"}`,
+      metadata: { payoutId, amount: payout.amount.toString(), restaurantId: payout.wallet.ownerId },
+    });
+
+    res.json({ message: "Payout approved successfully", payout: updatedPayout });
+  } catch (error: any) {
+    console.error("Approve payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to approve payout" });
+  }
+});
+
+// POST /api/admin/payouts/:payoutId/reject
+// Reject a payout request
+router.post("/payouts/:payoutId/reject", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { payoutId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const payout = await prisma.payout.findUnique({
+      where: { id: payoutId },
+      include: {
+        wallet: {
+          select: {
+            ownerId: true,
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (!payout) {
+      return res.status(404).json({ error: "Payout not found" });
+    }
+
+    if (payout.ownerType !== "RESTAURANT") {
+      return res.status(400).json({ error: "Invalid payout type" });
+    }
+
+    if (payout.status !== "pending") {
+      return res.status(400).json({ error: `Cannot reject payout with status: ${payout.status}` });
+    }
+
+    // Refund the amount to wallet and reject payout atomically
+    await prisma.$transaction(async (tx) => {
+      // Update payout status
+      await tx.payout.update({
+        where: { id: payoutId },
+        data: {
+          status: "failed",
+          failureReason: reason,
+          createdByAdminId: req.user!.id,
+        },
+      });
+
+      // Refund amount to wallet
+      const updatedWallet = await tx.wallet.update({
+        where: { id: payout.wallet.id },
+        data: {
+          availableBalance: { increment: payout.amount },
+        },
+      });
+
+      // Create refund transaction
+      await tx.walletTransaction.create({
+        data: {
+          walletId: payout.wallet.id,
+          ownerType: "RESTAURANT",
+          countryCode: payout.countryCode,
+          serviceType: "payout",
+          direction: "credit",
+          amount: payout.amount,
+          balanceSnapshot: updatedWallet.availableBalance,
+          negativeBalanceSnapshot: updatedWallet.negativeBalance,
+          referenceType: "payout",
+          referenceId: payoutId,
+          description: `Payout rejected: ${reason}`,
+          createdByAdminId: req.user!.id,
+        },
+      });
+    });
+
+    // Create notification for restaurant owner
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: payout.wallet.ownerId },
+      select: {
+        user: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (restaurant) {
+      await prisma.notification.create({
+        data: {
+          userId: restaurant.user.id,
+          type: "alert",
+          title: "Payout Rejected",
+          body: `Your payout request of ${payout.amount} ${payout.countryCode === "BD" ? "BDT" : "USD"} was rejected. Reason: ${reason}. The amount has been refunded to your wallet.`,
+        },
+      });
+    }
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.REJECT_PAYOUT,
+      entityType: EntityType.PAYOUT,
+      description: `Rejected payout #${payoutId.substring(0, 8)} - ${reason}`,
+      metadata: { payoutId, amount: payout.amount.toString(), restaurantId: payout.wallet.ownerId, reason },
+    });
+
+    res.json({ message: "Payout rejected and amount refunded" });
+  } catch (error: any) {
+    console.error("Reject payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to reject payout" });
+  }
+});
+
+// POST /api/admin/payouts/:payoutId/complete
+// Mark payout as completed/paid
+router.post("/payouts/:payoutId/complete", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { payoutId } = req.params;
+    const { externalReferenceId } = req.body;
+
+    const payout = await prisma.payout.findUnique({
+      where: { id: payoutId },
+      include: {
+        wallet: {
+          select: {
+            ownerId: true,
+          },
+        },
+      },
+    });
+
+    if (!payout) {
+      return res.status(404).json({ error: "Payout not found" });
+    }
+
+    if (payout.ownerType !== "RESTAURANT") {
+      return res.status(400).json({ error: "Invalid payout type" });
+    }
+
+    if (payout.status === "completed") {
+      return res.status(400).json({ error: "Payout already completed" });
+    }
+
+    if (payout.status !== "processing") {
+      return res.status(400).json({ error: `Cannot complete payout with status: ${payout.status}` });
+    }
+
+    // Update payout status
+    const updatedPayout = await prisma.payout.update({
+      where: { id: payoutId },
+      data: {
+        status: "completed",
+        processedAt: new Date(),
+        externalReferenceId,
+      },
+    });
+
+    // Create notification for restaurant owner
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: payout.wallet.ownerId },
+      select: {
+        user: {
+          select: {
+            id: true,
+          },
+        },
+      },
+    });
+
+    if (restaurant) {
+      await prisma.notification.create({
+        data: {
+          userId: restaurant.user.id,
+          type: "payout",
+          title: "Payout Completed",
+          body: `Your payout of ${payout.amount} ${payout.countryCode === "BD" ? "BDT" : "USD"} has been successfully processed and transferred to your account.`,
+        },
+      });
+    }
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.COMPLETE_PAYOUT,
+      entityType: EntityType.PAYOUT,
+      description: `Completed payout #${payoutId.substring(0, 8)} for ${payout.amount} ${payout.countryCode === "BD" ? "BDT" : "USD"}`,
+      metadata: { payoutId, amount: payout.amount.toString(), restaurantId: payout.wallet.ownerId, externalReferenceId },
+    });
+
+    res.json({ message: "Payout marked as completed", payout: updatedPayout });
+  } catch (error: any) {
+    console.error("Complete payout error:", error);
+    res.status(500).json({ error: error.message || "Failed to complete payout" });
+  }
+});
+
+// POST /api/admin/payouts/adjust-balance
+// Adjust restaurant wallet balance (admin override with audit logging)
+router.post("/payouts/adjust-balance", checkPermission(Permission.MANAGE_PAYOUTS), async (req: AuthRequest, res) => {
+  try {
+    const { restaurantId, amount, reason, adjustmentType } = req.body;
+
+    if (!restaurantId || amount === undefined || !reason || !adjustmentType) {
+      return res.status(400).json({
+        error: "restaurantId, amount, reason, and adjustmentType are required",
+      });
+    }
+
+    if (!["credit", "debit"].includes(adjustmentType)) {
+      return res.status(400).json({ error: "adjustmentType must be 'credit' or 'debit'" });
+    }
+
+    let amountDecimal: Prisma.Decimal;
+    try {
+      amountDecimal = new Prisma.Decimal(Math.abs(amount));
+    } catch {
+      return res.status(400).json({ error: "Invalid amount" });
+    }
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: restaurantId },
+      select: {
+        id: true,
+        businessName: true,
+        countryCode: true,
+      },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Get or create wallet
+    let wallet = await prisma.wallet.findUnique({
+      where: {
+        ownerId_ownerType: {
+          ownerId: restaurantId,
+          ownerType: "RESTAURANT",
+        },
+      },
+    });
+
+    if (!wallet) {
+      return res.status(404).json({ error: "Restaurant wallet not found" });
+    }
+
+    // Perform adjustment
+    const updatedWallet = await prisma.$transaction(async (tx) => {
+      const updated = await tx.wallet.update({
+        where: { id: wallet.id },
+        data: {
+          availableBalance:
+            adjustmentType === "credit"
+              ? { increment: amountDecimal }
+              : { decrement: amountDecimal },
+        },
+      });
+
+      // Create transaction record
+      await tx.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          ownerType: "RESTAURANT",
+          countryCode: wallet.countryCode,
+          serviceType: "adjustment",
+          direction: adjustmentType === "credit" ? "credit" : "debit",
+          amount: amountDecimal,
+          balanceSnapshot: updated.availableBalance,
+          negativeBalanceSnapshot: updated.negativeBalance,
+          referenceType: "admin_adjustment",
+          description: `Admin adjustment: ${reason}`,
+          createdByAdminId: req.user!.id,
+        },
+      });
+
+      return updated;
+    });
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.WALLET_ADJUSTMENT,
+      entityType: EntityType.WALLET,
+      description: `Adjusted restaurant wallet balance: ${adjustmentType} ${amountDecimal} ${wallet.currency}`,
+      metadata: {
+        restaurantId,
+        restaurantName: restaurant.businessName,
+        adjustmentType,
+        amount: amountDecimal.toString(),
+        reason,
+        newBalance: updatedWallet.availableBalance.toString(),
+      },
+    });
+
+    res.json({
+      message: "Wallet balance adjusted successfully",
+      newBalance: updatedWallet.availableBalance.toString(),
+      currency: wallet.currency,
+    });
+  } catch (error: any) {
+    console.error("Adjust balance error:", error);
+    res.status(500).json({ error: error.message || "Failed to adjust balance" });
+  }
+});
+
 // Get parcel earnings
 router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
