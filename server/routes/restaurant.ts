@@ -5,7 +5,7 @@ import { z } from "zod";
 import { validateRestaurantKYC } from "../utils/kyc-validator";
 import { notifyFoodOrderStatusChange, notifyRestaurantIssueEscalated } from "../utils/notifications";
 import { prisma } from "../db";
-import { auditMenuAction, getClientIp, EntityType } from "../utils/audit";
+import { auditMenuAction, getClientIp, EntityType, logAuditEvent, ActionType } from "../utils/audit";
 
 const router = Router();
 
@@ -2904,6 +2904,509 @@ router.get("/staff/activity-log", requireOwnerRole, async (req: AuthRequest, res
   } catch (error: any) {
     console.error("Get activity log error:", error);
     res.status(500).json({ error: error.message || "Failed to fetch activity log" });
+  }
+});
+
+// ====================================================
+// PHASE 7: PROMOTIONS & COUPONS API
+// ====================================================
+
+// GET /api/restaurant/promotions
+// Get all promotions for restaurant (OWNER-only)
+router.get("/promotions", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, isVerified: true, countryCode: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // KYC gating: Unverified restaurants cannot create/view promotions
+    if (!restaurantProfile.isVerified) {
+      return res.status(403).json({
+        error: "Your restaurant must be verified before accessing promotions",
+        kyc_required: true,
+      });
+    }
+
+    const { status, type } = req.query;
+
+    const where: any = { restaurantId: restaurantProfile.id };
+
+    // Filter by status
+    if (status) {
+      const now = new Date();
+      if (status === "active") {
+        where.isActive = true;
+        where.isFlagged = false;
+        where.startDate = { lte: now };
+        where.endDate = { gte: now };
+      } else if (status === "scheduled") {
+        where.isActive = true;
+        where.startDate = { gt: now };
+      } else if (status === "expired") {
+        where.endDate = { lt: now };
+      }
+    }
+
+    // Filter by type
+    if (type) {
+      where.promoType = type;
+    }
+
+    const promotions = await prisma.promotion.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ promotions });
+  } catch (error: any) {
+    console.error("Get promotions error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch promotions" });
+  }
+});
+
+// POST /api/restaurant/promotions
+// Create a new promotion (OWNER-only, KYC required)
+router.post("/promotions", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, isVerified: true, countryCode: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // KYC gating
+    if (!restaurantProfile.isVerified) {
+      return res.status(403).json({
+        error: "Your restaurant must be verified before creating promotions",
+        kyc_required: true,
+      });
+    }
+
+    const {
+      title,
+      description,
+      promoType,
+      discountValue,
+      discountPercentage,
+      buyQuantity,
+      getQuantity,
+      applicableItems,
+      applicableCategories,
+      minOrderAmount,
+      maxDiscountCap,
+      usageLimitPerCustomer,
+      globalUsageLimit,
+      startDate,
+      endDate,
+      timeWindowStart,
+      timeWindowEnd,
+      isFirstTimeCustomerOnly,
+      isActive,
+    } = req.body;
+
+    // Validate required fields
+    if (!title || !promoType || !startDate || !endDate) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Validate promotion type specific fields
+    if (promoType === "percentage_discount" && !discountPercentage) {
+      return res.status(400).json({ error: "Discount percentage required for percentage discount" });
+    }
+    if (promoType === "fixed_discount" && !discountValue) {
+      return res.status(400).json({ error: "Discount value required for fixed discount" });
+    }
+    if (promoType === "bogo" && (!buyQuantity || !getQuantity)) {
+      return res.status(400).json({ error: "Buy and get quantities required for BOGO promotion" });
+    }
+
+    const promotion = await prisma.promotion.create({
+      data: {
+        restaurantId: restaurantProfile.id,
+        title,
+        description,
+        promoType,
+        discountValue: discountValue ? new Prisma.Decimal(discountValue) : null,
+        discountPercentage: discountPercentage ? new Prisma.Decimal(discountPercentage) : null,
+        buyQuantity,
+        getQuantity,
+        applicableItems,
+        applicableCategories,
+        minOrderAmount: minOrderAmount ? new Prisma.Decimal(minOrderAmount) : null,
+        maxDiscountCap: maxDiscountCap ? new Prisma.Decimal(maxDiscountCap) : null,
+        usageLimitPerCustomer,
+        globalUsageLimit,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        timeWindowStart,
+        timeWindowEnd,
+        isFirstTimeCustomerOnly: isFirstTimeCustomerOnly || false,
+        isActive: isActive !== undefined ? isActive : true,
+        createdByOwnerId: userId,
+      },
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: user.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.CREATE_PROMOTION,
+        entityType: EntityType.PROMOTION,
+        entityId: promotion.id,
+        description: `Created promotion: ${promotion.title}`,
+        metadata: {
+          promotion_id: promotion.id,
+          title: promotion.title,
+          promo_type: promotion.promoType,
+          restaurant_id: restaurantProfile.id,
+        },
+      });
+    }
+
+    res.status(201).json({ promotion });
+  } catch (error: any) {
+    console.error("Create promotion error:", error);
+    res.status(500).json({ error: error.message || "Failed to create promotion" });
+  }
+});
+
+// PATCH /api/restaurant/promotions/:id
+// Update a promotion (OWNER-only)
+router.patch("/promotions/:id", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, isVerified: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check promotion ownership
+    const existingPromotion = await prisma.promotion.findUnique({
+      where: { id },
+    });
+
+    if (!existingPromotion) {
+      return res.status(404).json({ error: "Promotion not found" });
+    }
+
+    if (existingPromotion.restaurantId !== restaurantProfile.id) {
+      return res.status(403).json({ error: "You do not have permission to update this promotion" });
+    }
+
+    const updateData: any = {};
+    const allowedFields = [
+      "title",
+      "description",
+      "discountValue",
+      "discountPercentage",
+      "buyQuantity",
+      "getQuantity",
+      "applicableItems",
+      "applicableCategories",
+      "minOrderAmount",
+      "maxDiscountCap",
+      "usageLimitPerCustomer",
+      "globalUsageLimit",
+      "startDate",
+      "endDate",
+      "timeWindowStart",
+      "timeWindowEnd",
+      "isFirstTimeCustomerOnly",
+      "isActive",
+    ];
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        if (
+          field === "discountValue" ||
+          field === "discountPercentage" ||
+          field === "minOrderAmount" ||
+          field === "maxDiscountCap"
+        ) {
+          updateData[field] = req.body[field] ? new Prisma.Decimal(req.body[field]) : null;
+        } else if (field === "startDate" || field === "endDate") {
+          updateData[field] = new Date(req.body[field]);
+        } else {
+          updateData[field] = req.body[field];
+        }
+      }
+    }
+
+    const updatedPromotion = await prisma.promotion.update({
+      where: { id },
+      data: updateData,
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: user.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.UPDATE_PROMOTION,
+        entityType: EntityType.PROMOTION,
+        entityId: id,
+        description: `Updated promotion: ${updatedPromotion.title}`,
+        metadata: {
+          promotion_id: id,
+          changes: Object.keys(updateData),
+          restaurant_id: restaurantProfile.id,
+        },
+      });
+    }
+
+    res.json({ promotion: updatedPromotion });
+  } catch (error: any) {
+    console.error("Update promotion error:", error);
+    res.status(500).json({ error: error.message || "Failed to update promotion" });
+  }
+});
+
+// DELETE /api/restaurant/promotions/:id
+// Delete (soft delete) a promotion (OWNER-only)
+router.delete("/promotions/:id", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check promotion ownership
+    const existingPromotion = await prisma.promotion.findUnique({
+      where: { id },
+    });
+
+    if (!existingPromotion) {
+      return res.status(404).json({ error: "Promotion not found" });
+    }
+
+    if (existingPromotion.restaurantId !== restaurantProfile.id) {
+      return res.status(403).json({ error: "You do not have permission to delete this promotion" });
+    }
+
+    // Soft delete by setting isActive to false
+    await prisma.promotion.update({
+      where: { id },
+      data: { isActive: false },
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: user.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.DELETE_PROMOTION,
+        entityType: EntityType.PROMOTION,
+        entityId: id,
+        description: `Deleted promotion: ${existingPromotion.title}`,
+        metadata: {
+          promotion_id: id,
+          title: existingPromotion.title,
+          restaurant_id: restaurantProfile.id,
+        },
+      });
+    }
+
+    res.json({ message: "Promotion deleted successfully" });
+  } catch (error: any) {
+    console.error("Delete promotion error:", error);
+    res.status(500).json({ error: error.message || "Failed to delete promotion" });
+  }
+});
+
+// GET /api/restaurant/promotions/coupons
+// Get all coupons for restaurant (OWNER-only)
+router.get("/promotions/coupons", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, isVerified: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // KYC gating
+    if (!restaurantProfile.isVerified) {
+      return res.status(403).json({
+        error: "Your restaurant must be verified before accessing coupons",
+        kyc_required: true,
+      });
+    }
+
+    const coupons = await prisma.coupon.findMany({
+      where: { restaurantId: restaurantProfile.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json({ coupons });
+  } catch (error: any) {
+    console.error("Get coupons error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch coupons" });
+  }
+});
+
+// POST /api/restaurant/promotions/coupons
+// Create a new coupon (OWNER-only, KYC required)
+router.post("/promotions/coupons", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, isVerified: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // KYC gating
+    if (!restaurantProfile.isVerified) {
+      return res.status(403).json({
+        error: "Your restaurant must be verified before creating coupons",
+        kyc_required: true,
+      });
+    }
+
+    const {
+      code,
+      discountType,
+      discountValue,
+      discountPercentage,
+      minOrderAmount,
+      maxDiscountCap,
+      usageLimitPerCustomer,
+      globalUsageLimit,
+      startDate,
+      endDate,
+      isActive,
+      autoGenerate,
+    } = req.body;
+
+    // Auto-generate code if requested
+    let couponCode = code?.toUpperCase();
+    if (autoGenerate) {
+      const { generateCouponCode, isCouponCodeUnique } = await import("../promotions/validationUtils");
+      let attempts = 0;
+      do {
+        couponCode = generateCouponCode();
+        attempts++;
+      } while (!(await isCouponCodeUnique(couponCode, restaurantProfile.id)) && attempts < 10);
+
+      if (attempts >= 10) {
+        return res.status(500).json({ error: "Failed to generate unique coupon code" });
+      }
+    }
+
+    if (!couponCode) {
+      return res.status(400).json({ error: "Coupon code is required" });
+    }
+
+    if (!discountType || !startDate || !endDate) {
+      return res.status(400).json({ error: "Missing required fields" });
+    }
+
+    // Validate discount type specific fields
+    if (discountType === "percentage" && !discountPercentage) {
+      return res.status(400).json({ error: "Discount percentage required for percentage discount" });
+    }
+    if (discountType === "fixed_amount" && !discountValue) {
+      return res.status(400).json({ error: "Discount value required for fixed amount discount" });
+    }
+
+    // Check if code already exists
+    const existing = await prisma.coupon.findFirst({
+      where: {
+        code: couponCode,
+        restaurantId: restaurantProfile.id,
+      },
+    });
+
+    if (existing) {
+      return res.status(400).json({ error: "Coupon code already exists for this restaurant" });
+    }
+
+    const coupon = await prisma.coupon.create({
+      data: {
+        restaurantId: restaurantProfile.id,
+        code: couponCode,
+        discountType,
+        discountValue: discountValue ? new Prisma.Decimal(discountValue) : null,
+        discountPercentage: discountPercentage ? new Prisma.Decimal(discountPercentage) : null,
+        minOrderAmount: minOrderAmount ? new Prisma.Decimal(minOrderAmount) : null,
+        maxDiscountCap: maxDiscountCap ? new Prisma.Decimal(maxDiscountCap) : null,
+        usageLimitPerCustomer,
+        globalUsageLimit,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        isActive: isActive !== undefined ? isActive : true,
+        createdByOwnerId: userId,
+      },
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (user) {
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: user.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.CREATE_COUPON,
+        entityType: EntityType.COUPON,
+        entityId: coupon.id,
+        description: `Created coupon: ${coupon.code}`,
+        metadata: {
+          coupon_id: coupon.id,
+          code: coupon.code,
+          discount_type: coupon.discountType,
+          restaurant_id: restaurantProfile.id,
+        },
+      });
+    }
+
+    res.status(201).json({ coupon });
+  } catch (error: any) {
+    console.error("Create coupon error:", error);
+    res.status(500).json({ error: error.message || "Failed to create coupon" });
   }
 });
 
