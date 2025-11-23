@@ -42,11 +42,16 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { KYCBanner } from "@/components/restaurant/KYCBanner";
 import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertTriangle, BarChart3 } from "lucide-react";
+
+type TimePeriod = 'today' | 'week' | 'month';
 
 export default function RestaurantHome() {
   const { user, logout } = useAuth();
   const [isOnline, setIsOnline] = useState(true);
   const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('today');
   const { toast } = useToast();
 
   const { data: restaurantData, isLoading } = useQuery({
@@ -103,14 +108,52 @@ export default function RestaurantHome() {
   const wallet = (restaurantData as any)?.wallet;
   const orders = ordersData?.orders || [];
 
-  // Calculate KPIs
-  const today = new Date().toDateString();
-  const todayOrders = orders.filter((order: any) => 
-    new Date(order.createdAt).toDateString() === today
+  // Calculate time period boundaries
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const prevWeekStart = new Date(weekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const prevMonthStart = new Date(monthStart.getFullYear(), monthStart.getMonth() - 1, 1);
+
+  // Filter orders by time period
+  const getFilteredOrders = (start: Date) => 
+    orders.filter((order: any) => new Date(order.createdAt) >= start);
+
+  const todayOrders = getFilteredOrders(todayStart);
+  const weekOrders = getFilteredOrders(weekStart);
+  const monthOrders = getFilteredOrders(monthStart);
+  const prevWeekOrders = getFilteredOrders(prevWeekStart).filter((order: any) => 
+    new Date(order.createdAt) < weekStart
   );
-  const todayEarnings = todayOrders.reduce((sum: number, order: any) => 
-    sum + Number(order.restaurantPayout || 0), 0
-  );
+  const prevMonthOrders = orders.filter((order: any) => {
+    const date = new Date(order.createdAt);
+    return date >= prevMonthStart && date < monthStart;
+  });
+
+  // Calculate earnings
+  const calculateEarnings = (ordersList: any[]) =>
+    ordersList.reduce((sum, order) => sum + Number(order.restaurantPayout || 0), 0);
+
+  const todayEarnings = calculateEarnings(todayOrders);
+  const weekEarnings = calculateEarnings(weekOrders);
+  const monthEarnings = calculateEarnings(monthOrders);
+  const prevWeekEarnings = calculateEarnings(prevWeekOrders);
+  const prevMonthEarnings = calculateEarnings(prevMonthOrders);
+
+  // Get current period metrics based on selected time period
+  const currentOrders = timePeriod === 'today' ? todayOrders : 
+                        timePeriod === 'week' ? weekOrders : monthOrders;
+  const currentEarnings = timePeriod === 'today' ? todayEarnings : 
+                          timePeriod === 'week' ? weekEarnings : monthEarnings;
+  const prevEarnings = timePeriod === 'today' ? 0 : // No comparison for today
+                       timePeriod === 'week' ? prevWeekEarnings : prevMonthEarnings;
+
+  // Calculate trend percentages
+  const earningsTrend = prevEarnings > 0 
+    ? ((currentEarnings - prevEarnings) / prevEarnings) * 100 
+    : currentEarnings > 0 ? 100 : 0;
+
   const liveOrders = orders.filter((order: any) => 
     !['delivered', 'cancelled', 'completed'].includes(order.status)
   );
@@ -297,34 +340,76 @@ export default function RestaurantHome() {
         {/* KYC Verification Banner */}
         <KYCBanner />
 
+        {/* R-ENHANCE: Time Period Filter */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Performance Overview</h2>
+          <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
+            <TabsList data-testid="tabs-time-period">
+              <TabsTrigger value="today" data-testid="tab-today">Today</TabsTrigger>
+              <TabsTrigger value="week" data-testid="tab-week">7 Days</TabsTrigger>
+              <TabsTrigger value="month" data-testid="tab-month">30 Days</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {/* Today's Orders */}
+          {/* Orders Count */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Today's Orders</p>
-                  <p className="text-3xl font-bold" data-testid="text-today-orders">
-                    {todayOrders.length || "—"}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground mb-1">
+                    {timePeriod === 'today' ? "Today's Orders" : 
+                     timePeriod === 'week' ? "7-Day Orders" : "30-Day Orders"}
+                  </p>
+                  <p className="text-3xl font-bold" data-testid="text-period-orders">
+                    {currentOrders.length || "—"}
                   </p>
                 </div>
                 <ShoppingBag className="h-8 w-8 text-primary opacity-20" />
               </div>
+              {/* R-ENHANCE: Mini trend bar */}
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: `${Math.min((currentOrders.length / Math.max(currentOrders.length, 10)) * 100, 100)}%` }}
+                />
+              </div>
             </CardContent>
           </Card>
 
-          {/* Today's Earnings */}
+          {/* Earnings with Trend */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Today's Earnings</p>
-                  <p className="text-3xl font-bold text-green-600" data-testid="text-today-earnings">
-                    {todayEarnings > 0 ? `$${todayEarnings.toFixed(2)}` : "—"}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground mb-1">
+                    {timePeriod === 'today' ? "Today's Earnings" : 
+                     timePeriod === 'week' ? "7-Day Earnings" : "30-Day Earnings"}
                   </p>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-bold text-green-600" data-testid="text-period-earnings">
+                      {currentEarnings > 0 ? `$${currentEarnings.toFixed(2)}` : "—"}
+                    </p>
+                    {timePeriod !== 'today' && earningsTrend !== 0 && (
+                      <span 
+                        className={`text-xs font-medium ${earningsTrend > 0 ? 'text-green-600' : 'text-red-600'}`}
+                        data-testid="text-earnings-trend"
+                      >
+                        {earningsTrend > 0 ? '↑' : '↓'} {Math.abs(earningsTrend).toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">After SafeGo fees</p>
                 </div>
                 <DollarSign className="h-8 w-8 text-green-600 opacity-20" />
+              </div>
+              {/* R-ENHANCE: Revenue trend bar */}
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className={`h-full transition-all duration-300 ${earningsTrend >= 0 ? 'bg-green-500' : 'bg-orange-500'}`}
+                  style={{ width: `${Math.min((currentEarnings / Math.max(currentEarnings, prevEarnings, 100)) * 100, 100)}%` }}
+                />
               </div>
             </CardContent>
           </Card>
@@ -332,14 +417,22 @@ export default function RestaurantHome() {
           {/* Active Orders */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground mb-1">Active Orders</p>
                   <p className="text-3xl font-bold text-orange-600" data-testid="text-active-orders">
                     {liveOrders.length || "—"}
                   </p>
+                  <p className="text-xs text-muted-foreground">Needs attention</p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-orange-600 opacity-20" />
+              </div>
+              {/* R-ENHANCE: Active orders indicator */}
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-orange-500 transition-all duration-300"
+                  style={{ width: `${Math.min((liveOrders.length / Math.max(liveOrders.length, 5)) * 100, 100)}%` }}
+                />
               </div>
             </CardContent>
           </Card>
@@ -347,8 +440,8 @@ export default function RestaurantHome() {
           {/* Restaurant Rating */}
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex-1">
                   <p className="text-sm text-muted-foreground mb-1">Restaurant Rating</p>
                   {totalRatings > 0 ? (
                     <>
@@ -368,9 +461,84 @@ export default function RestaurantHome() {
                 </div>
                 <Star className="h-8 w-8 text-yellow-500 opacity-20" />
               </div>
+              {/* R-ENHANCE: Rating visualization */}
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-yellow-500 transition-all duration-300"
+                  style={{ width: `${totalRatings > 0 ? (avgRating / 5) * 100 : 0}%` }}
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* R-ENHANCE: Recent Orders + Alerts Unified Panel */}
+        {liveOrders.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-500" />
+                  Recent Orders & Alerts
+                  <Badge variant="default">{liveOrders.length} active</Badge>
+                </div>
+                <Link href="/restaurant/orders">
+                  <Button variant="outline" size="sm" data-testid="button-view-all-orders">
+                    View All Orders
+                  </Button>
+                </Link>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {liveOrders.slice(0, 3).map((order: any) => {
+                  const isUrgent = order.status === 'placed' && 
+                    (Date.now() - new Date(order.createdAt).getTime()) > 5 * 60 * 1000; // > 5 min
+                  
+                  return (
+                    <div
+                      key={order.id}
+                      className={`border rounded-lg p-3 hover-elevate ${isUrgent ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/20' : ''}`}
+                      data-testid={`recent-order-${order.id}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-semibold text-sm">Order #{order.id.substring(0, 8)}</span>
+                            <Badge variant={getStatusBadgeVariant(order.status)} className="text-xs">
+                              {getStatusLabel(order.status)}
+                            </Badge>
+                            {isUrgent && (
+                              <Badge variant="destructive" className="text-xs" data-testid={`badge-urgent-${order.id}`}>
+                                URGENT
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {getItemsSummary(order.items)} • {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm">${Number(order.serviceFare).toFixed(2)}</span>
+                          <Link href={`/restaurant/orders#${order.id}`}>
+                            <Button size="sm" variant="outline" data-testid={`button-view-order-${order.id}`}>
+                              View
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {liveOrders.length > 3 && (
+                  <p className="text-sm text-muted-foreground text-center pt-2">
+                    +{liveOrders.length - 3} more active orders
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* TWO-COLUMN LAYOUT SHELL */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
