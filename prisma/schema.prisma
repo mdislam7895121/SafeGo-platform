@@ -94,6 +94,7 @@ model CustomerProfile {
   foodOrders            FoodOrder[]
   rides                 Ride[]
   reviews               Review[]         // Phase 8: Customer reviews
+  supportTickets        SupportTicket[]  // Phase 12: Customer support tickets
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -119,6 +120,9 @@ model Delivery {
   taxBreakdown     Json?
   totalTaxAmount   Decimal?         @db.Decimal(10, 2)
   isDemo           Boolean          @default(false)
+  // Phase 12: Support ticket tracking (additive only)
+  supportTicketCount Int?           @default(0)
+  lastSupportStatus  String?        // Latest support ticket status
   createdAt        DateTime         @default(now())
   updatedAt        DateTime
   deliveredAt      DateTime?
@@ -252,6 +256,8 @@ model DriverProfile {
   vehicleDocuments      VehicleDocument[]
   vehicle               Vehicle?
   blockedRiders         BlockedRider[]
+  supportTickets        SupportTicket[] // Phase 12: Driver support tickets
+  financialAdjustments  FinancialAdjustment[] // Phase 12: Financial adjustments
 
   @@map("driver_profiles")
 }
@@ -334,6 +340,9 @@ model FoodOrder {
   appliedPromotionId   String?
   appliedCouponCode    String?
   discountAmount       Decimal?          @db.Decimal(10, 2)
+  // Phase 12: Support ticket tracking (additive only)
+  supportTicketCount   Int?              @default(0)
+  lastSupportStatus    String?           // Latest support ticket status
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
   deliveredAt          DateTime?
@@ -433,6 +442,8 @@ model RestaurantProfile {
   operationalSettings   OperationalSettings? // Phase 10: Delivery & pickup settings
   deliveryZones         DeliveryZone[] // Phase 10: Delivery zones
   surgeSettings         SurgeSettings? // Phase 10: Surge pricing settings
+  supportTickets        SupportTicket[] // Phase 12: Restaurant support tickets
+  financialAdjustments  FinancialAdjustment[] // Phase 12: Financial adjustments
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -582,6 +593,9 @@ model Ride {
   taxBreakdown     Json?
   totalTaxAmount   Decimal?          @db.Decimal(10, 2)
   isDemo           Boolean           @default(false)
+  // Phase 12: Support ticket tracking (additive only)
+  supportTicketCount Int?            @default(0)
+  lastSupportStatus  String?         // Latest support ticket status
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   completedAt      DateTime?
@@ -614,6 +628,8 @@ model User {
   approvalRequestsCreated ApprovalRequest[] @relation("ApprovalRequester")
   approvalRequestsApproved ApprovalRequest[] @relation("ApprovalApprover")
   adminSessions     AdminSession[] @relation("AdminSessions")
+  createdAdjustments FinancialAdjustment[] @relation("CreatedAdjustments")
+  approvedAdjustments FinancialAdjustment[] @relation("ApprovedAdjustments")
 
   @@index([isDemo])
   @@map("users")
@@ -1698,4 +1714,180 @@ model SurgeSettings {
 
   @@index([restaurantId])
   @@map("surge_settings")
+}
+
+// Phase 12: Support Ticket System Enums
+enum TicketServiceType {
+  food_order
+  ride
+  delivery
+}
+
+enum IssueCategory {
+  missing_item
+  wrong_order
+  cold_food
+  late_delivery
+  driver_behavior
+  payment_issue
+  unsafe_driving
+  rude_behavior
+  wrong_route
+  overcharge
+  damaged_package
+  not_delivered
+  app_issue
+  other
+}
+
+enum CustomerVisibleStatus {
+  open
+  in_review
+  awaiting_customer
+  resolved
+  closed
+}
+
+enum InternalStatus {
+  new
+  assigned_restaurant
+  assigned_admin
+  refund_pending
+  refund_approved
+  no_action
+  closed
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+}
+
+enum MessageType {
+  public
+  internal
+}
+
+enum ActorRole {
+  customer
+  restaurant_owner
+  restaurant_staff
+  driver
+  admin
+}
+
+enum AdjustmentType {
+  customer_refund
+  restaurant_debit
+  driver_debit
+  safego_cost
+  goodwill_credit
+}
+
+// Phase 12: Support Ticket System Models
+model SupportTicket {
+  id                      String                 @id @default(uuid())
+  ticketCode              String                 @unique // e.g., "SG-SUP-2025-000123"
+  serviceType             TicketServiceType
+  serviceId               String                 // References food_orders.id, rides.id, or deliveries.id
+  restaurantId            String?                // Nullable for rides/deliveries without restaurant
+  customerId              String
+  driverId                String?
+  countryCode             String
+  cityCode                String?
+  
+  issueCategory           IssueCategory
+  issueDescription        String                 @db.Text
+  photoUrls               Json?                  // Array of photo URLs
+  
+  customerVisibleStatus   CustomerVisibleStatus  @default(open)
+  internalStatus          InternalStatus         @default(new)
+  priority                TicketPriority         @default(medium)
+  originChannel           String                 @default("web") // "app" | "web" | "auto_flag" | "admin_manual"
+  
+  refundRequestedAmount   Decimal?               @db.Decimal(10, 2)
+  refundApprovedAmount    Decimal?               @db.Decimal(10, 2)
+  
+  proposedResolution      String?                // "remake_order" | "offer_coupon" | "request_partial_refund" | "request_full_refund" | "no_issue_found"
+  resolutionNotes         String?                @db.Text
+  
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  resolvedAt              DateTime?
+  
+  customer                CustomerProfile        @relation(fields: [customerId], references: [id])
+  restaurant              RestaurantProfile?     @relation(fields: [restaurantId], references: [id])
+  driver                  DriverProfile?         @relation(fields: [driverId], references: [id])
+  
+  messages                SupportTicketMessage[]
+  financialAdjustments    FinancialAdjustment[]
+
+  @@index([ticketCode])
+  @@index([serviceType])
+  @@index([serviceId])
+  @@index([restaurantId])
+  @@index([customerId])
+  @@index([driverId])
+  @@index([countryCode])
+  @@index([cityCode])
+  @@index([customerVisibleStatus])
+  @@index([internalStatus])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id              String        @id @default(uuid())
+  ticketId        String
+  actorId         String        // References user_id, can be customer, restaurant owner, staff, driver, or admin
+  actorRole       ActorRole
+  messageType     MessageType   @default(public)
+  messageBody     String        @db.Text
+  attachmentUrls  Json?         // Array of attachment URLs
+  
+  createdAt       DateTime      @default(now())
+  
+  ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("support_ticket_messages")
+}
+
+model FinancialAdjustment {
+  id              String          @id @default(uuid())
+  ticketId        String
+  serviceType     TicketServiceType
+  serviceId       String
+  restaurantId    String?
+  driverId        String?
+  
+  adjustmentType  AdjustmentType
+  amount          Decimal         @db.Decimal(10, 2)
+  currency        String          @default("USD")
+  
+  createdByAdminId String
+  approvedByAdminId String?
+  notes           String?         @db.Text
+  
+  createdAt       DateTime        @default(now())
+  approvedAt      DateTime?
+  
+  ticket          SupportTicket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  createdByAdmin  User            @relation("CreatedAdjustments", fields: [createdByAdminId], references: [id])
+  approvedByAdmin User?           @relation("ApprovedAdjustments", fields: [approvedByAdminId], references: [id])
+  restaurant      RestaurantProfile? @relation(fields: [restaurantId], references: [id])
+  driver          DriverProfile?  @relation(fields: [driverId], references: [id])
+
+  @@index([ticketId])
+  @@index([serviceType])
+  @@index([serviceId])
+  @@index([restaurantId])
+  @@index([driverId])
+  @@index([createdByAdminId])
+  @@index([createdAt])
+  @@map("financial_adjustments")
 }
