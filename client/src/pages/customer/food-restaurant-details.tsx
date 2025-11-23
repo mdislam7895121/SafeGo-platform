@@ -1,10 +1,12 @@
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import GalleryModal from "@/components/customer/GalleryModal";
 
 interface MenuItem {
   id: string;
@@ -45,8 +47,29 @@ interface MenuResponse {
   totalItems: number;
 }
 
+interface MediaItem {
+  id: string;
+  url: string;
+  type: string;
+  category: string;
+  displayOrder: number;
+}
+
+interface BrandingResponse {
+  branding: {
+    logoUrl: string | null;
+    coverPhotoUrl: string | null;
+    primaryColor: string | null;
+    secondaryColor: string | null;
+    themeMode: string;
+  };
+  media: MediaItem[];
+}
+
 export default function FoodRestaurantDetails() {
   const { id } = useParams() as { id: string };
+  const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [galleryStartIndex, setGalleryStartIndex] = useState(0);
 
   const { data: restaurantData, isLoading: restaurantLoading, error: restaurantError } = useQuery<RestaurantResponse>({
     queryKey: [`/api/customer/food/restaurants/${id}`],
@@ -58,10 +81,26 @@ export default function FoodRestaurantDetails() {
     retry: 1,
   });
 
+  const { data: brandingData, isLoading: brandingLoading } = useQuery<BrandingResponse>({
+    queryKey: [`/api/customer/food/restaurants/${id}/branding`],
+    retry: 1,
+  });
+
   const restaurant = restaurantData?.restaurant;
   const categories = menuData?.categories || [];
+  const branding = brandingData?.branding;
+  const media = brandingData?.media || [];
   const isLoading = restaurantLoading || menuLoading;
   const error = restaurantError || menuError;
+
+  // Get theme colors with fallback
+  const headerBgColor = branding?.primaryColor || undefined;
+  const headerStyle = headerBgColor ? { backgroundColor: headerBgColor } : {};
+
+  const openGallery = (index: number = 0) => {
+    setGalleryStartIndex(index);
+    setIsGalleryOpen(true);
+  };
 
   if (error) {
     return (
@@ -93,31 +132,87 @@ export default function FoodRestaurantDetails() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Link href="/customer/food">
-            <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-          </Link>
-          <div className="flex-1">
-            {isLoading ? (
-              <Skeleton className="h-8 w-48 bg-primary-foreground/20" />
-            ) : (
-              <>
-                <h1 className="text-2xl font-bold" data-testid="text-restaurant-name">
-                  {restaurant?.name}
-                </h1>
-                <p className="text-sm opacity-90">{restaurant?.cuisineType}</p>
-              </>
-            )}
+      {/* Cover Photo Banner */}
+      {branding?.coverPhotoUrl && (
+        <div className="relative h-48 md:h-64 overflow-hidden">
+          <img
+            src={branding.coverPhotoUrl}
+            alt="Restaurant cover"
+            className="w-full h-full object-cover"
+            data-testid="img-cover-photo"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent" />
+          
+          {/* Back button overlay */}
+          <div className="absolute top-4 left-4">
+            <Link href="/customer/food">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="text-white bg-black/30 hover:bg-black/50"
+                data-testid="button-back"
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
+            </Link>
           </div>
+
+          {/* Logo overlay */}
+          {branding.logoUrl && (
+            <div className="absolute bottom-0 left-6 transform translate-y-1/2">
+              <div className="h-24 w-24 md:h-32 md:w-32 rounded-xl overflow-hidden border-4 border-background bg-background shadow-lg">
+                <img
+                  src={branding.logoUrl}
+                  alt="Restaurant logo"
+                  className="w-full h-full object-cover"
+                  data-testid="img-logo"
+                />
+              </div>
+            </div>
+          )}
         </div>
-      </header>
+      )}
+
+      {/* Header (shown when no cover photo) */}
+      {!branding?.coverPhotoUrl && (
+        <header 
+          className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10"
+          style={headerStyle}
+        >
+          <div className="flex items-center gap-4">
+            <Link href="/customer/food">
+              <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
+            </Link>
+            <div className="flex-1 flex items-center gap-3">
+              {branding?.logoUrl && (
+                <div className="h-12 w-12 rounded-lg overflow-hidden border-2 border-primary-foreground/20">
+                  <img
+                    src={branding.logoUrl}
+                    alt="Restaurant logo"
+                    className="w-full h-full object-cover"
+                    data-testid="img-logo"
+                  />
+                </div>
+              )}
+              {isLoading ? (
+                <Skeleton className="h-8 w-48 bg-primary-foreground/20" />
+              ) : (
+                <div>
+                  <h1 className="text-2xl font-bold" data-testid="text-restaurant-name">
+                    {restaurant?.name}
+                  </h1>
+                  <p className="text-sm opacity-90">{restaurant?.cuisineType}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+      )}
 
       {/* Restaurant Info Card */}
-      <div className="p-6">
+      <div className={`p-6 ${branding?.coverPhotoUrl && branding?.logoUrl ? 'mt-14' : ''}`}>
         {restaurantLoading ? (
           <Card>
             <CardContent className="p-6">
@@ -131,6 +226,11 @@ export default function FoodRestaurantDetails() {
             <CardContent className="p-6">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
+                  {branding?.coverPhotoUrl && (
+                    <h2 className="text-2xl font-bold mb-2" data-testid="text-restaurant-name">
+                      {restaurant.name}
+                    </h2>
+                  )}
                   <Badge variant="secondary" className="mb-2">{restaurant.cuisineType}</Badge>
                   {restaurant.description && (
                     <p className="text-sm text-muted-foreground">{restaurant.description}</p>
@@ -160,6 +260,60 @@ export default function FoodRestaurantDetails() {
           </Card>
         ) : null}
       </div>
+
+      {/* Gallery Section */}
+      {!brandingLoading && media.length > 0 && (
+        <div className="px-6 pb-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Camera className="h-5 w-5" />
+                  Gallery ({media.length} photos)
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openGallery(0)}
+                  data-testid="button-view-all-photos"
+                >
+                  View All
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+                {media.slice(0, 12).map((item, idx) => (
+                  <button
+                    key={item.id}
+                    onClick={() => openGallery(idx)}
+                    className="aspect-square rounded-lg overflow-hidden hover-elevate active-elevate-2"
+                    data-testid={`button-gallery-${idx}`}
+                  >
+                    <img
+                      src={item.url}
+                      alt={`Gallery ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+                {media.length > 12 && (
+                  <button
+                    onClick={() => openGallery(12)}
+                    className="aspect-square rounded-lg bg-muted flex items-center justify-center hover-elevate active-elevate-2"
+                    data-testid="button-view-more"
+                  >
+                    <div className="text-center">
+                      <p className="font-semibold">+{media.length - 12}</p>
+                      <p className="text-xs text-muted-foreground">more</p>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Menu Section */}
       <div className="px-6 pb-6 space-y-6">
@@ -275,6 +429,14 @@ export default function FoodRestaurantDetails() {
           </Card>
         </div>
       )}
+
+      {/* Gallery Modal */}
+      <GalleryModal
+        media={media}
+        initialIndex={galleryStartIndex}
+        isOpen={isGalleryOpen}
+        onClose={() => setIsGalleryOpen(false)}
+      />
     </div>
   );
 }
