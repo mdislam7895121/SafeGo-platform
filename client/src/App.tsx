@@ -584,29 +584,6 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Payouts & Finance */}
-      <Route path="/restaurant/payouts/overview">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantLayout>
-            <PayoutsOverview />
-          </RestaurantLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/restaurant/payouts/history">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantLayout>
-            <PayoutsHistory />
-          </RestaurantLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/restaurant/payouts/bank-info">
-        <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantLayout userRole="OWNER">
-            <PayoutsBankInfo />
-          </RestaurantLayout>
-        </ProtectedRoute>
-      </Route>
-
       {/* Analytics - Phase 4 */}
       <Route path="/restaurant/analytics/overview">
         <ProtectedRoute allowedRoles={["restaurant"]}>

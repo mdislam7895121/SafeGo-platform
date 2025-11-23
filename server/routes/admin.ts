@@ -8307,7 +8307,7 @@ router.post("/payouts/adjust-balance", checkPermission(Permission.MANAGE_PAYOUTS
       actorEmail: req.user!.email,
       actorRole: req.user!.role,
       ipAddress: getClientIp(req),
-      actionType: ActionType.WALLET_ADJUSTMENT,
+      actionType: ActionType.ADJUST_WALLET_BALANCE,
       entityType: EntityType.WALLET,
       description: `Adjusted restaurant wallet balance: ${adjustmentType} ${amountDecimal} ${wallet.currency}`,
       metadata: {
