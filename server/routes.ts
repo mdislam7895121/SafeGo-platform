@@ -16,6 +16,7 @@ import referralSettingsRoutes from "./routes/referral-settings";
 import opportunitySettingsRoutes from "./routes/opportunity-settings";
 import restaurantSettingsRoutes from "./routes/restaurant-settings"; // Phase 10
 import adminRestaurantSettingsRoutes from "./routes/admin-restaurant-settings"; // Phase 10
+import customerRestaurantStatusRoutes from "./routes/customer-restaurant-status"; // Phase 10
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -24,6 +25,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/driver", driverRoutes);
   app.use("/api/customer", customerRoutes);
   app.use("/api/customer/food", customerFoodRoutes);
+  app.use("/api/customer/restaurants", customerRestaurantStatusRoutes); // Phase 10
   app.use("/api/restaurant", restaurantRoutes);
   app.use("/api/restaurant/settings", restaurantSettingsRoutes); // Phase 10
   app.use("/api/admin", adminRoutes);

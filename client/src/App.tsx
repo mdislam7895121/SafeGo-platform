@@ -79,6 +79,7 @@ import PromotionsCoupons from "@/pages/restaurant/promotions-coupons";
 import PromotionsFeatured from "@/pages/restaurant/promotions-featured";
 import RestaurantPayouts from "@/pages/restaurant/payouts";
 import AdminRestaurantPayouts from "@/pages/admin/restaurant-payouts";
+import AdminRestaurantSettings from "@/pages/admin/restaurant-settings";
 import AnalyticsOverview from "@/pages/restaurant/analytics-overview";
 import AnalyticsItems from "@/pages/restaurant/analytics-items";
 import AnalyticsCustomers from "@/pages/restaurant/analytics-customers";
@@ -860,6 +861,11 @@ function Router() {
       <Route path="/admin/restaurants/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminRestaurantDetails />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/restaurants/:id/settings">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminRestaurantSettings />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/complaints">
