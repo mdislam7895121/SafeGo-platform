@@ -93,6 +93,7 @@ model CustomerProfile {
   driverComplaints      DriverComplaint[]
   foodOrders            FoodOrder[]
   rides                 Ride[]
+  reviews               Review[]         // Phase 8: Customer reviews
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -341,6 +342,7 @@ model FoodOrder {
   driver               DriverProfile?    @relation(fields: [driverId], references: [id])
   restaurant           RestaurantProfile @relation(fields: [restaurantId], references: [id])
   appliedPromotion     Promotion?        @relation(fields: [appliedPromotionId], references: [id])
+  review               Review?           // Phase 8: One review per order
 
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt])
@@ -424,6 +426,7 @@ model RestaurantProfile {
   menuItems             MenuItem[]
   promotions            Promotion[]      // Phase 7: Restaurant promotions
   coupons               Coupon[]         // Phase 7: Restaurant coupons
+  reviews               Review[]         // Phase 8: Customer reviews
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -1468,4 +1471,43 @@ enum PromotionType {
 enum CouponDiscountType {
   percentage
   fixed_amount
+}
+
+// ====================================================
+// PHASE 8: Restaurant Review & Rating System
+// ====================================================
+
+model Review {
+  id             String   @id @default(uuid())
+  orderId        String   @unique // One review per order
+  restaurantId   String
+  customerId     String
+  rating         Int      // 1-5 stars
+  reviewText     String?  @db.Text
+  images         String[] // Array of image URLs
+  isHidden       Boolean  @default(false) // Admin hidden
+  hiddenByAdminId String?
+  hiddenAt       DateTime?
+  hideReason     String?  @db.Text
+  isFlagged      Boolean  @default(false) // Admin flagged
+  flaggedByAdminId String?
+  flaggedAt      DateTime?
+  flagReason     String?  @db.Text
+  isDemo         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  order          FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  restaurant     RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customer       CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([rating])
+  @@index([isHidden])
+  @@index([isFlagged])
+  @@index([createdAt])
+  @@index([isDemo])
+  @@map("reviews")
 }
