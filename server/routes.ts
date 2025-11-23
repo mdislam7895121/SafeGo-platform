@@ -21,6 +21,8 @@ import restaurantSettingsRoutes from "./routes/restaurant-settings"; // Phase 10
 import adminRestaurantSettingsRoutes from "./routes/admin-restaurant-settings"; // Phase 10
 import customerRestaurantStatusRoutes from "./routes/customer-restaurant-status"; // Phase 10
 import customerRestaurantPricingRoutes from "./routes/customer-restaurant-pricing"; // Phase 11
+import paymentConfigRoutes from "./routes/payment-config"; // Payment & Payout Configuration
+import restaurantPayoutMethodsRoutes from "./routes/restaurant-payout-methods"; // Payment & Payout Configuration
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -35,6 +37,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/restaurant", restaurantRoutes);
   app.use("/api/restaurant", restaurantSupportRoutes); // Phase 12
   app.use("/api/restaurant/settings", restaurantSettingsRoutes); // Phase 10
+  app.use("/api/restaurants", restaurantPayoutMethodsRoutes); // Payment & Payout Configuration
+  app.use("/api/config", paymentConfigRoutes); // Payment & Payout Configuration
   app.use("/api/admin", adminRoutes);
   app.use("/api/admin", adminSupportRoutes); // Phase 12
   app.use("/api/admin", adminRestaurantSettingsRoutes); // Phase 10
