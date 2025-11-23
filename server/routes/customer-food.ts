@@ -404,28 +404,27 @@ router.get("/restaurants/:id/branding", async (req: AuthRequest, res) => {
       });
     }
 
-    // Get visible media only (not hidden by admin, not flagged)
+    // Get visible media only (not hidden by admin, not flagged, and has valid fileUrl)
     const media = await prisma.restaurantMedia.findMany({
       where: {
         restaurantId: id,
         isHidden: false,
         isFlagged: false,
+        fileUrl: { not: null }, // Only return media with valid signed URLs
       },
       orderBy: {
         displayOrder: 'asc',
       },
       select: {
         id: true,
-        filePath: true,
         fileUrl: true,
         fileType: true,
         category: true,
         displayOrder: true,
-        createdAt: true,
       },
     });
 
-    // Format response (customer-facing only, no admin fields)
+    // Format response (customer-facing only, no admin fields, only signed URLs)
     res.json({
       branding: {
         logoUrl: branding.logoUrl,
@@ -436,7 +435,7 @@ router.get("/restaurants/:id/branding", async (req: AuthRequest, res) => {
       },
       media: media.map((item) => ({
         id: item.id,
-        url: item.fileUrl || item.filePath,
+        url: item.fileUrl!, // Safe to use ! because we filtered for non-null fileUrl
         type: item.fileType,
         category: item.category,
         displayOrder: item.displayOrder,
