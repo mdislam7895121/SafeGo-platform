@@ -6,7 +6,9 @@ import customerRoutes from "./routes/customer";
 import customerFoodRoutes from "./routes/customer-food";
 import customerSupportRoutes from "./routes/customer-support"; // Phase 12
 import restaurantRoutes from "./routes/restaurant";
+import restaurantSupportRoutes from "./routes/restaurant-support"; // Phase 12
 import adminRoutes from "./routes/admin";
+import adminSupportRoutes from "./routes/admin-support"; // Phase 12
 import rideRoutes from "./routes/rides";
 import foodOrderRoutes from "./routes/food-orders";
 import deliveryRoutes from "./routes/deliveries";
@@ -31,8 +33,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/customer/restaurants", customerRestaurantPricingRoutes); // Phase 11
   app.use("/api/customer/support", customerSupportRoutes); // Phase 12
   app.use("/api/restaurant", restaurantRoutes);
+  app.use("/api/restaurant", restaurantSupportRoutes); // Phase 12
   app.use("/api/restaurant/settings", restaurantSettingsRoutes); // Phase 10
   app.use("/api/admin", adminRoutes);
+  app.use("/api/admin", adminSupportRoutes); // Phase 12
   app.use("/api/admin", adminRestaurantSettingsRoutes); // Phase 10
   app.use("/api/admin/referral-settings", referralSettingsRoutes);
   app.use("/api/admin/opportunity-settings", opportunitySettingsRoutes);
