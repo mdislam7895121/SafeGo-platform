@@ -415,7 +415,7 @@ router.get("/menu/categories", async (req: AuthRequest, res) => {
       orderBy: { displayOrder: "asc" },
       include: {
         menuItems: {
-          where: { isActive: true },
+          where: { isArchived: false },
           orderBy: { displayOrder: "asc" },
         },
       },
