@@ -124,6 +124,7 @@ import AdminReferralSettings from "@/pages/admin/referral-settings";
 import AdminReferralSettingsEdit from "@/pages/admin/referral-settings-edit";
 import AdminOpportunityBonuses from "@/pages/admin/opportunity-bonuses";
 import AdminOpportunityBonusesEdit from "@/pages/admin/opportunity-bonuses-edit";
+import AdminReviews from "@/pages/admin/reviews";
 import AdminSupportChat from "@/pages/admin/support-chat";
 import AdminWallets from "@/pages/admin/wallets";
 import AdminWalletDetails from "@/pages/admin/wallet-details";
@@ -876,6 +877,11 @@ function Router() {
       <Route path="/admin/opportunity-bonuses">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminOpportunityBonuses />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/reviews">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminReviews />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-chat">
