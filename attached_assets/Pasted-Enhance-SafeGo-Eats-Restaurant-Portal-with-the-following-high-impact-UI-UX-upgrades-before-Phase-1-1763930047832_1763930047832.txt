@@ -1,0 +1,63 @@
+Enhance SafeGo Eats (Restaurant Portal) with the following high-impact UI/UX upgrades before Phase 13:
+
+PHASE: R-ENHANCE HIGH IMPACT (Option B)
+
+1. RESTAURANT HEADER PROFESSIONAL REDESIGN
+   - Modern Uber Eats style layout
+   - Fix alignment spacing, vertical centering, horizontal spacing
+   - Improve status badge (Verified & Active)
+   - Order receiving toggle redesigned (bigger, clearer)
+   - Restaurant name + ID column alignment
+   - Search bar full-width behavior
+   - Notification icon + unread badge correct alignment
+   - Owner menu dropdown modern UI
+   - Sticky header behavior on scroll
+
+2. RESPONSIVE FIXES (MOBILE + TABLET + LAPTOP)
+   - Proper breakpoints for all restaurant pages:
+     Dashboard, Orders, Menu, Promotions, Finance, Settings
+   - Fix font scaling, spacing, icon resizing
+   - Fix overflow issues, cut-off content, misaligned columns
+   - Cards stack correctly on mobile
+   - Sidebar auto-collapse behavior for smaller screens
+
+3. SEARCH + NOTIFICATION PANEL UX IMPROVEMENT
+   - Search bar unified style across all pages
+   - Notification panel dropdown redesigned
+   - Badge count repositioned correctly
+   - Smooth animation for open/close
+   - Ensure accessibility labels added
+
+4. GENERAL LAYOUT CLEANUP
+   - Normalize margins, paddings, gutters
+   - Remove irregular empty space
+   - Improve button styles (consistent radius, hover state)
+   - Card shadows + borders consistent across the UI
+   - Fix alignment for:
+       • Today's Orders panel
+       • Earnings panel
+       • Ratings summary
+       • Wallet & Earnings section
+
+5. SUPPORT PAGES POLISHING
+   - Ticket list alignment cleanup
+   - Status badges redesigned (Open, In-Progress, Resolved)
+   - Conversation thread bubble redesign (chat style)
+   - Fix reply box alignment and spacing
+   - Add loading states + empty state illustrations
+
+SECURITY & STABILITY REQUIREMENTS
+   - No breaking changes to backend endpoints
+   - Preserve all KYC + RBAC enforcement
+   - Maintain all existing audit logging triggers
+   - No change in database schema
+   - Strict type-safe UI changes only
+
+DELIVERABLES
+   - Rebuilt responsive header
+   - Fixed layout on all restaurant pages
+   - Polished support UI
+   - Updated components & styles
+   - Completed testing across 3 breakpoints (mobile / tab / laptop)
+
+After completing all tasks, show a summary with screenshots and confirm readiness for Phase 13 (Mobile App Architecture).

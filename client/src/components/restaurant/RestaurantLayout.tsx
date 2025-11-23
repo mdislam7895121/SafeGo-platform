@@ -32,6 +32,7 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
 
   const profile = (restaurantData as any)?.profile;
   const restaurantName = profile?.restaurantName || "SafeGo Restaurant";
+  const restaurantId = profile?.id;
   const actualOwnerRole = profile?.ownerRole || "OWNER"; // Default to OWNER for backward compatibility
 
   // Detect desktop vs mobile/tablet (must be before any conditional returns)
@@ -92,6 +93,7 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
       />
       <RestaurantTopNav
         restaurantName={restaurantName}
+        restaurantId={restaurantId}
         isOpen={isOpen}
         onToggleStatus={setIsOpen}
         sidebarCollapsed={sidebarCollapsed}
