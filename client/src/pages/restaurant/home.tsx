@@ -53,7 +53,7 @@ export default function RestaurantHome() {
   });
 
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ["/api/restaurant/orders?limit=50"],
+    queryKey: ["/api/restaurant/orders"],
     refetchInterval: 10000, // Poll every 10 seconds for live updates
   });
 
