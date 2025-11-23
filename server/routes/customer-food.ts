@@ -92,7 +92,7 @@ router.get("/restaurants", async (req: AuthRequest, res) => {
     });
 
     // Format response (customer-facing only, no internal fields)
-    const formattedRestaurants = restaurants.map(restaurant => ({
+    const formattedRestaurants = restaurants.map((restaurant: typeof restaurants[0]) => ({
       id: restaurant.id,
       name: restaurant.restaurantName,
       cuisineType: restaurant.cuisineType || 'Not specified',
@@ -296,11 +296,11 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
     });
 
     // Format response (customer-facing only)
-    const formattedCategories = categories.map(category => ({
+    const formattedCategories = categories.map((category: typeof categories[0]) => ({
       id: category.id,
       name: category.name,
       description: category.description || '',
-      items: category.menuItems.map(item => ({
+      items: category.menuItems.map((item: typeof category.menuItems[0]) => ({
         id: item.id,
         name: item.name,
         description: item.description || '',
@@ -315,7 +315,7 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
       restaurantName: restaurant.restaurantName,
       categories: formattedCategories,
       totalCategories: formattedCategories.length,
-      totalItems: formattedCategories.reduce((sum, cat) => sum + cat.items.length, 0),
+      totalItems: formattedCategories.reduce((sum: number, cat: typeof formattedCategories[0]) => sum + cat.items.length, 0),
     });
   } catch (error) {
     console.error("[Customer Food] Get restaurant menu error:", error);
