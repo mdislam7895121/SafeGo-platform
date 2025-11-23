@@ -2253,4 +2253,138 @@ router.delete("/menu/options/:id", requireKYCCompletion, requireOwnerRole, async
   }
 });
 
+// ============================================================================
+// ANALYTICS ENDPOINTS - Phase 4
+// ============================================================================
+
+import {
+  getOverviewAnalytics,
+  getItemAnalytics,
+  getCustomerAnalytics,
+  getDriverAnalytics,
+} from "../analytics/restaurantAnalytics";
+
+// Date range filter schema
+const dateRangeSchema = z.object({
+  startDate: z.string().transform((str) => new Date(str)),
+  endDate: z.string().transform((str) => new Date(str)),
+});
+
+// GET /api/restaurant/analytics/overview - Overview metrics
+router.get("/analytics/overview", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Default to last 30 days
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    const filters = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : startDate,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : endDate,
+    };
+
+    const metrics = await getOverviewAnalytics(restaurantProfile.id, filters);
+    res.json(metrics);
+  } catch (error) {
+    console.error("Overview analytics error:", error);
+    res.status(500).json({ error: "Failed to fetch overview analytics" });
+  }
+});
+
+// GET /api/restaurant/analytics/items - Item performance analytics
+router.get("/analytics/items", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    const filters = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : startDate,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : endDate,
+    };
+
+    const analytics = await getItemAnalytics(restaurantProfile.id, filters);
+    res.json(analytics);
+  } catch (error) {
+    console.error("Item analytics error:", error);
+    res.status(500).json({ error: "Failed to fetch item analytics" });
+  }
+});
+
+// GET /api/restaurant/analytics/customers - Customer analytics
+router.get("/analytics/customers", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    const filters = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : startDate,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : endDate,
+    };
+
+    const analytics = await getCustomerAnalytics(restaurantProfile.id, filters);
+    res.json(analytics);
+  } catch (error) {
+    console.error("Customer analytics error:", error);
+    res.status(500).json({ error: "Failed to fetch customer analytics" });
+  }
+});
+
+// GET /api/restaurant/analytics/drivers - Driver performance analytics
+router.get("/analytics/drivers", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    const filters = {
+      startDate: req.query.startDate ? new Date(req.query.startDate as string) : startDate,
+      endDate: req.query.endDate ? new Date(req.query.endDate as string) : endDate,
+    };
+
+    const analytics = await getDriverAnalytics(restaurantProfile.id, filters);
+    res.json(analytics);
+  } catch (error) {
+    console.error("Driver analytics error:", error);
+    res.status(500).json({ error: "Failed to fetch driver analytics" });
+  }
+});
+
 export default router;
