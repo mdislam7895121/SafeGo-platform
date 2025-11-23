@@ -97,6 +97,8 @@ import SupportStatus from "@/pages/restaurant/support-status";
 import RestaurantProfile from "@/pages/restaurant/profile";
 import RestaurantSupport from "@/pages/restaurant/support";
 import RestaurantWallet from "@/pages/restaurant/wallet";
+import StaffManagement from "@/pages/restaurant/staff";
+import StaffActivity from "@/pages/restaurant/staff-activity";
 
 // Admin pages
 import AdminHome from "@/pages/admin/home";
@@ -619,6 +621,22 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <RestaurantPayouts />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Staff Management - Phase 6 (OWNER only) */}
+      <Route path="/restaurant/staff/activity">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <StaffActivity />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/staff">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <StaffManagement />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>

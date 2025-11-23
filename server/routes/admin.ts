@@ -9214,6 +9214,201 @@ router.get("/points/drivers", checkPermission(Permission.VIEW_DRIVERS), async (r
 });
 
 // ====================================================
+// STAFF MANAGEMENT SYSTEM (Phase 6)
+// ====================================================
+
+// GET /api/admin/staff - Get all restaurant staff across platform
+router.get("/staff", checkPermission(Permission.VIEW_RESTAURANT_PROFILES), async (req: AuthRequest, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
+    const skip = (page - 1) * limit;
+    const restaurantId = req.query.restaurantId as string | undefined;
+    const status = req.query.status as string | undefined;
+
+    const where: any = {
+      ownerRole: "STAFF",
+    };
+
+    if (restaurantId) {
+      where.managedByOwnerId = restaurantId;
+    }
+
+    if (status === "active") {
+      where.staffActive = true;
+    } else if (status === "blocked") {
+      where.staffActive = false;
+    }
+
+    const [staff, total] = await Promise.all([
+      prisma.restaurantProfile.findMany({
+        where,
+        take: limit,
+        skip,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+              phone: true,
+              role: true,
+              isDemo: true,
+            },
+          },
+        },
+      }),
+      prisma.restaurantProfile.count({ where }),
+    ]);
+
+    res.json({
+      staff,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error: any) {
+    console.error("Admin get staff error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch staff" });
+  }
+});
+
+// GET /api/admin/staff/:id - Get specific staff member details
+router.get("/staff/:id", checkPermission(Permission.VIEW_RESTAURANT_PROFILES), async (req: AuthRequest, res) => {
+  try {
+    const { id: staffId } = req.params;
+
+    const staff = await prisma.restaurantProfile.findUnique({
+      where: { id: staffId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            role: true,
+            isDemo: true,
+          },
+        },
+      },
+    });
+
+    if (!staff) {
+      return res.status(404).json({ error: "Staff member not found" });
+    }
+
+    if (staff.ownerRole !== "STAFF") {
+      return res.status(400).json({ error: "User is not a staff member" });
+    }
+
+    // Get owner information
+    let ownerInfo = null;
+    if (staff.managedByOwnerId) {
+      ownerInfo = await prisma.restaurantProfile.findUnique({
+        where: { id: staff.managedByOwnerId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              name: true,
+            },
+          },
+        },
+      });
+    }
+
+    res.json({ staff, ownerInfo });
+  } catch (error: any) {
+    console.error("Admin get staff details error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch staff details" });
+  }
+});
+
+// POST /api/admin/staff/:id/block - Block or unblock a staff member (admin action)
+router.post(
+  "/staff/:id/block",
+  checkPermission(Permission.MANAGE_RESTAURANT_PROFILES),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id: staffId } = req.params;
+      const { block, reason } = req.body;
+      const adminId = req.user!.userId;
+
+      const staff = await prisma.restaurantProfile.findUnique({
+        where: { id: staffId },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (!staff) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      if (staff.ownerRole !== "STAFF") {
+        return res.status(400).json({ error: "User is not a staff member" });
+      }
+
+      // Update staff status
+      const updatedStaff = await prisma.restaurantProfile.update({
+        where: { id: staffId },
+        data: {
+          staffActive: !block,
+        },
+      });
+
+      // Create notification for staff member
+      await prisma.notification.create({
+        data: {
+          userId: updatedStaff.userId,
+          type: "alert",
+          title: block ? "Account Suspended by Admin" : "Account Activated by Admin",
+          body: block
+            ? `Your staff account has been suspended by administration. ${reason ? `Reason: ${reason}` : ""}`
+            : "Your staff account has been activated by administration. You can now log in.",
+        },
+      });
+
+      // Log admin action
+      await logAudit({
+        action: `${block ? "Blocked" : "Unblocked"} staff member ${staff.user.name} (${staff.user.email})${reason ? `. Reason: ${reason}` : ""}`,
+        actionType: block ? ActionType.BLOCK_STAFF : ActionType.UNBLOCK_STAFF,
+        actorId: adminId,
+        targetId: staffId,
+        targetType: "staff",
+        metadata: {
+          staffId,
+          staffName: staff.user.name,
+          staffEmail: staff.user.email,
+          block,
+          reason,
+        },
+      });
+
+      res.json({
+        message: `Staff member ${block ? "blocked" : "unblocked"} successfully`,
+        staff: updatedStaff,
+      });
+    } catch (error: any) {
+      console.error("Admin block staff error:", error);
+      res.status(500).json({ error: error.message || "Failed to block/unblock staff member" });
+    }
+  }
+);
+
+// ====================================================
 // Mount Analytics Routes
 // ====================================================
 router.use("/analytics", analyticsRouter);

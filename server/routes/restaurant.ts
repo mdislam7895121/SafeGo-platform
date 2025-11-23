@@ -153,6 +153,7 @@ router.get("/home", async (req: AuthRequest, res) => {
         verificationStatus: restaurantProfile.verificationStatus,
         isVerified: restaurantProfile.isVerified,
         rejectionReason: restaurantProfile.rejectionReason,
+        ownerRole: restaurantProfile.ownerRole || "OWNER", // Phase 6: Include owner role for RBAC
       },
       wallet: restaurantProfile.restaurantWallet ? {
         balance: restaurantProfile.restaurantWallet.balance,

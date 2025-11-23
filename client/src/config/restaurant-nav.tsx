@@ -142,6 +142,24 @@ export const restaurantNavigation: NavItem[] = [
     ]
   },
   {
+    label: "Staff Management",
+    icon: Users,
+    section: "staff",
+    requiredRole: ["OWNER"],
+    children: [
+      {
+        label: "Staff Members",
+        icon: Users,
+        path: "/restaurant/staff"
+      },
+      {
+        label: "Activity Log",
+        icon: Activity,
+        path: "/restaurant/staff/activity"
+      }
+    ]
+  },
+  {
     label: "Insights & Analytics",
     icon: TrendingUp,
     section: "analytics",
