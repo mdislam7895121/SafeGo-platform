@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
+import { z } from "zod";
+import { validatePromotion, validateCoupon } from "../promotions/validationUtils";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -372,6 +374,96 @@ router.get("/notifications", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Get notifications error:", error);
     res.status(500).json({ error: "Failed to fetch notifications" });
+  }
+});
+
+// ====================================================
+// POST /api/customer/promotions/validate
+// Validate a promotion or coupon for a specific order
+// ====================================================
+router.post("/promotions/validate", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Input validation
+    const schema = z.object({
+      couponCode: z.string().optional(),
+      promotionId: z.string().uuid().optional(),
+      restaurantId: z.string().uuid(),
+      subtotal: z.number().positive(),
+      itemIds: z.array(z.string().uuid()).optional(),
+    }).refine(data => data.couponCode || data.promotionId, {
+      message: "Either couponCode or promotionId must be provided",
+    });
+
+    const validationResult = schema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Invalid input",
+        details: validationResult.error.errors,
+      });
+    }
+
+    const { couponCode, promotionId, restaurantId, subtotal, itemIds } = validationResult.data;
+
+    let discountAmount = 0;
+    let validationError: string | undefined;
+    let appliedPromotionId: string | undefined;
+    let appliedCouponCode: string | undefined;
+
+    // Validate coupon if provided
+    if (couponCode) {
+      const couponResult = await validateCoupon(
+        couponCode,
+        restaurantId,
+        userId,
+        subtotal,
+        itemIds
+      );
+
+      if (couponResult.valid) {
+        discountAmount = couponResult.discountAmount;
+        appliedCouponCode = couponCode;
+      } else {
+        validationError = couponResult.error;
+      }
+    }
+    // Validate promotion if provided
+    else if (promotionId) {
+      const promotionResult = await validatePromotion(
+        promotionId,
+        restaurantId,
+        userId,
+        subtotal,
+        itemIds
+      );
+
+      if (promotionResult.valid) {
+        discountAmount = promotionResult.discountAmount;
+        appliedPromotionId = promotionId;
+      } else {
+        validationError = promotionResult.error;
+      }
+    }
+
+    // Return validation result
+    if (validationError) {
+      return res.status(400).json({
+        valid: false,
+        error: validationError,
+      });
+    }
+
+    res.json({
+      valid: true,
+      discountAmount: Number(discountAmount.toFixed(2)),
+      appliedPromotionId,
+      appliedCouponCode,
+      message: "Promotion applied successfully",
+    });
+  } catch (error: any) {
+    console.error("Validate promotion error:", error);
+    res.status(500).json({ error: error.message || "Failed to validate promotion" });
   }
 });
 
