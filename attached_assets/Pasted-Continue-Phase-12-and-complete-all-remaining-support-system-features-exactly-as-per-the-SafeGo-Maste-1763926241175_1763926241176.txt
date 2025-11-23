@@ -1,0 +1,70 @@
+Continue Phase 12 and complete all remaining support system features exactly as per the SafeGo Master Rules.
+
+Finish the remaining tasks:
+
+1. Restaurant Support Backend
+   • Fix schema mapping issues
+   • Complete all 5 restaurant support endpoints
+   • Enforce restaurant_id scoping
+   • OWNER vs STAFF permission separation (CAN_REPLY_SUPPORT)
+
+2. Admin Support Backend
+   • Implement 5 admin support endpoints
+   • Full RBAC enforcement (ADMIN only)
+   • Ticket assignment logic (assign to driver or restaurant)
+   • Status transition control with audit logging
+
+3. Restaurant Support Dashboard UI
+   • Ticket list with filters (open, in_review, awaiting_customer, resolved)
+   • Ticket detail + reply interface
+   • Attachments with signed URLs
+   • Mask customer identity fields (per Security Rules)
+   • Status badges + timeline
+
+4. Admin Support Center UI
+   • Global ticket list with filters by service (ride, food, parcel)
+   • Ticket assignment panel
+   • Status update actions
+   • Conversation view with role-tagged messages
+   • Full audit trail display
+
+5. Extend Customer UI to support rides + parcels
+   • “Report Issue” for ride_id and delivery_id
+   • Ticket list filter by service type
+   • Ticket detail with conversation thread
+
+6. Notification System Integration
+   • Notify customer, driver, restaurant, admin on:
+       - new ticket
+       - new reply
+       - assignment
+       - status change
+   • Use global notification model already in the system
+
+7. Financial Adjustment Logic
+   • If ticket leads to refund/adjustment:
+       - Cash ride refund → driver negative balance
+       - Cash food refund → restaurant negative balance
+       - Online payment refund → platform auto-adjusts
+   • Admin approval required with audit logging
+
+8. Full Testing & data-testid coverage
+   • All UI components
+   • All endpoints
+   • Error/loading states
+   • RBAC/KYC gating
+
+All changes must remain:
+• Fully additive
+• Non-breaking with Phases 1–11
+• Fully aligned with SafeGo global rules:
+   - Country-specific KYC (BD/US)
+   - 4 roles (Customer/Driver/Restaurant/Admin)
+   - All 3 services (Ride/Food/Parcel)
+   - Wallet/commission rules
+   - Strict security: no document leakage
+   - Signed URLs only
+   - Full audit logging
+   - Status flow enforcement for support tickets
+
+Proceed until Phase 12 is fully complete and production-ready.

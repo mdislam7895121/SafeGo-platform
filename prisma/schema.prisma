@@ -419,6 +419,7 @@ model RestaurantProfile {
   canViewAnalytics      Boolean            @default(false)
   canViewPayouts        Boolean            @default(false)
   canManageOrders       Boolean            @default(false)
+  canReplySupport       Boolean            @default(false) // Phase 12: Can view and reply to support tickets
   staffActive           Boolean            @default(true)
   managedByOwnerId      String?            // Restaurant ID of the OWNER who manages this STAFF
   lastLoginAt           DateTime?

@@ -9,6 +9,30 @@ router.use(authenticateToken);
 router.use(requireRole(["restaurant"]));
 
 /**
+ * Helper function to check if restaurant user has support access
+ * OWNER: Full access always (including null/undefined ownerRole for backward compatibility)
+ * STAFF: Only if canReplySupport = true, staffActive = true, and not suspended
+ */
+function checkSupportAccess(profile: any, requireOwner: boolean = false): boolean {
+  // OWNER always has full access (treat null/undefined as OWNER for backward compatibility)
+  if (!profile.ownerRole || profile.ownerRole === "OWNER") {
+    return true;
+  }
+  
+  // If OWNER role is required, deny STAFF
+  if (requireOwner) {
+    return false;
+  }
+  
+  // STAFF must have permission and be active
+  if (profile.ownerRole === "STAFF") {
+    return profile.canReplySupport && profile.staffActive && !profile.isSuspended;
+  }
+  
+  return false;
+}
+
+/**
  * GET /api/restaurant/support/tickets
  * List support tickets related to restaurant's food orders
  */
@@ -24,7 +48,10 @@ router.get("/support/tickets", async (req: AuthRequest, res: Response) => {
         isVerified: true,
         verificationStatus: true,
         restaurantName: true,
-        ownerRole: true
+        ownerRole: true,
+        canReplySupport: true,
+        staffActive: true,
+        isSuspended: true
       }
     });
 
@@ -36,6 +63,13 @@ router.get("/support/tickets", async (req: AuthRequest, res: Response) => {
     if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
       return res.status(403).json({ 
         error: "Restaurant verification required to access support system" 
+      });
+    }
+
+    // Check support access permission (OWNER or STAFF+canReplySupport)
+    if (!checkSupportAccess(restaurantProfile, false)) {
+      return res.status(403).json({ 
+        error: "You do not have permission to access support tickets. Please contact the restaurant owner." 
       });
     }
 
@@ -131,12 +165,28 @@ router.get("/support/tickets/:id", async (req: AuthRequest, res: Response) => {
     const restaurantProfile = await prisma.restaurantProfile.findUnique({
       where: { userId },
       select: {
-        id: true
+        id: true,
+        ownerRole: true,
+        canReplySupport: true,
+        staffActive: true,
+        isSuspended: true,
+        isVerified: true,
+        verificationStatus: true
       }
     });
 
     if (!restaurantProfile) {
       return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify KYC
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ error: "Restaurant verification required" });
+    }
+
+    // Check support access permission
+    if (!checkSupportAccess(restaurantProfile, false)) {
+      return res.status(403).json({ error: "You do not have permission to access support tickets" });
     }
 
     // Get ticket (DO NOT include customer relation to prevent privacy leaks)
@@ -224,7 +274,12 @@ router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Respo
         select: {
           id: true,
           restaurantName: true,
-          ownerRole: true
+          ownerRole: true,
+          canReplySupport: true,
+          staffActive: true,
+          isSuspended: true,
+          isVerified: true,
+          verificationStatus: true
         }
       }),
       prisma.user.findUnique({
@@ -239,6 +294,16 @@ router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Respo
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify KYC
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ error: "Restaurant verification required" });
+    }
+
+    // Check support access permission (can view and reply)
+    if (!checkSupportAccess(restaurantProfile, false)) {
+      return res.status(403).json({ error: "You do not have permission to reply to support tickets" });
     }
 
     // Get ticket
@@ -337,7 +402,12 @@ router.patch("/support/tickets/:id/status", async (req: AuthRequest, res: Respon
         select: {
           id: true,
           restaurantName: true,
-          ownerRole: true
+          ownerRole: true,
+          canReplySupport: true,
+          staffActive: true,
+          isSuspended: true,
+          isVerified: true,
+          verificationStatus: true
         }
       }),
       prisma.user.findUnique({
@@ -352,6 +422,16 @@ router.patch("/support/tickets/:id/status", async (req: AuthRequest, res: Respon
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify KYC
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ error: "Restaurant verification required" });
+    }
+
+    // Status update requires OWNER role only
+    if (!checkSupportAccess(restaurantProfile, true)) {
+      return res.status(403).json({ error: "Only restaurant owners can update ticket status" });
     }
 
     // Check permission (only OWNER can change status)
@@ -430,6 +510,7 @@ router.patch("/support/tickets/:id/status", async (req: AuthRequest, res: Respon
 /**
  * POST /api/restaurant/support/tickets/:id/proposed-resolution
  * Propose a resolution (refund, replacement, etc) - requires admin approval
+ * OWNER ONLY - requires elevated permission
  */
 router.post("/support/tickets/:id/proposed-resolution", async (req: AuthRequest, res: Response) => {
   try {
@@ -444,7 +525,12 @@ router.post("/support/tickets/:id/proposed-resolution", async (req: AuthRequest,
         select: {
           id: true,
           restaurantName: true,
-          ownerRole: true
+          ownerRole: true,
+          canReplySupport: true,
+          staffActive: true,
+          isSuspended: true,
+          isVerified: true,
+          verificationStatus: true
         }
       }),
       prisma.user.findUnique({
@@ -461,10 +547,14 @@ router.post("/support/tickets/:id/proposed-resolution", async (req: AuthRequest,
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Check permission (only OWNER can propose resolution)
-    const role = restaurantProfile.ownerRole || "OWNER";
-    if (role !== "OWNER") {
-      return res.status(403).json({ error: "Only restaurant owner can propose resolution" });
+    // Verify KYC
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ error: "Restaurant verification required" });
+    }
+
+    // Proposing resolution requires OWNER role only
+    if (!checkSupportAccess(restaurantProfile, true)) {
+      return res.status(403).json({ error: "Only restaurant owners can propose resolutions" });
     }
 
     // Validate input
