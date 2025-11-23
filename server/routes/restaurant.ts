@@ -551,185 +551,6 @@ router.delete("/menu/categories/:id", async (req: AuthRequest, res) => {
   }
 });
 
-// GET /api/restaurant/menu/items
-// Get all menu items for restaurant
-router.get("/menu/items", async (req: AuthRequest, res) => {
-  try {
-    const userId = req.user!.userId;
-
-    const restaurantProfile = await prisma.restaurantProfile.findUnique({
-      where: { userId },
-    });
-
-    if (!restaurantProfile) {
-      return res.status(404).json({ error: "Restaurant profile not found" });
-    }
-
-    const items = await prisma.menuItem.findMany({
-      where: { restaurantId: restaurantProfile.id },
-      include: { category: true },
-      orderBy: [{ categoryId: "asc" }, { displayOrder: "asc" }],
-    });
-
-    res.json({ items });
-  } catch (error) {
-    console.error("Get menu items error:", error);
-    res.status(500).json({ error: "Failed to fetch menu items" });
-  }
-});
-
-// POST /api/restaurant/menu/items
-// Create new menu item
-router.post("/menu/items", async (req: AuthRequest, res) => {
-  try {
-    const userId = req.user!.userId;
-    const { categoryId, name, description, price, imageUrl, displayOrder, isAvailable } = req.body;
-
-    const schema = z.object({
-      categoryId: z.string().uuid(),
-      name: z.string().min(1).max(200),
-      description: z.string().optional(),
-      price: z.number().positive(),
-      imageUrl: z.string().url().optional(),
-      displayOrder: z.number().int().optional(),
-      isAvailable: z.boolean().optional(),
-    });
-
-    const validation = schema.safeParse(req.body);
-    if (!validation.success) {
-      return res.status(400).json({
-        error: "Validation failed",
-        details: validation.error.errors,
-      });
-    }
-
-    const restaurantProfile = await prisma.restaurantProfile.findUnique({
-      where: { userId },
-    });
-
-    if (!restaurantProfile) {
-      return res.status(404).json({ error: "Restaurant profile not found" });
-    }
-
-    // Verify category ownership
-    const category = await prisma.menuCategory.findFirst({
-      where: { id: categoryId, restaurantId: restaurantProfile.id },
-    });
-
-    if (!category) {
-      return res.status(404).json({ error: "Category not found or access denied" });
-    }
-
-    const item = await prisma.menuItem.create({
-      data: {
-        restaurantId: restaurantProfile.id,
-        categoryId,
-        name,
-        description: description || null,
-        price,
-        imageUrl: imageUrl || null,
-        displayOrder: displayOrder || 0,
-        isAvailable: isAvailable !== undefined ? isAvailable : true,
-        isActive: true,
-      },
-    });
-
-    res.status(201).json({ item });
-  } catch (error) {
-    console.error("Create menu item error:", error);
-    res.status(500).json({ error: "Failed to create menu item" });
-  }
-});
-
-// PATCH /api/restaurant/menu/items/:id
-// Update menu item
-router.patch("/menu/items/:id", async (req: AuthRequest, res) => {
-  try {
-    const userId = req.user!.userId;
-    const { id } = req.params;
-    const { name, description, price, imageUrl, displayOrder, isAvailable, isActive, categoryId } = req.body;
-
-    const restaurantProfile = await prisma.restaurantProfile.findUnique({
-      where: { userId },
-    });
-
-    if (!restaurantProfile) {
-      return res.status(404).json({ error: "Restaurant profile not found" });
-    }
-
-    // Verify ownership
-    const item = await prisma.menuItem.findFirst({
-      where: { id, restaurantId: restaurantProfile.id },
-    });
-
-    if (!item) {
-      return res.status(404).json({ error: "Menu item not found" });
-    }
-
-    const updateData: any = {};
-    if (name) updateData.name = name;
-    if (description !== undefined) updateData.description = description;
-    if (price !== undefined) updateData.price = price;
-    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
-    if (displayOrder !== undefined) updateData.displayOrder = displayOrder;
-    if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    if (categoryId) {
-      // Verify new category ownership
-      const category = await prisma.menuCategory.findFirst({
-        where: { id: categoryId, restaurantId: restaurantProfile.id },
-      });
-      if (!category) {
-        return res.status(404).json({ error: "Category not found or access denied" });
-      }
-      updateData.categoryId = categoryId;
-    }
-
-    const updatedItem = await prisma.menuItem.update({
-      where: { id },
-      data: updateData,
-    });
-
-    res.json({ item: updatedItem });
-  } catch (error) {
-    console.error("Update menu item error:", error);
-    res.status(500).json({ error: "Failed to update menu item" });
-  }
-});
-
-// DELETE /api/restaurant/menu/items/:id
-// Delete menu item
-router.delete("/menu/items/:id", async (req: AuthRequest, res) => {
-  try {
-    const userId = req.user!.userId;
-    const { id } = req.params;
-
-    const restaurantProfile = await prisma.restaurantProfile.findUnique({
-      where: { userId },
-    });
-
-    if (!restaurantProfile) {
-      return res.status(404).json({ error: "Restaurant profile not found" });
-    }
-
-    // Verify ownership
-    const item = await prisma.menuItem.findFirst({
-      where: { id, restaurantId: restaurantProfile.id },
-    });
-
-    if (!item) {
-      return res.status(404).json({ error: "Menu item not found" });
-    }
-
-    await prisma.menuItem.delete({ where: { id } });
-
-    res.json({ message: "Menu item deleted successfully" });
-  } catch (error) {
-    console.error("Delete menu item error:", error);
-    res.status(500).json({ error: "Failed to delete menu item" });
-  }
-});
-
 // ====================================================
 // RESTAURANT ORDER MANAGEMENT API
 // ====================================================
@@ -1372,7 +1193,7 @@ router.post("/menu/categories", requireKYCCompletion, requireOwnerRole, async (r
       name: z.string().min(1).max(100),
       description: z.string().optional(),
       isActive: z.boolean().default(true),
-    });
+    }).strict(); // Prevent unknown properties
 
     const { name, description, isActive } = schema.parse(req.body);
 
@@ -1445,7 +1266,7 @@ router.patch("/menu/categories/:id", requireKYCCompletion, requireOwnerRole, asy
       name: z.string().min(1).max(100).optional(),
       description: z.string().optional(),
       isActive: z.boolean().optional(),
-    });
+    }).strict(); // Prevent unknown properties
 
     const updates = schema.parse(req.body);
 
@@ -1556,8 +1377,8 @@ router.patch("/menu/categories/reorder", requireKYCCompletion, requireOwnerRole,
     }
 
     const schema = z.object({
-      categoryIds: z.array(z.string()),
-    });
+      categoryIds: z.array(z.string()).min(1), // At least one category required
+    }).strict(); // Prevent unknown properties
 
     const { categoryIds } = schema.parse(req.body);
 
@@ -1742,7 +1563,7 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
       name: z.string().min(1).max(200),
       shortDescription: z.string().max(500).optional(),
       longDescription: z.string().optional(),
-      basePrice: z.number().min(0),
+      basePrice: z.coerce.number().min(0), // Coerce string to number for Decimal fields
       currency: z.string().default("USD"),
       preparationTimeMinutes: z.number().int().min(0).optional(),
       availabilityStatus: z.enum(["available", "unavailable", "out_of_stock"]).default("available"),
@@ -1751,9 +1572,9 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
       isVegan: z.boolean().default(false),
       isHalal: z.boolean().default(false),
       isSpicy: z.boolean().default(false),
-      dietaryTags: z.array(z.string()).optional(),
+      dietaryTags: z.array(z.string()).default([]),
       itemImageUrl: z.string().url().optional(),
-    });
+    }).strict(); // Prevent unknown properties
 
     const data = schema.parse(req.body);
 
@@ -1850,7 +1671,7 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
       name: z.string().min(1).max(200).optional(),
       shortDescription: z.string().max(500).optional(),
       longDescription: z.string().optional(),
-      basePrice: z.number().min(0).optional(),
+      basePrice: z.coerce.number().min(0).optional(), // Coerce string to number for Decimal fields
       currency: z.string().optional(),
       preparationTimeMinutes: z.number().int().min(0).optional(),
       availabilityStatus: z.enum(["available", "unavailable", "out_of_stock"]).optional(),
@@ -1861,7 +1682,7 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
       isSpicy: z.boolean().optional(),
       dietaryTags: z.array(z.string()).optional(),
       itemImageUrl: z.string().url().optional(),
-    });
+    }).strict(); // Prevent unknown properties
 
     const updates = schema.parse(req.body);
 
@@ -1908,6 +1729,72 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
     }
     console.error("Update item error:", error);
     res.status(500).json({ error: "Failed to update item" });
+  }
+});
+
+// PATCH /api/restaurant/menu/items/:id/availability
+// Toggle item availability (STAFF and OWNER allowed - no OWNER check needed)
+router.patch("/menu/items/:id/availability", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify item belongs to restaurant
+    const item = await prisma.menuItem.findFirst({
+      where: {
+        id,
+        restaurantId: restaurantProfile.id,
+      },
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Menu item not found" });
+    }
+
+    const schema = z.object({
+      availabilityStatus: z.enum(["available", "unavailable", "out_of_stock"]),
+    }).strict(); // Prevent unknown properties
+
+    const { availabilityStatus } = schema.parse(req.body);
+
+    const updatedItem = await prisma.menuItem.update({
+      where: { id },
+      data: { availabilityStatus },
+      include: {
+        category: true,
+      },
+    });
+
+    // Audit log
+    await auditMenuAction({
+      actorId: userId,
+      actorEmail: restaurantProfile.user.email,
+      actorRole: "restaurant",
+      ipAddress: getClientIp(req),
+      actionType: "update",
+      entityType: "menu_item",
+      entityId: id,
+      restaurantId: restaurantProfile.id,
+      description: `Updated item availability: ${updatedItem.name} to ${availabilityStatus}`,
+      metadata: { availabilityStatus, itemName: updatedItem.name },
+    });
+
+    res.json({ item: updatedItem });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid input", details: error.errors });
+    }
+    console.error("Update item availability error:", error);
+    res.status(500).json({ error: "Failed to update item availability" });
   }
 });
 
@@ -1992,13 +1879,15 @@ router.patch("/menu/items/bulk", requireKYCCompletion, requireOwnerRole, async (
     }
 
     const schema = z.object({
-      itemIds: z.array(z.string()),
+      itemIds: z.array(z.string()).min(1), // At least one item required
       updates: z.object({
         availabilityStatus: z.enum(["available", "unavailable", "out_of_stock"]).optional(),
         isFeatured: z.boolean().optional(),
-        basePrice: z.number().min(0).optional(),
+        basePrice: z.coerce.number().min(0).optional(), // Coerce string to number for Decimal fields
+      }).refine(data => Object.keys(data).length > 0, {
+        message: "At least one field must be provided for update",
       }),
-    });
+    }).strict(); // Prevent unknown properties
 
     const { itemIds, updates } = schema.parse(req.body);
 
@@ -2116,7 +2005,7 @@ router.post("/menu/option-groups", requireKYCCompletion, requireOwnerRole, async
       isRequired: z.boolean().default(false),
       minSelect: z.number().int().min(0).optional(),
       maxSelect: z.number().int().min(0).optional(),
-    });
+    }).strict(); // Prevent unknown properties
 
     const data = schema.parse(req.body);
 
@@ -2202,7 +2091,7 @@ router.patch("/menu/option-groups/:id", requireKYCCompletion, requireOwnerRole, 
       isRequired: z.boolean().optional(),
       minSelect: z.number().int().min(0).optional(),
       maxSelect: z.number().int().min(0).optional(),
-    });
+    }).strict(); // Prevent unknown properties
 
     const updates = schema.parse(req.body);
 
@@ -2311,10 +2200,10 @@ router.post("/menu/options", requireKYCCompletion, requireOwnerRole, async (req:
     const schema = z.object({
       optionGroupId: z.string(),
       label: z.string().min(1).max(100),
-      priceDelta: z.number().default(0),
+      priceDelta: z.coerce.number().default(0), // Coerce string to number for Decimal fields
       isActive: z.boolean().default(true),
       isDefault: z.boolean().default(false),
-    });
+    }).strict(); // Prevent unknown properties
 
     const data = schema.parse(req.body);
 
@@ -2396,10 +2285,10 @@ router.patch("/menu/options/:id", requireKYCCompletion, requireOwnerRole, async 
 
     const schema = z.object({
       label: z.string().min(1).max(100).optional(),
-      priceDelta: z.number().optional(),
+      priceDelta: z.coerce.number().optional(), // Coerce string to number for Decimal fields
       isActive: z.boolean().optional(),
       isDefault: z.boolean().optional(),
-    });
+    }).strict(); // Prevent unknown properties
 
     const updates = schema.parse(req.body);
 
