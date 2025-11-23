@@ -137,6 +137,17 @@ export default function RestaurantHome() {
   );
   // Placeholder - would need timestamps to calculate real prep time
   const avgPrepTime = completedOrders.length > 0 ? 15 : null; // Default 15 min
+  
+  // Calculate pending payouts (only from completed/delivered orders awaiting settlement)
+  const pendingPayoutOrders = last7DaysOrders.filter((order: any) => 
+    order.status === 'completed' || order.status === 'delivered'
+  );
+  const pendingPayouts = pendingPayoutOrders.reduce((sum: number, order: any) => 
+    sum + Number(order.restaurantPayout || 0), 0
+  );
+  
+  // Check if restaurant has payout methods configured
+  const hasPayoutMethod = wallet?.payoutMethods && Array.isArray(wallet.payoutMethods) && wallet.payoutMethods.length > 0;
 
   // Helper functions
   const getStatusBadgeVariant = (status: string) => {
@@ -583,7 +594,7 @@ export default function RestaurantHome() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Pending Payouts</span>
                     <span className="font-medium" data-testid="text-pending-payouts">
-                      ${last7DaysEarnings > 0 ? last7DaysEarnings.toFixed(2) : "0.00"}
+                      ${pendingPayouts > 0 ? pendingPayouts.toFixed(2) : "0.00"}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -595,7 +606,7 @@ export default function RestaurantHome() {
                 </div>
                 
                 {/* Warning if no payout method */}
-                {!wallet && (
+                {!hasPayoutMethod && (
                   <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
                     <p className="text-xs text-orange-700 dark:text-orange-300 font-medium">
                       ⚠ Add a payout method to receive earnings
