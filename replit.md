@@ -29,6 +29,16 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 -   **Blocked Riders System**: Allows drivers to block specific customers from future matches.
 -   **Restaurant Analytics & Management Systems**: Includes an Order Analytics & Performance Dashboard, a Review & Rating Management System (with customer identity masking and admin moderation), a Media Gallery & Branding Management System, and an Operational Settings System (with business hours, delivery/pickup settings, delivery zones, and surge pricing).
 -   **Customer-Facing Dynamic Pricing Display**: Real-time pricing transparency system showing surge multipliers, active promotions, coupon eligibility, and pricing breakdowns.
+-   **R-ENHANCE UI/UX Improvements**: Completed professional polish initiative for restaurant portal including layout standardization (space-y-6), unified FeaturePlaceholderLayout system for all planned features, WCAG 2.1 AA compliant search/notification UX, and API migration to new apiRequest pattern with FormData support. Fixed restaurant payouts overview 404 by adding /restaurant/payouts/overview route (OWNER-only).
+
+## Recent Changes
+
+### November 23, 2025 - R-ENHANCE Completion & Payment Configuration Spec
+- **R-ENHANCE Tasks 1-6 Complete**: All UI/UX improvements completed including layout standardization, search/notification UX, API migration, and support pages polishing.
+- **Route Fix**: Added missing `/restaurant/payouts/overview` route (OWNER-only) to resolve 404 errors in restaurant portal.
+- **Placeholder Unification**: Migrated all planned feature pages to unified FeaturePlaceholderLayout system (support-contact.tsx with Mail icon, support-status.tsx with Activity icon).
+- **Application Status**: Running successfully on port 5000 with all routes functional and no runtime errors.
+- **New Specification Received**: Payment & Payout Configuration system specification for country-aware, multi-method payment/payout architecture supporting BD and US markets with extensibility for future countries. Scope includes shared enums, configuration models, admin UI, restaurant payout methods, driver placeholders, and customer payment options service.
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, `PaymentMethod`, `OpportunitySetting`, `OpportunityReward`, `DriverTier`, `DriverPoints`, `TierBenefit`, `PointsRule`, `PointsTransaction`, `BlockedRider`, `Review`, `RestaurantBranding`, `RestaurantMedia`, `RestaurantHours`, `OperationalSettings`, `DeliveryZone`, and `SurgeSettings`. It supports country-specific identity fields with AES-256-GCM encryption and includes an `isDemo` flag, fields for US tax and driver preferences, and operational settings like business hours with split shifts, delivery zones, and surge pricing.

@@ -1174,6 +1174,84 @@ model PayoutBatch {
   @@map("payout_batches")
 }
 
+// ===== PAYMENT & PAYOUT CONFIGURATION SYSTEM =====
+
+// Country-aware customer payment method configuration
+model CountryPaymentConfig {
+  id                   String   @id @default(uuid())
+  countryCode          String   // BD, US, etc.
+  serviceType          String   // RIDE, FOOD, PARCEL
+  methodType           String   // PaymentMethodType enum value
+  provider             String   // PaymentProvider enum value
+  isEnabled            Boolean  @default(true)
+  priority             Int      @default(0)
+  minAmount            Decimal? @db.Decimal(12, 2)
+  maxAmount            Decimal? @db.Decimal(12, 2)
+  supportsRecurring    Boolean  @default(false)
+  requiresKycLevel     String   @default("NONE") // NONE, BASIC, FULL
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  createdByAdminId     String?
+  lastUpdatedByAdminId String?
+
+  @@unique([countryCode, serviceType, methodType, provider])
+  @@index([countryCode, serviceType])
+  @@index([isEnabled])
+  @@index([createdByAdminId])
+  @@map("country_payment_configs")
+}
+
+// Country-aware payout rail configuration for restaurants/drivers
+model CountryPayoutConfig {
+  id                   String   @id @default(uuid())
+  countryCode          String   // BD, US, etc.
+  actorType            String   // RESTAURANT, DRIVER
+  payoutRailType       String   // PayoutRailType enum value
+  provider             String   // PayoutProvider enum value
+  isEnabled            Boolean  @default(true)
+  minPayoutAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  payoutSchedule       String   @default("WEEKLY") // DAILY, WEEKLY, BIWEEKLY, MONTHLY, ON_DEMAND
+  requiresKycLevel     String   @default("BASIC") // NONE, BASIC, FULL
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  createdByAdminId     String?
+  lastUpdatedByAdminId String?
+
+  @@unique([countryCode, actorType, payoutRailType, provider])
+  @@index([countryCode, actorType])
+  @@index([isEnabled])
+  @@index([createdByAdminId])
+  @@map("country_payout_configs")
+}
+
+// Payout method instances for restaurants and drivers
+model RestaurantPayoutMethod {
+  id                    String   @id @default(uuid())
+  actorType             String   // RESTAURANT or DRIVER
+  restaurantId          String?
+  driverId              String?
+  countryCode           String
+  payoutRailType        String   // PayoutRailType enum value
+  provider              String   // PayoutProvider enum value
+  currency              String
+  isDefault             Boolean  @default(false)
+  status                String   @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, ACTIVE, DISABLED
+  maskedDetails         String   // e.g., "Bank ****1234", "bKash ***890"
+  metadata              Json?    // PSP-specific IDs, encrypted sensitive data
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdByActorId      String
+  lastUpdatedByActorId  String?
+  actorRole             String   // Role of the actor who created this
+
+  @@index([actorType, restaurantId])
+  @@index([actorType, driverId])
+  @@index([countryCode])
+  @@index([status])
+  @@index([isDefault])
+  @@map("restaurant_payout_methods")
+}
+
 enum ApprovalRequestStatus {
   pending
   approved
