@@ -455,3 +455,153 @@ export async function getDriverAnalytics(
     driverStats,
   };
 }
+
+// ====================================================
+// ADMIN ANALYTICS
+// ====================================================
+
+export interface AdminRestaurantAnalytics {
+  platformMetrics: {
+    totalRestaurants: number;
+    activeRestaurants: number;
+    totalRevenue: number;
+    totalOrders: number;
+    totalCommission: number;
+    avgOrderValue: number;
+  };
+  topRestaurants: {
+    restaurantId: string;
+    restaurantName: string;
+    totalRevenue: number;
+    totalOrders: number;
+    avgOrderValue: number;
+  }[];
+  dailyTrend: { date: string; orders: number; revenue: number; commission: number }[];
+}
+
+export async function getAdminRestaurantAnalytics(
+  filters: DateRangeFilter
+): Promise<AdminRestaurantAnalytics> {
+  const { startDate, endDate } = filters;
+
+  // Get all delivered orders (exclude demo and cancelled)
+  const orders = await prisma.foodOrder.findMany({
+    where: {
+      createdAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+      status: "delivered",
+      isDemo: false,
+    },
+    select: {
+      id: true,
+      restaurantId: true,
+      createdAt: true,
+      subtotal: true,
+      safegoCommission: true,
+      restaurant: {
+        select: {
+          id: true,
+          businessName: true,
+        },
+      },
+    },
+  });
+
+  // Calculate platform metrics (using subtotal for consistency with restaurant analytics)
+  const totalRevenue = orders.reduce((sum, o) => sum + decimalToNumber(o.subtotal), 0);
+  const totalCommission = orders.reduce((sum, o) => sum + decimalToNumber(o.safegoCommission), 0);
+  const totalOrders = orders.length;
+  const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  // Get active restaurants count (have at least one order in period)
+  const activeRestaurantIds = new Set(orders.map((o) => o.restaurantId));
+  const activeRestaurants = activeRestaurantIds.size;
+
+  // Get total restaurants count
+  const totalRestaurants = await prisma.restaurantProfile.count({
+    where: { isDemo: false },
+  });
+
+  // Aggregate by restaurant for top performers
+  const restaurantMap = new Map<
+    string,
+    {
+      restaurantName: string;
+      revenue: number;
+      orderCount: number;
+    }
+  >();
+
+  orders.forEach((order) => {
+    if (!restaurantMap.has(order.restaurantId)) {
+      restaurantMap.set(order.restaurantId, {
+        restaurantName: order.restaurant?.businessName || "Unknown Restaurant",
+        revenue: 0,
+        orderCount: 0,
+      });
+    }
+
+    const stat = restaurantMap.get(order.restaurantId)!;
+    stat.revenue += decimalToNumber(order.subtotal);
+    stat.orderCount++;
+  });
+
+  const topRestaurants = Array.from(restaurantMap.entries())
+    .map(([restaurantId, stat]) => ({
+      restaurantId,
+      restaurantName: stat.restaurantName,
+      totalRevenue: Math.round(stat.revenue * 100) / 100,
+      totalOrders: stat.orderCount,
+      avgOrderValue:
+        stat.orderCount > 0 ? Math.round((stat.revenue / stat.orderCount) * 100) / 100 : 0,
+    }))
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .slice(0, 10);
+
+  // Daily trend aggregation
+  const dailyMap = new Map<
+    string,
+    {
+      orders: number;
+      revenue: number;
+      commission: number;
+    }
+  >();
+
+  orders.forEach((order) => {
+    const dateKey = order.createdAt.toISOString().split("T")[0];
+
+    if (!dailyMap.has(dateKey)) {
+      dailyMap.set(dateKey, { orders: 0, revenue: 0, commission: 0 });
+    }
+
+    const stat = dailyMap.get(dateKey)!;
+    stat.orders++;
+    stat.revenue += decimalToNumber(order.subtotal);
+    stat.commission += decimalToNumber(order.safegoCommission);
+  });
+
+  const dailyTrend = Array.from(dailyMap.entries())
+    .map(([date, stat]) => ({
+      date,
+      orders: stat.orders,
+      revenue: Math.round(stat.revenue * 100) / 100,
+      commission: Math.round(stat.commission * 100) / 100,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return {
+    platformMetrics: {
+      totalRestaurants,
+      activeRestaurants,
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalOrders,
+      totalCommission: Math.round(totalCommission * 100) / 100,
+      avgOrderValue: Math.round(avgOrderValue * 100) / 100,
+    },
+    topRestaurants,
+    dailyTrend,
+  };
+}

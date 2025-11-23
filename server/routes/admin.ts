@@ -7713,6 +7713,47 @@ router.get("/earnings/dashboard/food", checkPermission(Permission.VIEW_EARNINGS_
   }
 });
 
+// ====================================================
+// RESTAURANT ANALYTICS (Admin View)
+// ====================================================
+
+// GET /api/admin/restaurant-analytics
+// Get platform-wide restaurant performance analytics (read-only admin view)
+router.get("/restaurant-analytics", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    // Default to last 30 days if no dates provided
+    const now = new Date();
+    const defaultStartDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const defaultEndDate = now;
+
+    const filters = {
+      startDate: startDate ? new Date(startDate as string) : defaultStartDate,
+      endDate: endDate ? new Date(endDate as string) : defaultEndDate,
+    };
+
+    const { getAdminRestaurantAnalytics } = await import("../analytics/restaurantAnalytics");
+    const analytics = await getAdminRestaurantAnalytics(filters);
+
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      entityType: EntityType.ANALYTICS,
+      description: `Viewed restaurant analytics dashboard`,
+      metadata: { filters: { startDate: filters.startDate, endDate: filters.endDate } },
+    });
+
+    res.json(analytics);
+  } catch (error: any) {
+    console.error("Get restaurant analytics error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch restaurant analytics" });
+  }
+});
+
 // Get parcel earnings
 router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
