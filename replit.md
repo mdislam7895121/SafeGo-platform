@@ -35,6 +35,7 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 
 ### November 23, 2025 - Payment & Payout Configuration System PRODUCTION-READY ✅
 - **R-ENHANCE Complete**: All UI/UX improvements completed including layout standardization, search/notification UX, API migration, and support pages polishing. Fixed restaurant payouts overview 404 by adding /restaurant/payouts/overview route.
+- **Routing Fix**: Added redirect from /restaurant/home → /restaurant/dashboard for consistent navigation experience.
 - **Payment & Payout Configuration System - Enterprise-Grade Implementation**:
   - **Type System**: Created comprehensive type system (shared/types.ts) with 9 enums: CountryCode, ServiceType, ActorType, PaymentMethodType, PayoutRailType, PaymentProvider, PayoutProvider, PayoutSchedule, KycLevel, PayoutMethodStatus
   - **Database Models**: Added 3 Prisma models (CountryPaymentConfig, CountryPayoutConfig, RestaurantPayoutMethod) with proper unique constraints and indexes

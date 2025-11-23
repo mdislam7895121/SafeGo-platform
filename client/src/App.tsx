@@ -517,6 +517,9 @@ function Router() {
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/restaurant/home">
+        <Redirect to="/restaurant/dashboard" />
+      </Route>
       <Route path="/restaurant">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
