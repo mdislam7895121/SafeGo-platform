@@ -1,0 +1,136 @@
+Proceed with Phase 9.
+
+PHASE 9 – Restaurant Media Gallery & Branding Management System (SafeGo Eats)
+
+Requirements:
+- Fully additive; do NOT modify or remove any existing logic.
+- Maintain strict RBAC, BD/US KYC gating, and restaurant_id scoping.
+- Customer cannot access raw image URLs; must use signed URLs.
+- Admin can moderate reported images.
+- Must not break restaurant reviews, promotions, menu, analytics, payouts, or staff features.
+
+----------------------------------------------------
+1. Branding Settings Page (/restaurant/branding)
+----------------------------------------------------
+OWNER-only.
+Fields:
+- restaurant_logo (image upload)
+- cover_photo (image upload)
+- primary_color (hex)
+- secondary_color (hex)
+- theme_mode (light/dark/auto)
+
+Backend:
+- PATCH /api/restaurant/branding
+- GET /api/restaurant/branding
+
+Security:
+- OWNER-only edit
+- STAFF read-only access if can_view_analytics = true
+- Signed upload URLs required
+
+----------------------------------------------------
+2. Media Gallery System (/restaurant/gallery)
+----------------------------------------------------
+Features:
+- Upload multiple photos (food, kitchen, ambience)
+- Max 50 photos
+- Delete/restore photos
+- Tag photos: food, ambience, team, kitchen
+- Drag-and-drop reordering
+
+Backend:
+- GET /api/restaurant/gallery
+- POST /api/restaurant/gallery/upload
+- PATCH /api/restaurant/gallery/:id
+- DELETE /api/restaurant/gallery/:id (soft delete)
+
+Security:
+- OWNER: full control
+- STAFF (optional): can_upload_media (toggle from Phase 6 permissions)
+
+----------------------------------------------------
+3. Customer-facing Integration
+----------------------------------------------------
+Add on:
+- Restaurant preview card
+- Restaurant detail page
+- Menu page header
+
+Fields visible to customers:
+- logo
+- cover_photo
+- gallery[]
+- theme colors
+- rating summary (from Phase 8)
+
+All images delivered via signed public URLs.
+
+----------------------------------------------------
+4. Admin Moderation Tools
+----------------------------------------------------
+Admin can:
+- View all restaurant media
+- Filter by reported images
+- Hide/unhide images
+- Add moderation notes
+- Audit-log all actions
+
+Endpoints:
+- GET /api/admin/media
+- POST /api/admin/media/:id/hide
+- POST /api/admin/media/:id/unhide
+- POST /api/admin/media/:id/flag
+
+----------------------------------------------------
+5. Storage Layer (Additive Only)
+----------------------------------------------------
+Add safe media storage with:
+- signed upload URLs
+- signed viewing URLs
+- expiry configurable
+- per-restaurant folder isolation
+
+Schema additions:
+- restaurant_media table:
+  - id
+  - restaurant_id
+  - file_path
+  - file_type
+  - category
+  - is_hidden
+  - created_at
+
+----------------------------------------------------
+6. UI Frontend
+----------------------------------------------------
+Restaurant side:
+- Branding settings UI
+- Gallery grid
+- Image upload modal
+- Manage tags
+- Delete/restore buttons
+- Drag reorder
+
+Customer side:
+- Restaurant detail gallery slider
+- Cover photo banner
+- Logo + theme colors applied
+
+Admin side:
+- Media moderation table
+- Hide/unhide/flag buttons
+- Audit log display
+
+----------------------------------------------------
+7. Security Highlights
+----------------------------------------------------
+- No cross-restaurant gallery access  
+- Signed URLs only  
+- OWNER only for branding settings  
+- STAFF must respect permission flags  
+- Admin moderation logged in security_audit_log  
+
+----------------------------------------------------
+Finish Phase 9 fully before moving to Phase 10.
+----------------------------------------------------

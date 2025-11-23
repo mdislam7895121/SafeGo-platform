@@ -427,6 +427,8 @@ model RestaurantProfile {
   promotions            Promotion[]      // Phase 7: Restaurant promotions
   coupons               Coupon[]         // Phase 7: Restaurant coupons
   reviews               Review[]         // Phase 8: Customer reviews
+  branding              RestaurantBranding? // Phase 9: Restaurant branding
+  media                 RestaurantMedia[] // Phase 9: Restaurant media gallery
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -1510,4 +1512,67 @@ model Review {
   @@index([createdAt])
   @@index([isDemo])
   @@map("reviews")
+}
+
+// ====================================================
+// PHASE 9: Restaurant Media Gallery & Branding System
+// ====================================================
+
+model RestaurantBranding {
+  id             String   @id @default(uuid())
+  restaurantId   String   @unique
+  logoUrl        String?  // Restaurant logo
+  coverPhotoUrl  String?  // Cover/banner photo
+  primaryColor   String?  // Hex color code
+  secondaryColor String?  // Hex color code
+  themeMode      String   @default("light") // light, dark, auto
+  isDemo         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  restaurant     RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([isDemo])
+  @@map("restaurant_branding")
+}
+
+enum MediaCategory {
+  food
+  ambience
+  team
+  kitchen
+  other
+}
+
+model RestaurantMedia {
+  id             String        @id @default(uuid())
+  restaurantId   String
+  filePath       String        // Path to file in storage
+  fileUrl        String?       // Signed URL (temporary)
+  fileType       String        @default("image") // image, video
+  category       MediaCategory @default(other)
+  displayOrder   Int           @default(0)
+  isHidden       Boolean       @default(false) // Admin hidden
+  hiddenByAdminId String?
+  hiddenAt       DateTime?
+  hideReason     String?       @db.Text
+  isFlagged      Boolean       @default(false) // Admin flagged
+  flaggedByAdminId String?
+  flaggedAt      DateTime?
+  flagReason     String?       @db.Text
+  isDemo         Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  
+  restaurant     RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([category])
+  @@index([isHidden])
+  @@index([isFlagged])
+  @@index([displayOrder])
+  @@index([createdAt])
+  @@index([isDemo])
+  @@map("restaurant_media")
 }
