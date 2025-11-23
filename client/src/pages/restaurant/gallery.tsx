@@ -55,12 +55,14 @@ export default function RestaurantGalleryPage() {
   const [editCategory, setEditCategory] = useState<string>("food");
 
   // Fetch restaurant profile to check permissions
-  const { data: profile } = useQuery<{ ownerRole: string; canViewAnalytics: boolean }>({
+  const { data: profile, isLoading: profileLoading, error: profileError } = useQuery<{ ownerRole: string; canViewAnalytics: boolean }>({
     queryKey: ["/api/restaurant/profile"],
   });
 
-  const isOwner = !profile || profile.ownerRole === "OWNER" || !profile.ownerRole;
-  const canManageGallery = isOwner || profile?.canViewAnalytics;
+  // Strict permission checks - default to deny
+  const isOwner = profile?.ownerRole === "OWNER";
+  const canViewGallery = isOwner || profile?.canViewAnalytics === true;
+  const canManageGallery = isOwner; // Only OWNER can upload/edit/delete
 
   // Fetch gallery
   const { data: media = [], isLoading } = useQuery<RestaurantMedia[]>({
@@ -196,7 +198,8 @@ export default function RestaurantGalleryPage() {
     setEditCategory(mediaItem.category);
   };
 
-  if (isLoading) {
+  // Show loading while profile or gallery is loading
+  if (isLoading || profileLoading) {
     return (
       <div className="p-6 space-y-6">
         <div>
@@ -212,6 +215,34 @@ export default function RestaurantGalleryPage() {
     );
   }
 
+  // Handle profile fetch errors
+  if (profileError) {
+    return (
+      <div className="p-6">
+        <Card className="border-destructive">
+          <CardContent className="p-6">
+            <h3 className="font-semibold text-destructive mb-2">Profile Error</h3>
+            <p className="text-sm">Failed to load your permissions. Please refresh the page.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Deny access if staff without canViewAnalytics
+  if (!canViewGallery) {
+    return (
+      <div className="p-6">
+        <Card className="border-destructive">
+          <CardContent className="p-6">
+            <h3 className="font-semibold text-destructive mb-2">Access Denied</h3>
+            <p className="text-sm">You don't have permission to view the gallery. Contact the restaurant owner.</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const activeMedia = media.filter((m) => !m.isHidden);
   const hiddenMedia = media.filter((m) => m.isHidden);
 
@@ -221,21 +252,18 @@ export default function RestaurantGalleryPage() {
         <div>
           <h1 className="text-3xl font-bold mb-2">Media Gallery</h1>
           <p className="text-muted-foreground">
-            Manage your restaurant's photos ({activeMedia.length}/50)
+            {canManageGallery ? `Manage your restaurant's photos (${activeMedia.length}/50)` : "View restaurant photos"}
           </p>
         </div>
-        <Button
-          onClick={() => setUploadDialogOpen(true)}
-          disabled={media.length >= 50 || !canManageGallery}
-          data-testid="button-upload-media"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          Upload Photo
-        </Button>
-        {!canManageGallery && (
-          <p className="text-sm text-muted-foreground">
-            You need analytics permission to manage the gallery
-          </p>
+        {canManageGallery && (
+          <Button
+            onClick={() => setUploadDialogOpen(true)}
+            disabled={media.length >= 50}
+            data-testid="button-upload-media"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Upload Photo
+          </Button>
         )}
       </div>
 
@@ -333,17 +361,15 @@ export default function RestaurantGalleryPage() {
                               <Tag className="h-4 w-4 mr-1" />
                               Tag
                             </Button>
-                            {isOwner && (
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => setDeleteMediaId(item.id)}
-                                data-testid={`button-delete-${item.id}`}
-                              >
-                                <Trash2 className="h-4 w-4 mr-1" />
-                                Delete
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setDeleteMediaId(item.id)}
+                              data-testid={`button-delete-${item.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Delete
+                            </Button>
                           </>
                         )}
                       </div>
