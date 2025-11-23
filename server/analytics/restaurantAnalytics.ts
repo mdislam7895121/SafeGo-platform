@@ -605,3 +605,359 @@ export async function getAdminRestaurantAnalytics(
     dailyTrend,
   };
 }
+
+// ====================================================
+// PERFORMANCE INSIGHTS & ANOMALY DETECTION
+// ====================================================
+
+export interface PerformanceInsights {
+  restaurantId: string;
+  restaurantName: string;
+  currentPeriod: {
+    orders: number;
+    revenue: number;
+    cancellationRate: number;
+    avgPrepTime: number;
+  };
+  previousPeriod: {
+    orders: number;
+    revenue: number;
+    cancellationRate: number;
+    avgPrepTime: number;
+  };
+  changes: {
+    ordersDelta: number;
+    ordersPercentChange: number;
+    revenueDelta: number;
+    revenuePercentChange: number;
+    cancellationRateDelta: number;
+    prepTimeDelta: number;
+  };
+  anomalies: {
+    type: "cancellation_spike" | "order_drop" | "prep_time_spike";
+    severity: "warning" | "critical";
+    message: string;
+  }[];
+  topItems: { itemName: string; orderCount: number; revenue: number }[];
+  summary: string;
+}
+
+export async function getRestaurantPerformanceInsights(
+  restaurantId: string
+): Promise<PerformanceInsights> {
+  // Get restaurant name
+  const restaurant = await prisma.restaurantProfile.findUnique({
+    where: { id: restaurantId },
+    select: { businessName: true },
+  });
+
+  const restaurantName = restaurant?.businessName || "Restaurant";
+
+  // Current period: last 7 days
+  const now = new Date();
+  const currentStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const currentEnd = now;
+
+  // Previous period: 7 days before that
+  const previousStart = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+  const previousEnd = currentStart;
+
+  // Fetch current period data
+  const currentOrders = await prisma.foodOrder.findMany({
+    where: {
+      restaurantId,
+      createdAt: { gte: currentStart, lte: currentEnd },
+      isDemo: false,
+    },
+    select: {
+      status: true,
+      subtotal: true,
+      acceptedAt: true,
+      readyAt: true,
+      items: true,
+    },
+  });
+
+  // Fetch previous period data
+  const previousOrders = await prisma.foodOrder.findMany({
+    where: {
+      restaurantId,
+      createdAt: { gte: previousStart, lte: previousEnd },
+      isDemo: false,
+    },
+    select: {
+      status: true,
+      subtotal: true,
+      acceptedAt: true,
+      readyAt: true,
+    },
+  });
+
+  // Calculate current period metrics
+  const currentDelivered = currentOrders.filter((o) => o.status === "delivered");
+  const currentCancelled = currentOrders.filter((o) => o.status === "cancelled");
+  const currentRevenue = currentDelivered.reduce(
+    (sum, o) => sum + decimalToNumber(o.subtotal),
+    0
+  );
+  const currentCancellationRate =
+    currentOrders.length > 0
+      ? Math.round((currentCancelled.length / currentOrders.length) * 100)
+      : 0;
+
+  const currentPrepTimes = currentOrders
+    .filter((o) => o.acceptedAt && o.readyAt)
+    .map((o) => {
+      const accepted = new Date(o.acceptedAt!).getTime();
+      const ready = new Date(o.readyAt!).getTime();
+      return (ready - accepted) / 60000;
+    });
+  const currentAvgPrepTime =
+    currentPrepTimes.length > 0
+      ? Math.round(currentPrepTimes.reduce((sum, t) => sum + t, 0) / currentPrepTimes.length)
+      : 0;
+
+  // Calculate previous period metrics
+  const previousDelivered = previousOrders.filter((o) => o.status === "delivered");
+  const previousCancelled = previousOrders.filter((o) => o.status === "cancelled");
+  const previousRevenue = previousDelivered.reduce(
+    (sum, o) => sum + decimalToNumber(o.subtotal),
+    0
+  );
+  const previousCancellationRate =
+    previousOrders.length > 0
+      ? Math.round((previousCancelled.length / previousOrders.length) * 100)
+      : 0;
+
+  const previousPrepTimes = previousOrders
+    .filter((o) => o.acceptedAt && o.readyAt)
+    .map((o) => {
+      const accepted = new Date(o.acceptedAt!).getTime();
+      const ready = new Date(o.readyAt!).getTime();
+      return (ready - accepted) / 60000;
+    });
+  const previousAvgPrepTime =
+    previousPrepTimes.length > 0
+      ? Math.round(previousPrepTimes.reduce((sum, t) => sum + t, 0) / previousPrepTimes.length)
+      : 0;
+
+  // Calculate changes
+  const ordersDelta = currentDelivered.length - previousDelivered.length;
+  const ordersPercentChange =
+    previousDelivered.length > 0
+      ? Math.round((ordersDelta / previousDelivered.length) * 100)
+      : 0;
+
+  const revenueDelta = Math.round((currentRevenue - previousRevenue) * 100) / 100;
+  const revenuePercentChange =
+    previousRevenue > 0 ? Math.round((revenueDelta / previousRevenue) * 100) : 0;
+
+  const cancellationRateDelta = currentCancellationRate - previousCancellationRate;
+  const prepTimeDelta = currentAvgPrepTime - previousAvgPrepTime;
+
+  // Detect anomalies
+  const anomalies: PerformanceInsights["anomalies"] = [];
+
+  // Anomaly: Cancellation spike (>10% increase or >30% absolute rate)
+  if (cancellationRateDelta > 10 || currentCancellationRate > 30) {
+    anomalies.push({
+      type: "cancellation_spike",
+      severity: currentCancellationRate > 30 ? "critical" : "warning",
+      message: `Cancellation rate is ${currentCancellationRate}% (up ${cancellationRateDelta}% from last week)`,
+    });
+  }
+
+  // Anomaly: Order drop (>30% decrease)
+  if (ordersPercentChange < -30 && previousDelivered.length > 5) {
+    anomalies.push({
+      type: "order_drop",
+      severity: ordersPercentChange < -50 ? "critical" : "warning",
+      message: `Orders dropped ${Math.abs(ordersPercentChange)}% compared to last week`,
+    });
+  }
+
+  // Anomaly: Prep time spike (>50% increase or >15 min increase)
+  if ((prepTimeDelta > 15 || (previousAvgPrepTime > 0 && (prepTimeDelta / previousAvgPrepTime) > 0.5)) && currentAvgPrepTime > 20) {
+    anomalies.push({
+      type: "prep_time_spike",
+      severity: prepTimeDelta > 20 ? "critical" : "warning",
+      message: `Avg prep time increased to ${currentAvgPrepTime} minutes (up ${prepTimeDelta} min)`,
+    });
+  }
+
+  // Get top items from current period
+  const itemMap = new Map<string, { orderCount: number; revenue: number }>();
+  currentDelivered.forEach((order) => {
+    if (!order.items) return;
+    try {
+      const items = JSON.parse(order.items);
+      items.forEach((item: any) => {
+        const itemName = item.name || "Unknown Item";
+        if (!itemMap.has(itemName)) {
+          itemMap.set(itemName, { orderCount: 0, revenue: 0 });
+        }
+        const stat = itemMap.get(itemName)!;
+        stat.orderCount++;
+        stat.revenue += item.price * item.quantity || 0;
+      });
+    } catch (e) {
+      // Skip invalid JSON
+    }
+  });
+
+  const topItems = Array.from(itemMap.entries())
+    .map(([itemName, stat]) => ({
+      itemName,
+      orderCount: stat.orderCount,
+      revenue: Math.round(stat.revenue * 100) / 100,
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 3);
+
+  // Generate summary
+  const summaryParts: string[] = [];
+  summaryParts.push(`${currentDelivered.length} orders this week`);
+  if (ordersPercentChange !== 0) {
+    summaryParts.push(
+      ordersPercentChange > 0
+        ? `(up ${ordersPercentChange}%)`
+        : `(down ${Math.abs(ordersPercentChange)}%)`
+    );
+  }
+  summaryParts.push(`with $${Math.round(currentRevenue)} revenue`);
+  if (anomalies.length > 0) {
+    summaryParts.push(`• ${anomalies.length} alert${anomalies.length > 1 ? "s" : ""} detected`);
+  }
+
+  return {
+    restaurantId,
+    restaurantName,
+    currentPeriod: {
+      orders: currentDelivered.length,
+      revenue: Math.round(currentRevenue * 100) / 100,
+      cancellationRate: currentCancellationRate,
+      avgPrepTime: currentAvgPrepTime,
+    },
+    previousPeriod: {
+      orders: previousDelivered.length,
+      revenue: Math.round(previousRevenue * 100) / 100,
+      cancellationRate: previousCancellationRate,
+      avgPrepTime: previousAvgPrepTime,
+    },
+    changes: {
+      ordersDelta,
+      ordersPercentChange,
+      revenueDelta,
+      revenuePercentChange,
+      cancellationRateDelta,
+      prepTimeDelta,
+    },
+    anomalies,
+    topItems,
+    summary: summaryParts.join(" "),
+  };
+}
+
+/**
+ * Generate and send performance summary notification to restaurant owner
+ * @param insights - Performance insights data
+ */
+export async function sendPerformanceNotification(
+  insights: PerformanceInsights
+): Promise<void> {
+  // Get restaurant owner user
+  const restaurantProfile = await prisma.restaurantProfile.findUnique({
+    where: { id: insights.restaurantId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+        },
+      },
+    },
+  });
+
+  if (!restaurantProfile) {
+    console.error(`Restaurant profile not found: ${insights.restaurantId}`);
+    return;
+  }
+
+  // Build notification body (no emojis per SafeGo guidelines)
+  const bodyParts: string[] = [];
+
+  // Summary
+  bodyParts.push(`Weekly Performance Summary for ${insights.restaurantName}`);
+  bodyParts.push("");
+  bodyParts.push(`This Week:`);
+  bodyParts.push(
+    `• ${insights.currentPeriod.orders} orders, $${insights.currentPeriod.revenue} revenue`
+  );
+  bodyParts.push(
+    `• ${insights.currentPeriod.cancellationRate}% cancellation rate, ${insights.currentPeriod.avgPrepTime} min avg prep time`
+  );
+  bodyParts.push("");
+
+  // Changes vs last week
+  if (insights.changes.ordersPercentChange !== 0 || insights.changes.revenuePercentChange !== 0) {
+    bodyParts.push(`Changes vs Last Week:`);
+    if (insights.changes.ordersPercentChange !== 0) {
+      bodyParts.push(
+        `• Orders: ${insights.changes.ordersPercentChange > 0 ? "+" : ""}${insights.changes.ordersPercentChange}% (${insights.changes.ordersPercentChange > 0 ? "+" : ""}${insights.changes.ordersDelta})`
+      );
+    }
+    if (insights.changes.revenuePercentChange !== 0) {
+      bodyParts.push(
+        `• Revenue: ${insights.changes.revenuePercentChange > 0 ? "+" : ""}${insights.changes.revenuePercentChange}% ($${insights.changes.revenuePercentChange > 0 ? "+" : ""}${insights.changes.revenueDelta})`
+      );
+    }
+    bodyParts.push("");
+  }
+
+  // Top items
+  if (insights.topItems.length > 0) {
+    bodyParts.push(`Top Performing Items:`);
+    insights.topItems.forEach((item, index) => {
+      bodyParts.push(
+        `${index + 1}. ${item.itemName} - ${item.orderCount} orders, $${item.revenue}`
+      );
+    });
+    bodyParts.push("");
+  }
+
+  // Anomalies/Alerts
+  if (insights.anomalies.length > 0) {
+    bodyParts.push(`Alerts:`);
+    insights.anomalies.forEach((anomaly) => {
+      const prefix = anomaly.severity === "critical" ? "[CRITICAL]" : "[WARNING]";
+      bodyParts.push(`${prefix} ${anomaly.message}`);
+    });
+    bodyParts.push("");
+  }
+
+  bodyParts.push(`View detailed analytics in your restaurant dashboard.`);
+
+  const notificationBody = bodyParts.join("\n");
+
+  // Determine notification type based on anomalies
+  const hasCriticalAnomaly = insights.anomalies.some((a) => a.severity === "critical");
+  const notificationType = hasCriticalAnomaly ? "alert" : "analytics";
+  const notificationTitle = hasCriticalAnomaly
+    ? `Performance Alert - ${insights.restaurantName}`
+    : `Weekly Performance Summary - ${insights.restaurantName}`;
+
+  // Create notification for restaurant owner
+  await prisma.notification.create({
+    data: {
+      userId: restaurantProfile.user.id,
+      type: notificationType,
+      title: notificationTitle,
+      body: notificationBody,
+    },
+  });
+
+  console.log(
+    `Performance notification sent to ${restaurantProfile.user.email} (${insights.restaurantName})`
+  );
+}

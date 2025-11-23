@@ -7754,6 +7754,92 @@ router.get("/restaurant-analytics", checkPermission(Permission.VIEW_EARNINGS_DAS
   }
 });
 
+// POST /api/admin/restaurant-analytics/generate-insights
+// Generate and send performance insights notifications to all KYC-verified restaurant owners
+router.post("/restaurant-analytics/generate-insights", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    // Get all KYC-verified, non-demo restaurants
+    const restaurants = await prisma.restaurantProfile.findMany({
+      where: {
+        isVerified: true,
+        isDemo: false,
+      },
+      select: {
+        id: true,
+        businessName: true,
+        userId: true,
+      },
+    });
+
+    const results: {
+      success: string[];
+      failed: { restaurantId: string; error: string }[];
+      skipped: string[];
+    } = {
+      success: [],
+      failed: [],
+      skipped: [],
+    };
+
+    const { getRestaurantPerformanceInsights, sendPerformanceNotification } = await import("../analytics/restaurantAnalytics");
+
+    // Process each restaurant
+    for (const restaurant of restaurants) {
+      try {
+        // Generate insights
+        const insights = await getRestaurantPerformanceInsights(restaurant.id);
+
+        // Skip if no orders in current period (nothing to report)
+        if (insights.currentPeriod.orders === 0) {
+          results.skipped.push(restaurant.id);
+          continue;
+        }
+
+        // Send notification to restaurant owner
+        await sendPerformanceNotification(insights);
+        results.success.push(restaurant.id);
+      } catch (error: any) {
+        console.error(`Failed to generate insights for ${restaurant.id}:`, error);
+        results.failed.push({
+          restaurantId: restaurant.id,
+          error: error.message || "Unknown error",
+        });
+      }
+    }
+
+    // Log audit event
+    await logAuditEvent({
+      actorId: req.user!.id,
+      actorEmail: req.user!.email,
+      actorRole: req.user!.role,
+      ipAddress: getClientIp(req),
+      actionType: ActionType.VIEW_EARNINGS_DASHBOARD,
+      entityType: EntityType.ANALYTICS,
+      description: `Generated performance insights for ${results.success.length} restaurants`,
+      metadata: {
+        totalRestaurants: restaurants.length,
+        successCount: results.success.length,
+        failedCount: results.failed.length,
+        skippedCount: results.skipped.length,
+      },
+    });
+
+    res.json({
+      message: `Performance insights generated for ${results.success.length} of ${restaurants.length} restaurants`,
+      results: {
+        total: restaurants.length,
+        notificationsSent: results.success.length,
+        failed: results.failed.length,
+        skipped: results.skipped.length,
+      },
+      details: results,
+    });
+  } catch (error: any) {
+    console.error("Generate insights error:", error);
+    res.status(500).json({ error: error.message || "Failed to generate insights" });
+  }
+});
+
 // Get parcel earnings
 router.get("/earnings/dashboard/parcels", checkPermission(Permission.VIEW_EARNINGS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
