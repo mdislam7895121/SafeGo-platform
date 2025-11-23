@@ -328,20 +328,26 @@ model FoodOrder {
   preparingAt        DateTime?         // When restaurant started preparing
   readyAt            DateTime?         // When order ready for pickup
   pickedUpAt         DateTime?         // When driver picked up
-  isDemo             Boolean           @default(false)
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime
-  deliveredAt        DateTime?
-  completedAt        DateTime?
-  customer           CustomerProfile   @relation(fields: [customerId], references: [id])
-  driver             DriverProfile?    @relation(fields: [driverId], references: [id])
-  restaurant         RestaurantProfile @relation(fields: [restaurantId], references: [id])
+  isDemo               Boolean           @default(false)
+  // Phase 7: Promotion & Coupon tracking (additive only)
+  appliedPromotionId   String?
+  appliedCouponCode    String?
+  discountAmount       Decimal?          @db.Decimal(10, 2)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime
+  deliveredAt          DateTime?
+  completedAt          DateTime?
+  customer             CustomerProfile   @relation(fields: [customerId], references: [id])
+  driver               DriverProfile?    @relation(fields: [driverId], references: [id])
+  restaurant           RestaurantProfile @relation(fields: [restaurantId], references: [id])
+  appliedPromotion     Promotion?        @relation(fields: [appliedPromotionId], references: [id])
 
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt])
   @@index([orderCode])
   @@index([status])
   @@index([isDemo])
+  @@index([appliedPromotionId])
   @@map("food_orders")
 }
 
@@ -416,6 +422,8 @@ model RestaurantProfile {
   foodOrders            FoodOrder[]
   menuCategories        MenuCategory[]
   menuItems             MenuItem[]
+  promotions            Promotion[]      // Phase 7: Restaurant promotions
+  coupons               Coupon[]         // Phase 7: Restaurant coupons
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -1362,4 +1370,102 @@ model OpportunityReward {
   @@index([triggeredAt])
   @@index([isDemo])
   @@map("opportunity_rewards")
+}
+
+// ====================================================
+// PHASE 7: Restaurant Promotions & Coupons
+// ====================================================
+
+model Promotion {
+  id                      String        @id @default(uuid())
+  restaurantId            String
+  title                   String
+  description             String?       @db.Text
+  promoType               PromotionType
+  discountValue           Decimal?      @db.Decimal(10, 2) // For fixed amount
+  discountPercentage      Decimal?      @db.Decimal(5, 2) // For percentage (0-100)
+  buyQuantity             Int?          // For BOGO: buy X
+  getQuantity             Int?          // For BOGO: get Y
+  applicableItems         Json?         // Array of menu item IDs
+  applicableCategories    Json?         // Array of category names
+  minOrderAmount          Decimal?      @db.Decimal(10, 2)
+  maxDiscountCap          Decimal?      @db.Decimal(10, 2)
+  usageLimitPerCustomer   Int?
+  globalUsageLimit        Int?
+  currentUsageCount       Int           @default(0)
+  startDate               DateTime
+  endDate                 DateTime
+  timeWindowStart         String?       // For time-based promos (e.g., "11:00")
+  timeWindowEnd           String?       // For time-based promos (e.g., "14:00")
+  isFirstTimeCustomerOnly Boolean       @default(false)
+  isActive                Boolean       @default(true)
+  isFlagged               Boolean       @default(false)
+  flagReason              String?       @db.Text
+  flaggedByAdminId        String?
+  flaggedAt               DateTime?
+  isDemo                  Boolean       @default(false)
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  createdByOwnerId        String
+  restaurant              RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orders                  FoodOrder[]
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([promoType])
+  @@index([isFlagged])
+  @@index([isDemo])
+  @@map("promotions")
+}
+
+model Coupon {
+  id                    String   @id @default(uuid())
+  restaurantId          String
+  code                  String   // Unique coupon code
+  discountType          CouponDiscountType
+  discountValue         Decimal? @db.Decimal(10, 2) // For fixed amount
+  discountPercentage    Decimal? @db.Decimal(5, 2) // For percentage (0-100)
+  minOrderAmount        Decimal? @db.Decimal(10, 2)
+  maxDiscountCap        Decimal? @db.Decimal(10, 2)
+  usageLimitPerCustomer Int?
+  globalUsageLimit      Int?
+  currentUsageCount     Int      @default(0)
+  startDate             DateTime
+  endDate               DateTime
+  isActive              Boolean  @default(true)
+  isFlagged             Boolean  @default(false)
+  flagReason            String?  @db.Text
+  flaggedByAdminId      String?
+  flaggedAt             DateTime?
+  isDemo                Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdByOwnerId      String
+  restaurant            RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId])
+  @@index([code])
+  @@index([isActive])
+  @@index([startDate])
+  @@index([endDate])
+  @@index([isFlagged])
+  @@index([isDemo])
+  @@map("coupons")
+}
+
+enum PromotionType {
+  percentage_discount
+  fixed_discount
+  bogo
+  category_discount
+  time_window
+  first_time_customer
+}
+
+enum CouponDiscountType {
+  percentage
+  fixed_amount
 }

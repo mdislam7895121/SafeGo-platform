@@ -1,0 +1,146 @@
+Proceed with Phase 7.
+
+PHASE 7 – Restaurant Promotions, Discounts & Coupon System (SafeGo Eats)
+
+Requirements:
+- Additive only. No removal/modification of any existing fields or logic.
+- Must not break food_orders, menu, payouts, staff system, analytics, rides, or parcel.
+- Full RBAC and restaurant_id scoping.
+- BD/US KYC gating must apply: unverified restaurants cannot create promotions.
+
+Build the following modules:
+
+----------------------------------------------------
+1. Promotions Dashboard (/restaurant/promotions)
+----------------------------------------------------
+OWNER-only page.
+Features:
+- List all current, scheduled, and expired promotions
+- Columns: title, type, discount, validity, status, usage_count, created_at
+- Filters: active, scheduled, expired, type (percentage, fixed, BOGO)
+
+----------------------------------------------------
+2. Create Promotion (/restaurant/promotions/new)
+----------------------------------------------------
+Promotion types supported:
+1. Percentage Discount (e.g., 10% off)
+2. Flat Amount Discount (e.g., $5 off)
+3. BOGO (Buy X Get Y)
+4. Category-based discount
+5. Time-window promotions (e.g., lunch-only deals)
+6. First-time-customer discount
+
+Fields:
+- title (required)
+- description
+- promo_type
+- discount_value / percentage
+- applicable_items[] OR applicable_categories[]
+- min_order_amount
+- max_discount_cap
+- usage_limit_per_customer
+- global_usage_limit
+- start_date, end_date
+- is_active
+
+Permissions:
+- OWNER can create/update/delete promotions
+- STAFF can only view, not edit
+
+----------------------------------------------------
+3. Coupon Code System (/restaurant/promotions/coupons)
+----------------------------------------------------
+OWNER-only.
+Features:
+- Create coupon codes manually or auto-generate
+- Fields:
+  - code
+  - discount_type
+  - discount_value
+  - validity period
+  - usage limit
+  - per-customer limit
+  - is_active
+- Coupons visible in customer checkout flow if applicable
+
+----------------------------------------------------
+4. Checkout & Order Calculation Integration
+----------------------------------------------------
+Additive changes only to food_orders:
+- customer can apply a valid coupon before placing order
+- validate:
+  - coupon exists
+  - not expired
+  - usage limits
+  - restaurant ownership matches
+  - min order amount matches
+- Apply discount BEFORE commission calculation
+- Commission logic unchanged (SafeGo still earns on discounted subtotal)
+
+Add new additive fields to food_orders if not present:
+- applied_promotion_id
+- applied_coupon_code
+- discount_amount
+
+----------------------------------------------------
+5. Admin Panel Extensions
+----------------------------------------------------
+Add promotion moderation for safety and compliance:
+- Admin can view all promotions+coupons from all restaurants
+- Admin can flag/unflag promotions
+- Admin can force-disable promotion if violating policy
+- Admin cannot edit promo details (OWNER controls content)
+
+Additive endpoints:
+- GET /api/admin/promotions
+- POST /api/admin/promotions/:id/flag
+- POST /api/admin/promotions/:id/disable
+
+----------------------------------------------------
+6. Backend Endpoints (Add-only)
+----------------------------------------------------
+Restaurant:
+- GET /api/restaurant/promotions
+- POST /api/restaurant/promotions
+- PATCH /api/restaurant/promotions/:id
+- DELETE /api/restaurant/promotions/:id (soft delete)
+- GET /api/restaurant/promotions/coupons
+- POST /api/restaurant/promotions/coupons
+
+Customer:
+- POST /api/customer/promotions/validate
+  - Validate coupon/promo during checkout
+
+Admin:
+- GET /api/admin/promotions
+- POST /api/admin/promotions/:id/flag
+- POST /api/admin/promotions/:id/disable
+
+----------------------------------------------------
+7. Security & RBAC
+----------------------------------------------------
+- OWNER-only creation/modification
+- STAFF read-only
+- Customers only validate/apply; cannot view internal details
+- Admin can only moderate, not change promo structure
+- All promo create/update/delete logged in security_audit_log
+
+----------------------------------------------------
+8. UI Frontend
+----------------------------------------------------
+Build:
+- Promotions list
+- New promotion form
+- Edit promotion page
+- Coupon list page
+- Coupon creation modal
+- Activation toggles
+- Validation messages
+
+Ensure:
+- Works with existing Phase 1–6 navbar/layout
+- Fully responsive on mobile
+
+----------------------------------------------------
+Finish Phase 7 completely before moving to Phase 8.
+----------------------------------------------------
