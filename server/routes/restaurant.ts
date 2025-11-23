@@ -2616,4 +2616,294 @@ router.get("/analytics/drivers", requireKYCCompletion, async (req: AuthRequest, 
   }
 });
 
+// ====================================================
+// STAFF MANAGEMENT SYSTEM (Phase 6)
+// ====================================================
+
+// GET /api/restaurant/staff
+// Get all staff members for the current OWNER
+router.get("/staff", requireOwnerRole, requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const { getStaffForOwner } = await import("../staff/staffUtils");
+    const staff = await getStaffForOwner(restaurantProfile.id);
+
+    res.json({ staff });
+  } catch (error: any) {
+    console.error("Get staff error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch staff" });
+  }
+});
+
+// POST /api/restaurant/staff
+// Create a new staff member (OWNER only)
+router.post("/staff", requireOwnerRole, requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { name, email, phone, temporaryPassword, permissions } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !phone || !temporaryPassword) {
+      return res.status(400).json({
+        error: "Name, email, phone, and temporary password are required",
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, isVerified: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    if (!restaurantProfile.isVerified) {
+      return res.status(403).json({
+        error: "Restaurant must be verified before adding staff",
+      });
+    }
+
+    const { createStaffMember } = await import("../staff/staffUtils");
+    const result = await createStaffMember(restaurantProfile.id, {
+      name,
+      email,
+      phone,
+      temporaryPassword,
+      permissions,
+    });
+
+    res.status(201).json({
+      message: "Staff member created successfully",
+      staff: result.restaurantProfile,
+    });
+  } catch (error: any) {
+    console.error("Create staff error:", error);
+    res.status(500).json({ error: error.message || "Failed to create staff member" });
+  }
+});
+
+// GET /api/restaurant/staff/:id
+// Get details of a specific staff member
+router.get("/staff/:id", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: staffId } = req.params;
+
+    const { canManageStaff } = await import("../staff/staffUtils");
+    const canManage = await canManageStaff(userId, staffId);
+
+    if (!canManage) {
+      return res.status(403).json({
+        error: "You do not have permission to view this staff member",
+      });
+    }
+
+    const staff = await prisma.restaurantProfile.findUnique({
+      where: { id: staffId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+            role: true,
+          },
+        },
+      },
+    });
+
+    if (!staff) {
+      return res.status(404).json({ error: "Staff member not found" });
+    }
+
+    res.json({ staff });
+  } catch (error: any) {
+    console.error("Get staff details error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch staff details" });
+  }
+});
+
+// PATCH /api/restaurant/staff/:id
+// Update staff member permissions (OWNER only)
+router.patch("/staff/:id", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: staffId } = req.params;
+    const { permissions } = req.body;
+
+    const { canManageStaff } = await import("../staff/staffUtils");
+    const canManage = await canManageStaff(userId, staffId);
+
+    if (!canManage) {
+      return res.status(403).json({
+        error: "You do not have permission to manage this staff member",
+      });
+    }
+
+    // Build update data from permissions object
+    const updateData: any = {};
+    if (permissions) {
+      if (permissions.canEditCategories !== undefined)
+        updateData.canEditCategories = permissions.canEditCategories;
+      if (permissions.canEditItems !== undefined)
+        updateData.canEditItems = permissions.canEditItems;
+      if (permissions.canToggleAvailability !== undefined)
+        updateData.canToggleAvailability = permissions.canToggleAvailability;
+      if (permissions.canUseBulkTools !== undefined)
+        updateData.canUseBulkTools = permissions.canUseBulkTools;
+      if (permissions.canViewAnalytics !== undefined)
+        updateData.canViewAnalytics = permissions.canViewAnalytics;
+      if (permissions.canViewPayouts !== undefined)
+        updateData.canViewPayouts = permissions.canViewPayouts;
+      if (permissions.canManageOrders !== undefined)
+        updateData.canManageOrders = permissions.canManageOrders;
+    }
+
+    const updatedStaff = await prisma.restaurantProfile.update({
+      where: { id: staffId },
+      data: updateData,
+    });
+
+    res.json({
+      message: "Staff permissions updated successfully",
+      staff: updatedStaff,
+    });
+  } catch (error: any) {
+    console.error("Update staff error:", error);
+    res.status(500).json({ error: error.message || "Failed to update staff member" });
+  }
+});
+
+// POST /api/restaurant/staff/:id/block
+// Block or unblock a staff member (OWNER only)
+router.post("/staff/:id/block", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: staffId } = req.params;
+    const { block, reason } = req.body;
+
+    const { canManageStaff } = await import("../staff/staffUtils");
+    const canManage = await canManageStaff(userId, staffId);
+
+    if (!canManage) {
+      return res.status(403).json({
+        error: "You do not have permission to manage this staff member",
+      });
+    }
+
+    const updatedStaff = await prisma.restaurantProfile.update({
+      where: { id: staffId },
+      data: {
+        staffActive: !block,
+      },
+    });
+
+    // Create notification for staff member
+    await prisma.notification.create({
+      data: {
+        userId: updatedStaff.userId,
+        type: "alert",
+        title: block ? "Account Suspended" : "Account Activated",
+        body: block
+          ? `Your staff account has been suspended. ${reason ? `Reason: ${reason}` : ""}`
+          : "Your staff account has been activated. You can now log in.",
+      },
+    });
+
+    res.json({
+      message: `Staff member ${block ? "blocked" : "unblocked"} successfully`,
+      staff: updatedStaff,
+    });
+  } catch (error: any) {
+    console.error("Block staff error:", error);
+    res.status(500).json({ error: error.message || "Failed to block/unblock staff member" });
+  }
+});
+
+// GET /api/restaurant/staff/activity-log
+// Get activity log for all staff members (OWNER only)
+router.get("/staff/activity-log", requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+    const staffId = req.query.staffId as string | undefined;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Get all staff IDs for this restaurant
+    const { getStaffForOwner } = await import("../staff/staffUtils");
+    const staff = await getStaffForOwner(restaurantProfile.id);
+    const staffUserIds = staff.map((s) => s.user.id);
+
+    // Build where clause for audit logs
+    const where: any = {
+      actorId: { in: staffUserIds },
+    };
+
+    // Filter by specific staff if provided
+    if (staffId) {
+      const staffMember = staff.find((s) => s.id === staffId);
+      if (staffMember) {
+        where.actorId = staffMember.user.id;
+      }
+    }
+
+    const logs = await prisma.auditLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+    });
+
+    const total = await prisma.auditLog.count({ where });
+
+    res.json({
+      logs,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    });
+  } catch (error: any) {
+    console.error("Get activity log error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch activity log" });
+  }
+});
+
 export default router;
