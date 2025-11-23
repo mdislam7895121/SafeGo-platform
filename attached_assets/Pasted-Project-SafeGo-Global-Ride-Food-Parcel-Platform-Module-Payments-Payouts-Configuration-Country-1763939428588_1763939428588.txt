@@ -1,0 +1,293 @@
+Project: SafeGo – Global Ride/Food/Parcel Platform
+Module: Payments & Payouts Configuration (Country-aware, multi-method)
+Current Phase Context:
+- Phase 12 core backend is stable (rides, food, parcel, commissions, payouts, analytics).
+- Restaurant portal R-ENHANCE is almost done (header, layout, support).
+- We now need a SAFE, CONFIGURABLE payment + payout architecture that supports:
+  - Multiple countries (starting with BD and US)
+  - Multiple methods per country
+  - Future extensions without breaking existing logic
+
+Strict rules (do not violate):
+- Do NOT break any existing Phase 1–12 functionality.
+- Do NOT remove KYC, RBAC, audit logging, or security controls.
+- No real money movement or real PSP integration in this step.
+- All changes must be incremental, backwards compatible, and production-safe.
+- Follow SafeGo roles: CUSTOMER, DRIVER, RESTAURANT, ADMIN.
+- Support all three services: RIDES, FOOD, PARCEL.
+
+High-level goal
+1) Payouts:
+   - Restaurants and Drivers must be able to configure payout methods appropriate for their country.
+   - Admin can control which payout rails are allowed per country and per role.
+2) Customer Payments:
+   - Customers must be able to pay using any enabled payment method for their country and service.
+   - Admin can configure which payment methods are visible/enabled in each region.
+
+This phase focuses on:
+- Shared data model + configuration services
+- Admin and Restaurant UIs for configuration
+- Fixing existing payout 404s
+- Preparing, but not fully wiring, Driver & Customer flows (we can add safe “planned feature” placeholders).
+
+PART A – Shared enums and core models
+
+1. Country & Service enums
+Create or reuse enums:
+
+- CountryCode: BD, US, (keep extensible: IN, UK, etc.)
+- ServiceType: RIDE, FOOD, PARCEL
+- ActorType: CUSTOMER, DRIVER, RESTAURANT
+
+2. Payment/Payout method enums
+
+PaymentMethodType (for customer payments):
+- CARD
+- MOBILE_WALLET
+- BANK_TRANSFER
+- CASH
+- DIGITAL_WALLET
+- OTHER_PROVIDER
+
+PayoutRailType (for payouts):
+- BANK_ACCOUNT
+- CARD_PAYOUT
+- MOBILE_WALLET
+- EXTERNAL_PROVIDER
+- CASH_SETTLEMENT  (for small offline settlements, drivers only)
+- OTHER_RAIL
+
+PaymentProvider (examples, keep extensible):
+- VISA, MASTERCARD, AMEX
+- STRIPE_CARD, STRIPE_APPLE_PAY, STRIPE_GOOGLE_PAY
+- BKASH, NAGAD, ROCKET        (Bangladesh)
+- PAYPAL, WISE                (US/global)
+- CASH_ON_DELIVERY
+- INTERNAL_WALLET
+- OTHER
+
+PayoutProvider:
+- STRIPE_CONNECT
+- BANK_TRANSFER_US_ACH
+- BANK_TRANSFER_BD_LOCAL
+- BKASH_AGENT, NAGAD_AGENT, ROCKET_AGENT
+- PAYPAL_PAYOUT
+- MANUAL_OFFLINE
+- OTHER
+
+PART B – Configuration tables/services
+
+3. CountryPaymentConfig (what customers can use to PAY)
+
+Add a configuration model, for example:
+
+- CountryPaymentConfig
+  - id
+  - countryCode
+  - serviceType (RIDE/FOOD/PARCEL)
+  - methodType (PaymentMethodType)
+  - provider (PaymentProvider)
+  - isEnabled (boolean)
+  - priority (for ordering in UI)
+  - minAmount, maxAmount (optional)
+  - supportsRecurring (boolean)
+  - requiresKycLevel (enum: NONE, BASIC, FULL)
+  - createdAt, updatedAt
+  - createdByAdminId, lastUpdatedByAdminId
+
+Examples to seed (non-breaking):
+
+- Bangladesh (BD)
+  - FOOD: BKASH, NAGAD, ROCKET, CARD (VISA/MASTERCARD), CASH_ON_DELIVERY
+  - RIDE: BKASH, NAGAD, CASH_ON_DELIVERY
+  - PARCEL: BKASH, NAGAD, CASH_ON_DELIVERY, CARD
+
+- United States (US)
+  - FOOD: CARD (VISA/MASTERCARD/AMEX via STRIPE_CARD), STRIPE_APPLE_PAY, STRIPE_GOOGLE_PAY, PAYPAL, CASH_ON_DELIVERY (optional)
+  - RIDE: CARD, APPLE_PAY, GOOGLE_PAY
+  - PARCEL: CARD, PAYPAL
+
+4. CountryPayoutConfig (what RESTAURANTS/DRIVERS can use to GET PAID)
+
+Add a configuration model:
+
+- CountryPayoutConfig
+  - id
+  - countryCode
+  - actorType (RESTAURANT or DRIVER)
+  - payoutRailType (PayoutRailType)
+  - provider (PayoutProvider)
+  - isEnabled (boolean)
+  - minPayoutAmount
+  - payoutSchedule (enum: DAILY, WEEKLY, BIWEEKLY, MONTHLY, ON_DEMAND)
+  - requiresKycLevel (NONE/BASIC/FULL)
+  - createdAt, updatedAt
+  - createdByAdminId, lastUpdatedByAdminId
+
+Examples to seed:
+
+- BD / RESTAURANT:
+  - BANK_ACCOUNT via BANK_TRANSFER_BD_LOCAL
+  - MOBILE_WALLET via BKASH_AGENT, NAGAD_AGENT
+- BD / DRIVER:
+  - MOBILE_WALLET: BKASH_AGENT, NAGAD_AGENT, ROCKET_AGENT
+  - CASH_SETTLEMENT (MANUAL_OFFLINE, small balances)
+- US / RESTAURANT:
+  - BANK_ACCOUNT via BANK_TRANSFER_US_ACH
+  - STRIPE_CONNECT (card settlement)
+- US / DRIVER:
+  - CARD_PAYOUT to debit card (via STRIPE_CONNECT)
+  - BANK_ACCOUNT (ACH)
+  - CASH_SETTLEMENT (for legacy cases)
+
+PART C – PayoutMethod instances (Restaurant + Driver)
+
+5. Reuse a core PayoutMethod model, but allow both restaurant and driver:
+
+- PayoutMethod
+  - id
+  - actorType (RESTAURANT/DRIVER)
+  - restaurantId (nullable)
+  - driverId (nullable)
+  - countryCode
+  - payoutRailType
+  - provider (PayoutProvider)
+  - currency
+  - isDefault
+  - status (PENDING_VERIFICATION, ACTIVE, DISABLED)
+  - maskedDetails
+  - metadata (JSON – PSP specific ids, etc. encrypted if needed)
+  - createdAt, updatedAt
+  - createdByActorId, lastUpdatedByActorId, actorRole
+
+Security rules:
+- Never return sensitive bank/card details to the frontend.
+- Only return maskedDetails + safe metadata (bankName, last4, etc.).
+- Encrypt any PSP tokens or sensitive identifiers at rest if stored.
+
+For now:
+- FULLY IMPLEMENT restaurant payout methods UI + API using this model.
+- For drivers: create the schema and backend endpoints, but it is OK to leave the UI as “planned feature” with a simple read-only placeholder page in the driver portal that reads which payout rails will be available per country.
+
+PART D – Customer payment methods (frontend behavior)
+
+6. Central PaymentOptionsService
+
+Create a backend service like PaymentOptionsService that:
+
+- Given: countryCode, serviceType (RIDE/FOOD/PARCEL), customerId (optional), order amount
+- Returns: the list of enabled payment methods based on CountryPaymentConfig, customer KYC level, and any risk rules.
+- This service will be used later by:
+  - Web customer app
+  - Mobile apps
+  - Restaurant/driver portals when showing “How your customers can pay”
+
+In this phase:
+- Wire PaymentOptionsService into:
+  - Restaurant portal: a read-only info section in Store Settings (e.g., “Customer Payment Options in your region”).
+  - Admin portal: full management UI for CountryPaymentConfig.
+
+Do NOT change live checkout flows yet if they exist. If checkout already exists, you can:
+- Add a “debug/log only” usage of PaymentOptionsService to log which options would be shown, but keep current behavior unchanged.
+
+PART E – Admin UI for global config
+
+7. Admin Payment & Payout Settings (new pages)
+
+Add an Admin panel section:
+
+- “Payments & Payouts Configuration”
+  - Tab 1: Customer Payment Methods
+    - Filters: Country, Service (Ride/Food/Parcel)
+    - Table/list of CountryPaymentConfig rows:
+      - Method type, provider, enabled toggle, priority, min/max, KYC requirement.
+    - Admin can:
+      - Add new method config (e.g., enable BKASH for BD/FOOD).
+      - Enable/disable existing configs.
+      - Adjust priority (order).
+  - Tab 2: Payout Rails
+    - Filters: Country, ActorType (Restaurant/Driver)
+    - Table of CountryPayoutConfig rows:
+      - Rail type, provider, enabled toggle, schedule, min amount, KYC requirement.
+    - Admin can:
+      - Add/modify/delete configs.
+      - Enable/disable payout rails per country & role.
+
+Security:
+- Only ADMIN role with proper permission can modify these configs.
+- All changes are recorded in audit logs (who, what, when, from where).
+
+PART F – Restaurant UI updates
+
+8. Restaurant payout changes (extend previous work)
+
+Extend the restaurant Payout & Wallet section:
+
+- Fix any existing 404s (e.g. /restaurant/payouts/overview must resolve).
+- “View Wallet”:
+  - Shows wallet snapshot + basic transaction list placeholder.
+- “Manage Payout Methods”:
+  - Shows the list of active payout methods (from PayoutMethod).
+  - Shows which rails are allowed in this country for RESTAURANT (from CountryPayoutConfig).
+  - Button “Add Payout Method”:
+    - Filters choices by allowed rails for this country.
+    - Example (BD restaurant): Bank Account (local), bKash, Nagad.
+    - Example (US restaurant): Bank Account (ACH), Stripe Connect.
+
+Validation:
+- Do not allow adding payout methods that are not enabled in CountryPayoutConfig for that restaurant’s country.
+- If admin later disables a payout rail, existing methods using that rail:
+  - become DISABLED or show a warning (“This payout method is no longer supported. Please add a new method.”).
+
+PART G – Driver and customer placeholders
+
+9. Driver portal
+
+- Add a simple “Payout Settings (Coming Soon)” page in the driver portal that:
+  - Lists which payout rails are configured for the driver’s country from CountryPayoutConfig.
+  - Shows a message that full setup will be available in a later phase.
+- Do NOT implement actual driver payout forms yet, just the schema and a read-only view.
+
+10. Customer info
+
+- Add read-only info where appropriate (e.g., in Help Center or Store Settings):
+  - For each country + service type, show a human-readable list of customer payment methods configured in CountryPaymentConfig.
+  - This is documentation only for now; checkout will use PaymentOptionsService in a future phase.
+
+PART H – Security, RBAC, auditing
+
+11. RBAC
+
+- ADMIN:
+  - Full control over CountryPaymentConfig and CountryPayoutConfig.
+- RESTAURANT_OWNER:
+  - Can manage their own PayoutMethod entries, limited by CountryPayoutConfig.
+  - Cannot change Country-level configs.
+- RESTAURANT_STAFF (finance role):
+  - Read-only view of payout methods and wallet snapshots.
+- DRIVER:
+  - For now, read-only “coming soon” view of which payout rails will be available.
+- CUSTOMER:
+  - No direct access to configuration; only see available options via checkout later.
+
+12. Audit logging
+
+All mutating operations must be logged:
+- Creating/updating/deleting:
+  - CountryPaymentConfig
+  - CountryPayoutConfig
+  - PayoutMethod
+- Log: actorType, actorId, role, old values, new values, timestamp, and identifying metadata (IP/user-agent if available).
+
+PART I – Testing and documentation
+
+13. Tests
+
+Add tests (unit/integration) to cover:
+
+- PaymentOptionsService:
+  - BD/FOOD returns BKASH/NAGAD etc when enabled.
+  - US/FOOD returns CARD/APPLE_PAY/GOOGLE_PAY/PAYPAL as configured.
+  - KYC requirements enforced (if customer KYC level is too low, method not returned).
+- Payout methods:
+  - Restaurant can only add
