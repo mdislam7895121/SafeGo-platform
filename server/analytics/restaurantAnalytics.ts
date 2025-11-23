@@ -119,12 +119,11 @@ export async function getOverviewAnalytics(
   }
 
   orders.forEach((order) => {
+    if (order.status !== "delivered") return;
     const hour = new Date(order.createdAt).getHours();
     const current = hourlyMap.get(hour)!;
     current.orders++;
-    if (order.status === "delivered") {
-      current.revenue += decimalToNumber(order.subtotal);
-    }
+    current.revenue += decimalToNumber(order.subtotal);
   });
 
   const hourlyDistribution = Array.from(hourlyMap.entries()).map(([hour, data]) => ({
@@ -135,15 +134,14 @@ export async function getOverviewAnalytics(
   // Daily trend
   const dailyMap = new Map<string, { orders: number; revenue: number }>();
   orders.forEach((order) => {
+    if (order.status !== "delivered") return;
     const dateKey = new Date(order.createdAt).toISOString().split("T")[0];
     if (!dailyMap.has(dateKey)) {
       dailyMap.set(dateKey, { orders: 0, revenue: 0 });
     }
     const current = dailyMap.get(dateKey)!;
     current.orders++;
-    if (order.status === "delivered") {
-      current.revenue += decimalToNumber(order.subtotal);
-    }
+    current.revenue += decimalToNumber(order.subtotal);
   });
 
   const dailyTrend = Array.from(dailyMap.entries())
@@ -195,7 +193,7 @@ export async function getItemAnalytics(
   // Parse items and aggregate
   const itemStats = new Map<
     string,
-    { orderCount: number; revenue: number; cancellations: number; prepTimes: number[] }
+    { deliveredCount: number; revenue: number; cancellations: number; prepTimes: number[] }
   >();
 
   orders.forEach((order) => {
@@ -208,13 +206,13 @@ export async function getItemAnalytics(
       items.forEach((item: any) => {
         const name = item.name || item.itemName || "Unknown Item";
         if (!itemStats.has(name)) {
-          itemStats.set(name, { orderCount: 0, revenue: 0, cancellations: 0, prepTimes: [] });
+          itemStats.set(name, { deliveredCount: 0, revenue: 0, cancellations: 0, prepTimes: [] });
         }
 
         const stat = itemStats.get(name)!;
-        stat.orderCount++;
 
         if (order.status === "delivered") {
+          stat.deliveredCount++;
           stat.revenue += decimalToNumber(order.subtotal) / items.length;
         }
 
@@ -233,18 +231,21 @@ export async function getItemAnalytics(
     }
   });
 
-  const itemArray = Array.from(itemStats.entries()).map(([name, stat]) => ({
-    itemName: name,
-    orderCount: stat.orderCount,
-    revenue: Math.round(stat.revenue * 100) / 100,
-    cancellationCount: stat.cancellations,
-    cancellationRate:
-      stat.orderCount > 0 ? Math.round((stat.cancellations / stat.orderCount) * 100) : 0,
-    avgPrepTime:
-      stat.prepTimes.length > 0
-        ? Math.round(stat.prepTimes.reduce((a, b) => a + b, 0) / stat.prepTimes.length)
-        : 0,
-  }));
+  const itemArray = Array.from(itemStats.entries()).map(([name, stat]) => {
+    const totalAttempts = stat.deliveredCount + stat.cancellations;
+    return {
+      itemName: name,
+      orderCount: stat.deliveredCount,
+      revenue: Math.round(stat.revenue * 100) / 100,
+      cancellationCount: stat.cancellations,
+      cancellationRate:
+        totalAttempts > 0 ? Math.round((stat.cancellations / totalAttempts) * 100) : 0,
+      avgPrepTime:
+        stat.prepTimes.length > 0
+          ? Math.round(stat.prepTimes.reduce((a, b) => a + b, 0) / stat.prepTimes.length)
+          : 0,
+    };
+  });
 
   const topItems = itemArray
     .sort((a, b) => b.revenue - a.revenue)
