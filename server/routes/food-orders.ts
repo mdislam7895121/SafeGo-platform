@@ -2,6 +2,7 @@ import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { walletService } from "../services/walletService";
+import crypto from "crypto";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -107,6 +108,7 @@ router.post("/", async (req: AuthRequest, res) => {
     if (restaurantUser) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: restaurantUser.id,
           type: "food_order_update",
           title: "New Food Order",
@@ -296,6 +298,7 @@ router.patch("/:id/accept", async (req: AuthRequest, res) => {
     if (customerUser) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: customerUser.id,
           type: "food_order_update",
           title: "Order Accepted",
@@ -380,6 +383,7 @@ router.patch("/:id/assign-driver", async (req: AuthRequest, res) => {
     if (customerUser) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: customerUser.id,
           type: "food_order_update",
           title: "Driver Assigned",
@@ -452,6 +456,7 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
     if (customerUser) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: customerUser.id,
           type: "food_order_update",
           title: "Order Status Updated",

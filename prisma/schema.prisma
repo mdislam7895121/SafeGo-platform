@@ -293,30 +293,35 @@ model DriverWallet {
 }
 
 model FoodOrder {
-  id                String            @id
-  customerId        String
-  restaurantId      String
-  driverId          String?
-  deliveryAddress   String
-  deliveryLat       Float?
-  deliveryLng       Float?
-  serviceFare       Decimal           @db.Decimal(10, 2)
-  safegoCommission  Decimal           @db.Decimal(10, 2)
-  restaurantPayout  Decimal           @db.Decimal(10, 2)
-  driverPayout      Decimal           @db.Decimal(10, 2)
-  paymentMethod     String
-  status            String
-  customerRating    Int?
-  customerFeedback  String?
-  taxBreakdown      Json?
-  totalTaxAmount    Decimal?          @db.Decimal(10, 2)
-  isDemo            Boolean           @default(false)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime
-  deliveredAt       DateTime?
-  customer          CustomerProfile   @relation(fields: [customerId], references: [id])
-  driver            DriverProfile?    @relation(fields: [driverId], references: [id])
-  restaurant        RestaurantProfile @relation(fields: [restaurantId], references: [id])
+  id                 String            @id
+  customerId         String
+  restaurantId       String
+  driverId           String?
+  deliveryAddress    String
+  deliveryLat        Float?
+  deliveryLng        Float?
+  items              String?           // JSON string of ordered items (nullable for backward compatibility)
+  serviceFare        Decimal           @db.Decimal(10, 2)
+  safegoCommission   Decimal           @db.Decimal(10, 2)
+  restaurantPayout   Decimal           @db.Decimal(10, 2)
+  driverPayout       Decimal           @db.Decimal(10, 2)
+  deliveryPayout     Decimal?          @db.Decimal(10, 2) // Alias for driverPayout for compatibility
+  paymentMethod      String
+  status             String
+  customerRating     Int?
+  customerFeedback   String?
+  restaurantRating   Int?
+  restaurantFeedback String?
+  taxBreakdown       Json?
+  totalTaxAmount     Decimal?          @db.Decimal(10, 2)
+  isDemo             Boolean           @default(false)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime
+  deliveredAt        DateTime?
+  completedAt        DateTime?
+  customer           CustomerProfile   @relation(fields: [customerId], references: [id])
+  driver             DriverProfile?    @relation(fields: [driverId], references: [id])
+  restaurant         RestaurantProfile @relation(fields: [restaurantId], references: [id])
 
   @@index([isDemo])
   @@map("food_orders")

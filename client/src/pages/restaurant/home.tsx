@@ -17,7 +17,7 @@ export default function RestaurantHome() {
 
   // Fetch recent orders
   const { data: ordersData } = useQuery({
-    queryKey: ["/api/restaurant/orders", { limit: 5 }],
+    queryKey: ["/api/restaurant/orders?limit=5"],
     refetchInterval: 10000, // Refresh every 10 seconds
   });
 
