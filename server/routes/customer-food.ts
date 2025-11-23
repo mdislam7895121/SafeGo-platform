@@ -323,4 +323,121 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/customer/food/restaurants/:id/branding
+// Get restaurant branding and media gallery (customer only)
+// Returns only visible media (not hidden/flagged by admin)
+// ====================================================
+router.get("/restaurants/:id/branding", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can view restaurant branding" });
+    }
+
+    // Get customer profile to check verification
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Enforce KYC verification
+    if (!customerProfile.isVerified) {
+      return res.status(403).json({ 
+        error: "You must complete KYC verification to order food",
+        requiresVerification: true,
+      });
+    }
+
+    // Get restaurant
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Verify restaurant is available
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended) {
+      return res.status(404).json({ error: "Restaurant not available" });
+    }
+
+    // Verify jurisdiction match
+    if (restaurant.user.countryCode !== customerProfile.user.countryCode) {
+      return res.status(403).json({ error: "Restaurant not available in your country" });
+    }
+
+    // Get branding (or create default)
+    let branding = await prisma.restaurantBranding.findUnique({
+      where: { restaurantId: id },
+    });
+
+    if (!branding) {
+      branding = await prisma.restaurantBranding.create({
+        data: {
+          restaurantId: id,
+          themeMode: "light",
+        },
+      });
+    }
+
+    // Get visible media only (not hidden by admin, not flagged)
+    const media = await prisma.restaurantMedia.findMany({
+      where: {
+        restaurantId: id,
+        isHidden: false,
+        isFlagged: false,
+      },
+      orderBy: {
+        displayOrder: 'asc',
+      },
+      select: {
+        id: true,
+        filePath: true,
+        fileUrl: true,
+        fileType: true,
+        category: true,
+        displayOrder: true,
+        createdAt: true,
+      },
+    });
+
+    // Format response (customer-facing only, no admin fields)
+    res.json({
+      branding: {
+        logoUrl: branding.logoUrl,
+        coverPhotoUrl: branding.coverPhotoUrl,
+        primaryColor: branding.primaryColor,
+        secondaryColor: branding.secondaryColor,
+        themeMode: branding.themeMode,
+      },
+      media: media.map((item) => ({
+        id: item.id,
+        url: item.fileUrl || item.filePath,
+        type: item.fileType,
+        category: item.category,
+        displayOrder: item.displayOrder,
+      })),
+    });
+  } catch (error) {
+    console.error("[Customer Food] Get restaurant branding error:", error);
+    res.status(500).json({ error: "Failed to fetch restaurant branding" });
+  }
+});
+
 export default router;
