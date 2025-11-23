@@ -34,6 +34,21 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
   const restaurantName = profile?.restaurantName || "SafeGo Restaurant";
   const actualOwnerRole = profile?.ownerRole || "OWNER"; // Default to OWNER for backward compatibility
 
+  // Detect desktop vs mobile/tablet (must be before any conditional returns)
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      setIsDesktop(e.matches);
+    };
+    
+    // Check initial state
+    handleChange(mediaQuery);
+    
+    // Listen for changes
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   // RBAC: If this layout requires OWNER role, verify the user is actually an OWNER
   useEffect(() => {
     if (!isLoading && profile && userRole === "OWNER" && actualOwnerRole === "STAFF") {
@@ -68,21 +83,6 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
       </div>
     );
   }
-
-  // Detect desktop vs mobile/tablet
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(min-width: 1024px)');
-    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
-      setIsDesktop(e.matches);
-    };
-    
-    // Check initial state
-    handleChange(mediaQuery);
-    
-    // Listen for changes
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
 
   return (
     <div className="min-h-screen bg-background">
