@@ -1,0 +1,347 @@
+Act as a senior full-stack engineer for SafeGo.
+
+GOAL  
+Build a production-ready **Admin Live Support Console** on top of the existing SafeGo bot-first support system (Option C: single `conversationActive` source of truth).  
+This console will let internal support agents see escalated conversations and chat live with drivers, riders, restaurants, and parcel couriers.
+
+Absolute rules (do not break these):
+- Keep all existing SafeGo conventions:
+  - Four roles only: `driver`, `rider` (customer), `restaurant`, `courier` (parcel).
+  - Existing KYC, tax, payouts, documents, trips, and wallet logic must remain unchanged.
+- Do **not** break or rename any existing URLs or API contracts already used by the driver/customer apps.
+- Do **not** touch ride / food / parcel order flows except where they appear as read-only info in the admin console.
+- Keep the Option C architecture:
+  - Single `conversationActive` flag as the only source of truth for open/closed state.
+  - Existing support APIs: `start`, `messages`, `send`, `escalate`, `bot-helpful`, `bot-unhelpful`, `end` must keep working exactly as they are for user-side.
+- All changes must be backward-compatible, race-condition-free, and safe to deploy.
+
+────────────────────────
+1. Existing System (assume this is already working)
+────────────────────────
+The current system already has:
+- Bot-first support flow for all 4 roles.
+- Intent engine and escalation rules.
+- Conversation lifecycle with rating at the end.
+- Backend services (or equivalents):
+  - `BotService` – intent detection + responses.
+  - `EscalationService` – manual + automatic escalation.
+  - `LiveChatService` – manages conversation lifecycle.
+- 7 REST endpoints (names may vary, but the idea is):
+  - `POST /api/support/start`
+  - `GET  /api/support/messages?conversationId=...`
+  - `POST /api/support/send`
+  - `POST /api/support/escalate`
+  - `POST /api/support/bot-helpful`
+  - `POST /api/support/bot-unhelpful`
+  - `POST /api/support/end`
+- Frontend guards that use:
+  - `conversationActive` ref as single source of truth.
+  - `conversationStatusRef`, `finalStatusRef`, and polling interval refs.
+  - Defensive checks so no API calls happen when the conversation is closed.
+
+You must **reuse this architecture** and only extend it for internal admins.
+
+────────────────────────
+2. New Feature: Admin Support Console
+────────────────────────
+Create a new **admin-only** area for live support.
+
+ROUTE
+- Add a single page at:
+  - `/admin/support`
+- Access:
+  - Only logged-in users with role `admin` or `support_agent`.
+  - All other roles → return 403 on API and redirect to a safe page on the UI.
+
+MAIN REQUIREMENTS
+- Show all escalated or open conversations for all roles.
+- Allow an agent to:
+  - Claim a conversation (“Take chat”).
+  - Send live messages to the user.
+  - See bot history and intents.
+  - End the chat → which triggers the existing rating flow on the user side.
+- Integrate safely with the existing `conversationActive` logic so:
+  - Bot cannot send messages after an agent closes the conversation.
+  - Agent cannot send messages after `conversationActive` becomes false.
+
+────────────────────────
+3. Data Models (Prisma or equivalent ORM)
+────────────────────────
+If not already present, add or extend the following models without breaking existing tables:
+
+`SupportConversation`
+- `id` (string/UUID)
+- `userId` (FK to driver/rider/restaurant/courier user table)
+- `role` enum: `"driver" | "rider" | "restaurant" | "courier"`
+- `channel` default `"support"`
+- `status` enum:
+  - `"bot_only"`        // active but no agent yet
+  - `"waiting_agent"`   // escalated, in admin queue
+  - `"active_agent"`    // agent chatting
+  - `"closed"`          // finished
+- `escalationType` enum:
+  - `"none"`
+  - `"manual"`          // user typed “agent”, “human”, etc.
+  - `"auto"`            // 3 bot failures
+- `assignedAgentId` (nullable FK to admin/support_agent user)
+- `lastMessageAt` (DateTime)
+- `rating` (nullable int 1-5)
+- `feedback` (nullable string)
+- `createdAt`, `updatedAt`
+
+`SupportMessage`
+- `id` (string/UUID)
+- `conversationId` (FK)
+- `senderType` enum: `"user" | "bot" | "agent" | "system"`
+- `senderId` (nullable; null or fixed value for bot/system)
+- `text` (string)
+- `metadata` (JSON; can store intent, topic, language, etc.)
+- `createdAt`
+
+Rules:
+- Do not remove or rename any fields used by the existing user-side support system.
+- If a similar model already exists, extend instead of replacing it.
+
+────────────────────────
+4. Backend Admin APIs
+────────────────────────
+Create a new admin API group. All routes must:
+- Require `admin` or `support_agent` role.
+- Use shared auth middleware.
+- Return 403 for non-admin roles.
+
+4.1 List conversations
+`GET /api/admin/support/conversations`
+Query params:
+- `status?` → `"open" | "closed" | "waiting_agent" | "active_agent"`  
+  - `open` means `bot_only` OR `waiting_agent` OR `active_agent`.
+- `role?` → `"driver" | "rider" | "restaurant" | "courier"`
+- `search?` (partial email, phone, or conversationId)
+- `page?` (default 1)
+- `pageSize?` (default 20)
+
+Response:
+- Paginated list with:
+  - `conversationId`
+  - `userName`, `maskedEmail`, `role`
+  - `status`, `escalationType`
+  - `assignedAgentName` (if any)
+  - `lastMessageAt`
+  - `lastIntent` (from metadata if available)
+  - `unreadCount` for agent
+
+4.2 Get conversation details
+`GET /api/admin/support/conversations/:id`
+
+Response:
+- `conversation` (meta fields)
+- `userSummary`:
+  - name, role, city/country
+  - current tier (Blue/Gold/Premium)
+  - last 3 trips/deliveries OR last 3 orders (depending on role)
+  - latest payout date and amount if driver/courier
+- `messages`:
+  - ordered oldest→newest
+  - each with senderType, text, createdAt, metadata (intent/topic, etc.)
+
+4.3 Assign / Take chat
+`POST /api/admin/support/conversations/:id/assign`
+Body:
+- `{ agentId?: string }`  
+Rules:
+- If `agentId` missing → use current logged-in admin.
+- Only one active agent per conversation.
+- When assigned:
+  - If status is `waiting_agent` or `bot_only` → set to `active_agent`.
+  - Save event message:
+    - `senderType = "system"`, text like `"Agent John Doe joined the chat."`
+
+4.4 Admin send message
+`POST /api/admin/support/messages`
+Body:
+- `{ conversationId: string, text: string }`
+
+Logic:
+- Validate:
+  - conversation exists
+  - `conversationActive === true`
+  - `status !== "closed"`
+- Append `SupportMessage` with `senderType = "agent"`, `senderId = currentAdminId`.
+- Update `lastMessageAt`.
+- Return updated message list or new message.
+
+4.5 End chat
+`POST /api/admin/support/conversations/:id/close`
+
+Logic:
+- Set:
+  - `status = "closed"`
+  - `conversationActive = false` (respect existing Option C logic)
+- Create a system message: `"Conversation closed by support."`
+- Trigger or mark for the **existing rating flow** on the user side (whatever mechanism already exists).
+- Guard: ignore if already closed.
+
+Optional (nice to have, but do not break anything):
+- 4.6 Simple metrics endpoint:
+  - `/api/admin/support/metrics` → counts of open, waiting_agent, active_agent, closed, avg response time, etc.
+
+────────────────────────
+5. Frontend: Admin Support UI (/admin/support)
+────────────────────────
+Implement a clean 3-column layout. Desktop-first; mobile can stack later.
+
+5.1 Left Column — Inbox
+- Search box (email, phone, id).
+- Filters:
+  - Tabs or dropdown:
+    - “All open”
+    - “Waiting for agent”
+    - “My chats”
+    - “Closed”
+  - Role filter: Driver / Rider / Restaurant / Parcel.
+- Conversation list items:
+  - User name + role badge (color-coded).
+  - Short preview of last message.
+  - Status pill:
+    - yellow for `waiting_agent`
+    - green for `active_agent`
+    - grey for `bot_only`
+    - dark/disabled for `closed`
+  - Escalation badge: Manual / Auto.
+  - Time since last message.
+
+5.2 Middle Column — Live Chat
+Header:
+- User name and role.
+- “Escalation: Manual/Auto” label.
+- Status:  
+  - `Bot only`, `Waiting agent`, `Agent connected`, `Closed`.
+- Buttons:
+  - “Take chat” (if unassigned or waiting_agent).
+  - “End chat” (if active_agent).
+  - Disabled when closed.
+
+Chat area:
+- Show conversation history:
+  - Different styles/colors for `bot`, `user`, `agent`, `system`.
+  - Timestamp on hover or small text.
+- Show system events:
+  - “Escalated after 3 unhelpful bot responses.”
+  - “Agent joined.”
+  - “Conversation closed.”
+
+Input area:
+- Text input with send button.
+- Quick reply templates based on role:
+  - For drivers: payouts, documents, trip issues.
+  - For riders: fare, cancellation, safety.
+  - For restaurants: orders, menu, prep time.
+  - For couriers: pickup/delivery failed, instructions.
+
+Important:
+- Respect `conversationActive`:
+  - If `false` or status `closed` → input is disabled and shows “Conversation closed. You cannot send new messages.”
+- Use existing polling or WebSocket strategy:
+  - Reuse the same pattern as the user-side chat but in admin context.
+  - Avoid additional race conditions.
+
+5.3 Right Column — User Snapshot
+Show read-only relevant info. Keep it lightweight and fast.
+
+For drivers/couriers:
+- Tier: Blue / Gold / Premium.
+- Last 3 trips/deliveries (short summary).
+- Latest payout:
+  - last payout date + amount.
+- Document status:
+  - driver license, TLC/NID, insurance, registration, background check.
+
+For riders:
+- Last 3 trips.
+- Payment method status.
+- Flags (fraud, chargeback, etc. if available).
+
+For restaurants:
+- Recent 3 orders.
+- Active menu status.
+- Estimated prep time configuration.
+
+Security note:
+- Do **not** expose full SSN, full NID, or full card details.
+- Respect existing masking rules (show only last 4 digits where applicable).
+
+────────────────────────
+6. Escalation & Rating Integration
+────────────────────────
+The existing bot-side rules must remain:
+
+- Manual escalation:
+  - user types:
+    - “agent”, “human”, “support”, “not helping”, etc.
+  - Bot sets `escalationType = "manual"`, `status = "waiting_agent"`.
+
+- Automatic escalation:
+  - After 3 consecutive bot responses marked unhelpful.
+  - Set `escalationType = "auto"`, `status = "waiting_agent"`.
+
+Admin console:
+- Should **only** read these flags; never override them incorrectly.
+- When admin “takes chat”:
+  - `status = "active_agent"`.
+- When admin “ends chat”:
+  - `status = "closed"`.
+  - `conversationActive = false`.
+  - Trigger or flag user rating flow.
+
+The existing rating modal / flow must work unchanged.
+
+────────────────────────
+7. Security & Reliability Requirements
+────────────────────────
+- All admin APIs must use the existing auth/guard layer.
+- No new public unauthenticated endpoints.
+- Validate:
+  - conversation exists
+  - current admin is authorized
+  - conversation not closed when sending messages.
+- Add basic server-side logging for:
+  - escalation events
+  - agent assignment
+  - chat closure
+
+Do not log sensitive fields (SSN, full NID, full card numbers).
+
+────────────────────────
+8. Testing Checklist (MUST PASS)
+────────────────────────
+Implement and manually verify these flows **before** declaring work complete:
+
+1) Bot-only flow still works for a driver — no admin involved.
+2) Manual escalation:
+   - Driver types “agent”.
+   - Status becomes `waiting_agent`.
+   - Conversation appears in `/admin/support` as “Waiting for agent”.
+3) Auto escalation:
+   - Trigger 3 unhelpful bot responses.
+   - Status becomes `waiting_agent` with `escalationType = "auto"`.
+   - Appears in admin list correctly labeled.
+4) Agent takeover:
+   - Admin opens `/admin/support`, filters “Waiting for agent”.
+   - Clicks “Take chat”.
+   - Status becomes `active_agent`.
+   - Messages from agent appear on driver side in real time.
+5) End chat:
+   - Admin clicks “End chat”.
+   - status = `closed`.
+   - Driver can no longer send messages.
+   - Rating flow appears for the driver as designed.
+6) Multi-role:
+   - Repeat a quick test for rider, restaurant, and courier.
+   - Verify role badges, quick topics, and user snapshot info are correct.
+7) Safety:
+   - Confirm that non-admin roles cannot access `/admin/support` or admin APIs.
+   - Confirm that sensitive fields remain masked.
+
+Only when all above checks pass, update any internal documentation (e.g., SUPPORT_SYSTEM_DEMO.md) to include the new Admin Console section and mark the system as production-ready.
+
+Now implement these changes step-by-step, keeping the code clean, typed, and consistent with the existing SafeGo codebase. Do not skip tests.
