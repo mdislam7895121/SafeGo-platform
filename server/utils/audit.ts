@@ -112,6 +112,10 @@ export const EntityType = {
   REFERRAL_SETTING: "referral_setting",
   PERFORMANCE: "performance",
   TAX_RULE: "tax_rule",
+  MENU_CATEGORY: "menu_category",
+  MENU_ITEM: "menu_item",
+  MENU_OPTION_GROUP: "menu_option_group",
+  MENU_OPTION: "menu_option",
 } as const;
 
 interface AuditLogParams {
@@ -215,4 +219,55 @@ export function getClientIp(req: any): string | null {
     req.socket?.remoteAddress ||
     null
   );
+}
+
+/**
+ * Menu-specific audit logging helper
+ * Logs menu CRUD operations (create/update/delete) for categories, items, and options
+ */
+interface MenuAuditParams {
+  actorId: string;
+  actorEmail: string;
+  actorRole: string;
+  ipAddress?: string | null;
+  actionType: "create" | "update" | "delete";
+  entityType: "menu_category" | "menu_item" | "menu_option_group" | "menu_option";
+  entityId: string;
+  restaurantId: string;
+  description: string;
+  metadata?: Record<string, any> | null;
+}
+
+export async function auditMenuAction(params: MenuAuditParams): Promise<void> {
+  const {
+    actorId,
+    actorEmail,
+    actorRole,
+    ipAddress = null,
+    actionType,
+    entityType,
+    entityId,
+    restaurantId,
+    description,
+    metadata = null,
+  } = params;
+
+  // Add restaurant_id to metadata for filtering
+  const enrichedMetadata = {
+    ...metadata,
+    restaurant_id: restaurantId,
+  };
+
+  await logAuditEvent({
+    actorId,
+    actorEmail,
+    actorRole,
+    ipAddress,
+    actionType: actionType.toUpperCase(),
+    entityType,
+    entityId,
+    description,
+    metadata: enrichedMetadata,
+    success: true,
+  });
 }
