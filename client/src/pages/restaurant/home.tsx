@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { 
   UtensilsCrossed, 
@@ -11,28 +11,76 @@ import {
   TrendingUp,
   Info,
   MessageCircle,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  Check,
+  X,
+  ChefHat,
+  PackageCheck,
+  Truck,
+  CreditCard,
+  MapPin
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatDistanceToNow } from "date-fns";
 
 export default function RestaurantHome() {
   const { user, logout } = useAuth();
   const [isOnline, setIsOnline] = useState(true);
+  const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const { data: restaurantData, isLoading } = useQuery({
     queryKey: ["/api/restaurant/home"],
     refetchInterval: 5000,
   });
 
-  const { data: ordersData } = useQuery({
+  const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ["/api/restaurant/orders?limit=50"],
-    refetchInterval: 10000,
+    refetchInterval: 10000, // Poll every 10 seconds for live updates
+  });
+
+  // Mutation for updating order status
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      return await apiRequest(`/api/food-orders/${orderId}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/home"] });
+      toast({
+        title: "Success",
+        description: "Order status updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update order status",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -56,13 +104,80 @@ export default function RestaurantHome() {
   const todayEarnings = todayOrders.reduce((sum: number, order: any) => 
     sum + Number(order.restaurantPayout || 0), 0
   );
-  const activeOrders = orders.filter((order: any) => 
+  const liveOrders = orders.filter((order: any) => 
     !['delivered', 'cancelled', 'completed'].includes(order.status)
   );
 
   // Mock rating (to be replaced with real data)
   const avgRating = 4.5;
   const totalRatings = 0;
+
+  // Helper functions
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'placed':
+        return 'default';
+      case 'accepted':
+      case 'preparing':
+        return 'secondary';
+      case 'ready_for_pickup':
+      case 'picked_up':
+        return 'default';
+      default:
+        return 'secondary';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      placed: 'NEW',
+      accepted: 'ACCEPTED',
+      preparing: 'PREPARING',
+      ready_for_pickup: 'READY',
+      picked_up: 'OUT FOR DELIVERY',
+      on_the_way: 'OUT FOR DELIVERY',
+      delivered: 'DELIVERED',
+      completed: 'COMPLETED',
+    };
+    return labels[status] || status.toUpperCase();
+  };
+
+  const getItemsSummary = (items: any) => {
+    if (!items || !Array.isArray(items)) return 'No items';
+    const totalItems = items.reduce((sum: number, item: any) => sum + (item.quantity || 1), 0);
+    const preview = items.slice(0, 2).map((item: any) => 
+      `${item.quantity || 1}x ${item.name}`
+    ).join(', ');
+    const remaining = items.length - 2;
+    return `${totalItems} items · ${preview}${remaining > 0 ? `, +${remaining} more` : ''}`;
+  };
+
+  const handleAcceptOrder = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, status: 'accepted' });
+  };
+
+  const handleRejectOrder = () => {
+    if (rejectOrderId) {
+      updateStatusMutation.mutate({ orderId: rejectOrderId, status: 'cancelled' });
+      setRejectOrderId(null);
+    }
+  };
+
+  const handleMarkPreparing = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, status: 'preparing' });
+  };
+
+  const handleMarkReady = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, status: 'ready_for_pickup' });
+  };
+
+  const handleMarkOutForDelivery = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, status: 'picked_up' });
+  };
+
+  const handleMarkCompleted = (orderId: string) => {
+    updateStatusMutation.mutate({ orderId, status: 'completed' });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -174,7 +289,7 @@ export default function RestaurantHome() {
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Active Orders</p>
                   <p className="text-3xl font-bold text-orange-600" data-testid="text-active-orders">
-                    {activeOrders.length || "—"}
+                    {liveOrders.length || "—"}
                   </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-orange-600 opacity-20" />
@@ -216,32 +331,160 @@ export default function RestaurantHome() {
           <div className="lg:col-span-2 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Live Orders
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Live Orders
+                    {liveOrders.length > 0 && (
+                      <Badge variant="default" className="ml-2">
+                        {liveOrders.length}
+                      </Badge>
+                    )}
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <Clock className="h-16 w-16 mx-auto mb-4 opacity-20" />
-                  <p className="font-medium">Live Orders will appear here</p>
-                  <p className="text-sm mt-2">This section will be implemented in Phase 2</p>
-                </div>
-              </CardContent>
-            </Card>
+                {ordersLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-32 w-full" />
+                    ))}
+                  </div>
+                ) : liveOrders.length > 0 ? (
+                  <div className="space-y-3">
+                    {liveOrders.map((order: any) => (
+                      <div
+                        key={order.id}
+                        className="border rounded-lg p-4 space-y-3 hover-elevate"
+                        data-testid={`live-order-${order.id}`}
+                      >
+                        {/* Order Header */}
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-semibold">Order #{order.id.substring(0, 8)}</p>
+                              <Badge 
+                                variant={getStatusBadgeVariant(order.status)}
+                                data-testid={`badge-order-status-${order.id}`}
+                              >
+                                {getStatusLabel(order.status)}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
+                            </p>
+                          </div>
+                          <p className="font-bold text-lg">${Number(order.serviceFare).toFixed(2)}</p>
+                        </div>
 
-            {/* Scheduled Orders Placeholder */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Scheduled Orders
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  <p className="text-sm">Scheduled orders coming in Phase 2</p>
-                </div>
+                        {/* Order Details */}
+                        <div className="space-y-2 text-sm">
+                          <div className="flex items-start gap-2">
+                            <ShoppingBag className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <span>{getItemsSummary(order.items)}</span>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                            <span className="text-muted-foreground">{order.deliveryAddress}</span>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-1">
+                              <Truck className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs">Delivery</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <CreditCard className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-xs capitalize">{order.paymentMethod}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        {profile?.isVerified && (
+                          <div className="pt-3 border-t">
+                            {order.status === 'placed' && (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  className="flex-1"
+                                  onClick={() => handleAcceptOrder(order.id)}
+                                  disabled={updateStatusMutation.isPending}
+                                  data-testid={`button-accept-order-${order.id}`}
+                                >
+                                  <Check className="h-4 w-4 mr-1" />
+                                  Accept Order
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setRejectOrderId(order.id)}
+                                  disabled={updateStatusMutation.isPending}
+                                  data-testid={`button-reject-order-${order.id}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                            {order.status === 'accepted' && (
+                              <Button
+                                size="sm"
+                                className="w-full"
+                                onClick={() => handleMarkPreparing(order.id)}
+                                disabled={updateStatusMutation.isPending}
+                                data-testid={`button-preparing-${order.id}`}
+                              >
+                                <ChefHat className="h-4 w-4 mr-2" />
+                                Mark as Preparing
+                              </Button>
+                            )}
+                            {order.status === 'preparing' && (
+                              <Button
+                                size="sm"
+                                className="w-full"
+                                onClick={() => handleMarkReady(order.id)}
+                                disabled={updateStatusMutation.isPending}
+                                data-testid={`button-ready-${order.id}`}
+                              >
+                                <PackageCheck className="h-4 w-4 mr-2" />
+                                Mark as Ready
+                              </Button>
+                            )}
+                            {order.status === 'ready_for_pickup' && (
+                              <div className="space-y-2">
+                                <Button
+                                  size="sm"
+                                  className="w-full"
+                                  onClick={() => handleMarkOutForDelivery(order.id)}
+                                  disabled={updateStatusMutation.isPending}
+                                  data-testid={`button-out-delivery-${order.id}`}
+                                >
+                                  <Truck className="h-4 w-4 mr-2" />
+                                  Mark as Out for Delivery
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => handleMarkCompleted(order.id)}
+                                  disabled={updateStatusMutation.isPending}
+                                  data-testid={`button-completed-${order.id}`}
+                                >
+                                  Customer Picked Up
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Clock className="h-16 w-16 mx-auto mb-4 opacity-20" />
+                    <p className="font-medium">No live orders right now</p>
+                    <p className="text-sm mt-2">New orders will appear here as customers order</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -395,6 +638,27 @@ export default function RestaurantHome() {
           </Card>
         )}
       </div>
+
+      {/* Reject Order Confirmation Dialog */}
+      <AlertDialog open={!!rejectOrderId} onOpenChange={() => setRejectOrderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reject this order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel the order and notify the customer. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleRejectOrder}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Reject Order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
