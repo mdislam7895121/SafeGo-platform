@@ -819,6 +819,7 @@ model SupportConversation {
   userType          String                      // "driver" | "customer" | "restaurant" | "parcel"
   status            SupportConversationStatus   @default(open)
   assignedAdminId   String?                     // Reference to User.id (admin)
+  adminLastSeenAt   DateTime?                   // Track when admin last viewed for unread count
   verifiedAt        DateTime?                   // When user confirmed their details
   topic             String?                     // payments | trips | documents | tax | account_settings | other
   entryContext      Json?                       // Device info, channel, etc.
@@ -837,6 +838,7 @@ model SupportConversation {
   @@index([assignedAdminId])
   @@index([status, createdAt])
   @@index([userId, userType, status])
+  @@index([adminLastSeenAt])
   @@map("support_conversations")
 }
 

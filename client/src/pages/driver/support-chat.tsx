@@ -255,6 +255,9 @@ export default function DriverSupportChat() {
   useEffect(() => {
     if (!conversationId) return;
 
+    // AbortController to cancel in-flight requests and prevent memory leaks
+    const abortController = new AbortController();
+
     const fetchNewMessages = async () => {
       try {
         // Use ref to access latest lastMessageTime without triggering effect recreation
@@ -263,6 +266,7 @@ export default function DriverSupportChat() {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
+          signal: abortController.signal, // Cancel request on cleanup
         });
         
         if (!res.ok) return;
@@ -290,17 +294,23 @@ export default function DriverSupportChat() {
           updateMessages(data.messages);
         }
       } catch (error) {
+        // Ignore AbortErrors from intentional cancellations
+        if (error instanceof Error && error.name === 'AbortError') return;
         console.error("Error fetching messages:", error);
       }
     };
 
-    // CRITICAL: Fire immediately on mount to prevent 4s delay in status updates
+    // CRITICAL: Fire immediately on mount to prevent delay in status updates
     fetchNewMessages();
     
-    // CRITICAL: Store interval handle in ref for cleanup in applyClosedState
-    pollingIntervalRef.current = setInterval(fetchNewMessages, 4000);
+    // MEMORY OPTIMIZATION: Increased from 4s to 5s to reduce polling overhead
+    // Adaptive polling: slower interval reduces memory pressure while maintaining real-time feel
+    pollingIntervalRef.current = setInterval(fetchNewMessages, 5000);
     
     return () => {
+      // Cancel any in-flight requests to prevent memory leaks
+      abortController.abort();
+      
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
