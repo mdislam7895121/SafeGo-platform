@@ -300,12 +300,18 @@ model FoodOrder {
   deliveryAddress    String
   deliveryLat        Float?
   deliveryLng        Float?
+  pickupAddress      String?           // Restaurant pickup location
+  pickupLat          Float?
+  pickupLng          Float?
   items              String?           // JSON string of ordered items (nullable for backward compatibility)
+  itemsCount         Int?              // Total number of items in order
   serviceFare        Decimal           @db.Decimal(10, 2)
   safegoCommission   Decimal           @db.Decimal(10, 2)
   restaurantPayout   Decimal           @db.Decimal(10, 2)
   driverPayout       Decimal           @db.Decimal(10, 2)
   deliveryPayout     Decimal?          @db.Decimal(10, 2) // Alias for driverPayout for compatibility
+  subtotal           Decimal?          @db.Decimal(10, 2) // Items subtotal before fees/taxes
+  deliveryFee        Decimal?          @db.Decimal(10, 2) // Delivery fee component
   paymentMethod      String
   status             String
   customerRating     Int?
@@ -314,6 +320,14 @@ model FoodOrder {
   restaurantFeedback String?
   taxBreakdown       Json?
   totalTaxAmount     Decimal?          @db.Decimal(10, 2)
+  orderCode          String?           // Unique searchable order code (e.g., "ORD-12345")
+  whoCancelled       String?           // "customer" | "restaurant" | "driver" | "admin"
+  cancellationReason String?           @db.Text
+  cancelledAt        DateTime?
+  acceptedAt         DateTime?         // When restaurant accepted order
+  preparingAt        DateTime?         // When restaurant started preparing
+  readyAt            DateTime?         // When order ready for pickup
+  pickedUpAt         DateTime?         // When driver picked up
   isDemo             Boolean           @default(false)
   createdAt          DateTime          @default(now())
   updatedAt          DateTime
@@ -323,6 +337,10 @@ model FoodOrder {
   driver             DriverProfile?    @relation(fields: [driverId], references: [id])
   restaurant         RestaurantProfile @relation(fields: [restaurantId], references: [id])
 
+  @@index([restaurantId, status])
+  @@index([restaurantId, createdAt])
+  @@index([orderCode])
+  @@index([status])
   @@index([isDemo])
   @@map("food_orders")
 }
@@ -341,37 +359,60 @@ model Notification {
 }
 
 model RestaurantProfile {
-  id                 String             @id @default(uuid())
-  userId             String             @unique
-  restaurantName     String
-  address            String
-  cuisineType        String?
-  description        String?
-  cityCode           String?
-  averageRating      Float?             @default(0)
-  totalRatings       Int?               @default(0)
-  verificationStatus String             @default("pending")
-  rejectionReason    String?
-  isVerified         Boolean            @default(false)
-  isActive           Boolean            @default(true)
-  isDemo             Boolean            @default(false)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  isSuspended        Boolean            @default(false)
-  suspendedAt        DateTime?
-  suspensionReason   String?
-  securityStatus     SecurityStatus     @default(normal)
-  securityNotes      String?
-  driverComplaints   DriverComplaint[]
-  foodOrders         FoodOrder[]
-  menuCategories     MenuCategory[]
-  menuItems          MenuItem[]
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  restaurantWallet   RestaurantWallet?
+  id                    String             @id @default(uuid())
+  userId                String             @unique
+  restaurantName        String
+  address               String
+  cuisineType           String?
+  description           String?
+  cityCode              String?
+  countryCode           String?
+  averageRating         Float?             @default(0)
+  totalRatings          Int?               @default(0)
+  verificationStatus    String             @default("pending")
+  rejectionReason       String?
+  isVerified            Boolean            @default(false)
+  isActive              Boolean            @default(true)
+  isDemo                Boolean            @default(false)
+  // Country-specific KYC fields (BD - Bangladesh)
+  fatherName            String?            // BD: Owner's father name
+  presentAddress        String?            // BD: Current address
+  permanentAddress      String?            // BD: Permanent address
+  nidNumber             String?            // BD: National ID number
+  nidFrontImageUrl      String?            // BD: NID front image
+  nidBackImageUrl       String?            // BD: NID back image
+  // Country-specific KYC fields (US - United States)
+  homeAddress           String?            // US: Owner's home address
+  governmentIdType      String?            // US: ID type (SSN, Driver License, etc.)
+  governmentIdLast4     String?            // US: Last 4 digits of government ID
+  // Common KYC fields
+  dateOfBirth           DateTime?          // Owner's date of birth
+  emergencyContactName  String?            // Emergency contact full name
+  emergencyContactPhone String?            // Emergency contact phone
+  // Business details
+  businessLicenseNumber String?
+  businessLicenseUrl    String?
+  healthCertificateUrl  String?
+  ownerRole             String?            // OWNER | STAFF
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  isSuspended           Boolean            @default(false)
+  suspendedAt           DateTime?
+  suspensionReason      String?
+  securityStatus        SecurityStatus     @default(normal)
+  securityNotes         String?
+  driverComplaints      DriverComplaint[]
+  foodOrders            FoodOrder[]
+  menuCategories        MenuCategory[]
+  menuItems             MenuItem[]
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  restaurantWallet      RestaurantWallet?
 
   @@index([cityCode])
+  @@index([countryCode])
   @@index([isActive])
   @@index([isDemo])
+  @@index([verificationStatus])
   @@map("restaurant_profiles")
 }
 

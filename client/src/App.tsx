@@ -64,6 +64,8 @@ import DriverAccountAbout from "@/pages/driver/account/about";
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
 import RestaurantHome from "@/pages/restaurant/home";
 import LiveOrders from "@/pages/restaurant/orders-live";
+import OrdersOverview from "@/pages/restaurant/orders-overview";
+import OrdersCancellations from "@/pages/restaurant/orders-cancellations";
 import ScheduledOrders from "@/pages/restaurant/orders-scheduled";
 import RestaurantOrders from "@/pages/restaurant/orders";
 import RestaurantMenu from "@/pages/restaurant/menu";
@@ -478,10 +480,24 @@ function Router() {
       </Route>
 
       {/* Orders */}
+      <Route path="/restaurant/orders/overview">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <OrdersOverview />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/restaurant/orders/live">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <LiveOrders />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/orders/cancellations">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <OrdersCancellations />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>

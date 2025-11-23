@@ -702,6 +702,152 @@ router.delete("/menu/items/:id", async (req: AuthRequest, res) => {
 // RESTAURANT ORDER MANAGEMENT API
 // ====================================================
 
+// GET /api/restaurant/orders/overview
+// Get restaurant orders overview with today's stats
+router.get("/orders/overview", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { restaurantWallet: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Get today's date range
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Get today's orders
+    const todayOrders = await prisma.foodOrder.findMany({
+      where: {
+        restaurantId: restaurantProfile.id,
+        createdAt: { gte: todayStart },
+      },
+    });
+
+    // Calculate today's stats
+    const todayStats = todayOrders.reduce(
+      (acc, order) => {
+        acc.totalOrders++;
+        acc.totalRevenue = acc.totalRevenue.add(order.serviceFare);
+        acc.totalCommission = acc.totalCommission.add(order.safegoCommission);
+        
+        if (order.status === "placed") acc.placedCount++;
+        else if (order.status === "accepted" || order.status === "preparing" || order.status === "ready_for_pickup") 
+          acc.activeCount++;
+        else if (order.status === "delivered") acc.completedCount++;
+        else if (order.status.startsWith("cancelled")) acc.cancelledCount++;
+        
+        return acc;
+      },
+      {
+        totalOrders: 0,
+        totalRevenue: new Prisma.Decimal(0),
+        totalCommission: new Prisma.Decimal(0),
+        placedCount: 0,
+        activeCount: 0,
+        completedCount: 0,
+        cancelledCount: 0,
+      }
+    );
+
+    res.json({
+      today: {
+        totalOrders: todayStats.totalOrders,
+        totalRevenue: todayStats.totalRevenue.toNumber(),
+        totalCommission: todayStats.totalCommission.toNumber(),
+        netRevenue: todayStats.totalRevenue.minus(todayStats.totalCommission).toNumber(),
+        placedCount: todayStats.placedCount,
+        activeCount: todayStats.activeCount,
+        completedCount: todayStats.completedCount,
+        cancelledCount: todayStats.cancelledCount,
+      },
+      wallet: restaurantProfile.restaurantWallet ? {
+        balance: restaurantProfile.restaurantWallet.balance.toNumber(),
+        negativeBalance: restaurantProfile.restaurantWallet.negativeBalance.toNumber(),
+      } : null,
+    });
+  } catch (error) {
+    console.error("Get orders overview error:", error);
+    res.status(500).json({ error: "Failed to fetch orders overview" });
+  }
+});
+
+// GET /api/restaurant/orders/live
+// Get live orders board (Kanban-style)
+router.get("/orders/live", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Get all active orders (not completed or cancelled)
+    const activeStatuses = [
+      "placed",
+      "accepted",
+      "preparing",
+      "ready_for_pickup",
+      "picked_up",
+      "on_the_way",
+    ];
+
+    const liveOrders = await prisma.foodOrder.findMany({
+      where: {
+        restaurantId: restaurantProfile.id,
+        status: { in: activeStatuses },
+      },
+      orderBy: { createdAt: "asc" },
+      include: {
+        customer: {
+          include: {
+            user: { select: { email: true } },
+          },
+        },
+        driver: {
+          include: {
+            user: { select: { email: true } },
+          },
+        },
+      },
+    });
+
+    // Group by status
+    const boardColumns = {
+      placed: [] as any[],
+      accepted: [] as any[],
+      preparing: [] as any[],
+      ready_for_pickup: [] as any[],
+      picked_up: [] as any[],
+      on_the_way: [] as any[],
+    };
+
+    liveOrders.forEach((order) => {
+      const column = boardColumns[order.status as keyof typeof boardColumns];
+      if (column) {
+        column.push({
+          ...order,
+          items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
+        });
+      }
+    });
+
+    res.json({ board: boardColumns });
+  } catch (error) {
+    console.error("Get live orders error:", error);
+    res.status(500).json({ error: "Failed to fetch live orders" });
+  }
+});
+
 // GET /api/restaurant/orders
 // Get all orders for restaurant
 router.get("/orders", async (req: AuthRequest, res) => {
@@ -862,6 +1008,177 @@ router.get("/orders/:id", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Get order details error:", error);
     res.status(500).json({ error: "Failed to fetch order details" });
+  }
+});
+
+// POST /api/restaurant/orders/:id/status
+// Update order status with audit logging
+router.post("/orders/:id/status", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Get current order
+    const order = await prisma.foodOrder.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Validate status transitions (business rules)
+    const validTransitions: Record<string, string[]> = {
+      placed: ["accepted", "cancelled_restaurant"],
+      accepted: ["preparing", "cancelled_restaurant"],
+      preparing: ["ready_for_pickup", "cancelled_restaurant"],
+      ready_for_pickup: ["picked_up"],
+      picked_up: ["on_the_way"],
+      on_the_way: ["delivered"],
+    };
+
+    const currentValidStatuses = validTransitions[order.status] || [];
+    if (!currentValidStatuses.includes(status)) {
+      return res.status(400).json({
+        error: `Invalid status transition from ${order.status} to ${status}`,
+        validStatuses: currentValidStatuses,
+      });
+    }
+
+    // Update order with transaction and audit log
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // Update order status with timestamps
+      const updateData: any = { status };
+      
+      if (status === "accepted") updateData.acceptedAt = new Date();
+      else if (status === "preparing") updateData.preparingAt = new Date();
+      else if (status === "ready_for_pickup") updateData.readyAt = new Date();
+      else if (status === "picked_up") updateData.pickedUpAt = new Date();
+      else if (status === "delivered") {
+        updateData.deliveredAt = new Date();
+        updateData.completedAt = new Date();
+      } else if (status.startsWith("cancelled")) {
+        updateData.cancelledAt = new Date();
+        updateData.whoCancelled = "restaurant";
+      }
+
+      const updated = await tx.foodOrder.update({
+        where: { id },
+        data: updateData,
+      });
+
+      // Create audit log
+      await tx.auditLog.create({
+        data: {
+          actorId: userId,
+          actorEmail: restaurantProfile.user.email,
+          actorRole: "restaurant",
+          actionType: "order_status_update",
+          entityType: "food_order",
+          entityId: id,
+          description: `Order status changed from ${order.status} to ${status}`,
+          metadata: {
+            restaurantId: restaurantProfile.id,
+            previousStatus: order.status,
+            newStatus: status,
+            orderId: id,
+          },
+          success: true,
+        },
+      });
+
+      return updated;
+    });
+
+    res.json({
+      message: "Order status updated successfully",
+      order: {
+        ...updatedOrder,
+        items: typeof updatedOrder.items === 'string' ? JSON.parse(updatedOrder.items) : updatedOrder.items,
+      },
+    });
+  } catch (error) {
+    console.error("Update order status error:", error);
+    res.status(500).json({ error: "Failed to update order status" });
+  }
+});
+
+// POST /api/restaurant/orders/:id/issue
+// Report an issue with an order
+router.post("/orders/:id/issue", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    const { issueType, description } = req.body;
+
+    const schema = z.object({
+      issueType: z.enum(["quality", "delivery", "payment", "customer", "other"]),
+      description: z.string().min(10).max(500),
+    });
+
+    const validation = schema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify order ownership
+    const order = await prisma.foodOrder.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Create audit log for issue report
+    await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorEmail: restaurantProfile.user.email,
+        actorRole: "restaurant",
+        actionType: "order_issue_reported",
+        entityType: "food_order",
+        entityId: id,
+        description: `Restaurant reported ${issueType} issue: ${description.substring(0, 100)}`,
+        metadata: {
+          restaurantId: restaurantProfile.id,
+          orderId: id,
+          issueType,
+          description,
+        },
+        success: true,
+      },
+    });
+
+    res.json({
+      message: "Issue reported successfully. Our team will review and contact you soon.",
+      issueId: id,
+    });
+  } catch (error) {
+    console.error("Report order issue error:", error);
+    res.status(500).json({ error: "Failed to report issue" });
   }
 });
 
