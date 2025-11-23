@@ -256,7 +256,11 @@ export async function getItemAnalytics(
 
   const worstItems = itemArray
     .filter((i) => i.totalAttempts >= 3)
-    .sort((a, b) => a.revenue - b.revenue)
+    .sort((a, b) => {
+      const aPerf = a.revenue / a.totalAttempts;
+      const bPerf = b.revenue / b.totalAttempts;
+      return aPerf - bPerf; // Sort by revenue per attempt (ascending = worst performance)
+    })
     .slice(0, 10)
     .map((i) => ({ itemName: i.itemName, orderCount: i.orderCount, totalAttempts: i.totalAttempts, revenue: i.revenue }));
 
