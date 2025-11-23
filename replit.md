@@ -33,15 +33,19 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 
 ## Recent Changes
 
-### November 23, 2025 - R-ENHANCE Completion & Payment Configuration Spec
-- **R-ENHANCE Tasks 1-6 Complete**: All UI/UX improvements completed including layout standardization, search/notification UX, API migration, and support pages polishing.
-- **Route Fix**: Added missing `/restaurant/payouts/overview` route (OWNER-only) to resolve 404 errors in restaurant portal.
-- **Placeholder Unification**: Migrated all planned feature pages to unified FeaturePlaceholderLayout system (support-contact.tsx with Mail icon, support-status.tsx with Activity icon).
-- **Application Status**: Running successfully on port 5000 with all routes functional and no runtime errors.
-- **New Specification Received**: Payment & Payout Configuration system specification for country-aware, multi-method payment/payout architecture supporting BD and US markets with extensibility for future countries. Scope includes shared enums, configuration models, admin UI, restaurant payout methods, driver placeholders, and customer payment options service.
+### November 23, 2025 - Payment & Payout Configuration Foundation
+- **R-ENHANCE Complete**: All UI/UX improvements completed including layout standardization, search/notification UX, API migration, and support pages polishing. Fixed restaurant payouts overview 404 by adding /restaurant/payouts/overview route.
+- **Payment Configuration Foundation Completed**:
+  - Created comprehensive type system (shared/types.ts): 7 enums including CountryCode, ServiceType, ActorType, PaymentMethodType, PayoutRailType, PaymentProvider, PayoutProvider, PayoutSchedule, KycLevel, PayoutMethodStatus
+  - Added 3 Prisma models: CountryPaymentConfig (customer payment methods), CountryPayoutConfig (restaurant/driver payout rails), RestaurantPayoutMethod (payout method instances)
+  - Database migration successful: New tables with proper unique constraints and indexes
+  - Seed data populated: 23 customer payment configurations and 12 payout rail configurations for BD/US markets across RIDE, FOOD, PARCEL services
+- **Payment Configuration Scope**: Country-aware payment method and payout rail configuration supporting Bangladesh (bKash, Nagad, Rocket, Cash) and United States (Visa, Mastercard, Amex, Stripe, Apple Pay, Google Pay) with multi-actor support
+- **Next Phase**: PaymentOptionsService, admin CRUD APIs, restaurant payout method APIs, Admin UI, Restaurant Payouts UI updates, driver payout placeholder, audit logging
+- **Application Status**: Running successfully on port 5000 with all routes functional and payment configuration database ready
 
 ### Database Schema Design
-The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, `PaymentMethod`, `OpportunitySetting`, `OpportunityReward`, `DriverTier`, `DriverPoints`, `TierBenefit`, `PointsRule`, `PointsTransaction`, `BlockedRider`, `Review`, `RestaurantBranding`, `RestaurantMedia`, `RestaurantHours`, `OperationalSettings`, `DeliveryZone`, and `SurgeSettings`. It supports country-specific identity fields with AES-256-GCM encryption and includes an `isDemo` flag, fields for US tax and driver preferences, and operational settings like business hours with split shifts, delivery zones, and surge pricing.
+The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, `PaymentMethod`, `OpportunitySetting`, `OpportunityReward`, `DriverTier`, `DriverPoints`, `TierBenefit`, `PointsRule`, `PointsTransaction`, `BlockedRider`, `Review`, `RestaurantBranding`, `RestaurantMedia`, `RestaurantHours`, `OperationalSettings`, `DeliveryZone`, `SurgeSettings`, `CountryPaymentConfig`, `CountryPayoutConfig`, and `RestaurantPayoutMethod`. It supports country-specific identity fields with AES-256-GCM encryption and includes an `isDemo` flag, fields for US tax and driver preferences, and operational settings like business hours with split shifts, delivery zones, and surge pricing. The new payment/payout configuration models enable country-aware payment method and payout rail management with multi-actor support.
 
 ## External Dependencies
 
