@@ -1,13 +1,14 @@
 import { Link, useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
+import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle, Info, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import GalleryModal from "@/components/customer/GalleryModal";
+import { PricingBreakdownModal } from "@/components/PricingBreakdownModal";
 
 interface MenuItem {
   id: string;
@@ -112,10 +113,53 @@ interface OperationalStatusError {
   reason?: string;
 }
 
+interface PricingData {
+  basePriceMultiplier: number;
+  surgeMultiplier: number;
+  surgeReason: string | null;
+  discountPercent: number;
+  activePromotions: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    promoType: string;
+    discountPercentage: number | null;
+    discountValue: number | null;
+    minOrderAmount: number | null;
+    maxDiscountCap: number | null;
+    timeWindowStart: string | null;
+    timeWindowEnd: string | null;
+  }>;
+  couponEligibility: Array<{
+    code: string;
+    discountType: string;
+    discountPercentage: number | null;
+    discountValue: number | null;
+    minOrderAmount: number | null;
+    maxDiscountCap: number | null;
+  }>;
+  prepTimeMinutes: number | null;
+  realTimeOpenStatus: boolean;
+  deliveryZoneEligible: boolean;
+  throttlingLimitReached: boolean;
+  dynamicPricingBreakdown: {
+    basePrice: number;
+    surgeMultiplier: number;
+    surgeAmount: number;
+    subtotalAfterSurge: number;
+    discountPercent: number;
+    discountAmount: number;
+    finalPrice: number;
+    appliedPromotions: string[];
+    appliedCoupons: string[];
+  };
+}
+
 export default function FoodRestaurantDetails() {
   const { id } = useParams() as { id: string };
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
 
   const { data: restaurantData, isLoading: restaurantLoading, error: restaurantError } = useQuery<RestaurantResponse>({
     queryKey: [`/api/customer/food/restaurants/${id}`],
@@ -138,6 +182,15 @@ export default function FoodRestaurantDetails() {
     error: operationalError 
   } = useQuery<OperationalStatusResponse>({
     queryKey: [`/api/customer/restaurants/${id}/status`],
+    retry: false, // Don't retry on auth/verification errors
+  });
+
+  const {
+    data: pricingData,
+    isLoading: pricingLoading,
+    error: pricingError
+  } = useQuery<PricingData>({
+    queryKey: [`/api/customer/restaurants/${id}/pricing`],
     retry: false, // Don't retry on auth/verification errors
   });
 
@@ -545,7 +598,124 @@ export default function FoodRestaurantDetails() {
             </CardContent>
           </Card>
         ) : null}
+
+        {/* Pricing & Promotions Panel */}
+        {pricingLoading ? (
+          <Card className="mt-4">
+            <CardContent className="p-6">
+              <Skeleton className="h-6 w-40 mb-4" />
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardContent>
+          </Card>
+        ) : pricingError ? (
+          <Card className="mt-4">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Info className="h-4 w-4" />
+                <p className="text-sm" data-testid="text-pricing-error">
+                  {(pricingError as any)?.message?.includes("verification")
+                    ? "Complete verification to view pricing details"
+                    : "Pricing information unavailable"}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : pricingData ? (
+          <Card className="mt-4">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-lg" data-testid="text-pricing-heading">
+                  Pricing & Offers
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsPricingModalOpen(true)}
+                  className="gap-2"
+                  data-testid="button-pricing-breakdown"
+                >
+                  <Info className="h-4 w-4" />
+                  See Breakdown
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {/* Active Promotions Summary */}
+                {pricingData.activePromotions.length > 0 && (
+                  <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800" data-testid="card-active-promotions-summary">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Tag className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <span className="text-sm font-medium text-green-900 dark:text-green-200" data-testid="text-promotions-count">
+                        {pricingData.activePromotions.length} Active {pricingData.activePromotions.length === 1 ? "Promotion" : "Promotions"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-800 dark:text-green-300" data-testid="text-best-promotion">
+                      Best offer: {pricingData.activePromotions[0].title}
+                      {pricingData.activePromotions[0].discountPercentage && (
+                        <span className="ml-1 font-bold">({pricingData.activePromotions[0].discountPercentage}% OFF)</span>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                {/* Available Coupons Summary */}
+                {pricingData.couponEligibility.length > 0 && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800" data-testid="card-coupons-summary">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Tag className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-sm font-medium text-blue-900 dark:text-blue-200" data-testid="text-coupons-count">
+                        {pricingData.couponEligibility.length} Coupon {pricingData.couponEligibility.length === 1 ? "Code" : "Codes"} Available
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-800 dark:text-blue-300" data-testid="text-coupon-hint">
+                      Use codes at checkout for extra savings
+                    </p>
+                  </div>
+                )}
+
+                {/* Estimated Price Example */}
+                {pricingData.dynamicPricingBreakdown && (
+                  <div className="p-3 bg-muted/50 rounded-lg border" data-testid="card-price-estimate">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">Example Order ($100)</span>
+                      <span className="text-lg font-bold text-primary" data-testid="text-estimated-price">
+                        ${pricingData.dynamicPricingBreakdown.finalPrice.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      {pricingData.surgeMultiplier > 1.0 && (
+                        <div className="flex items-center gap-1" data-testid="text-surge-note">
+                          <TrendingUp className="h-3 w-3 text-orange-600" />
+                          <span>
+                            Surge pricing active ({pricingData.surgeMultiplier}x)
+                          </span>
+                        </div>
+                      )}
+                      {pricingData.discountPercent > 0 && (
+                        <div className="flex items-center gap-1" data-testid="text-discount-note">
+                          <Tag className="h-3 w-3 text-green-600" />
+                          <span>
+                            {pricingData.discountPercent}% discount applied
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
+
+      {/* Pricing Breakdown Modal */}
+      <PricingBreakdownModal
+        open={isPricingModalOpen}
+        onOpenChange={setIsPricingModalOpen}
+        pricingData={pricingData || null}
+        restaurantName={restaurant?.name || "Restaurant"}
+      />
 
       {/* Gallery Section */}
       {!brandingLoading && media.length > 0 && (
