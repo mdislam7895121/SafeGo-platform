@@ -85,6 +85,12 @@ router.get("/restaurants", async (req: AuthRequest, res) => {
             countryCode: true,
           },
         },
+        branding: {
+          select: {
+            logoUrl: true,
+            primaryColor: true,
+          },
+        },
       },
       orderBy: sortBy === 'rating' 
         ? { averageRating: 'desc' }
@@ -101,6 +107,8 @@ router.get("/restaurants", async (req: AuthRequest, res) => {
       cityCode: restaurant.cityCode || 'Nationwide',
       averageRating: restaurant.averageRating || 0,
       totalRatings: restaurant.totalRatings || 0,
+      logoUrl: restaurant.branding?.logoUrl || null,
+      primaryColor: restaurant.branding?.primaryColor || null,
     }));
 
     res.json({

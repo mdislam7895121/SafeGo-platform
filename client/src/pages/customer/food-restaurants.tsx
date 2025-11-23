@@ -23,6 +23,8 @@ interface Restaurant {
   cityCode: string;
   averageRating: number;
   totalRatings: number;
+  logoUrl: string | null;
+  primaryColor: string | null;
 }
 
 interface RestaurantsResponse {
@@ -143,50 +145,68 @@ export default function FoodRestaurants() {
             </CardContent>
           </Card>
         ) : (
-          restaurants.map((restaurant) => (
-            <Link key={restaurant.id} href={`/customer/food/${restaurant.id}`}>
-              <Card
-                className="hover-elevate active-elevate-2 cursor-pointer transition-all"
-                data-testid={`card-restaurant-${restaurant.id}`}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg mb-1" data-testid={`text-restaurant-name-${restaurant.id}`}>
-                        {restaurant.name}
-                      </h3>
-                      <Badge variant="secondary" className="text-xs" data-testid={`badge-cuisine-${restaurant.id}`}>
-                        {restaurant.cuisineType}
-                      </Badge>
+          restaurants.map((restaurant) => {
+            // Apply custom accent if primary color exists
+            const accentStyle = restaurant.primaryColor 
+              ? { borderLeftColor: restaurant.primaryColor, borderLeftWidth: '4px' }
+              : {};
+            
+            return (
+              <Link key={restaurant.id} href={`/customer/food/${restaurant.id}`}>
+                <Card
+                  className="hover-elevate active-elevate-2 cursor-pointer transition-all"
+                  style={accentStyle}
+                  data-testid={`card-restaurant-${restaurant.id}`}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-start gap-3 mb-3">
+                      {restaurant.logoUrl && (
+                        <div className="flex-shrink-0 h-14 w-14 rounded-lg overflow-hidden border border-border">
+                          <img
+                            src={restaurant.logoUrl}
+                            alt={`${restaurant.name} logo`}
+                            className="w-full h-full object-cover"
+                            data-testid={`img-logo-${restaurant.id}`}
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-lg mb-1" data-testid={`text-restaurant-name-${restaurant.id}`}>
+                          {restaurant.name}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs" data-testid={`badge-cuisine-${restaurant.id}`}>
+                          {restaurant.cuisineType}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm flex-shrink-0">
+                        <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                        <span className="font-medium" data-testid={`text-rating-${restaurant.id}`}>
+                          {restaurant.averageRating.toFixed(1)}
+                        </span>
+                        <span className="text-muted-foreground">({restaurant.totalRatings})</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 text-sm">
-                      <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                      <span className="font-medium" data-testid={`text-rating-${restaurant.id}`}>
-                        {restaurant.averageRating.toFixed(1)}
-                      </span>
-                      <span className="text-muted-foreground">({restaurant.totalRatings})</span>
-                    </div>
-                  </div>
 
-                  {restaurant.description && (
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {restaurant.description}
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span className="line-clamp-1">{restaurant.address}</span>
-                    {restaurant.cityCode !== "Nationwide" && (
-                      <Badge variant="outline" className="text-xs ml-auto">
-                        {restaurant.cityCode}
-                      </Badge>
+                    {restaurant.description && (
+                      <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                        {restaurant.description}
+                      </p>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))
+
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="h-4 w-4" />
+                      <span className="line-clamp-1">{restaurant.address}</span>
+                      {restaurant.cityCode !== "Nationwide" && (
+                        <Badge variant="outline" className="text-xs ml-auto">
+                          {restaurant.cityCode}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })
         )}
       </div>
 
