@@ -482,10 +482,10 @@ export default function FoodRestaurantDetails() {
 
                 {/* Surge Pricing Indicator */}
                 {operational.surgePricing.isActive && (
-                  <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="p-3 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-800" data-testid="card-surge-pricing">
                     <div className="flex items-center gap-2 mb-1">
                       <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                      <span className="text-sm font-medium text-orange-900 dark:text-orange-200">
+                      <span className="text-sm font-medium text-orange-900 dark:text-orange-200" data-testid="text-surge-heading">
                         High Demand
                       </span>
                     </div>
@@ -497,7 +497,7 @@ export default function FoodRestaurantDetails() {
 
                 {/* Throttling Notice */}
                 {operational.status.isThrottled && (
-                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800" data-testid="card-throttling">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                       <p className="text-sm text-amber-900 dark:text-amber-200" data-testid="text-throttling-notice">
@@ -511,10 +511,10 @@ export default function FoodRestaurantDetails() {
                 {operational.deliveryZone && operational.operational?.deliveryEnabled && (
                   <>
                     {operational.deliveryZone.inZone ? (
-                      <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800" data-testid="card-delivery-zone-available">
                         <div className="flex items-center gap-2 mb-1">
                           <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          <span className="text-sm font-medium text-green-900 dark:text-green-200">
+                          <span className="text-sm font-medium text-green-900 dark:text-green-200" data-testid="text-delivery-available">
                             Delivers to your area
                           </span>
                         </div>
@@ -530,7 +530,7 @@ export default function FoodRestaurantDetails() {
                         )}
                       </div>
                     ) : (
-                      <div className="p-3 bg-muted rounded-lg border">
+                      <div className="p-3 bg-muted rounded-lg border" data-testid="card-delivery-zone-unavailable">
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           <p className="text-sm text-muted-foreground" data-testid="text-no-delivery">
