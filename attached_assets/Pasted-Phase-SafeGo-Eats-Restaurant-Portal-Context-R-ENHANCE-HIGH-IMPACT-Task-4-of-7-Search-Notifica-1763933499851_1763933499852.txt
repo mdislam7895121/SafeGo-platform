@@ -1,0 +1,183 @@
+Phase: SafeGo Eats – Restaurant Portal
+Context: R-ENHANCE HIGH IMPACT
+Task 4 of 7: Search + Notification UX
+
+You have already completed:
+- Task 1: Restaurant Header Redesign
+- Task 2: Unified Placeholder System
+- Task 3: Comprehensive Responsive Layout (no horizontal scroll, responsive drawer, mobile/tablet/desktop ready)
+
+Goal for Task 4:
+Improve the usability and UX of the top search bar and header notification area on all restaurant pages, without breaking any existing backend logic, routing, RBAC, or KYC gating. This is a FRONTEND-ONLY enhancement task.
+
+Scope:
+1) Search Bar UX
+2) Notifications UX (icons, badges, dropdown)
+3) Accessibility + test IDs
+4) No breaking changes, no new APIs
+
+General rules:
+- Do NOT change database schema or create new API endpoints.
+- Do NOT modify RBAC, KYC, or auth logic.
+- Keep all changes additive, backward compatible with Phases 1–12.
+- Maintain the existing responsive layout from Task 3 (desktop, tablet, mobile).
+- Use existing design language (SafeGo Eats style, typography, spacing).
+
+--------------------------------
+1. SEARCH BAR UX IMPROVEMENTS
+--------------------------------
+
+Requirements:
+- Location: The global search bar in the restaurant header (between restaurant identity and right-side controls).
+- Keep it a single, full-width search bar shared across restaurant pages.
+
+Implement the following enhancements:
+
+A. Placeholder and labels:
+- Add a clear, helpful placeholder such as:
+  "Search orders, menu items, customers..."
+- Ensure the input has an accessible aria-label (e.g. aria-label="Search orders, menu items, and customers").
+- When focused, keep the placeholder visible until the user starts typing.
+
+B. Clear / reset control:
+- Add a small “X” clear button inside the search bar that appears only when there is text.
+- Clicking the clear button:
+  - Clears the input value.
+  - Triggers any search reset logic (if present) or falls back to default view.
+- This must be keyboard-accessible (Tab focus + Enter/Space to activate).
+
+C. Keyboard shortcuts:
+- Add a keyboard shortcut to focus the search bar:
+  - “/” (forward slash) OR “Ctrl+K” (Cmd+K on Mac).
+- The shortcut must:
+  - Not interfere with existing browser shortcuts.
+  - Only work when the user is inside the restaurant portal (not in a text input or textarea).
+- When triggered, focus the search field and select existing text (if any) so the user can start a new search immediately.
+
+D. Loading / searching state (non-breaking):
+- If there is already search logic, show a subtle loading indicator (spinner or animated dots) inside the search bar while a search is in progress.
+- If there is no actual backend search integration for some contexts, keep the UI ready but use a mock “Searching…” state or no-op handler – do NOT add new APIs.
+- Make sure this does not break existing routes or filters.
+
+E. Responsive behavior:
+- Desktop: Full-width bar as it is now (aligned with header layout from Task 1).
+- Tablet/mobile:
+  - Ensure the search bar shrinks or stacks correctly as per Task 3 responsive layout.
+  - Minimum tap target height 44px, enough padding so fingers can tap without difficulty.
+
+F. data-testid attributes:
+- Add stable data-testid attributes for future automated tests:
+  - data-testid="restaurant-search-input"
+  - data-testid="restaurant-search-clear"
+  - data-testid="restaurant-search-loading"
+
+--------------------------------
+2. NOTIFICATION UX (ICONS + BADGES)
+--------------------------------
+
+Current situation:
+- There are multiple small status / alert icons near the top-right of the restaurant header.
+
+Goal:
+Make notifications clear, consistent, and easy to understand, without changing any backend notification logic.
+
+Implement the following:
+
+A. Consolidated notification icons:
+- Keep ONE main notification bell icon for general alerts (orders, system, support).
+- If there are other icons (e.g. help, language, system), make sure they are visually distinct and not confused with the notification bell.
+- Use consistent icon size and spacing in the header.
+
+B. Badges and counts:
+- For the main notification bell:
+  - Show a small badge with the count of unread/recent notifications (if this data already exists).
+  - If no count data is available, show a simple dot badge for “has alerts” vs no badge for “no alerts”.
+- Make sure badges do NOT overlap with other header elements at small screen sizes.
+
+C. Notification dropdown (UI only, non-breaking):
+- Clicking the notification bell opens a dropdown panel.
+- The dropdown can be simple but must follow SafeGo visual style.
+- Sections (if data available):
+  - “Order alerts” (e.g. new orders, delayed orders, cancellations)
+  - “System updates” (e.g. platform announcements, maintenance)
+  - “Support / issues” (e.g. tickets, complaints)
+- If real data is not wired yet, show placeholder entries using the unified placeholder system:
+  - "No new order alerts"
+  - "No system notifications"
+  - "No support updates"
+- Add quick links at the bottom:
+  - “View all orders”
+  - “View system status”
+  - “Go to Help Center”
+  These links must only navigate to existing, already-defined routes – do NOT create new pages.
+
+D. Hover & active states:
+- Add subtle hover styles for icons and dropdown items (e.g. background on hover).
+- On mobile, ensure tap interactions are clear and do not require hover.
+
+E. Accessibility:
+- The notification bell must have an accessible label:
+  - aria-label="Notifications" or "Restaurant notifications"
+- Badge counts should be announced to screen readers where possible.
+- The dropdown should close when:
+  - User clicks outside the dropdown.
+  - User presses Escape.
+
+F. data-testid attributes:
+- Add:
+  - data-testid="restaurant-notification-icon"
+  - data-testid="restaurant-notification-badge"
+  - data-testid="restaurant-notification-dropdown"
+
+--------------------------------
+3. GENERAL CLEANUP (SEARCH + NOTIFICATIONS)
+--------------------------------
+
+- Ensure spacing between search bar and notification area is consistent on all pages (Dashboard, Orders, Menu Management, Payouts & Finance, Staff Management, Insights & Analytics, Ratings & Reviews, Store Settings, Documents & Compliance, Support).
+- Verify that the header content (search + notifications + profile menu) is properly aligned vertically.
+- Respect the three-row header structure from Task 1:
+  - Row 1: brand + global controls
+  - Row 2: restaurant identity + online/offline toggle
+  - Row 3: search bar
+
+--------------------------------
+4. SAFETY AND REGRESSION CHECKS
+--------------------------------
+
+After implementing the changes:
+
+- Run through the main restaurant pages and verify:
+  - Dashboard
+  - Live Orders / Scheduled Orders / Order History
+  - Menu Management (All Items, Categories, Add New Item, Bulk Actions)
+  - Promotions (Campaigns, Coupons & Discounts, Featured Items)
+  - Payouts & Finance
+  - Staff Management
+  - Insights & Analytics (Overview, Item Performance, Customer Insights, Driver Performance)
+  - Ratings & Reviews (All Reviews, Complaints / Issues)
+  - Store Settings (Profile, Business Hours, Delivery & Pickup, Delivery Zones, Surge Pricing, Staff & Roles, Devices & Printers)
+  - Documents & Compliance (Business Documents, Health & Safety, KYC / Verification)
+  - Support (Help Center, Contact Support, System Status)
+
+Check that:
+- The header layout is not broken on any page.
+- Search bar and notification icons look consistent everywhere.
+- No horizontal scroll appears at common breakpoints (mobile portrait, mobile landscape, tablet, small laptop, large desktop).
+- Online/offline capsule, KYC/RBAC controls, and all previous logic remain unchanged.
+
+--------------------------------
+5. DOCUMENTATION
+--------------------------------
+
+- Update replit.md in the SafeGo Eats restaurant section to document Task 4 completion:
+  - What was changed in the search bar UX.
+  - How the notification icon and dropdown behave.
+  - Any data-testid attributes added.
+  - Confirm that no API or DB changes were introduced and that all changes are fully backward compatible.
+
+When you are done, summarize:
+- The concrete UI changes.
+- Any files you modified.
+- How you validated that the layout and behavior work correctly on desktop, tablet, and mobile.
+
+Begin with implementing Task 4 now.
