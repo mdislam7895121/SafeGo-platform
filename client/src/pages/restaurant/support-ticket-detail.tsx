@@ -18,7 +18,7 @@ import { ArrowLeft, Send, AlertCircle, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Message {
   id: string;
@@ -75,7 +75,7 @@ export default function RestaurantSupportTicketDetail() {
   const [proposedNote, setProposedNote] = useState("");
 
   // Fetch restaurant profile to check OWNER role
-  const { data: profileData } = useQuery({
+  const { data: profileData } = useQuery<{ profile: { ownerRole?: string } }>({
     queryKey: ["/api/restaurant/home"],
   });
 
