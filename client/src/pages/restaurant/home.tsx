@@ -15,6 +15,12 @@ export default function RestaurantHome() {
     refetchInterval: 5000,
   });
 
+  // Fetch recent orders
+  const { data: ordersData } = useQuery({
+    queryKey: ["/api/restaurant/orders", { limit: 5 }],
+    refetchInterval: 10000, // Refresh every 10 seconds
+  });
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6 space-y-4">
@@ -154,10 +160,58 @@ export default function RestaurantHome() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
-              <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">No orders yet</p>
-            </div>
+            {ordersData?.orders && ordersData.orders.length > 0 ? (
+              <div className="space-y-3">
+                {ordersData.orders.slice(0, 5).map((order: any) => (
+                  <div 
+                    key={order.id} 
+                    className="p-4 border rounded-lg hover-elevate cursor-pointer"
+                    data-testid={`order-${order.id}`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1">
+                        <p className="font-medium">Order #{order.id.substring(0, 8)}</p>
+                        <p className="text-sm text-muted-foreground">{order.deliveryAddress}</p>
+                      </div>
+                      <Badge 
+                        variant={
+                          order.status === 'placed' ? 'default' :
+                          order.status === 'accepted' ? 'secondary' :
+                          order.status === 'preparing' ? 'secondary' :
+                          order.status === 'ready_for_pickup' ? 'default' :
+                          'default'
+                        }
+                        data-testid={`badge-status-${order.id}`}
+                      >
+                        {order.status.replace(/_/g, ' ').toUpperCase()}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {new Date(order.createdAt).toLocaleString()}
+                      </span>
+                      <span className="font-semibold" data-testid={`text-amount-${order.id}`}>
+                        ${Number(order.serviceFare).toFixed(2)}
+                      </span>
+                    </div>
+                    {order.status === 'placed' && profile?.isVerified && (
+                      <div className="mt-3 pt-3 border-t">
+                        <Link href={`/restaurant/orders/${order.id}`}>
+                          <Button size="sm" className="w-full" data-testid={`button-accept-${order.id}`}>
+                            Accept Order
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground">No orders yet</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

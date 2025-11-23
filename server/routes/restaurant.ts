@@ -360,4 +360,470 @@ router.get("/payouts", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// MENU MANAGEMENT API
+// ====================================================
+
+// GET /api/restaurant/menu/categories
+// Get all menu categories for restaurant
+router.get("/menu/categories", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const categories = await prisma.menuCategory.findMany({
+      where: { restaurantId: restaurantProfile.id },
+      orderBy: { displayOrder: "asc" },
+      include: {
+        menuItems: {
+          where: { isActive: true },
+          orderBy: { displayOrder: "asc" },
+        },
+      },
+    });
+
+    res.json({ categories });
+  } catch (error) {
+    console.error("Get menu categories error:", error);
+    res.status(500).json({ error: "Failed to fetch menu categories" });
+  }
+});
+
+// POST /api/restaurant/menu/categories
+// Create new menu category
+router.post("/menu/categories", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { name, description, displayOrder } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "Category name is required" });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const category = await prisma.menuCategory.create({
+      data: {
+        restaurantId: restaurantProfile.id,
+        name,
+        description: description || null,
+        displayOrder: displayOrder || 0,
+        isActive: true,
+      },
+    });
+
+    res.status(201).json({ category });
+  } catch (error) {
+    console.error("Create category error:", error);
+    res.status(500).json({ error: "Failed to create category" });
+  }
+});
+
+// PATCH /api/restaurant/menu/categories/:id
+// Update menu category
+router.patch("/menu/categories/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    const { name, description, displayOrder, isActive } = req.body;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify ownership
+    const category = await prisma.menuCategory.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    const updateData: any = {};
+    if (name) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (displayOrder !== undefined) updateData.displayOrder = displayOrder;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
+    const updatedCategory = await prisma.menuCategory.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.json({ category: updatedCategory });
+  } catch (error) {
+    console.error("Update category error:", error);
+    res.status(500).json({ error: "Failed to update category" });
+  }
+});
+
+// DELETE /api/restaurant/menu/categories/:id
+// Delete menu category
+router.delete("/menu/categories/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify ownership
+    const category = await prisma.menuCategory.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!category) {
+      return res.status(404).json({ error: "Category not found" });
+    }
+
+    // Check if category has menu items
+    const itemCount = await prisma.menuItem.count({
+      where: { categoryId: id },
+    });
+
+    if (itemCount > 0) {
+      return res.status(400).json({
+        error: "Cannot delete category with menu items. Delete items first or move them to another category.",
+      });
+    }
+
+    await prisma.menuCategory.delete({ where: { id } });
+
+    res.json({ message: "Category deleted successfully" });
+  } catch (error) {
+    console.error("Delete category error:", error);
+    res.status(500).json({ error: "Failed to delete category" });
+  }
+});
+
+// GET /api/restaurant/menu/items
+// Get all menu items for restaurant
+router.get("/menu/items", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const items = await prisma.menuItem.findMany({
+      where: { restaurantId: restaurantProfile.id },
+      include: { category: true },
+      orderBy: [{ categoryId: "asc" }, { displayOrder: "asc" }],
+    });
+
+    res.json({ items });
+  } catch (error) {
+    console.error("Get menu items error:", error);
+    res.status(500).json({ error: "Failed to fetch menu items" });
+  }
+});
+
+// POST /api/restaurant/menu/items
+// Create new menu item
+router.post("/menu/items", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { categoryId, name, description, price, imageUrl, displayOrder, isAvailable } = req.body;
+
+    const schema = z.object({
+      categoryId: z.string().uuid(),
+      name: z.string().min(1).max(200),
+      description: z.string().optional(),
+      price: z.number().positive(),
+      imageUrl: z.string().url().optional(),
+      displayOrder: z.number().int().optional(),
+      isAvailable: z.boolean().optional(),
+    });
+
+    const validation = schema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify category ownership
+    const category = await prisma.menuCategory.findFirst({
+      where: { id: categoryId, restaurantId: restaurantProfile.id },
+    });
+
+    if (!category) {
+      return res.status(404).json({ error: "Category not found or access denied" });
+    }
+
+    const item = await prisma.menuItem.create({
+      data: {
+        restaurantId: restaurantProfile.id,
+        categoryId,
+        name,
+        description: description || null,
+        price,
+        imageUrl: imageUrl || null,
+        displayOrder: displayOrder || 0,
+        isAvailable: isAvailable !== undefined ? isAvailable : true,
+        isActive: true,
+      },
+    });
+
+    res.status(201).json({ item });
+  } catch (error) {
+    console.error("Create menu item error:", error);
+    res.status(500).json({ error: "Failed to create menu item" });
+  }
+});
+
+// PATCH /api/restaurant/menu/items/:id
+// Update menu item
+router.patch("/menu/items/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    const { name, description, price, imageUrl, displayOrder, isAvailable, isActive, categoryId } = req.body;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify ownership
+    const item = await prisma.menuItem.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Menu item not found" });
+    }
+
+    const updateData: any = {};
+    if (name) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (price !== undefined) updateData.price = price;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
+    if (displayOrder !== undefined) updateData.displayOrder = displayOrder;
+    if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (categoryId) {
+      // Verify new category ownership
+      const category = await prisma.menuCategory.findFirst({
+        where: { id: categoryId, restaurantId: restaurantProfile.id },
+      });
+      if (!category) {
+        return res.status(404).json({ error: "Category not found or access denied" });
+      }
+      updateData.categoryId = categoryId;
+    }
+
+    const updatedItem = await prisma.menuItem.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.json({ item: updatedItem });
+  } catch (error) {
+    console.error("Update menu item error:", error);
+    res.status(500).json({ error: "Failed to update menu item" });
+  }
+});
+
+// DELETE /api/restaurant/menu/items/:id
+// Delete menu item
+router.delete("/menu/items/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify ownership
+    const item = await prisma.menuItem.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Menu item not found" });
+    }
+
+    await prisma.menuItem.delete({ where: { id } });
+
+    res.json({ message: "Menu item deleted successfully" });
+  } catch (error) {
+    console.error("Delete menu item error:", error);
+    res.status(500).json({ error: "Failed to delete menu item" });
+  }
+});
+
+// ====================================================
+// RESTAURANT ORDER MANAGEMENT API
+// ====================================================
+
+// GET /api/restaurant/orders
+// Get all orders for restaurant
+router.get("/orders", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const status = req.query.status as string;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const where: any = { restaurantId: restaurantProfile.id };
+    if (status) {
+      where.status = status;
+    }
+
+    const orders = await prisma.foodOrder.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+      include: {
+        customer: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
+        },
+        driver: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+            vehicle: true,
+          },
+        },
+      },
+    });
+
+    const total = await prisma.foodOrder.count({ where });
+
+    // Parse items JSON for each order
+    const ordersWithParsedItems = orders.map(order => ({
+      ...order,
+      items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
+    }));
+
+    res.json({
+      orders: ordersWithParsedItems,
+      pagination: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    });
+  } catch (error) {
+    console.error("Get restaurant orders error:", error);
+    res.status(500).json({ error: "Failed to fetch orders" });
+  }
+});
+
+// GET /api/restaurant/orders/:id
+// Get specific order details
+router.get("/orders/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const order = await prisma.foodOrder.findFirst({
+      where: {
+        id,
+        restaurantId: restaurantProfile.id,
+      },
+      include: {
+        customer: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
+        },
+        driver: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+            vehicle: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    res.json({
+      order: {
+        ...order,
+        items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items,
+      },
+    });
+  } catch (error) {
+    console.error("Get order details error:", error);
+    res.status(500).json({ error: "Failed to fetch order details" });
+  }
+});
+
 export default router;
