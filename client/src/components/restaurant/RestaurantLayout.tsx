@@ -12,7 +12,13 @@ interface RestaurantLayoutProps {
 export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isOpen, setIsOpen] = useState(true);
-  const [isDesktop, setIsDesktop] = useState(true);
+  // Initialize isDesktop using matchMedia to avoid layout flash
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(min-width: 1024px)').matches;
+    }
+    return true;
+  });
 
   // Fetch restaurant data for top nav
   const { data: restaurantData } = useQuery({
@@ -25,10 +31,17 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
 
   // Detect desktop vs mobile/tablet
   useEffect(() => {
-    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+      setIsDesktop(e.matches);
+    };
+    
+    // Check initial state
+    handleChange(mediaQuery);
+    
+    // Listen for changes
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
   }, []);
 
   return (
@@ -43,6 +56,7 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
         onToggleStatus={setIsOpen}
         sidebarCollapsed={sidebarCollapsed}
         isDesktop={isDesktop}
+        userRole={userRole}
       />
       
       <main

@@ -14,7 +14,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
+import { RestaurantSidebar } from "./RestaurantSidebar";
+import type { UserRole } from "@/config/restaurant-nav";
 
 interface RestaurantTopNavProps {
   restaurantName?: string;
@@ -22,6 +29,7 @@ interface RestaurantTopNavProps {
   onToggleStatus?: (status: boolean) => void;
   sidebarCollapsed?: boolean;
   isDesktop?: boolean;
+  userRole?: UserRole;
 }
 
 export function RestaurantTopNav({
@@ -29,11 +37,13 @@ export function RestaurantTopNav({
   isOpen = true,
   onToggleStatus,
   sidebarCollapsed = false,
-  isDesktop = true
+  isDesktop = true,
+  userRole = "OWNER"
 }: RestaurantTopNavProps) {
   const { logout, user } = useAuth();
   const [language, setLanguage] = useState("en");
   const [notificationCount] = useState(3); // Mock notification count
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <header
@@ -46,14 +56,25 @@ export function RestaurantTopNav({
         {/* Left Section */}
         <div className="flex items-center gap-2 lg:gap-4">
           {/* Mobile Menu Button (visible on mobile/tablet only) */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden hover-elevate active-elevate-2"
-            data-testid="button-mobile-menu"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden hover-elevate active-elevate-2"
+                data-testid="button-mobile-menu"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="p-0 w-64">
+              <RestaurantSidebar 
+                userRole={userRole} 
+                isMobileDrawer 
+                onNavigate={() => setMobileMenuOpen(false)}
+              />
+            </SheetContent>
+          </Sheet>
           
           {/* SafeGo Eats Branding */}
           <div className="flex items-center gap-2 pr-4 border-r">

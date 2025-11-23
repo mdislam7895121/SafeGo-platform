@@ -14,9 +14,11 @@ import {
 interface RestaurantSidebarProps {
   userRole?: UserRole;
   onCollapsedChange?: (collapsed: boolean) => void;
+  isMobileDrawer?: boolean;
+  onNavigate?: () => void;
 }
 
-export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange }: RestaurantSidebarProps) {
+export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange, isMobileDrawer = false, onNavigate }: RestaurantSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(["Orders", "Menu Management"]);
   const [location] = useLocation();
@@ -71,6 +73,7 @@ export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange }: Res
                       "w-full h-10 justify-center hover-elevate active-elevate-2",
                       active && "bg-accent"
                     )}
+                    onClick={() => onNavigate?.()}
                     data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <Icon className="h-5 w-5" />
@@ -108,6 +111,7 @@ export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange }: Res
                 level > 0 && "pl-10",
                 active && "bg-accent"
               )}
+              onClick={() => onNavigate?.()}
               data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
@@ -141,6 +145,26 @@ export function RestaurantSidebar({ userRole = "OWNER", onCollapsedChange }: Res
       </div>
     );
   };
+
+  // If this is a mobile drawer, don't show collapse button or fixed positioning
+  if (isMobileDrawer) {
+    return (
+      <div className="h-full bg-card flex flex-col">
+        {/* Header */}
+        <div className="p-4 border-b">
+          <div>
+            <h2 className="font-bold text-lg">SafeGo Eats</h2>
+            <p className="text-xs text-muted-foreground">Restaurant Portal</p>
+          </div>
+        </div>
+
+        {/* Navigation Items */}
+        <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+          {navigation.map((item) => renderNavItem(item, 0))}
+        </nav>
+      </div>
+    );
+  }
 
   return (
     <aside

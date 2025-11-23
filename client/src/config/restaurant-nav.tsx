@@ -85,7 +85,7 @@ export const restaurantNavigation: NavItem[] = [
       {
         label: "All Items",
         icon: Grid,
-        path: "/restaurant/menu/items"
+        path: "/restaurant/menu"
       },
       {
         label: "Categories",
