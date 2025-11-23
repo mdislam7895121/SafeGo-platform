@@ -90,12 +90,20 @@ export const restaurantNavigation: NavItem[] = [
       {
         label: "Categories",
         icon: FolderPlus,
-        path: "/restaurant/menu/categories"
+        path: "/restaurant/menu/categories",
+        requiredRole: ["OWNER"]
       },
       {
         label: "Add New Item",
         icon: PlusCircle,
-        path: "/restaurant/menu/new"
+        path: "/restaurant/menu/new",
+        requiredRole: ["OWNER"]
+      },
+      {
+        label: "Bulk Actions",
+        icon: Settings,
+        path: "/restaurant/menu/bulk",
+        requiredRole: ["OWNER"]
       }
     ]
   },

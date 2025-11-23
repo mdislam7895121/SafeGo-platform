@@ -85,8 +85,7 @@ export default function RestaurantMenu() {
 
     // Availability filter
     if (availabilityFilter !== "all") {
-      const isAvailable = availabilityFilter === "available";
-      filtered = filtered.filter((item: any) => item.isAvailable === isAvailable);
+      filtered = filtered.filter((item: any) => item.availabilityStatus === availabilityFilter);
     }
 
     return filtered;
@@ -101,10 +100,10 @@ export default function RestaurantMenu() {
 
   // Mutations
   const toggleAvailabilityMutation = useMutation({
-    mutationFn: async ({ itemId, isAvailable }: { itemId: string; isAvailable: boolean }) => {
-      return await apiRequest(`/api/restaurant/menu/items/${itemId}`, {
+    mutationFn: async ({ itemId, availabilityStatus }: { itemId: string; availabilityStatus: string }) => {
+      return await apiRequest(`/api/restaurant/menu/items/${itemId}/availability`, {
         method: "PATCH",
-        body: JSON.stringify({ isAvailable }),
+        body: JSON.stringify({ availabilityStatus }),
         headers: { "Content-Type": "application/json" },
       });
     },
@@ -125,11 +124,11 @@ export default function RestaurantMenu() {
   });
 
   const bulkToggleAvailabilityMutation = useMutation({
-    mutationFn: async ({ itemIds, isAvailable }: { itemIds: string[]; isAvailable: boolean }) => {
+    mutationFn: async ({ itemIds, availabilityStatus }: { itemIds: string[]; availabilityStatus: string }) => {
       const promises = itemIds.map((id) =>
-        apiRequest(`/api/restaurant/menu/items/${id}`, {
+        apiRequest(`/api/restaurant/menu/items/${id}/availability`, {
           method: "PATCH",
-          body: JSON.stringify({ isAvailable }),
+          body: JSON.stringify({ availabilityStatus }),
           headers: { "Content-Type": "application/json" },
         })
       );
@@ -174,14 +173,14 @@ export default function RestaurantMenu() {
   const handleBulkMakeAvailable = () => {
     bulkToggleAvailabilityMutation.mutate({
       itemIds: Array.from(selectedItems),
-      isAvailable: true,
+      availabilityStatus: "available",
     });
   };
 
   const handleBulkMakeUnavailable = () => {
     bulkToggleAvailabilityMutation.mutate({
       itemIds: Array.from(selectedItems),
-      isAvailable: false,
+      availabilityStatus: "unavailable",
     });
   };
 
@@ -265,6 +264,7 @@ export default function RestaurantMenu() {
                   <SelectItem value="all">All Items</SelectItem>
                   <SelectItem value="available">Available</SelectItem>
                   <SelectItem value="unavailable">Unavailable</SelectItem>
+                  <SelectItem value="out_of_stock">Out of Stock</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -375,16 +375,17 @@ export default function RestaurantMenu() {
                           onCheckedChange={() => handleSelectItem(item.id)}
                           data-testid={`checkbox-item-${item.id}`}
                         />
-                        <Badge variant={item.isAvailable ? "default" : "secondary"}>
-                          {item.isAvailable ? "Available" : "Unavailable"}
+                        <Badge variant={item.availabilityStatus === "available" ? "default" : "secondary"}>
+                          {item.availabilityStatus === "available" ? "Available" : 
+                           item.availabilityStatus === "out_of_stock" ? "Out of Stock" : "Unavailable"}
                         </Badge>
                       </div>
 
                       {/* Image Placeholder */}
                       <div className="aspect-video bg-muted rounded-lg flex items-center justify-center">
-                        {item.imageUrl ? (
+                        {item.itemImageUrl ? (
                           <img
-                            src={item.imageUrl}
+                            src={item.itemImageUrl}
                             alt={item.name}
                             className="w-full h-full object-cover rounded-lg"
                             loading="lazy"
@@ -398,16 +399,16 @@ export default function RestaurantMenu() {
                       <div className="space-y-2">
                         <div>
                           <h3 className="font-semibold text-base line-clamp-1">{item.name}</h3>
-                          {item.description && (
+                          {item.shortDescription && (
                             <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                              {item.description}
+                              {item.shortDescription}
                             </p>
                           )}
                         </div>
 
                         <div className="flex items-center justify-between">
                           <p className="text-lg font-bold text-primary">
-                            ${Number(item.price).toFixed(2)}
+                            {item.currency === "BDT" ? "৳" : "$"}{Number(item.basePrice).toFixed(2)}
                           </p>
                           {item.category && (
                             <Badge variant="outline" className="text-xs">
@@ -416,10 +417,10 @@ export default function RestaurantMenu() {
                           )}
                         </div>
 
-                        {/* Tags */}
-                        {item.tags && item.tags.length > 0 && (
+                        {/* Dietary Tags */}
+                        {item.dietaryTags && item.dietaryTags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
-                            {item.tags.slice(0, 3).map((tag: string, idx: number) => (
+                            {item.dietaryTags.slice(0, 3).map((tag: string, idx: number) => (
                               <Badge key={idx} variant="secondary" className="text-xs">
                                 <Tag className="h-3 w-3 mr-1" />
                                 {tag}
@@ -434,11 +435,11 @@ export default function RestaurantMenu() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">Availability</span>
                           <Switch
-                            checked={item.isAvailable}
+                            checked={item.availabilityStatus === "available"}
                             onCheckedChange={(checked) =>
                               toggleAvailabilityMutation.mutate({
                                 itemId: item.id,
-                                isAvailable: checked,
+                                availabilityStatus: checked ? "available" : "unavailable",
                               })
                             }
                             disabled={toggleAvailabilityMutation.isPending}

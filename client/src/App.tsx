@@ -71,6 +71,7 @@ import RestaurantOrders from "@/pages/restaurant/orders";
 import RestaurantMenu from "@/pages/restaurant/menu";
 import MenuCategories from "@/pages/restaurant/menu-categories";
 import AddMenuItem from "@/pages/restaurant/menu-new";
+import MenuBulkActions from "@/pages/restaurant/menu-bulk";
 import PromotionsCampaigns from "@/pages/restaurant/promotions-campaigns";
 import PromotionsCoupons from "@/pages/restaurant/promotions-coupons";
 import PromotionsFeatured from "@/pages/restaurant/promotions-featured";
@@ -542,6 +543,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <AddMenuItem />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/menu/bulk">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <MenuBulkActions />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
