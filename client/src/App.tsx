@@ -658,9 +658,16 @@ function Router() {
       </Route>
 
       {/* Payouts - Phase 5 */}
+      <Route path="/restaurant/payouts/overview">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <RestaurantPayouts />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/restaurant/payouts">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <RestaurantLayout>
+          <RestaurantLayout userRole="OWNER">
             <RestaurantPayouts />
           </RestaurantLayout>
         </ProtectedRoute>

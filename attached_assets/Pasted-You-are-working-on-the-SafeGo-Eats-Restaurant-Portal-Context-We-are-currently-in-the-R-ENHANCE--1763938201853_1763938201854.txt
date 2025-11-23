@@ -1,0 +1,92 @@
+You are working on the SafeGo Eats Restaurant Portal.
+
+Context:
+- We are currently in the R-ENHANCE phase for the restaurant portal and have just started Task 7 (Final Testing & Screenshots).
+- The user found several issues during manual testing that must be fixed BEFORE we mark R-ENHANCE as complete.
+- All existing security, RBAC, KYC gating, payouts logic, and audit logging MUST remain intact. Do not weaken or bypass any checks. Do not change database schema or business logic unless absolutely required for these fixes.
+
+Primary goals:
+1) Fix the restaurant payouts overview 404 route.
+2) Make sure all “planned feature / coming soon” restaurant pages use the new unified placeholder layout and are reachable without 404 errors.
+3) Do a final compatibility pass so these pages behave correctly on desktop, tablet, and mobile.
+
+Detailed tasks:
+
+1. Fix payouts overview 404
+- Current problem: From the restaurant Dashboard, the “View Wallet” button (in the Wallet Snapshot section) navigates to `/restaurant/payouts/overview` and shows `404 Page Not Found – Did you forget to add the page to the router?`.
+- Requirements:
+  - Identify the intended payouts overview route and component.
+    - If a payouts/wallet overview page component already exists, wire the router so `/restaurant/payouts/overview` (or the route used by the sidebar) points to that component.
+    - If no component exists, create a basic, production-ready payouts overview page that shows:
+      - Wallet snapshot (current balance, pending payouts, next payout schedule).
+      - Recent payout list (even if mocked from an existing service, but DO NOT change core payouts logic or DB schema).
+      - Clear CTAs: “Manage Payout Methods” and “Download payout history” (these can be stubbed with safe placeholders or existing links).
+  - Make sure:
+    - The “View Wallet” button and the Payouts & Finance navigation items all point to valid routes (no 404).
+    - Access is restricted to restaurant OWNER (and any staff role that is explicitly allowed by existing RBAC). Do NOT loosen RBAC.
+    - No internal IDs or sensitive fields are exposed in the UI.
+
+2. Unify placeholder pages using the new planned-feature template
+We previously added a unified placeholder system. Now apply it consistently to all restaurant “not yet implemented” pages so that they:
+- Use the same layout: icon, title, short status label, and a “What you’ll be able to do here” bullet list.
+- Do NOT show raw “Coming Soon” boxes with old text.
+- Are reachable via navigation without 404 errors.
+
+Update the following restaurant routes (verify the exact paths in the project):
+
+A. Store / Settings
+- Store Profile (`/restaurant/settings/profile`)
+- Business Documents (`/restaurant/documents/business` or similar)
+- Health & Safety (`/restaurant/documents/health`)
+- KYC / Verification (`/restaurant/documents/kyc`)
+
+B. Orders & Promotions
+- Scheduled Orders (`/restaurant/orders/scheduled`)
+- Featured Items (`/restaurant/promotions/featured`)
+
+C. Reviews & Issues
+- Complaints / Issues (`/restaurant/reviews/complaints`)
+
+D. Support
+- Help Center (`/restaurant/support/help`)
+- Contact Support (`/restaurant/support/contact`)
+- System Status (`/restaurant/support/status`)
+
+For each of these pages:
+- Use the unified placeholder component (or create a single reusable `PlannedFeaturePage` if not yet done).
+- Provide concise, realistic bullet points describing what the feature will do (e.g., for Business Documents: upload/manage licenses, track expiry, share with SafeGo support, etc.), similar to the new Business Documents / Health & Safety mockups.
+- Include a clear status label such as “Planned feature”, “Future release”, or “In planning” but keep styling consistent across all placeholders.
+- Preserve existing navigation structure and do NOT remove any menu items.
+
+3. Layout, responsiveness, and usability checks
+- Ensure the updated pages (payouts overview and all placeholder pages) follow our current responsive rules:
+  - No horizontal scroll on common breakpoints (desktop, tablet, mobile widths).
+  - Minimum tap size for interactive elements (~44px).
+  - Consistent typography with the rest of the restaurant portal.
+- Confirm that the new “Online / Offline” status capsule in the header still works correctly and keeps its green (online) / red (offline) behavior.
+- Verify that:
+  - “Add New Item” form, “Create Coupon” form, and “Create Staff member” form still render correctly and are not affected by your changes.
+  - Help Center page continues to show the explanatory “What you’ll be able to do here” text rather than a blank placeholder.
+
+Security and safety constraints (very important):
+- Do NOT modify payouts calculation logic, commission logic, or database schema.
+- Do NOT add any debug routes, test data, or hard-coded secrets.
+- Keep RBAC strict: payouts, documents, and staff management must remain OWNER-only unless an existing role already has access.
+- Keep KYC and document-related pages behind whatever KYC/verification gating we already enforce.
+
+Testing and documentation:
+- After implementing the changes:
+  - Run the app and manually navigate through all updated routes from the restaurant sidebar to confirm:
+    - No 404 errors.
+    - Unified placeholder layout is used consistently.
+    - Payouts overview loads correctly with valid data and no console errors.
+  - Test resizing the browser (or using dev tools) to simulate desktop, tablet, and mobile widths.
+  - Check for TypeScript / LSP errors and fix any introduced by your changes.
+- Finally, update `replit.md` (or the main project README used for internal docs) with a short section:
+  - Noting that restaurant payouts overview is now wired and stable.
+  - Listing all pages that currently use the unified planned-feature placeholder template.
+
+When everything is finished, summarize:
+- Exactly which files you changed.
+- Which routes were fixed or added.
+- How you verified there are no more 404s on restaurant payouts and documents/support pages.
