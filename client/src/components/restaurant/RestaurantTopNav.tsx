@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Bell, Globe, ChevronDown, Search, Menu, ShieldCheck, MapPin } from "lucide-react";
+import { Globe, ChevronDown, Menu, ShieldCheck, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -21,6 +20,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { RestaurantSidebar } from "./RestaurantSidebar";
 import { RestaurantReceivingOrdersButton } from "./RestaurantReceivingOrdersButton";
+import { RestaurantSearchBar } from "./RestaurantSearchBar";
+import { RestaurantNotificationDropdown } from "./RestaurantNotificationDropdown";
 import type { UserRole } from "@/config/restaurant-nav";
 
 interface RestaurantTopNavProps {
@@ -46,8 +47,37 @@ export function RestaurantTopNav({
 }: RestaurantTopNavProps) {
   const { logout, user } = useAuth();
   const [language, setLanguage] = useState("en");
-  const [notificationCount] = useState(3);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+
+  // Mock notification data - in production this would come from API
+  const mockNotifications: Array<{
+    id: string;
+    type: "order" | "system" | "support";
+    title: string;
+    message: string;
+    time: string;
+    unread: boolean;
+    link?: string;
+  }> = [
+    // You can add mock notifications here for demo, or leave empty
+  ];
+  const unreadNotificationCount = mockNotifications.filter(n => n.unread).length;
+
+  const handleSearch = (query: string) => {
+    if (!query.trim()) {
+      setIsSearching(false);
+      return;
+    }
+    
+    // Simulate search loading
+    setIsSearching(true);
+    setTimeout(() => {
+      setIsSearching(false);
+      // In production: implement actual search logic here
+      console.log("Searching for:", query);
+    }, 500);
+  };
 
   // Calculate header left offset based on sidebar width
   const getHeaderLeftOffset = () => {
@@ -100,41 +130,11 @@ export function RestaurantTopNav({
 
         {/* Right: Notifications + Language + Profile */}
         <div className="flex items-center gap-1">
-          {/* Notifications */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative"
-                data-testid="button-notifications"
-              >
-                <Bell className="h-4 w-4" />
-                {notificationCount > 0 && (
-                  <Badge
-                    variant="destructive"
-                    className="absolute -top-0.5 -right-0.5 h-4 w-4 p-0 flex items-center justify-center text-[10px] rounded-full"
-                    data-testid="badge-notification-count"
-                  >
-                    {notificationCount > 9 ? '9+' : notificationCount}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
-              <DropdownMenuLabel className="flex items-center justify-between">
-                <span>Notifications</span>
-                <Badge variant="secondary" className="text-xs">
-                  {notificationCount} new
-                </Badge>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <div className="p-8 text-sm text-muted-foreground text-center">
-                <Bell className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                <p>No new notifications</p>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Enhanced Notifications */}
+          <RestaurantNotificationDropdown
+            notifications={mockNotifications}
+            unreadCount={unreadNotificationCount}
+          />
 
           {/* Language Selector */}
           <DropdownMenu>
@@ -277,17 +277,14 @@ export function RestaurantTopNav({
         </div>
       </div>
 
-      {/* ROW 3: SEARCH BAR */}
+      {/* ROW 3: ENHANCED SEARCH BAR */}
       <div className="h-12 px-4 flex items-center border-t border-border/40">
-        <div className="relative w-full max-w-4xl mx-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <Input
-            placeholder="Search orders, menu items, customers..."
-            className="pl-10 h-9 bg-background w-full text-sm"
-            disabled
-            data-testid="input-global-search"
-          />
-        </div>
+        <RestaurantSearchBar
+          placeholder="Search orders, menu items, customers..."
+          onSearch={handleSearch}
+          isLoading={isSearching}
+          className="max-w-4xl mx-auto"
+        />
       </div>
     </header>
   );
