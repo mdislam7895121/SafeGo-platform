@@ -429,6 +429,10 @@ model RestaurantProfile {
   reviews               Review[]         // Phase 8: Customer reviews
   branding              RestaurantBranding? // Phase 9: Restaurant branding
   media                 RestaurantMedia[] // Phase 9: Restaurant media gallery
+  hours                 RestaurantHours[] // Phase 10: Operating hours
+  operationalSettings   OperationalSettings? // Phase 10: Delivery & pickup settings
+  deliveryZones         DeliveryZone[] // Phase 10: Delivery zones
+  surgeSettings         SurgeSettings? // Phase 10: Surge pricing settings
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -1575,4 +1579,123 @@ model RestaurantMedia {
   @@index([createdAt])
   @@index([isDemo])
   @@map("restaurant_media")
+}
+
+// ============================================================
+// PHASE 10: Restaurant Operational Settings System
+// ============================================================
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model RestaurantHours {
+  id             String       @id @default(uuid())
+  restaurantId   String
+  dayOfWeek      DayOfWeek
+  isClosed       Boolean      @default(false) // Closed all day
+  openTime1      String?      // Format: "HH:mm" (24-hour)
+  closeTime1     String?      // Format: "HH:mm" (24-hour)
+  openTime2      String?      // For split shifts
+  closeTime2     String?      // For split shifts
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  restaurant     RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([restaurantId, dayOfWeek])
+  @@index([restaurantId])
+  @@map("restaurant_hours")
+}
+
+model OperationalSettings {
+  id                      String    @id @default(uuid())
+  restaurantId            String    @unique
+  
+  // Delivery settings
+  deliveryEnabled         Boolean   @default(true)
+  pickupEnabled           Boolean   @default(true)
+  preparationTimeMinutes  Int       @default(30)
+  autoAcceptOrders        Boolean   @default(false)
+  maxConcurrentOrders     Int?      // For throttling (null = unlimited)
+  
+  // Order amount settings
+  minOrderAmount          Decimal?  @db.Decimal(10, 2)
+  freeDeliveryThreshold   Decimal?  @db.Decimal(10, 2)
+  
+  // Temporary closure
+  isTemporarilyClosed     Boolean   @default(false)
+  temporaryCloseReason    String?
+  temporaryCloseUntil     DateTime?
+  
+  // Holiday closures (JSON array of dates: ["2025-12-25", "2025-01-01"])
+  holidayClosures         Json?
+  
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  
+  restaurant              RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("operational_settings")
+}
+
+model DeliveryZone {
+  id              String    @id @default(uuid())
+  restaurantId    String
+  zoneName        String
+  zoneType        String    @default("radius") // "radius" or "polygon"
+  
+  // For radius zones
+  centerLat       Float?
+  centerLng       Float?
+  radiusKm        Float?
+  
+  // For polygon zones (JSON array of {lat, lng} points)
+  polygonPoints   Json?
+  
+  // Delivery fees
+  baseFee         Decimal   @default(0) @db.Decimal(10, 2)
+  perKmFee        Decimal   @default(0) @db.Decimal(10, 2)
+  minimumFee      Decimal   @default(0) @db.Decimal(10, 2)
+  
+  // ETA adjustments
+  estimatedMinutes Int      @default(30)
+  
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  restaurant      RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@map("delivery_zones")
+}
+
+model SurgeSettings {
+  id                 String    @id @default(uuid())
+  restaurantId       String    @unique
+  
+  surgeEnabled       Boolean   @default(false)
+  surgeMultiplier    Float     @default(1.0) // 1.0 - 2.0
+  
+  // Peak hours (JSON array of {start: "HH:mm", end: "HH:mm"})
+  peakHours          Json?
+  
+  weekendMultiplier  Float     @default(1.0) // 1.0 - 2.0
+  
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  restaurant         RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@map("surge_settings")
 }
