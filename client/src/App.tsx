@@ -81,6 +81,8 @@ import PromotionsCampaigns from "@/pages/restaurant/promotions-campaigns";
 import PromotionsCoupons from "@/pages/restaurant/promotions-coupons";
 import PromotionsFeatured from "@/pages/restaurant/promotions-featured";
 import RestaurantPayouts from "@/pages/restaurant/payouts";
+import RestaurantPayoutMethods from "@/pages/restaurant/payout-methods";
+import RestaurantPaymentOptions from "@/pages/restaurant/payment-options";
 import AdminRestaurantPayouts from "@/pages/admin/restaurant-payouts";
 import AdminRestaurantSettings from "@/pages/admin/restaurant-settings";
 import AnalyticsOverview from "@/pages/restaurant/analytics-overview";
@@ -669,6 +671,24 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <RestaurantPayouts />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Payout Methods - Payment & Payout Configuration (OWNER only) */}
+      <Route path="/restaurant/payout-methods">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <RestaurantPayoutMethods />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      
+      {/* Customer Payment Options - Payment & Payout Configuration */}
+      <Route path="/restaurant/payment-options">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantPaymentOptions />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
