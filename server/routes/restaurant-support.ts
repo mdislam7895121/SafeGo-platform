@@ -373,6 +373,24 @@ router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Respo
       }
     });
 
+    // Send notifications (non-blocking)
+    const ticketData = {
+      id: ticket.id,
+      ticketCode: ticket.ticketCode,
+      serviceType: ticket.serviceType,
+      customerId: ticket.customerId,
+      restaurantId: ticket.restaurantId,
+      driverId: ticket.driverId,
+      issueCategory: ticket.issueCategory,
+      internalStatus: ticket.internalStatus,
+      priority: ticket.priority,
+      country: ticket.countryCode,
+    };
+    
+    notifyTicketReply(ticketData, "RESTAURANT", messageBody.trim(), messageType === "internal").catch((error) => {
+      console.error("Failed to send restaurant reply notification:", error);
+    });
+
     return res.status(201).json({
       id: message.id,
       actorRole: message.actorRole,

@@ -2,6 +2,8 @@ import { Router, type Response } from "express";
 import { prisma } from "../db";
 import { loadAdminProfile, type AuthRequest } from "../middleware/auth";
 import { authenticateToken, requireAdmin } from "../middleware/authz";
+import { notifyTicketReply, notifyTicketStatusChange, notifyRefundDecision } from "../services/support-notifications";
+import { processRefundAdjustment } from "../services/financial-adjustments";
 
 const router = Router();
 
@@ -323,6 +325,24 @@ router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Respo
         },
         success: true
       }
+    });
+
+    // Send notifications (non-blocking)
+    const ticketData = {
+      id: ticket.id,
+      ticketCode: ticket.ticketCode,
+      serviceType: ticket.serviceType,
+      customerId: ticket.customerId,
+      restaurantId: ticket.restaurantId,
+      driverId: ticket.driverId,
+      issueCategory: ticket.issueCategory,
+      internalStatus: ticket.internalStatus,
+      priority: ticket.priority,
+      country: ticket.countryCode,
+    };
+    
+    notifyTicketReply(ticketData, "ADMIN", messageBody.trim(), messageType === "internal").catch((error) => {
+      console.error("Failed to send admin reply notification:", error);
     });
 
     return res.status(201).json({
