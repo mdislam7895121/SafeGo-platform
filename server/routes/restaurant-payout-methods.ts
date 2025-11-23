@@ -67,7 +67,7 @@ router.post("/me/payout-methods", authenticateToken, requireRole("RESTAURANT"), 
     const userId = req.user!.userId;
 
     const {
-      countryCode,
+      countryCode, // Optional - derived from restaurant profile for security
       payoutRailType,
       provider,
       currency,
@@ -76,10 +76,10 @@ router.post("/me/payout-methods", authenticateToken, requireRole("RESTAURANT"), 
       isDefault,
     } = req.body;
 
-    // Validate required fields
-    if (!countryCode || !payoutRailType || !provider || !currency || !maskedDetails) {
+    // Validate required fields (countryCode is derived server-side, not required from client)
+    if (!payoutRailType || !provider || !currency || !maskedDetails) {
       return res.status(400).json({
-        error: "Missing required fields: countryCode, payoutRailType, provider, currency, maskedDetails",
+        error: "Missing required fields: payoutRailType, provider, currency, maskedDetails",
       });
     }
 
@@ -118,7 +118,10 @@ router.post("/me/payout-methods", authenticateToken, requireRole("RESTAURANT"), 
     res.status(201).json({ payoutMethod });
   } catch (error: any) {
     console.error("Error creating payout method:", error);
-    res.status(500).json({ error: error.message || "Internal server error" });
+    
+    // Handle validation errors with appropriate status codes
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({ error: error.message || "Internal server error" });
   }
 });
 
