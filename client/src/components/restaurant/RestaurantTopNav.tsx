@@ -4,7 +4,6 @@ import { Bell, Globe, ChevronDown, Search, Menu, ShieldCheck, MapPin } from "luc
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -21,6 +20,7 @@ import {
 } from "@/components/ui/sheet";
 import { useAuth } from "@/contexts/AuthContext";
 import { RestaurantSidebar } from "./RestaurantSidebar";
+import { RestaurantReceivingOrdersButton } from "./RestaurantReceivingOrdersButton";
 import type { UserRole } from "@/config/restaurant-nav";
 
 interface RestaurantTopNavProps {
@@ -256,29 +256,12 @@ export function RestaurantTopNav({
           </div>
         </div>
 
-        {/* Right: Status Pills - Accepting Orders + Active */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Accepting Orders Toggle */}
-          <div className="flex items-center gap-2 px-2.5 py-1.5 border rounded-md bg-background h-8">
-            <span className="text-xs font-medium whitespace-nowrap">
-              {isOpen ? "Accepting orders" : "Not accepting"}
-            </span>
-            <Switch
-              checked={isOpen}
-              onCheckedChange={onToggleStatus}
-              data-testid="switch-store-status"
-              className="scale-90"
-            />
-          </div>
-          
-          {/* Active Status Pill */}
-          <Badge
-            variant={isOpen ? "default" : "secondary"}
-            className="text-xs px-2 py-1 h-8 flex items-center"
-            data-testid="badge-store-status"
-          >
-            {isOpen ? "Active" : "Inactive"}
-          </Badge>
+        {/* Right: Capsule-Style Receiving Orders Button */}
+        <div className="shrink-0">
+          <RestaurantReceivingOrdersButton
+            isReceivingOrders={isOpen}
+            onToggle={onToggleStatus || (() => {})}
+          />
         </div>
       </div>
 
