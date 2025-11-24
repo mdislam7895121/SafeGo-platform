@@ -329,46 +329,76 @@ export default function DriverKYCDocuments() {
     },
   });
 
+  const handleVehicleKYCSave = () => {
+    // Validate dropdown selections
+    if (isUSA && !selectedColor) {
+      toast({
+        title: "Validation error",
+        description: "Please select a vehicle color",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isUSA && !selectedModel) {
+      toast({
+        title: "Validation error",
+        description: "Please select a vehicle model",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Build final values from dropdown selections + custom inputs
+    let finalColor = selectedColor;
+    let finalModel = selectedModel;
+    
+    // If "Other" is selected, validate and use the custom value
+    if (selectedColor === "Other") {
+      if (!customColor?.trim()) {
+        toast({
+          title: "Validation error",
+          description: "Please enter a custom color",
+          variant: "destructive",
+        });
+        return;
+      }
+      finalColor = customColor.trim();
+    }
+    
+    if (selectedModel === "Other") {
+      if (!customModel?.trim()) {
+        toast({
+          title: "Validation error",
+          description: "Please enter a custom model",
+          variant: "destructive",
+        });
+        return;
+      }
+      finalModel = customModel.trim();
+    }
+    
+    // Validate license plate
+    if (isUSA && !vehicleKYCForm.licensePlateNumber?.trim()) {
+      toast({
+        title: "Validation error",
+        description: "Please enter a license plate number",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const data = {
+      vehicleColor: finalColor,
+      vehicleModel: finalModel,
+      licensePlateNumber: vehicleKYCForm.licensePlateNumber,
+    };
+    
+    updateVehicleKYCMutation.mutate(data);
+  };
+
   const updateVehicleKYCMutation = useMutation({
-    mutationFn: async () => {
-      // Build final values from dropdown selections + custom inputs
-      let finalColor = selectedColor;
-      let finalModel = selectedModel;
-      
-      // If "Other" is selected, use the custom value
-      if (selectedColor === "Other") {
-        if (!customColor?.trim()) {
-          throw new Error("Please enter a custom color");
-        }
-        finalColor = customColor.trim();
-      }
-      
-      if (selectedModel === "Other") {
-        if (!customModel?.trim()) {
-          throw new Error("Please enter a custom model");
-        }
-        finalModel = customModel.trim();
-      }
-      
-      // Validate required fields for USA drivers
-      if (isUSA) {
-        if (!finalColor) {
-          throw new Error("Vehicle color is required");
-        }
-        if (!finalModel) {
-          throw new Error("Vehicle model is required");
-        }
-        if (!vehicleKYCForm.licensePlateNumber?.trim()) {
-          throw new Error("License plate number is required");
-        }
-      }
-      
-      const data = {
-        vehicleColor: finalColor,
-        vehicleModel: finalModel,
-        licensePlateNumber: vehicleKYCForm.licensePlateNumber,
-      };
-      
+    mutationFn: async (data: { vehicleColor: string; vehicleModel: string; licensePlateNumber: string }) => {
       const result = await apiRequest("/api/driver/vehicle-kyc-details", {
         method: "PUT",
         body: JSON.stringify(data),
@@ -887,7 +917,7 @@ export default function DriverKYCDocuments() {
             </div>
 
             <Button
-              onClick={() => updateVehicleKYCMutation.mutate()}
+              onClick={handleVehicleKYCSave}
               disabled={
                 (isUSA && (!selectedColor || !selectedModel || !vehicleKYCForm.licensePlateNumber)) ||
                 (selectedColor === "Other" && !customColor?.trim()) ||

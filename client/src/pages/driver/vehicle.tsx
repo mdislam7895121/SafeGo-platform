@@ -12,6 +12,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Car, CheckCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+
+// Predefined vehicle model options (same as KYC documents page)
+const VEHICLE_MODELS = [
+  "Toyota Camry",
+  "Toyota Corolla",
+  "Honda Civic",
+  "Honda Accord",
+  "Honda CR-V",
+  "Nissan Altima",
+  "Hyundai Elantra",
+  "Hyundai Sonata",
+  "Kia Seltos",
+  "Kia Sportage",
+  "Ford Focus",
+  "Ford Explorer",
+  "Chevrolet Malibu",
+  "Tesla Model 3",
+  "Tesla Model Y",
+  "Other",
+] as const;
 
 // Vehicle registration schema
 const vehicleSchema = z.object({
@@ -34,14 +55,40 @@ export default function DriverVehicle() {
   const vehicle = (driverData as any)?.vehicle;
   const hasVehicle = !!vehicle;
 
+  // Dropdown state for model
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [customModel, setCustomModel] = useState<string>("");
+  const [modelInitialized, setModelInitialized] = useState(false);
+
   const form = useForm<VehicleFormData>({
     resolver: zodResolver(vehicleSchema),
     defaultValues: {
       vehicleType: vehicle?.vehicleType || "",
-      vehicleModel: vehicle?.vehicleModel || "",
+      vehicleModel: "", // Start empty to force dropdown selection
       vehiclePlate: vehicle?.vehiclePlate || "",
     },
   });
+
+  // Initialize model dropdown from existing vehicle data
+  useEffect(() => {
+    if (vehicle && !modelInitialized) {
+      const savedModel = vehicle.vehicleModel || "";
+      
+      // Check if saved model matches predefined options
+      const isModelPredefined = VEHICLE_MODELS.includes(savedModel as any);
+      if (isModelPredefined && savedModel !== "Other") {
+        setSelectedModel(savedModel);
+        setCustomModel("");
+        form.setValue("vehicleModel", savedModel);
+      } else if (savedModel) {
+        // Custom model - select "Other" and prefill custom field
+        setSelectedModel("Other");
+        setCustomModel(savedModel);
+        form.setValue("vehicleModel", savedModel);
+      }
+      setModelInitialized(true);
+    }
+  }, [vehicle, modelInitialized, form]);
 
   // Reset form when vehicle data loads
   if (vehicle && !form.getValues().vehicleType) {
@@ -109,10 +156,40 @@ export default function DriverVehicle() {
   });
 
   const onSubmit = (data: VehicleFormData) => {
+    // Validate dropdown selection
+    if (!selectedModel) {
+      toast({
+        title: "Validation error",
+        description: "Please select a vehicle model",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Build final model value from dropdown selection + custom input
+    let finalModel = selectedModel;
+    
+    if (selectedModel === "Other") {
+      if (!customModel?.trim()) {
+        toast({
+          title: "Validation error",
+          description: "Please enter a custom vehicle model",
+          variant: "destructive",
+        });
+        return;
+      }
+      finalModel = customModel.trim();
+    }
+    
+    const submitData = {
+      ...data,
+      vehicleModel: finalModel,
+    };
+    
     if (hasVehicle) {
-      updateVehicleMutation.mutate(data);
+      updateVehicleMutation.mutate(submitData);
     } else {
-      registerVehicleMutation.mutate(data);
+      registerVehicleMutation.mutate(submitData);
     }
   };
 
@@ -191,24 +268,51 @@ export default function DriverVehicle() {
                 )}
               />
 
-              {/* Vehicle Model */}
-              <FormField
-                control={form.control}
-                name="vehicleModel"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vehicle Model</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., Toyota Camry 2020"
-                        data-testid="input-vehicle-model"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              {/* Vehicle Model Dropdown */}
+              <FormItem>
+                <FormLabel>Vehicle Model</FormLabel>
+                <Select
+                  value={selectedModel}
+                  onValueChange={(value) => {
+                    setSelectedModel(value);
+                    if (value !== "Other") {
+                      setCustomModel("");
+                      form.setValue("vehicleModel", value);
+                    }
+                  }}
+                >
+                  <FormControl>
+                    <SelectTrigger data-testid="select-vehicle-model">
+                      <SelectValue placeholder="Select vehicle model" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {VEHICLE_MODELS.map((model) => (
+                      <SelectItem 
+                        key={model} 
+                        value={model}
+                        data-testid={`option-model-${model.toLowerCase().replace(/\s+/g, '-')}`}
+                      >
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedModel === "Other" && (
+                  <Input
+                    id="customModel"
+                    data-testid="input-custom-model"
+                    value={customModel}
+                    onChange={(e) => {
+                      setCustomModel(e.target.value);
+                      form.setValue("vehicleModel", e.target.value);
+                    }}
+                    placeholder="Enter custom model (e.g., Honda Accord 2018)"
+                    className="mt-2"
+                  />
                 )}
-              />
+                <FormMessage />
+              </FormItem>
 
               {/* License Plate */}
               <FormField
@@ -233,7 +337,11 @@ export default function DriverVehicle() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isPending}
+                disabled={
+                  isPending || 
+                  !selectedModel || 
+                  (selectedModel === "Other" && !customModel?.trim())
+                }
                 data-testid="button-submit-vehicle"
               >
                 <Car className="h-4 w-4 mr-2" />
