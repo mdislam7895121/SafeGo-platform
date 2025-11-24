@@ -361,6 +361,7 @@ model FoodOrder {
   restaurant           RestaurantProfile @relation(fields: [restaurantId], references: [id])
   appliedPromotion     Promotion?        @relation(fields: [appliedPromotionId], references: [id])
   review               Review?           // Phase 8: One review per order
+  earningsTransaction  EarningsTransaction? // R6: Earnings tracking
 
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt])
@@ -458,6 +459,9 @@ model RestaurantProfile {
   restaurantSupportTickets RestaurantSupportTicket[] @relation("RestaurantSupportTickets") // Phase 12.5: Restaurant support center tickets
   liveChatSessions      LiveChatSession[] @relation("LiveChatSessions") // Phase 12.5: Live chat sessions
   supportCallbacks      SupportCallback[] @relation("SupportCallbacks") // Phase 12.5: Support callbacks
+  commissionRules       CommissionRule[] // R6: Commission rules
+  earningsTransactions  EarningsTransaction[] // R6: Earnings transactions
+  earningsSummaries     EarningsSummary[] // R6: Earnings summaries
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -514,6 +518,7 @@ model Category {
   updatedAt     DateTime      @updatedAt
   subCategories SubCategory[]
   menuItems     MenuItem[]    @relation("MenuItemMainCategory")
+  commissionRules CommissionRule[] // R6: Category-level commission rules
 
   @@index([slug])
   @@index([isActive])
@@ -2538,4 +2543,108 @@ model SupportArticle {
   @@index([isPublished])
   @@index([viewCount])
   @@map("support_articles")
+}
+
+// ====================================================
+// R6: Restaurant Earnings & Commission Center
+// ====================================================
+
+// Commission Rule: Base + category-level commission rates
+model CommissionRule {
+  id                  String   @id @default(uuid())
+  restaurantId        String?  // null = global/default rule
+  categoryId          String?  // null = base commission rule
+  commissionRate      Decimal  @db.Decimal(5, 2) // Percentage (0-100)
+  effectiveFrom       DateTime @default(now())
+  effectiveTo         DateTime? // null = indefinite
+  isActive            Boolean  @default(true)
+  createdByAdminId    String?
+  updatedByAdminId    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  restaurant          RestaurantProfile? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category            Category? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  @@unique([restaurantId, categoryId, effectiveFrom])
+  @@index([restaurantId])
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([effectiveFrom])
+  @@map("commission_rules")
+}
+
+enum EarningsStatus {
+  pending    // Order placed, awaiting completion
+  cleared    // Order completed, earnings available
+  refunded   // Order refunded, earnings reversed
+  adjusted   // Manual adjustment by admin
+}
+
+// Detailed earnings tracking per order with commission breakdown
+model EarningsTransaction {
+  id                  String           @id @default(uuid())
+  restaurantId        String
+  orderId             String           @unique // One earnings record per order
+  orderStatus         String           // FoodOrder status snapshot
+  grossAmount         Decimal          @db.Decimal(12, 2) // Total order value
+  serviceFare         Decimal          @db.Decimal(12, 2) // From FoodOrder
+  baseCommission      Decimal          @db.Decimal(12, 2) // Calculated base commission
+  categoryCommission  Decimal?         @db.Decimal(12, 2) // Additional category commission
+  totalCommission     Decimal          @db.Decimal(12, 2) // Base + category
+  netEarnings         Decimal          @db.Decimal(12, 2) // serviceFare - totalCommission
+  status              EarningsStatus   @default(pending)
+  clearedAt           DateTime?        // When earnings became available
+  refundedAt          DateTime?        // When order was refunded
+  adjustedAt          DateTime?        // Manual adjustment timestamp
+  adjustmentReason    String?          @db.Text
+  adjustedByAdminId   String?
+  commissionRuleId    String?          // Applied commission rule
+  categoryCommissionRuleId String?     // Applied category rule
+  countryCode         String
+  currency            String
+  isDemo              Boolean          @default(false)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  
+  restaurant          RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  order               FoodOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@index([restaurantId])
+  @@index([orderId])
+  @@index([status])
+  @@index([clearedAt])
+  @@index([createdAt])
+  @@index([countryCode])
+  @@index([isDemo])
+  @@map("earnings_transactions")
+}
+
+// Aggregated daily/monthly earnings summary for performance
+model EarningsSummary {
+  id                  String   @id @default(uuid())
+  restaurantId        String
+  periodType          String   // "daily", "weekly", "monthly"
+  periodStart         DateTime
+  periodEnd           DateTime
+  totalOrders         Int      @default(0)
+  grossRevenue        Decimal  @default(0) @db.Decimal(12, 2)
+  totalCommission     Decimal  @default(0) @db.Decimal(12, 2)
+  netEarnings         Decimal  @default(0) @db.Decimal(12, 2)
+  pendingEarnings     Decimal  @default(0) @db.Decimal(12, 2)
+  clearedEarnings     Decimal  @default(0) @db.Decimal(12, 2)
+  refundedAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  currency            String
+  isDemo              Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  restaurant          RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  @@unique([restaurantId, periodType, periodStart])
+  @@index([restaurantId])
+  @@index([periodType])
+  @@index([periodStart])
+  @@index([isDemo])
+  @@map("earnings_summaries")
 }
