@@ -1,388 +1,158 @@
-import { PrismaClient, PayoutType, PayoutAccountStatus } from "@prisma/client";
-import { z } from "zod";
-import { encrypt, decrypt } from "../utils/encryption";
+import { Prisma, PayoutStatus, PayoutMethod, WalletOwnerType } from "@prisma/client";
+import { prisma } from "../db";
+import { WalletService } from "./walletService";
 
-const prisma = new PrismaClient();
-
-function maskAccountNumber(accountNumber: string): string {
-  if (accountNumber.length <= 4) {
-    return "*".repeat(accountNumber.length);
-  }
-  const last4 = accountNumber.slice(-4);
-  const masked = "*".repeat(Math.min(accountNumber.length - 4, 8));
-  return masked + last4;
-}
-
-interface PayoutDetails {
-  accountNumber?: string;
-  routingNumber?: string;
-  bankName?: string;
-  mobileNumber?: string;
-  stripeAccountId?: string;
-  [key: string]: any;
-}
-
-export const createPayoutAccountSchema = z.object({
-  ownerType: z.enum(["driver", "restaurant"]),
-  ownerId: z.string(),
-  countryCode: z.enum(["BD", "US"]),
-  payoutType: z.enum(["mobile_wallet", "bank_account", "stripe_connect", "manual"]),
-  provider: z.string().optional(),
-  displayName: z.string().min(1),
-  accountHolderName: z.string().min(1),
-  isDefault: z.boolean().optional(),
-  details: z.object({
-    accountNumber: z.string().optional(),
-    routingNumber: z.string().optional(),
-    bankName: z.string().optional(),
-    mobileNumber: z.string().optional(),
-    stripeAccountId: z.string().optional(),
-  }),
-});
-
-export const updatePayoutAccountSchema = z.object({
-  displayName: z.string().min(1).optional(),
-  accountHolderName: z.string().min(1).optional(),
-  status: z.enum(["pending_verification", "active", "inactive"]).optional(),
-  details: z.object({
-    accountNumber: z.string().optional(),
-    routingNumber: z.string().optional(),
-    bankName: z.string().optional(),
-    mobileNumber: z.string().optional(),
-    stripeAccountId: z.string().optional(),
-  }).optional(),
-});
-
-export type CreatePayoutAccountInput = z.infer<typeof createPayoutAccountSchema>;
-export type UpdatePayoutAccountInput = z.infer<typeof updatePayoutAccountSchema>;
-
-function validateCountrySpecificRules(input: CreatePayoutAccountInput): void {
-  const { countryCode, payoutType, provider, details } = input;
-
-  if (countryCode === "BD") {
-    if (payoutType === "mobile_wallet") {
-      if (!provider || !["bkash", "nagad"].includes(provider.toLowerCase())) {
-        throw new Error("For BD mobile wallets, provider must be 'bkash' or 'nagad'");
-      }
-      if (!details.mobileNumber) {
-        throw new Error("Mobile number is required for mobile wallet");
-      }
-    } else if (payoutType === "bank_account") {
-      if (!details.accountNumber || !details.bankName) {
-        throw new Error("Account number and bank name are required for BD bank accounts");
-      }
-    }
-  } else if (countryCode === "US") {
-    if (payoutType === "bank_account") {
-      if (!details.accountNumber || !details.routingNumber) {
-        throw new Error("Account number and routing number are required for US bank accounts");
-      }
-    } else if (payoutType === "stripe_connect") {
-      if (!details.stripeAccountId) {
-        throw new Error("Stripe account ID is required for Stripe Connect");
-      }
-    }
-  }
-}
-
-export async function createPayoutAccount(input: CreatePayoutAccountInput) {
-  const validated = createPayoutAccountSchema.parse(input);
-  
-  validateCountrySpecificRules(validated);
-
-  const accountIdentifier =
-    validated.details.accountNumber ||
-    validated.details.mobileNumber ||
-    validated.details.stripeAccountId ||
-    "N/A";
-
-  const maskedAccount = maskAccountNumber(accountIdentifier);
-
-  const encryptedDetails = encrypt(JSON.stringify(validated.details));
-
-  if (validated.isDefault) {
-    await prisma.payoutAccount.updateMany({
-      where: {
-        ownerType: validated.ownerType,
-        ownerId: validated.ownerId,
-        isDefault: true,
-      },
-      data: {
-        isDefault: false,
-      },
-    });
-  }
-
-  const payoutAccount = await prisma.payoutAccount.create({
-    data: {
-      ownerType: validated.ownerType,
-      ownerId: validated.ownerId,
-      countryCode: validated.countryCode,
-      payoutType: validated.payoutType,
-      provider: validated.provider || null,
-      displayName: validated.displayName,
-      accountHolderName: validated.accountHolderName,
-      maskedAccount,
-      encryptedDetails,
-      isDefault: validated.isDefault || false,
-      status: PayoutAccountStatus.pending_verification,
-    },
-  });
-
-  return sanitizePayoutAccount(payoutAccount);
-}
-
-export async function updatePayoutAccount(id: string, input: UpdatePayoutAccountInput) {
-  const validated = updatePayoutAccountSchema.parse(input);
-
-  const existingAccount = await prisma.payoutAccount.findUnique({
-    where: { id },
-  });
-
-  if (!existingAccount) {
-    throw new Error("Payout account not found");
-  }
-
-  let encryptedDetails = existingAccount.encryptedDetails;
-  let maskedAccount = existingAccount.maskedAccount;
-
-  if (validated.details) {
-    const currentDetails = JSON.parse(decrypt(existingAccount.encryptedDetails));
-    const updatedDetails = { ...currentDetails, ...validated.details };
-    encryptedDetails = encrypt(JSON.stringify(updatedDetails));
-
-    const accountIdentifier =
-      updatedDetails.accountNumber ||
-      updatedDetails.mobileNumber ||
-      updatedDetails.stripeAccountId ||
-      "N/A";
-    maskedAccount = maskAccountNumber(accountIdentifier);
-  }
-
-  const updatedAccount = await prisma.payoutAccount.update({
-    where: { id },
-    data: {
-      displayName: validated.displayName,
-      accountHolderName: validated.accountHolderName,
-      status: validated.status,
-      encryptedDetails,
-      maskedAccount,
-      updatedAt: new Date(),
-    },
-  });
-
-  return sanitizePayoutAccount(updatedAccount);
-}
-
-export async function setDefaultPayoutAccount(
-  ownerType: "driver" | "restaurant",
-  ownerId: string,
-  payoutAccountId: string
-) {
-  const account = await prisma.payoutAccount.findUnique({
-    where: { id: payoutAccountId },
-  });
-
-  if (!account) {
-    throw new Error("Payout account not found");
-  }
-
-  if (account.ownerType !== ownerType || account.ownerId !== ownerId) {
-    throw new Error("Payout account does not belong to this owner");
-  }
-
-  await prisma.$transaction([
-    prisma.payoutAccount.updateMany({
-      where: {
-        ownerType,
-        ownerId,
-        isDefault: true,
-      },
-      data: {
-        isDefault: false,
-      },
-    }),
-    prisma.payoutAccount.update({
-      where: { id: payoutAccountId },
-      data: {
-        isDefault: true,
-      },
-    }),
-  ]);
-
-  const updatedAccount = await prisma.payoutAccount.findUnique({
-    where: { id: payoutAccountId },
-    select: SAFE_PAYOUT_ACCOUNT_SELECT,
-  });
-
-  return updatedAccount;
-}
-
-const SAFE_PAYOUT_ACCOUNT_SELECT = {
-  id: true,
-  ownerType: true,
-  ownerId: true,
-  countryCode: true,
-  payoutType: true,
-  provider: true,
-  displayName: true,
-  accountHolderName: true,
-  maskedAccount: true,
-  isDefault: true,
-  status: true,
-  createdAt: true,
-  updatedAt: true,
-  encryptedDetails: false,
-} as const;
-
-function sanitizePayoutAccount(account: any) {
-  const { encryptedDetails, ...safeData } = account;
-  return safeData;
-}
-
-export async function listPayoutAccounts(ownerType: "driver" | "restaurant", ownerId: string) {
-  const accounts = await prisma.payoutAccount.findMany({
-    where: {
-      ownerType,
-      ownerId,
-    },
-    select: SAFE_PAYOUT_ACCOUNT_SELECT,
-    orderBy: [
-      { isDefault: "desc" },
-      { createdAt: "desc" },
-    ],
-  });
-
-  return accounts;
-}
-
-export async function getDefaultPayoutAccount(ownerType: "driver" | "restaurant", ownerId: string) {
-  const account = await prisma.payoutAccount.findFirst({
-    where: {
-      ownerType,
-      ownerId,
-      isDefault: true,
-      status: PayoutAccountStatus.active,
-    },
-    select: SAFE_PAYOUT_ACCOUNT_SELECT,
-  });
-
-  return account;
-}
-
-export async function getPayoutAccount(id: string) {
-  const account = await prisma.payoutAccount.findUnique({
-    where: { id },
-    select: SAFE_PAYOUT_ACCOUNT_SELECT,
-  });
-
-  return account;
-}
-
-import type {
-  WalletOwnerType,
-  PayoutMethod,
-  PayoutStatus,
-} from "@prisma/client";
-import { walletService } from "./walletService";
-
-export interface CreateWalletPayoutParams {
+export interface CreatePayoutParams {
+  walletId: string;
   ownerId: string;
   ownerType: WalletOwnerType;
   amount: number;
   method: PayoutMethod;
+  countryCode: string;
+  payoutAccountId?: string;
   scheduledAt?: Date;
   createdByAdminId?: string;
 }
 
-export interface UpdateWalletPayoutStatusParams {
-  payoutId: string;
-  status: PayoutStatus;
-  failureReason?: string;
-  externalReferenceId?: string;
-  processedByAdminId?: string;
+export interface PayoutFilters {
+  ownerId?: string;
+  ownerType?: WalletOwnerType;
+  status?: PayoutStatus;
+  method?: PayoutMethod;
+  startDate?: Date;
+  endDate?: Date;
+  limit?: number;
+  offset?: number;
 }
 
-export class WalletPayoutService {
-  async createWalletPayout(params: CreateWalletPayoutParams) {
+export class PayoutService {
+  private walletService: WalletService;
+
+  constructor() {
+    this.walletService = new WalletService();
+  }
+
+  /**
+   * Create a payout request
+   */
+  async createPayout(params: CreatePayoutParams) {
     const {
+      walletId,
       ownerId,
       ownerType,
       amount,
       method,
+      countryCode,
+      payoutAccountId,
       scheduledAt,
       createdByAdminId,
     } = params;
 
-    if (amount <= 0) {
-      throw new Error("Payout amount must be greater than zero");
+    // Validate wallet and balance
+    const wallet = await this.walletService.getWalletById(walletId);
+    
+    if (!wallet) {
+      throw new Error("Wallet not found");
     }
 
+    if (wallet.ownerId !== ownerId || wallet.ownerType !== ownerType) {
+      throw new Error("Wallet ownership mismatch");
+    }
+
+    // Check for negative balance (commission debt)
+    const negativeBalance = parseFloat(wallet.negativeBalance.toString());
+    if (negativeBalance > 0) {
+      throw new Error(
+        `Cannot request payout while commission debt exists. Outstanding: ${wallet.currency} ${negativeBalance.toFixed(2)}`
+      );
+    }
+
+    // Validate sufficient balance
+    const availableBalance = parseFloat(wallet.availableBalance.toString());
+    if (availableBalance < amount) {
+      throw new Error(
+        `Insufficient balance. Available: ${wallet.currency} ${availableBalance.toFixed(2)}, Requested: ${wallet.currency} ${amount.toFixed(2)}`
+      );
+    }
+
+    // Validate minimum payout amount based on country
+    const minAmount = this.getMinimumPayoutAmount(countryCode);
+    if (amount < minAmount) {
+      throw new Error(
+        `Minimum payout amount is ${wallet.currency} ${minAmount.toFixed(2)}`
+      );
+    }
+
+    // Validate payout account if provided
+    if (payoutAccountId) {
+      const account = await prisma.payoutAccount.findUnique({
+        where: { id: payoutAccountId },
+      });
+
+      if (!account || account.ownerId !== ownerId) {
+        throw new Error("Payout account not found or access denied");
+      }
+
+      if (account.status !== "active") {
+        throw new Error("Payout account must be active before use");
+      }
+    }
+
+    // Create payout in transaction
     return await prisma.$transaction(async (tx) => {
-      const wallet = await tx.wallet.findUnique({
-        where: {
-          ownerId_ownerType: {
-            ownerId,
-            ownerType,
+      // Double-check balance hasn't changed
+      const currentWallet = await tx.wallet.findUnique({
+        where: { id: walletId },
+      });
+
+      if (!currentWallet) {
+        throw new Error("Wallet not found");
+      }
+
+      const currentAvailable = parseFloat(currentWallet.availableBalance.toString());
+      if (currentAvailable < amount) {
+        throw new Error("Insufficient funds - concurrent payout detected");
+      }
+
+      // Deduct from available balance
+      await tx.wallet.update({
+        where: { id: walletId },
+        data: {
+          availableBalance: {
+            decrement: new Prisma.Decimal(amount),
           },
         },
       });
 
-      if (!wallet) {
-        throw new Error(`Wallet not found for ${ownerType} ${ownerId}`);
-      }
-
-      const availableBalance = parseFloat(wallet.availableBalance.toString());
-      const negativeBalance = parseFloat(wallet.negativeBalance.toString());
-
-      if (negativeBalance > 0) {
-        throw new Error(
-          `Cannot process payout. Outstanding commission debt of ${negativeBalance.toFixed(2)} ${wallet.currency} must be settled first. Available balance: ${availableBalance.toFixed(2)}`
-        );
-      }
-
-      if (availableBalance < amount) {
-        throw new Error(
-          `Insufficient balance. Available: ${availableBalance}, Requested: ${amount}`
-        );
-      }
-
-      const newAvailableBalance = availableBalance - amount;
-
-      await tx.wallet.update({
-        where: { id: wallet.id },
-        data: {
-          availableBalance: newAvailableBalance,
-        },
-      });
-
+      // Create payout record
       const payout = await tx.payout.create({
         data: {
-          walletId: wallet.id,
-          countryCode: wallet.countryCode,
-          ownerType,
+          walletId,
           ownerId,
-          amount,
+          ownerType,
+          amount: new Prisma.Decimal(amount),
           method,
-          status: "pending",
+          status: scheduledAt ? "pending" : "processing",
+          countryCode,
           scheduledAt,
           createdByAdminId,
         },
       });
 
+      // Record transaction
       await tx.walletTransaction.create({
         data: {
-          walletId: wallet.id,
+          walletId,
           ownerType,
-          countryCode: wallet.countryCode,
+          countryCode,
           serviceType: "payout",
           direction: "debit",
-          amount,
-          balanceSnapshot: newAvailableBalance,
-          negativeBalanceSnapshot: wallet.negativeBalance,
+          amount: new Prisma.Decimal(amount),
           referenceType: "payout",
           referenceId: payout.id,
-          description: `Payout request: ${amount.toFixed(2)} ${wallet.currency}`,
+          description: `Payout ${method === "auto_weekly" ? "(weekly)" : ""} - ${payout.id}`,
+          balanceSnapshot: new Prisma.Decimal(currentAvailable).minus(amount),
+          negativeBalanceSnapshot: currentWallet.negativeBalance,
           createdByAdminId,
         },
       });
@@ -391,72 +161,157 @@ export class WalletPayoutService {
     });
   }
 
-  async updateWalletPayoutStatus(params: UpdateWalletPayoutStatusParams) {
+  /**
+   * Get payout history for an owner
+   */
+  async getPayoutHistory(filters: PayoutFilters) {
     const {
-      payoutId,
+      ownerId,
+      ownerType,
       status,
-      failureReason,
-      externalReferenceId,
-      processedByAdminId,
-    } = params;
+      method,
+      startDate,
+      endDate,
+      limit = 50,
+      offset = 0,
+    } = filters;
+
+    const where: Prisma.PayoutWhereInput = {};
+
+    if (ownerId) where.ownerId = ownerId;
+    if (ownerType) where.ownerType = ownerType;
+    if (status) where.status = status;
+    if (method) where.method = method;
+
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = startDate;
+      if (endDate) where.createdAt.lte = endDate;
+    }
+
+    const [payouts, total] = await Promise.all([
+      prisma.payout.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: offset,
+        include: {
+          wallet: {
+            select: {
+              currency: true,
+              ownerId: true,
+              ownerType: true,
+            },
+          },
+        },
+      }),
+      prisma.payout.count({ where }),
+    ]);
+
+    return {
+      payouts,
+      total,
+      limit,
+      offset,
+      hasMore: offset + payouts.length < total,
+    };
+  }
+
+  /**
+   * Get pending payouts for automatic processing
+   */
+  async getPendingAutomaticPayouts() {
+    return await prisma.payout.findMany({
+      where: {
+        method: "auto_weekly",
+        status: "pending",
+        scheduledAt: {
+          lte: new Date(),
+        },
+      },
+      include: {
+        wallet: true,
+      },
+    });
+  }
+
+  /**
+   * Process a payout (mark as completed)
+   */
+  async processPayout(payoutId: string, externalReferenceId?: string) {
+    const payout = await prisma.payout.findUnique({
+      where: { id: payoutId },
+    });
+
+    if (!payout) {
+      throw new Error("Payout not found");
+    }
+
+    if (payout.status === "completed") {
+      throw new Error("Payout already completed");
+    }
+
+    return await prisma.payout.update({
+      where: { id: payoutId },
+      data: {
+        status: "completed",
+        processedAt: new Date(),
+        externalReferenceId,
+      },
+    });
+  }
+
+  /**
+   * Fail a payout (return funds to wallet)
+   */
+  async failPayout(payoutId: string, failureReason: string) {
+    const payout = await prisma.payout.findUnique({
+      where: { id: payoutId },
+      include: { wallet: true },
+    });
+
+    if (!payout) {
+      throw new Error("Payout not found");
+    }
+
+    if (payout.status === "completed") {
+      throw new Error("Cannot fail a completed payout");
+    }
 
     return await prisma.$transaction(async (tx) => {
-      const payout = await tx.payout.findUnique({
-        where: { id: payoutId },
+      // Return funds to wallet
+      await tx.wallet.update({
+        where: { id: payout.walletId },
+        data: {
+          availableBalance: {
+            increment: payout.amount,
+          },
+        },
       });
 
-      if (!payout) {
-        throw new Error(`Payout ${payoutId} not found`);
-      }
-
-      if (payout.status === "completed") {
-        throw new Error("Cannot modify a completed payout");
-      }
-
-      if (status === "failed" && payout.status !== "completed") {
-        const wallet = await tx.wallet.findUnique({
-          where: { id: payout.walletId },
-        });
-
-        if (!wallet) {
-          throw new Error(`Wallet ${payout.walletId} not found`);
-        }
-
-        const refundAmount = parseFloat(payout.amount.toString());
-        const newAvailableBalance = parseFloat(wallet.availableBalance.toString()) + refundAmount;
-
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: {
-            availableBalance: newAvailableBalance,
-          },
-        });
-
-        await tx.walletTransaction.create({
-          data: {
-            walletId: wallet.id,
-            ownerType: payout.ownerType,
-            countryCode: payout.countryCode,
-            serviceType: "adjustment",
-            direction: "credit",
-            amount: payout.amount,
-            balanceSnapshot: newAvailableBalance,
-            negativeBalanceSnapshot: wallet.negativeBalance,
-            referenceType: "payout",
-            referenceId: payout.id,
-            description: `Payout failed - refund: ${refundAmount.toFixed(2)} ${wallet.currency}`,
-            createdByAdminId: processedByAdminId,
-          },
-        });
-      }
-
+      // Update payout status
       const updatedPayout = await tx.payout.update({
         where: { id: payoutId },
         data: {
-          status,
-          failureReason: status === "failed" ? failureReason : null,
-          externalReferenceId,
-          processedAt: status === "completed" || status === "failed" ? new Date() : null,
+          status: "failed",
+          failureReason,
+        },
+      });
+
+      // Record refund transaction
+      await tx.walletTransaction.create({
+        data: {
+          walletId: payout.walletId,
+          ownerType: payout.ownerType,
+          countryCode: payout.countryCode,
+          serviceType: "payout",
+          direction: "credit",
+          amount: payout.amount,
+          referenceType: "payout",
+          referenceId: payout.id,
+          description: `Payout failed refund - ${payout.id}`,
+          balanceSnapshot: payout.wallet.availableBalance,
+          negativeBalanceSnapshot: payout.wallet.negativeBalance,
         },
       });
 
@@ -464,451 +319,131 @@ export class WalletPayoutService {
     });
   }
 
-  async getWalletPayoutById(payoutId: string) {
-    return prisma.payout.findUnique({
-      where: { id: payoutId },
-      include: {
-        wallet: true,
-      },
-    });
-  }
+  /**
+   * Schedule automatic weekly payouts for all eligible wallets
+   */
+  async scheduleWeeklyPayouts() {
+    const now = new Date();
+    const nextSunday = this.getNextSunday();
 
-  async listWalletPayouts(filters?: {
-    ownerType?: WalletOwnerType;
-    ownerId?: string;
-    status?: PayoutStatus;
-    countryCode?: string;
-    startDate?: Date;
-    endDate?: Date;
-    limit?: number;
-    offset?: number;
-  }) {
-    const where: any = {};
-
-    if (filters?.ownerType) {
-      where.ownerType = filters.ownerType;
-    }
-
-    if (filters?.ownerId) {
-      where.ownerId = filters.ownerId;
-    }
-
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-
-    if (filters?.countryCode) {
-      where.countryCode = filters.countryCode;
-    }
-
-    if (filters?.startDate || filters?.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        where.createdAt.gte = filters.startDate;
-      }
-      if (filters.endDate) {
-        where.createdAt.lte = filters.endDate;
-      }
-    }
-
-    return prisma.payout.findMany({
-      where,
-      include: {
-        wallet: true,
-      },
-      orderBy: { createdAt: "desc" },
-      take: filters?.limit || 50,
-      skip: filters?.offset || 0,
-    });
-  }
-
-  async getWalletPayoutCount(filters?: {
-    ownerType?: WalletOwnerType;
-    ownerId?: string;
-    status?: PayoutStatus;
-    countryCode?: string;
-  }): Promise<number> {
-    const where: any = {};
-
-    if (filters?.ownerType) {
-      where.ownerType = filters.ownerType;
-    }
-
-    if (filters?.ownerId) {
-      where.ownerId = filters.ownerId;
-    }
-
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-
-    if (filters?.countryCode) {
-      where.countryCode = filters.countryCode;
-    }
-
-    return prisma.payout.count({ where });
-  }
-
-  async getPendingWalletPayoutsByOwner(ownerId: string, ownerType: WalletOwnerType) {
-    return prisma.payout.findMany({
+    // Find all wallets with sufficient balance
+    const eligibleWallets = await prisma.wallet.findMany({
       where: {
-        ownerId,
-        ownerType,
-        status: {
-          in: ["pending", "processing"],
+        availableBalance: {
+          gte: new Prisma.Decimal(10), // Minimum threshold
         },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  async getTotalPayoutAmountByOwner(
-    ownerId: string,
-    ownerType: WalletOwnerType
-  ): Promise<number> {
-    const payouts = await prisma.payout.findMany({
-      where: {
-        ownerId,
-        ownerType,
-        status: "completed",
-      },
-      select: {
-        amount: true,
+        negativeBalance: {
+          equals: new Prisma.Decimal(0),
+        },
       },
     });
 
-    return payouts.reduce((sum, payout) => sum + parseFloat(payout.amount.toString()), 0);
-  }
+    const scheduled: any[] = [];
 
-  async createPayoutBatch(params: {
-    periodStart: Date;
-    periodEnd: Date;
-    ownerType?: WalletOwnerType;
-    countryCode?: string;
-    minPayoutAmount?: number;
-    createdByAdminId: string;
-  }) {
-    const {
-      periodStart,
-      periodEnd,
-      ownerType,
-      countryCode,
-      minPayoutAmount = 10,
-      createdByAdminId,
-    } = params;
-
-    return await prisma.$transaction(async (tx) => {
-      const walletWhere: any = {};
-
-      if (ownerType) {
-        walletWhere.ownerType = ownerType;
-      } else {
-        walletWhere.ownerType = { in: ["driver", "restaurant"] };
-      }
-
-      if (countryCode) {
-        walletWhere.countryCode = countryCode;
-      }
-
-      const eligibleWallets = await tx.wallet.findMany({
-        where: walletWhere,
-        include: {
-          _count: {
-            select: {
-              payouts: {
-                where: {
-                  status: { in: ["pending", "processing"] },
-                },
-              },
-            },
-          },
-        },
-      });
-
-      const walletsForPayout = eligibleWallets.filter((wallet) => {
-        const availableBalance = parseFloat(wallet.availableBalance.toString());
-        const negativeBalance = parseFloat(wallet.negativeBalance.toString());
-        const hasPendingPayouts = wallet._count.payouts > 0;
-
-        return (
-          availableBalance >= minPayoutAmount &&
-          negativeBalance === 0 &&
-          !hasPendingPayouts
-        );
-      });
-
-      const batch = await tx.payoutBatch.create({
-        data: {
-          batchType: ownerType || null,
-          periodStart,
-          periodEnd,
-          totalPayoutCount: walletsForPayout.length,
-          totalPayoutAmount: 0,
-          status: "created",
-          createdByAdminId,
-        },
-      });
-
-      let totalBatchAmount = 0;
-      const createdPayouts = [];
-
-      for (const wallet of walletsForPayout) {
-        const availableBalance = parseFloat(wallet.availableBalance.toString());
-
-        const payout = await tx.payout.create({
-          data: {
+    for (const wallet of eligibleWallets) {
+      try {
+        // Check if there's already a scheduled payout for this week
+        const existingScheduled = await prisma.payout.findFirst({
+          where: {
             walletId: wallet.id,
-            countryCode: wallet.countryCode,
-            ownerType: wallet.ownerType,
-            ownerId: wallet.ownerId,
-            amount: availableBalance,
             method: "auto_weekly",
             status: "pending",
-            scheduledAt: new Date(),
-            createdByAdminId,
-            batchId: batch.id,
+            scheduledAt: {
+              gte: now,
+              lte: nextSunday,
+            },
           },
         });
 
-        totalBatchAmount += availableBalance;
-        createdPayouts.push(payout);
-      }
-
-      await tx.payoutBatch.update({
-        where: { id: batch.id },
-        data: {
-          totalPayoutAmount: totalBatchAmount,
-        },
-      });
-
-      return {
-        batch,
-        payouts: createdPayouts,
-      };
-    });
-  }
-
-  async processPayoutBatch(batchId: string, processedByAdminId: string) {
-    return await prisma.$transaction(async (tx) => {
-      const batch = await tx.payoutBatch.findUnique({
-        where: { id: batchId },
-        include: {
-          payouts: true,
-        },
-      });
-
-      if (!batch) {
-        throw new Error(`Batch ${batchId} not found`);
-      }
-
-      if (batch.status !== "created") {
-        throw new Error(`Batch is already ${batch.status}`);
-      }
-
-      await tx.payoutBatch.update({
-        where: { id: batchId },
-        data: {
-          status: "processing",
-        },
-      });
-
-      let completedCount = 0;
-      let failedCount = 0;
-
-      for (const payout of batch.payouts) {
-        if (payout.status !== "pending") {
-          continue;
+        if (existingScheduled) {
+          continue; // Skip if already scheduled
         }
 
-        const wallet = await tx.wallet.findUnique({
-          where: { id: payout.walletId },
-        });
+        // Get minimum payout amount for country
+        const minAmount = this.getMinimumPayoutAmount(wallet.countryCode);
+        const availableBalance = parseFloat(wallet.availableBalance.toString());
 
-        if (!wallet) {
-          await tx.payout.update({
-            where: { id: payout.id },
-            data: {
-              status: "failed",
-              failureReason: "Wallet not found",
-              processedAt: new Date(),
-            },
-          });
-          failedCount++;
-          continue;
-        }
-
-        const currentBalance = parseFloat(wallet.availableBalance.toString());
-        const payoutAmount = parseFloat(payout.amount.toString());
-
-        if (currentBalance < payoutAmount) {
-          await tx.payout.update({
-            where: { id: payout.id },
-            data: {
-              status: "failed",
-              failureReason: `Insufficient balance. Available: ${currentBalance}, Required: ${payoutAmount}`,
-              processedAt: new Date(),
-            },
-          });
-          failedCount++;
-          continue;
-        }
-
-        const newBalance = currentBalance - payoutAmount;
-
-        await tx.wallet.update({
-          where: { id: wallet.id },
-          data: {
-            availableBalance: newBalance,
-          },
-        });
-
-        await tx.walletTransaction.create({
-          data: {
+        if (availableBalance >= minAmount) {
+          const payout = await this.createPayout({
             walletId: wallet.id,
+            ownerId: wallet.ownerId,
             ownerType: wallet.ownerType,
+            amount: availableBalance,
+            method: "auto_weekly",
             countryCode: wallet.countryCode,
-            serviceType: "payout",
-            direction: "debit",
-            amount: payoutAmount,
-            balanceSnapshot: newBalance,
-            negativeBalanceSnapshot: wallet.negativeBalance,
-            referenceType: "payout",
-            referenceId: payout.id,
-            description: `Batch payout debit: ${payoutAmount.toFixed(2)} ${wallet.currency}`,
-            createdByAdminId: processedByAdminId,
-          },
-        });
-
-        try {
-          await tx.payout.update({
-            where: { id: payout.id },
-            data: {
-              status: "completed",
-              processedAt: new Date(),
-            },
-          });
-          completedCount++;
-        } catch (error: any) {
-          const refundBalance = newBalance + payoutAmount;
-          await tx.wallet.update({
-            where: { id: wallet.id },
-            data: {
-              availableBalance: refundBalance,
-            },
+            scheduledAt: nextSunday,
           });
 
-          await tx.walletTransaction.create({
-            data: {
-              walletId: wallet.id,
-              ownerType: wallet.ownerType,
-              countryCode: wallet.countryCode,
-              serviceType: "payout",
-              direction: "credit",
-              amount: payoutAmount,
-              balanceSnapshot: refundBalance,
-              negativeBalanceSnapshot: wallet.negativeBalance,
-              referenceType: "payout",
-              referenceId: payout.id,
-              description: `Batch payout refund (failed): ${payoutAmount.toFixed(2)} ${wallet.currency}`,
-              createdByAdminId: processedByAdminId,
-            },
-          });
-
-          await tx.payout.update({
-            where: { id: payout.id },
-            data: {
-              status: "failed",
-              failureReason: error.message || "Payout execution failed",
-              processedAt: new Date(),
-            },
-          });
-          failedCount++;
+          scheduled.push(payout);
         }
-      }
-
-      const finalStatus =
-        failedCount === 0
-          ? "completed"
-          : completedCount === 0
-          ? "failed"
-          : "partially_failed";
-
-      await tx.payoutBatch.update({
-        where: { id: batchId },
-        data: {
-          status: finalStatus,
-        },
-      });
-
-      return {
-        batchId,
-        status: finalStatus,
-        completedCount,
-        failedCount,
-      };
-    });
-  }
-
-  async getPayoutBatch(batchId: string) {
-    return prisma.payoutBatch.findUnique({
-      where: { id: batchId },
-      include: {
-        payouts: {
-          include: {
-            wallet: true,
-          },
-        },
-      },
-    });
-  }
-
-  async listPayoutBatches(filters?: {
-    status?: string;
-    startDate?: Date;
-    endDate?: Date;
-    limit?: number;
-    offset?: number;
-  }) {
-    const where: any = {};
-
-    if (filters?.status) {
-      where.status = filters.status;
-    }
-
-    if (filters?.startDate || filters?.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) {
-        where.createdAt.gte = filters.startDate;
-      }
-      if (filters.endDate) {
-        where.createdAt.lte = filters.endDate;
+      } catch (error) {
+        console.error(`Failed to schedule payout for wallet ${wallet.id}:`, error);
       }
     }
 
-    const [batches, total] = await Promise.all([
-      prisma.payoutBatch.findMany({
-        where,
-        include: {
-          _count: {
-            select: {
-              payouts: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-        take: filters?.limit || 50,
-        skip: filters?.offset || 0,
+    return {
+      scheduled: scheduled.length,
+      nextScheduledDate: nextSunday,
+    };
+  }
+
+  /**
+   * Get minimum payout amount based on country
+   */
+  private getMinimumPayoutAmount(countryCode: string): number {
+    const minimums: Record<string, number> = {
+      BD: 100, // 100 BDT
+      US: 10, // $10 USD
+    };
+
+    return minimums[countryCode] || 10;
+  }
+
+  /**
+   * Get next Sunday at 00:00:00
+   */
+  private getNextSunday(): Date {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek;
+    
+    const nextSunday = new Date(now);
+    nextSunday.setDate(now.getDate() + daysUntilSunday);
+    nextSunday.setHours(0, 0, 0, 0);
+
+    return nextSunday;
+  }
+
+  /**
+   * Get payout statistics for an owner
+   */
+  async getPayoutStats(ownerId: string, ownerType: WalletOwnerType) {
+    const [totalPayouts, completedPayouts, pendingPayouts, totalAmount] = await Promise.all([
+      prisma.payout.count({
+        where: { ownerId, ownerType },
       }),
-      prisma.payoutBatch.count({ where }),
+      prisma.payout.count({
+        where: { ownerId, ownerType, status: "completed" },
+      }),
+      prisma.payout.count({
+        where: { ownerId, ownerType, status: "pending" },
+      }),
+      prisma.payout.aggregate({
+        where: { ownerId, ownerType, status: "completed" },
+        _sum: { amount: true },
+      }),
     ]);
 
     return {
-      batches,
-      total,
-      limit: filters?.limit || 50,
-      offset: filters?.offset || 0,
+      totalPayouts,
+      completedPayouts,
+      pendingPayouts,
+      totalAmount: totalAmount._sum.amount || new Prisma.Decimal(0),
     };
   }
 }
 
-export const walletPayoutService = new WalletPayoutService();
+export const payoutService = new PayoutService();
+
+// Backwards compatibility - alias for existing code
+export const walletPayoutService = payoutService;
