@@ -33,8 +33,6 @@ function checkSupportAccess(profile: any, requireOwner: boolean = false): boolea
   return false;
 }
 
-import { restaurantSupportService } from "../services/RestaurantSupportService";
-
 /**
  * ===========================
  * RESTAURANT SUPPORT CENTER ROUTES
