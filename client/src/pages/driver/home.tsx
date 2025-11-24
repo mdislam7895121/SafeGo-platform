@@ -7,9 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Suspense, lazy } from "react";
-
-const VehicleViewer = lazy(() => import("@/components/3d/VehicleViewer"));
 
 export default function DriverHome() {
   const { user, logout } = useAuth();
@@ -139,66 +136,37 @@ export default function DriverHome() {
           </Card>
         </div>
 
-        {/* Vehicle Info with 3D Viewer */}
+        {/* Vehicle Info */}
         {vehicle && (
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Car className="h-5 w-5" />
                 Your Vehicle
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* 3D Vehicle Render */}
-              <Suspense
-                fallback={
-                  <div className="w-full h-[180px] bg-muted rounded-lg flex items-center justify-center">
-                    <div className="animate-pulse text-muted-foreground text-sm">
-                      Loading 3D vehicle...
-                    </div>
-                  </div>
-                }
-              >
-                <VehicleViewer
-                  vehicleType={vehicle.vehicleType}
-                  vehicleColor={vehicle.vehicleColor || "Silver"}
-                  height={180}
-                  autoRotate={true}
-                  showControls={true}
-                />
-              </Suspense>
-
-              {/* Vehicle Details Grid */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Type</p>
-                  <Badge variant="secondary" className="mt-1">{vehicle.vehicleType}</Badge>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Color</p>
-                  <p className="font-medium text-sm mt-1">{vehicle.vehicleColor || "Not set"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Model</p>
-                  <p className="font-medium text-sm mt-1">{vehicle.vehicleModel}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Plate</p>
-                  <p className="font-medium text-sm mt-1 font-mono">{vehicle.vehiclePlate}</p>
-                </div>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Type</span>
+                <Badge>{vehicle.vehicleType}</Badge>
               </div>
-
-              <div className="flex justify-between items-center pt-2 border-t">
-                <div>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Earnings</p>
-                  <p className="font-bold text-lg">${vehicle.totalEarnings != null ? Number(vehicle.totalEarnings).toFixed(2) : "0.00"}</p>
-                </div>
-                <Link href="/driver/vehicle">
-                  <Button variant="outline" size="sm" data-testid="button-edit-vehicle">
-                    Edit Vehicle
-                  </Button>
-                </Link>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Model</span>
+                <span className="font-medium">{vehicle.vehicleModel}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Plate</span>
+                <span className="font-medium">{vehicle.vehiclePlate}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Earnings</span>
+                <span className="font-bold">${vehicle.totalEarnings != null ? Number(vehicle.totalEarnings).toFixed(2) : "0.00"}</span>
+              </div>
+              <Link href="/driver/vehicle">
+                <Button variant="outline" className="w-full mt-2" data-testid="button-edit-vehicle">
+                  Edit Vehicle
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         )}

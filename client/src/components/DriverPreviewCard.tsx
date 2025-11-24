@@ -1,10 +1,7 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Star } from "lucide-react";
-import { Suspense, lazy } from "react";
-
-const VehicleViewer = lazy(() => import("@/components/3d/VehicleViewer"));
+import { AlertCircle, Star, Car } from "lucide-react";
 
 type DriverPublicProfile = {
   name: string;
@@ -26,15 +23,11 @@ type DriverPublicProfile = {
 interface DriverPreviewCardProps {
   profile: DriverPublicProfile;
   className?: string;
-  show3DViewer?: boolean;
-  viewerHeight?: string | number;
 }
 
 export function DriverPreviewCard({ 
   profile, 
   className = "",
-  show3DViewer = true,
-  viewerHeight = 180,
 }: DriverPreviewCardProps) {
   const formatRideCount = (count: number) => {
     if (count >= 1000) {
@@ -79,52 +72,17 @@ export function DriverPreviewCard({
           </div>
         </div>
 
-        {/* Vehicle Section with 3D Viewer */}
+        {/* Vehicle Section */}
         {profile.vehicle && (
           <div className="space-y-3">
-            {/* 3D Vehicle Render */}
-            {show3DViewer ? (
-              <Suspense
-                fallback={
-                  <div 
-                    className="w-full bg-muted rounded-lg flex items-center justify-center"
-                    style={{ height: typeof viewerHeight === 'number' ? `${viewerHeight}px` : viewerHeight }}
-                  >
-                    <div className="animate-pulse text-muted-foreground text-sm">
-                      Loading 3D vehicle...
-                    </div>
-                  </div>
-                }
-              >
-                <VehicleViewer
-                  vehicleType={profile.vehicle.type}
-                  vehicleColor={profile.vehicle.color}
-                  height={viewerHeight}
-                  autoRotate={true}
-                  showControls={true}
-                />
-              </Suspense>
-            ) : (
-              <div className="w-full bg-muted rounded-lg p-4 flex items-center justify-center min-h-[100px]">
-                <p className="text-sm text-muted-foreground">
-                  {profile.vehicle.color} {profile.vehicle.type}
-                </p>
-              </div>
-            )}
-
-            {/* Vehicle Details */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Vehicle</p>
-                <p className="font-medium text-sm" data-testid="text-vehicle-model">
-                  {profile.vehicle.model}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Color</p>
-                <p className="font-medium text-sm" data-testid="text-vehicle-color">
-                  {profile.vehicle.color}
-                </p>
+            {/* Vehicle Icon */}
+            <div className="w-full bg-muted rounded-lg p-4 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <Car className="h-8 w-8 text-muted-foreground" />
+                <div className="text-left">
+                  <p className="font-medium">{profile.vehicle.color} {profile.vehicle.type}</p>
+                  <p className="text-sm text-muted-foreground">{profile.vehicle.model}</p>
+                </div>
               </div>
             </div>
 
