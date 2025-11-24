@@ -43,6 +43,7 @@ import { ordersKeys } from "@/lib/queryKeys";
 import { formatDistanceToNow } from "date-fns";
 import { KYCBanner } from "@/components/restaurant/KYCBanner";
 import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
+import { PerformanceInsights } from "@/components/restaurant/PerformanceInsights";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, BarChart3 } from "lucide-react";
 
@@ -756,68 +757,6 @@ export default function RestaurantHome() {
               </CardContent>
             </Card>
 
-            {/* Performance Insights */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TrendingUp className="h-4 w-4" />
-                  Performance Insights
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">Last 7 days</p>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ShoppingBag className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Total Orders</span>
-                    </div>
-                    <span className="font-semibold" data-testid="text-7day-orders">
-                      {last7DaysOrders.length}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Total Earnings</span>
-                    </div>
-                    <span className="font-semibold text-green-600" data-testid="text-7day-earnings">
-                      ${last7DaysEarnings.toFixed(2)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Avg. Prep Time</span>
-                    </div>
-                    <span className="font-semibold" data-testid="text-avg-prep-time">
-                      {avgPrepTime ? `${avgPrepTime} min` : "N/A"}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <X className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Cancelled Orders</span>
-                    </div>
-                    <span className={`font-semibold ${cancellationRate > 10 ? 'text-red-600' : ''}`} data-testid="text-cancellation-rate">
-                      {cancellationRate.toFixed(1)}%
-                    </span>
-                  </div>
-                  
-                  {last7DaysOrders.length === 0 && (
-                    <div className="pt-2 text-center">
-                      <p className="text-xs text-muted-foreground">
-                        No orders in the last 7 days
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Quick Actions */}
             <Card>
               <CardHeader>
@@ -854,6 +793,11 @@ export default function RestaurantHome() {
               </CardContent>
             </Card>
           </div>
+        </div>
+
+        {/* Enhanced Performance Insights - R2 */}
+        <div className="mt-8">
+          <PerformanceInsights />
         </div>
 
         {/* Warning for Unverified Restaurants */}

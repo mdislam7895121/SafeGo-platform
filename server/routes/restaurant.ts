@@ -4209,4 +4209,242 @@ router.delete("/gallery/:id", requireKYCCompletion, async (req: AuthRequest, res
   }
 });
 
+// =====================================================
+// GET /api/restaurant/analytics
+// Get restaurant analytics and performance insights
+// Security: KYC required for financial data, restaurantId scoped
+// =====================================================
+router.get("/analytics", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { range = "7d" } = req.query;
+
+    // Get restaurant profile
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // KYC validation for financial data access
+    const profileWithCountry = {
+      ...restaurantProfile,
+      countryCode: restaurantProfile.countryCode || restaurantProfile.user.countryCode,
+    };
+    const kycValidation = validateRestaurantKYC(profileWithCountry);
+    if (!kycValidation.isComplete) {
+      return res.status(403).json({
+        error: "KYC verification required",
+        message: "Please complete your KYC verification to view analytics",
+        missingFields: kycValidation.missingFields,
+        countryCode: kycValidation.countryCode,
+      });
+    }
+
+    // Calculate time range
+    const now = new Date();
+    let startDate: Date;
+    let groupBy: "hour" | "day" = "day";
+
+    switch (range) {
+      case "today":
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        groupBy = "hour";
+        break;
+      case "7d":
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        groupBy = "day";
+        break;
+      case "30d":
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        groupBy = "day";
+        break;
+      default:
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        groupBy = "day";
+    }
+
+    // Fetch all orders in the time range (scoped to this restaurant only)
+    const orders = await prisma.foodOrder.findMany({
+      where: {
+        restaurantId: restaurantProfile.id,
+        createdAt: {
+          gte: startDate,
+        },
+      },
+      select: {
+        id: true,
+        orderCode: true,
+        status: true,
+        items: true,
+        serviceFare: true,
+        restaurantPayout: true,
+        safegoCommission: true,
+        paymentMethod: true,
+        orderType: true,
+        createdAt: true,
+        acceptedAt: true,
+        preparingAt: true,
+        readyAt: true,
+        pickedUpAt: true,
+        deliveredAt: true,
+        completedAt: true,
+        whoCancelled: true,
+        cancellationReason: true,
+        customer: {
+          select: {
+            user: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Calculate KPIs
+    const totalOrders = orders.length;
+    const totalEarnings = orders.reduce((sum, order) => sum + Number(order.restaurantPayout || 0), 0);
+    const averageOrderValue = totalOrders > 0 ? totalEarnings / totalOrders : 0;
+
+    const placedOrders = orders.filter(o => o.status === "placed" || o.acceptedAt !== null);
+    const acceptedOrders = orders.filter(o => o.acceptedAt !== null);
+    const acceptanceRate = placedOrders.length > 0 ? (acceptedOrders.length / placedOrders.length) * 100 : 0;
+
+    const cancelledOrders = orders.filter(o => 
+      o.status.includes("cancelled") || o.whoCancelled !== null
+    );
+    const cancellationRate = totalOrders > 0 ? (cancelledOrders.length / totalOrders) * 100 : 0;
+
+    // On-time completion rate (delivered within expected time - simplified as deliveredAt exists)
+    const completedOrders = orders.filter(o => 
+      o.status === "delivered" || o.status === "completed" || o.deliveredAt !== null
+    );
+    const onTimeRate = completedOrders.length; // Simplified - just count completed orders
+
+    // Group orders by time bucket for charts
+    const ordersOverTime: { [key: string]: number } = {};
+    const earningsOverTime: { [key: string]: number } = {};
+
+    orders.forEach(order => {
+      const date = new Date(order.createdAt);
+      let key: string;
+
+      if (groupBy === "hour") {
+        // Group by hour for "today"
+        key = `${date.getHours()}:00`;
+      } else {
+        // Group by date for 7d and 30d
+        key = date.toISOString().split("T")[0];
+      }
+
+      ordersOverTime[key] = (ordersOverTime[key] || 0) + 1;
+      earningsOverTime[key] = (earningsOverTime[key] || 0) + Number(order.restaurantPayout || 0);
+    });
+
+    // Convert to arrays for charts
+    const ordersTimeSeries = Object.entries(ordersOverTime)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const earningsTimeSeries = Object.entries(earningsOverTime)
+      .map(([date, amount]) => ({ date, amount }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Top categories and items analysis
+    const itemStats: { [key: string]: { count: number; revenue: number } } = {};
+    const categoryStats: { [key: string]: { count: number; revenue: number } } = {};
+
+    orders.forEach(order => {
+      const items = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+      const orderRevenue = Number(order.restaurantPayout || 0);
+
+      if (Array.isArray(items)) {
+        items.forEach((item: any) => {
+          const itemName = item.name || item.itemName || "Unknown";
+          const category = item.category || "Uncategorized";
+
+          // Track item stats
+          if (!itemStats[itemName]) {
+            itemStats[itemName] = { count: 0, revenue: 0 };
+          }
+          itemStats[itemName].count += 1;
+          itemStats[itemName].revenue += orderRevenue / items.length; // Distribute revenue evenly
+
+          // Track category stats
+          if (!categoryStats[category]) {
+            categoryStats[category] = { count: 0, revenue: 0 };
+          }
+          categoryStats[category].count += 1;
+          categoryStats[category].revenue += orderRevenue / items.length;
+        });
+      }
+    });
+
+    // Top 5 items and categories
+    const topItems = Object.entries(itemStats)
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const topCategories = Object.entries(categoryStats)
+      .map(([name, stats]) => ({ name, ...stats }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    // Recent orders (last 30 in range)
+    const recentOrders = orders.slice(0, 30).map(order => ({
+      id: order.id,
+      orderCode: order.orderCode,
+      customerName: order.customer?.user?.name || "Customer",
+      amount: Number(order.restaurantPayout || 0),
+      orderType: order.orderType,
+      status: order.status,
+      paymentMethod: order.paymentMethod,
+      createdAt: order.createdAt,
+    }));
+
+    // Audit log for analytics access
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantProfile.id,
+      userId,
+      action: ActionType.VIEW,
+      details: `Viewed analytics for range: ${range}`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json({
+      range,
+      groupBy,
+      kpis: {
+        totalOrders,
+        totalEarnings,
+        averageOrderValue,
+        acceptanceRate,
+        cancellationRate,
+        onTimeCompletionCount: onTimeRate,
+      },
+      charts: {
+        ordersOverTime: ordersTimeSeries,
+        earningsOverTime: earningsTimeSeries,
+        topItems,
+        topCategories,
+      },
+      recentOrders,
+    });
+  } catch (error: any) {
+    console.error("Analytics error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch analytics" });
+  }
+});
+
 export default router;

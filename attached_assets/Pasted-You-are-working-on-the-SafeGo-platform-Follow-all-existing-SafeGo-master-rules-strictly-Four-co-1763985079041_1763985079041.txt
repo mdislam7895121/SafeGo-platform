@@ -1,0 +1,207 @@
+You are working on the SafeGo platform. Follow all existing SafeGo master rules strictly:
+
+- Four core roles: customer, driver, restaurant, admin (RBAC already implemented).
+- Country-specific KYC for Bangladesh and USA is mandatory for any money-related or sensitive data.
+- Commission, payout, and wallet logic must remain exactly as implemented.
+- All queries and APIs must be tenant-scoped by restaurantId and respect existing SafeGuard security rules, audit logging, and KYC/RBAC checks.
+- No breaking changes to existing routes, database schemas, or other roles without explicit instruction.
+
+Current context
+- SafeGo Eats (restaurant portal) is already live with:
+  - Restaurant Identity & KYC
+  - Online/Offline toggle
+  - Wallet Snapshot + Unified Payout System (individual withdrawals only)
+  - Menu Categories + Smart Category Search & Auto-suggest (50+ main categories, 500+ subcategories)
+  - Menu Item management (create/edit with categories)
+  - Staff Management & Permissions
+  - Restaurant Support Center (tickets, live chat, phone callback, help center)
+  - Restaurant Order Management R1:
+    - Live Orders Board
+    - Order list + order details page
+    - Status timeline + action buttons (accept/reject/preparing/ready/completed/cancelled)
+    - Real-time synchronization
+
+We are now in Restaurant Phase R2:
+“Restaurant Analytics & Performance Insights”
+
+High-level goal
+Build a production-ready Restaurant Analytics & Insights experience for the restaurant role ONLY, on top of the existing data and APIs, without breaking anything.
+
+This must be:
+- Read-only for analytics (no changes to payouts, orders, or wallets).
+- Fully responsive for mobile, tablet, and desktop.
+- SafeGo-brand aligned (no new design system, reuse existing components).
+- Strictly within current backend and schema, unless a small helper endpoint is required.
+
+R2 Scope (Restaurant-side only)
+
+1) Enhance the existing Performance Insights section
+Currently, the dashboard shows a simple Performance Insights area. Upgrade it to a full analytics module with:
+
+A. Time range controls
+- Tabs: Today, 7 Days, 30 Days.
+- Optional: “Custom range” stub, but do NOT implement complex UI – just keep the tab or placeholder for future use.
+- All metrics and charts must respect the selected time range.
+
+B. Key KPI cards (top of Performance Insights)
+For the selected time range, show cards with:
+- Total Orders
+- Total Earnings (after SafeGo fees; use the same net/after-fees logic as the Wallet/Earnings system)
+- Average Order Value
+- Acceptance Rate (accepted vs total new orders)
+- Cancellation Rate (restaurant-cancelled + customer-cancelled vs total orders)
+- On-time Completion Rate (if the data exists, otherwise clearly label as “N/A”)
+
+Each card:
+- Uses existing typography and card components.
+- Is readable and compact on mobile (2 per row / stacked) and arranged nicely on tablet/desktop.
+
+C. Charts section
+Add a “Trends” area under KPI cards inside Performance Insights:
+
+1. Orders Over Time chart
+   - For the selected range, show a line or bar chart of number of orders grouped by time bucket:
+     - Today → by hour
+     - 7 Days → by day
+     - 30 Days → by day/week (choose whichever is easier and performant)
+   - Reuse existing chart/visualization components already used in the app, if any. Do NOT introduce a heavy new chart library.
+
+2. Earnings Over Time chart
+   - Same time grouping as Orders Over Time.
+   - Uses net earnings (after SafeGo fees).
+
+3. Top Categories / Top Items
+   - Simple list or bar-like representation (no complex graphs needed):
+     - Top 5 categories by order count and/or revenue.
+     - Top 5 items by order count and/or revenue.
+   - Each entry shows name + metric (count and/or total earned).
+
+Make sure:
+- If there is not enough data (e.g., no orders), show clear “No data yet” states instead of empty or broken charts.
+- All queries are efficient; do not pull unnecessary large datasets into the client if aggregation can be done server-side.
+
+D. Recent Performance Table
+Under the charts, add a “Recent Orders Summary” table:
+
+Columns (adapt to existing data model):
+- Order ID / short code
+- Placed at (time)
+- Customer name (masked as per privacy rules if required)
+- Total amount (after SafeGo fees label consistent with existing dashboard)
+- Order type (Delivery / Pickup)
+- Status (same status labels as live orders)
+- Payment method (if available: card, cash, wallet, etc.)
+
+Behavior:
+- Limited to the last 20–30 orders in the current time range.
+- Read-only.
+- Tap/Click on a row navigates to the existing Order Details page (reuse routing, do NOT create a new details layout).
+
+2) Data & API requirements
+
+Use existing backend capabilities as much as possible:
+
+- Prefer to reuse existing `/api/restaurant/orders*` or similar endpoints.
+- If needed, you may:
+  - Add a single analytics helper endpoint, for example:
+    - `GET /api/restaurant/analytics/summary?range=today|7d|30d`
+  - This endpoint may return aggregated metrics and grouped series for charts.
+- DO NOT:
+  - Change existing database schemas.
+  - Remove or rename existing fields.
+  - Modify wallet/payout logic.
+  - Modify support center routes.
+  - Touch customer or driver routes, except to read already-existing data if strictly necessary.
+
+Security & Compliance (must confirm explicitly)
+
+For every new query and endpoint:
+- Enforce `authenticateToken` and `requireRole(["restaurant"])`.
+- Enforce tenant scoping by restaurantId (no cross-restaurant data leakage).
+- Ensure KYC rules remain intact:
+  - If a restaurant is not verified/approved (isVerified + verificationStatus), analytics should either be limited or show a clear message, following the existing rules for other protected sections.
+- Do NOT expose raw customer PII beyond what is already allowed in the existing restaurant order views.
+- Maintain existing audit logging behavior. If analytics endpoints are added, log them at the same level as similar read operations, but do not over-log sensitive data.
+
+UI/UX constraints
+
+- Keep the Online toggle, Wallet Snapshot, and existing dashboard layout intact.
+- Insert the enhanced Performance Insights section where the current one already lives.
+- Use the same component patterns (cards, tabs, typography, spacing) as:
+  - Wallet Snapshot
+  - Staff Management
+  - Menu Items and Orders pages
+- Must work well on:
+  - Mobile (320px+): stacked layout, no horizontal scroll.
+  - Tablet (768px+): 2-column layout where appropriate.
+  - Desktop (1024px+): multi-column layout with good spacing.
+
+Performance considerations
+
+- Do not run heavy analytics queries every few seconds like the live orders poll. Analytics should:
+  - Refresh on time-range change, and
+  - Optionally have a “Refresh” control, or
+  - Auto-refresh at a reasonable interval (e.g., every 5 minutes) if very cheap.
+- Use pagination or “limit + order by” for the recent orders table.
+- Cache responses where appropriate using the existing query/cache utilities (react-query, SWR, or whatever this codebase uses now).
+
+Testing & verification plan
+
+Implement and verify at least the following test flows:
+
+1. No orders state:
+   - Restaurant with no orders → All KPI cards show 0 or “N/A”.
+   - Charts show proper “No data yet” messages.
+   - Recent orders table shows an empty state.
+
+2. Basic data state:
+   - Restaurant with a small number of orders across a few days.
+   - Verify KPI numbers match manual calculations from raw orders.
+   - Verify Orders Over Time and Earnings Over Time align with the underlying data.
+
+3. Time range switching:
+   - Switch between Today, 7 Days, 30 Days.
+   - Confirm all KPI cards, charts, and the recent orders table update consistently.
+   - Ensure no console errors and no stale data issues.
+
+4. Navigation:
+   - From dashboard → Performance Insights → click a recent order → opens existing Order Details page.
+   - Back navigation returns correctly to the dashboard.
+
+5. Security:
+   - Confirm all new endpoints are not accessible without authentication.
+   - Confirm restaurant A cannot see restaurant B’s analytics (using logs or test harness).
+   - Confirm KYC gating is respected if there is any existing gating logic for earnings/financial views.
+
+6. Mobile / tablet / desktop responsiveness:
+   - Take screenshots of the dashboard on:
+     - Mobile (~375px width)
+     - Tablet (~768px width)
+     - Desktop (~1280px+)
+   - Ensure no overflow, overlapping text, or broken layouts.
+
+Documentation
+
+- Update `replit.md` (or the existing architecture doc) with:
+  - The R2 “Restaurant Analytics & Performance Insights” feature description.
+  - Any new endpoint signatures, including request/response shapes.
+  - The list of KPI definitions (how each metric is calculated).
+  - Notes on time range behavior and caching.
+
+Strict rules
+
+- DO NOT modify or break:
+  - Unified Payout System
+  - Wallet and commission calculations
+  - Menu category schema
+  - Multi-role Support Center
+  - Driver and Customer flows
+- DO NOT introduce any new external dependencies (especially chart libraries) unless absolutely required and architect-approved.
+- Maintain backward compatibility for all existing APIs and UI flows.
+
+Task
+
+1. Design and implement the enhanced Restaurant Performance Insights (R2) as described.
+2. Ensure all security, KYC/RBAC, and SafeGuard rules stay intact.
+3. Run through the test plan and summarize results.
+4. Show me the updated dashboard with screenshots and a brief summary of what changed.
