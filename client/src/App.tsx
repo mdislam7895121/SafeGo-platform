@@ -29,6 +29,15 @@ import CreateSupportTicket from "@/pages/customer/create-support-ticket";
 import SupportTicketDetail from "@/pages/customer/support-ticket-detail";
 import CustomerWallet from "@/pages/customer/wallet";
 import CustomerNotifications from "@/pages/customer/notifications";
+import CustomerSupportHub from "@/pages/customer-app/support-hub";
+import CustomerSupportHelp from "@/pages/customer-app/support-help";
+import CustomerSupportArticle from "@/pages/customer-app/support-article";
+import CustomerSupportContact from "@/pages/customer-app/support-contact";
+import CustomerSupportStatus from "@/pages/customer-app/support-status";
+import CustomerSupportLiveChat from "@/pages/customer-app/support-live-chat";
+import CustomerSupportPhone from "@/pages/customer-app/support-phone";
+import CustomerSupportTickets from "@/pages/customer-app/support-tickets";
+import CustomerSupportTicketDetail from "@/pages/customer-app/support-ticket-detail";
 
 // Driver pages
 import { DriverLayout } from "@/layouts/DriverLayout";
@@ -42,6 +51,15 @@ import DriverWalletBalance from "@/pages/driver/wallet-balance";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
 import DriverRefer from "@/pages/driver/refer";
+import DriverSupportHub from "@/pages/driver/support-hub";
+import DriverSupportHelp from "@/pages/driver/support-help";
+import DriverSupportArticle from "@/pages/driver/support-article";
+import DriverSupportContact from "@/pages/driver/support-contact";
+import DriverSupportStatus from "@/pages/driver/support-status";
+import DriverSupportLiveChat from "@/pages/driver/support-live-chat";
+import DriverSupportPhone from "@/pages/driver/support-phone";
+import DriverSupportTickets from "@/pages/driver/support-tickets";
+import DriverSupportTicketDetail from "@/pages/driver/support-ticket-detail";
 import DriverPoints from "@/pages/driver/points";
 import DriverPromotions from "@/pages/driver/promotions";
 import DriverHelp from "@/pages/driver/help";
@@ -158,6 +176,15 @@ import AdminMonitoring from "@/pages/admin/monitoring";
 import AdminSecurityCenter from "@/pages/admin/security-center";
 import AdminSupportCenter from "@/pages/admin/support-center";
 import AdminSupportTicketDetail from "@/pages/admin/support-ticket-detail";
+import AdminSupportHub from "@/pages/admin-portal/support-hub";
+import AdminSupportHelp from "@/pages/admin-portal/support-help";
+import AdminSupportArticle from "@/pages/admin-portal/support-article";
+import AdminSupportContact from "@/pages/admin-portal/support-contact";
+import AdminSupportStatus from "@/pages/admin-portal/support-status";
+import AdminSupportLiveChat from "@/pages/admin-portal/support-live-chat";
+import AdminSupportPhone from "@/pages/admin-portal/support-phone";
+import AdminSupportTickets from "@/pages/admin-portal/support-tickets";
+import AdminSupportTicketDetail2 from "@/pages/admin-portal/support-ticket-detail";
 
 import NotFound from "@/pages/not-found";
 
@@ -281,6 +308,52 @@ function Router() {
       <Route path="/customer/notifications">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerNotifications />
+        </ProtectedRoute>
+      </Route>
+      {/* Customer Support Center Routes */}
+      <Route path="/customer/support-center/tickets/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportTicketDetail />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center/tickets">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportTickets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center/live-chat">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportLiveChat />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center/phone">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportPhone />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center/articles/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportArticle />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center/help">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportHelp />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center/contact">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportContact />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center/status">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportStatus />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/support-center">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSupportHub />
         </ProtectedRoute>
       </Route>
 
@@ -508,6 +581,70 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Account Settings">
             <DriverAccount />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      {/* Driver Support Center Routes */}
+      <Route path="/driver/support-center/tickets/:id">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Support Ticket">
+            <DriverSupportTicketDetail />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center/tickets">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="My Tickets">
+            <DriverSupportTickets />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center/live-chat">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Live Chat">
+            <DriverSupportLiveChat />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center/phone">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Phone Support">
+            <DriverSupportPhone />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center/articles/:id">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Help Article">
+            <DriverSupportArticle />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center/help">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Help Center">
+            <DriverSupportHelp />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center/contact">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Contact Support">
+            <DriverSupportContact />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center/status">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="System Status">
+            <DriverSupportStatus />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-center">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Support Center">
+            <DriverSupportHub />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
@@ -1111,6 +1248,52 @@ function Router() {
       <Route path="/admin/security-center">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSecurityCenter />
+        </ProtectedRoute>
+      </Route>
+      {/* Admin Support Center Routes */}
+      <Route path="/admin/support-portal/tickets/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportTicketDetail2 />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal/tickets">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportTickets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal/live-chat">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportLiveChat />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal/phone">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportPhone />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal/articles/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportArticle />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal/help">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportHelp />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal/contact">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportContact />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal/status">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportStatus />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/support-portal">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSupportHub />
         </ProtectedRoute>
       </Route>
 
