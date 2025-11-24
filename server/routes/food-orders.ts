@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 import {
@@ -9,7 +9,6 @@ import {
 import crypto from "crypto";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // All routes require authentication
 router.use(authenticateToken);
@@ -105,19 +104,16 @@ router.post("/", async (req: AuthRequest, res) => {
     });
 
     // R6: Create earnings transaction for commission tracking
-    try {
-      await createEarningsTransaction({
-        orderId: foodOrder.id,
-        restaurantId,
-        serviceFare: foodOrder.serviceFare,
-        orderStatus: foodOrder.status,
-        countryCode: restaurant.countryCode || 'US',
-        currency: restaurant.countryCode === 'BD' ? 'BDT' : 'USD',
-        isDemo: restaurant.isDemo || false,
-      });
-    } catch (earningsError) {
-      console.error('Failed to create earnings transaction:', earningsError);
-    }
+    // NOTE: If this fails, the entire request fails to prevent order creation without earnings record
+    await createEarningsTransaction({
+      orderId: foodOrder.id,
+      restaurantId,
+      serviceFare: foodOrder.serviceFare,
+      orderStatus: foodOrder.status,
+      countryCode: restaurant.countryCode || 'US',
+      currency: restaurant.countryCode === 'BD' ? 'BDT' : 'USD',
+      isDemo: restaurant.isDemo || false,
+    });
 
     // Notify restaurant
     const restaurantUser = await prisma.user.findFirst({
