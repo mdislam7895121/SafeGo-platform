@@ -442,6 +442,7 @@ router.patch("/kyc/:userId", checkPermission(Permission.MANAGE_KYC), async (req:
     // Create notification for user
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId,
         type: "verification",
         title: `KYC ${verificationStatus}`,
@@ -686,6 +687,7 @@ router.post("/kyc/approve", checkPermission(Permission.MANAGE_KYC), async (req: 
     if (userId) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId,
           type: "verification",
           title: "KYC Approved",
@@ -695,6 +697,7 @@ router.post("/kyc/approve", checkPermission(Permission.MANAGE_KYC), async (req: 
     }
 
     res.json({
+      success: true,
       message: "KYC approved successfully",
       profileId,
     });
@@ -774,6 +777,7 @@ router.post("/kyc/reject", checkPermission(Permission.MANAGE_KYC), async (req: A
     if (userId) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId,
           type: "verification",
           title: "KYC Rejected",
@@ -783,6 +787,7 @@ router.post("/kyc/reject", checkPermission(Permission.MANAGE_KYC), async (req: A
     }
 
     res.json({
+      success: true,
       message: "KYC rejected successfully",
       profileId,
     });
@@ -823,6 +828,7 @@ router.patch("/block/:userId", checkPermission(Permission.MANAGE_USER_STATUS), a
     // Create notification
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId,
         type: "admin",
         title: isBlocked ? "Account Blocked" : "Account Unblocked",
@@ -2391,6 +2397,7 @@ router.patch("/drivers/:id/suspend", checkPermission(Permission.MANAGE_USER_STAT
     // Create notification
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: driver.userId,
         type: "admin",
         title: "Account Suspended",
@@ -2457,6 +2464,7 @@ router.patch("/drivers/:id/unsuspend", checkPermission(Permission.MANAGE_USER_ST
     // Create notification
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: driver.userId,
         type: "admin",
         title: "Account Unsuspended",
@@ -2774,6 +2782,7 @@ router.patch("/restaurants/:id/suspend", checkPermission(Permission.MANAGE_RESTA
     // Create notification
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: restaurant.userId,
         type: "admin",
         title: "Account Suspended",
@@ -2838,6 +2847,7 @@ router.patch("/restaurants/:id/unsuspend", checkPermission(Permission.MANAGE_RES
     // Create notification
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: restaurant.userId,
         type: "admin",
         title: "Account Unsuspended",
@@ -2897,6 +2907,7 @@ router.patch("/restaurants/:id/block", checkPermission(Permission.MANAGE_USER_ST
     // Create notification
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: restaurant.userId,
         type: "admin",
         title: "Account Blocked",
@@ -2944,6 +2955,7 @@ router.patch("/restaurants/:id/unblock", checkPermission(Permission.MANAGE_USER_
     // Create notification
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: restaurant.userId,
         type: "admin",
         title: "Account Unblocked",
@@ -3588,10 +3600,11 @@ router.patch("/customers/:id/suspend", checkPermission(Permission.MANAGE_CUSTOME
     // Create notification for customer
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: customer.userId,
         type: "account_suspended",
         title: "Account Suspended",
-        message: `Your account has been suspended. Reason: ${reason}`,
+        body: `Your account has been suspended. Reason: ${reason}`,
       },
     });
 
@@ -3645,10 +3658,11 @@ router.patch("/customers/:id/unsuspend", checkPermission(Permission.MANAGE_CUSTO
     // Create notification for customer
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: customer.userId,
         type: "account_active",
         title: "Account Unsuspended",
-        message: "Your account suspension has been lifted. You can now use SafeGo services.",
+        body: "Your account suspension has been lifted. You can now use SafeGo services.",
       },
     });
 
@@ -3707,10 +3721,11 @@ router.patch("/customers/:id/block", checkPermission(Permission.MANAGE_USER_STAT
     // Create notification for customer
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: customer.userId,
         type: "account_blocked",
         title: "Account Blocked",
-        message: "Your account has been permanently blocked. Please contact support for more information.",
+        body: "Your account has been permanently blocked. Please contact support for more information.",
       },
     });
 
@@ -3769,10 +3784,11 @@ router.patch("/customers/:id/unblock", checkPermission(Permission.MANAGE_USER_ST
     // Create notification for customer
     await prisma.notification.create({
       data: {
+        id: crypto.randomUUID(),
         userId: customer.userId,
         type: "account_active",
         title: "Account Unblocked",
-        message: "Your account has been unblocked. You can now use SafeGo services.",
+        body: "Your account has been unblocked. You can now use SafeGo services.",
       },
     });
 
@@ -8029,6 +8045,7 @@ router.post("/payouts/:payoutId/approve", checkPermission(Permission.MANAGE_PAYO
     if (restaurant) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: restaurant.user.id,
           type: "payout",
           title: "Payout Approved",
@@ -8144,6 +8161,7 @@ router.post("/payouts/:payoutId/reject", checkPermission(Permission.MANAGE_PAYOU
     if (restaurant) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: restaurant.user.id,
           type: "alert",
           title: "Payout Rejected",
@@ -8229,6 +8247,7 @@ router.post("/payouts/:payoutId/complete", checkPermission(Permission.MANAGE_PAY
     if (restaurant) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: restaurant.user.id,
           type: "payout",
           title: "Payout Completed",
@@ -9407,6 +9426,7 @@ router.post(
       // Create notification for staff member
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: updatedStaff.userId,
           type: "alert",
           title: block ? "Account Suspended by Admin" : "Account Activated by Admin",
@@ -9558,6 +9578,7 @@ router.post(
 
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: promotion.restaurant.userId,
           type: "alert",
           title: "Promotion Flagged by Admin",
@@ -9628,6 +9649,7 @@ router.post(
 
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: promotion.restaurant.userId,
           type: "alert",
           title: "Promotion Disabled by Admin",
@@ -9756,6 +9778,7 @@ router.post(
 
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: coupon.restaurant.userId,
           type: "alert",
           title: "Coupon Flagged by Admin",
@@ -10068,6 +10091,7 @@ router.post(
 
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: review.restaurant.userId,
           type: "alert",
           title: "Review Flagged by Admin",
@@ -10238,6 +10262,7 @@ router.post(
 
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: media.restaurant.userId,
           type: "alert",
           title: "Media Hidden by Admin",
@@ -10306,6 +10331,7 @@ router.post(
 
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: media.restaurant.userId,
           type: "info",
           title: "Media Restored",
@@ -10380,6 +10406,7 @@ router.post(
 
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: media.restaurant.userId,
           type: "alert",
           title: "Media Flagged by Admin",
