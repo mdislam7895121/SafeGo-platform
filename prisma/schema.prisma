@@ -260,7 +260,7 @@ model DriverProfile {
   foodOrders            FoodOrder[]
   rides                 Ride[]
   vehicleDocuments      VehicleDocument[]
-  vehicle               Vehicle?
+  vehicles              Vehicle[]         // D1: Changed from Vehicle? to Vehicle[] for 1:N support
   blockedRiders         BlockedRider[]
   supportTickets        SupportTicket[] // Phase 12: Driver support tickets
   financialAdjustments  FinancialAdjustment[] // Phase 12: Financial adjustments
@@ -766,11 +766,13 @@ model VehicleDocument {
 }
 
 model Vehicle {
-  id                      String            @id
-  driverId                String            @unique
+  id                      String            @id @default(uuid())
+  driverId                String            // D1: Changed from @unique to allow 1:N (multi-vehicle support)
   vehicleType             String
   vehicleModel            String
   vehiclePlate            String
+  isPrimary               Boolean           @default(false) // D1: Mark primary vehicle
+  isActive                Boolean           @default(true)  // D1: Soft delete support
   isOnline                Boolean           @default(false)
   totalEarnings           Decimal           @default(0) @db.Decimal(10, 2)
   createdAt               DateTime          @default(now())
@@ -780,6 +782,7 @@ model Vehicle {
   year                    Int?
   color                   String?
   licensePlate            String?
+  insurancePolicyNumber   String?           // D1: Insurance policy number
   registrationDocumentUrl String?
   registrationExpiry      DateTime?
   registrationStatus      DocumentStatus    @default(PENDING)
@@ -804,10 +807,11 @@ model Vehicle {
   plateStatus             DocumentStatus    @default(PENDING)
   tlcLicenseNumber        String?
   tlcLicenseStatus        DocumentStatus    @default(PENDING)
-  isPrimary                        Boolean              @default(true)
   vehicleDocuments        VehicleDocument[]
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
+  @@index([driverId])           // D1: Index for 1:N queries
+  @@index([isPrimary])          // D1: Index for finding primary vehicle
   @@map("vehicles")
 }
 

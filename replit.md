@@ -1,7 +1,87 @@
 # SafeGo Global Super-App
 
 ## Overview
-SafeGo is a production-ready, full-stack multi-service super-app platform designed for global market leadership in on-demand services such as ride-hailing, food delivery, and parcel delivery. Its purpose is to provide a comprehensive, scalable, and secure solution for integrated urban services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, full service lifecycle management, unified payment/payout layouts, and comprehensive multi-role support ticket management.
+SafeGo is a production-ready, full-stack multi-service super-app platform designed for global market leadership in on-demand services such as ride-hailing, food delivery, and parcel delivery. Its purpose is to provide a comprehensive, scalable, and secure solution for integrated urban services. Key capabilities include multi-role authentication, country-specific KYC, commission tracking with negative balance support, full service lifecycle management, unified payment/payout layouts, comprehensive multi-role support ticket management, and driver identity & profile management (Phase D1).
+
+---
+
+## Driver Phase D1 – Analysis & Implementation
+
+### Existing Driver Infrastructure
+
+**Database Models (Prisma):**
+- `DriverProfile` - Comprehensive model with 50+ fields supporting:
+  - **Bangladesh KYC**: nidNumber (encrypted), fatherName, presentAddress, permanentAddress, district, thana, village, postOffice
+  - **USA KYC**: firstName, middleName, lastName, dmvLicenseNumber (encrypted), dmvLicenseExpiry, tlcLicenseNumber, tlcLicenseExpiry, ssnLast4 (encrypted), backgroundCheckStatus
+  - **Common fields**: profilePhotoUrl, dateOfBirth, phoneNumber, emergencyContactName/Phone/Relationship
+  - **Verification**: verificationStatus (pending/approved/rejected), isVerified, rejectionReason
+  - **Tax compliance**: W-9 status, 1099-K/1099-NEC tracking, tax year
+  - **Preferences**: Navigation app, auto-accept rides, notification settings, theme/language
+  - **Security**: securityStatus (normal/flagged/suspended), securityNotes, isSuspended
+  
+- `Vehicle` (1:1 with driver) - Fields:
+  - Basic: vehicleType, vehicleModel, make, year, color, licensePlate
+  - Registration: registrationDocumentUrl, registrationExpiry, registrationStatus
+  - Insurance: insuranceDocumentUrl, insuranceExpiry, insuranceStatus  
+  - DMV Inspection: dmvInspectionType, dmvInspectionDate, dmvInspectionExpiry, verification status
+  - **Limitation**: Current schema has `driverId @unique` - only supports 1 vehicle per driver
+
+- `VehicleDocument` - Document storage with:
+  - documentType, fileUrl, uploadedAt, expiresAt
+  - Linked to both driver and vehicle (optional vehicleId)
+
+- `DriverStats` (1:1) - rating, totalTrips
+- `DriverWallet` (1:1) - balance, negativeBalance
+
+**Backend Routes (`server/routes/driver.ts`):**
+- GET `/api/driver/home` - Dashboard data (profile, vehicle, stats, wallet)
+- PATCH `/api/driver/profile` - Update profile (USA/Bangladesh KYC fields)
+- POST `/api/driver/vehicle` - Register vehicle
+- PATCH `/api/driver/vehicle` - Update vehicle
+- PATCH `/api/driver/status` - Toggle online/offline
+- GET `/api/driver/wallet` - Wallet details + transactions
+- GET `/api/driver/blocked-riders` - List blocked customers
+- Account settings endpoints (name, email, password, preferences)
+
+**Admin Routes (`server/routes/admin.ts`):**
+- GET `/api/admin/drivers` - List drivers with filters
+- GET `/api/admin/drivers/:id` - Driver detail view
+- PATCH `/api/admin/kyc/:userId` - Approve/reject KYC
+
+**Frontend Pages:**
+- `/driver` - Home dashboard (`client/src/pages/driver/home.tsx`)
+- `/driver/profile` - Public profile (`client/src/pages/driver/profile.tsx`)
+- `/driver/vehicle` - Vehicle management (`client/src/pages/driver/vehicle.tsx`)
+- `/driver/wallet` - Wallet & transactions (`client/src/pages/driver/wallet.tsx`)
+- `/driver/kyc-documents` - Document upload (`client/src/pages/driver/kyc-documents.tsx`)
+- `/driver/account/*` - Settings (payment, map, tax, preferences)
+- `/driver/support/*` - Support center, chat, tickets
+- `/admin/drivers` - Admin driver list
+- `/admin/driver-details/:id` - Admin driver detail
+
+### D1 Requirements Gap Analysis
+
+**✅ Already Complete:**
+1. DriverProfile model with USA (NYC) KYC fields (DMV license, TLC license, SSN last4)
+2. Encryption for sensitive fields (nidEncrypted, ssnEncrypted, dmvLicenseNumber_encrypted)
+3. Background check tracking (status, date, provider)
+4. Emergency contact fields
+5. Document upload system (VehicleDocument model)
+6. Admin KYC approval workflow
+7. Audit logging infrastructure (can extend for driver mutations)
+8. Profile photo support
+9. Existing driver routes and frontend pages
+
+**🔧 Needs Enhancement:**
+1. **Multi-vehicle support**: Change Vehicle.driverId from `@unique` to allow 1:N relationship, add `isPrimary` boolean
+2. **Onboarding wizard**: No dedicated multi-step onboarding flow exists (only separate profile/vehicle pages)
+3. **KYC status centralization**: Currently scattered across DriverProfile fields, need unified status model
+4. **Document upload endpoints**: Need REST endpoints for profile picture, license images, vehicle photos (similar to restaurant image uploads)
+5. **Enhanced vehicle model**: Add insurancePolicyNumber, isActive for soft-delete
+6. **KYC timeline UI**: Frontend doesn't show KYC progression (NOT_STARTED → PENDING_REVIEW → VERIFIED)
+
+**❌ Blocking Issues:**
+None - existing infrastructure is solid, only needs extensions.
 
 ## User Preferences
 **Preferred communication style**: Simple, everyday language.

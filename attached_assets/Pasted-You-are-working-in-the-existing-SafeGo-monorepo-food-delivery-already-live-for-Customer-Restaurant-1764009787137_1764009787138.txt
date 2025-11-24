@@ -1,0 +1,235 @@
+You are working in the existing SafeGo monorepo (food delivery already live for Customer, Restaurant, Admin). Now start **Driver Phase D1: Core Driver Identity, KYC & Profile**.
+
+⚠️ ABSOLUTE RULES (do NOT break these)
+1. Do not break any existing production-ready restaurant features (R1–R6), wallet, payouts, or KYC flows.
+2. Keep all changes backward-compatible:
+   - No destructive Prisma migrations for existing tables.
+   - If you must extend existing models, only ADD nullable fields or new tables with proper FKs.
+3. Respect existing security patterns:
+   - Re-use existing auth, RBAC, KYC middlewares (e.g. requireAuth, requireKYCCompletion, role-based guards).
+   - All driver APIs must be protected with appropriate role checks (Driver role only).
+4. Global SafeGo model:
+   - 4 roles must remain: CUSTOMER, DRIVER, RESTAURANT, ADMIN.
+   - Future job types: FOOD, PARCEL, RIDE → design driver side generically (jobType aware), but in D1 we only need FOOD delivery ready.
+5. No hard-coded country-specific logic in core models:
+   - Support multi-country KYC, but for now ensure USA (New York) requirements are correctly represented.
+   - If you need country-specific rules, centralize them in config/strategy, not scattered across the code.
+
+--------------------------------
+PHASE D1 – GOAL
+--------------------------------
+Implement a **complete Driver Identity & Profile system** so that:
+
+- Drivers can:
+  - Sign in and complete a multi-step onboarding flow.
+  - Provide all required identity, license, vehicle and contact data.
+  - Upload required documents/images (e.g. license photo, profile picture).
+  - See their verification / KYC status and what is missing.
+- Admins can:
+  - View driver profiles and verification status using existing or minimal new admin screens/APIs.
+- System can:
+  - Enforce that only KYC-complete drivers will later be allowed to go online / accept orders (actual online/offline and jobs will be future phases).
+  - Keep strong audit logs on all sensitive changes.
+
+Do NOT implement full driver job/dispatch/route logic in D1. Focus only on driver identity, KYC & profile.
+
+--------------------------------
+STEP 1 – Analyse existing driver-related code
+--------------------------------
+1. Search the codebase for any existing driver models, routes, or pages:
+   - In Prisma schema: look for models like `Driver`, `DriverProfile`, `DriverKyc`, etc.
+   - In server/routes: any `/api/driver` or similar endpoints.
+   - In client/src/pages or components: any `/driver/...` routes.
+
+2. Based on what already exists:
+   - If there is an existing driver model → extend it with the fields we need instead of creating a new parallel model.
+   - If nothing exists → design new driver models that are consistent with how Restaurant and Customer profiles are modeled.
+
+Document your findings in `replit.md` under a new section `Driver Phase D1 – Analysis`.
+
+--------------------------------
+STEP 2 – Data Model Design (Prisma, non-breaking)
+--------------------------------
+Design / extend Prisma models to support:
+
+A. Core Driver Profile (per user account)
+   - driverId (UUID, PK, FK to User or Auth table – follow existing pattern).
+   - profilePictureUrl (nullable).
+   - firstName, middleName (nullable), lastName.
+   - phoneNumber (normalized format).
+   - dateOfBirth.
+   - country, state, city.
+   - residentialAddressLine1, residentialAddressLine2 (nullable), postalCode.
+   - emergencyContactName, emergencyContactPhone (nullable for now).
+   - isActive (soft-delete / suspension flag – reuse existing pattern like isActive/staffActive).
+   - createdAt, updatedAt.
+
+B. Identity & License (USA-first, multi-country ready)
+   - Separate model or embedded fields, depending on what exists already. For example:
+     - `DriverIdentity` model linked to DriverProfile (1:1).
+   - Fields (USA / New York ready):
+     - legalFirstName, legalLastName (if you separate from display name).
+     - licenseCountry, licenseState.
+     - driverLicenseNumber.
+     - driverLicenseExpiry (date).
+     - tlcLicenseNumber (nullable, for NYC TLC drivers).
+     - tlcLicenseExpiry (nullable).
+     - ssnLast4 or maskedSSN (store securely, follow existing encryption pattern if present).
+     - backgroundCheckStatus (PENDING/APPROVED/REJECTED).
+     - backgroundCheckProvider (nullable).
+   - Make sure all sensitive fields follow existing encryption / masking conventions if such exists in the repo.
+
+C. Vehicle Information
+   - `DriverVehicle` model, 1:N (a driver can have multiple vehicles, but only one active).
+   - Fields:
+     - vehicleId (PK).
+     - driverId (FK).
+     - type (CAR, BIKE, SCOOTER, etc.).
+     - make, model, color.
+     - plateNumber.
+     - year (int).
+     - isPrimary (boolean).
+     - insurancePolicyNumber (nullable).
+     - insuranceExpiry (nullable).
+     - isActive (soft-delete pattern).
+     - createdAt, updatedAt.
+
+D. KYC & Verification State
+   - `DriverKycStatus` or equivalent, ideally 1:1 with driver.
+   - Fields:
+     - driverId (FK, PK).
+     - kycStatus (NOT_STARTED, IN_PROGRESS, PENDING_REVIEW, VERIFIED, REJECTED).
+     - identityVerified (bool).
+     - licenseVerified (bool).
+     - vehicleVerified (bool).
+     - backgroundCheckVerified (bool).
+     - lastReviewedAt.
+     - reviewedByAdminId (FK to admin user, nullable).
+   - This must integrate conceptually with existing platform KYC rules (do not break them).
+
+E. Document / Image Storage References
+   - Reuse the image upload system just implemented for menu items & reviews, generalize if needed.
+   - Create `DriverDocument` model:
+     - id, driverId.
+     - documentType (PROFILE_PICTURE, LICENSE_FRONT, LICENSE_BACK, TLC_LICENSE, INSURANCE, VEHICLE_PHOTO, OTHER).
+     - fileUrl or storageKey.
+     - mimeType, fileSize.
+     - uploadedAt.
+   - Ensure filename sanitization and ownership checks match the restaurant image upload implementation.
+
+Update `prisma/schema.prisma` with minimal, additive changes. Run migrations safely.
+
+--------------------------------
+STEP 3 – Backend API Design (Driver D1)
+--------------------------------
+Add RBAC-protected API routes under `/api/driver` (or reuse existing convention):
+
+1. Profile endpoints
+   - GET `/api/driver/profile` – Get current driver’s profile (self).
+   - PATCH `/api/driver/profile` – Update profile fields (only allowed for authenticated driver).
+   - GET `/api/driver/kyc-status` – Get KYC / verification summary.
+
+2. Vehicle endpoints
+   - GET `/api/driver/vehicles` – List driver’s vehicles.
+   - POST `/api/driver/vehicles` – Create a vehicle.
+   - PATCH `/api/driver/vehicles/:id` – Update a vehicle.
+   - PATCH `/api/driver/vehicles/:id/set-primary` – Mark one as primary.
+   - DELETE `/api/driver/vehicles/:id` – Soft delete only.
+
+3. Document / image upload endpoints
+   - POST `/api/driver/profile-picture` – upload/change profile picture.
+   - POST `/api/driver/documents` – upload document (documentType + file).
+   - DELETE `/api/driver/documents/:id` – remove document (with proper permission and path validation).
+
+4. Admin-side review endpoints (minimal)
+   - GET `/api/admin/drivers` – Admin list with filters (status, KYC state, city).
+   - GET `/api/admin/drivers/:id` – Admin view of a driver profile.
+   - PATCH `/api/admin/drivers/:id/kyc` – Update KYC status, with audit logging.
+
+Security & validation:
+   - All driver routes must require auth + driver role.
+   - All admin routes must require admin role (reuse `checkPermission` / admin RBAC middleware).
+   - Validate UUID formats for IDs.
+   - For file uploads, enforce file type and size limits, and re-use the generic upload helper.
+
+Add audit logging for all critical mutations (profile changes, KYC status changes, document upload/delete) consistent with existing audit system (see how restaurant actions are logged and mirror that).
+
+--------------------------------
+STEP 4 – Frontend: Driver Onboarding & Profile UI
+--------------------------------
+Create/extend driver-facing pages in `client/src/pages/driver` (or equivalent):
+
+1. `/driver/onboarding`
+   - Multi-step wizard:
+     1) Personal info (name, DOB, phone, address, profile picture).
+     2) Identity & license (license state, number, expiry, TLC if needed, SSN last4).
+     3) Vehicle info (type, plate, color, insurance).
+     4) Documents upload (license photos, insurance, vehicle photo).
+   - Progress indicator and clear validation errors.
+   - At the end, mark KYC as IN_PROGRESS / PENDING_REVIEW.
+
+2. `/driver/profile`
+   - Read-only summary of:
+     - Basic info, photo, contact.
+     - Vehicle list with primary vehicle marked.
+     - KYC status timeline (NOT_STARTED → PENDING_REVIEW → VERIFIED).
+   - Links/buttons:
+     - “Edit profile” (go to onboarding or dedicated edit page).
+     - “Manage vehicles”.
+     - “Manage documents”.
+
+3. `/driver/settings/identity` and/or tabs within profile
+   - If there is already a driver layout component, integrate with it.
+   - Keep consistent SafeGo UI style (like Restaurant settings pages).
+
+4. Admin pages (minimal, reuse patterns)
+   - If there is an admin layout, add:
+     - `/admin/drivers` – table of drivers with filters + KYC badge.
+     - `/admin/drivers/:id` – detail view (no need for fancy design in D1, just functional).
+
+Frontend constraints:
+   - Reuse existing design system components (buttons, forms, cards, toasts).
+   - Mobile-first responsive layout (as with Restaurant portal).
+   - Show KYC-related warning banners where relevant (e.g., “Your account is under review, you cannot go online yet”).
+
+--------------------------------
+STEP 5 – Security, Hardening & Tests (minimum for D1)
+--------------------------------
+1. Security:
+   - Ensure drivers can only access their own data (no ID-guessing).
+   - Validate ownership for vehicle + document operations.
+   - Mask sensitive fields in responses (e.g., never return full SSN).
+
+2. File + DB transactional safety:
+   - For driver document uploads, follow the same transactional pattern used for menu/review images:
+     - If DB write fails, file should not remain as an orphan.
+     - Consider wrapping file + DB operations in a transaction-compatible helper, similar to R6 earnings atomic patterns, but keep changes minimal and safe.
+
+3. Tests:
+   - Add at least a few integration tests (if test framework exists) for:
+     - creating/updating driver profile.
+     - uploading a driver document.
+     - admin changing KYC status and verifying audit logs.
+
+--------------------------------
+STEP 6 – Documentation & Checkpoint
+--------------------------------
+1. Update `replit.md`:
+   - New section: `Driver Phase D1 – Driver Identity & Profile`.
+   - Summarize:
+     - Models added/extended.
+     - Routes added.
+     - Frontend pages.
+     - Security/KYC rules.
+     - Any known limitations / TODOs for future driver phases (D2: live jobs, navigation; D3: driver analytics, etc.).
+
+2. Restart the application and verify:
+   - Restaurant R1–R6 behaviour unchanged.
+   - New driver flows work without errors in console or server logs.
+
+Finally, present:
+   - A short summary of what you implemented.
+   - A quick test plan for me (step-by-step: how to try driver onboarding and see the data in UI).
+   - Any recommended follow-up items for later driver phases (but do NOT start them now).
+
+Begin implementing Driver Phase D1 following the steps above.
