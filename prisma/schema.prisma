@@ -1709,6 +1709,10 @@ model Review {
   flaggedByAdminId String?
   flaggedAt      DateTime?
   flagReason     String?  @db.Text
+  // R5: Restaurant Reply (one reply per review)
+  restaurantReplyText String? @db.Text
+  restaurantRepliedAt DateTime?
+  restaurantRepliedById String?
   isDemo         Boolean  @default(false)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt

@@ -26,6 +26,7 @@ import paymentConfigRoutes from "./routes/payment-config"; // Payment & Payout C
 import restaurantPayoutMethodsRoutes from "./routes/restaurant-payout-methods"; // Payment & Payout Configuration
 import payoutRoutes from "./routes/payout"; // Unified Payout System
 import couponRoutes from "./routes/coupons"; // R4: Coupon validation
+import reviewRoutes from "./routes/reviews"; // R5: Reviews & Ratings
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -56,6 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", documentRoutes);
   app.use("/api/admin/auth/2fa", twoFactorRoutes);
   app.use("/api/coupons", couponRoutes); // R4: Coupon validation
+  app.use("/api/reviews", reviewRoutes); // R5: Reviews & Ratings
 
   const httpServer = createServer(app);
   
