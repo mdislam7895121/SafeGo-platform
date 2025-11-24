@@ -123,6 +123,43 @@ Core systems and features include:
 - Restaurant review uploads use `.array("reviewImages", 5)` field name (unchanged)
 - No breaking changes to existing restaurant upload flows
 
+### D1-VEHICLE-REG: Vehicle Registration Error Fix (COMPLETED)
+
+**Implementation Status:** ✅ Complete
+
+**Bug Fixed:** "Cannot read properties of null (reading 'json')" error during vehicle registration
+
+**Root Cause:**
+1. **Incorrect apiRequest usage**: Frontend called `apiRequest(method, url, data)` with 3 arguments, but function signature is `apiRequest(url, options)` with 2 arguments
+2. **Double JSON parsing**: Frontend called `.json()` on result when `apiRequest` already returns parsed JSON (or null for non-JSON responses)
+
+**Changes Made:**
+- **File**: `client/src/pages/driver/vehicle.tsx`
+- **Before**:
+  ```typescript
+  const response = await apiRequest("POST", "/api/driver/vehicle", data);
+  return response.json();  // ERROR: response might be null!
+  ```
+- **After**:
+  ```typescript
+  const result = await apiRequest("/api/driver/vehicle", {
+    method: "POST",
+    body: JSON.stringify(data),
+    headers: { "Content-Type": "application/json" },
+  });
+  return result;  // apiRequest already returns parsed JSON
+  ```
+
+**Backend Verification:**
+- Old endpoints `/api/driver/vehicle` (POST/PATCH) return proper JSON with `{ message, vehicle }` structure
+- New endpoints `/api/driver/vehicles` (GET/POST/PATCH/DELETE) also return proper JSON responses
+- Both old and new endpoints are functional, old endpoints marked as deprecated
+
+**Error Prevention:**
+- TypeScript LSP caught the 3-argument error: "Expected 1-2 arguments, but got 3"
+- Frontend null checks prevent crashes on non-JSON responses
+- Consistent error handling with toast notifications
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
 
