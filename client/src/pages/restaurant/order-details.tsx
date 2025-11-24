@@ -94,7 +94,6 @@ export default function RestaurantOrderDetails() {
     onSuccess: () => {
       // Invalidate all order-related queries to refresh list, details, overview, and live board
       queryClient.invalidateQueries({ queryKey: ordersKeys.all });
-      queryClient.invalidateQueries({ queryKey: ordersKeys.detail(orderId || "") });
       toast({
         title: "Success",
         description: "Order status updated successfully",
@@ -121,6 +120,7 @@ export default function RestaurantOrderDetails() {
     });
   };
 
+  // Loading state - initial fetch
   if (isLoading) {
     return (
       <div className="min-h-screen p-4 md:p-6 space-y-6">
@@ -138,7 +138,8 @@ export default function RestaurantOrderDetails() {
     );
   }
 
-  if (!order) {
+  // Not found state - fetch completed but no order (404 or permission denied)
+  if (!isLoading && !order) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
