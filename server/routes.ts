@@ -32,10 +32,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/driver", driverRoutes);
   app.use("/api/driver", driverSupportRoutes); // Phase 12
   app.use("/api/customer", customerRoutes);
+  app.use("/api/customer", customerSupportRoutes); // Phase 12
   app.use("/api/customer/food", customerFoodRoutes);
   app.use("/api/customer/restaurants", customerRestaurantStatusRoutes); // Phase 10
   app.use("/api/customer/restaurants", customerRestaurantPricingRoutes); // Phase 11
-  app.use("/api/customer/support", customerSupportRoutes); // Phase 12
   app.use("/api/restaurant", restaurantRoutes);
   app.use("/api/restaurant", restaurantSupportRoutes); // Phase 12
   app.use("/api/restaurant/settings", restaurantSettingsRoutes); // Phase 10

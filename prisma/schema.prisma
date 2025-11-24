@@ -48,6 +48,9 @@ model AdminProfile {
   countryCode                  String?
   cityCode                     String?
   user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adminSupportTickets          AdminSupportTicket[] @relation("AdminSupportTickets") // Phase 12 Extension
+  adminLiveChatSessions        AdminLiveChatSession[] @relation("AdminLiveChatSessions") // Phase 12 Extension
+  adminSupportCallbacks        AdminSupportCallback[] @relation("AdminSupportCallbacks") // Phase 12 Extension
 
   @@index([countryCode])
   @@index([cityCode])
@@ -95,6 +98,9 @@ model CustomerProfile {
   rides                 Ride[]
   reviews               Review[]         // Phase 8: Customer reviews
   supportTickets        SupportTicket[]  // Phase 12: Customer support tickets
+  customerSupportTickets CustomerSupportTicket[] @relation("CustomerSupportTickets") // Phase 12 Extension
+  customerLiveChatSessions CustomerLiveChatSession[] @relation("CustomerLiveChatSessions") // Phase 12 Extension
+  customerSupportCallbacks CustomerSupportCallback[] @relation("CustomerSupportCallbacks") // Phase 12 Extension
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -258,6 +264,9 @@ model DriverProfile {
   blockedRiders         BlockedRider[]
   supportTickets        SupportTicket[] // Phase 12: Driver support tickets
   financialAdjustments  FinancialAdjustment[] // Phase 12: Financial adjustments
+  driverSupportTickets  DriverSupportTicket[] @relation("DriverSupportTickets") // Phase 12 Extension
+  driverLiveChatSessions DriverLiveChatSession[] @relation("DriverLiveChatSessions") // Phase 12 Extension
+  driverSupportCallbacks DriverSupportCallback[] @relation("DriverSupportCallbacks") // Phase 12 Extension
 
   @@map("driver_profiles")
 }
@@ -2051,6 +2060,133 @@ model RestaurantSupportMessage {
   @@map("restaurant_support_messages")
 }
 
+// Driver Support Center Models (Phase 12 Extension)
+model DriverSupportTicket {
+  id              String                      @id @default(uuid())
+  ticketCode      String                      @unique // e.g., "DST-2025-000123"
+  driverId        String
+  subject         String
+  category        RestaurantSupportCategory
+  priority        RestaurantSupportPriority   @default(normal)
+  status          RestaurantSupportStatus     @default(open)
+  description     String                      @db.Text
+  attachmentUrls  Json?                       // Array of attachment URLs
+  channel         String                      @default("web") // email, phone, chat
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  resolvedAt      DateTime?
+  
+  driver          DriverProfile               @relation("DriverSupportTickets", fields: [driverId], references: [id], onDelete: Cascade)
+  messages        DriverSupportMessage[]
+  
+  @@index([driverId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@map("driver_support_tickets")
+}
+
+model DriverSupportMessage {
+  id              String                   @id @default(uuid())
+  ticketId        String
+  senderRole      String                   // "driver" | "support"
+  senderName      String                   // Display name of sender
+  messageBody     String                   @db.Text
+  attachmentUrls  Json?                    // Array of attachment URLs
+  createdAt       DateTime                 @default(now())
+  
+  ticket          DriverSupportTicket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("driver_support_messages")
+}
+
+// Customer Support Center Models (Phase 12 Extension)
+model CustomerSupportTicket {
+  id              String                      @id @default(uuid())
+  ticketCode      String                      @unique // e.g., "CST-2025-000123"
+  customerId      String
+  subject         String
+  category        RestaurantSupportCategory
+  priority        RestaurantSupportPriority   @default(normal)
+  status          RestaurantSupportStatus     @default(open)
+  description     String                      @db.Text
+  attachmentUrls  Json?                       // Array of attachment URLs
+  channel         String                      @default("web") // email, phone, chat
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  resolvedAt      DateTime?
+  
+  customer        CustomerProfile             @relation("CustomerSupportTickets", fields: [customerId], references: [id], onDelete: Cascade)
+  messages        CustomerSupportMessage[]
+  
+  @@index([customerId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@map("customer_support_tickets")
+}
+
+model CustomerSupportMessage {
+  id              String                   @id @default(uuid())
+  ticketId        String
+  senderRole      String                   // "customer" | "support"
+  senderName      String                   // Display name of sender
+  messageBody     String                   @db.Text
+  attachmentUrls  Json?                    // Array of attachment URLs
+  createdAt       DateTime                 @default(now())
+  
+  ticket          CustomerSupportTicket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("customer_support_messages")
+}
+
+// Admin Support Center Models (Phase 12 Extension)
+model AdminSupportTicket {
+  id              String                      @id @default(uuid())
+  ticketCode      String                      @unique // e.g., "AST-2025-000123"
+  adminId         String
+  subject         String
+  category        RestaurantSupportCategory
+  priority        RestaurantSupportPriority   @default(normal)
+  status          RestaurantSupportStatus     @default(open)
+  description     String                      @db.Text
+  attachmentUrls  Json?                       // Array of attachment URLs
+  channel         String                      @default("web") // email, phone, chat
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  resolvedAt      DateTime?
+  
+  admin           AdminProfile                @relation("AdminSupportTickets", fields: [adminId], references: [id], onDelete: Cascade)
+  messages        AdminSupportMessage[]
+  
+  @@index([adminId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@map("admin_support_tickets")
+}
+
+model AdminSupportMessage {
+  id              String                   @id @default(uuid())
+  ticketId        String
+  senderRole      String                   // "admin" | "support"
+  senderName      String                   // Display name of sender
+  messageBody     String                   @db.Text
+  attachmentUrls  Json?                    // Array of attachment URLs
+  createdAt       DateTime                 @default(now())
+  
+  ticket          AdminSupportTicket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("admin_support_messages")
+}
+
+// Restaurant Live Chat (existing)
 model LiveChatSession {
   id              String           @id @default(uuid())
   restaurantId    String
@@ -2087,11 +2223,124 @@ model LiveChatMessage {
   @@map("live_chat_messages")
 }
 
+// Driver Live Chat
+model DriverLiveChatSession {
+  id              String           @id @default(uuid())
+  driverId        String
+  agentId         String?
+  agentName       String?
+  status          LiveChatStatus   @default(waiting)
+  startedAt       DateTime         @default(now())
+  endedAt         DateTime?
+  updatedAt       DateTime         @updatedAt
+  
+  driver          DriverProfile    @relation("DriverLiveChatSessions", fields: [driverId], references: [id], onDelete: Cascade)
+  messages        DriverLiveChatMessage[]
+  
+  @@index([driverId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("driver_live_chat_sessions")
+}
+
+model DriverLiveChatMessage {
+  id              String                 @id @default(uuid())
+  sessionId       String
+  senderRole      String                 // "driver" | "agent"
+  senderName      String
+  messageBody     String                 @db.Text
+  attachmentUrls  Json?
+  isTyping        Boolean                @default(false)
+  createdAt       DateTime               @default(now())
+  
+  session         DriverLiveChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("driver_live_chat_messages")
+}
+
+// Customer Live Chat
+model CustomerLiveChatSession {
+  id              String           @id @default(uuid())
+  customerId      String
+  agentId         String?
+  agentName       String?
+  status          LiveChatStatus   @default(waiting)
+  startedAt       DateTime         @default(now())
+  endedAt         DateTime?
+  updatedAt       DateTime         @updatedAt
+  
+  customer        CustomerProfile  @relation("CustomerLiveChatSessions", fields: [customerId], references: [id], onDelete: Cascade)
+  messages        CustomerLiveChatMessage[]
+  
+  @@index([customerId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("customer_live_chat_sessions")
+}
+
+model CustomerLiveChatMessage {
+  id              String                   @id @default(uuid())
+  sessionId       String
+  senderRole      String                   // "customer" | "agent"
+  senderName      String
+  messageBody     String                   @db.Text
+  attachmentUrls  Json?
+  isTyping        Boolean                  @default(false)
+  createdAt       DateTime                 @default(now())
+  
+  session         CustomerLiveChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("customer_live_chat_messages")
+}
+
+// Admin Live Chat
+model AdminLiveChatSession {
+  id              String           @id @default(uuid())
+  adminId         String
+  agentId         String?
+  agentName       String?
+  status          LiveChatStatus   @default(waiting)
+  startedAt       DateTime         @default(now())
+  endedAt         DateTime?
+  updatedAt       DateTime         @updatedAt
+  
+  admin           AdminProfile     @relation("AdminLiveChatSessions", fields: [adminId], references: [id], onDelete: Cascade)
+  messages        AdminLiveChatMessage[]
+  
+  @@index([adminId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("admin_live_chat_sessions")
+}
+
+model AdminLiveChatMessage {
+  id              String                 @id @default(uuid())
+  sessionId       String
+  senderRole      String                 // "admin" | "agent"
+  senderName      String
+  messageBody     String                 @db.Text
+  attachmentUrls  Json?
+  isTyping        Boolean                @default(false)
+  createdAt       DateTime               @default(now())
+  
+  session         AdminLiveChatSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("admin_live_chat_messages")
+}
+
+// Restaurant Support Callback (existing)
 model SupportCallback {
   id              String           @id @default(uuid())
   restaurantId    String
   phoneNumber     String
   preferredTime   String
+  timezone        String           @default("UTC")
   reason          String           @db.Text
   status          CallbackStatus   @default(pending)
   createdAt       DateTime         @default(now())
@@ -2103,6 +2352,66 @@ model SupportCallback {
   @@index([status])
   @@index([createdAt])
   @@map("support_callbacks")
+}
+
+// Driver Support Callback
+model DriverSupportCallback {
+  id              String           @id @default(uuid())
+  driverId        String
+  phoneNumber     String
+  preferredTime   String
+  timezone        String           @default("UTC")
+  reason          String           @db.Text
+  status          CallbackStatus   @default(pending)
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
+  
+  driver          DriverProfile    @relation("DriverSupportCallbacks", fields: [driverId], references: [id], onDelete: Cascade)
+  
+  @@index([driverId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("driver_support_callbacks")
+}
+
+// Customer Support Callback
+model CustomerSupportCallback {
+  id              String           @id @default(uuid())
+  customerId      String
+  phoneNumber     String
+  preferredTime   String
+  timezone        String           @default("UTC")
+  reason          String           @db.Text
+  status          CallbackStatus   @default(pending)
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
+  
+  customer        CustomerProfile  @relation("CustomerSupportCallbacks", fields: [customerId], references: [id], onDelete: Cascade)
+  
+  @@index([customerId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("customer_support_callbacks")
+}
+
+// Admin Support Callback
+model AdminSupportCallback {
+  id              String           @id @default(uuid())
+  adminId         String
+  phoneNumber     String
+  preferredTime   String
+  timezone        String           @default("UTC")
+  reason          String           @db.Text
+  status          CallbackStatus   @default(pending)
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
+  
+  admin           AdminProfile     @relation("AdminSupportCallbacks", fields: [adminId], references: [id], onDelete: Cascade)
+  
+  @@index([adminId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("admin_support_callbacks")
 }
 
 model SupportArticle {
