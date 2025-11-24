@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import authRoutes from "./routes/auth";
 import driverRoutes from "./routes/driver";
+import driverSupportRoutes from "./routes/driver-support"; // Phase 12
 import customerRoutes from "./routes/customer";
 import customerFoodRoutes from "./routes/customer-food";
 import customerSupportRoutes from "./routes/customer-support"; // Phase 12
@@ -29,6 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register all API routes
   app.use("/api/auth", authRoutes);
   app.use("/api/driver", driverRoutes);
+  app.use("/api/driver", driverSupportRoutes); // Phase 12
   app.use("/api/customer", customerRoutes);
   app.use("/api/customer/food", customerFoodRoutes);
   app.use("/api/customer/restaurants", customerRestaurantStatusRoutes); // Phase 10
