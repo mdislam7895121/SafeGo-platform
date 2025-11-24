@@ -101,6 +101,7 @@ import PromotionsCoupons from "@/pages/restaurant/promotions-coupons";
 import PromotionsFeatured from "@/pages/restaurant/promotions-featured";
 import RestaurantPayouts from "@/pages/restaurant/payouts";
 import RestaurantPayoutMethods from "@/pages/restaurant/payout-methods";
+import RestaurantPayoutsHistory from "@/pages/restaurant/payouts-history";
 import RestaurantPaymentOptions from "@/pages/restaurant/payment-options";
 import AdminRestaurantPayouts from "@/pages/admin/restaurant-payouts";
 import AdminRestaurantSettings from "@/pages/admin/restaurant-settings";
@@ -832,6 +833,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout userRole="OWNER">
             <RestaurantPayoutMethods />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/payouts-history">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout userRole="OWNER">
+            <RestaurantPayoutsHistory />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
