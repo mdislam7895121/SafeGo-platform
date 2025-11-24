@@ -15,7 +15,6 @@ async function canReviewOrder(customerId: string, orderId: string): Promise<{ ca
     select: {
       customerId: true,
       status: true,
-      isPaid: true,
     },
   });
 
@@ -25,10 +24,6 @@ async function canReviewOrder(customerId: string, orderId: string): Promise<{ ca
 
   if (order.customerId !== customerId) {
     return { canReview: false, reason: "You can only review your own orders" };
-  }
-
-  if (!order.isPaid) {
-    return { canReview: false, reason: "Order must be paid before reviewing" };
   }
 
   if (order.status !== "delivered") {
@@ -103,7 +98,6 @@ router.post("/", requireRole(["customer"]), async (req: AuthRequest, res) => {
         rating,
         reviewText: reviewText || null,
         images: images || [],
-        isDemo: customerProfile.isDemo,
       },
       include: {
         customer: {
@@ -117,20 +111,28 @@ router.post("/", requireRole(["customer"]), async (req: AuthRequest, res) => {
         restaurant: {
           select: {
             id: true,
-            businessName: true,
+            restaurantName: true,
           },
         },
       },
     });
 
+    // Get user for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
     // Audit log
     await logAuditEvent({
+      actorId: customerProfile.id,
+      actorEmail: user?.email || "unknown",
+      actorRole: user?.role || "customer",
       entityType: EntityType.CUSTOMER,
       entityId: customerProfile.id,
-      action: ActionType.CREATE,
-      details: `Created review for order ${orderId}, rating: ${rating}/5`,
+      actionType: ActionType.CREATE,
+      description: `Created review for order ${orderId}, rating: ${rating}/5`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.status(201).json({ review });
@@ -159,14 +161,13 @@ router.get("/:id", async (req: AuthRequest, res) => {
         restaurant: {
           select: {
             id: true,
-            businessName: true,
-            logoUrl: true,
+            restaurantName: true,
           },
         },
         order: {
           select: {
             id: true,
-            totalAmount: true,
+            subtotal: true,
             createdAt: true,
           },
         },
@@ -344,14 +345,22 @@ router.patch("/:id", requireRole(["customer"]), async (req: AuthRequest, res) =>
       },
     });
 
+    // Get user for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
     // Audit log
     await logAuditEvent({
+      actorId: customerProfile.id,
+      actorEmail: user?.email || "unknown",
+      actorRole: user?.role || "customer",
       entityType: EntityType.CUSTOMER,
       entityId: customerProfile.id,
-      action: ActionType.UPDATE,
-      details: `Updated review ${id}`,
+      actionType: ActionType.UPDATE,
+      description: `Updated review ${id}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ review: updatedReview });
@@ -395,14 +404,22 @@ router.delete("/:id", requireRole(["customer"]), async (req: AuthRequest, res) =
       where: { id },
     });
 
+    // Get user for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
     // Audit log
     await logAuditEvent({
+      actorId: customerProfile.id,
+      actorEmail: user?.email || "unknown",
+      actorRole: user?.role || "customer",
       entityType: EntityType.CUSTOMER,
       entityId: customerProfile.id,
-      action: ActionType.DELETE,
-      details: `Deleted review ${id}`,
+      actionType: ActionType.DELETE,
+      description: `Deleted review ${id}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ success: true, message: "Review deleted successfully" });
@@ -443,10 +460,6 @@ router.post("/:id/reply", requireRole(["restaurant"]), async (req: AuthRequest, 
       return res.status(403).json({ error: "You can only reply to reviews of your own restaurant" });
     }
 
-    if (review.restaurantReplyText) {
-      return res.status(400).json({ error: "You have already replied to this review" });
-    }
-
     const updatedReview = await prisma.review.update({
       where: { id },
       data: {
@@ -466,14 +479,22 @@ router.post("/:id/reply", requireRole(["restaurant"]), async (req: AuthRequest, 
       },
     });
 
+    // Get user for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
     // Audit log
     await logAuditEvent({
+      actorId: restaurantProfile.id,
+      actorEmail: user?.email || "unknown",
+      actorRole: user?.role || "restaurant",
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      action: ActionType.CREATE,
-      details: `Replied to review ${id}`,
+      actionType: ActionType.CREATE,
+      description: `Replied to review ${id}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ review: updatedReview });
@@ -529,17 +550,25 @@ router.patch("/:id/hide", requireRole(["restaurant", "admin"]), async (req: Auth
       },
     });
 
+    // Get user for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
     // Audit log
-    const entityType = userRole === "admin" ? EntityType.ADMIN : EntityType.RESTAURANT;
+    const entityType = userRole === "admin" ? EntityType.RESTAURANT : EntityType.RESTAURANT;
     const entityId = userRole === "admin" ? (adminId || "") : review.restaurantId;
 
     await logAuditEvent({
+      actorId: entityId,
+      actorEmail: user?.email || "unknown",
+      actorRole: user?.role || userRole,
       entityType,
       entityId,
-      action: ActionType.UPDATE,
-      details: `${hide ? "Hid" : "Unhid"} review ${id}${reason ? `: ${reason}` : ""}`,
+      actionType: ActionType.UPDATE,
+      description: `${hide ? "Hid" : "Unhid"} review ${id}${reason ? `: ${reason}` : ""}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ review: updatedReview });
@@ -593,17 +622,25 @@ router.patch("/:id/flag", requireRole(["customer", "admin"]), async (req: AuthRe
       },
     });
 
+    // Get user for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
     // Audit log
-    const entityType = userRole === "admin" ? EntityType.ADMIN : EntityType.CUSTOMER;
+    const entityType = userRole === "admin" ? EntityType.RESTAURANT : EntityType.CUSTOMER;
     const entityId = userRole === "admin" ? (adminId || "") : (customerId || "");
 
     await logAuditEvent({
+      actorId: entityId,
+      actorEmail: user?.email || "unknown",
+      actorRole: user?.role || userRole,
       entityType,
       entityId,
-      action: ActionType.UPDATE,
-      details: `${flag ? "Flagged" : "Unflagged"} review ${id}${reason ? `: ${reason}` : ""}`,
+      actionType: ActionType.UPDATE,
+      description: `${flag ? "Flagged" : "Unflagged"} review ${id}${reason ? `: ${reason}` : ""}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ review: updatedReview });
