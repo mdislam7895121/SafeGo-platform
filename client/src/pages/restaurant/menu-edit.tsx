@@ -1,9 +1,9 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation, useRoute } from "wouter";
 import {
   ArrowLeft,
-  Plus,
+  Save,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,9 +39,11 @@ const itemSchema = z.object({
 
 type ItemFormData = z.infer<typeof itemSchema>;
 
-export default function AddMenuItem() {
+export default function EditMenuItem() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const [, params] = useRoute("/restaurant/menu-edit/:id");
+  const itemId = params?.id;
   
   const [formData, setFormData] = useState<ItemFormData>({
     categoryId: "",
@@ -61,29 +63,63 @@ export default function AddMenuItem() {
   
   const [formErrors, setFormErrors] = useState<Partial<Record<keyof ItemFormData, string>>>({});
 
+  // Fetch existing item data
+  const { data: itemData, isLoading: itemLoading } = useQuery({
+    queryKey: ["/api/restaurant/menu/items", itemId],
+    queryFn: async () => {
+      const response = await apiRequest(`/api/restaurant/menu/items/${itemId}`, {
+        method: "GET",
+      });
+      return response;
+    },
+    enabled: !!itemId,
+  });
+
+  // Pre-populate form when item loads
+  useEffect(() => {
+    if (itemData?.item) {
+      const item = itemData.item;
+      setFormData({
+        categoryId: item.categoryId || "",
+        name: item.name || "",
+        shortDescription: item.shortDescription || "",
+        longDescription: item.longDescription || "",
+        basePrice: parseFloat(item.basePrice) || 0,
+        currency: item.currency || "USD",
+        preparationTimeMinutes: item.preparationTimeMinutes || 15,
+        itemImageUrl: item.itemImageUrl || "",
+        isVegetarian: item.isVegetarian || false,
+        isVegan: item.isVegan || false,
+        isHalal: item.isHalal || false,
+        isSpicy: item.isSpicy || false,
+        dietaryTags: item.dietaryTags || [],
+      });
+    }
+  }, [itemData]);
+
   const { data: categoriesData } = useQuery<{ categories: any[] }>({
     queryKey: ["/api/restaurant/menu/categories"],
   });
 
   const categories = categoriesData?.categories || [];
 
-  const createItemMutation = useMutation({
+  const updateItemMutation = useMutation({
     mutationFn: async (data: ItemFormData) => {
-      return await apiRequest("/api/restaurant/menu/items", {
-        method: "POST",
+      return await apiRequest(`/api/restaurant/menu/items/${itemId}`, {
+        method: "PATCH",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/menu/items"] });
-      toast({ title: "Success", description: "Menu item created successfully" });
+      toast({ title: "Success", description: "Menu item updated successfully" });
       setLocation("/restaurant/menu");
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create item",
+        description: error.message || "Failed to update item",
         variant: "destructive",
       });
     },
@@ -110,16 +146,26 @@ export default function AddMenuItem() {
 
   const handleSubmit = () => {
     if (!validateForm()) return;
-    createItemMutation.mutate(formData);
+    updateItemMutation.mutate(formData);
   };
+
+  if (itemLoading) {
+    return (
+      <div className="container mx-auto p-4 lg:p-6">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Loading menu item...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-4 lg:p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Add New Menu Item</h1>
+          <h1 className="text-2xl font-bold">Edit Menu Item</h1>
           <p className="text-sm text-muted-foreground">
-            Create a new item for your restaurant menu
+            Update the details of your menu item
           </p>
         </div>
         <Link href="/restaurant/menu">
@@ -314,12 +360,12 @@ export default function AddMenuItem() {
             <CardContent className="pt-6 space-y-3">
               <Button
                 onClick={handleSubmit}
-                disabled={createItemMutation.isPending}
+                disabled={updateItemMutation.isPending || itemLoading}
                 className="w-full"
-                data-testid="button-create-item"
+                data-testid="button-update-item"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                {createItemMutation.isPending ? "Creating..." : "Create Menu Item"}
+                <Save className="h-4 w-4 mr-2" />
+                {updateItemMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
               <Link href="/restaurant/menu">
                 <Button variant="outline" className="w-full">

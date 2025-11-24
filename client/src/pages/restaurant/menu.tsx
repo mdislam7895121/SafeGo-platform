@@ -53,12 +53,12 @@ export default function RestaurantMenu() {
   }, [searchQuery]);
 
   // Fetch menu categories
-  const { data: categoriesData } = useQuery({
+  const { data: categoriesData } = useQuery<{ categories: any[] }>({
     queryKey: ["/api/restaurant/menu/categories"],
   });
 
   // Fetch menu items
-  const { data: itemsData, isLoading: itemsLoading } = useQuery({
+  const { data: itemsData, isLoading: itemsLoading } = useQuery<{ items: any[] }>({
     queryKey: ["/api/restaurant/menu/items"],
   });
 
@@ -144,6 +144,28 @@ export default function RestaurantMenu() {
       toast({
         title: "Error",
         description: "Failed to update items",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      return await apiRequest(`/api/restaurant/menu/items/${itemId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/menu/items"] });
+      toast({
+        title: "Success",
+        description: "Menu item deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete menu item",
         variant: "destructive",
       });
     },
@@ -295,6 +317,14 @@ export default function RestaurantMenu() {
                 )}
               </CardTitle>
               <div className="flex items-center gap-2">
+                {allItems.length > 0 && (
+                  <Link href="/restaurant/menu/new">
+                    <Button size="sm" data-testid="button-add-item">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Item
+                    </Button>
+                  </Link>
+                )}
                 <Checkbox
                   checked={selectedItems.size === paginatedItems.length && paginatedItems.length > 0}
                   onCheckedChange={handleSelectAll}
@@ -321,10 +351,12 @@ export default function RestaurantMenu() {
                     : "No items match your search or filters"}
                 </p>
                 {allItems.length === 0 && (
-                  <Button data-testid="button-add-first-item">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Item
-                  </Button>
+                  <Link href="/restaurant/menu/new">
+                    <Button data-testid="button-add-first-item">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add First Item
+                    </Button>
+                  </Link>
                 )}
               </div>
             ) : (
@@ -417,11 +449,23 @@ export default function RestaurantMenu() {
                           />
                         </div>
                         <div className="flex gap-2">
-                          <Button size="sm" variant="outline" className="flex-1" data-testid={`button-edit-${item.id}`}>
-                            <Edit className="h-3 w-3 mr-1" />
-                            Edit
-                          </Button>
-                          <Button size="sm" variant="outline" data-testid={`button-delete-${item.id}`}>
+                          <Link href={`/restaurant/menu-edit/${item.id}`} className="flex-1">
+                            <Button size="sm" variant="outline" className="w-full" data-testid={`button-edit-${item.id}`}>
+                              <Edit className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                          </Link>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            data-testid={`button-delete-${item.id}`}
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
+                                deleteItemMutation.mutate(item.id);
+                              }
+                            }}
+                            disabled={deleteItemMutation.isPending}
+                          >
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
