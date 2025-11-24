@@ -117,13 +117,39 @@ export default function ManageAccount() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/driver/upload/profile-photo", {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
+      
+      let res: Response;
+      try {
+        res = await fetch("/api/driver/upload/profile-photo", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+      } catch (networkError) {
+        throw new Error("Network error. Please check your connection and try again.");
+      }
+
+      if (!res) {
+        throw new Error("No response from server. Please try again.");
+      }
+
+      if (!res.ok) {
+        let errorMessage = "Failed to upload photo";
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          errorMessage = await res.text() || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || data.message || "Upload failed");
+      }
+      
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
