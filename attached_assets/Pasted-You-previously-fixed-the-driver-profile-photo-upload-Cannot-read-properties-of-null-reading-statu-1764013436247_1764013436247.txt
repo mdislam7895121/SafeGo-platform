@@ -1,0 +1,103 @@
+You previously fixed the driver profile photo upload "Cannot read properties of null (reading 'status')" error.
+
+Now there is a similar error when registering a vehicle:
+
+UI error:
+"Registration failed
+Cannot read properties of null (reading 'json')"
+
+Steps to reproduce:
+1. Log in as a driver.
+2. Go to the vehicle registration page (SafeGo → Driver → Vehicles).
+3. Fill the form and click "Register Vehicle".
+4. The red toast appears with the error above.
+
+Goal:
+Make the whole driver vehicle registration flow production-ready at MVP level with **no null / undefined response handling issues** and proper JSON responses.
+
+Please do the following in small, safe steps:
+
+1. Locate the vehicle registration frontend:
+   - Search in `client/src/pages` and `client/src/components` for the submit handler that calls `/api/driver/vehicles` (or similar).
+   - Identify the function that calls `fetch` and then uses `response.json()` for vehicle registration.
+
+2. Fix frontend error handling for vehicle registration:
+   - Ensure we NEVER call `.json()` on a null or undefined value.
+   - Implement a robust pattern similar to:
+
+     ```ts
+     const res = await fetch('/api/driver/vehicles', { ... });
+
+     if (!res) {
+       throw new Error('No response from server');
+     }
+
+     const contentType = res.headers.get('content-type') || '';
+     const isJson = contentType.includes('application/json');
+
+     if (!res.ok) {
+       const errorBody = isJson ? await res.json().catch(() => null) : null;
+       const message =
+         errorBody?.message ||
+         errorBody?.error ||
+         `Vehicle registration failed with status ${res.status}`;
+       throw new Error(message);
+     }
+
+     const data = isJson ? await res.json() : null;
+     // use data or show success toast
+     ```
+
+   - Make sure the toast / error UI reads from a safe `error.message` and never from `response.status` or `response.json()` when `response` might be null.
+
+3. Verify and standardize the backend vehicle APIs:
+   - Open `server/routes/driver.ts` (or wherever the driver vehicle routes are defined).
+   - For ALL vehicle endpoints (`GET /api/driver/vehicles`, `POST /api/driver/vehicles`, `PATCH /api/driver/vehicles/:id`, `DELETE /api/driver/vehicles/:id`, `PATCH /api/driver/vehicles/:id/set-primary`):
+     - Ensure they always return a structured JSON response, for example:
+
+       ```ts
+       return res.status(201).json({
+         success: true,
+         vehicle,
+       });
+       ```
+
+     - On error, return something like:
+
+       ```ts
+       return res.status(400).json({
+         success: false,
+         message: 'Vehicle registration failed because ...',
+       });
+       ```
+
+   - Confirm there is NO code path that returns `null`, `undefined`, or a non-JSON response body.
+
+4. Add defensive checks on shared helpers if needed:
+   - If there is a shared helper for API calls on the frontend (for example a `apiClient` or `callApi` function), update it so that:
+     - It never returns `null` silently.
+     - It either returns a valid `Response` or throws an Error with a meaningful message.
+   - Ensure driver profile update and vehicle registration both use this common safe helper where appropriate.
+
+5. Regression check:
+   - Re-run the server.
+   - Test the following end-to-end flows:
+     - Driver profile photo upload.
+     - Driver name / profile info update.
+     - Vehicle registration (success path).
+     - Vehicle registration with an intentional validation error (e.g., missing required field) to verify that a nice, user-friendly error toast appears instead of a JS exception.
+   - Confirm that:
+     - No "Cannot read properties of null (reading 'json')" errors occur.
+     - No "Cannot read properties of null (reading 'status')" errors occur.
+     - Errors are shown as clean toast messages coming from the backend `message` field.
+
+6. Update `replit.md`:
+   - Add a short `D1-VEHICLE-ERROR-HANDLING` section describing:
+     - The new response contract for driver vehicle APIs.
+     - The frontend error-handling pattern.
+     - Known limitations, if any.
+
+When you are done, summarize:
+- Which files were modified.
+- What changes were made to fix the null/undefined response issues.
+- How to reproduce the fixed flow for vehicle registration as a driver.
