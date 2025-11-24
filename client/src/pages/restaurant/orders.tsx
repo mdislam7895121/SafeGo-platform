@@ -109,26 +109,6 @@ export default function RestaurantOrders() {
       .join(" ");
   };
 
-  // Get status timeline for order details
-  const getStatusTimeline = (status: string) => {
-    const allStatuses = [
-      { key: "placed", label: "Order Received", icon: ShoppingBag },
-      { key: "accepted", label: "Accepted", icon: CheckCircle2 },
-      { key: "preparing", label: "Preparing", icon: Package },
-      { key: "ready_for_pickup", label: "Ready for Pickup", icon: Clock },
-      { key: "picked_up", label: "Picked Up", icon: Truck },
-      { key: "on_the_way", label: "On the Way", icon: MapPin },
-      { key: "completed", label: "Completed", icon: CheckCircle2 },
-    ];
-
-    const currentIndex = allStatuses.findIndex((s) => s.key === status);
-    return allStatuses.map((s, idx) => ({
-      ...s,
-      completed: idx <= currentIndex,
-      current: idx === currentIndex,
-    }));
-  };
-
   return (
     <div className="space-y-6">
         {/* Filter Bar - Stable 24px spacing from header */}

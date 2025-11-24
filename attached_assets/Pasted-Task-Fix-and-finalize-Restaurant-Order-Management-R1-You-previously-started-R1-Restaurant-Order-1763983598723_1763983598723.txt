@@ -1,0 +1,96 @@
+Task: Fix and finalize Restaurant Order Management – R1
+
+You previously started R1 (Restaurant Order Management) but the architect reported critical runtime issues (import + getStatusTimeline) while adding the dedicated order details page and improved order list. Please carefully FIX and COMPLETE R1 without breaking any existing flows.
+
+A. Scope (R1 only)
+1. Restaurant Orders page `/restaurant/orders`
+2. Dedicated Order Details view `/restaurant/orders/:id`
+3. Restaurant order actions:
+   - Accept / Reject (new orders)
+   - Mark as Preparing / Ready for Pickup / Out for Delivery / Completed / Cancelled
+4. Status timeline & activity log (read-only, safe)
+5. Real-time refresh or safe polling for status updates
+
+B. Error fixing & cleanup
+1. Check console + server logs to see WHY the agent “encountered an error” when working on `orders.tsx` and `getStatusTimeline`.
+2. Fix issues WITHOUT removing any of these:
+   - authentication middleware
+   - KYC checks
+   - RBAC role checks
+   - existing payout, wallet, support, or menu systems
+3. Specifically:
+   - Remove unused imports only if they are really unused.
+   - If `getStatusTimeline` is not used, either:
+     a) safely remove the function, OR
+     b) implement it correctly and use it in the Order Details page.
+   - After fixing, restart the app and confirm it compiles and runs with no TypeScript or runtime errors.
+
+C. Restaurant Orders UX (mobile, tablet, desktop)
+1. `/restaurant/orders` main list:
+   - Filter tabs: All, New, Active, Completed, Cancelled.
+   - Each row shows: Order ID, Time, Items count, Total, Status, and a “View details” button.
+   - Status pills should match SafeGo brand colors and be consistent with other status UI.
+2. Order Details page:
+   - Show:
+     - Customer name (mask sensitive info as in other parts of the app)
+     - Delivery type (Delivery / Pickup)
+     - List of items (name, quantity, price)
+     - Fees and commission breakdown (subtotal, delivery fee, SafeGo commission, restaurant earnings)
+     - Current status + status timeline (Created → Accepted → Preparing → Ready → Completed or Cancelled)
+   - Action buttons for the restaurant:
+     - NEW: Accept, Reject
+     - ACCEPTED/PREPARING: Mark as Preparing, Mark as Ready
+     - READY: Mark as Completed
+     - ACTIVE: Cancel (with confirmation)
+3. Make sure all pages are fully responsive:
+   - Mobile: single-column layout, no horizontal scroll.
+   - Tablet: 2-column where possible.
+   - Desktop: full-width with good spacing.
+
+D. Business rules & safety
+1. Only restaurants with:
+   - isVerified = true
+   - verificationStatus = "APPROVED"
+   can manage orders.
+2. Enforce RBAC:
+   - OWNER: full access to all restaurant orders.
+   - STAFF: can view and update order statuses only if `canManageOrders` permission is true and `staffActive` = true and not suspended.
+3. Do NOT change any commission logic, payout logic, or wallet balances.
+4. Do NOT touch any routes outside the restaurant order system.
+5. Keep all API contracts backward compatible. If a change is required:
+   - prefer extending response objects rather than renaming/removing fields.
+   - do not break existing mobile/web clients.
+
+E. Implementation details
+1. Backend
+   - Use existing order models and services; do not create new tables.
+   - If needed, add helper methods in the existing Order service for:
+     - listOrdersByStatus(restaurantId, status)
+     - updateOrderStatus(orderId, newStatus, actor)
+   - Log all status changes in the existing audit / activity logging system (if hooks already exist, reuse them).
+2. Frontend
+   - Use the existing data fetching pattern (React Query or equivalent) with proper query keys so cache stays in sync.
+   - Add loading and error states for the orders list and details.
+   - Use existing button + badge components for visual consistency.
+
+F. Regression checklist (must run)
+After implementing:
+1. Confirm app builds and starts with no TypeScript errors, no runtime crashes.
+2. Test flows:
+   - New order appears in `/restaurant/orders`.
+   - Restaurant accepts order → status updates in list and details.
+   - Restaurant marks Preparing → Ready → Completed.
+   - Restaurant cancels an order and it is no longer in Active tab.
+3. Confirm:
+   - No changes to payout, wallet, support center, category system, or driver/customer apps.
+   - KYC/RBAC rules still enforced on all restaurant order routes.
+   - No new public APIs exposed; only existing order endpoints are used or slightly extended.
+
+G. Reporting back
+When you are done, summarize:
+1. What changed in code (files + high-level overview).
+2. Any functions removed or renamed (especially related to `getStatusTimeline`).
+3. How you verified the flows on mobile, tablet, and desktop.
+4. Explicit confirmation that:
+   - No schema changes were made.
+   - No security rules (KYC, RBAC, SafeGuard) were weakened.
