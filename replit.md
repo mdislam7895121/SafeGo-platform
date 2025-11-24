@@ -37,6 +37,20 @@ Core systems and features include:
 -   **Driver Public Profile Card (D2)**: ✅ COMPLETED - Uber/Lyft-style customer-facing driver preview with profile photo (circular avatar with fallback), vehicle details (type, model, color, license plate), driver stats (total rides, average rating, years active), pronouns support, and integrated safety message. Endpoint `GET /api/driver/public-profile/:driver_profile_id` uses driver_profile table primary key for all lookups and returns safe, non-sensitive fields. Stats calculated from completed rides count and customer rating reviews (not driverStats). Component `<DriverPreviewCard />` displays formatted stats ("5.0k+ Rides | ★5.0 Rating | 4.8 Years"), license plate badge with yellow styling, and vehicle icon (ready for 3D render assets). Fully integrated across customer pages: ride-details, ride-assigned, order-confirmation, and public driver profile view (/customer/driver/:driver_profile_id). Test driver "Michael James Rodriguez" (ID: 4f90b2e4-e726-46f9-9a8c-67884d4a48cc) with 7 completed rides, 4.71★ rating. Pronouns field reserved for future schema update.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
+### Admin KYC Approvals Response Contract
+The Admin KYC Approvals page (`/admin/kyc`) uses proper JSON response handling:
+
+**Backend Endpoints (server/routes/admin.ts):**
+- `POST /api/admin/kyc/approve` - Returns: `{ success: true, message: "KYC approved successfully", profileId: "<id>" }` or error: `{ error: "Human readable error..." }`
+- `POST /api/admin/kyc/reject` - Returns: `{ success: true, message: "KYC rejected successfully", profileId: "<id>" }` or error: `{ error: "Human readable error..." }`
+- `GET /api/admin/kyc/pending?role=<role>` - Returns array of pending KYC requests
+
+**Frontend Pattern (client/src/pages/admin/kyc.tsx):**
+- Uses `apiRequest()` which returns already-parsed JSON (not a Response object)
+- Mutations directly return the result without calling `.json()` again
+- Error handling uses optional chaining: `error.message || "Fallback message"`
+- Cache invalidation includes the role query param for proper refresh
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
 

@@ -21,20 +21,24 @@ export default function AdminKYC() {
 
   const approveMutation = useMutation({
     mutationFn: async (data: { role: string; profileId: string }) => {
-      const res = await apiRequest("POST", "/api/admin/kyc/approve", data);
-      return res.json();
+      const result = await apiRequest("/api/admin/kyc/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/kyc/pending"] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/kyc/pending?role=${selectedRole}`] });
       toast({
         title: "User approved",
-        description: "The user has been verified and can now use the platform",
+        description: data?.message || "The user has been verified and can now use the platform",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Approval failed",
-        description: error.message,
+        description: error.message || "Failed to approve KYC",
         variant: "destructive",
       });
     },
@@ -42,20 +46,24 @@ export default function AdminKYC() {
 
   const rejectMutation = useMutation({
     mutationFn: async (data: { role: string; profileId: string; reason: string }) => {
-      const res = await apiRequest("POST", "/api/admin/kyc/reject", data);
-      return res.json();
+      const result = await apiRequest("/api/admin/kyc/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return result;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/kyc/pending"] });
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/kyc/pending?role=${selectedRole}`] });
       toast({
         title: "User rejected",
-        description: "The user has been notified of the rejection",
+        description: data?.message || "The user has been notified of the rejection",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Rejection failed",
-        description: error.message,
+        description: error.message || "Failed to reject KYC",
         variant: "destructive",
       });
     },
