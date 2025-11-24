@@ -40,7 +40,7 @@ function checkSupportAccess(profile: any, requireOwner: boolean = false): boolea
  * ===========================
  */
 
-import { restaurantSupportService } from "../services/RestaurantSupportService";
+import { restaurantSupportService } from "../services/GenericSupportService";
 
 /**
  * GET /api/restaurant/support-center/tickets
@@ -191,7 +191,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
     }
 
     const ticket = await restaurantSupportService.createTicket({
-      restaurantId: restaurantProfile.id,
+      profileId: restaurantProfile.id,
       subject,
       category,
       priority: priority || "normal",
@@ -282,7 +282,7 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
 
     const message = await restaurantSupportService.addMessage({
       ticketId,
-      restaurantId: restaurantProfile.id,
+      profileId: restaurantProfile.id,
       senderRole: "restaurant",
       senderName: restaurantProfile.restaurantName,
       messageBody: messageBody.trim(),
@@ -324,7 +324,7 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
 /**
  * Live Chat Routes
  */
-import { liveChatService } from "../services/LiveChatService";
+import { restaurantLiveChatService } from "../services/GenericLiveChatService";
 
 /**
  * POST /api/restaurant/support-center/live-chat/start
@@ -371,12 +371,12 @@ router.post("/support-center/live-chat/start", async (req: AuthRequest, res: Res
     }
 
     // Check if there's already an active session
-    const existingSession = await liveChatService.getActiveSession(restaurantProfile.id);
+    const existingSession = await restaurantLiveChatService.getActiveSession(restaurantProfile.id);
     if (existingSession) {
       return res.json({ session: existingSession });
     }
 
-    const session = await liveChatService.createSession(restaurantProfile.id);
+    const session = await restaurantLiveChatService.createSession(restaurantProfile.id);
 
     await prisma.auditLog.create({
       data: {
@@ -437,7 +437,7 @@ router.get("/support-center/live-chat/:sessionId", async (req: AuthRequest, res:
       return res.status(403).json({ error: "You do not have permission to access live chat" });
     }
 
-    const session = await liveChatService.getSessionById(sessionId, restaurantProfile.id);
+    const session = await restaurantLiveChatService.getSessionById(sessionId, restaurantProfile.id);
 
     return res.json({ session });
   } catch (error: any) {
@@ -502,9 +502,9 @@ router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthReq
       return res.status(403).json({ error: "You do not have permission to send messages" });
     }
 
-    const message = await liveChatService.sendMessage({
+    const message = await restaurantLiveChatService.sendMessage({
       sessionId,
-      restaurantId: restaurantProfile.id,
+      profileId: restaurantProfile.id,
       senderRole: "restaurant",
       senderName: restaurantProfile.restaurantName,
       messageBody: messageBody.trim(),
@@ -577,7 +577,7 @@ router.post("/support-center/live-chat/:sessionId/end", async (req: AuthRequest,
       return res.status(403).json({ error: "You do not have permission to end chat sessions" });
     }
 
-    const session = await liveChatService.endSession(sessionId, restaurantProfile.id);
+    const session = await restaurantLiveChatService.endSession(sessionId, restaurantProfile.id);
 
     return res.json({ session });
   } catch (error: any) {
@@ -595,7 +595,7 @@ router.post("/support-center/live-chat/:sessionId/end", async (req: AuthRequest,
 /**
  * Support Callback Routes
  */
-import { supportCallbackService } from "../services/SupportCallbackService";
+import { restaurantCallbackService } from "../services/GenericSupportCallbackService";
 
 /**
  * POST /api/restaurant/support-center/callbacks
@@ -646,10 +646,11 @@ router.post("/support-center/callbacks", async (req: AuthRequest, res: Response)
       return res.status(403).json({ error: "You do not have permission to request callbacks" });
     }
 
-    const callback = await supportCallbackService.createCallback({
-      restaurantId: restaurantProfile.id,
+    const callback = await restaurantCallbackService.createCallback({
+      profileId: restaurantProfile.id,
       phoneNumber,
       preferredTime,
+      timezone: timezone || "UTC",
       reason
     });
 

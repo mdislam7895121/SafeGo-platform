@@ -2,9 +2,9 @@ import { Router, type Response } from "express";
 import { prisma } from "../db";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
 import { getAdminSupportContext } from "../utils/support-helpers";
-import { restaurantSupportService } from "../services/RestaurantSupportService";
-import { liveChatService } from "../services/LiveChatService";
-import { supportCallbackService } from "../services/SupportCallbackService";
+import { adminSupportService } from "../services/GenericSupportService";
+import { adminLiveChatService } from "../services/GenericLiveChatService";
+import { adminCallbackService } from "../services/GenericSupportCallbackService";
 import { supportArticleService } from "../services/SupportArticleService";
 
 const router = Router();
@@ -22,7 +22,7 @@ router.get("/support-center/tickets", async (req: AuthRequest, res: Response) =>
     const userId = req.user!.userId;
     const context = await getAdminSupportContext(userId);
     
-    const tickets = await restaurantSupportService.listTickets(context.profileId);
+    const tickets = await adminSupportService.listTickets(context.profileId);
     return res.json({ tickets });
   } catch (error: any) {
     console.error("Error listing admin support tickets:", error);
@@ -43,7 +43,7 @@ router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response
     const ticketId = req.params.id;
     const context = await getAdminSupportContext(userId);
 
-    const ticket = await restaurantSupportService.getTicketById(ticketId, context.profileId);
+    const ticket = await adminSupportService.getTicketById(ticketId, context.profileId);
     return res.json({ ticket });
   } catch (error: any) {
     console.error("Error getting admin support ticket:", error);
@@ -82,8 +82,8 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
       return res.status(404).json({ error: "User not found" });
     }
 
-    const ticket = await restaurantSupportService.createTicket({
-      restaurantId: context.profileId,
+    const ticket = await adminSupportService.createTicket({
+      profileId: context.profileId,
       subject,
       category,
       priority: priority || "normal",
@@ -139,9 +139,9 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
 
     const context = await getAdminSupportContext(userId);
 
-    const message = await restaurantSupportService.addMessage({
+    const message = await adminSupportService.addMessage({
       ticketId,
-      restaurantId: context.profileId,
+      profileId: context.profileId,
       senderRole: context.senderRole,
       senderName: context.displayName,
       messageBody,
@@ -168,8 +168,8 @@ router.post("/support-center/live-chat/start", async (req: AuthRequest, res: Res
     const { initialMessage } = req.body;
     const context = await getAdminSupportContext(userId);
 
-    const session = await liveChatService.startSession({
-      restaurantId: context.profileId,
+    const session = await adminLiveChatService.startSession({
+      profileId: context.profileId,
       customerName: context.displayName,
       initialMessage
     });
@@ -194,7 +194,7 @@ router.get("/support-center/live-chat/:sessionId", async (req: AuthRequest, res:
     const sessionId = req.params.sessionId;
     const context = await getAdminSupportContext(userId);
 
-    const session = await liveChatService.getSession(sessionId, context.profileId);
+    const session = await adminLiveChatService.getSession(sessionId, context.profileId);
     return res.json({ session });
   } catch (error: any) {
     console.error("Error getting admin live chat session:", error);
@@ -224,9 +224,9 @@ router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthReq
 
     const context = await getAdminSupportContext(userId);
 
-    const message = await liveChatService.sendMessage({
+    const message = await adminLiveChatService.sendMessage({
       sessionId,
-      restaurantId: context.profileId,
+      profileId: context.profileId,
       senderRole: "restaurant",
       senderName: context.displayName,
       messageBody
@@ -252,7 +252,7 @@ router.post("/support-center/live-chat/:sessionId/end", async (req: AuthRequest,
     const sessionId = req.params.sessionId;
     const context = await getAdminSupportContext(userId);
 
-    const session = await liveChatService.endSession(sessionId, context.profileId);
+    const session = await adminLiveChatService.endSession(sessionId, context.profileId);
     return res.json({ session });
   } catch (error: any) {
     console.error("Error ending admin live chat session:", error);
@@ -278,8 +278,8 @@ router.post("/support-center/callbacks", async (req: AuthRequest, res: Response)
 
     const context = await getAdminSupportContext(userId);
 
-    const callback = await supportCallbackService.requestCallback({
-      restaurantId: context.profileId,
+    const callback = await adminCallbackService.requestCallback({
+      profileId: context.profileId,
       phoneNumber,
       preferredTime,
       timezone,
