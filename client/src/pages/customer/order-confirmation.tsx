@@ -36,7 +36,7 @@ export default function OrderConfirmation() {
   });
 
   const order = orderData?.order;
-  const driverProfileId = order?.delivery?.driverId;
+  const driverProfileId = order?.driver?.id;
 
   // Fetch driver public profile when driver is assigned
   const { data: driverProfile, isLoading: isLoadingDriver } = useQuery<DriverPublicProfile>({

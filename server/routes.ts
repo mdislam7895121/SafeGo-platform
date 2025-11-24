@@ -68,6 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         where: { id: driver_profile_id },
         select: {
           id: true,
+          userId: true,
           firstName: true,
           middleName: true,
           lastName: true,
@@ -81,10 +82,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      // Use driver's userId (not driver_profile_id) to query rides
+      // because rides table stores driverId as the driver's user ID
+      const driverUserId = driverProfile.userId;
+
       // Calculate total rides from completed rides table
       const totalRides = await db.ride.count({
         where: {
-          driverId: driver_profile_id,
+          driverId: driverUserId,
           status: "COMPLETED",
         },
       });
@@ -92,7 +97,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate rating from ride reviews
       const rideReviews = await db.ride.findMany({
         where: {
-          driverId: driver_profile_id,
+          driverId: driverUserId,
           status: "COMPLETED",
           customerRating: { not: null },
         },
@@ -110,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch primary vehicle (safe fields only)
       const primaryVehicle = await db.vehicle.findFirst({
         where: {
-          driverId: driver_profile_id,
+          driverId: driverUserId,
           isPrimary: true,
           isActive: true,
         },

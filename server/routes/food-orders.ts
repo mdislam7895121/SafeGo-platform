@@ -231,6 +231,7 @@ router.get("/:id", async (req: AuthRequest, res) => {
           address: foodOrder.restaurant.address,
         },
         driver: foodOrder.driver ? {
+          id: foodOrder.driver.id, // driver_profile_id for public profile lookup
           email: foodOrder.driver.user.email,
           vehicle: foodOrder.driver.vehicle,
         } : null,

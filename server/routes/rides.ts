@@ -205,6 +205,7 @@ router.get("/:id", async (req: AuthRequest, res) => {
           email: ride.customer.user.email,
         },
         driver: ride.driver ? {
+          id: ride.driver.id, // driver_profile_id for public profile lookup
           email: ride.driver.user.email,
           vehicle: ride.driver.vehicle,
         } : null,
