@@ -1,4 +1,4 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
@@ -34,14 +34,32 @@ import {
 } from "@/components/ui/popover";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
-import { MENU_CATEGORIES, getMainCategories, getSubCategories } from "@/config/menuCategoryConfig";
+
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  isActive: boolean;
+  displayOrder: number;
+};
+
+type SubCategory = {
+  id: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  displayOrder: number;
+};
 
 const itemSchema = z.object({
-  primaryCategory: z.string().min(1, "Main category is required"),
-  subCategories: z.array(z.string()).optional(),
+  mainCategoryId: z.string().uuid("Main category is required"),
+  subCategoryIds: z.array(z.string().uuid()).optional(),
   name: z.string().min(1, "Name is required").max(200),
   shortDescription: z.string().max(500).optional(),
   longDescription: z.string().optional(),
@@ -63,8 +81,8 @@ export default function AddMenuItem() {
   const [, setLocation] = useLocation();
   
   const [formData, setFormData] = useState<ItemFormData>({
-    primaryCategory: "",
-    subCategories: [],
+    mainCategoryId: "",
+    subCategoryIds: [],
     name: "",
     shortDescription: "",
     longDescription: "",
@@ -85,31 +103,30 @@ export default function AddMenuItem() {
   // Category selection UI state
   const [mainCategoryOpen, setMainCategoryOpen] = useState(false);
   const [mainCategorySearch, setMainCategorySearch] = useState("");
-  const [customMainCategory, setCustomMainCategory] = useState("");
   
   const [subCategoryOpen, setSubCategoryOpen] = useState(false);
   const [subCategorySearch, setSubCategorySearch] = useState("");
-  const [customSubCategory, setCustomSubCategory] = useState("");
   
-  // Available subcategories based on selected main category
-  const [availableSubCategories, setAvailableSubCategories] = useState<string[]>([]);
+  // Fetch main categories
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ["/api/restaurant/categories"],
+  });
   
-  // Update available subcategories when main category changes
+  // Fetch subcategories for selected main category
+  const { data: subCategories = [], isLoading: subCategoriesLoading } = useQuery<SubCategory[]>({
+    queryKey: ["/api/restaurant/subcategories", formData.mainCategoryId],
+    enabled: !!formData.mainCategoryId,
+  });
+  
+  // Reset subcategories when main category changes
   useEffect(() => {
-    if (formData.primaryCategory) {
-      const subs = getSubCategories(formData.primaryCategory);
-      setAvailableSubCategories(subs);
-      // Reset subcategories when main category changes
-      setFormData(prev => ({ ...prev, subCategories: [] }));
-    } else {
-      setAvailableSubCategories([]);
-    }
-  }, [formData.primaryCategory]);
+    setFormData(prev => ({ ...prev, subCategoryIds: [] }));
+  }, [formData.mainCategoryId]);
   
   // Show warning if no subcategory selected
   useEffect(() => {
-    setShowWarning(formData.primaryCategory !== "" && (!formData.subCategories || formData.subCategories.length === 0));
-  }, [formData.primaryCategory, formData.subCategories]);
+    setShowWarning(formData.mainCategoryId !== "" && (!formData.subCategoryIds || formData.subCategoryIds.length === 0));
+  }, [formData.mainCategoryId, formData.subCategoryIds]);
 
   const createItemMutation = useMutation({
     mutationFn: async (data: ItemFormData) => {
@@ -158,58 +175,46 @@ export default function AddMenuItem() {
   };
   
   // Filter main categories based on search
-  const filteredMainCategories = getMainCategories().filter(cat => 
-    cat.toLowerCase().includes(mainCategorySearch.toLowerCase())
+  const filteredMainCategories = categories.filter(cat => 
+    cat.name.toLowerCase().includes(mainCategorySearch.toLowerCase())
   );
   
   // Filter subcategories based on search
-  const filteredSubCategories = availableSubCategories.filter(sub =>
-    sub.toLowerCase().includes(subCategorySearch.toLowerCase())
+  const filteredSubCategories = subCategories.filter(sub =>
+    sub.name.toLowerCase().includes(subCategorySearch.toLowerCase())
   );
   
-  // Handle adding custom main category
-  const handleAddCustomMainCategory = () => {
-    if (customMainCategory.trim()) {
-      setFormData({ ...formData, primaryCategory: customMainCategory.trim() });
-      setCustomMainCategory("");
-      setMainCategoryOpen(false);
-    }
-  };
+  // Get selected main category name for display
+  const selectedCategoryName = categories.find(c => c.id === formData.mainCategoryId)?.name || "";
   
-  // Handle adding custom subcategory
-  const handleAddCustomSubCategory = () => {
-    if (customSubCategory.trim() && formData.subCategories) {
-      setFormData({ 
-        ...formData, 
-        subCategories: [...formData.subCategories, customSubCategory.trim()] 
-      });
-      setCustomSubCategory("");
-    }
-  };
+  // Get selected subcategory names for display
+  const selectedSubCategoryNames = subCategories
+    .filter(sub => formData.subCategoryIds?.includes(sub.id))
+    .map(sub => ({ id: sub.id, name: sub.name }));
   
   // Toggle subcategory selection
-  const toggleSubCategory = (subCat: string) => {
-    if (!formData.subCategories) {
-      setFormData({ ...formData, subCategories: [subCat] });
-    } else if (formData.subCategories.includes(subCat)) {
+  const toggleSubCategory = (subCatId: string) => {
+    if (!formData.subCategoryIds) {
+      setFormData({ ...formData, subCategoryIds: [subCatId] });
+    } else if (formData.subCategoryIds.includes(subCatId)) {
       setFormData({ 
         ...formData, 
-        subCategories: formData.subCategories.filter(s => s !== subCat) 
+        subCategoryIds: formData.subCategoryIds.filter(id => id !== subCatId) 
       });
     } else {
       setFormData({ 
         ...formData, 
-        subCategories: [...formData.subCategories, subCat] 
+        subCategoryIds: [...formData.subCategoryIds, subCatId] 
       });
     }
   };
   
   // Remove subcategory chip
-  const removeSubCategory = (subCat: string) => {
-    if (formData.subCategories) {
+  const removeSubCategory = (subCatId: string) => {
+    if (formData.subCategoryIds) {
       setFormData({ 
         ...formData, 
-        subCategories: formData.subCategories.filter(s => s !== subCat) 
+        subCategoryIds: formData.subCategoryIds.filter(id => id !== subCatId) 
       });
     }
   };
@@ -259,149 +264,46 @@ export default function AddMenuItem() {
                 <label className="text-sm font-medium">
                   Main Category <span className="text-destructive">*</span>
                 </label>
-                <Popover open={mainCategoryOpen} onOpenChange={setMainCategoryOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={mainCategoryOpen}
-                      className="w-full justify-between"
-                      data-testid="button-main-category"
-                    >
-                      {formData.primaryCategory || "Select main category..."}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0" align="start">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search categories..." 
-                        value={mainCategorySearch}
-                        onValueChange={setMainCategorySearch}
-                        data-testid="input-search-main-category"
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          <div className="p-2 space-y-2">
-                            <p className="text-sm text-muted-foreground">No matching categories</p>
-                            <div className="flex gap-2">
-                              <Input
-                                placeholder="Enter custom category"
-                                value={customMainCategory}
-                                onChange={(e) => setCustomMainCategory(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleAddCustomMainCategory();
-                                  }
-                                }}
-                                data-testid="input-custom-main-category"
-                              />
-                              <Button 
-                                size="sm" 
-                                onClick={handleAddCustomMainCategory}
-                                data-testid="button-add-custom-main-category"
-                              >
-                                Add
-                              </Button>
-                            </div>
-                          </div>
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {filteredMainCategories.map((cat) => (
-                            <CommandItem
-                              key={cat}
-                              value={cat}
-                              onSelect={() => {
-                                setFormData({ ...formData, primaryCategory: cat });
-                                setMainCategoryOpen(false);
-                                setMainCategorySearch("");
-                              }}
-                              data-testid={`option-main-category-${cat}`}
-                            >
-                              {cat}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {formErrors.primaryCategory && (
-                  <p className="text-sm text-destructive">{formErrors.primaryCategory}</p>
-                )}
-              </div>
-
-              {/* Subcategory Selection */}
-              {formData.primaryCategory && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">
-                    Subcategories {!showWarning && "(Recommended)"}
-                  </label>
-                  
-                  <Popover open={subCategoryOpen} onOpenChange={setSubCategoryOpen}>
+                {categoriesLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : (
+                  <Popover open={mainCategoryOpen} onOpenChange={setMainCategoryOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         role="combobox"
-                        aria-expanded={subCategoryOpen}
+                        aria-expanded={mainCategoryOpen}
                         className="w-full justify-between"
-                        data-testid="button-subcategories"
+                        data-testid="button-main-category"
                       >
-                        {formData.subCategories && formData.subCategories.length > 0
-                          ? `${formData.subCategories.length} selected`
-                          : "Select subcategories..."}
+                        {selectedCategoryName || "Select main category..."}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-full p-0" align="start">
                       <Command>
                         <CommandInput 
-                          placeholder="Search subcategories..." 
-                          value={subCategorySearch}
-                          onValueChange={setSubCategorySearch}
-                          data-testid="input-search-subcategory"
+                          placeholder="Search categories..." 
+                          value={mainCategorySearch}
+                          onValueChange={setMainCategorySearch}
+                          data-testid="input-search-main-category"
                         />
                         <CommandList>
                           <CommandEmpty>
-                            <div className="p-2 space-y-2">
-                              <p className="text-sm text-muted-foreground">No matching subcategories</p>
-                              <div className="flex gap-2">
-                                <Input
-                                  placeholder="Enter custom subcategory"
-                                  value={customSubCategory}
-                                  onChange={(e) => setCustomSubCategory(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      handleAddCustomSubCategory();
-                                    }
-                                  }}
-                                  data-testid="input-custom-subcategory"
-                                />
-                                <Button 
-                                  size="sm" 
-                                  onClick={handleAddCustomSubCategory}
-                                  data-testid="button-add-custom-subcategory"
-                                >
-                                  Add
-                                </Button>
-                              </div>
-                            </div>
+                            <p className="p-2 text-sm text-muted-foreground">No matching categories</p>
                           </CommandEmpty>
                           <CommandGroup>
-                            {filteredSubCategories.map((sub) => (
+                            {filteredMainCategories.map((cat) => (
                               <CommandItem
-                                key={sub}
-                                value={sub}
-                                onSelect={() => toggleSubCategory(sub)}
-                                data-testid={`option-subcategory-${sub}`}
+                                key={cat.id}
+                                value={cat.name}
+                                onSelect={() => {
+                                  setFormData({ ...formData, mainCategoryId: cat.id });
+                                  setMainCategoryOpen(false);
+                                  setMainCategorySearch("");
+                                }}
+                                data-testid={`option-main-category-${cat.slug}`}
                               >
-                                <div className="flex items-center gap-2 w-full">
-                                  <Checkbox
-                                    checked={formData.subCategories?.includes(sub) || false}
-                                    onCheckedChange={() => toggleSubCategory(sub)}
-                                  />
-                                  <span>{sub}</span>
-                                </div>
+                                {cat.name}
                               </CommandItem>
                             ))}
                           </CommandGroup>
@@ -409,22 +311,87 @@ export default function AddMenuItem() {
                       </Command>
                     </PopoverContent>
                   </Popover>
+                )}
+                {formErrors.mainCategoryId && (
+                  <p className="text-sm text-destructive">{formErrors.mainCategoryId}</p>
+                )}
+              </div>
+
+              {/* Subcategory Selection */}
+              {formData.mainCategoryId && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">
+                    Subcategories {!showWarning && "(Recommended)"}
+                  </label>
+                  
+                  {subCategoriesLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                  ) : (
+                    <Popover open={subCategoryOpen} onOpenChange={setSubCategoryOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={subCategoryOpen}
+                          className="w-full justify-between"
+                          data-testid="button-subcategories"
+                        >
+                          {formData.subCategoryIds && formData.subCategoryIds.length > 0
+                            ? `${formData.subCategoryIds.length} selected`
+                            : "Select subcategories..."}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search subcategories..." 
+                            value={subCategorySearch}
+                            onValueChange={setSubCategorySearch}
+                            data-testid="input-search-subcategory"
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              <p className="p-2 text-sm text-muted-foreground">No matching subcategories</p>
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {filteredSubCategories.map((sub) => (
+                                <CommandItem
+                                  key={sub.id}
+                                  value={sub.name}
+                                  onSelect={() => toggleSubCategory(sub.id)}
+                                  data-testid={`option-subcategory-${sub.slug}`}
+                                >
+                                  <div className="flex items-center gap-2 w-full">
+                                    <Checkbox
+                                      checked={formData.subCategoryIds?.includes(sub.id) || false}
+                                      onCheckedChange={() => toggleSubCategory(sub.id)}
+                                    />
+                                    <span>{sub.name}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                   
                   {/* Selected subcategories as chips */}
-                  {formData.subCategories && formData.subCategories.length > 0 && (
+                  {selectedSubCategoryNames.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
-                      {formData.subCategories.map((sub) => (
+                      {selectedSubCategoryNames.map((sub) => (
                         <Badge 
-                          key={sub} 
+                          key={sub.id} 
                           variant="secondary"
                           className="gap-1"
-                          data-testid={`badge-subcategory-${sub}`}
+                          data-testid={`badge-subcategory-${sub.name}`}
                         >
-                          {sub}
+                          {sub.name}
                           <X 
                             className="h-3 w-3 cursor-pointer" 
-                            onClick={() => removeSubCategory(sub)}
-                            data-testid={`button-remove-subcategory-${sub}`}
+                            onClick={() => removeSubCategory(sub.id)}
+                            data-testid={`button-remove-subcategory-${sub.name}`}
                           />
                         </Badge>
                       ))}

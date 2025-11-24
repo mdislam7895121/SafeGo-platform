@@ -31,13 +31,32 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
+type Category = {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  isActive: boolean;
+  displayOrder: number;
+};
+
+type SubCategory = {
+  id: string;
+  categoryId: string;
+  name: string;
+  slug: string;
+  isActive: boolean;
+  displayOrder: number;
+};
+
 export default function RestaurantMenu() {
   const { toast } = useToast();
   
   // State
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedMainCategory, setSelectedMainCategory] = useState("all");
+  const [selectedSubCategory, setSelectedSubCategory] = useState("all");
   const [availabilityFilter, setAvailabilityFilter] = useState("all");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,9 +71,20 @@ export default function RestaurantMenu() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch menu categories
-  const { data: categoriesData } = useQuery<{ categories: any[] }>({
-    queryKey: ["/api/restaurant/menu/categories"],
+  // Reset subcategory filter when main category changes
+  useEffect(() => {
+    setSelectedSubCategory("all");
+  }, [selectedMainCategory]);
+
+  // Fetch main categories
+  const { data: categories = [] } = useQuery<Category[]>({
+    queryKey: ["/api/restaurant/categories"],
+  });
+
+  // Fetch subcategories for selected main category
+  const { data: subCategories = [] } = useQuery<SubCategory[]>({
+    queryKey: ["/api/restaurant/subcategories", selectedMainCategory],
+    enabled: selectedMainCategory !== "all",
   });
 
   // Fetch menu items
@@ -62,7 +92,6 @@ export default function RestaurantMenu() {
     queryKey: ["/api/restaurant/menu/items"],
   });
 
-  const categories = categoriesData?.categories || [];
   const allItems = itemsData?.items || [];
 
   // Filtered and paginated items
@@ -76,9 +105,16 @@ export default function RestaurantMenu() {
       );
     }
 
-    // Category filter
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter((item: any) => item.categoryId === selectedCategory);
+    // Main Category filter
+    if (selectedMainCategory !== "all") {
+      filtered = filtered.filter((item: any) => item.mainCategoryId === selectedMainCategory);
+    }
+
+    // Subcategory filter
+    if (selectedSubCategory !== "all") {
+      filtered = filtered.filter((item: any) =>
+        item.subCategoryLinks?.some((link: any) => link.subCategoryId === selectedSubCategory)
+      );
     }
 
     // Availability filter
@@ -87,7 +123,7 @@ export default function RestaurantMenu() {
     }
 
     return filtered;
-  }, [allItems, debouncedSearchQuery, selectedCategory, availabilityFilter]);
+  }, [allItems, debouncedSearchQuery, selectedMainCategory, selectedSubCategory, availabilityFilter]);
 
   // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
@@ -209,7 +245,7 @@ export default function RestaurantMenu() {
         {/* Search and Filters - Stable 24px spacing from header */}
         <Card className="mt-6">
           <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               {/* Search */}
               <div className="md:col-span-2 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -226,19 +262,41 @@ export default function RestaurantMenu() {
                 />
               </div>
 
-              {/* Category Filter */}
-              <Select value={selectedCategory} onValueChange={(value) => {
-                setSelectedCategory(value);
+              {/* Main Category Filter */}
+              <Select value={selectedMainCategory} onValueChange={(value) => {
+                setSelectedMainCategory(value);
                 setCurrentPage(1);
               }}>
-                <SelectTrigger data-testid="select-category">
+                <SelectTrigger data-testid="select-main-category">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((cat: any) => (
+                  {categories.map((cat) => (
                     <SelectItem key={cat.id} value={cat.id}>
                       {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Subcategory Filter */}
+              <Select 
+                value={selectedSubCategory} 
+                onValueChange={(value) => {
+                  setSelectedSubCategory(value);
+                  setCurrentPage(1);
+                }}
+                disabled={selectedMainCategory === "all"}
+              >
+                <SelectTrigger data-testid="select-subcategory">
+                  <SelectValue placeholder="All Subcategories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subcategories</SelectItem>
+                  {subCategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.id}>
+                      {sub.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

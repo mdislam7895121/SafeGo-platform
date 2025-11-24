@@ -1632,6 +1632,16 @@ router.get("/menu/items", async (req: AuthRequest, res) => {
           category: {
             select: { id: true, name: true },
           },
+          mainCategory: {
+            select: { id: true, name: true, slug: true },
+          },
+          subCategoryLinks: {
+            include: {
+              subCategory: {
+                select: { id: true, name: true, slug: true },
+              },
+            },
+          },
           optionGroups: {
             include: {
               options: true,
@@ -1680,6 +1690,12 @@ router.get("/menu/items/:id", async (req: AuthRequest, res) => {
       },
       include: {
         category: true,
+        mainCategory: true,
+        subCategoryLinks: {
+          include: {
+            subCategory: true,
+          },
+        },
         optionGroups: {
           include: {
             options: true,
@@ -1823,7 +1839,7 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
       include: {
         category: true, // LEGACY
         mainCategory: true, // NEW
-        menuItemCategories: { // NEW
+        subCategoryLinks: { // NEW
           include: {
             subCategory: true,
           },
@@ -1991,7 +2007,7 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
       include: {
         category: true, // LEGACY
         mainCategory: true, // NEW
-        menuItemCategories: { // NEW
+        subCategoryLinks: { // NEW
           include: {
             subCategory: true,
           },
