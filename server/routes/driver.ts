@@ -1307,24 +1307,43 @@ router.post("/upload/profile-photo", uploadProfilePhoto, async (req: AuthRequest
     const userId = req.user!.userId;
     
     if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
+      return res.status(400).json({ 
+        success: false,
+        error: "No file uploaded" 
+      });
+    }
+
+    // Verify driver profile exists
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ 
+        success: false,
+        error: "Driver profile not found" 
+      });
     }
 
     const fileUrl = getFileUrl(req.file.filename);
 
     // Update driver profile with photo URL
-    const updatedProfile = await prisma.driverProfile.update({
+    await prisma.driverProfile.update({
       where: { userId },
       data: { profilePhotoUrl: fileUrl },
     });
 
     res.json({
+      success: true,
       message: "Profile photo uploaded successfully",
       profilePhotoUrl: fileUrl,
     });
   } catch (error) {
     console.error("Profile photo upload error:", error);
-    res.status(500).json({ error: "Failed to upload profile photo" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to upload profile photo" 
+    });
   }
 });
 
