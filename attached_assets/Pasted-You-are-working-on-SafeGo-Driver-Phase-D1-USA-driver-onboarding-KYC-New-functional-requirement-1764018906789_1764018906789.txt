@@ -1,0 +1,116 @@
+You are working on SafeGo Driver Phase D1 (USA driver onboarding & KYC).
+
+New functional requirements from the product owner:
+
+1) Vehicle documents section changes (on driver KYC page)
+   - Location: the “Vehicle documents” / “Vehicle inspection / plate / registration” area on the `/driver/kyc-documents` page (or equivalent).
+   - We no longer want image uploads for license plate.
+   - Instead, we want explicit text fields for basic vehicle details.
+
+Requirements:
+
+A. Replace license plate image upload with structured fields
+   - On the driver KYC documents page, within the vehicle-related block:
+     1) Add a text input field: **Vehicle Color**
+        - Example: "Black", "White", "Silver".
+        - Required for USA drivers.
+     2) Add a text input field: **Vehicle Model**
+        - Example: "Honda Accord 2018".
+        - If the driver already has a registered vehicle in the D1 vehicle system, prefill from that model information if possible; otherwise leave blank and editable.
+        - Also required for USA drivers.
+     3) Add a text input field: **License Plate Number**
+        - Example: "NYC1230".
+        - Required for USA drivers.
+   - Remove the license plate **photo** upload from the UI:
+     - The “License plate document” upload slot should not be shown to the driver anymore.
+     - Drivers will only provide the plate number as text.
+
+B. Remove Social Security card image upload
+   - If there is currently an upload field that lets USA drivers upload a photo of their Social Security Card (or "SSN card" / "social card"):
+     - Hide/remove that upload element from the KYC UI.
+   - The system should rely on the SSN number field only (masked, with proper KYC validation), but no image upload of the SSN card itself.
+   - Do **not** delete any existing database rows; just stop showing and using that upload type in the UI and KYC flow.
+   - If a specific document type enum is used (e.g. `SOCIAL_SECURITY_CARD`), you may mark it as deprecated in code comments and exclude it from forms.
+
+C. Persistence model updates
+   - Inspect existing schema for how vehicle and KYC data are stored:
+     - Check models like `Vehicle`, `DriverProfile`, `DriverKyc`, `KycDocument`, or similar.
+   - Implement persistence for the new fields with minimal, non-breaking changes:
+     - Preferred option:
+       * Add fields to the `Vehicle` model (or whichever model already stores vehicle metadata):
+         - `color` (string, nullable -> required at validation level for USA)
+         - `modelDescription` or reuse existing `model` field (do not break existing data)
+         - `licensePlateNumber` (string, nullable -> required at validation level for USA)
+       * When the KYC vehicle details form is submitted, update the **primary vehicle** for the driver:
+         - Ensure ownership is enforced (driver can only update their own vehicle).
+     - If there is already a dedicated KYC/identity model that has fields for color, model, or plate number, then reuse those fields instead of adding duplicates.
+   - Absolutely avoid destructive migrations:
+     - Do not drop existing columns.
+     - If you add new columns, use safe Prisma migrations with default values that do not break older records.
+
+D. API and validation changes
+   - Identify the API endpoints that handle driver KYC update / vehicle documents, for example:
+     - `POST /api/driver/kyc-documents`
+     - `PATCH /api/driver/kyc-documents`
+     - or any dedicated route that saves vehicle-related KYC information.
+   - Extend these endpoints so they accept:
+     - `vehicleColor`
+     - `vehicleModel` or `vehicleModelDescription`
+     - `licensePlateNumber`
+   - Add server-side validation rules:
+     - For USA drivers:
+       * All three fields (color, model, plate number) must be non-empty.
+     - For non-USA countries, keep current behavior (do not introduce breaking requirements) unless the KYC logic already enforces them.
+   - Remove dependency on a license-plate image upload in these endpoints:
+     - If the current handler expects an uploaded file for the "license plate" document, make that part optional or remove it.
+     - Make sure the endpoint no longer throws “Unexpected field” or similar file-upload errors when no plate image is sent.
+
+E. Frontend UX behavior
+   - On `/driver/kyc-documents`:
+     - Show the three new text fields in a clear "Vehicle details" section.
+     - Use helper text to explain:
+       - Vehicle Color
+       - Vehicle Model
+       - License Plate Number (text only, no photo needed)
+     - Remove any UI hints that ask the user to upload a license-plate photo or Social Security card image.
+   - Preserve the other existing KYC document uploads:
+     - Vehicle insurance document
+     - Vehicle inspection document
+     - Driver license document
+     - TLC license (for NYC TLC drivers)
+   - Ensure all success and error toasts are updated to reflect that these are text fields, not image uploads.
+
+F. Security and privacy requirements
+   - Continue enforcing:
+     - Authenticated driver session for all KYC changes.
+     - Ownership checks so drivers cannot read or modify someone else’s KYC or vehicle data.
+   - Removing Social Security card image upload reduces sensitive PII exposure:
+     - Make sure no new logs or debugging statements print full SSN or full plate number.
+     - If logging is necessary, only log masked values.
+
+G. Testing
+   - Manually test with a USA driver account (for example, the existing `vitorgarh2` account):
+     1) Visit `/driver/kyc-documents`.
+     2) Fill in:
+        - Vehicle Color
+        - Vehicle Model
+        - License Plate Number
+     3) Save / submit.
+     4) Confirm:
+        - Data is saved in the database (Vehicle or KYC model).
+        - The page reloads and shows the saved values.
+        - No upload slot appears for license plate photo.
+        - No Social Security card image upload is visible.
+     5) Confirm other KYC document uploads (insurance, inspection, driver license, TLC) still work.
+   - Also test that drivers without an existing vehicle can still complete KYC:
+     - The system should either:
+       * Create or update the primary vehicle with these details, or
+       * Store the data in a consistent KYC record that ties back to the driver.
+
+H. Documentation
+   - Update `replit.md` with a new section, e.g. `D1-KYC-VEHICLE-FIELDS`:
+     - Describe:
+       * The new fields added (vehicle color, vehicle model, license plate number).
+       * Where they are stored in the schema.
+       * The removal of license plate photo and Social Security card image upload.
+       * Any known limitations or future TODOs (e.g., plan to link these fields more tightly with the multi-vehicle system later).
