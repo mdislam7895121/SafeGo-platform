@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -15,39 +17,23 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  Eye,
 } from "lucide-react";
-
-interface Article {
-  id: string;
-  title: string;
-  category: string;
-  views: number;
-  isPopular?: boolean;
-}
 
 interface Category {
   id: string;
   name: string;
   icon: typeof Package;
   color: string;
-  articleCount: number;
 }
 
 const categories: Category[] = [
-  { id: "orders", name: "Orders", icon: Package, color: "text-blue-600", articleCount: 12 },
-  { id: "payouts", name: "Payouts", icon: CreditCard, color: "text-green-600", articleCount: 8 },
-  { id: "menu", name: "Menu & Pricing", icon: UtensilsCrossed, color: "text-orange-600", articleCount: 15 },
-  { id: "kyc", name: "Account & KYC", icon: FileText, color: "text-purple-600", articleCount: 6 },
-  { id: "technical", name: "Technical Issues", icon: Settings, color: "text-red-600", articleCount: 10 },
-  { id: "other", name: "Other", icon: HelpCircle, color: "text-gray-600", articleCount: 5 },
-];
-
-const popularArticles: Article[] = [
-  { id: "1", title: "How to update menu item pricing", category: "Menu & Pricing", views: 1245, isPopular: true },
-  { id: "2", title: "Understanding payout schedules", category: "Payouts", views: 987, isPopular: true },
-  { id: "3", title: "Setting up delivery zones", category: "Menu & Pricing", views: 856, isPopular: true },
-  { id: "4", title: "How to handle order cancellations", category: "Orders", views: 743, isPopular: true },
-  { id: "5", title: "Verifying your restaurant KYC documents", category: "Account & KYC", views: 621, isPopular: true },
+  { id: "orders", name: "Orders", icon: Package, color: "text-blue-600" },
+  { id: "payouts", name: "Payouts", icon: CreditCard, color: "text-green-600" },
+  { id: "menu_pricing", name: "Menu & Pricing", icon: UtensilsCrossed, color: "text-orange-600" },
+  { id: "account_kyc", name: "Account & KYC", icon: FileText, color: "text-purple-600" },
+  { id: "technical", name: "Technical Issues", icon: Settings, color: "text-red-600" },
+  { id: "other", name: "Other", icon: HelpCircle, color: "text-gray-600" },
 ];
 
 const quickGuides = [
@@ -60,20 +46,30 @@ export default function SupportHelp() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const filteredArticles = popularArticles.filter(article => {
+  const { data: articlesData, isLoading } = useQuery<{ articles: any[] }>({
+    queryKey: ["/api/restaurant/support-center/articles"],
+  });
+
+  const articles = articlesData?.articles || [];
+
+  const filteredArticles = articles.filter(article => {
     const matchesSearch = searchQuery === "" || 
       article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       article.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = !selectedCategory || article.category === categories.find(c => c.id === selectedCategory)?.name;
+    const matchesCategory = !selectedCategory || article.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const getCategoryName = (categoryId: string) => {
+    return categories.find(c => c.id === categoryId)?.name || categoryId.replace('_', ' ');
+  };
 
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 space-y-8">
         {/* Hero Section */}
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold tracking-tight">Help Center</h1>
+          <h1 className="text-4xl font-bold tracking-tight" data-testid="text-page-title">Help Center</h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
             Find answers to common questions and learn how to make the most of SafeGo Eats
           </p>
@@ -117,41 +113,44 @@ export default function SupportHelp() {
         <div>
           <h2 className="text-2xl font-bold mb-4">Browse by Category</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((category) => (
-              <Card
-                key={category.id}
-                className={`hover-elevate cursor-pointer transition-all ${
-                  selectedCategory === category.id ? 'ring-2 ring-primary' : ''
-                }`}
-                onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
-                data-testid={`card-category-${category.id}`}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-lg bg-muted ${category.color}`}>
-                      <category.icon className="h-6 w-6" />
+            {categories.map((category) => {
+              const categoryArticleCount = articles.filter(a => a.category === category.id).length;
+              return (
+                <Card
+                  key={category.id}
+                  className={`hover-elevate cursor-pointer transition-all ${
+                    selectedCategory === category.id ? 'ring-2 ring-primary' : ''
+                  }`}
+                  onClick={() => setSelectedCategory(selectedCategory === category.id ? null : category.id)}
+                  data-testid={`card-category-${category.id}`}
+                >
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-lg bg-muted ${category.color}`}>
+                        <category.icon className="h-6 w-6" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-lg">{category.name}</h3>
+                        <p className="text-sm text-muted-foreground">{categoryArticleCount} articles</p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{category.name}</h3>
-                      <p className="text-sm text-muted-foreground">{category.articleCount} articles</p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
 
-        {/* Popular Articles */}
+        {/* Articles List */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-bold">
               {selectedCategory 
-                ? `${categories.find(c => c.id === selectedCategory)?.name} Articles`
+                ? `${getCategoryName(selectedCategory)} Articles`
                 : searchQuery 
                 ? 'Search Results'
-                : 'Popular Articles'}
+                : 'All Articles'}
             </h2>
             {selectedCategory && (
               <Button
@@ -165,44 +164,64 @@ export default function SupportHelp() {
             )}
           </div>
 
-          {filteredArticles.length === 0 ? (
+          {isLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="space-y-2">
+                      <div className="h-5 w-3/4 bg-muted animate-pulse rounded" />
+                      <div className="h-4 w-1/2 bg-muted animate-pulse rounded" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : filteredArticles.length === 0 ? (
             <Card>
               <CardContent className="p-12 text-center">
                 <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="text-lg font-semibold mb-2">No articles found</h3>
                 <p className="text-muted-foreground">
-                  Try adjusting your search or browse by category
+                  {searchQuery 
+                    ? "Try adjusting your search or browse by category"
+                    : "No articles available in this category yet"
+                  }
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-2">
               {filteredArticles.map((article) => (
-                <Card
-                  key={article.id}
-                  className="hover-elevate cursor-pointer"
-                  data-testid={`card-article-${article.id}`}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold">{article.title}</h3>
-                          {article.isPopular && (
-                            <Badge variant="secondary" className="text-xs">
-                              Popular
-                            </Badge>
-                          )}
+                <Link key={article.id} href={`/restaurant/support/articles/${article.id}`}>
+                  <Card
+                    className="hover-elevate cursor-pointer"
+                    data-testid={`card-article-${article.id}`}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold">{article.title}</h3>
+                            {article.viewCount > 100 && (
+                              <Badge variant="secondary" className="text-xs">
+                                Popular
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">{getCategoryName(article.category)}</p>
                         </div>
-                        <p className="text-sm text-muted-foreground">{article.category}</p>
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                            <Eye className="h-4 w-4" />
+                            <span>{article.viewCount || 0}</span>
+                          </div>
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-muted-foreground">{article.views.toLocaleString()} views</span>
-                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           )}
@@ -218,12 +237,16 @@ export default function SupportHelp() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Button variant="default" asChild data-testid="button-contact-support">
-                <a href="/restaurant/support/contact">Contact Support</a>
-              </Button>
-              <Button variant="outline" asChild data-testid="button-system-status">
-                <a href="/restaurant/support/status">Check System Status</a>
-              </Button>
+              <Link href="/restaurant/support">
+                <Button variant="default" data-testid="button-contact-support">
+                  Contact Support
+                </Button>
+              </Link>
+              <Link href="/restaurant/support/status">
+                <Button variant="outline" data-testid="button-system-status">
+                  Check System Status
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>

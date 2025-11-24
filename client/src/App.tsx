@@ -105,6 +105,7 @@ import DocumentsHealth from "@/pages/restaurant/documents-health";
 import DocumentsKYC from "@/pages/restaurant/documents-kyc";
 import SupportHub from "@/pages/restaurant/support-hub";
 import SupportHelp from "@/pages/restaurant/support-help";
+import SupportArticle from "@/pages/restaurant/support-article";
 import SupportContact from "@/pages/restaurant/support-contact";
 import SupportStatus from "@/pages/restaurant/support-status";
 import SupportLiveChat from "@/pages/restaurant/support-live-chat";
@@ -851,6 +852,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <SupportPhone />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/support/articles/:id">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SupportArticle />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
