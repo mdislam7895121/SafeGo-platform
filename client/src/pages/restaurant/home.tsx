@@ -270,8 +270,8 @@ export default function RestaurantHome() {
         {/* KYC Verification Banner */}
         <KYCBanner />
 
-        {/* Performance Overview Section - Stable spacing from header */}
-        <section className="mt-5 sm:mt-6 space-y-6">
+        {/* Performance Overview Section - Increased spacing from header for breathing room */}
+        <section className="mt-8 sm:mt-9 space-y-6">
           {/* Performance Overview with Time Period Filter */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold whitespace-nowrap">Performance Overview</h2>
