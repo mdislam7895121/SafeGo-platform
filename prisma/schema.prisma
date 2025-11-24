@@ -503,7 +503,9 @@ model MenuCategory {
 model MenuItem {
   id                     String              @id @default(uuid())
   restaurantId           String
-  categoryId             String
+  categoryId             String?
+  primaryCategory        String?
+  subCategories          String[]            @default([])
   name                   String
   shortDescription       String?
   longDescription        String?
@@ -531,11 +533,12 @@ model MenuItem {
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   restaurant             RestaurantProfile   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  category               MenuCategory        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  category               MenuCategory?       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   optionGroups           MenuOptionGroup[]
 
   @@index([restaurantId])
   @@index([categoryId])
+  @@index([primaryCategory])
   @@index([availabilityStatus])
   @@index([isFeatured])
   @@index([isArchived])
