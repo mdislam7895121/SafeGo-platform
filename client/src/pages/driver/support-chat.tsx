@@ -90,8 +90,12 @@ export default function DriverSupportChat() {
 
   const startChatMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/support/chat/start", {});
-      return res.json();
+      const result = await apiRequest("/api/support/chat/start", {
+        method: "POST",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: (data) => {
       // CRITICAL: Set status FIRST (updates ref synchronously) BEFORE setting conversationId
@@ -135,11 +139,12 @@ export default function DriverSupportChat() {
         throw new Error("Cannot send messages to a closed or escalated conversation");
       }
       if (!conversationId) throw new Error("No conversation");
-      const res = await apiRequest("POST", "/api/support/chat/messages", {
-        conversationId,
-        content,
+      const result = await apiRequest("/api/support/chat/messages", {
+        method: "POST",
+        body: JSON.stringify({ conversationId, content }),
+        headers: { "Content-Type": "application/json" },
       });
-      return res.json();
+      return result;
     },
     onSuccess: (data) => {
       setMessageInput("");
@@ -160,10 +165,12 @@ export default function DriverSupportChat() {
       if (conversationStatusRef.current !== "active") {
         throw new Error("Cannot escalate a closed conversation");
       }
-      const res = await apiRequest("POST", "/api/support/chat/escalate", {
-        conversationId,
+      const result = await apiRequest("/api/support/chat/escalate", {
+        method: "POST",
+        body: JSON.stringify({ conversationId }),
+        headers: { "Content-Type": "application/json" },
       });
-      return res.json();
+      return result;
     },
     onSuccess: () => {
       applyClosedState("escalated");
@@ -189,8 +196,12 @@ export default function DriverSupportChat() {
         throw new Error("Cannot provide feedback for a closed or escalated conversation");
       }
       const endpoint = helpful ? "/api/support/chat/bot-helpful" : "/api/support/chat/bot-unhelpful";
-      const res = await apiRequest("POST", endpoint, { conversationId });
-      return res.json();
+      const result = await apiRequest(endpoint, {
+        method: "POST",
+        body: JSON.stringify({ conversationId }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: (data, variables) => {
       setFeedbackGiven(prev => new Set(prev).add(variables.messageId));
@@ -219,12 +230,16 @@ export default function DriverSupportChat() {
 
   const endChatMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/support/chat/end", {
-        conversationId,
-        rating: selectedRating > 0 ? selectedRating : undefined,
-        feedback: ratingFeedback.trim() || undefined,
+      const result = await apiRequest("/api/support/chat/end", {
+        method: "POST",
+        body: JSON.stringify({
+          conversationId,
+          rating: selectedRating > 0 ? selectedRating : undefined,
+          feedback: ratingFeedback.trim() || undefined,
+        }),
+        headers: { "Content-Type": "application/json" },
       });
-      return res.json();
+      return result;
     },
     onSuccess: () => {
       applyClosedState("closed");

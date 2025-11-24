@@ -63,7 +63,7 @@ export default function DriverKYCDocuments() {
     }
   }, [profile, formInitialized]);
 
-  // Helper for multipart form uploads using apiRequest
+  // Helper for multipart form uploads using fetch (FormData not supported by apiRequest)
   const uploadFile = async (endpoint: string, fieldName: string, file: File, extraData?: Record<string, string>) => {
     const formData = new FormData();
     formData.append(fieldName, file);
@@ -72,21 +72,35 @@ export default function DriverKYCDocuments() {
         formData.append(key, value);
       });
     }
-    const response = await apiRequest("POST", endpoint, formData);
-    // Handle empty responses (204 No Content or no body)
+    const token = localStorage.getItem("safego_token");
+    const headers: any = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    
+    const response = await fetch(endpoint, {
+      method: "POST",
+      body: formData,
+      headers,
+      credentials: "include",
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || "Upload failed");
+    }
+    
+    // Handle empty responses (204 No Content)
     if (response.status === 204) {
       return { success: true };
     }
-    // Try to parse JSON, return success object if empty
-    try {
-      const text = await response.text();
-      if (!text) {
-        return { success: true };
-      }
-      return JSON.parse(text);
-    } catch (error) {
-      return { success: true };
+    
+    const contentType = response.headers.get("content-type");
+    if (contentType && contentType.includes("application/json")) {
+      return await response.json();
     }
+    
+    return { success: true };
   };
 
   // Upload mutations
@@ -135,16 +149,12 @@ export default function DriverKYCDocuments() {
 
   const updateNIDMutation = useMutation({
     mutationFn: async (nidNumber: string) => {
-      const response = await apiRequest("PUT", "/api/driver/identity/nid", { nidNumber });
-      if (response.status === 204 || response.status === 200) {
-        return { success: true };
-      }
-      try {
-        const text = await response.text();
-        return text ? JSON.parse(text) : { success: true };
-      } catch {
-        return { success: true };
-      }
+      const result = await apiRequest("/api/driver/identity/nid", {
+        method: "PUT",
+        body: JSON.stringify({ nidNumber }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result || { success: true };
     },
     onSuccess: () => {
       toast({
@@ -166,16 +176,12 @@ export default function DriverKYCDocuments() {
 
   const updateSSNMutation = useMutation({
     mutationFn: async (ssn: string) => {
-      const response = await apiRequest("PUT", "/api/driver/identity/ssn", { ssn });
-      if (response.status === 204 || response.status === 200) {
-        return { success: true };
-      }
-      try {
-        const text = await response.text();
-        return text ? JSON.parse(text) : { success: true };
-      } catch {
-        return { success: true };
-      }
+      const result = await apiRequest("/api/driver/identity/ssn", {
+        method: "PUT",
+        body: JSON.stringify({ ssn }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result || { success: true };
     },
     onSuccess: () => {
       toast({
@@ -201,20 +207,12 @@ export default function DriverKYCDocuments() {
       if (!data.firstName?.trim() || !data.lastName?.trim()) {
         throw new Error("First name and last name are required");
       }
-      const response = await apiRequest("PUT", "/api/driver/usa-name", data);
-      // Handle empty responses (204 No Content or no body)
-      if (response.status === 204) {
-        return { success: true };
-      }
-      try {
-        const text = await response.text();
-        if (!text) {
-          return { success: true };
-        }
-        return JSON.parse(text);
-      } catch (error) {
-        return { success: true };
-      }
+      const result = await apiRequest("/api/driver/usa-name", {
+        method: "PUT",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result || { success: true };
     },
     onSuccess: () => {
       toast({

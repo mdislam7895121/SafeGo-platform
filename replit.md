@@ -37,6 +37,26 @@ Core systems and features include:
 -   **Driver Image Upload System**: Production-ready profile photo upload with field name alignment, proper error handling, and null-safe responses.
 -   **API Design**: Robust API endpoints for driver vehicle and profile photo management, enforcing KYC, ownership validation, UUID format validation, and Zod schema validation. Includes atomic transactions and consistent error handling. Corrected `apiRequest` usage to ensure proper data handling and prevent common frontend errors.
 
+### Recent Driver Phase Updates
+
+**D1-A: Multi-Vehicle Backend (COMPLETED)**
+- Implemented 5 vehicle management endpoints with comprehensive validation
+- Database constraint `idx_primary_vehicle_per_driver` enforces single primary vehicle per driver
+- Endpoints: GET /api/driver/vehicles, POST /api/driver/vehicles, PATCH /api/driver/vehicles/:id, DELETE /api/driver/vehicles/:id, PATCH /api/driver/vehicles/:id/set-primary
+
+**D1-IMG: Driver Profile Photo Upload (COMPLETED)**
+- Fixed field name mismatch between frontend (`profilePhoto`) and backend expectation
+- Enhanced error handling for null-safe responses across profile photo upload flow
+
+**D1-BUGS: Comprehensive Frontend Mutation Fix (COMPLETED)**
+- **Root Cause**: Incorrect `apiRequest` usage pattern across ~25+ driver mutations in 17 files
+- **Issue**: Frontend code used deprecated 3-argument signature `apiRequest(method, url, data)` and attempted to call `.json()` on result
+- **Fix**: Updated all driver mutations to use correct 2-argument signature: `apiRequest(url, { method, body, headers })`
+- **Pattern**: apiRequest returns parsed JSON or null (never a Response object requiring `.json()` call)
+- **Exception**: FormData uploads use `fetch` directly (profile photos, KYC documents) since apiRequest doesn't handle multipart/form-data
+- **Files Fixed**: manage.tsx, address.tsx, vehicle.tsx, navigation.tsx, privacy.tsx, language.tsx, work-hub.tsx, notifications.tsx, dark-mode.tsx, payout-methods.tsx, tax-info-edit.tsx, blocked-users.tsx, kyc-documents.tsx, support-chat.tsx, wallet.tsx
+- **Impact**: Eliminated "Cannot read properties of null (reading 'json'/'status')" errors across entire driver account experience
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
 

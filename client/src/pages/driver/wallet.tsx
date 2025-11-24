@@ -81,7 +81,12 @@ export default function DriverWallet() {
   // Cash out mutation
   const cashOutMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/driver/wallet/cash-out");
+      const result = await apiRequest("/api/driver/wallet/cash-out", {
+        method: "POST",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: (data: any) => {
       toast({
