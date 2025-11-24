@@ -1,0 +1,219 @@
+You are the SafeGo architect/engineer working on the SafeGo Eats Restaurant Portal.
+
+Goal of this task
+Design and implement a **production-ready Restaurant Order Management system** for SafeGo Eats, fully integrated with existing SafeGo architecture and security (KYC, RBAC, payout, support center). This is **Restaurant-only Phase – Step 1: Orders Management**. Do NOT change payouts, support center, or category schemas.
+
+Context (current state)
+1. Roles: customer, driver, restaurant, admin are already modeled with KYC/RBAC.
+2. Existing systems that must remain intact:
+   - Unified payout system (wallet + methods + withdrawals) – FROZEN and production-ready.
+   - Multi-role Support Center (tickets, live chat, phone callback, help center).
+   - Restaurant dashboard shell with:
+     - Wallet Snapshot + Performance Insights card.
+     - Menu Categories + Subcategories + Smart Search/Auto-suggest.
+     - Menu item create/edit/delete.
+   - Driver and admin payout routes are stable.
+3. App already supports FOOD/RIDE/PARCEL modes with SafeGuard security (KYC gating, RBAC, audit logs, no public routes).
+
+Strict rules
+1. **No breaking changes**:
+   - Do NOT change existing database schemas for payouts, support center, or user/core KYC tables.
+   - Prefer extending existing Order/Shipment models if they exist; otherwise create minimal new models.
+   - No removal of existing routes; if you must deprecate something, keep old routes working.
+2. **Security must remain intact**:
+   - All new routes must pass through `authenticateToken` and appropriate `requireRole` (restaurant only).
+   - Enforce KYC rules: only `isVerified && verificationStatus === "APPROVED"` restaurants can manage live orders.
+   - Respect existing RBAC: restaurant_owner vs restaurant_staff (use existing permission flags if present).
+   - Maintain and extend audit logging for order state changes.
+3. **Scoped to restaurant role**:
+   - Do NOT alter driver or customer apps beyond what is required for compatibility.
+   - Do NOT change payouts behavior beyond attaching read-only order references where needed.
+4. **Responsiveness & UX**:
+   - Mobile first (320px), then tablet (768px) and desktop (1024px+).
+   - No horizontal scroll on mobile.
+   - Reuse existing SafeGo Eats styling and components.
+
+--------------------------------
+A. Functional scope – Restaurant Order Management
+--------------------------------
+Implement an end-to-end order management experience for the **restaurant role**, reusing existing Order models/routes where possible.
+
+1. Order list views
+   - New top-level page(s) under restaurant:
+     - `/restaurant/orders` as primary.
+   - Inside this view, provide tabs or filters:
+     - **Active** (New + Preparing + Ready for pickup).
+     - **Scheduled** (future orders, if the data model supports it).
+     - **Completed** (Delivered + Completed).
+     - **Cancelled**.
+   - Each order row should show at least:
+     - Order ID (shortened).
+     - Created time (relative, e.g., “5 min ago”).
+     - Customer name (or masked if privacy rules require).
+     - Items count and short summary (first 1–2 items + “+X more”).
+     - Order total and currency.
+     - Service type: FOOD (SafeGo Eats), RIDE, PARCEL (if applicable to the restaurant flow).
+     - Current status badge (color-coded).
+
+2. Order detail view
+   - Route: `/restaurant/orders/:orderId`.
+   - Show:
+     - Full item list (item, variant, add-ons, quantity, per-item price, subtotal).
+     - Delivery info: address, map link placeholder if already used elsewhere.
+     - Customer contact (masked or via in-app contact if available).
+     - Payment state: paid / pending / refund_in_progress.
+     - Timeline of status changes with timestamps.
+   - Action buttons (depending on current status):
+     - New → Accept / Reject.
+     - Accepted → Start Preparing / Cancel (with reason).
+     - Preparing → Mark as Ready.
+     - Ready → Handed to driver (or “Picked up”).
+     - Completed → read-only.
+   - Require confirmation dialogs for destructive actions (Reject, Cancel).
+
+3. Order status model
+   - Use existing status fields if present (e.g., `status`, `subStatus`) and map them.
+   - If you must add new statuses, keep them backward compatible and documented.
+   - Minimum statuses:
+     - `NEW`
+     - `ACCEPTED`
+     - `PREPARING`
+     - `READY_FOR_PICKUP`
+     - `HANDOVER_TO_DRIVER`
+     - `COMPLETED`
+     - `CANCELLED`
+   - Support optional `scheduledAt` for scheduled orders.
+
+4. Business rules
+   - Restaurant cannot:
+     - Accept an order if restaurant is offline or not KYC-approved.
+     - Change an order after it is `COMPLETED` or `CANCELLED`.
+   - Enforce preparation time:
+     - Allow setting/adjusting estimated ready time (e.g., 15, 25, 40 minutes).
+     - Store this in the order or related table without breaking existing APIs.
+   - If the platform already has SLA/ETA fields, integrate with them instead of inventing new ones.
+
+5. Notifications & real-time hints (minimal, non-breaking)
+   - At minimum, support:
+     - New order sound/visual highlight on `/restaurant/orders`.
+     - Soft auto-refresh (polling using existing APIs; do NOT add WebSocket infra unless it already exists).
+   - Respect rate limits and performance (e.g., poll every 15–30 seconds on active tab).
+
+--------------------------------
+B. Permissions, KYC, and RBAC
+--------------------------------
+1. Access control
+   - Only restaurant users with valid session + APPROVED KYC can:
+     - View active orders.
+     - Accept/reject/change order states.
+   - If a restaurant is pending or rejected:
+     - Show a blocked state on the orders page with a clear KYC message.
+2. Owner vs Staff
+   - If RBAC for staff already exists (e.g., `canManageOrders` or similar):
+     - Enforce it so that only authorized staff can act on orders.
+   - Make sure staff actions (accept/reject/change status) are logged with:
+     - restaurantId
+     - staffId
+     - oldStatus → newStatus
+     - timestamp
+
+--------------------------------
+C. Data model & API integration
+--------------------------------
+1. Reuse existing Order model/routes
+   - First, scan the codebase for existing:
+     - Order models (DB schemas).
+     - Order controllers/services.
+     - Existing `/api/restaurant/orders` or similar routes.
+   - Prefer adapting/expanding existing routes for the restaurant role:
+     - `GET /api/restaurant/orders` with filters: status, date range, pagination.
+     - `GET /api/restaurant/orders/:id`
+     - `POST /api/restaurant/orders/:id/accept`
+     - `POST /api/restaurant/orders/:id/reject`
+     - `POST /api/restaurant/orders/:id/update-status` (or separate endpoints per transition).
+   - All new endpoints must:
+     - Use existing error response shapes where possible.
+     - Be covered by authenticateToken + requireRole(["restaurant"]).
+
+2. Audit logging
+   - Extend existing audit log pipeline to capture:
+     - Order lifecycle events (accept, reject, status change, ETA change).
+   - Avoid schema changes in audit tables; use existing generic metadata fields where possible.
+
+3. Performance considerations
+   - Use pagination for order lists.
+   - Support query params: `status`, `from`, `to`, `page`, `limit`.
+   - Index DB fields used for filtering if not already indexed.
+
+--------------------------------
+D. UI/UX implementation – Restaurant portal
+--------------------------------
+1. New orders page
+   - Integrate into the existing SafeGo Eats navigation (e.g., “Orders” in sidebar/top nav).
+   - Maintain existing header layout (name, verified badge, Online toggle, search bar, wallet snapshot, etc.).
+   - Below the global search, place:
+     - Orders tabs (Active, Scheduled, Completed, Cancelled).
+   - Use consistent card design and typography with the dashboard.
+
+2. Mobile, tablet, desktop behaviors
+   - Mobile (single column):
+     - Order cards stacked vertically.
+     - Key info (status, time, items, total, CTA button) visible without horizontal scroll.
+   - Tablet:
+     - 1–2 column layout as space allows.
+   - Desktop:
+     - Table or card grid with action buttons.
+
+3. Safety & UX details
+   - Show clear messages for:
+     - No active orders.
+     - KYC not approved.
+     - Network/API errors (with retry).
+   - Disable action buttons while a request is in flight to avoid double submissions.
+
+--------------------------------
+E. Regression & compatibility checks
+--------------------------------
+After implementing, verify that:
+
+1. No existing payout routes or wallet pages are changed or broken.
+2. Support Center pages for restaurant, driver, customer, admin still work exactly as before.
+3. Menu category & menu item flows remain unchanged (only new order UI added).
+4. Unified payout system remains FROZEN in its current behavior (no new side effects from order logic).
+5. No new public/unprotected API endpoints exist.
+
+--------------------------------
+F. Testing plan (what I expect you to run)
+--------------------------------
+1. Technical tests
+   - Hit all new/updated API endpoints with sample data:
+     - List active orders.
+     - Accept a NEW order.
+     - Move it through PREPARING → READY_FOR_PICKUP → HANDOVER_TO_DRIVER → COMPLETED.
+     - Reject another NEW order (ensure status and audit log updated).
+   - Verify KYC enforcement:
+     - Restaurant without APPROVED KYC cannot act on orders.
+2. UI flows (restaurant role)
+   - On mobile:
+     - View active orders, open an order, accept, move to preparing, mark ready.
+   - On desktop (or larger viewport):
+     - Use filters/tabs, open multiple orders, confirm pagination works.
+3. Security
+   - Try to access restaurant order routes as:
+     - Driver
+     - Customer
+     - Anonymous user
+     - Ensure access is denied and logged per existing security rules.
+
+--------------------------------
+G. Deliverables
+--------------------------------
+1. Fully working Restaurant Orders page(s) and detail view.
+2. New or updated API routes for restaurant order management, documented in `replit.md` under a new section “Restaurant Orders – SafeGo Eats”.
+3. Short summary in `replit.md` describing:
+   - Status lifecycle for restaurant.
+   - RBAC & KYC rules.
+   - Any new environment variables (if absolutely required; avoid if possible).
+4. A brief test report in the console log or `replit.md` summarizing the manual tests you ran and confirming the system is production-ready.
+
+Please start implementing this **Restaurant Order Management system** now, following the SafeGuard security model and without breaking any existing payouts, support, or wallet logic.
