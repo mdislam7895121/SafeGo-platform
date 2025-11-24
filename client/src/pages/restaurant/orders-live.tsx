@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ordersKeys } from "@/lib/queryKeys";
 import { format } from "date-fns";
 import { useState } from "react";
 import {
@@ -31,7 +32,8 @@ export default function LiveOrders() {
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
   const { data: liveData, isLoading } = useQuery({
-    queryKey: ["/api/restaurant/orders/live"],
+    queryKey: ordersKeys.live(),
+    queryFn: () => apiRequest("/api/restaurant/orders/live"),
     refetchInterval: 5000, // Refresh every 5 seconds
   });
 
@@ -45,8 +47,7 @@ export default function LiveOrders() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/orders/live"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/orders/overview"] });
+      queryClient.invalidateQueries({ queryKey: ordersKeys.all });
       toast({
         title: "Success",
         description: "Order status updated successfully",

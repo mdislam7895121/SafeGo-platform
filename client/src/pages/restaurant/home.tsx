@@ -39,6 +39,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ordersKeys } from "@/lib/queryKeys";
 import { formatDistanceToNow } from "date-fns";
 import { KYCBanner } from "@/components/restaurant/KYCBanner";
 import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
@@ -59,7 +60,8 @@ export default function RestaurantHome() {
   });
 
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ["/api/restaurant/orders"],
+    queryKey: ordersKeys.list({ limit: 10 }),
+    queryFn: () => apiRequest("/api/restaurant/orders?limit=10"),
     refetchInterval: 10000, // Poll every 10 seconds for live updates
   });
 
@@ -78,7 +80,7 @@ export default function RestaurantHome() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/orders"] });
+      queryClient.invalidateQueries({ queryKey: ordersKeys.all });
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/home"] });
       toast({
         title: "Success",

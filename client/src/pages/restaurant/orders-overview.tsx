@@ -18,10 +18,13 @@ import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { KYCBanner } from "@/components/restaurant/KYCBanner";
 import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
+import { apiRequest } from "@/lib/queryClient";
+import { ordersKeys } from "@/lib/queryKeys";
 
 export default function OrdersOverview() {
   const { data: overviewData, isLoading } = useQuery({
-    queryKey: ["/api/restaurant/orders/overview"],
+    queryKey: ordersKeys.overview(),
+    queryFn: () => apiRequest("/api/restaurant/orders/overview"),
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 

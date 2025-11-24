@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import {
   Filter,
@@ -14,6 +14,7 @@ import {
   XCircle,
   ArrowLeft,
   ShoppingBag,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,11 +34,26 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Separator } from "@/components/ui/separator";
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { ordersKeys } from "@/lib/queryKeys";
 
 export default function RestaurantOrders() {
+
+  const { toast } = useToast();
 
   // Filters state
   const [statusFilter, setStatusFilter] = useState("all");
@@ -47,30 +63,54 @@ export default function RestaurantOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
 
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    description: string;
+    action: () => void;
+  }>({
+    open: false,
+    title: "",
+    description: "",
+    action: () => {},
+  });
+
   const itemsPerPage = 20;
 
-  // Build query URL with params
-  const ordersQueryUrl = useMemo(() => {
-    const params = new URLSearchParams();
-    params.append("limit", itemsPerPage.toString());
-    params.append("offset", ((currentPage - 1) * itemsPerPage).toString());
+  // Build filters object
+  const filters = useMemo(() => {
+    const f: Record<string, any> = {
+      limit: itemsPerPage,
+      offset: (currentPage - 1) * itemsPerPage,
+    };
 
-    if (statusFilter !== "all") params.append("status", statusFilter);
-    if (orderTypeFilter !== "all") params.append("orderType", orderTypeFilter);
-    if (timeRangeFilter !== "all") params.append("timeRange", timeRangeFilter);
-    if (paymentStatusFilter !== "all") params.append("paymentStatus", paymentStatusFilter);
+    if (statusFilter !== "all") f.status = statusFilter;
+    if (orderTypeFilter !== "all") f.orderType = orderTypeFilter;
+    if (timeRangeFilter !== "all") f.timeRange = timeRangeFilter;
+    if (paymentStatusFilter !== "all") f.paymentStatus = paymentStatusFilter;
 
-    return `/api/restaurant/orders?${params.toString()}`;
+    return f;
   }, [statusFilter, orderTypeFilter, timeRangeFilter, paymentStatusFilter, currentPage]);
 
-  // Fetch orders with filters
+  // Fetch orders with filters using query key factory
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: [ordersQueryUrl],
+    queryKey: ordersKeys.list(filters),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        params.append(key, value.toString());
+      });
+      return await apiRequest(`/api/restaurant/orders?${params.toString()}`);
+    },
   });
 
   // Fetch selected order details
   const { data: orderDetailsData } = useQuery({
-    queryKey: [`/api/restaurant/orders/${selectedOrderId}`],
+    queryKey: selectedOrderId ? ordersKeys.detail(selectedOrderId) : ["no-order-selected"],
+    queryFn: async () => {
+      return await apiRequest(`/api/restaurant/orders/${selectedOrderId}`);
+    },
     enabled: !!selectedOrderId,
   });
 
@@ -78,6 +118,92 @@ export default function RestaurantOrders() {
   const pagination = ordersData?.pagination || { total: 0, hasMore: false };
   const totalPages = Math.ceil(pagination.total / itemsPerPage);
   const orderDetails = orderDetailsData?.order;
+
+  // Status update mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      return await apiRequest(`/api/restaurant/orders/${orderId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+    },
+    onSuccess: () => {
+      // Invalidate all order queries using query key factory
+      queryClient.invalidateQueries({ queryKey: ordersKeys.all });
+      toast({
+        title: "Success",
+        description: "Order status updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update order status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Action handlers
+  const handleAcceptOrder = () => {
+    if (!selectedOrderId) return;
+    updateStatusMutation.mutate({ orderId: selectedOrderId, status: "accepted" });
+  };
+
+  const handleRejectOrder = () => {
+    if (!selectedOrderId) return;
+    setConfirmDialog({
+      open: true,
+      title: "Reject Order",
+      description:
+        "Are you sure you want to reject this order? This action cannot be undone and the customer will be notified.",
+      action: () => {
+        updateStatusMutation.mutate({ orderId: selectedOrderId, status: "cancelled_restaurant" });
+        setConfirmDialog({ ...confirmDialog, open: false });
+      },
+    });
+  };
+
+  const handleStartPreparing = () => {
+    if (!selectedOrderId) return;
+    updateStatusMutation.mutate({ orderId: selectedOrderId, status: "preparing" });
+  };
+
+  const handleMarkReady = () => {
+    if (!selectedOrderId) return;
+    updateStatusMutation.mutate({ orderId: selectedOrderId, status: "ready_for_pickup" });
+  };
+
+  const handleMarkPickedUp = () => {
+    if (!selectedOrderId) return;
+    updateStatusMutation.mutate({ orderId: selectedOrderId, status: "picked_up" });
+  };
+
+  // Get available actions based on current status
+  const getAvailableActions = (status: string) => {
+    const actions: Array<{ label: string; variant: any; onClick: () => void }> = [];
+
+    switch (status) {
+      case "placed":
+        actions.push({ label: "Accept Order", variant: "default", onClick: handleAcceptOrder });
+        actions.push({ label: "Reject Order", variant: "destructive", onClick: handleRejectOrder });
+        break;
+      case "accepted":
+        actions.push({ label: "Start Preparing", variant: "default", onClick: handleStartPreparing });
+        actions.push({ label: "Cancel Order", variant: "destructive", onClick: handleRejectOrder });
+        break;
+      case "preparing":
+        actions.push({ label: "Mark as Ready", variant: "default", onClick: handleMarkReady });
+        actions.push({ label: "Cancel Order", variant: "destructive", onClick: handleRejectOrder });
+        break;
+      case "ready_for_pickup":
+        actions.push({ label: "Mark as Picked Up", variant: "default", onClick: handleMarkPickedUp });
+        break;
+    }
+
+    return actions;
+  };
 
   // Status badge variant helper
   const getStatusBadgeVariant = (status: string) => {
@@ -587,6 +713,30 @@ export default function RestaurantOrders() {
                     </div>
                   </div>
                 </div>
+
+                {/* Action Buttons */}
+                {getAvailableActions(orderDetails.status).length > 0 && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <h3 className="font-semibold">Actions</h3>
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        {getAvailableActions(orderDetails.status).map((action, idx) => (
+                          <Button
+                            key={idx}
+                            variant={action.variant}
+                            onClick={action.onClick}
+                            disabled={updateStatusMutation.isPending}
+                            className="flex-1"
+                            data-testid={`button-${action.label.toLowerCase().replace(/\s+/g, "-")}`}
+                          >
+                            {updateStatusMutation.isPending ? "Processing..." : action.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           ) : (
@@ -600,6 +750,29 @@ export default function RestaurantOrders() {
           )}
         </SheetContent>
       </Sheet>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
+        <AlertDialogContent data-testid="dialog-confirm-action">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              {confirmDialog.title}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{confirmDialog.description}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDialog.action}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm"
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
