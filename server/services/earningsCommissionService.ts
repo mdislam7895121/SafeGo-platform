@@ -1,6 +1,6 @@
-import { PrismaClient, EarningsStatus, Prisma } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { EarningsStatus, Prisma } from '@prisma/client';
+import { prisma } from '../db';
+import { logAuditEvent } from '../utils/audit';
 
 type Decimal = Prisma.Decimal;
 
@@ -147,7 +147,7 @@ export async function createEarningsTransaction(
   const status: EarningsStatus =
     orderStatus === 'delivered' ? 'cleared' : 'pending';
 
-  await prisma.earningsTransaction.create({
+  const transaction = await prisma.earningsTransaction.create({
     data: {
       restaurantId,
       orderId,
@@ -167,6 +167,27 @@ export async function createEarningsTransaction(
       isDemo,
     },
   });
+
+  // R6: Audit log earnings transaction creation
+  await logAuditEvent({
+    actorId: null,
+    actorEmail: 'system',
+    actorRole: 'system',
+    actionType: 'CREATE',
+    entityType: 'earnings_transaction',
+    entityId: transaction.id,
+    description: `Created earnings transaction for order ${orderId}`,
+    metadata: {
+      restaurantId,
+      orderId,
+      grossAmount: Number(serviceFare),
+      totalCommission: Number(commission.totalCommission),
+      netEarnings: Number(commission.netEarnings),
+      status,
+      commissionRate: commission.commissionRate,
+    },
+    success: true,
+  });
 }
 
 export async function updateEarningsTransactionStatus(
@@ -181,6 +202,7 @@ export async function updateEarningsTransactionStatus(
     return;
   }
 
+  const previousStatus = transaction.status;
   const updateData: any = {
     orderStatus: newOrderStatus,
     updatedAt: new Date(),
@@ -191,18 +213,95 @@ export async function updateEarningsTransactionStatus(
     updateData.clearedAt = new Date();
   }
 
-  if (
-    newOrderStatus === 'cancelled_restaurant' ||
-    newOrderStatus === 'cancelled_customer' ||
-    newOrderStatus === 'cancelled_driver'
-  ) {
+  // Handle all cancellation statuses (generic + role-specific)
+  const isCancellation = [
+    'cancelled',
+    'cancelled_restaurant',
+    'cancelled_customer',
+    'cancelled_driver',
+  ].includes(newOrderStatus);
+
+  if (isCancellation) {
     updateData.status = 'refunded';
     updateData.refundedAt = new Date();
+    
+    // If previously cleared, reverse the wallet credit atomically
+    if (previousStatus === 'cleared' && transaction.clearedAt) {
+      // Clear the clearedAt timestamp since this is no longer cleared
+      updateData.clearedAt = null;
+      
+      // Wrap wallet reversal + earnings update in Prisma $transaction for atomicity
+      // Both operations must succeed or both will rollback
+      const { walletService } = await import('./walletService');
+      
+      await prisma.$transaction(async (tx) => {
+        // Execute wallet reversal with transaction client
+        await walletService.reverseFoodOrderEarning(
+          transaction.restaurantId,
+          orderId,
+          {
+            netEarnings: transaction.netEarnings,
+            totalCommission: transaction.totalCommission,
+            currency: transaction.currency,
+            countryCode: transaction.countryCode,
+          },
+          tx // Pass transaction client for atomic operations
+        );
+        
+        // Update earnings transaction (will rollback if wallet reversal failed)
+        await tx.earningsTransaction.update({
+          where: { orderId },
+          data: updateData,
+        });
+      });
+      
+      // Audit log after successful atomic operation
+      await logAuditEvent({
+        actorId: null,
+        actorEmail: 'system',
+        actorRole: 'system',
+        actionType: 'UPDATE',
+        entityType: 'earnings_transaction',
+        entityId: transaction.id,
+        description: `Updated earnings transaction status for order ${orderId} with wallet reversal`,
+        metadata: {
+          orderId,
+          previousStatus: transaction.status,
+          newStatus: 'refunded',
+          orderStatus: newOrderStatus,
+          walletReversalApplied: true,
+        },
+        success: true,
+      });
+      
+      return; // Exit early after successful atomic transaction
+    }
   }
 
-  await prisma.earningsTransaction.update({
+  // Non-cancellation or pending→refunded path (no wallet reversal needed)
+  const updated = await prisma.earningsTransaction.update({
     where: { orderId },
     data: updateData,
+  });
+
+  // R6: Audit log earnings transaction status update
+  await logAuditEvent({
+    actorId: null,
+    actorEmail: 'system',
+    actorRole: 'system',
+    actionType: 'UPDATE',
+    entityType: 'earnings_transaction',
+    entityId: updated.id,
+    description: `Updated earnings transaction status for order ${orderId}`,
+    metadata: {
+      orderId,
+      previousStatus: transaction.status,
+      newStatus: updateData.status || transaction.status,
+      orderStatus: newOrderStatus,
+      clearedAt: updateData.clearedAt,
+      refundedAt: updateData.refundedAt,
+    },
+    success: true,
   });
 }
 

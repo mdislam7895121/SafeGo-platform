@@ -2,6 +2,10 @@ import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { walletService } from "../services/walletService";
+import {
+  createEarningsTransaction,
+  updateEarningsTransactionStatus,
+} from "../services/earningsCommissionService";
 import crypto from "crypto";
 
 const router = Router();
@@ -99,6 +103,21 @@ router.post("/", async (req: AuthRequest, res) => {
         status: "placed",
       },
     });
+
+    // R6: Create earnings transaction for commission tracking
+    try {
+      await createEarningsTransaction({
+        orderId: foodOrder.id,
+        restaurantId,
+        serviceFare: foodOrder.serviceFare,
+        orderStatus: foodOrder.status,
+        countryCode: restaurant.countryCode || 'US',
+        currency: restaurant.countryCode === 'BD' ? 'BDT' : 'USD',
+        isDemo: restaurant.isDemo || false,
+      });
+    } catch (earningsError) {
+      console.error('Failed to create earnings transaction:', earningsError);
+    }
 
     // Notify restaurant
     const restaurantUser = await prisma.user.findFirst({
@@ -447,6 +466,11 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
       where: { id },
       data: { status },
     });
+
+    // R6: Update earnings transaction status when order status changes
+    // NOTE: If this fails (e.g., wallet reversal fails), the entire request fails
+    // to prevent order status and ledgers from diverging
+    await updateEarningsTransactionStatus(id, status);
 
     // Create notification
     const customerUser = await prisma.user.findFirst({

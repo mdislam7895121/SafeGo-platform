@@ -362,6 +362,95 @@ export class WalletService {
     }
   }
 
+  /**
+   * R6: Reverse a food order earning when order is refunded/cancelled
+   * Uses amounts from EarningsTransaction to ensure consistency with original posting
+   * @param tx Optional Prisma transaction client for atomic operations
+   */
+  async reverseFoodOrderEarning(
+    restaurantId: string,
+    orderId: string,
+    earningsTransaction: {
+      netEarnings: any;
+      totalCommission: any;
+      currency: string;
+      countryCode: string;
+    },
+    tx?: Prisma.TransactionClient
+  ): Promise<void> {
+    // Use transaction client if provided, otherwise use global prisma
+    const db = tx || prisma;
+    
+    // Get the original order to determine payment method
+    const order = await db.foodOrder.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      throw new Error(`Order ${orderId} not found for earnings reversal`);
+    }
+
+    // Use currency/country from the earnings transaction to match original posting
+    const countryCode = earningsTransaction.countryCode;
+    const currency = earningsTransaction.currency;
+    const commissionAmount = Number(earningsTransaction.totalCommission.toString());
+    const netEarningsAmount = Number(earningsTransaction.netEarnings.toString());
+
+    // Get wallet using the same country/currency as original transaction
+    const wallet = await db.wallet.findFirst({
+      where: {
+        ownerId: restaurantId,
+        ownerType: "restaurant",
+        countryCode,
+      },
+    });
+
+    if (!wallet) {
+      throw new Error(`Wallet not found for restaurant ${restaurantId} in ${countryCode}`);
+    }
+
+    if (order.paymentMethod === "cash") {
+      // Cash: Reverse commission that was owed (credited to negative balance)
+      await db.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          serviceType: "commission_refund",
+          direction: "credit",
+          amount: commissionAmount,
+          balanceAfter: wallet.balance + commissionAmount,
+          referenceType: "food_order",
+          referenceId: orderId,
+          description: `Refund: Commission reversed for cancelled cash order`,
+        },
+      });
+      
+      await db.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: { increment: commissionAmount } },
+      });
+    } else {
+      // Online: Reverse payout that was credited to available balance
+      // Use netEarnings (what was actually credited) instead of restaurantPayout
+      await db.walletTransaction.create({
+        data: {
+          walletId: wallet.id,
+          serviceType: "food_order",
+          direction: "debit",
+          amount: netEarningsAmount,
+          balanceAfter: wallet.balance - netEarningsAmount,
+          referenceType: "food_order",
+          referenceId: orderId,
+          description: `Refund: Payout reversed for cancelled online order`,
+        },
+      });
+      
+      await db.wallet.update({
+        where: { id: wallet.id },
+        data: { balance: { decrement: netEarningsAmount } },
+      });
+    }
+  }
+
   async recordFoodDeliveryEarning(
     driverId: string,
     delivery: {
