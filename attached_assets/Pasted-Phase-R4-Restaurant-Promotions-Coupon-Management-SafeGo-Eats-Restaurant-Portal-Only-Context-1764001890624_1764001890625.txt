@@ -1,0 +1,161 @@
+Phase R4 – Restaurant Promotions & Coupon Management (SafeGo Eats – Restaurant Portal Only)
+
+Context
+- Platform: SafeGo multi-role system (Customer, Driver, Restaurant, Admin).
+- Scope for this phase: RESTAURANT ROLE ONLY, inside SafeGo Eats (restaurant web portal).
+- Existing systems that must remain stable:
+  - Authentication + KYC + RBAC (OWNER vs STAFF, Bangladesh + USA rules).
+  - Unified Payout System (frozen state – individual withdrawals only).
+  - Wallet & Earnings, Order Management (R1), Analytics & Performance (R2), Staff & Role Management (R3).
+  - Support Center, Category & Menu system, Live Orders Board.
+- Goal for R4: Add a production-ready Promotions & Coupon system for restaurants without breaking any existing flows.
+
+Primary Objectives
+1. Allow restaurant owners and permitted staff to:
+   - Create, edit, activate, deactivate, and delete promotions/coupons.
+   - Configure discounts (percentage, fixed amount) with clear validation.
+   - Target specific items, categories, or the full cart.
+   - Set validity windows (start/end date, time-of-day, optional days-of-week).
+   - Set usage limits:
+     - Per-code global usage cap.
+     - Per-customer usage limit.
+   - Configure eligibility rules:
+     - Minimum order amount.
+     - Included/excluded categories/items.
+     - New vs returning customers (if customer metadata already exists).
+2. Expose a clean Restaurant Promotions UI inside the restaurant portal:
+   - Promotions List view (table with filters, search, status badges).
+   - Create / Edit Promotion form (multi-step or single form, mobile-friendly).
+   - Promotion Detail view (summary, current status, basic usage stats).
+3. Add a Coupon Code system that can be used at checkout (design backend + restaurant view only):
+   - Secure code generation & storage (no plain-text secrets if not necessary).
+   - API endpoints for validating a coupon against a given cart snapshot:
+     - Check restaurant, active window, usage limits, and eligibility.
+   - Return consistent error messages for invalid/expired/overused coupons.
+   - For this phase, focus on backend validation + restaurant-side visibility.
+     - Do NOT change customer checkout UI beyond what is absolutely required without explicit instruction.
+
+Data & Models (Non-breaking design)
+- You MAY create new tables/models dedicated to promotions/coupons such as:
+  - Promotion (id, restaurantId, name, description, type, status, startAt, endAt, createdBy, updatedBy, createdAt, updatedAt, etc.).
+  - PromotionRule or PromotionTarget (e.g., appliesTo: "ITEM" | "CATEGORY" | "ORDER"; targetIds[]).
+  - CouponCode (id, code, promotionId, usageLimitTotal, usageLimitPerCustomer, usedCount, etc.).
+  - PromotionUsage or CouponRedemption (logging each successful application).
+- You MUST NOT:
+  - Modify existing payout/wallet tables.
+  - Break existing order schema or response shapes.
+- Any migrations must be:
+  - Backwards compatible.
+  - Idempotent and safe to re-run.
+  - Documented in replit.md under a new “R4 – Promotions & Coupon Management” section.
+
+API & Integration Requirements
+1. Restaurant-facing endpoints (protected by authenticateToken + requireRole(["restaurant"]), plus KYC gating):
+   - GET  /api/restaurant/promotions          – list promotions for this restaurant (with filters: status, date, type).
+   - POST /api/restaurant/promotions          – create a new promotion.
+   - GET  /api/restaurant/promotions/:id      – get promotion detail.
+   - PATCH/PUT /api/restaurant/promotions/:id – update promotion (respect immutable fields like original creator where needed).
+   - POST /api/restaurant/promotions/:id/toggle – activate/deactivate promotion (soft toggle).
+   - DELETE /api/restaurant/promotions/:id    – soft delete or mark archived (no hard delete of historical data).
+   - Optional: GET /api/restaurant/promotions/:id/usage – simple usage stats (total redemptions, active vs expired).
+2. Coupon validation endpoints (backend only, to be used later by checkout flows):
+   - POST /api/coupons/validate
+     - Input: { restaurantId, customerId (optional but preferred), items[], subtotal, currency, couponCode }
+     - Output (success): { valid: true, discountAmount, newTotal, appliedPromotionId, messages[] }
+     - Output (failure): { valid: false, reasonCode, messages[] }
+   - All validation must:
+     - Ensure the coupon belongs to the same restaurant.
+     - Check promotion status, time window, usage limits, min order amount, and item/category eligibility.
+3. Security and Access Control:
+   - Only restaurant OWNER and staff with explicit permission (e.g., canManagePromotions) may create/edit promotions.
+   - Staff without permission may view list but not change anything (read-only).
+   - All routes must remain under existing Express router structure (restaurant routes namespace).
+   - Maintain existing KYC rules: only verified + approved restaurants can access promotions.
+
+Restaurant UI Requirements
+1. Navigation
+   - Add a “Promotions” section under the SafeGo Eats restaurant sidebar/top navigation (do NOT break existing nav).
+   - Sub-pages:
+     - Promotions Overview (default list).
+     - New Promotion.
+     - Promotion Detail (usage summary).
+2. Promotions List
+   - Table with:
+     - Name, Type (Percent / Fixed), Status (Upcoming, Active, Expired, Paused), Validity (start–end), Last updated.
+   - Filters:
+     - Status filter chips or dropdown.
+     - Search by name or code.
+   - Actions:
+     - View, Edit, Activate/Deactivate, Duplicate (optional), Delete/Archive.
+3. Create / Edit Promotion Form
+   - Sections:
+     1) Basic Info: name, description, promotion type.
+     2) Discount: percent or fixed amount, currency-aware validation (no negative, sensible upper limits).
+     3) Schedule: start date/time, end date/time; optional days-of-week.
+     4) Eligibility & Targeting:
+        - Applies to: Entire order / Specific categories / Specific items.
+        - Category & item selection using existing category/menu APIs (reuse existing smart search where possible).
+        - Minimum order amount.
+     5) Coupon Settings:
+        - Option to auto-generate a coupon code OR manually specify one (validate for uniqueness per restaurant).
+        - Usage limits (total vs per customer).
+   - Mobile-friendly layout (no horizontal scroll).
+4. Promotion Detail View
+   - Show all configured fields (read-only summary).
+   - Show quick stats section:
+     - Status badge, active window, total redemptions (if usage table exists).
+   - Action buttons: Edit, Activate/Deactivate, Archive.
+
+System Behaviour & Constraints
+- Promotion evaluation rules (for future checkout use):
+  - For now, support ONE coupon code per order.
+  - If multiple active promotions could apply, return the highest discount by default (document this choice).
+  - Do NOT implement complex stacking logic in this phase; just design for simple extension later.
+- Time zones:
+  - Use restaurant’s configured timezone if available; otherwise default system timezone consistently.
+- Performance:
+  - Listing 100+ promotions must remain fast; use pagination or server-side filters where needed.
+- Internationalization:
+  - Keep all labels/messages in English only for now, but design so future localization is possible.
+
+Security, Logging, and Compliance
+- All promotion and coupon changes must be tracked:
+  - Log who created, updated, activated, deactivated, or archived a promotion (userId + role + timestamp).
+  - Add entries into existing audit log system if available, using the same pattern as support/payout.
+- Validate all inputs on both server and client:
+  - Amount ranges, date ranges (end ≥ start), required fields, coupon code format.
+- Make sure there is no way for a restaurant to modify another restaurant’s promotions (strict scoping by restaurantId).
+
+Testing & Validation
+- Implement or update tests to cover:
+  - Creating/editing promotions with valid and invalid payloads.
+  - Coupon validation success & failure cases (expired, over-limit, wrong restaurant, below minimum amount).
+  - RBAC: OWNER vs STAFF with/without promotion permissions.
+  - KYC-gated access: unverified or pending restaurants should be blocked from promotions endpoints and UI.
+- Manually verify on:
+  - Mobile viewport (~320px).
+  - Tablet (~768px).
+  - Desktop (1024px+).
+- Confirm no regressions in:
+  - Order Management (R1).
+  - Analytics (R2) – if you surface any “orders with discount” metrics, keep them additive only, no breaking changes.
+  - Staff Management (R3).
+
+Documentation
+- Update replit.md with:
+  - “Phase R4 – Restaurant Promotions & Coupon Management”.
+  - Data models, endpoints, permission model, and key UX flows.
+  - Any limitations: e.g., one coupon per order, customer UI integration deferred to later phase.
+
+Strict Rules
+- Do NOT modify or remove any existing routes, models, or tables outside the new promotions/coupons scope.
+- Do NOT change payout, wallet, or support center behaviour.
+- Preserve all KYC, RBAC, and SafeGuard security rules.
+- If you must make any risky change, explain it clearly in the logs and keep it minimal and backwards compatible.
+
+Task
+- Implement the complete R4 Restaurant Promotions & Coupon Management system as described.
+- When finished, give me:
+  1) A short summary of what you built.
+  2) The list of new endpoints and models added.
+  3) Any constraints or TODOs left for future phases (e.g., customer-side coupon UI).

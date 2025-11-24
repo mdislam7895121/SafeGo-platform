@@ -429,6 +429,7 @@ model RestaurantProfile {
   canViewPayouts        Boolean            @default(false)
   canManageOrders       Boolean            @default(false)
   canReplySupport       Boolean            @default(false) // Phase 12: Can view and reply to support tickets
+  canManagePromotions   Boolean            @default(false) // R4: Can create/edit promotions and coupons
   staffActive           Boolean            @default(true)
   managedByOwnerId      String?            // Restaurant ID of the OWNER who manages this STAFF
   lastLoginAt           DateTime?
@@ -1554,41 +1555,47 @@ model OpportunityReward {
 // ====================================================
 
 model Promotion {
-  id                      String        @id @default(uuid())
+  id                      String           @id @default(uuid())
   restaurantId            String
   title                   String
-  description             String?       @db.Text
+  description             String?          @db.Text
   promoType               PromotionType
-  discountValue           Decimal?      @db.Decimal(10, 2) // For fixed amount
-  discountPercentage      Decimal?      @db.Decimal(5, 2) // For percentage (0-100)
-  buyQuantity             Int?          // For BOGO: buy X
-  getQuantity             Int?          // For BOGO: get Y
-  applicableItems         Json?         // Array of menu item IDs
-  applicableCategories    Json?         // Array of category names
-  minOrderAmount          Decimal?      @db.Decimal(10, 2)
-  maxDiscountCap          Decimal?      @db.Decimal(10, 2)
+  status                  PromotionStatus  @default(UPCOMING) // R4: Track promotion lifecycle
+  discountValue           Decimal?         @db.Decimal(10, 2) // For fixed amount
+  discountPercentage      Decimal?         @db.Decimal(5, 2) // For percentage (0-100)
+  buyQuantity             Int?             // For BOGO: buy X
+  getQuantity             Int?             // For BOGO: get Y
+  applicableItems         Json?            // Array of menu item IDs
+  applicableCategories    Json?            // Array of category names
+  minOrderAmount          Decimal?         @db.Decimal(10, 2)
+  maxDiscountCap          Decimal?         @db.Decimal(10, 2)
   usageLimitPerCustomer   Int?
   globalUsageLimit        Int?
-  currentUsageCount       Int           @default(0)
+  currentUsageCount       Int              @default(0)
   startDate               DateTime
   endDate                 DateTime
-  timeWindowStart         String?       // For time-based promos (e.g., "11:00")
-  timeWindowEnd           String?       // For time-based promos (e.g., "14:00")
-  isFirstTimeCustomerOnly Boolean       @default(false)
-  isActive                Boolean       @default(true)
-  isFlagged               Boolean       @default(false)
-  flagReason              String?       @db.Text
+  timeWindowStart         String?          // For time-based promos (e.g., "11:00")
+  timeWindowEnd           String?          // For time-based promos (e.g., "14:00")
+  daysOfWeek              String[]         // R4: Optional days-of-week filter (e.g., ["monday", "friday"])
+  isFirstTimeCustomerOnly Boolean          @default(false)
+  isActive                Boolean          @default(true)
+  isFlagged               Boolean          @default(false)
+  flagReason              String?          @db.Text
   flaggedByAdminId        String?
   flaggedAt               DateTime?
-  isDemo                  Boolean       @default(false)
-  createdAt               DateTime      @default(now())
-  updatedAt               DateTime      @updatedAt
+  isDemo                  Boolean          @default(false)
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
   createdByOwnerId        String
+  updatedByOwnerId        String?          // R4: Track who last updated
   restaurant              RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders                  FoodOrder[]
+  promotionUsages         PromotionUsage[] // R4: Track each redemption
+  coupons                 Coupon[]         // R4: Link coupons to promotions
 
   @@index([restaurantId])
   @@index([isActive])
+  @@index([status])
   @@index([startDate])
   @@index([endDate])
   @@index([promoType])
@@ -1598,32 +1605,36 @@ model Promotion {
 }
 
 model Coupon {
-  id                    String   @id @default(uuid())
+  id                    String             @id @default(uuid())
   restaurantId          String
-  code                  String   // Unique coupon code
+  promotionId           String?            // R4: Link coupon to promotion (optional for standalone coupons)
+  code                  String             // Unique coupon code
   discountType          CouponDiscountType
-  discountValue         Decimal? @db.Decimal(10, 2) // For fixed amount
-  discountPercentage    Decimal? @db.Decimal(5, 2) // For percentage (0-100)
-  minOrderAmount        Decimal? @db.Decimal(10, 2)
-  maxDiscountCap        Decimal? @db.Decimal(10, 2)
+  discountValue         Decimal?           @db.Decimal(10, 2) // For fixed amount
+  discountPercentage    Decimal?           @db.Decimal(5, 2) // For percentage (0-100)
+  minOrderAmount        Decimal?           @db.Decimal(10, 2)
+  maxDiscountCap        Decimal?           @db.Decimal(10, 2)
   usageLimitPerCustomer Int?
   globalUsageLimit      Int?
-  currentUsageCount     Int      @default(0)
+  currentUsageCount     Int                @default(0)
   startDate             DateTime
   endDate               DateTime
-  isActive              Boolean  @default(true)
-  isFlagged             Boolean  @default(false)
-  flagReason            String?  @db.Text
+  isActive              Boolean            @default(true)
+  isFlagged             Boolean            @default(false)
+  flagReason            String?            @db.Text
   flaggedByAdminId      String?
   flaggedAt             DateTime?
-  isDemo                Boolean  @default(false)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  isDemo                Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
   createdByOwnerId      String
-  restaurant            RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurant            RestaurantProfile  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  promotion             Promotion?         @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+  promotionUsages       PromotionUsage[]   // R4: Track coupon redemptions
 
   @@unique([restaurantId, code])
   @@index([restaurantId])
+  @@index([promotionId])
   @@index([code])
   @@index([isActive])
   @@index([startDate])
@@ -1633,6 +1644,30 @@ model Coupon {
   @@map("coupons")
 }
 
+model PromotionUsage {
+  id              String    @id @default(uuid())
+  promotionId     String
+  couponId        String?   // Optional - if coupon was used
+  customerId      String
+  orderId         String    // Link to FoodOrder
+  restaurantId    String
+  discountAmount  Decimal   @db.Decimal(10, 2)
+  currency        String    @default("USD")
+  usedAt          DateTime  @default(now())
+  isDemo          Boolean   @default(false)
+  promotion       Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  coupon          Coupon?   @relation(fields: [couponId], references: [id], onDelete: SetNull)
+
+  @@index([promotionId])
+  @@index([couponId])
+  @@index([customerId])
+  @@index([orderId])
+  @@index([restaurantId])
+  @@index([usedAt])
+  @@index([isDemo])
+  @@map("promotion_usages")
+}
+
 enum PromotionType {
   percentage_discount
   fixed_discount
@@ -1640,6 +1675,13 @@ enum PromotionType {
   category_discount
   time_window
   first_time_customer
+}
+
+enum PromotionStatus {
+  UPCOMING
+  ACTIVE
+  EXPIRED
+  PAUSED
 }
 
 enum CouponDiscountType {
