@@ -1,0 +1,155 @@
+SafeGo Eats – Restaurant Support Center & Live Support Foundation
+
+GOAL
+Implement a complete Restaurant Support Center in the SafeGo Eats restaurant portal, including:
+- Help Center (self-service documentation)
+- Contact Support (ticket-based support with conversation view)
+- System Status (platform status overview)
+- A “Live Chat” ready UI slot (no complex realtime logic required yet)
+This must be fully usable on mobile, tablet, and desktop. Keep all SafeGuard, KYC, and RBAC rules intact.
+
+SCOPE
+1) Restaurant portal only.
+2) Routes already exist as placeholders – use and enhance them instead of creating new top-level routes:
+   - /restaurant/support/help
+   - /restaurant/support/contact
+   - /restaurant/support/status
+3) Do NOT modify:
+   - Authentication, KYC gating, or role-based access control.
+   - Core payment, payout, or order logic.
+   - Existing navigation structure outside the Support section.
+
+A. HELP CENTER PAGE – /restaurant/support/help
+1. Header:
+   - Title: “Help Center”
+   - Subtitle: “Browse help articles and guides to manage your restaurant on SafeGo.”
+2. Search:
+   - Search bar: “Search help topics…”
+   - Debounced search over help articles (client-side is fine if content is static).
+3. Categories:
+   - Show category cards or list:
+     - Orders & Deliveries
+     - Payouts & Finance
+     - Menu & Pricing
+     - Account & Verification (KYC)
+     - Technical Issues
+4. Article layout:
+   - Each article: title, short summary, category badges.
+   - Clicking opens an article detail view with:
+     - Title, category, updated date.
+     - Body text (static markdown/HTML content is fine for now).
+5. Mobile responsiveness:
+   - Single column on small screens.
+   - No horizontal scroll.
+   - Search bar pinned near the top of the content area.
+
+B. CONTACT SUPPORT PAGE – /restaurant/support/contact
+This is the main “contact us” entry point and the foundation for future live support.
+
+1. Support request form (Create Ticket)
+   Fields:
+   - Subject (text input, required)
+   - Category (select: Orders, Payouts, Menu & Pricing, Account & KYC, Technical Issue, Other)
+   - Priority (select: Low, Normal, High)
+   - Description (multi-line textarea, required)
+   - Attachments (optional; image/PDF upload if backend supports it – otherwise stub the control elegantly)
+   - Preferred Contact Method (radio or select: Email, Phone, Live Chat)
+2. Submit behavior:
+   - On submit, create a support ticket for the current restaurant account.
+   - Save ticket with fields: id, restaurantId, subject, category, priority, status (Open by default),
+     description, createdAt, updatedAt, channel (email/phone/chat), and any attachment metadata.
+   - Enforce RBAC: restaurants can only see their own tickets.
+3. Ticket list (“My Support Requests”)
+   - Table/list below the form with columns:
+     - Ticket ID
+     - Subject
+     - Category
+     - Status: Open / In Progress / Resolved / Closed
+     - Last updated timestamp
+   - Click row → open ticket detail view.
+4. Ticket detail view
+   - Show ticket header: ID, status, priority, category, created/updated timestamps.
+   - Conversation thread:
+     - Simple message bubbles: sender (Restaurant vs SafeGo Support), timestamp, message.
+     - A small “Add reply” box at the bottom with textarea + “Send Reply” button.
+   - This can be implemented using existing API patterns. If no support models exist yet, create minimal:
+     - SupportTicket
+     - SupportMessage
+5. Live Chat foundation (no heavy realtime logic yet):
+   - In the Contact Support page, within the header or right-hand panel, add a “Live Chat” card:
+     - If no live-chat backend is configured:
+       - Show status: “Live Chat: Coming Soon”
+       - Or “Live Chat is not yet available for your account.”
+     - Architect the UI so that later we can hook it to WebSocket or a third-party chat service without redesign.
+   - Do NOT implement complex realtime logic now – focus on a clean, extensible UI and stub handlers.
+
+C. SYSTEM STATUS PAGE – /restaurant/support/status
+1. Header:
+   - Title: “System Status”
+   - Subtitle: “Check SafeGo platform status and uptime.”
+2. Status overview:
+   - Show a list or grid of key services:
+     - Restaurant Portal
+     - Customer App
+     - Driver App
+     - Orders & Dispatch
+     - Payments
+     - Payouts
+     - Live Chat
+     - Notifications
+   - Each item has:
+     - Service name
+     - Status badge: Operational / Degraded / Partial Outage / Major Outage
+     - Optional short note.
+   - For now, you can hard-code a mock status model or use a simple config; no external status API is required.
+3. Incident history (optional but preferred):
+   - List last few incidents with date, impacted services, and short resolution note.
+4. Ensure:
+   - Read-only; restaurants cannot edit status.
+   - No horizontal scroll; fully responsive.
+
+D. NAVIGATION & LAYOUT
+1. In the restaurant sidebar, under “Support”, ensure the following entries are present and properly linked:
+   - Help Center
+   - Contact Support
+   - System Status
+2. Consistent header:
+   - All support pages must reuse the same global restaurant header (SafeGo Eats, restaurant identity, Online toggle, search bar, notifications, profile avatar).
+   - Do NOT duplicate or invent a second header.
+3. Responsiveness:
+   - Mobile: single-column, stacked sections.
+   - Tablet: allow 2-column layouts where appropriate (e.g., ticket list beside ticket details).
+   - Desktop: comfortable, wider layouts while preserving readability.
+
+E. SECURITY & SAFEGUARD REQUIREMENTS
+Please apply SafeGo security principles for this feature:
+1. RBAC:
+   - Only authenticated restaurant users can access `/restaurant/support/*`.
+   - Restaurants can see and modify ONLY their own support tickets and messages.
+2. Data protection:
+   - Do not expose internal IDs or other restaurants’ data.
+   - Validate and sanitize all input fields.
+3. Rate limiting / abuse protection:
+   - Reasonable safeguards to prevent ticket spam (basic throttling or front-end guard is enough for now).
+4. Audit logging:
+   - Log ticket creation and status changes (who did what and when) using existing logging patterns.
+5. No PII leaks:
+   - When rendering system messages or internal notes, avoid exposing internal staff emails or sensitive identifiers beyond what is necessary for support.
+
+F. DO NOT DO
+- Do NOT modify payment, payout, or order processing logic.
+- Do NOT change authentication, KYC flows, or the main restaurant onboarding.
+- Do NOT introduce new top-level navigation sections unrelated to Support.
+- Do NOT break existing layouts in Dashboard, Orders, Menu, Payouts, Staff Management, etc.
+
+G. FINAL VERIFICATION
+After implementation:
+1. Test `/restaurant/support/help`, `/restaurant/support/contact`, and `/restaurant/support/status` on mobile, tablet, and desktop.
+2. Confirm:
+   - Navigation between support pages works from the sidebar.
+   - Ticket creation and viewing work end-to-end for a restaurant account.
+   - The UI does not overlap with the keyboard on mobile; everything is scrollable.
+   - Live Chat UI is present but clearly marked as not yet available (if backend is not wired).
+   - No horizontal scroll and no layout regressions on other restaurant pages.
+
+This work should make the restaurant Support Center fully usable today (via tickets and documentation), while keeping the codebase ready for future live chat integration. No changes to core business logic or SafeGuard/KYC flows.

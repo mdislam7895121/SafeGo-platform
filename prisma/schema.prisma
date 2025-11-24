@@ -445,6 +445,7 @@ model RestaurantProfile {
   surgeSettings         SurgeSettings? // Phase 10: Surge pricing settings
   supportTickets        SupportTicket[] // Phase 12: Restaurant support tickets
   financialAdjustments  FinancialAdjustment[] // Phase 12: Financial adjustments
+  restaurantSupportTickets RestaurantSupportTicket[] @relation("RestaurantSupportTickets") // Phase 12.5: Restaurant support center tickets
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -1969,4 +1970,68 @@ model FinancialAdjustment {
   @@index([createdByAdminId])
   @@index([createdAt])
   @@map("financial_adjustments")
+}
+
+// Phase 12.5: Restaurant Support Center Models (separate from customer/driver support)
+enum RestaurantSupportCategory {
+  orders
+  payouts
+  menu_pricing
+  account_kyc
+  technical_issue
+  other
+}
+
+enum RestaurantSupportPriority {
+  low
+  normal
+  high
+}
+
+enum RestaurantSupportStatus {
+  open
+  in_progress
+  resolved
+  closed
+}
+
+model RestaurantSupportTicket {
+  id              String                      @id @default(uuid())
+  ticketCode      String                      @unique // e.g., "RST-2025-000123"
+  restaurantId    String
+  subject         String
+  category        RestaurantSupportCategory
+  priority        RestaurantSupportPriority   @default(normal)
+  status          RestaurantSupportStatus     @default(open)
+  description     String                      @db.Text
+  attachmentUrls  Json?                       // Array of attachment URLs
+  channel         String                      @default("web") // email, phone, chat
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+  resolvedAt      DateTime?
+  
+  restaurant      RestaurantProfile           @relation("RestaurantSupportTickets", fields: [restaurantId], references: [id], onDelete: Cascade)
+  messages        RestaurantSupportMessage[]
+  
+  @@index([restaurantId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@map("restaurant_support_tickets")
+}
+
+model RestaurantSupportMessage {
+  id              String                   @id @default(uuid())
+  ticketId        String
+  senderRole      String                   // "restaurant" | "support"
+  senderName      String                   // Display name of sender
+  messageBody     String                   @db.Text
+  attachmentUrls  Json?                    // Array of attachment URLs
+  createdAt       DateTime                 @default(now())
+  
+  ticket          RestaurantSupportTicket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("restaurant_support_messages")
 }
