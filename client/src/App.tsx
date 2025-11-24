@@ -91,6 +91,7 @@ import OrdersOverview from "@/pages/restaurant/orders-overview";
 import OrdersCancellations from "@/pages/restaurant/orders-cancellations";
 import ScheduledOrders from "@/pages/restaurant/orders-scheduled";
 import RestaurantOrders from "@/pages/restaurant/orders";
+import RestaurantOrderDetails from "@/pages/restaurant/order-details";
 import RestaurantMenu from "@/pages/restaurant/menu";
 import MenuCategories from "@/pages/restaurant/menu-categories";
 import AddMenuItem from "@/pages/restaurant/menu-new";
@@ -704,6 +705,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <RestaurantOrders />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/orders/:orderId">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantOrderDetails />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
