@@ -101,6 +101,36 @@ Core systems and features include:
   - Future work: Migrate all driver UIs to use new multi-vehicle endpoints
 - **Impact**: Drivers can now successfully register and update vehicles on `/driver/vehicle` page without 404 errors
 
+**D1-KYC-VEHICLE-FIELDS: Vehicle Text Fields Replace Photo Uploads (COMPLETED)**
+- **Requirement**: Replace vehicle license plate photo upload with text fields (color, model, plate number) and remove SSN card image upload for USA drivers
+- **Implementation**:
+  - **Backend Endpoint**: PUT `/api/driver/vehicle-kyc-details` (server/routes/driver.ts lines 2114-2208)
+    - Accepts JSON body: `vehicleColor`, `vehicleModel`, `licensePlateNumber`
+    - USA driver validation: Trims inputs FIRST, then validates all three fields required (prevents blank string submissions)
+    - Updates existing primary vehicle or creates one if none exists
+    - Atomic transaction with error handling
+  - **Frontend UI** (client/src/pages/driver/kyc-documents.tsx):
+    - Added "Vehicle Details" card section with three text inputs (lines 702-755)
+    - Marked as required (*) for USA drivers
+    - Auto-prefills from `driverData.vehicle` (not primaryVehicle)
+    - Helper text clarifies no photo needed for license plate
+    - Save button with USA validation
+  - **Removed Photo Uploads**:
+    - SSN card image upload section removed (was lines 618-632)
+    - License plate photo upload removed (was lines 722-738)
+  - **Updated Validation Logic**:
+    - Removed `ssnCardImageUrl` check from KYC completeness
+    - Removed `hasLicensePlate` photo check
+    - Added checks for `vehicle.color`, `vehicle.vehicleModel`, `vehicle.licensePlate` text fields for USA drivers
+- **Data Model**: No schema changes required - Vehicle model already contains color, licensePlate, vehicleModel fields
+- **Security**: JWT authentication required, driver ownership enforcement, 400 validation errors for empty/blank strings
+- **API Response**: Returns updated vehicle data, frontend invalidates `/api/driver/home` cache
+- **Non-USA Drivers**: Fields optional, no validation enforcement
+- **Critical Fixes Applied**:
+  - Backend: Trim-first validation prevents whitespace-only submissions
+  - Frontend: Correct prefill from `vehicle` property (not `primaryVehicle`)
+- **Impact**: USA drivers provide vehicle details via text fields instead of uploading license plate photos; SSN card image upload removed from all flows
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
 
