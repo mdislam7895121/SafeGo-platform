@@ -1,0 +1,141 @@
+You are working on the SafeGo multi-role platform (Customer, Driver, Restaurant, Admin) with global support for FOOD/RIDE/PARCEL services, Bangladesh + USA KYC, unified payouts, and existing SafeGuard security. Follow all existing SafeGo rules strictly. Your task is a SMALL, NON-BREAKING enhancement focused ONLY on the Restaurant → SafeGo Eats menu management UI.
+
+TASK GOAL
+Implement a “Smart Category & Subcategory Search + Auto-Suggest” system for restaurant menu items, using the existing relational category model (50+ main categories, 500+ subcategories). This must improve UX for restaurant owners when creating/editing menu items, without changing database schema, payouts, other roles, or any security behavior.
+
+SCOPE LIMITS (DO NOT VIOLATE)
+1. Roles:
+   - Restaurant: CHANGE ALLOWED (menu category UI + helper logic only).
+   - Driver, Customer, Admin: NO functional changes, no new routes, no schema changes.
+2. Services:
+   - FOOD menus: CHANGE ALLOWED (this task).
+   - RIDE and PARCEL: NO changes.
+3. Data model:
+   - NO new tables, columns, or migrations.
+   - Use existing Category/Subcategory/MenuItem models and relations.
+4. Security:
+   - Keep all SafeGuard rules, RBAC, KYC, and audit logging exactly as they are.
+   - No public unauthenticated endpoints; no new external integrations.
+5. Payouts & Wallet:
+   - Unified payout system is FROZEN IN CURRENT STATE. Do not touch any `/api/payout/*` or wallet logic.
+
+A. SMART CATEGORY & SUBCATEGORY SEARCH (RESTAURANT PORTAL)
+Implement an efficient search system for categories/subcategories when restaurant owners add/edit menu items.
+
+1. UI placement:
+   - On the restaurant menu item editor (create/edit item screen), above the category selection area, add a “Search categories…” input.
+   - Re-use existing SafeGo input components and style; no new design system.
+
+2. Behavior:
+   - As the user types, filter the category tree in-memory (no extra DB calls per keystroke).
+   - Search should match:
+     - Main category names (e.g., “Burgers”, “Pizza”)
+     - Subcategory names (e.g., “Veg Pizza”, “Cheese Burger”)
+     - Partial matches and case-insensitive.
+   - Show only relevant categories:
+     - If a main category matches, show it plus its subcategories.
+     - If only subcategories match, show their parent category expanded with only the matching subcategories visible.
+   - Highlight matching text (e.g., bold or subtle highlight) without breaking theme.
+
+3. Performance constraints:
+   - On page load, fetch categories ONCE using existing API.
+   - Perform search & filtering client-side in-memory.
+   - No N+1 queries; no new server round-trips per keystroke.
+   - Must remain smooth on mobile for 500+ subcategories.
+
+B. AUTO-SUGGEST CATEGORY/SUBCATEGORY FROM ITEM TITLE/DESCRIPTION
+Assist restaurant owners by suggesting the most likely category/subcategory based on the menu item they are adding.
+
+1. Inputs:
+   - Menu Item “Title”
+   - Menu Item “Description” (if present)
+
+2. Suggestion engine logic (client-side or a small non-breaking helper on backend):
+   - Tokenize title + description.
+   - Match against known category/subcategory keyword sets.
+   - Support basic synonyms, e.g.:
+     - “burger, cheeseburger, patty melt” → Burger category
+     - “pizza, margherita, pepperoni” → Pizza category
+     - “biriyani, biryani, pulao” → Rice / Biryani category
+   - Score matches and pick:
+     - 1 best “Suggested Category”
+     - Up to 3 “Suggested Subcategories” (if applicable)
+
+3. UI behavior:
+   - Show a small “Suggested” block near the category selector:
+     - Suggested Category: [Category Name] (click to apply)
+     - Suggested Subcategories: [Subcat 1], [Subcat 2], [Subcat 3] (click to apply)
+   - When the user clicks a suggestion:
+     - Automatically set the category and subcategory dropdowns to those values.
+   - User can always override suggestions manually; existing manual selection must still work.
+
+4. Fallbacks:
+   - If confidence is low or no good match, show a neutral message like “No strong suggestion – please choose manually” and do not auto-fill.
+   - Do NOT auto-assign a random category.
+
+C. CATEGORY DROPDOWN & FILTER EXPERIENCE
+1. Category dropdown:
+   - Use a 2-level selection:
+     - First: Main Category
+     - Then: Subcategory (filtered by chosen main category)
+   - Integrate search results:
+     - When search is active, dropdown only shows filtered categories/subcategories.
+   - Ensure “Select All” or multi-select patterns remain consistent with existing design (if already implemented). Do not introduce multi-select if it does not exist.
+
+2. Accessibility & devices:
+   - Must be fully usable on mobile, tablet, and desktop.
+   - No horizontal scroll.
+   - Tap targets large enough on narrow screens.
+   - Keep SafeGo fonts, colors, spacing.
+
+D. BACKEND & API CONSTRAINTS
+1. No new tables or migrations.
+2. If you need backend help for search:
+   - Extend ONLY the existing category fetch endpoint with an optional query parameter (e.g., `?q=`) that performs server-side filtering.
+   - Response shape must remain backwards compatible (same JSON shape, just filtered contents).
+3. Any new helper functions must:
+   - Live inside appropriate service layer file (e.g., MenuCategoryService / helpers).
+   - Be pure transformations (no direct DB access if running client-side).
+4. DO NOT touch:
+   - Payout models (Payout, PayoutAccount, PayoutBatch).
+   - Support Center routes.
+   - Global collections (rides, food_orders, deliveries) beyond reading needed category info for FOOD.
+
+E. SECURITY & SAFEGOARD COMPLIANCE
+1. Keep all existing authentication and RBAC policies unchanged.
+2. Restaurant-only pages must still require:
+   - Authenticated restaurant session
+   - KYC/verification checks where already enforced.
+3. No new public endpoints; no unauthenticated search.
+4. Ensure no cross-restaurant data leakage:
+   - Only load categories that are global or specifically allowed for that restaurant tenant, same as current logic.
+
+F. TESTING & VALIDATION
+1. Manual tests:
+   - Restaurant role:
+     - Open menu editor, type in item name and description.
+     - Verify suggestions appear and can be applied.
+     - Verify manual selection still works.
+     - Verify search filters categories correctly and performs well on mobile.
+   - Confirm that Driver, Customer, and Admin UIs behave exactly as before (no new options, no errors).
+2. Responsive testing:
+   - Mobile (320–430px width)
+   - Tablet (~768px)
+   - Desktop (1024px+)
+3. Regression:
+   - Existing menu items still show their previously saved categories and subcategories.
+   - No change to pricing, taxes, payouts, or order flows.
+
+G. DOCUMENTATION
+1. Update `replit.md` (or the main project doc) with:
+   - “Smart Category & Subcategory Search” description.
+   - “Auto-Suggest Category from Item Title/Description” behavior.
+   - Any config flags or environment toggles (if added).
+2. Clearly note: “No schema changes; all modifications are UI + helper logic only. Payout system remains frozen as previously documented.”
+
+DELIVERABLE
+When done, briefly summarize:
+- What was implemented.
+- Any helper functions added.
+- How a restaurant owner uses the new search + suggestion when creating a menu item.
+- Confirmation that all 4 roles (Customer, Driver, Restaurant, Admin) still work correctly and only Restaurant FOOD menu UI behavior changed.
