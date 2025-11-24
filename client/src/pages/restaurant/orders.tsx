@@ -133,8 +133,8 @@ export default function RestaurantOrders() {
 
   return (
     <div className="space-y-6">
-        {/* Filter Bar */}
-        <Card>
+        {/* Filter Bar - Stable 24px spacing from header */}
+        <Card className="mt-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5" />

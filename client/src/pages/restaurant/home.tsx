@@ -270,19 +270,21 @@ export default function RestaurantHome() {
         {/* KYC Verification Banner */}
         <KYCBanner />
 
-        {/* Performance Overview with Time Period Filter */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Performance Overview</h2>
-          <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
-            <TabsList data-testid="tabs-time-period">
-              <TabsTrigger value="today" data-testid="tab-today">Today</TabsTrigger>
-              <TabsTrigger value="week" data-testid="tab-week">7 Days</TabsTrigger>
-              <TabsTrigger value="month" data-testid="tab-month">30 Days</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        {/* Performance Overview Section - Stable 24px spacing from header */}
+        <section className="mt-6 space-y-6">
+          {/* Performance Overview with Time Period Filter */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Performance Overview</h2>
+            <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
+              <TabsList data-testid="tabs-time-period">
+                <TabsTrigger value="today" data-testid="tab-today">Today</TabsTrigger>
+                <TabsTrigger value="week" data-testid="tab-week">7 Days</TabsTrigger>
+                <TabsTrigger value="month" data-testid="tab-month">30 Days</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {/* Orders Count */}
           <Card>
             <CardContent className="p-4">
@@ -400,7 +402,8 @@ export default function RestaurantHome() {
               </div>
             </CardContent>
           </Card>
-        </div>
+          </div>
+        </section>
 
         {/* R-ENHANCE: Recent Orders + Alerts Unified Panel */}
         {liveOrders.length > 0 && (
