@@ -130,11 +130,18 @@ export default function ManageAccount() {
       const formData = new FormData();
       formData.append("file", file);
       
+      const token = localStorage.getItem("safego_token");
+      const headers: any = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      
       let res: Response;
       try {
         res = await fetch("/api/driver/upload/profile-photo", {
           method: "POST",
           body: formData,
+          headers,
           credentials: "include",
         });
       } catch (networkError) {

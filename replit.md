@@ -66,6 +66,17 @@ Core systems and features include:
 - **Security**: Driver-only authentication, 5MB limit, image types only (JPEG, PNG, WebP)
 - **Impact**: Profile photo upload now works on both /driver/kyc-documents and /driver/account/manage pages
 
+**D1-PROFILE-PHOTO-AUTH: Authorization Header Fix (COMPLETED)**
+- **Issue**: Driver profile photo uploads failed with "Access token required" error on both /driver/account/manage and /driver/kyc-documents
+- **Root Cause**: Backend route POST /api/driver/upload/profile-photo requires JWT authentication via Authorization header, but frontend manage.tsx was not sending it
+- **Fix**: Updated manage.tsx to retrieve JWT token from localStorage and include `Authorization: Bearer <token>` header in multipart upload request (matching kyc-documents.tsx pattern)
+- **Authentication Model**: Standard SafeGo JWT-based authentication using Authorization header (no separate access token field required)
+- **Request Format**: 
+  - Multipart/form-data with field name "file"
+  - Authorization: Bearer {JWT_TOKEN} header
+  - Max 5MB, JPEG/PNG/WebP only
+- **Impact**: Profile photo uploads now work correctly on both /driver/account/manage and /driver/kyc-documents pages without authentication errors
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
 
