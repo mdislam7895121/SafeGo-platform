@@ -1,0 +1,135 @@
+You are the architect + engineer working on SafeGo Driver Phase D1.
+
+BUG TO FIX (BLOCKER):
+On the driver web app, the driver profile page is broken.  
+When I try to:
+- upload driver profile photo, OR  
+- update profile fields (name, etc.)
+
+I get a red toast saying:
+
+  "Upload failed
+   Cannot read properties of null (reading 'status')"
+
+Nothing is actually updated. This happens on the driver side only.  
+Restaurant image uploads and restaurant profile operations must continue to work as before.
+
+Your goal:
+Fix all driver profile update + profile photo upload flows so they are production-ready, with a clear and consistent API contract and no "Cannot read properties of null (reading 'status')" error.
+
+Please follow these steps carefully:
+
+1) Reproduce and locate the bug
+- Open the driver dashboard in Preview and go to the driver profile page (the one where I tried to upload profile photo and change my name).
+- Open browser devtools console and Network tab.
+- Try:
+  a) uploading a valid small JPG/PNG as profile photo,
+  b) changing the driver name and saving.
+- Confirm the toast error appears and capture:
+  - the failing frontend request(s),
+  - the HTTP status code,
+  - the response body (if any).
+- Based on that, identify exactly which frontend file and which API call is trying to read `response.status` (or similar) from a null/undefined value.
+
+2) Inspect frontend code
+Focus on the driver profile page and any shared hooks used there. Likely locations (adjust if different):
+- client/src/pages/driver/profile.tsx
+- client/src/components/driver/DriverProfileForm.tsx
+- any shared upload helper or API client used by driver profile uploads.
+
+Tasks:
+- Find all places where the driver profile or photo upload code:
+  - assumes `response` or `response.data` is non-null, and
+  - reads `.status` or `.success` without checking for null/undefined.
+- Add defensive checks:
+  - If the fetch/axios call returns no JSON body (e.g., 204), treat HTTP 2xx as success without reading a `status` field from the body.
+  - Always guard with something like: `if (!res || !res.data) { show generic error toast and return; }` before reading `res.data.status` or similar.
+- Ensure the success condition is consistent. For example:
+  - Either rely on HTTP status (2xx = success), or
+  - Rely on a `success: true` boolean in the JSON body — but then enforce that consistently in the backend.
+
+3) Inspect backend API for driver profile + image upload
+Locate the driver endpoints, for example (adjust paths if needed):
+- server/routes/driver.ts
+- server/routes/uploads.ts (or similar)
+- any driver-specific upload controller/service.
+
+Tasks:
+- Identify the endpoints used by:
+  a) driver profile update (name, etc.),
+  b) driver profile photo upload.
+- Make the API contract explicit and consistent:
+  - On success, always return HTTP 200 (or 201) with a JSON body like:
+
+    {
+      "success": true,
+      "driver": { ...updated profile data... }
+    }
+
+  - On validation or permission errors, return:
+    - 400/401/403 with:
+
+    {
+      "success": false,
+      "error": {
+        "code": "VALIDATION_ERROR" | "UNAUTHORIZED" | "FORBIDDEN" | ...,
+        "message": "Human-readable message"
+      }
+    }
+
+- Do NOT return `null` or an empty body on success for these endpoints — the frontend is clearly expecting some JSON.
+- Ensure the handler never returns `null` directly as the top-level object.
+
+4) Wire frontend to the new contract
+After the backend is normalized:
+
+- Update driver profile update and photo upload code to:
+  - Parse the JSON response safely.
+  - Check `if (response.ok && body?.success)` then:
+      - update UI state with the new driver profile/photo URL,
+      - show a green success toast.
+  - Else:
+      - read `body?.error?.message` if present,
+      - fall back to a generic error message if not,
+      - show a red error toast.
+- Ensure that NO code path relies on `body.status` when `body` might be null.
+- Remove any leftover references to a previous `status` field if the new contract uses `success`.
+
+5) Cross-check with restaurant uploads
+We previously implemented restaurant-side image upload (for menu items and reviews).  
+Tasks:
+- Confirm that changes for driver profile uploads do not break:
+  - restaurant menu image uploads,
+  - restaurant review image uploads.
+- If there is a shared upload handler, make sure it:
+  - returns a consistent JSON shape for both restaurant and driver uploads,
+  - does not break existing restaurant flows.
+
+6) Security checks (keep it MVP-safe)
+For driver profile photo upload, verify:
+- KYC/driver authentication is enforced (no anonymous upload).
+- File type and size validation is in place (only image types, up to configured max size).
+- Filenames are sanitized and stored safely (no path traversal).
+- Any errors from storage (disk or object storage) are correctly propagated and produce a structured error response (no null body).
+
+7) Testing
+Implement a small manual test plan:
+
+From the driver profile page:
+- Case 1: Upload a valid JPG/PNG under the size limit.
+  - Expect: no console errors, HTTP 2xx, JSON `{ success: true, ... }`, profile photo updates in UI, green success toast.
+- Case 2: Upload an invalid file type or too large file.
+  - Expect: proper validation error from backend, red toast with meaningful message, no null-status error.
+- Case 3: Change name and save.
+  - Expect: updated name in UI, persisted after refresh, green success toast, no console errors.
+
+Make sure that the "Cannot read properties of null (reading 'status')" error never appears again in any of these flows.
+
+8) Documentation
+- Update replit.md under the D1 driver section to document:
+  - the driver profile update and photo upload API contract,
+  - example success and error responses,
+  - known limitations (if any remaining).
+- Note explicitly that the previous null-status error has been fixed and how.
+
+Finally, restart the app and confirm everything is working from the driver profile UI. Then summarize the exact files and changes you made.
