@@ -6,6 +6,7 @@ import { validateRestaurantKYC } from "../utils/kyc-validator";
 import { notifyFoodOrderStatusChange, notifyRestaurantIssueEscalated } from "../utils/notifications";
 import { prisma } from "../db";
 import { auditMenuAction, getClientIp, EntityType, logAuditEvent, ActionType } from "../utils/audit";
+import { uploadMenuItemImage, getFileUrl } from "../middleware/upload";
 import {
   isRestaurantOwner,
   getStaffForOwner,
@@ -119,6 +120,305 @@ router.patch("/profile", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Profile update error:", error);
     res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// ====================================================
+// STAFF MANAGEMENT API (R3)
+// ====================================================
+
+// POST /api/restaurant/staff - Create/invite staff member
+router.post("/staff", requireKYCCompletion, requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const createStaffSchema = z.object({
+      name: z.string().min(1, "Name is required"),
+      email: z.string().email("Invalid email format"),
+      phone: z.string().min(1, "Phone is required"),
+      temporaryPassword: z.string().min(8, "Password must be at least 8 characters"),
+      permissions: z.object({
+        canEditCategories: z.boolean().optional().default(false),
+        canEditItems: z.boolean().optional().default(false),
+        canToggleAvailability: z.boolean().optional().default(false),
+        canUseBulkTools: z.boolean().optional().default(false),
+        canViewAnalytics: z.boolean().optional().default(false),
+        canViewPayouts: z.boolean().optional().default(false),
+        canManageOrders: z.boolean().optional().default(false),
+      }).optional(),
+    });
+
+    const validatedData = createStaffSchema.parse(req.body);
+
+    const ownerProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, restaurantName: true },
+    });
+
+    if (!ownerProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email: validatedData.email },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+
+    // Create staff member using utility function
+    const { user, restaurantProfile } = await createStaffMember(ownerProfile.id, validatedData);
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: ownerProfile.id,
+      action: ActionType.CREATE,
+      details: `Created staff member: ${validatedData.name} (${validatedData.email})`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.status(201).json({
+      message: "Staff member created successfully",
+      staff: {
+        id: restaurantProfile.id,
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        staffActive: restaurantProfile.staffActive,
+        permissions: {
+          canEditCategories: restaurantProfile.canEditCategories,
+          canEditItems: restaurantProfile.canEditItems,
+          canToggleAvailability: restaurantProfile.canToggleAvailability,
+          canUseBulkTools: restaurantProfile.canUseBulkTools,
+          canViewAnalytics: restaurantProfile.canViewAnalytics,
+          canViewPayouts: restaurantProfile.canViewPayouts,
+          canManageOrders: restaurantProfile.canManageOrders,
+        },
+        createdAt: restaurantProfile.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Create staff error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: error.message || "Failed to create staff member" });
+  }
+});
+
+// GET /api/restaurant/staff - List all staff members
+router.get("/staff", requireKYCCompletion, requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const ownerProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!ownerProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Get all staff members using utility function
+    const staffMembers = await getStaffForOwner(ownerProfile.id);
+
+    // Transform response to include user details
+    const staffList = staffMembers.map((staff) => ({
+      id: staff.id,
+      userId: staff.userId,
+      name: staff.user.name,
+      email: staff.user.email,
+      phone: staff.user.phone,
+      staffActive: staff.staffActive,
+      permissions: {
+        canEditCategories: staff.canEditCategories,
+        canEditItems: staff.canEditItems,
+        canToggleAvailability: staff.canToggleAvailability,
+        canUseBulkTools: staff.canUseBulkTools,
+        canViewAnalytics: staff.canViewAnalytics,
+        canViewPayouts: staff.canViewPayouts,
+        canManageOrders: staff.canManageOrders,
+      },
+      lastLoginAt: staff.lastLoginAt,
+      createdAt: staff.createdAt,
+    }));
+
+    res.json({ staff: staffList });
+  } catch (error: any) {
+    console.error("Get staff error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch staff members" });
+  }
+});
+
+// PATCH /api/restaurant/staff/:id - Update staff permissions
+router.patch("/staff/:id", requireKYCCompletion, requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: staffId } = req.params;
+
+    const updateStaffSchema = z.object({
+      staffActive: z.boolean().optional(),
+      permissions: z.object({
+        canEditCategories: z.boolean().optional(),
+        canEditItems: z.boolean().optional(),
+        canToggleAvailability: z.boolean().optional(),
+        canUseBulkTools: z.boolean().optional(),
+        canViewAnalytics: z.boolean().optional(),
+        canViewPayouts: z.boolean().optional(),
+        canManageOrders: z.boolean().optional(),
+      }).optional(),
+    });
+
+    const validatedData = updateStaffSchema.parse(req.body);
+
+    const ownerProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!ownerProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify staff belongs to this owner
+    const canManage = await canManageStaff(userId, staffId);
+    if (!canManage) {
+      return res.status(403).json({ error: "You can only manage your own staff members" });
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (validatedData.staffActive !== undefined) {
+      updateData.staffActive = validatedData.staffActive;
+    }
+    if (validatedData.permissions) {
+      Object.assign(updateData, validatedData.permissions);
+    }
+
+    // Update staff member
+    const updatedStaff = await prisma.restaurantProfile.update({
+      where: { id: staffId },
+      data: updateData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            phone: true,
+          },
+        },
+      },
+    });
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: ownerProfile.id,
+      action: ActionType.UPDATE,
+      details: `Updated staff permissions: ${updatedStaff.user.name} (${updatedStaff.user.email})`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json({
+      message: "Staff permissions updated successfully",
+      staff: {
+        id: updatedStaff.id,
+        userId: updatedStaff.userId,
+        name: updatedStaff.user.name,
+        email: updatedStaff.user.email,
+        phone: updatedStaff.user.phone,
+        staffActive: updatedStaff.staffActive,
+        permissions: {
+          canEditCategories: updatedStaff.canEditCategories,
+          canEditItems: updatedStaff.canEditItems,
+          canToggleAvailability: updatedStaff.canToggleAvailability,
+          canUseBulkTools: updatedStaff.canUseBulkTools,
+          canViewAnalytics: updatedStaff.canViewAnalytics,
+          canViewPayouts: updatedStaff.canViewPayouts,
+          canManageOrders: updatedStaff.canManageOrders,
+        },
+        lastLoginAt: updatedStaff.lastLoginAt,
+        createdAt: updatedStaff.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Update staff error:", error);
+    if (error.name === "ZodError") {
+      return res.status(400).json({ error: "Validation error", details: error.errors });
+    }
+    res.status(500).json({ error: error.message || "Failed to update staff member" });
+  }
+});
+
+// DELETE /api/restaurant/staff/:id - Soft delete (deactivate) staff member
+router.delete("/staff/:id", requireKYCCompletion, requireOwnerRole, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: staffId } = req.params;
+
+    const ownerProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    if (!ownerProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify staff belongs to this owner
+    const canManage = await canManageStaff(userId, staffId);
+    if (!canManage) {
+      return res.status(403).json({ error: "You can only manage your own staff members" });
+    }
+
+    // Get staff details before deactivation
+    const staffMember = await prisma.restaurantProfile.findUnique({
+      where: { id: staffId },
+      include: {
+        user: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!staffMember) {
+      return res.status(404).json({ error: "Staff member not found" });
+    }
+
+    // Soft delete by marking as inactive
+    await prisma.restaurantProfile.update({
+      where: { id: staffId },
+      data: { staffActive: false },
+    });
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: ownerProfile.id,
+      action: ActionType.DELETE,
+      details: `Deactivated staff member: ${staffMember.user.name} (${staffMember.user.email})`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json({
+      message: "Staff member deactivated successfully",
+      success: true,
+    });
+  } catch (error: any) {
+    console.error("Delete staff error:", error);
+    res.status(500).json({ error: error.message || "Failed to deactivate staff member" });
   }
 });
 
@@ -589,10 +889,10 @@ router.post("/payouts/request-enhanced", requireKYCCompletion, async (req: AuthR
         data: {
           walletId: wallet.id,
           countryCode: wallet.countryCode,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
           ownerId: restaurantProfile.id,
           amount: amountDecimal,
-          method: "bank_transfer",
+          method: "manual_request",
           status: "pending",
           isDemo: restaurantProfile.isDemo,
         },
@@ -2078,6 +2378,86 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
     }
     console.error("Update item error:", error);
     res.status(500).json({ error: "Failed to update item" });
+  }
+});
+
+// POST /api/restaurant/menu/items/:id/image
+// Upload menu item image (OWNER only)
+router.post("/menu/items/:id/image", requireKYCCompletion, requireOwnerRole, uploadMenuItemImage, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No image file provided" });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Verify item belongs to restaurant
+    const item = await prisma.menuItem.findFirst({
+      where: {
+        id,
+        restaurantId: restaurantProfile.id,
+      },
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Menu item not found" });
+    }
+
+    // Generate file URL
+    const imageUrl = getFileUrl(req.file.filename);
+
+    // Delete old image file if exists (cleanup)
+    if (item.itemImageUrl) {
+      try {
+        const oldFilename = item.itemImageUrl.split('/').pop();
+        if (oldFilename) {
+          const { deleteFile } = await import("../middleware/upload");
+          deleteFile(oldFilename);
+        }
+      } catch (error) {
+        console.error("Failed to delete old image:", error);
+        // Continue even if deletion fails - new image is more important
+      }
+    }
+
+    // Update menu item with new image URL
+    const updatedItem = await prisma.menuItem.update({
+      where: { id },
+      data: { itemImageUrl: imageUrl },
+    });
+
+    // Audit log
+    await auditMenuAction({
+      actorId: userId,
+      actorEmail: restaurantProfile.user.email,
+      actorRole: "restaurant",
+      ipAddress: getClientIp(req),
+      actionType: "update",
+      entityType: "menu_item",
+      entityId: id,
+      restaurantId: restaurantProfile.id,
+      description: `Uploaded image for menu item: ${item.name}`,
+      metadata: { imageUrl },
+    });
+
+    res.json({
+      message: "Image uploaded successfully",
+      imageUrl,
+      item: updatedItem,
+    });
+  } catch (error: any) {
+    console.error("Upload menu item image error:", error);
+    res.status(500).json({ error: error.message || "Failed to upload image" });
   }
 });
 

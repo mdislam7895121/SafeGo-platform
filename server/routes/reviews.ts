@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { logAuditEvent, EntityType, ActionType, getClientIp } from "../utils/audit";
+import { uploadReviewImages, getFileUrl } from "../middleware/upload";
 
 const router = Router();
 
@@ -182,6 +183,92 @@ router.get("/:id", async (req: AuthRequest, res) => {
   } catch (error: any) {
     console.error("Get review error:", error);
     res.status(500).json({ error: error.message || "Failed to fetch review" });
+  }
+});
+
+// POST /api/reviews/:id/images - Upload review images (customer only, within 24 hours)
+router.post("/:id/images", requireRole(["customer"]), uploadReviewImages, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
+      return res.status(400).json({ error: "No image files provided" });
+    }
+
+    // Get customer profile
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify review belongs to customer and within 24 hours
+    // SECURITY: Use compound where clause to prevent ID guessing attacks
+    const review = await prisma.review.findFirst({
+      where: {
+        id,
+        customerId: customerProfile.id, // Verify ownership in query, not after
+      },
+    });
+
+    if (!review) {
+      return res.status(404).json({ error: "Review not found or you don't have permission to modify it" });
+    }
+
+    if (!canModifyReview(review.createdAt)) {
+      return res.status(403).json({ error: "Images can only be uploaded within 24 hours of review creation" });
+    }
+
+    // Validate total image count (max 5 per review)
+    const currentImageCount = review.images.length;
+    const newImageCount = (req.files as Express.Multer.File[]).length;
+    
+    if (currentImageCount + newImageCount > 5) {
+      return res.status(400).json({ 
+        error: `Cannot upload ${newImageCount} images. Maximum 5 images per review (currently have ${currentImageCount})` 
+      });
+    }
+
+    // Generate image URLs
+    const imageUrls = (req.files as Express.Multer.File[]).map(file => getFileUrl(file.filename));
+
+    // Update review with new images (append to existing)
+    const updatedReview = await prisma.review.update({
+      where: { id },
+      data: {
+        images: [...review.images, ...imageUrls],
+      },
+    });
+
+    // Get user for audit log
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    });
+
+    // Audit log
+    await logAuditEvent({
+      actorId: customerProfile.id,
+      actorEmail: user?.email || "unknown",
+      actorRole: user?.role || "customer",
+      entityType: EntityType.CUSTOMER,
+      entityId: customerProfile.id,
+      actionType: ActionType.UPDATE,
+      description: `Uploaded ${imageUrls.length} image(s) to review ${id}`,
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({
+      message: "Images uploaded successfully",
+      imageUrls,
+      review: updatedReview,
+    });
+  } catch (error: any) {
+    console.error("Upload review images error:", error);
+    res.status(500).json({ error: error.message || "Failed to upload images" });
   }
 });
 

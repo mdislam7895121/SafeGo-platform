@@ -8,17 +8,30 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// Sanitize filename to prevent path traversal
+function sanitizeFilename(filename: string): string {
+  // Remove path separators and null bytes
+  return filename
+    .replace(/[/\\]/g, "")
+    .replace(/\0/g, "")
+    .replace(/\.\./g, "")
+    .trim();
+}
+
 // Configure multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
-    // Generate unique filename: timestamp-randomstring-originalname
+    // SECURITY: Sanitize original filename to prevent path traversal
+    const sanitizedOriginal = sanitizeFilename(file.originalname);
+    const ext = path.extname(sanitizedOriginal);
+    const nameWithoutExt = path.basename(sanitizedOriginal, ext);
+    
+    // Generate unique filename with sanitized components
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    const ext = path.extname(file.originalname);
-    const nameWithoutExt = path.basename(file.originalname, ext);
-    cb(null, `${nameWithoutExt}-${uniqueSuffix}${ext}`);
+    cb(null, `${nameWithoutExt.substring(0, 50)}-${uniqueSuffix}${ext}`);
   },
 });
 
@@ -105,6 +118,24 @@ export const uploadSupportAttachment = multer({
     fileSize: 10 * 1024 * 1024, // 10MB default (configurable via settings)
   },
 }).single("attachment");
+
+// Upload configuration for menu item images
+export const uploadMenuItemImage = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+}).single("menuItemImage");
+
+// Upload configuration for review images (multiple)
+export const uploadReviewImages = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB per file
+  },
+}).array("reviewImages", 5); // Max 5 images per review
 
 // Helper to delete file
 export function deleteFile(filename: string): void {
