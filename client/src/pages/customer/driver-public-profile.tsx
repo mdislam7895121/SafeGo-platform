@@ -107,7 +107,11 @@ export default function DriverPublicProfile() {
           </div>
         </div>
 
-        <DriverPreviewCard profile={driverProfile} />
+        <DriverPreviewCard 
+          profile={driverProfile} 
+          show3DViewer={true}
+          viewerHeight={250}
+        />
 
         <Button
           onClick={() => setLocation("/customer")}
