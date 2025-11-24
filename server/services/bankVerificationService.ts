@@ -81,25 +81,64 @@ export class BankVerificationService {
     const errors: string[] = [];
     let kycLevel: "NONE" | "BASIC" | "FULL" = "BASIC";
 
-    // Required fields for Bangladesh
-    const requiredFields = [
-      { field: "nidNumber", name: "National ID Number" },
+    // Required: Present address and father's name
+    const commonRequiredFields = [
       { field: "presentAddress", name: "Present Address" },
       { field: "fatherName", name: "Father's Name" },
     ];
 
-    for (const { field, name } of requiredFields) {
+    for (const { field, name } of commonRequiredFields) {
       if (!profile[field]) {
         errors.push(`${name} is required for Bangladesh KYC verification`);
       }
     }
 
-    // Validate NID format (10 or 13 digits for Bangladesh)
-    if (profile.nidNumber) {
+    // Required: NID OR Passport (at least one must be provided)
+    const hasNID = profile.nidNumber && profile.nidNumber.trim() !== "";
+    const hasPassport = profile.passportNumber && profile.passportNumber.trim() !== "";
+
+    if (!hasNID && !hasPassport) {
+      errors.push("Either National ID (NID) or Passport number is required for Bangladesh KYC");
+    }
+
+    // Track if identity documents are valid
+    let hasValidNID = false;
+    let hasValidPassport = false;
+
+    // Validate NID format if provided (10, 13, or 17 digits for Bangladesh)
+    if (hasNID) {
       const nidLength = profile.nidNumber.replace(/\s/g, "").length;
       if (nidLength !== 10 && nidLength !== 13 && nidLength !== 17) {
         errors.push("Invalid NID format. Must be 10, 13, or 17 digits");
       } else {
+        hasValidNID = true;
+      }
+    }
+
+    // Validate Passport format if provided (typically 8-9 alphanumeric characters)
+    if (hasPassport) {
+      if (!/^[A-Z0-9]{8,9}$/i.test(profile.passportNumber.trim())) {
+        errors.push("Invalid Passport format. Must be 8-9 alphanumeric characters");
+      } else {
+        hasValidPassport = true;
+      }
+    }
+
+    // RESTAURANT-SPECIFIC: Business license required for FULL KYC
+    if (params.ownerType === "restaurant") {
+      const hasBusinessLicense = profile.businessLicenseNumber && profile.businessLicenseNumber.trim() !== "";
+      
+      if (!hasBusinessLicense) {
+        errors.push("Business license number is required for restaurant payout accounts");
+      }
+      
+      // Only grant FULL KYC if restaurant has VALID identity document AND business license
+      if ((hasValidNID || hasValidPassport) && hasBusinessLicense) {
+        kycLevel = "FULL";
+      }
+    } else {
+      // For drivers/customers: FULL KYC only requires VALID identity document
+      if (hasValidNID || hasValidPassport) {
         kycLevel = "FULL";
       }
     }
@@ -152,12 +191,50 @@ export class BankVerificationService {
       }
     }
 
-    // Validate SSN format if provided (XXX-XX-XXXX)
-    if (profile.ssnLast4) {
-      if (!/^\d{4}$/.test(profile.ssnLast4)) {
-        errors.push("Invalid SSN last 4 digits format");
+    // Track if tax documents are valid
+    let hasValidEIN = false;
+    let hasValidSSN = false;
+
+    // RESTAURANT-SPECIFIC: EIN required for FULL KYC
+    if (params.ownerType === "restaurant") {
+      const hasEIN = profile.taxIdNumber && profile.taxIdNumber.trim() !== "";
+      
+      if (!hasEIN) {
+        errors.push("Employer Identification Number (EIN) is required for restaurant payout accounts");
       } else {
+        // Validate EIN format (XX-XXXXXXX, 9 digits)
+        const einClean = profile.taxIdNumber.replace(/-/g, "");
+        if (!/^\d{9}$/.test(einClean)) {
+          errors.push("Invalid EIN format. Must be 9 digits (XX-XXXXXXX)");
+        } else {
+          hasValidEIN = true;
+        }
+      }
+
+      // Restaurants can optionally provide SSN as fallback if EIN is unavailable
+      const hasSSN = profile.ssnLast4 && profile.ssnLast4.trim() !== "";
+      if (hasSSN && !/^\d{4}$/.test(profile.ssnLast4)) {
+        errors.push("Invalid SSN last 4 digits format. Must be exactly 4 digits");
+      } else if (hasSSN) {
+        hasValidSSN = true;
+      }
+
+      // Grant FULL KYC if either valid EIN OR valid SSN is provided
+      if (hasValidEIN || hasValidSSN) {
         kycLevel = "FULL";
+      }
+    } else {
+      // DRIVER/CUSTOMER-SPECIFIC: SSN last 4 required (NOT optional) for FULL KYC
+      if (!profile.ssnLast4 || profile.ssnLast4.trim() === "") {
+        errors.push("SSN last 4 digits are required for USA payout accounts");
+      } else {
+        // Validate SSN last 4 format (XXXX, 4 digits)
+        if (!/^\d{4}$/.test(profile.ssnLast4)) {
+          errors.push("Invalid SSN last 4 digits format. Must be exactly 4 digits");
+        } else {
+          hasValidSSN = true;
+          kycLevel = "FULL";
+        }
       }
     }
 
@@ -182,7 +259,7 @@ export class BankVerificationService {
 
     // Stripe Connect requires full KYC
     if (params.payoutType === "stripe_connect") {
-      if (!profile.ssnLast4) {
+      if (params.ownerType !== "restaurant" && !profile.ssnLast4) {
         errors.push("SSN last 4 digits required for Stripe Connect");
       }
       if (!profile.dateOfBirth) {

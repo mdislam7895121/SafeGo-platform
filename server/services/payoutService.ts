@@ -441,6 +441,205 @@ export class PayoutService {
       totalAmount: totalAmount._sum.amount || new Prisma.Decimal(0),
     };
   }
+
+  /**
+   * Admin method: Update payout status
+   */
+  async updateWalletPayoutStatus(params: {
+    payoutId: string;
+    status: PayoutStatus;
+    failureReason?: string;
+    externalReferenceId?: string;
+    processedByAdminId: string;
+  }) {
+    const { payoutId, status, failureReason, externalReferenceId, processedByAdminId } = params;
+
+    return await prisma.$transaction(async (tx) => {
+      // Get current payout
+      const currentPayout = await tx.payout.findUnique({
+        where: { id: payoutId },
+        include: { payoutAccount: true },
+      });
+
+      if (!currentPayout) {
+        throw new Error("Payout not found");
+      }
+
+      // If marking as failed, refund the amount back to wallet
+      if (status === "failed" && currentPayout.status === "pending") {
+        await tx.wallet.update({
+          where: { id: currentPayout.walletId },
+          data: {
+            availableBalance: {
+              increment: currentPayout.amount,
+            },
+          },
+        });
+
+        // Create refund transaction record
+        await tx.walletTransaction.create({
+          data: {
+            walletId: currentPayout.walletId,
+            transactionType: "payout_refund",
+            serviceType: "payout",
+            direction: "credit",
+            amount: currentPayout.amount,
+            referenceType: "payout",
+            referenceId: payoutId,
+            description: `Payout failed - refunded to wallet: ${failureReason || "Unknown reason"}`,
+            balanceSnapshot: new Prisma.Decimal(0), // Will be updated by trigger
+            negativeBalanceSnapshot: new Prisma.Decimal(0),
+            createdByAdminId: processedByAdminId,
+          },
+        });
+      }
+
+      // Update payout status
+      const payout = await tx.payout.update({
+        where: { id: payoutId },
+        data: {
+          status,
+          failureReason,
+          externalReferenceId,
+          processedAt: status === "completed" || status === "failed" ? new Date() : undefined,
+        },
+        include: {
+          payoutAccount: true,
+        },
+      });
+
+      return payout;
+    });
+  }
+
+  /**
+   * Admin method: Create payout batch
+   */
+  async createPayoutBatch(params: {
+    periodStart: Date;
+    periodEnd: Date;
+    ownerType?: WalletOwnerType;
+    countryCode?: string;
+    minPayoutAmount?: number;
+    createdByAdminId: string;
+  }) {
+    const { periodStart, periodEnd, ownerType, countryCode, minPayoutAmount, createdByAdminId } = params;
+
+    const batch = await prisma.payoutBatch.create({
+      data: {
+        batchNumber: `BATCH-${Date.now()}`,
+        periodStart,
+        periodEnd,
+        ownerType,
+        countryCode,
+        totalAmount: new Prisma.Decimal(0),
+        totalCount: 0,
+        status: "pending",
+      },
+    });
+
+    return { batch, payoutsCreated: 0 };
+  }
+
+  /**
+   * Admin method: List payout batches
+   */
+  async listPayoutBatches(filters?: {
+    status?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: any = {};
+
+    if (filters?.status) {
+      where.status = filters.status;
+    }
+
+    if (filters?.startDate || filters?.endDate) {
+      where.createdAt = {};
+      if (filters.startDate) {
+        where.createdAt.gte = filters.startDate;
+      }
+      if (filters.endDate) {
+        where.createdAt.lte = filters.endDate;
+      }
+    }
+
+    const [batches, total] = await Promise.all([
+      prisma.payoutBatch.findMany({
+        where,
+        include: {
+          _count: {
+            select: {
+              payouts: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: filters?.limit || 20,
+        skip: filters?.offset || 0,
+      }),
+      prisma.payoutBatch.count({ where }),
+    ]);
+
+    return { batches, total, limit: filters?.limit || 20, offset: filters?.offset || 0 };
+  }
+
+  /**
+   * Admin method: Get payout batch
+   */
+  async getPayoutBatch(id: string) {
+    const batch = await prisma.payoutBatch.findUnique({
+      where: { id },
+      include: {
+        payouts: {
+          include: {
+            payoutAccount: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        _count: {
+          select: {
+            payouts: true,
+          },
+        },
+      },
+    });
+
+    return batch;
+  }
+
+  /**
+   * Admin method: Process payout batch
+   */
+  async processPayoutBatch(id: string, adminId: string) {
+    const batch = await prisma.payoutBatch.findUnique({
+      where: { id },
+      include: {
+        payouts: true,
+      },
+    });
+
+    if (!batch) {
+      throw new Error("Batch not found");
+    }
+
+    if (batch.status !== "pending") {
+      throw new Error("Batch already processed");
+    }
+
+    await prisma.payoutBatch.update({
+      where: { id },
+      data: {
+        status: "processing",
+        processedAt: new Date(),
+      },
+    });
+
+    return { batch, processedCount: batch.payouts.length };
+  }
 }
 
 export const payoutService = new PayoutService();
