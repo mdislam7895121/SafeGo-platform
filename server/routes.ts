@@ -31,28 +31,28 @@ import earningsRoutes from "./routes/earnings"; // R6: Earnings & Commission Cen
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { db } from "./db";
 
-// Public Driver Profile Summary Type
-type DriverPublicSummary = {
-  driverId: string;
-  displayName: string;
-  pronouns?: string | null;
+// Public Driver Profile Summary Type (D2 Spec)
+type DriverPublicProfile = {
+  name: string;
+  pronouns: string | null;
   profilePhotoUrl: string | null;
   vehicle: {
-    make: string;
+    type: string;
     model: string;
     color: string;
-    licensePlate: string;
+    plateNumber: string;
   } | null;
   stats: {
-    totalTrips: number;
-    averageRating: number;
-    yearsOnPlatform: number;
+    totalRides: number;
+    rating: number;
+    yearsActive: number;
   };
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Public routes (no authentication required)
-  app.get("/api/public/driver/:driverId/summary", async (req, res) => {
+  // D2: Public Driver Profile endpoint
+  app.get("/api/public/driver/:driverId", async (req, res) => {
     try {
       const { driverId } = req.params;
 
@@ -81,14 +81,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Fetch driver stats
-      const driverStats = await db.driverStats.findUnique({
-        where: { driverId },
-        select: {
-          totalTrips: true,
-          rating: true,
+      // Calculate total rides from completed rides table
+      const totalRides = await db.ride.count({
+        where: {
+          driverId,
+          status: "COMPLETED",
         },
       });
+
+      // Calculate rating from ride reviews
+      const rideReviews = await db.ride.findMany({
+        where: {
+          driverId,
+          status: "COMPLETED",
+          customerRating: { not: null },
+        },
+        select: {
+          customerRating: true,
+        },
+      });
+
+      // Compute average rating from reviews
+      const rating =
+        rideReviews.length > 0
+          ? rideReviews.reduce((sum, ride) => sum + (ride.customerRating || 0), 0) / rideReviews.length
+          : 5.0;
 
       // Fetch primary vehicle (safe fields only)
       const primaryVehicle = await db.vehicle.findFirst({
@@ -98,24 +115,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           isActive: true,
         },
         select: {
+          vehicleType: true,
           make: true,
           vehicleModel: true,
           color: true,
           licensePlate: true,
-        },
-      });
-
-      // Fetch first completed ride to calculate years on platform
-      const firstCompletedRide = await db.ride.findFirst({
-        where: {
-          driverId,
-          status: "COMPLETED",
-        },
-        orderBy: {
-          completedAt: "asc",
-        },
-        select: {
-          completedAt: true,
         },
       });
 
@@ -125,41 +129,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         driverProfile.middleName,
         driverProfile.lastName,
       ].filter(Boolean);
-      const displayName = nameParts.join(" ") || "Driver";
+      const name = nameParts.join(" ") || "Driver";
 
-      // Calculate years on platform
-      const yearsOnPlatform = firstCompletedRide?.completedAt
-        ? Math.floor(
-            (Date.now() - firstCompletedRide.completedAt.getTime()) /
-              (1000 * 60 * 60 * 24 * 365)
+      // Calculate years active from driver account creation
+      const yearsActive = driverProfile.createdAt
+        ? parseFloat(
+            ((Date.now() - driverProfile.createdAt.getTime()) / (1000 * 60 * 60 * 24 * 365)).toFixed(1)
           )
         : 0;
 
       // Build vehicle object
       const vehicle = primaryVehicle
         ? {
-            make: primaryVehicle.make || "",
-            model: primaryVehicle.vehicleModel || "",
-            color: primaryVehicle.color || "",
-            licensePlate: primaryVehicle.licensePlate || "",
+            type: primaryVehicle.vehicleType || "Car",
+            model: `${primaryVehicle.make || ""} ${primaryVehicle.vehicleModel || ""}`.trim() || "Vehicle",
+            color: primaryVehicle.color || "Black",
+            plateNumber: primaryVehicle.licensePlate || "",
           }
         : null;
 
-      // Build response
-      const summary: DriverPublicSummary = {
-        driverId: driverProfile.id,
-        displayName,
-        pronouns: null, // Not yet in schema, reserved for future
+      // Build response matching D2 spec
+      const profile: DriverPublicProfile = {
+        name,
+        pronouns: null, // Pronoun support reserved for future schema update
         profilePhotoUrl: driverProfile.profilePhotoUrl,
         vehicle,
         stats: {
-          totalTrips: driverStats?.totalTrips || 0,
-          averageRating: driverStats?.rating ? parseFloat(driverStats.rating.toString()) : 5.0,
-          yearsOnPlatform,
+          totalRides,
+          rating: parseFloat(rating.toFixed(2)),
+          yearsActive,
         },
       };
 
-      res.json(summary);
+      res.json(profile);
     } catch (error: any) {
       console.error("Error fetching driver public summary:", error);
       res.status(500).json({ message: "Failed to fetch driver profile" });

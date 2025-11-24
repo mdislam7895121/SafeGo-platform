@@ -1,20 +1,47 @@
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, MapPin, Navigation, User, Car, Phone, Star } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { DriverPreviewCard } from "@/components/DriverPreviewCard";
+
+type DriverPublicProfile = {
+  name: string;
+  pronouns: string | null;
+  profilePhotoUrl: string | null;
+  vehicle: {
+    type: string;
+    model: string;
+    color: string;
+    plateNumber: string;
+  } | null;
+  stats: {
+    totalRides: number;
+    rating: number;
+    yearsActive: number;
+  };
+};
 
 export default function RideDetails() {
   const { id } = useParams();
   const { toast } = useToast();
 
-  const { data, isLoading } = useQuery({
+  const { data: rideData, isLoading: isLoadingRide } = useQuery<{ ride: any }>({
     queryKey: [`/api/rides/${id}`],
     refetchInterval: 5000, // Refresh every 5 seconds for live updates
+  });
+
+  // Fetch driver public profile when driver is assigned
+  const ride = rideData?.ride;
+  const driverId = ride?.driver?.id;
+
+  const { data: driverProfile, isLoading: isLoadingDriver } = useQuery<DriverPublicProfile>({
+    queryKey: [`/api/public/driver/${driverId}`],
+    enabled: !!driverId, // Only fetch when driver is assigned
   });
 
   const cancelMutation = useMutation({
@@ -61,7 +88,7 @@ export default function RideDetails() {
     return ["requested", "searching_driver", "accepted", "driver_arriving"].includes(status);
   };
 
-  if (isLoading) {
+  if (isLoadingRide) {
     return (
       <div className="min-h-screen bg-background p-6 space-y-4">
         <Skeleton className="h-12 w-full" />
@@ -70,8 +97,6 @@ export default function RideDetails() {
       </div>
     );
   }
-
-  const ride = data?.ride;
 
   if (!ride) {
     return (
@@ -141,57 +166,24 @@ export default function RideDetails() {
           </CardContent>
         </Card>
 
-        {/* Driver Info */}
-        {ride.driver && (
+        {/* Driver Public Profile - D2 Implementation */}
+        {ride.driver && driverProfile && !isLoadingDriver && (
+          <DriverPreviewCard profile={driverProfile} />
+        )}
+
+        {/* Loading state for driver profile */}
+        {ride.driver && isLoadingDriver && (
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Driver Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Email</p>
-                <p className="font-medium" data-testid="text-driver-email">
-                  {ride.driver.email}
-                </p>
-              </div>
-
-              {ride.driver.vehicle && (
-                <>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Vehicle</p>
-                    <p className="font-medium" data-testid="text-vehicle">
-                      {ride.driver.vehicle.vehicleType} - {ride.driver.vehicle.vehicleModel}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-muted-foreground">License Plate</p>
-                    <p className="font-medium font-mono" data-testid="text-plate">
-                      {ride.driver.vehicle.vehiclePlate}
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {ride.driverRating && (
-                <div>
-                  <p className="text-sm text-muted-foreground">Your Rating</p>
-                  <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`h-4 w-4 ${
-                          i < ride.driverRating ? "fill-yellow-500 text-yellow-500" : "text-gray-300"
-                        }`}
-                      />
-                    ))}
-                    <span className="ml-2 text-sm font-medium">{ride.driverRating}/5</span>
-                  </div>
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-20 w-20 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-6 w-32" />
+                  <Skeleton className="h-4 w-24" />
                 </div>
-              )}
+              </div>
+              <Skeleton className="h-32 w-full" />
+              <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
         )}
