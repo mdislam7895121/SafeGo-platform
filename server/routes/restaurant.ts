@@ -1252,8 +1252,57 @@ router.get("/kyc-status", async (req: AuthRequest, res) => {
 // MENU MANAGEMENT API (Phase 3)
 // ====================================================
 
+// GET /api/restaurant/categories
+// List all global main categories (for menu item categorization)
+router.get("/categories", async (req: AuthRequest, res) => {
+  try {
+    const categories = await prisma.category.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        type: true,
+      },
+    });
+
+    res.json({ categories });
+  } catch (error) {
+    console.error("Get global categories error:", error);
+    res.status(500).json({ error: "Failed to fetch categories" });
+  }
+});
+
+// GET /api/restaurant/subcategories/:categoryId
+// List all subcategories for a specific main category
+router.get("/subcategories/:categoryId", async (req: AuthRequest, res) => {
+  try {
+    const { categoryId } = req.params;
+
+    const subcategories = await prisma.subCategory.findMany({
+      where: {
+        categoryId,
+        isActive: true,
+      },
+      orderBy: { displayOrder: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        displayOrder: true,
+      },
+    });
+
+    res.json({ subcategories });
+  } catch (error) {
+    console.error("Get subcategories error:", error);
+    res.status(500).json({ error: "Failed to fetch subcategories" });
+  }
+});
+
 // GET /api/restaurant/menu/categories
-// List all menu categories for the restaurant
+// List all menu categories for the restaurant (LEGACY - restaurant-specific categories)
 router.get("/menu/categories", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
@@ -1666,9 +1715,11 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
     }
 
     const schema = z.object({
-      categoryId: z.string().optional(), // Optional for backwards compatibility
-      primaryCategory: z.string().optional(), // New two-level category system
-      subCategories: z.array(z.string()).optional().default([]), // New two-level category system
+      categoryId: z.string().optional(), // LEGACY: Optional for backwards compatibility
+      primaryCategory: z.string().optional(), // LEGACY: New two-level category system
+      subCategories: z.array(z.string()).optional().default([]), // LEGACY: New two-level category system
+      mainCategoryId: z.string().optional(), // NEW: Relational model main category FK
+      subCategoryIds: z.array(z.string()).optional().default([]), // NEW: Relational model subcategory IDs
       name: z.string().min(1).max(200),
       shortDescription: z.string().max(500).optional(),
       longDescription: z.string().optional(),
@@ -1687,7 +1738,7 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
 
     const data = schema.parse(req.body);
 
-    // Verify category if categoryId is provided (backwards compatibility)
+    // Verify legacy category if categoryId is provided (backwards compatibility)
     if (data.categoryId) {
       const category = await prisma.menuCategory.findFirst({
         where: {
@@ -1701,29 +1752,82 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
       }
     }
 
-    const item = await prisma.menuItem.create({
-      data: {
-        restaurantId: restaurantProfile.id,
-        categoryId: data.categoryId || null,
-        primaryCategory: data.primaryCategory || null,
-        subCategories: data.subCategories || [],
-        name: data.name,
-        shortDescription: data.shortDescription || null,
-        longDescription: data.longDescription || null,
-        basePrice: data.basePrice,
-        currency: data.currency,
-        preparationTimeMinutes: data.preparationTimeMinutes || null,
-        availabilityStatus: data.availabilityStatus,
-        isFeatured: data.isFeatured,
-        isVegetarian: data.isVegetarian,
-        isVegan: data.isVegan,
-        isHalal: data.isHalal,
-        isSpicy: data.isSpicy,
-        dietaryTags: data.dietaryTags || [],
-        itemImageUrl: data.itemImageUrl || null,
-      },
+    // Verify main category if mainCategoryId is provided (new relational model)
+    if (data.mainCategoryId) {
+      const mainCategory = await prisma.category.findUnique({
+        where: { id: data.mainCategoryId, isActive: true },
+      });
+
+      if (!mainCategory) {
+        return res.status(404).json({ error: "Main category not found" });
+      }
+    }
+
+    // Verify subcategories if subCategoryIds are provided (new relational model)
+    if (data.subCategoryIds && data.subCategoryIds.length > 0) {
+      const subcategories = await prisma.subCategory.findMany({
+        where: {
+          id: { in: data.subCategoryIds },
+          isActive: true,
+        },
+      });
+
+      if (subcategories.length !== data.subCategoryIds.length) {
+        return res.status(400).json({ error: "One or more subcategories not found" });
+      }
+    }
+
+    // Create menu item with related subcategories using transaction
+    const item = await prisma.$transaction(async (tx) => {
+      // Create menu item
+      const newItem = await tx.menuItem.create({
+        data: {
+          restaurantId: restaurantProfile.id,
+          categoryId: data.categoryId || null, // LEGACY
+          primaryCategory: data.primaryCategory || null, // LEGACY
+          subCategories: data.subCategories || [], // LEGACY
+          mainCategoryId: data.mainCategoryId || null, // NEW
+          name: data.name,
+          shortDescription: data.shortDescription || null,
+          longDescription: data.longDescription || null,
+          basePrice: data.basePrice,
+          currency: data.currency,
+          preparationTimeMinutes: data.preparationTimeMinutes || null,
+          availabilityStatus: data.availabilityStatus,
+          isFeatured: data.isFeatured,
+          isVegetarian: data.isVegetarian,
+          isVegan: data.isVegan,
+          isHalal: data.isHalal,
+          isSpicy: data.isSpicy,
+          dietaryTags: data.dietaryTags || [],
+          itemImageUrl: data.itemImageUrl || null,
+        },
+      });
+
+      // Create MenuItemCategory relationships for subcategories
+      if (data.subCategoryIds && data.subCategoryIds.length > 0) {
+        await tx.menuItemCategory.createMany({
+          data: data.subCategoryIds.map((subCategoryId) => ({
+            menuItemId: newItem.id,
+            subCategoryId,
+          })),
+        });
+      }
+
+      return newItem;
+    });
+
+    // Fetch item with relations for response
+    const itemWithRelations = await prisma.menuItem.findUnique({
+      where: { id: item.id },
       include: {
-        category: true,
+        category: true, // LEGACY
+        mainCategory: true, // NEW
+        menuItemCategories: { // NEW
+          include: {
+            subCategory: true,
+          },
+        },
       },
     });
 
@@ -1738,10 +1842,15 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
       entityId: item.id,
       restaurantId: restaurantProfile.id,
       description: `Created menu item: ${item.name}`,
-      metadata: { name: item.name, categoryId: item.categoryId, basePrice: item.basePrice.toString() },
+      metadata: {
+        name: item.name,
+        categoryId: item.categoryId,
+        mainCategoryId: item.mainCategoryId,
+        basePrice: item.basePrice.toString(),
+      },
     });
 
-    res.json({ item });
+    res.json({ item: itemWithRelations });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Invalid input", details: error.errors });
@@ -1780,9 +1889,11 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
     }
 
     const schema = z.object({
-      categoryId: z.string().optional(),
-      primaryCategory: z.string().optional(), // New two-level category system
-      subCategories: z.array(z.string()).optional(), // New two-level category system
+      categoryId: z.string().optional(), // LEGACY
+      primaryCategory: z.string().optional(), // LEGACY
+      subCategories: z.array(z.string()).optional(), // LEGACY
+      mainCategoryId: z.string().optional(), // NEW
+      subCategoryIds: z.array(z.string()).optional(), // NEW
       name: z.string().min(1).max(200).optional(),
       shortDescription: z.string().max(500).optional(),
       longDescription: z.string().optional(),
@@ -1801,7 +1912,7 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
 
     const updates = schema.parse(req.body);
 
-    // If category is being changed, verify it belongs to restaurant
+    // If legacy category is being changed, verify it belongs to restaurant
     if (updates.categoryId) {
       const category = await prisma.menuCategory.findFirst({
         where: {
@@ -1815,11 +1926,76 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
       }
     }
 
-    const updatedItem = await prisma.menuItem.update({
+    // Verify main category if mainCategoryId is provided (new relational model)
+    if (updates.mainCategoryId !== undefined) {
+      if (updates.mainCategoryId) {
+        const mainCategory = await prisma.category.findUnique({
+          where: { id: updates.mainCategoryId, isActive: true },
+        });
+
+        if (!mainCategory) {
+          return res.status(404).json({ error: "Main category not found" });
+        }
+      }
+    }
+
+    // Verify subcategories if subCategoryIds are provided (new relational model)
+    if (updates.subCategoryIds !== undefined && updates.subCategoryIds.length > 0) {
+      const subcategories = await prisma.subCategory.findMany({
+        where: {
+          id: { in: updates.subCategoryIds },
+          isActive: true,
+        },
+      });
+
+      if (subcategories.length !== updates.subCategoryIds.length) {
+        return res.status(400).json({ error: "One or more subcategories not found" });
+      }
+    }
+
+    // Update menu item with transaction for subcategory relationship changes
+    const updatedItem = await prisma.$transaction(async (tx) => {
+      // Update menu item
+      const newUpdates: any = { ...updates };
+      delete newUpdates.subCategoryIds; // Remove from direct update
+
+      const updated = await tx.menuItem.update({
+        where: { id },
+        data: newUpdates,
+      });
+
+      // Update subcategory relationships if subCategoryIds is provided
+      if (updates.subCategoryIds !== undefined) {
+        // Delete existing relationships
+        await tx.menuItemCategory.deleteMany({
+          where: { menuItemId: id },
+        });
+
+        // Create new relationships
+        if (updates.subCategoryIds.length > 0) {
+          await tx.menuItemCategory.createMany({
+            data: updates.subCategoryIds.map((subCategoryId) => ({
+              menuItemId: id,
+              subCategoryId,
+            })),
+          });
+        }
+      }
+
+      return updated;
+    });
+
+    // Fetch item with relations for response
+    const itemWithRelations = await prisma.menuItem.findUnique({
       where: { id },
-      data: updates,
       include: {
-        category: true,
+        category: true, // LEGACY
+        mainCategory: true, // NEW
+        menuItemCategories: { // NEW
+          include: {
+            subCategory: true,
+          },
+        },
       },
     });
 
@@ -1837,7 +2013,7 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
       metadata: updates,
     });
 
-    res.json({ item: updatedItem });
+    res.json({ item: itemWithRelations });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Invalid input", details: error.errors });
