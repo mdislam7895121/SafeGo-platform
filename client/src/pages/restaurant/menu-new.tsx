@@ -134,10 +134,23 @@ export default function AddMenuItem() {
     enabled: !!formData.mainCategoryId,
   });
   
-  // Reset subcategories when main category changes
+  // Reset subcategories only if they don't belong to the new category
   useEffect(() => {
-    setFormData(prev => ({ ...prev, subCategoryIds: [] }));
-  }, [formData.mainCategoryId]);
+    if (!formData.mainCategoryId || !formData.subCategoryIds || formData.subCategoryIds.length === 0) {
+      return;
+    }
+    
+    // Check if current subcategories belong to the selected main category
+    const incompatibleSubcategories = formData.subCategoryIds.filter(subId => {
+      const subcategory = allSubCategories.find(sub => sub.id === subId);
+      return subcategory && subcategory.categoryId !== formData.mainCategoryId;
+    });
+    
+    // Only reset if there are incompatible subcategories
+    if (incompatibleSubcategories.length > 0) {
+      setFormData(prev => ({ ...prev, subCategoryIds: [] }));
+    }
+  }, [formData.mainCategoryId, allSubCategories]);
   
   // Show warning if no subcategory selected
   useEffect(() => {
