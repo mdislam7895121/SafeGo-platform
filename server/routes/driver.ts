@@ -139,9 +139,16 @@ router.get("/home", async (req: AuthRequest, res) => {
       },
     });
 
-    // Get vehicle
-    const vehicle = await prisma.vehicle.findUnique({
-      where: { driverId: driverProfile.id },
+    // Get primary vehicle (or first active vehicle)
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { 
+        driverId: driverProfile.id,
+        isActive: true,
+      },
+      orderBy: [
+        { isPrimary: 'desc' }, // Primary first
+        { createdAt: 'desc' },  // Then newest
+      ],
     });
 
     // Get stats
@@ -236,7 +243,10 @@ router.get("/available-rides", async (req: AuthRequest, res) => {
       where: { userId },
       include: {
         user: true,
-        vehicle: true,
+        vehicles: {
+          where: { isActive: true },
+          orderBy: [{ isPrimary: 'desc' }, { createdAt: 'desc' }],
+        },
       },
     });
 
@@ -337,17 +347,19 @@ router.post("/vehicle", async (req: AuthRequest, res) => {
     // Get driver profile
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
-      include: { vehicle: true },
+      include: { 
+        vehicles: {
+          where: { isActive: true },
+        },
+      },
     });
 
     if (!driverProfile) {
       return res.status(404).json({ error: "Driver profile not found" });
     }
 
-    // Check if vehicle already exists
-    if (driverProfile.vehicle) {
-      return res.status(400).json({ error: "Vehicle already registered. Use PATCH to update." });
-    }
+    // Note: Multi-vehicle support - drivers can now have multiple vehicles
+    // This endpoint is deprecated; use POST /api/driver/vehicles instead
 
     // Create vehicle
     const vehicle = await prisma.vehicle.create({
@@ -387,17 +399,22 @@ router.patch("/vehicle", async (req: AuthRequest, res) => {
     const userId = req.user!.userId;
     const { vehicleType, vehicleModel, vehiclePlate } = req.body;
 
-    // Get driver profile
+    // Get driver profile with primary vehicle
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
-      include: { vehicle: true },
+      include: { 
+        vehicles: {
+          where: { isActive: true, isPrimary: true },
+        },
+      },
     });
 
     if (!driverProfile) {
       return res.status(404).json({ error: "Driver profile not found" });
     }
 
-    if (!driverProfile.vehicle) {
+    const primaryVehicle = driverProfile.vehicles[0];
+    if (!primaryVehicle) {
       return res.status(404).json({ error: "No vehicle registered. Use POST to register." });
     }
 
@@ -408,7 +425,7 @@ router.patch("/vehicle", async (req: AuthRequest, res) => {
     if (vehiclePlate) updateData.vehiclePlate = vehiclePlate;
 
     const updatedVehicle = await prisma.vehicle.update({
-      where: { id: driverProfile.vehicle.id },
+      where: { id: primaryVehicle.id },
       data: updateData,
     });
 
@@ -426,6 +443,499 @@ router.patch("/vehicle", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Vehicle update error:", error);
     res.status(500).json({ error: "Failed to update vehicle" });
+  }
+});
+
+// ====================================================
+// D1-A: MULTI-VEHICLE MANAGEMENT ENDPOINTS
+// ====================================================
+
+// Helper: Validate UUID format
+function isValidUUID(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
+// Helper: Get driver profile with KYC verification
+async function getVerifiedDriverProfile(userId: string) {
+  const driverProfile = await prisma.driverProfile.findUnique({
+    where: { userId },
+    include: {
+      vehicles: {
+        where: { isActive: true },
+      },
+    },
+  });
+
+  if (!driverProfile) {
+    return { error: "Driver profile not found", status: 404 };
+  }
+
+  if (!driverProfile.isVerified) {
+    return { 
+      error: "KYC verification required", 
+      status: 403,
+      kyc_required: true 
+    };
+  }
+
+  return { profile: driverProfile };
+}
+
+// Helper: Verify vehicle ownership
+async function verifyVehicleOwnership(vehicleId: string, driverId: string) {
+  const vehicle = await prisma.vehicle.findFirst({
+    where: {
+      id: vehicleId,
+      driverId,
+      isActive: true,
+    },
+  });
+
+  if (!vehicle) {
+    return { error: "Vehicle not found or you don't have permission", status: 404 };
+  }
+
+  return { vehicle };
+}
+
+// Zod schemas for vehicle validation
+const createVehicleSchema = z.object({
+  vehicleType: z.string().min(1, "Vehicle type is required"),
+  make: z.string().min(1, "Make is required").max(50),
+  model: z.string().min(1, "Model is required").max(100),
+  year: z.number().int().min(1900).max(new Date().getFullYear()), // No future years
+  color: z.string().min(1, "Color is required").max(30),
+  plateNumber: z.string().min(1, "Plate number is required").max(20),
+  insurancePolicyNumber: z.string().max(50).optional(),
+  isPrimary: z.boolean().optional(),
+});
+
+const updateVehicleSchema = z.object({
+  vehicleType: z.string().min(1).optional(),
+  make: z.string().min(1).max(50).optional(),
+  model: z.string().min(1).max(100).optional(),
+  year: z.number().int().min(1900).max(new Date().getFullYear()).optional(),
+  color: z.string().min(1).max(30).optional(),
+  plateNumber: z.string().min(1).max(20).optional(),
+  insurancePolicyNumber: z.string().max(50).optional(),
+}).refine(data => Object.keys(data).length > 0, {
+  message: "At least one field must be provided for update",
+});
+
+// ====================================================
+// GET /api/driver/vehicles
+// List all active vehicles for the authenticated driver
+// ====================================================
+router.get("/vehicles", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get driver profile
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Get all active vehicles, ordered by primary first
+    const vehicles = await prisma.vehicle.findMany({
+      where: {
+        driverId: driverProfile.id,
+        isActive: true,
+      },
+      orderBy: [
+        { isPrimary: 'desc' }, // Primary vehicle first
+        { createdAt: 'desc' }, // Then newest
+      ],
+    });
+
+    res.json({
+      vehicles: vehicles.map(v => ({
+        id: v.id,
+        vehicleType: v.vehicleType,
+        make: v.make,
+        model: v.model,
+        year: v.year,
+        color: v.color,
+        plateNumber: v.licensePlate || v.vehiclePlate,
+        insurancePolicyNumber: v.insurancePolicyNumber,
+        isPrimary: v.isPrimary,
+        isOnline: v.isOnline,
+        totalEarnings: v.totalEarnings,
+        createdAt: v.createdAt,
+        updatedAt: v.updatedAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get vehicles error:", error);
+    res.status(500).json({ error: "Failed to fetch vehicles" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/vehicles
+// Create a new vehicle for the authenticated driver
+// Requires: KYC verification
+// ====================================================
+router.post("/vehicles", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body
+    const validationResult = createVehicleSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: validationResult.error.errors 
+      });
+    }
+
+    const { vehicleType, make, model, year, color, plateNumber, insurancePolicyNumber, isPrimary } = validationResult.data;
+
+    // Get verified driver profile using helper
+    const profileResult = await getVerifiedDriverProfile(userId);
+    if ('error' in profileResult) {
+      return res.status(profileResult.status).json({ 
+        error: profileResult.error,
+        ...(profileResult.kyc_required && { kyc_required: true })
+      });
+    }
+
+    const driverProfile = profileResult.profile;
+
+    // Determine if this should be primary vehicle
+    const existingVehicles = driverProfile.vehicles;
+    const shouldBePrimary = isPrimary !== undefined ? isPrimary : existingVehicles.length === 0;
+
+    // Atomic operation: Unset other primary vehicles, then create new one
+    const vehicle = await prisma.$transaction(async (tx) => {
+      // If setting as primary, unset all other vehicles' isPrimary
+      if (shouldBePrimary) {
+        await tx.vehicle.updateMany({
+          where: {
+            driverId: driverProfile.id,
+            isActive: true,
+          },
+          data: { isPrimary: false },
+        });
+      }
+
+      // Create vehicle
+      return await tx.vehicle.create({
+        data: {
+          driverId: driverProfile.id,
+          vehicleType,
+          make,
+          vehicleModel: model,
+          year,
+          color,
+          vehiclePlate: plateNumber,
+          licensePlate: plateNumber,
+          insurancePolicyNumber: insurancePolicyNumber || null,
+          isPrimary: shouldBePrimary,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+      });
+    });
+
+    res.status(201).json({
+      message: "Vehicle created successfully",
+      vehicle: {
+        id: vehicle.id,
+        vehicleType: vehicle.vehicleType,
+        make: vehicle.make,
+        model: vehicle.vehicleModel,
+        year: vehicle.year,
+        color: vehicle.color,
+        plateNumber: vehicle.licensePlate,
+        insurancePolicyNumber: vehicle.insurancePolicyNumber,
+        isPrimary: vehicle.isPrimary,
+        isOnline: vehicle.isOnline,
+        totalEarnings: vehicle.totalEarnings,
+        createdAt: vehicle.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Create vehicle error:", error);
+    
+    // Handle unique constraint violations (P2002)
+    if (error.code === 'P2002' || error.message?.includes('Unique constraint')) {
+      return res.status(409).json({ 
+        error: "Constraint violation",
+        message: "A conflicting vehicle record already exists"
+      });
+    }
+    
+    // Handle transaction errors from ownership verification
+    if (error.message === "Vehicle not found, inactive, or permission denied") {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: "Failed to create vehicle" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/vehicles/:id
+// Update an existing vehicle (ownership enforced)
+// Requires: KYC verification
+// ====================================================
+router.patch("/vehicles/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: vehicleId } = req.params;
+
+    // Validate UUID format using helper
+    if (!isValidUUID(vehicleId)) {
+      return res.status(400).json({ error: "Invalid vehicle ID format" });
+    }
+
+    // Validate request body
+    const validationResult = updateVehicleSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: validationResult.error.errors 
+      });
+    }
+
+    // Get verified driver profile using helper
+    const profileResult = await getVerifiedDriverProfile(userId);
+    if ('error' in profileResult) {
+      return res.status(profileResult.status).json({ 
+        error: profileResult.error,
+        ...(profileResult.kyc_required && { kyc_required: true })
+      });
+    }
+
+    const driverProfile = profileResult.profile;
+
+    // Prepare update data
+    const { vehicleType, make, model, year, color, plateNumber, insurancePolicyNumber } = validationResult.data;
+    const updateData: any = { updatedAt: new Date() };
+    
+    if (vehicleType) updateData.vehicleType = vehicleType;
+    if (make) updateData.make = make;
+    if (model) updateData.vehicleModel = model;
+    if (year) updateData.year = year;
+    if (color) updateData.color = color;
+    if (plateNumber) {
+      updateData.vehiclePlate = plateNumber;
+      updateData.licensePlate = plateNumber;
+    }
+    if (insurancePolicyNumber !== undefined) updateData.insurancePolicyNumber = insurancePolicyNumber;
+
+    // Update vehicle with ownership verification inside transaction
+    const updatedVehicle = await prisma.$transaction(async (tx) => {
+      // Re-verify ownership inside transaction to prevent race conditions
+      const vehicle = await tx.vehicle.findFirst({
+        where: {
+          id: vehicleId,
+          driverId: driverProfile.id,
+          isActive: true,
+        },
+      });
+
+      if (!vehicle) {
+        throw new Error("Vehicle not found, inactive, or permission denied");
+      }
+
+      return await tx.vehicle.update({
+        where: { id: vehicleId },
+        data: updateData,
+      });
+    });
+
+    res.json({
+      message: "Vehicle updated successfully",
+      vehicle: {
+        id: updatedVehicle.id,
+        vehicleType: updatedVehicle.vehicleType,
+        make: updatedVehicle.make,
+        model: updatedVehicle.vehicleModel,
+        year: updatedVehicle.year,
+        color: updatedVehicle.color,
+        plateNumber: updatedVehicle.licensePlate,
+        insurancePolicyNumber: updatedVehicle.insurancePolicyNumber,
+        isPrimary: updatedVehicle.isPrimary,
+        isOnline: updatedVehicle.isOnline,
+        totalEarnings: updatedVehicle.totalEarnings,
+        updatedAt: updatedVehicle.updatedAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Update vehicle error:", error);
+    
+    // Handle transaction errors from ownership verification
+    if (error.message === "Vehicle not found, inactive, or permission denied") {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: "Failed to update vehicle" });
+  }
+});
+
+// ====================================================
+// DELETE /api/driver/vehicles/:id
+// Soft delete a vehicle (ownership enforced)
+// Requires: KYC verification
+// Business rule: If deleting primary vehicle, auto-assign another
+// ====================================================
+router.delete("/vehicles/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: vehicleId } = req.params;
+
+    // Validate UUID format using helper
+    if (!isValidUUID(vehicleId)) {
+      return res.status(400).json({ error: "Invalid vehicle ID format" });
+    }
+
+    // Get verified driver profile using helper
+    const profileResult = await getVerifiedDriverProfile(userId);
+    if ('error' in profileResult) {
+      return res.status(profileResult.status).json({ 
+        error: profileResult.error,
+        ...(profileResult.kyc_required && { kyc_required: true })
+      });
+    }
+
+    const driverProfile = profileResult.profile;
+
+    // Verify vehicle ownership
+    const vehicle = driverProfile.vehicles.find(v => v.id === vehicleId);
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found or you don't have permission to delete it" });
+    }
+
+    // Atomic operation: Soft delete, reassign primary if needed
+    await prisma.$transaction(async (tx) => {
+      // Soft delete the vehicle
+      await tx.vehicle.update({
+        where: { id: vehicleId },
+        data: { 
+          isActive: false,
+          isPrimary: false,
+          isOnline: false,
+          updatedAt: new Date(),
+        },
+      });
+
+      // If this was the primary vehicle, re-query remaining active vehicles 
+      // and promote the newest one to primary
+      if (vehicle.isPrimary) {
+        const remainingVehicles = await tx.vehicle.findMany({
+          where: {
+            driverId: driverProfile.id,
+            isActive: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        });
+        
+        if (remainingVehicles.length > 0) {
+          await tx.vehicle.update({
+            where: { id: remainingVehicles[0].id },
+            data: { isPrimary: true, updatedAt: new Date() },
+          });
+        }
+        // If no remaining vehicles, driver has zero vehicles - no primary needed
+      }
+    });
+
+    res.json({
+      success: true,
+      message: "Vehicle deleted successfully",
+    });
+  } catch (error) {
+    console.error("Delete vehicle error:", error);
+    res.status(500).json({ error: "Failed to delete vehicle" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/vehicles/:id/set-primary
+// Set a vehicle as primary (ownership enforced)
+// Requires: KYC verification
+// Business rule: Automatically unset isPrimary on all other vehicles
+// ====================================================
+router.patch("/vehicles/:id/set-primary", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: vehicleId } = req.params;
+
+    // Validate UUID format using helper
+    if (!isValidUUID(vehicleId)) {
+      return res.status(400).json({ error: "Invalid vehicle ID format" });
+    }
+
+    // Get verified driver profile using helper
+    const profileResult = await getVerifiedDriverProfile(userId);
+    if ('error' in profileResult) {
+      return res.status(profileResult.status).json({ 
+        error: profileResult.error,
+        ...(profileResult.kyc_required && { kyc_required: true })
+      });
+    }
+
+    const driverProfile = profileResult.profile;
+
+    // Atomic operation: Verify ownership inside transaction, unset all others, set this one
+    const updatedVehicle = await prisma.$transaction(async (tx) => {
+      // Re-verify ownership inside transaction to prevent race conditions
+      const vehicle = await tx.vehicle.findFirst({
+        where: {
+          id: vehicleId,
+          driverId: driverProfile.id,
+          isActive: true,
+        },
+      });
+
+      if (!vehicle) {
+        throw new Error("Vehicle not found, inactive, or permission denied");
+      }
+
+      // Unset primary on all driver's vehicles
+      await tx.vehicle.updateMany({
+        where: {
+          driverId: driverProfile.id,
+          isActive: true,
+        },
+        data: { isPrimary: false },
+      });
+      
+      // Set this vehicle as primary
+      return await tx.vehicle.update({
+        where: { id: vehicleId },
+        data: { 
+          isPrimary: true,
+          updatedAt: new Date(),
+        },
+      });
+    });
+
+    res.json({
+      message: "Primary vehicle updated successfully",
+      vehicle: {
+        id: updatedVehicle.id,
+        vehicleType: updatedVehicle.vehicleType,
+        make: updatedVehicle.make,
+        model: updatedVehicle.vehicleModel,
+        isPrimary: updatedVehicle.isPrimary,
+      },
+    });
+  } catch (error: any) {
+    console.error("Set primary vehicle error:", error);
+    
+    // Handle transaction errors from ownership verification
+    if (error.message === "Vehicle not found, inactive, or permission denied") {
+      return res.status(404).json({ error: error.message });
+    }
+    
+    res.status(500).json({ error: "Failed to set primary vehicle" });
   }
 });
 
@@ -518,17 +1028,22 @@ router.patch("/status", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "isOnline must be a boolean" });
     }
 
-    // Get driver profile
+    // Get driver profile with primary vehicle
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
-      include: { vehicle: true },
+      include: { 
+        vehicles: {
+          where: { isActive: true, isPrimary: true },
+        },
+      },
     });
 
     if (!driverProfile) {
       return res.status(404).json({ error: "Driver profile not found" });
     }
 
-    if (!driverProfile.vehicle) {
+    const primaryVehicle = driverProfile.vehicles[0];
+    if (!primaryVehicle) {
       return res.status(400).json({ error: "Vehicle not registered. Please complete vehicle registration first." });
     }
 
@@ -539,7 +1054,7 @@ router.patch("/status", async (req: AuthRequest, res) => {
 
     // Update vehicle online status
     const updatedVehicle = await prisma.vehicle.update({
-      where: { id: driverProfile.vehicle.id },
+      where: { id: primaryVehicle.id },
       data: { isOnline },
     });
 

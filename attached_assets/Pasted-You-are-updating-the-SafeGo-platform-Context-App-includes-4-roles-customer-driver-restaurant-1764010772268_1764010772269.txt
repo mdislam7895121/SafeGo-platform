@@ -1,0 +1,169 @@
+You are updating the SafeGo platform.
+
+Context:
+- App includes 4 roles: customer, driver, restaurant, admin.
+- Global logic: same core driver profile will be used for rides, food delivery, and parcel delivery.
+- We are in **Driver Phase D1 – Driver Profile & Onboarding**, sub-phase **D1-A: Multi-Vehicle Backend APIs**.
+- Restaurant side R1–R6 are already production-ready; do not break any restaurant/admin/customer functionality.
+- Prisma schema for drivers/vehicles has already been updated and migrated:
+  - `DriverProfile` now has `vehicles: Vehicle[]`.
+  - `Vehicle` has `driverId`, `isPrimary`, `isActive`, `insurancePolicyNumber`, and other existing fields.
+  - 1:N relationship: one driver → many vehicles (no `@unique` on `driverId`).
+  - Indexes exist on `driverId` and `isPrimary`.
+
+Goal of this loop:
+Implement and fully wire the **multi-vehicle backend APIs for drivers only**, with correct RBAC, KYC checks, validation, and soft-delete behavior. Do NOT start any onboarding UI or document upload work in this loop.
+
+### High-level requirements
+
+1. **Driver-only vehicle management**
+   - A driver can:
+     - List all their vehicles.
+     - Create multiple vehicles (car, bike, scooter, etc.).
+     - Update an existing vehicle.
+     - Soft delete a vehicle.
+     - Mark one vehicle as primary (`isPrimary = true`), and automatically unset `isPrimary` for all other vehicles of that driver.
+   - A driver **must never** see or modify another driver’s vehicles.
+
+2. **Security & RBAC**
+   - All endpoints must:
+     - Require authenticated driver session.
+     - Use the same `requireDriverRole` / auth middleware pattern used elsewhere for driver APIs.
+     - Apply **KYC / verification rules**:
+       - Reads (GET) can be allowed for partially onboarded drivers if that matches current driver APIs.
+       - Writes (POST/PATCH/DELETE/set-primary) must require whatever “completed KYC / active driver” check you already use (similar to `requireKYCCompletion` on restaurant).
+     - Enforce strict ownership:
+       - Filter by `driverId = currentDriver.id` in all queries.
+       - For any `:id` operation, return 404 if the vehicle does not belong to the current driver.
+   - Apply consistent HTTP status codes across all endpoints:
+     - 200/201 success, 400 validation errors, 401/403 auth/role failures, 404 not found, 409 for business-rule conflicts (e.g., trying to delete the only primary vehicle if that should be blocked), 500 for server errors.
+
+3. **Soft delete & business rules**
+   - Use the same soft delete pattern used elsewhere:
+     - `isActive` (or equivalent) should be used to mark vehicle as active/inactive.
+     - “Delete” must be **soft delete**:
+       - Do not physically remove rows.
+       - Set `isActive = false` and ensure it is excluded from default listings (unless explicitly needed).
+   - Ensure at most **one primary vehicle per driver**:
+     - When calling `set-primary`, wrap in a safe operation so that:
+       - All other vehicles for that driver get `isPrimary = false`.
+       - The chosen vehicle gets `isPrimary = true` and `isActive = true`.
+     - Decide and document behavior for:
+       - Creating the first vehicle → auto-set as primary.
+       - Deleting the current primary vehicle → if other active vehicles exist, choose a deterministic fallback primary (e.g., latest created), or allow “no primary” state if that is acceptable. Document the choice.
+
+4. **Data validation**
+   - Use existing validation approach (e.g., Zod schemas) for request bodies:
+     - Required fields: make, model, type (car/bike/etc.), plateNumber (or equivalent), year, color, etc. Use existing schema fields.
+     - Optional fields: `insurancePolicyNumber`, `isPrimary`, `isActive` (client should not override isActive directly on create).
+   - Normalize input:
+     - Trim strings, enforce max lengths.
+     - Validate enums (vehicle type, status) against existing types.
+
+5. **Error handling & logging**
+   - Follow the platform’s existing error propagation rules:
+     - No error swallowing.
+     - Throw errors that surface as proper HTTP responses (as done in the latest R6 work).
+   - Add basic logging/audit where appropriate:
+     - Vehicle create, update, delete, and set-primary should be traceable for debugging and security review (reuse existing audit/log helpers if present; otherwise keep it minimal but consistent with the rest of the codebase).
+
+6. **Non-goals for this loop**
+   - Do NOT build or modify:
+     - Driver onboarding wizard UI.
+     - Any document upload endpoints.
+     - Admin driver management UI.
+   - Those will be separate D1 sub-phases after this loop.
+
+---
+
+### Concrete tasks for this loop
+
+1. **Review current driver auth & context**
+   - Locate existing driver APIs (e.g., profile, online/offline toggle, payouts).
+   - Reuse the same auth middleware, driver context loader, and KYC/active-driver checks for the new vehicle endpoints.
+
+2. **Implement vehicle API routes**
+   Create or extend the appropriate driver routes file (for example, `server/routes/driver.ts` or equivalent) with these endpoints:
+
+   1) `GET /api/driver/vehicles`
+      - Return a list of the current driver’s vehicles.
+      - Filter out `isActive = false` by default (unless the existing design requires showing inactive too; if so, add an optional query param and document).
+      - Sort by `isPrimary` (primary first) then createdAt/updatedAt.
+
+   2) `POST /api/driver/vehicles`
+      - Create a new vehicle for the authenticated driver.
+      - Ensure `driverId` is always taken from the auth context, not from the request body.
+      - Validation:
+        - Required: type, make, model, plateNumber, etc. per your schema.
+        - Optional: `insurancePolicyNumber`, etc.
+      - Business rules:
+        - If the driver currently has **no active vehicles**, this new vehicle becomes `isPrimary = true` by default.
+        - Otherwise, respect a client-supplied `isPrimary` flag only if it passes ownership rules and update other vehicles accordingly.
+      - Return the created vehicle as JSON (no sensitive internal fields).
+
+   3) `PATCH /api/driver/vehicles/:id`
+      - Update specific fields on a vehicle owned by the current driver.
+      - Fetch by `id` AND `driverId = currentDriver.id`. If not found, return 404.
+      - Disallow changing `driverId`.
+      - If request attempts to update `isPrimary`, enforce the single-primary rule in a safe way (wrap in a single logical operation so state doesn’t get inconsistent).
+      - Return updated vehicle.
+
+   4) `DELETE /api/driver/vehicles/:id`
+      - Soft delete only.
+      - Ownership check as above.
+      - Behavior:
+        - Set `isActive = false`.
+        - Decide whether to also clear `isPrimary`; if this was the primary vehicle and other active vehicles exist, automatically assign another primary or allow “no primary” but document behavior.
+      - Return a success payload indicating deletion (for example `{ success: true }`).
+
+   5) `PATCH /api/driver/vehicles/:id/set-primary`
+      - Ownership check (`driverId = currentDriver.id` and `isActive = true`).
+      - Ensure this is done in a safe operation (single logical unit):
+        - Set `isPrimary = false` for all other vehicles of this driver.
+        - Set `isPrimary = true` on the target vehicle, ensure `isActive = true`.
+      - Handle the case when the vehicle is not found or is inactive (404 or 400 as appropriate).
+      - Return updated vehicle or a simple status payload.
+
+3. **Apply KYC/activation rules**
+   - For GET:
+     - Use the same “driver must be authenticated” rule as existing driver profile APIs.
+   - For POST/PATCH/DELETE/set-primary:
+     - Require the driver to be KYC-verified / fully onboarded, consistent with how drivers are allowed to go online or accept orders.
+   - Make sure responses for KYC failures match existing patterns (e.g., 403 with a `kyc_required: true` flag if that is already used).
+
+4. **Consistency with existing patterns**
+   - Use the same naming conventions, helper functions, and file structure as other route groups (restaurant R1–R6, wallet, etc.).
+   - Maintain the same JSON response shapes (e.g., `{ data: ..., meta: ... }` vs raw array) as used in other modern endpoints; do not invent a new pattern.
+   - Ensure TypeScript types are updated:
+     - Add/update any `Vehicle`-related types/interfaces used by the driver frontend.
+     - If you have a shared API client or types, extend them accordingly.
+
+5. **Tests & basic QA**
+   - If there are existing tests for REST endpoints, add at least minimal coverage:
+     - Auth/ownership test (driver A cannot see/update driver B’s vehicles).
+     - Primary vehicle logic test.
+   - If there isn’t a formal test suite, at least add a short manual test plan in `replit.md` describing:
+     - How to create multiple vehicles for a driver.
+     - How to change primary vehicle.
+     - How soft delete behaves.
+     - Expected responses for unauthorized or cross-driver access.
+
+6. **Update documentation**
+   - In `replit.md`, under the Driver section, add a **D1-A: Multi-Vehicle Backend APIs** subsection that documents:
+     - The new endpoints (paths, methods, brief description).
+     - Required auth/role/KYC behavior.
+     - Primary-vehicle rules.
+     - Soft-delete behavior.
+     - Any edge cases or intentional limitations (for example, no admin override yet).
+
+7. **Final check**
+   - Run the dev server and verify:
+     - No TypeScript LSP errors in the modified driver and schema files.
+     - No Prisma migration or connection issues.
+     - No console errors when hitting the new endpoints.
+   - Confirm that no restaurant/admin/customer routes were modified unintentionally.
+
+When you’re done, summarize in the console:
+- What endpoints were added or changed.
+- Any trade-offs you made (for example, how you handle deletion of the primary vehicle).
+- Anything you recommend we handle later in a follow-up D1 sub-phase (for example, analytics on vehicles, document uploads, admin view).

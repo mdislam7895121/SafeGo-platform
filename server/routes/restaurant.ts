@@ -1193,7 +1193,9 @@ router.get("/orders", async (req: AuthRequest, res) => {
             user: {
               select: { email: true },
             },
-            vehicle: true,
+            vehicles: {
+              where: { isActive: true, isPrimary: true },
+            },
           },
         },
       },
@@ -1255,7 +1257,9 @@ router.get("/orders/:id", async (req: AuthRequest, res) => {
             user: {
               select: { email: true },
             },
-            vehicle: true,
+            vehicles: {
+              where: { isActive: true, isPrimary: true },
+            },
           },
         },
       },
