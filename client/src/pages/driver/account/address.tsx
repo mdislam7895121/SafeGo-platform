@@ -99,8 +99,12 @@ function AddressForm({ profile, countryCode }: { profile: any; countryCode: stri
         };
       }
 
-      const response = await apiRequest("PATCH", "/api/driver/profile", payload);
-      return response.json();
+      const result = await apiRequest("/api/driver/profile", {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       // Invalidate driver home query to refresh profile data

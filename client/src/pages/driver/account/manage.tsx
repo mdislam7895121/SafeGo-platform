@@ -48,8 +48,12 @@ export default function ManageAccount() {
   // Update name mutation
   const updateNameMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("PATCH", "/api/driver/profile/name", data);
-      return res.json();
+      const result = await apiRequest("/api/driver/profile/name", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
@@ -72,8 +76,12 @@ export default function ManageAccount() {
   // Update email mutation
   const updateEmailMutation = useMutation({
     mutationFn: async (email: string) => {
-      const res = await apiRequest("PATCH", "/api/driver/email", { email });
-      return res.json();
+      const result = await apiRequest("/api/driver/email", {
+        method: "PATCH",
+        body: JSON.stringify({ email }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
@@ -93,8 +101,12 @@ export default function ManageAccount() {
   // Change password mutation
   const changePasswordMutation = useMutation({
     mutationFn: async (data: { currentPassword: string; newPassword: string }) => {
-      const res = await apiRequest("PATCH", "/api/driver/password", data);
-      return res.json();
+      const result = await apiRequest("/api/driver/password", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       toast({ title: "Password changed successfully" });
@@ -167,8 +179,12 @@ export default function ManageAccount() {
   // Delete account mutation
   const deleteAccountMutation = useMutation({
     mutationFn: async (password: string) => {
-      const res = await apiRequest("DELETE", "/api/driver/account", { password });
-      return res.json();
+      const result = await apiRequest("/api/driver/account", {
+        method: "DELETE",
+        body: JSON.stringify({ password }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       toast({ title: "Account deleted successfully" });
