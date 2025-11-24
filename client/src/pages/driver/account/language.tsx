@@ -25,8 +25,12 @@ export default function LanguageSettings() {
 
   const updateLanguageMutation = useMutation({
     mutationFn: async (preferredLanguage: string) => {
-      const res = await apiRequest("PATCH", "/api/driver/preferences/language", { preferredLanguage });
-      return res.json();
+      const result = await apiRequest("/api/driver/preferences/language", {
+        method: "PATCH",
+        body: JSON.stringify({ preferredLanguage }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });

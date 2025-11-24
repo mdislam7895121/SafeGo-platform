@@ -25,8 +25,12 @@ export default function NavigationSettings() {
 
   const updateNavigationMutation = useMutation({
     mutationFn: async (preferredNavigationApp: string) => {
-      const res = await apiRequest("PATCH", "/api/driver/preferences/navigation", { preferredNavigationApp });
-      return res.json();
+      const result = await apiRequest("/api/driver/preferences/navigation", {
+        method: "PATCH",
+        body: JSON.stringify({ preferredNavigationApp }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });

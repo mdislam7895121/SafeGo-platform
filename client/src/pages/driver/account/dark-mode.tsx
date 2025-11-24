@@ -23,8 +23,12 @@ export default function DarkModeSettings() {
 
   const updateThemeMutation = useMutation({
     mutationFn: async (themePreference: string) => {
-      const res = await apiRequest("PATCH", "/api/driver/preferences/theme", { themePreference });
-      return res.json();
+      const result = await apiRequest("/api/driver/preferences/theme", {
+        method: "PATCH",
+        body: JSON.stringify({ themePreference }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });

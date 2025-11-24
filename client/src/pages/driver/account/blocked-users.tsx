@@ -29,11 +29,12 @@ export default function BlockedUsers() {
   // Mutation to unblock a rider
   const unblockMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/driver/blocked-riders/${id}`, {});
-      if (response.status === 200) {
-        return response.json();
-      }
-      throw new Error("Failed to unblock rider");
+      const result = await apiRequest(`/api/driver/blocked-riders/${id}`, {
+        method: "DELETE",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/blocked-riders"] });

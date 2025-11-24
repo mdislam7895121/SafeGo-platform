@@ -70,13 +70,17 @@ export default function PayoutMethods() {
   // Create payout method mutation
   const createMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/driver/payout-methods", {
-        payoutType,
-        provider: payoutType === "mobile_wallet" ? provider : undefined,
-        accountHolderName,
-        accountNumber,
-        routingNumber: payoutType === "bank_account" ? routingNumber : undefined,
-        bankName: payoutType === "bank_account" ? bankName : undefined,
+      return await apiRequest("/api/driver/payout-methods", {
+        method: "POST",
+        body: JSON.stringify({
+          payoutType,
+          provider: payoutType === "mobile_wallet" ? provider : undefined,
+          accountHolderName,
+          accountNumber,
+          routingNumber: payoutType === "bank_account" ? routingNumber : undefined,
+          bankName: payoutType === "bank_account" ? bankName : undefined,
+        }),
+        headers: { "Content-Type": "application/json" },
       });
     },
     onSuccess: () => {
@@ -101,7 +105,11 @@ export default function PayoutMethods() {
   // Set default mutation
   const setDefaultMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("PATCH", `/api/driver/payout-methods/${id}/set-default`, {});
+      return await apiRequest(`/api/driver/payout-methods/${id}/set-default`, {
+        method: "PATCH",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({
@@ -123,7 +131,11 @@ export default function PayoutMethods() {
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/driver/payout-methods/${id}`, {});
+      return await apiRequest(`/api/driver/payout-methods/${id}`, {
+        method: "DELETE",
+        body: JSON.stringify({}),
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({

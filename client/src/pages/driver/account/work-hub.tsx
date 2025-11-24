@@ -17,8 +17,12 @@ export default function WorkHub() {
 
   const updateWorkPrefsMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("PATCH", "/api/driver/preferences/work", data);
-      return res.json();
+      const result = await apiRequest("/api/driver/preferences/work", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });

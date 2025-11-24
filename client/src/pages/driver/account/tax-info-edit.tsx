@@ -53,8 +53,12 @@ export default function TaxInfoEdit() {
 
   const updateTaxInfoMutation = useMutation({
     mutationFn: async (data: any) => {
-      const response = await apiRequest("PUT", "/api/driver/tax-info", data);
-      return response.json();
+      const result = await apiRequest("/api/driver/tax-info", {
+        method: "PUT",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });

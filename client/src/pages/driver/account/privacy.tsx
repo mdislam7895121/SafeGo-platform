@@ -17,8 +17,12 @@ export default function PrivacySettings() {
 
   const updatePrivacyMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("PATCH", "/api/driver/preferences/privacy", data);
-      return res.json();
+      const result = await apiRequest("/api/driver/preferences/privacy", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });
