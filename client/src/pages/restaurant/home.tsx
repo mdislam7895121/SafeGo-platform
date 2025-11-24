@@ -272,10 +272,10 @@ export default function RestaurantHome() {
         {/* KYC Verification Banner */}
         <KYCBanner />
 
-        {/* Restaurant Header with Online/Offline Toggle */}
-        <div className="space-y-4">
+        {/* Restaurant Header with Identity and Online/Offline Toggle */}
+        <div className="space-y-3 pb-4 border-b">
           {/* Restaurant Identity Row */}
-          <div className="flex flex-col items-center gap-2 pb-2 border-b">
+          <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold" data-testid="text-restaurant-name">
                 {profile?.restaurantName || "SafeGo Eats"}
@@ -301,23 +301,25 @@ export default function RestaurantHome() {
             )}
           </div>
 
-          {/* Online/Offline Toggle - Centered */}
-          <RestaurantReceivingOrdersButton 
-            isReceivingOrders={isOnline}
-            onToggle={(status) => {
-              setIsOnline(status);
-              toast({
-                title: status ? "Restaurant is now Online" : "Restaurant is now Offline",
-                description: status 
-                  ? "You are now accepting orders" 
-                  : "You are not accepting new orders",
-              });
-            }}
-          />
+          {/* Online/Offline Toggle - Centered under identity */}
+          <div className="flex justify-center">
+            <RestaurantReceivingOrdersButton 
+              isReceivingOrders={isOnline}
+              onToggle={(status) => {
+                setIsOnline(status);
+                toast({
+                  title: status ? "Restaurant is now Online" : "Restaurant is now Offline",
+                  description: status 
+                    ? "You are now accepting orders" 
+                    : "You are not accepting new orders",
+                });
+              }}
+            />
+          </div>
         </div>
 
-        {/* R-ENHANCE: Time Period Filter */}
-        <div className="flex items-center justify-between mb-4">
+        {/* Performance Overview with Time Period Filter */}
+        <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Performance Overview</h2>
           <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
             <TabsList data-testid="tabs-time-period">
