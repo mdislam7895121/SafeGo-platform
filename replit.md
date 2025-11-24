@@ -77,6 +77,30 @@ Core systems and features include:
   - Max 5MB, JPEG/PNG/WebP only
 - **Impact**: Profile photo uploads now work correctly on both /driver/account/manage and /driver/kyc-documents pages without authentication errors
 
+**D1-VEH-COMPAT: Legacy Single-Vehicle Endpoint Compatibility Fix (COMPLETED)**
+- **Issue**: Driver vehicle registration on `/driver/vehicle` showed both success toast ("Vehicle Registered") and error toast ("Update failed - 404: No vehicle registered. Use POST to register")
+- **Root Cause**: 
+  - POST `/api/driver/vehicle` created vehicles without setting `isPrimary: true` flag
+  - PATCH `/api/driver/vehicle` specifically looked for `isPrimary: true` vehicles
+  - After successful POST, some flow triggered PATCH which couldn't find primary vehicle → returned 404
+- **Fix Implemented**: Option A - Backend compatibility shim
+  - Updated POST `/api/driver/vehicle` (server/routes/driver.ts line 367-382):
+    - Now sets `isPrimary: true` automatically if this is the driver's first vehicle
+    - Sets `isActive: true` explicitly for clarity
+  - Updated PATCH `/api/driver/vehicle` (server/routes/driver.ts line 424-448):
+    - If no primary vehicle found, checks for ANY active vehicle
+    - If found, promotes it to primary and proceeds with update
+    - If no vehicle exists at all, returns graceful 404 message
+- **Endpoints Modified**:
+  - POST `/api/driver/vehicle` - Legacy endpoint for first vehicle registration
+  - PATCH `/api/driver/vehicle` - Legacy endpoint for vehicle updates
+- **Backward Compatibility**: Maintained full compatibility with existing `/driver/vehicle` page
+- **Multi-Vehicle Support**: New endpoints `/api/driver/vehicles` remain the preferred approach for future features
+- **Known Limitations**: 
+  - Legacy endpoints handle single-vehicle flows only
+  - Future work: Migrate all driver UIs to use new multi-vehicle endpoints
+- **Impact**: Drivers can now successfully register and update vehicles on `/driver/vehicle` page without 404 errors
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
 

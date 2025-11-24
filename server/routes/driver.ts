@@ -360,17 +360,37 @@ router.post("/vehicle", async (req: AuthRequest, res) => {
 
     // Note: Multi-vehicle support - drivers can now have multiple vehicles
     // This endpoint is deprecated; use POST /api/driver/vehicles instead
+    
+    // Backward compatibility: Set isPrimary true if this is the first vehicle
+    const isFirstVehicle = driverProfile.vehicles.length === 0;
 
-    // Create vehicle
-    const vehicle = await prisma.vehicle.create({
-      data: {
-        id: randomUUID(),
-        driverId: driverProfile.id,
-        vehicleType,
-        vehicleModel,
-        vehiclePlate,
-        updatedAt: new Date(),
-      },
+    // Atomic transaction: Create vehicle and manage primary status
+    const vehicle = await prisma.$transaction(async (tx) => {
+      // If this is the first vehicle, mark it as primary
+      // If driver has other vehicles, unset their primary status first
+      if (!isFirstVehicle) {
+        await tx.vehicle.updateMany({
+          where: {
+            driverId: driverProfile.id,
+            isPrimary: true,
+          },
+          data: { isPrimary: false },
+        });
+      }
+      
+      // Create the new vehicle (always set as primary for legacy endpoint)
+      return await tx.vehicle.create({
+        data: {
+          id: randomUUID(),
+          driverId: driverProfile.id,
+          vehicleType,
+          vehicleModel,
+          vehiclePlate,
+          isPrimary: true,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+      });
     });
 
     res.status(201).json({
@@ -413,17 +433,52 @@ router.patch("/vehicle", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Driver profile not found" });
     }
 
-    const primaryVehicle = driverProfile.vehicles[0];
+    let primaryVehicle = driverProfile.vehicles[0];
+    
+    // Backward compatibility: If no primary vehicle found, promote first active vehicle
     if (!primaryVehicle) {
-      return res.status(404).json({ error: "No vehicle registered. Use POST to register." });
+      // Check if driver has ANY active vehicle (not marked as primary)
+      const anyVehicle = await prisma.vehicle.findFirst({
+        where: {
+          driverId: driverProfile.id,
+          isActive: true,
+        },
+      });
+      
+      if (!anyVehicle) {
+        // No vehicle exists - should use POST, but be graceful
+        return res.status(404).json({ 
+          error: "No vehicle registered. Please use the registration form first." 
+        });
+      }
+      
+      // Atomic transaction: Promote this vehicle to primary
+      primaryVehicle = await prisma.$transaction(async (tx) => {
+        // Unset any existing primaries (defensive, shouldn't exist)
+        await tx.vehicle.updateMany({
+          where: {
+            driverId: driverProfile.id,
+            isPrimary: true,
+          },
+          data: { isPrimary: false },
+        });
+        
+        // Set this vehicle as primary
+        return await tx.vehicle.update({
+          where: { id: anyVehicle.id },
+          data: { isPrimary: true },
+        });
+      });
     }
 
-    // Update vehicle
+    // Prepare update data
     const updateData: any = {};
     if (vehicleType) updateData.vehicleType = vehicleType;
     if (vehicleModel) updateData.vehicleModel = vehicleModel;
     if (vehiclePlate) updateData.vehiclePlate = vehiclePlate;
+    updateData.updatedAt = new Date();
 
+    // Update the primary vehicle
     const updatedVehicle = await prisma.vehicle.update({
       where: { id: primaryVehicle.id },
       data: updateData,
