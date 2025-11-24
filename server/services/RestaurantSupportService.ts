@@ -4,7 +4,6 @@ const prisma = new PrismaClient();
 
 const VALID_CATEGORIES: RestaurantSupportCategory[] = ["orders", "payouts", "menu_pricing", "account_kyc", "technical", "other"];
 const VALID_PRIORITIES: RestaurantSupportPriority[] = ["low", "normal", "high", "urgent"];
-const VALID_STATUSES: RestaurantSupportStatus[] = ["open", "in_progress", "resolved", "closed"];
 
 export class RestaurantSupportService {
   async listTickets(restaurantId: string) {
@@ -129,34 +128,6 @@ export class RestaurantSupportService {
     });
   }
 
-  async updateTicketStatus(ticketId: string, restaurantId: string, status: string) {
-    if (!VALID_STATUSES.includes(status as RestaurantSupportStatus)) {
-      throw new Error("Invalid status");
-    }
-
-    const ticket = await prisma.restaurantSupportTicket.findUnique({
-      where: { id: ticketId },
-    });
-
-    if (!ticket) {
-      throw new Error("Ticket not found");
-    }
-
-    if (ticket.restaurantId !== restaurantId) {
-      throw new Error("Access denied: You can only update your own tickets");
-    }
-
-    const resolvedAt = status === "resolved" || status === "closed" ? new Date() : null;
-
-    return await prisma.restaurantSupportTicket.update({
-      where: { id: ticketId },
-      data: {
-        status: status as RestaurantSupportStatus,
-        resolvedAt,
-        updatedAt: new Date(),
-      },
-    });
-  }
 }
 
 export const restaurantSupportService = new RestaurantSupportService();

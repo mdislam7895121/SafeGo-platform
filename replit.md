@@ -20,6 +20,7 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 -   **Tax & Fees System**: Uber-style multi-country tax management with city-level overrides and 7 tax types. Includes US 1099 Tax System and Bangladesh Tax Reporting System.
 -   **System Monitoring**: Real-time performance monitoring, stability alerts, and an enterprise performance dashboard.
 -   **Bot-First Support System**: AI-first support chat with 4-role support, pre-chat verification, two-tier escalation (bot FAQ → human agent), automatic and manual escalation, and an Admin Live Support Console. A comprehensive multi-service support ticket management system for customers, restaurants, and admins has been implemented.
+-   **Restaurant Support Center**: Production-ready general support system with Help Center (FAQ categories for Orders, Payouts, Menu, KYC, Technical), Contact Support (ticket creation with collision-free codes, ticket listing/detail, message threading), and System Status pages. Implements enterprise-grade security with KYC/RBAC gating, transaction-wrapped operations, enum validation, and complete audit logging.
 -   **Demo Mode**: Comprehensive demo data generation for multi-jurisdiction scenarios.
 -   **Opportunity Bonus Management System**: Admin-managed ride incentives with country-specific amounts, campaigns, and zone-based targeting for drivers.
 -   **SafeGo Points System**: Uber Pro-style gamified loyalty program with 3 exclusive tiers and 90-day cycles based on time-based trip points.
@@ -32,6 +33,29 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 -   **R-ENHANCE UI/UX Improvements**: Completed professional polish initiative for restaurant portal including layout standardization (space-y-6), unified FeaturePlaceholderLayout system for all planned features, WCAG 2.1 AA compliant search/notification UX, and API migration to new apiRequest pattern with FormData support. Fixed restaurant payouts overview 404 by adding /restaurant/payouts/overview route (OWNER-only).
 
 ## Recent Changes
+
+### November 24, 2025 - Restaurant Support Center PRODUCTION-READY ✅
+- **Restaurant Support Center - Enterprise-Grade Implementation**:
+  - **Database Models**: Added RestaurantSupportTicket and RestaurantSupportMessage with @unique ticketCode constraint, enums (RestaurantSupportCategory, RestaurantSupportPriority, RestaurantSupportStatus), and proper indexes
+  - **Backend Service**: RestaurantSupportService with collision-free ticketCode generation (timestamp + random suffix), transaction-wrapped ticket/message creation, enum validation, and RBAC enforcement
+  - **API Routes**: Four secure endpoints with full KYC/RBAC protection:
+    - GET /api/restaurant/support-center/tickets (list tickets)
+    - GET /api/restaurant/support-center/tickets/:id (view ticket details)
+    - POST /api/restaurant/support-center/tickets (create ticket)
+    - POST /api/restaurant/support-center/tickets/:id/messages (add reply)
+  - **Security Hardening**:
+    - KYC verification required (isVerified + APPROVED status)
+    - checkSupportAccess() enforces OWNER full access, STAFF needs canReplySupport + staffActive + not suspended
+    - Transaction wrapping ensures atomic ticket + initial message creation
+    - Enum validation without 'as any' type bypasses
+    - Complete audit logging for all create/reply operations
+    - Status updates are admin-only (restaurants cannot change ticket status)
+  - **Frontend Pages**:
+    - Help Center (/restaurant/support/help): Searchable FAQ with 6 categories (Orders, Payouts, Menu & Pricing, Account & KYC, Technical Issues, Other)
+    - Contact Support (/restaurant/support/contact): Ticket creation form with category/priority selection, recent tickets table with status badges, ticket detail view with message threading
+    - System Status (/restaurant/support/status): Live service health monitoring grid (Restaurant Portal, Customer App, Driver App, Orders, Payments, Payouts, Live Chat, Notifications) with uptime stats
+  - **Design**: Maintains SafeGo brand consistency with mobile-friendly responsive layouts, proper spacing (space-y-6), skeleton loading states, and WCAG 2.1 AA accessibility
+- **Architect Review**: Confirmed production-ready with all enterprise security requirements met
 
 ### November 23, 2025 - Payment & Payout Configuration System PRODUCTION-READY ✅
 - **R-ENHANCE Complete**: All UI/UX improvements completed including layout standardization, search/notification UX, API migration, and support pages polishing. Fixed restaurant payouts overview 404 by adding /restaurant/payouts/overview route.
@@ -63,7 +87,7 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 - **Application Status**: Running successfully on port 5000 with all routes functional, payment configuration system verified production-ready by architect review
 
 ### Database Schema Design
-The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, `PaymentMethod`, `OpportunitySetting`, `OpportunityReward`, `DriverTier`, `DriverPoints`, `TierBenefit`, `PointsRule`, `PointsTransaction`, `BlockedRider`, `Review`, `RestaurantBranding`, `RestaurantMedia`, `RestaurantHours`, `OperationalSettings`, `DeliveryZone`, `SurgeSettings`, `CountryPaymentConfig`, `CountryPayoutConfig`, and `RestaurantPayoutMethod`. It supports country-specific identity fields with AES-256-GCM encryption and includes an `isDemo` flag, fields for US tax and driver preferences, and operational settings like business hours with split shifts, delivery zones, and surge pricing. The new payment/payout configuration models enable country-aware payment method and payout rail management with multi-actor support.
+The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for `Wallet`, `WalletTransaction`, `Payout`, `PayoutBatch`, `AuditLog`, `AdminNotification`, `PlatformSettings`, `PayoutAccount`, `PaymentMethod`, `OpportunitySetting`, `OpportunityReward`, `DriverTier`, `DriverPoints`, `TierBenefit`, `PointsRule`, `PointsTransaction`, `BlockedRider`, `Review`, `RestaurantBranding`, `RestaurantMedia`, `RestaurantHours`, `OperationalSettings`, `DeliveryZone`, `SurgeSettings`, `CountryPaymentConfig`, `CountryPayoutConfig`, `RestaurantPayoutMethod`, `RestaurantSupportTicket`, and `RestaurantSupportMessage`. It supports country-specific identity fields with AES-256-GCM encryption and includes an `isDemo` flag, fields for US tax and driver preferences, and operational settings like business hours with split shifts, delivery zones, and surge pricing. The payment/payout configuration models enable country-aware payment method and payout rail management with multi-actor support. The support ticket models enable enterprise-grade general support with collision-free ticketCode generation and full message threading.
 
 ## External Dependencies
 
