@@ -12,6 +12,51 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { FileUpload } from "@/components/file-upload";
 import { useState, useEffect } from "react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+// Predefined vehicle color options
+const VEHICLE_COLORS = [
+  "Black",
+  "White",
+  "Silver",
+  "Gray",
+  "Blue",
+  "Red",
+  "Green",
+  "Yellow",
+  "Brown",
+  "Gold",
+  "Orange",
+  "Beige",
+  "Purple",
+  "Other",
+] as const;
+
+// Predefined vehicle model options
+const VEHICLE_MODELS = [
+  "Toyota Camry",
+  "Toyota Corolla",
+  "Honda Civic",
+  "Honda Accord",
+  "Honda CR-V",
+  "Nissan Altima",
+  "Hyundai Elantra",
+  "Hyundai Sonata",
+  "Kia Seltos",
+  "Kia Sportage",
+  "Ford Focus",
+  "Ford Explorer",
+  "Chevrolet Malibu",
+  "Tesla Model 3",
+  "Tesla Model Y",
+  "Other",
+] as const;
 
 export default function DriverKYCDocuments() {
   const { toast } = useToast();
@@ -33,6 +78,12 @@ export default function DriverKYCDocuments() {
     vehicleModel: "",
     licensePlateNumber: "",
   });
+  
+  // Dropdown state for color and model
+  const [selectedColor, setSelectedColor] = useState<string>("");
+  const [customColor, setCustomColor] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [customModel, setCustomModel] = useState<string>("");
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
@@ -76,9 +127,34 @@ export default function DriverKYCDocuments() {
     if (driverData && !vehicleFormInitialized) {
       const vehicle = (driverData as any)?.vehicle;
       if (vehicle) {
+        const savedColor = vehicle.color || "";
+        const savedModel = vehicle.vehicleModel || "";
+        
+        // Check if saved color matches predefined options
+        const isColorPredefined = VEHICLE_COLORS.includes(savedColor as any);
+        if (isColorPredefined && savedColor !== "Other") {
+          setSelectedColor(savedColor);
+          setCustomColor("");
+        } else if (savedColor) {
+          // Custom color - select "Other" and prefill custom field
+          setSelectedColor("Other");
+          setCustomColor(savedColor);
+        }
+        
+        // Check if saved model matches predefined options
+        const isModelPredefined = VEHICLE_MODELS.includes(savedModel as any);
+        if (isModelPredefined && savedModel !== "Other") {
+          setSelectedModel(savedModel);
+          setCustomModel("");
+        } else if (savedModel) {
+          // Custom model - select "Other" and prefill custom field
+          setSelectedModel("Other");
+          setCustomModel(savedModel);
+        }
+        
         setVehicleKYCForm({
-          vehicleColor: vehicle.color || "",
-          vehicleModel: vehicle.vehicleModel || "",
+          vehicleColor: savedColor,
+          vehicleModel: savedModel,
           licensePlateNumber: vehicle.licensePlate || "",
         });
         setVehicleFormInitialized(true);
@@ -254,19 +330,45 @@ export default function DriverKYCDocuments() {
   });
 
   const updateVehicleKYCMutation = useMutation({
-    mutationFn: async (data: typeof vehicleKYCForm) => {
+    mutationFn: async () => {
+      // Build final values from dropdown selections + custom inputs
+      let finalColor = selectedColor;
+      let finalModel = selectedModel;
+      
+      // If "Other" is selected, use the custom value
+      if (selectedColor === "Other") {
+        if (!customColor?.trim()) {
+          throw new Error("Please enter a custom color");
+        }
+        finalColor = customColor.trim();
+      }
+      
+      if (selectedModel === "Other") {
+        if (!customModel?.trim()) {
+          throw new Error("Please enter a custom model");
+        }
+        finalModel = customModel.trim();
+      }
+      
       // Validate required fields for USA drivers
       if (isUSA) {
-        if (!data.vehicleColor?.trim()) {
+        if (!finalColor) {
           throw new Error("Vehicle color is required");
         }
-        if (!data.vehicleModel?.trim()) {
+        if (!finalModel) {
           throw new Error("Vehicle model is required");
         }
-        if (!data.licensePlateNumber?.trim()) {
+        if (!vehicleKYCForm.licensePlateNumber?.trim()) {
           throw new Error("License plate number is required");
         }
       }
+      
+      const data = {
+        vehicleColor: finalColor,
+        vehicleModel: finalModel,
+        licensePlateNumber: vehicleKYCForm.licensePlateNumber,
+      };
+      
       const result = await apiRequest("/api/driver/vehicle-kyc-details", {
         method: "PUT",
         body: JSON.stringify(data),
@@ -686,7 +788,7 @@ export default function DriverKYCDocuments() {
           </Card>
         )}
 
-        {/* Vehicle Details (KYC Text Fields) */}
+        {/* Vehicle Details (KYC Dropdown Fields) */}
         <Card>
           <CardHeader>
             <CardTitle>Vehicle Details</CardTitle>
@@ -694,29 +796,84 @@ export default function DriverKYCDocuments() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
+              {/* Vehicle Color Dropdown */}
+              <div className="space-y-2">
                 <Label htmlFor="vehicleColor">Vehicle Color {isUSA && "*"}</Label>
-                <Input
-                  id="vehicleColor"
-                  data-testid="input-vehicle-color"
-                  value={vehicleKYCForm.vehicleColor}
-                  onChange={(e) => setVehicleKYCForm({ ...vehicleKYCForm, vehicleColor: e.target.value })}
-                  placeholder="e.g., Black, White, Silver"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Enter your vehicle's color</p>
+                <Select
+                  value={selectedColor}
+                  onValueChange={(value) => {
+                    setSelectedColor(value);
+                    if (value !== "Other") {
+                      setCustomColor("");
+                    }
+                  }}
+                >
+                  <SelectTrigger id="vehicleColor" data-testid="select-vehicle-color">
+                    <SelectValue placeholder="Select vehicle color" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VEHICLE_COLORS.map((color) => (
+                      <SelectItem key={color} value={color} data-testid={`option-color-${color.toLowerCase()}`}>
+                        {color}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedColor === "Other" && (
+                  <Input
+                    id="customColor"
+                    data-testid="input-custom-color"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    placeholder="Enter custom color"
+                    className="mt-2"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {selectedColor === "Other" ? "Enter custom color" : "Select your vehicle's color"}
+                </p>
               </div>
-              <div>
+
+              {/* Vehicle Model Dropdown */}
+              <div className="space-y-2">
                 <Label htmlFor="vehicleModel">Vehicle Model {isUSA && "*"}</Label>
-                <Input
-                  id="vehicleModel"
-                  data-testid="input-vehicle-model"
-                  value={vehicleKYCForm.vehicleModel}
-                  onChange={(e) => setVehicleKYCForm({ ...vehicleKYCForm, vehicleModel: e.target.value })}
-                  placeholder="e.g., Honda Accord 2018"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Enter make, model, and year</p>
+                <Select
+                  value={selectedModel}
+                  onValueChange={(value) => {
+                    setSelectedModel(value);
+                    if (value !== "Other") {
+                      setCustomModel("");
+                    }
+                  }}
+                >
+                  <SelectTrigger id="vehicleModel" data-testid="select-vehicle-model">
+                    <SelectValue placeholder="Select vehicle model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VEHICLE_MODELS.map((model) => (
+                      <SelectItem key={model} value={model} data-testid={`option-model-${model.toLowerCase().replace(/\s+/g, '-')}`}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedModel === "Other" && (
+                  <Input
+                    id="customModel"
+                    data-testid="input-custom-model"
+                    value={customModel}
+                    onChange={(e) => setCustomModel(e.target.value)}
+                    placeholder="Enter custom model (e.g., Honda Accord 2018)"
+                    className="mt-2"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {selectedModel === "Other" ? "Enter make, model, and year" : "Select your vehicle model"}
+                </p>
               </div>
-              <div>
+
+              {/* License Plate Number */}
+              <div className="space-y-2">
                 <Label htmlFor="licensePlateNumber">License Plate Number {isUSA && "*"}</Label>
                 <Input
                   id="licensePlateNumber"
@@ -725,13 +882,16 @@ export default function DriverKYCDocuments() {
                   onChange={(e) => setVehicleKYCForm({ ...vehicleKYCForm, licensePlateNumber: e.target.value.toUpperCase() })}
                   placeholder="e.g., NYC1230"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Enter plate number (no photo needed)</p>
+                <p className="text-xs text-muted-foreground">Enter plate number (no photo needed)</p>
               </div>
             </div>
+
             <Button
-              onClick={() => updateVehicleKYCMutation.mutate(vehicleKYCForm)}
+              onClick={() => updateVehicleKYCMutation.mutate()}
               disabled={
-                (isUSA && (!vehicleKYCForm.vehicleColor || !vehicleKYCForm.vehicleModel || !vehicleKYCForm.licensePlateNumber)) ||
+                (isUSA && (!selectedColor || !selectedModel || !vehicleKYCForm.licensePlateNumber)) ||
+                (selectedColor === "Other" && !customColor?.trim()) ||
+                (selectedModel === "Other" && !customModel?.trim()) ||
                 updateVehicleKYCMutation.isPending
               }
               data-testid="button-save-vehicle-kyc"

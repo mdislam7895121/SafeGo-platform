@@ -1,0 +1,129 @@
+You are continuing SafeGo Driver Phase D1 (USA driver onboarding & KYC).
+
+Goal: Convert the free-text Vehicle Color and Vehicle Model fields into dropdown selects with predefined options, while still allowing a custom “Other” entry. This must stay compatible with the existing D1 schema and API you just added.
+
+Context
+- We already added:
+  - Vehicle Color (text)
+  - Vehicle Model / Model Description (text)
+  - License Plate Number (text)
+- These are saved on the primary vehicle (or equivalent driver vehicle record).
+- KYC vehicle details are entered on `/driver/kyc-documents`.
+
+New requirements:
+
+1) Vehicle Color dropdown
+   - On the vehicle details section (KYC documents page and any related driver vehicle form), replace the plain text input for **Vehicle Color** with a dropdown/select.
+   - The dropdown should contain a curated list of common colors, for example:
+     - Black
+     - White
+     - Silver
+     - Gray
+     - Blue
+     - Red
+     - Green
+     - Yellow
+     - Brown
+     - Gold
+     - Orange
+     - Beige
+     - Purple
+     - Other
+   - UX behavior:
+     - Default state: empty / “Select vehicle color”.
+     - If the saved vehicle color matches one of the predefined options, pre-select that option.
+     - If the saved color does NOT match any predefined option:
+       - Select “Other”.
+       - Show a small text input called “Custom Color” and prefill it with the existing value.
+     - When the driver selects any color other than “Other”, hide the custom color input and save exactly the selected value.
+     - When the driver selects “Other”, show the custom text field and require a non-empty value there.
+   - Storage:
+     - Continue storing a single `color` string on the vehicle model (as before).
+     - If “Other” is chosen, store the value from the custom text field into `color`.
+     - No schema changes should be required; only frontend + validation logic.
+
+2) Vehicle Model dropdown
+   - Similar pattern for **Vehicle Model**:
+     - Replace the plain text model input with a dropdown plus optional custom field.
+   - Because there are many possible models, implement it as:
+     - A dropdown of common models per vehicle type (if possible), OR a generic dropdown of popular models plus “Other”.
+     - For example (for cars/SUVs):
+       - Toyota Camry
+       - Toyota Corolla
+       - Honda Civic
+       - Honda Accord
+       - Honda CR-V
+       - Nissan Altima
+       - Hyundai Elantra
+       - Hyundai Sonata
+       - Kia Seltos
+       - Kia Sportage
+       - Ford Focus
+       - Ford Explorer
+       - Chevrolet Malibu
+       - Tesla Model 3
+       - Tesla Model Y
+       - Other
+   - If the current implementation already knows the vehicle type (Sedan, SUV, Hatchback, Van, Truck, Motorcycle, Rickshaw, Auto Rickshaw), you may:
+     - Use different predefined model lists per type (optional nice-to-have).
+     - Otherwise, use a single shared list as above.
+   - UX behavior:
+     - Default placeholder: “Select vehicle model”.
+     - If the stored model matches an item in the dropdown, select that item.
+     - If the stored model does not match any option:
+       - Select “Other” and prefill a “Custom Model” text input with the existing model value.
+     - When “Other” is selected, require the custom model field; when a predefined model is selected, hide the custom model field.
+   - Storage:
+     - Keep using the existing model/modelDescription string field on the vehicle entity.
+     - Save either the chosen predefined model, or the “Custom Model” value if “Other” is selected.
+     - Again, no destructive schema changes.
+
+3) API and validation updates
+   - Update the relevant APIs handling vehicle details / KYC vehicle save, for example:
+     - `/api/driver/kyc-documents`
+     - `/api/driver/vehicles` (if it participates in the same flow)
+   - The request payload should still contain:
+     - `vehicleColor` (final string that is stored)
+     - `vehicleModel` (final string that is stored)
+     - `licensePlateNumber`
+   - Frontend should handle mapping between dropdown + custom fields and this final string.
+   - Validation:
+     - For USA drivers:
+       - Do not allow saving if:
+         - vehicleColor is empty, or
+         - vehicleModel is empty, or
+         - licensePlateNumber is empty.
+       - When “Other” is selected for color or model, the corresponding custom field is required.
+     - For non-USA drivers, keep the previous validation rules (no extra breaking requirements).
+
+4) UI integration and consistency
+   - Ensure these dropdown+custom inputs are used consistently wherever the driver edits vehicle info or KYC vehicle details:
+     - `/driver/kyc-documents` vehicle section
+     - Any “Vehicle Registration / Update Vehicle” page used in D1.
+   - The existing “Vehicle Type” dropdown (Sedan/SUV/etc.) must continue working as before.
+   - Keep the layout simple and mobile-friendly:
+     - Vehicle Type
+     - Vehicle Color (dropdown + optional custom)
+     - Vehicle Model (dropdown + optional custom)
+     - License Plate Number (text)
+   - Make sure the toast messages and inline errors mention “select a color/model” instead of “enter text”, where appropriate.
+
+5) Security and backward compatibility
+   - Do not change the authentication / KYC ownership rules.
+   - No destructive Prisma migrations.
+   - Existing stored color/model values must continue to display correctly in the new dropdown+custom UI, even if they are unusual values.
+
+6) Testing
+   - With a USA driver test account:
+     - Register/update a vehicle using only predefined options for color and model.
+     - Register/update another vehicle (or update the same one) using the “Other” option for color and/or model and a custom value.
+     - Reload the pages (`/driver/vehicle`, `/driver/kyc-documents`) and confirm:
+       - The selects show the correct selected value.
+       - Custom inputs appear only when “Other” is selected.
+       - All data persists correctly in the database.
+     - Confirm no regressions in vehicle registration, update, or KYC submission flows.
+
+Please implement these changes, then summarize:
+- Files modified (frontend + any API updates).
+- How existing data is handled when it doesn’t match the predefined lists.
+- Any limitations or TODOs you are leaving for later (for example, a more complete per-type model database).
