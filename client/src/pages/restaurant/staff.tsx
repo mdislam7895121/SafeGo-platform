@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -91,7 +92,7 @@ export default function StaffManagementPage() {
   });
 
   const { data, isLoading } = useQuery<{ staff: StaffMember[] }>({
-    queryKey: ["/api/restaurant/staff"],
+    queryKey: queryKeys.restaurant.staff.list,
   });
 
   const createStaffMutation = useMutation({
@@ -107,7 +108,7 @@ export default function StaffManagementPage() {
         title: "Staff member added",
         description: "The staff member has been successfully created.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/staff"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.restaurant.staff.all });
       setNewStaff({
         name: "",
         email: "",
@@ -146,7 +147,7 @@ export default function StaffManagementPage() {
         title: "Permissions updated",
         description: "Staff member permissions have been updated successfully.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/staff"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.restaurant.staff.all });
       setEditingStaff(null);
     },
     onError: (error: any) => {
@@ -173,7 +174,7 @@ export default function StaffManagementPage() {
           ? "The staff member has been blocked and cannot access the system."
           : "The staff member has been unblocked and can now access the system.",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/staff"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.restaurant.staff.all });
       setBlockingStaff(null);
       setBlockReason("");
     },

@@ -16,4 +16,14 @@ export const ordersKeys = {
 export const restaurantKeys = {
   home: ['/api/restaurant/home'] as const,
   wallet: ['/api/restaurant/wallet'] as const,
+  staff: {
+    all: ['/api/restaurant/staff'] as const,
+    list: ['/api/restaurant/staff', 'list'] as const,
+    activity: ['/api/restaurant/staff/activity'] as const,
+  },
+};
+
+export const queryKeys = {
+  orders: ordersKeys,
+  restaurant: restaurantKeys,
 };
