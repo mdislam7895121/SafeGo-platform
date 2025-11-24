@@ -1,0 +1,93 @@
+SafeGo Agent – Task: Fix “Performance Overview” layout on the restaurant dashboard
+
+Context:
+- The Online/Offline toggle and the restaurant header are now OK.
+- The problem is with the “Performance Overview” row on the restaurant dashboard on mobile.
+- On small screens, the “Performance Overview” heading and the date range tabs (Today / 7 Days / 30 Days) are too close to the search bar and look visually cramped, sometimes appearing partially under the search bar.
+
+Goal:
+Make the “Performance Overview” section clean, readable, and properly spaced under the search bar on all screen sizes, without changing any backend logic.
+
+Scope:
+- Restaurant dashboard main page:
+  - `/restaurant`
+  - `/restaurant/dashboard` (if this route exists and reuses the same layout)
+- Only the “Performance Overview” row and its spacing relative to the search bar.
+- Do NOT modify:
+  - Online/Offline toggle logic or placement
+  - Header structure and KYC/role gating
+  - Dashboard cards content or metrics logic
+
+Requirements:
+
+A. Spacing between search bar and Performance Overview
+1. After the search bar container, ensure there is clear vertical space before the “Performance Overview” row.
+2. Add a margin-top between the bottom of the search bar and the Performance Overview row:
+   - Mobile: 16–20px
+   - Tablet / Desktop: 20–24px
+3. Make sure nothing from the Performance Overview row renders “inside” or under the search bar visually. The search bar is one clear block, then space, then the row with:
+   - “Performance Overview” title on the left
+   - Date-range tabs (Today / 7 Days / 30 Days) on the right.
+
+B. Performance Overview row layout
+1. The first line of this section should be a single row container with:
+   - Left: Heading text “Performance Overview”
+   - Right: The date-range selector (tabs or segmented control: Today / 7 Days / 30 Days)
+2. Implement this row using a responsive flex layout:
+   - `display: flex`
+   - `align-items: center`
+   - `justify-content: space-between`
+   - `gap` for spacing between elements
+3. On very small screens, the row should be allowed to wrap:
+   - `flex-wrap: wrap`
+   - When wrapping, the heading stays on the first line, and the date-range tabs go to a second line BELOW the heading with a small top margin (e.g., 8–12px).
+4. The heading text must not be truncated:
+   - Full text “Performance Overview” visible.
+   - No overlap with search bar or date tabs.
+
+C. Typography and alignment
+1. Keep existing typography tokens, but ensure:
+   - Heading uses the correct heading style (same as other section titles in the dashboard).
+   - Date-range tabs remain right-aligned on larger screens.
+2. On mobile, when wrapping:
+   - Heading is left-aligned.
+   - Date-range selector is also left-aligned on its own line, with consistent padding.
+
+D. Sticky / z-index behavior (if search bar is sticky)
+1. If the search bar container uses sticky positioning:
+   - Ensure the Performance Overview row is below it in stacking order and does not render underneath when scrolling.
+   - Fix any z-index or margin issues that cause the title to appear overlapped by the search bar edge.
+
+E. No layout regressions
+1. Do not change:
+   - Card layout for Today’s Orders, Today’s Earnings, Active Orders, etc.
+   - Metrics logic or API calls.
+2. Confirm that the same section looks correct on:
+   - Mobile (375–430px width)
+   - Tablet
+   - Desktop
+3. The cards should start immediately below the Performance Overview row with consistent vertical spacing (16–24px).
+
+F. Validation steps
+1. After implementing, test on:
+   - `/restaurant`
+   - `/restaurant/dashboard` (if applicable)
+2. On each viewport:
+   - Scroll from the top and visually confirm:
+     - Search bar at top
+     - Clear vertical space
+     - “Performance Overview” row
+     - Then the metrics cards
+   - Confirm no text is cut off and nothing overlaps horizontally or vertically.
+3. Take a screenshot on mobile width of the top of the dashboard showing:
+   - Header
+   - Search bar
+   - “Performance Overview” + date-range tabs
+   - Top of the first card
+4. Confirm in your summary:
+   - Performance Overview spacing is fixed.
+   - No overlap with search bar.
+   - No duplicate headers or new regressions.
+   - All SafeGuard rules, KYC gating, and backend logic remain unchanged.
+
+This task is strictly a visual / layout refinement for the Performance Overview section on the restaurant dashboard.

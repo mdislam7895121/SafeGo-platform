@@ -270,11 +270,11 @@ export default function RestaurantHome() {
         {/* KYC Verification Banner */}
         <KYCBanner />
 
-        {/* Performance Overview Section - Stable 24px spacing from header */}
-        <section className="mt-6 space-y-6">
+        {/* Performance Overview Section - Stable spacing from header */}
+        <section className="mt-5 sm:mt-6 space-y-6">
           {/* Performance Overview with Time Period Filter */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Performance Overview</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold whitespace-nowrap">Performance Overview</h2>
             <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
               <TabsList data-testid="tabs-time-period">
                 <TabsTrigger value="today" data-testid="tab-today">Today</TabsTrigger>
