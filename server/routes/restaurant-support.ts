@@ -666,11 +666,32 @@ router.get("/support-center/tickets", async (req: AuthRequest, res: Response) =>
 
     const restaurantProfile = await prisma.restaurantProfile.findUnique({
       where: { userId },
-      select: { id: true, restaurantName: true }
+      select: {
+        id: true,
+        restaurantName: true,
+        isVerified: true,
+        verificationStatus: true,
+        ownerRole: true,
+        canReplySupport: true,
+        staffActive: true,
+        isSuspended: true
+      }
     });
 
     if (!restaurantProfile) {
       return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ 
+        error: "Restaurant verification required to access support system" 
+      });
+    }
+
+    if (!checkSupportAccess(restaurantProfile, false)) {
+      return res.status(403).json({ 
+        error: "You do not have permission to access support tickets. Please contact the restaurant owner." 
+      });
     }
 
     const tickets = await restaurantSupportService.listTickets(restaurantProfile.id);
@@ -693,11 +714,28 @@ router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response
 
     const restaurantProfile = await prisma.restaurantProfile.findUnique({
       where: { userId },
-      select: { id: true, restaurantName: true }
+      select: {
+        id: true,
+        restaurantName: true,
+        isVerified: true,
+        verificationStatus: true,
+        ownerRole: true,
+        canReplySupport: true,
+        staffActive: true,
+        isSuspended: true
+      }
     });
 
     if (!restaurantProfile) {
       return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ error: "Restaurant verification required" });
+    }
+
+    if (!checkSupportAccess(restaurantProfile, false)) {
+      return res.status(403).json({ error: "You do not have permission to access support tickets" });
     }
 
     const ticket = await restaurantSupportService.getTicketById(ticketId, restaurantProfile.id);
@@ -717,7 +755,7 @@ router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response
 
 /**
  * POST /api/restaurant/support-center/tickets
- * Create a new support center ticket
+ * Create a new support center ticket (OWNER or STAFF with canReplySupport)
  */
 router.post("/support-center/tickets", async (req: AuthRequest, res: Response) => {
   try {
@@ -731,7 +769,16 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
     const [restaurantProfile, user] = await Promise.all([
       prisma.restaurantProfile.findUnique({
         where: { userId },
-        select: { id: true, restaurantName: true }
+        select: {
+          id: true,
+          restaurantName: true,
+          isVerified: true,
+          verificationStatus: true,
+          ownerRole: true,
+          canReplySupport: true,
+          staffActive: true,
+          isSuspended: true
+        }
       }),
       prisma.user.findUnique({
         where: { id: userId },
@@ -745,6 +792,16 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ error: "Restaurant verification required to create support tickets" });
+    }
+
+    if (!checkSupportAccess(restaurantProfile, false)) {
+      return res.status(403).json({ 
+        error: "You do not have permission to create support tickets. Please contact the restaurant owner." 
+      });
     }
 
     const ticket = await restaurantSupportService.createTicket({
@@ -787,7 +844,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
 
 /**
  * POST /api/restaurant/support-center/tickets/:id/messages
- * Add a message to a support center ticket
+ * Add a message to a support center ticket (OWNER or STAFF with canReplySupport)
  */
 router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res: Response) => {
   try {
@@ -802,7 +859,16 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
     const [restaurantProfile, user] = await Promise.all([
       prisma.restaurantProfile.findUnique({
         where: { userId },
-        select: { id: true, restaurantName: true }
+        select: {
+          id: true,
+          restaurantName: true,
+          isVerified: true,
+          verificationStatus: true,
+          ownerRole: true,
+          canReplySupport: true,
+          staffActive: true,
+          isSuspended: true
+        }
       }),
       prisma.user.findUnique({
         where: { id: userId },
@@ -816,6 +882,16 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!restaurantProfile.isVerified || restaurantProfile.verificationStatus !== "APPROVED") {
+      return res.status(403).json({ error: "Restaurant verification required" });
+    }
+
+    if (!checkSupportAccess(restaurantProfile, false)) {
+      return res.status(403).json({ 
+        error: "You do not have permission to reply to support tickets. Please contact the restaurant owner." 
+      });
     }
 
     const message = await restaurantSupportService.addMessage({
