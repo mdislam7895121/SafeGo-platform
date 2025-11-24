@@ -28,7 +28,7 @@ export function RestaurantReceivingOrdersButton({
         }
         data-testid="button-receiving-orders-toggle"
         className={`
-          inline-flex items-center justify-center gap-3 w-28 h-12 rounded-full font-semibold text-[15px]
+          inline-flex items-center justify-center gap-3 w-[134px] h-[58px] rounded-[29px] font-semibold text-[15px]
           bg-[#111] dark:bg-[#111] transition-all duration-200 cursor-pointer
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
           active:scale-[0.98]
