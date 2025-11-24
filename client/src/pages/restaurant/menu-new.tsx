@@ -6,6 +6,8 @@ import {
   Plus,
   X,
   AlertCircle,
+  Search,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +40,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { z } from "zod";
+import { filterCategories, highlightMatch } from "@/lib/categorySearch";
+import { suggestCategory } from "@/lib/categoryAutoSuggest";
 
 type Category = {
   id: string;
@@ -107,12 +111,24 @@ export default function AddMenuItem() {
   const [subCategoryOpen, setSubCategoryOpen] = useState(false);
   const [subCategorySearch, setSubCategorySearch] = useState("");
   
+  // Smart category search state
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  
+  // Auto-suggest state
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  
   // Fetch main categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ["/api/restaurant/categories"],
   });
   
-  // Fetch subcategories for selected main category
+  // Fetch ALL subcategories for search/auto-suggest (loads once at page load)
+  const { data: allSubCategoriesData } = useQuery<{ subcategories: SubCategory[] }>({
+    queryKey: ["/api/restaurant/subcategories/all"],
+  });
+  const allSubCategories = allSubCategoriesData?.subcategories || [];
+  
+  // Fetch subcategories for selected main category (for manual dropdown selection)
   const { data: subCategories = [], isLoading: subCategoriesLoading } = useQuery<SubCategory[]>({
     queryKey: ["/api/restaurant/subcategories", formData.mainCategoryId],
     enabled: !!formData.mainCategoryId,
@@ -174,12 +190,48 @@ export default function AddMenuItem() {
     createItemMutation.mutate(formData);
   };
   
-  // Filter main categories based on search
-  const filteredMainCategories = categories.filter(cat => 
-    cat.name.toLowerCase().includes(mainCategorySearch.toLowerCase())
+  // Auto-suggest category based on title and description (using ALL subcategories)
+  const autoSuggestResult = suggestCategory(
+    formData.name,
+    formData.shortDescription || "",
+    categories,
+    allSubCategories
   );
   
-  // Filter subcategories based on search
+  // Apply suggested category
+  const applySuggestedCategory = () => {
+    if (autoSuggestResult.category) {
+      setFormData(prev => ({ ...prev, mainCategoryId: autoSuggestResult.category!.id }));
+      setShowSuggestions(false);
+    }
+  };
+  
+  // Apply suggested subcategories
+  const applySuggestedSubcategories = () => {
+    if (autoSuggestResult.subcategories.length > 0) {
+      setFormData(prev => ({ 
+        ...prev, 
+        subCategoryIds: autoSuggestResult.subcategories.map(s => s.id) 
+      }));
+      setShowSuggestions(false);
+    }
+  };
+  
+  // Smart category search - filter based on categorySearchQuery (using ALL subcategories)
+  const filteredCategoryTree = filterCategories(
+    categorySearchQuery,
+    categories,
+    allSubCategories
+  );
+  
+  // Filter main categories based on popover search (existing behavior)
+  const filteredMainCategories = categorySearchQuery 
+    ? filteredCategoryTree.map(f => f.category)
+    : categories.filter(cat => 
+        cat.name.toLowerCase().includes(mainCategorySearch.toLowerCase())
+      );
+  
+  // Filter subcategories based on popover search (existing behavior)
   const filteredSubCategories = subCategories.filter(sub =>
     sub.name.toLowerCase().includes(subCategorySearch.toLowerCase())
   );
@@ -258,6 +310,159 @@ export default function AddMenuItem() {
                   <p className="text-sm text-destructive">{formErrors.name}</p>
                 )}
               </div>
+
+              {/* Smart Category Search */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  Search Categories
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search categories and subcategories..."
+                    value={categorySearchQuery}
+                    onChange={(e) => setCategorySearchQuery(e.target.value)}
+                    className="pl-10"
+                    data-testid="input-category-search"
+                  />
+                  {categorySearchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => setCategorySearchQuery("")}
+                      data-testid="button-clear-search"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {categorySearchQuery && filteredCategoryTree.length > 0 && (
+                  <div className="border rounded-md p-3 space-y-2 bg-muted/30">
+                    <p className="text-xs text-muted-foreground">
+                      {filteredCategoryTree.length} category group{filteredCategoryTree.length !== 1 ? 's' : ''} found
+                    </p>
+                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                      {filteredCategoryTree.map((result) => {
+                        const highlight = highlightMatch(result.category.name, categorySearchQuery);
+                        return (
+                          <div key={result.category.id} className="space-y-1">
+                            <button
+                              onClick={() => {
+                                setFormData(prev => ({ ...prev, mainCategoryId: result.category.id }));
+                                setCategorySearchQuery("");
+                              }}
+                              className="text-left w-full px-2 py-1.5 rounded-sm hover-elevate text-sm font-medium"
+                              data-testid={`search-result-category-${result.category.slug}`}
+                            >
+                              {highlight.parts.map((part, idx) => (
+                                <span key={idx} className={part.highlight ? "bg-primary/20 font-semibold" : ""}>
+                                  {part.text}
+                                </span>
+                              ))}
+                            </button>
+                            {result.subcategories.length > 0 && (
+                              <div className="ml-4 space-y-0.5">
+                                {result.subcategories.slice(0, 3).map(sub => {
+                                  const subHighlight = highlightMatch(sub.name, categorySearchQuery);
+                                  return (
+                                    <button
+                                      key={sub.id}
+                                      onClick={() => {
+                                        setFormData(prev => ({ 
+                                          ...prev, 
+                                          mainCategoryId: result.category.id,
+                                          subCategoryIds: [sub.id]
+                                        }));
+                                        setCategorySearchQuery("");
+                                      }}
+                                      className="text-left w-full px-2 py-1 rounded-sm hover-elevate text-xs text-muted-foreground"
+                                      data-testid={`search-result-subcategory-${sub.slug}`}
+                                    >
+                                      {subHighlight.parts.map((part, idx) => (
+                                        <span key={idx} className={part.highlight ? "bg-primary/20 font-semibold" : ""}>
+                                          {part.text}
+                                        </span>
+                                      ))}
+                                    </button>
+                                  );
+                                })}
+                                {result.subcategories.length > 3 && (
+                                  <p className="text-xs text-muted-foreground ml-2">
+                                    +{result.subcategories.length - 3} more
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {categorySearchQuery && filteredCategoryTree.length === 0 && (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      No categories or subcategories match "{categorySearchQuery}"
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              {/* Auto-Suggest Section */}
+              {formData.name && autoSuggestResult.confidence !== 'none' && showSuggestions && !formData.mainCategoryId && (
+                <Alert className="border-primary/50 bg-primary/5">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Suggested Category</p>
+                      {autoSuggestResult.category && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={applySuggestedCategory}
+                          className="mr-2"
+                          data-testid="button-apply-suggested-category"
+                        >
+                          {autoSuggestResult.category.name}
+                        </Button>
+                      )}
+                      {autoSuggestResult.subcategories.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Suggested Subcategories:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {autoSuggestResult.subcategories.map(sub => (
+                              <Badge
+                                key={sub.id}
+                                variant="secondary"
+                                className="cursor-pointer hover-elevate"
+                                onClick={() => {
+                                  if (autoSuggestResult.category) {
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      mainCategoryId: autoSuggestResult.category!.id,
+                                      subCategoryIds: [sub.id]
+                                    }));
+                                    setShowSuggestions(false);
+                                  }
+                                }}
+                                data-testid={`badge-suggested-subcategory-${sub.slug}`}
+                              >
+                                {sub.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Click to apply suggestion, or choose manually below
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {/* Main Category Selection */}
               <div className="space-y-2">

@@ -1275,19 +1275,27 @@ router.get("/categories", async (req: AuthRequest, res) => {
 });
 
 // GET /api/restaurant/subcategories/:categoryId
-// List all subcategories for a specific main category
+// List all subcategories for a specific main category (or all if categoryId is 'all')
 router.get("/subcategories/:categoryId", async (req: AuthRequest, res) => {
   try {
     const { categoryId } = req.params;
 
+    // Support fetching all subcategories for smart search/auto-suggest
+    const whereClause: Prisma.SubCategoryWhereInput = { isActive: true };
+    if (categoryId !== 'all') {
+      whereClause.categoryId = categoryId;
+    }
+
     const subcategories = await prisma.subCategory.findMany({
-      where: {
-        categoryId,
-        isActive: true,
-      },
-      orderBy: { displayOrder: "asc" },
+      where: whereClause,
+      // Deterministic ordering: group by category, then by display order
+      orderBy: [
+        { categoryId: "asc" },
+        { displayOrder: "asc" },
+      ],
       select: {
         id: true,
+        categoryId: true,
         name: true,
         slug: true,
         displayOrder: true,
