@@ -446,6 +446,8 @@ model RestaurantProfile {
   supportTickets        SupportTicket[] // Phase 12: Restaurant support tickets
   financialAdjustments  FinancialAdjustment[] // Phase 12: Financial adjustments
   restaurantSupportTickets RestaurantSupportTicket[] @relation("RestaurantSupportTickets") // Phase 12.5: Restaurant support center tickets
+  liveChatSessions      LiveChatSession[] @relation("LiveChatSessions") // Phase 12.5: Live chat sessions
+  supportCallbacks      SupportCallback[] @relation("SupportCallbacks") // Phase 12.5: Support callbacks
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -1986,6 +1988,7 @@ enum RestaurantSupportPriority {
   low
   normal
   high
+  urgent
 }
 
 enum RestaurantSupportStatus {
@@ -1993,6 +1996,18 @@ enum RestaurantSupportStatus {
   in_progress
   resolved
   closed
+}
+
+enum LiveChatStatus {
+  waiting
+  active
+  ended
+}
+
+enum CallbackStatus {
+  pending
+  completed
+  cancelled
 }
 
 model RestaurantSupportTicket {
@@ -2034,4 +2049,77 @@ model RestaurantSupportMessage {
   @@index([ticketId])
   @@index([createdAt])
   @@map("restaurant_support_messages")
+}
+
+model LiveChatSession {
+  id              String           @id @default(uuid())
+  restaurantId    String
+  agentId         String?
+  agentName       String?
+  status          LiveChatStatus   @default(waiting)
+  startedAt       DateTime         @default(now())
+  endedAt         DateTime?
+  updatedAt       DateTime         @updatedAt
+  
+  restaurant      RestaurantProfile @relation("LiveChatSessions", fields: [restaurantId], references: [id], onDelete: Cascade)
+  messages        LiveChatMessage[]
+  
+  @@index([restaurantId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("live_chat_sessions")
+}
+
+model LiveChatMessage {
+  id              String           @id @default(uuid())
+  sessionId       String
+  senderRole      String           // "restaurant" | "agent"
+  senderName      String
+  messageBody     String           @db.Text
+  attachmentUrls  Json?
+  isTyping        Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  
+  session         LiveChatSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("live_chat_messages")
+}
+
+model SupportCallback {
+  id              String           @id @default(uuid())
+  restaurantId    String
+  phoneNumber     String
+  preferredTime   String
+  reason          String           @db.Text
+  status          CallbackStatus   @default(pending)
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
+  
+  restaurant      RestaurantProfile @relation("SupportCallbacks", fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  @@index([restaurantId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("support_callbacks")
+}
+
+model SupportArticle {
+  id              String           @id @default(uuid())
+  category        String
+  title           String
+  slug            String           @unique
+  content         String           @db.Text
+  isPublished     Boolean          @default(true)
+  viewCount       Int              @default(0)
+  helpfulCount    Int              @default(0)
+  relatedArticles Json?            // Array of article IDs
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  @@index([category])
+  @@index([isPublished])
+  @@index([viewCount])
+  @@map("support_articles")
 }
