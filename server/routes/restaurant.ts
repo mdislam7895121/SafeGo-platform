@@ -1653,8 +1653,15 @@ router.get("/menu/items", async (req: AuthRequest, res) => {
       prisma.menuItem.count({ where }),
     ]);
 
+    // Add flattened relational IDs for frontend convenience
+    const serializedItems = items.map(item => ({
+      ...item,
+      mainCategoryId: item.mainCategoryId || item.mainCategory?.id || null,
+      subCategoryIds: item.subCategoryLinks?.map(link => link.subCategoryId) || [],
+    }));
+
     res.json({
-      items,
+      items: serializedItems,
       pagination: {
         total,
         limit,
@@ -1709,7 +1716,14 @@ router.get("/menu/items/:id", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Menu item not found" });
     }
 
-    res.json({ item });
+    // Add flattened relational IDs for frontend convenience
+    const serializedItem = {
+      ...item,
+      mainCategoryId: item.mainCategoryId || item.mainCategory?.id || null,
+      subCategoryIds: item.subCategoryLinks?.map(link => link.subCategoryId) || [],
+    };
+
+    res.json({ item: serializedItem });
   } catch (error) {
     console.error("Get item error:", error);
     res.status(500).json({ error: "Failed to fetch item" });
@@ -1866,7 +1880,14 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
       },
     });
 
-    res.json({ item: itemWithRelations });
+    // Add flattened relational IDs for frontend convenience
+    const serializedItem = {
+      ...itemWithRelations,
+      mainCategoryId: itemWithRelations?.mainCategoryId || itemWithRelations?.mainCategory?.id || null,
+      subCategoryIds: itemWithRelations?.subCategoryLinks?.map(link => link.subCategoryId) || [],
+    };
+
+    res.json({ item: serializedItem });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Invalid input", details: error.errors });
@@ -2029,7 +2050,14 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
       metadata: updates,
     });
 
-    res.json({ item: itemWithRelations });
+    // Add flattened relational IDs for frontend convenience
+    const serializedItem = {
+      ...itemWithRelations,
+      mainCategoryId: itemWithRelations?.mainCategoryId || itemWithRelations?.mainCategory?.id || null,
+      subCategoryIds: itemWithRelations?.subCategoryLinks?.map(link => link.subCategoryId) || [],
+    };
+
+    res.json({ item: serializedItem });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Invalid input", details: error.errors });
