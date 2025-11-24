@@ -74,11 +74,13 @@ export default function RestaurantOrderDetails() {
   });
 
   // Fetch order details
-  const { data: order, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ordersKeys.detail(orderId || ""),
     queryFn: () => apiRequest(`/api/restaurant/orders/${orderId}`),
     enabled: !!orderId,
   });
+
+  const order = data?.order;
 
   // Status update mutation
   const updateStatusMutation = useMutation({
@@ -90,7 +92,9 @@ export default function RestaurantOrderDetails() {
       });
     },
     onSuccess: () => {
+      // Invalidate all order-related queries to refresh list, details, overview, and live board
       queryClient.invalidateQueries({ queryKey: ordersKeys.all });
+      queryClient.invalidateQueries({ queryKey: ordersKeys.detail(orderId || "") });
       toast({
         title: "Success",
         description: "Order status updated successfully",
@@ -160,7 +164,8 @@ export default function RestaurantOrderDetails() {
     );
   }
 
-  const items = order.items ? JSON.parse(order.items) : [];
+  // Items are already parsed by the backend
+  const items = order.items || [];
   const timeline = buildTimeline(order);
 
   // Action button visibility
