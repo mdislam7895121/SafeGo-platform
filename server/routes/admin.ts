@@ -57,6 +57,11 @@ function validateDriverKYC(
 ): KYCValidationResult {
   const missing: string[] = [];
 
+  // Get primary vehicle from vehicles array (safely handle empty/undefined arrays)
+  const primaryVehicle = Array.isArray(driver.vehicles) && driver.vehicles.length > 0
+    ? (driver.vehicles.find((v: any) => v.isPrimary) ?? driver.vehicles[0])
+    : null;
+
   // Profile photo required for ALL drivers
   if (!driver.profilePhotoUrl) {
     missing.push("Profile photo");
@@ -68,7 +73,7 @@ function validateDriverKYC(
       missing.push("NID (National ID)");
     }
     // Check for vehicle registration document (new Vehicle field OR legacy vehicleDocuments)
-    const hasNewVehicleReg = driver.vehicle?.registrationDocumentUrl;
+    const hasNewVehicleReg = primaryVehicle?.registrationDocumentUrl;
     const hasLegacyVehicleReg = driver.vehicleDocuments?.some((doc: any) => doc.documentType === "registration");
     if (!hasNewVehicleReg && !hasLegacyVehicleReg) {
       missing.push("Vehicle registration document");
@@ -110,31 +115,31 @@ function validateDriverKYC(
     }
 
     // Check for vehicle registration document (new Vehicle field OR legacy vehicleDocuments)
-    const hasNewVehicleReg = driver.vehicle?.registrationDocumentUrl;
+    const hasNewVehicleReg = primaryVehicle?.registrationDocumentUrl;
     const hasLegacyVehicleReg = driver.vehicleDocuments?.some((doc: any) => doc.documentType === "registration");
     if (!hasNewVehicleReg && !hasLegacyVehicleReg) {
       missing.push("Vehicle registration document");
     }
 
     // Check for DMV Inspection (type, date, expiry, and document)
-    if (!driver.vehicle?.dmvInspectionType) {
+    if (!primaryVehicle?.dmvInspectionType) {
       missing.push("DMV inspection type");
     }
-    if (!driver.vehicle?.dmvInspectionDate) {
+    if (!primaryVehicle?.dmvInspectionDate) {
       missing.push("DMV inspection date");
     }
-    if (!driver.vehicle?.dmvInspectionExpiry) {
+    if (!primaryVehicle?.dmvInspectionExpiry) {
       missing.push("DMV inspection expiry date");
     }
-    if (!driver.vehicle?.dmvInspectionImageUrl) {
+    if (!primaryVehicle?.dmvInspectionImageUrl) {
       missing.push("DMV inspection document");
     }
     // Check DMV inspection status: only "VALID" is acceptable, all others fail
     // (null, undefined, "MISSING", "EXPIRED", or any unexpected value should be rejected)
-    if (driver.vehicle?.dmvInspectionStatus !== 'VALID') {
-      if (driver.vehicle?.dmvInspectionStatus === 'EXPIRED') {
+    if (primaryVehicle?.dmvInspectionStatus !== 'VALID') {
+      if (primaryVehicle?.dmvInspectionStatus === 'EXPIRED') {
         missing.push("DMV inspection has expired");
-      } else if (driver.vehicle?.dmvInspectionStatus === 'MISSING') {
+      } else if (primaryVehicle?.dmvInspectionStatus === 'MISSING') {
         missing.push("DMV inspection is missing");
       } else {
         // null, undefined, or unexpected values
@@ -385,7 +390,7 @@ router.patch("/kyc/:userId", checkPermission(Permission.MANAGE_KYC), async (req:
         const driverProfile = await prisma.driverProfile.findUnique({
           where: { userId },
           include: {
-            vehicle: true,
+            vehicles: true,
             vehicleDocuments: true,
           },
         });
@@ -1524,7 +1529,7 @@ router.get("/drivers", checkPermission(Permission.VIEW_USER), async (req: AuthRe
               createdAt: true,
             },
           },
-          vehicle: onlineFilter ? { where: onlineFilter } : true,
+          vehicles: onlineFilter ? { where: onlineFilter } : true,
           driverStats: true,
           driverWallet: true,
         },
@@ -1583,28 +1588,32 @@ router.get("/drivers", checkPermission(Permission.VIEW_USER), async (req: AuthRe
     });
 
     // Format response with commission data
-    const formattedDrivers = drivers.map((driver) => ({
-      id: driver.id,
-      userId: driver.user.id,
-      email: driver.user.email,
-      countryCode: driver.user.countryCode,
-      verificationStatus: driver.verificationStatus,
-      isVerified: driver.isVerified,
-      isSuspended: driver.isSuspended,
-      suspensionReason: driver.suspensionReason,
-      isBlocked: driver.user.isBlocked,
-      isOnline: driver.vehicle?.isOnline || false,
-      totalTrips: driver.driverStats?.totalTrips || 0,
-      totalEarnings: driver.vehicle?.totalEarnings ? Number(driver.vehicle.totalEarnings) : 0,
-      averageRating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 0,
-      walletBalance: driver.driverWallet?.balance ? Number(driver.driverWallet.balance) : 0,
-      negativeBalance: driver.driverWallet?.negativeBalance ? Number(driver.driverWallet.negativeBalance) : 0,
-      commissionPaid: Number(commissionMap.get(driver.id) || 0).toFixed(2),
-      vehicleType: driver.vehicle?.vehicleType,
-      vehicleModel: driver.vehicle?.vehicleModel,
-      vehiclePlate: driver.vehicle?.vehiclePlate,
-      createdAt: driver.user.createdAt,
-    }));
+    const formattedDrivers = drivers.map((driver) => {
+      // Get primary/active vehicle from the vehicles array
+      const primaryVehicle = driver.vehicles?.find((v: any) => v.isPrimary) || driver.vehicles?.[0];
+      return {
+        id: driver.id,
+        userId: driver.user.id,
+        email: driver.user.email,
+        countryCode: driver.user.countryCode,
+        verificationStatus: driver.verificationStatus,
+        isVerified: driver.isVerified,
+        isSuspended: driver.isSuspended,
+        suspensionReason: driver.suspensionReason,
+        isBlocked: driver.user.isBlocked,
+        isOnline: primaryVehicle?.isOnline || false,
+        totalTrips: driver.driverStats?.totalTrips || 0,
+        totalEarnings: primaryVehicle?.totalEarnings ? Number(primaryVehicle.totalEarnings) : 0,
+        averageRating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 0,
+        walletBalance: driver.driverWallet?.balance ? Number(driver.driverWallet.balance) : 0,
+        negativeBalance: driver.driverWallet?.negativeBalance ? Number(driver.driverWallet.negativeBalance) : 0,
+        commissionPaid: Number(commissionMap.get(driver.id) || 0).toFixed(2),
+        vehicleType: primaryVehicle?.vehicleType,
+        vehicleModel: primaryVehicle?.vehicleModel,
+        vehiclePlate: primaryVehicle?.vehiclePlate,
+        createdAt: driver.user.createdAt,
+      };
+    });
 
     res.json({
       drivers: formattedDrivers,
@@ -1673,7 +1682,7 @@ router.get("/drivers/:id", checkPermission(Permission.VIEW_USER), async (req: Au
       where: { id },
       include: {
         user: true,
-        vehicle: true,
+        vehicles: true,
         driverStats: true,
         driverWallet: true,
       },
@@ -1752,34 +1761,53 @@ router.get("/drivers/:id", checkPermission(Permission.VIEW_USER), async (req: Au
         governmentIdType: driver.governmentIdType,
         governmentIdLast4: driver.governmentIdLast4,
         ssnLast4: driver.ssnLast4,
-        // Vehicle info
-        vehicle: driver.vehicle
-          ? {
-              id: driver.vehicle.id,
-              vehicleType: driver.vehicle.vehicleType,
-              vehicleModel: driver.vehicle.vehicleModel,
-              vehiclePlate: driver.vehicle.vehiclePlate,
-              make: driver.vehicle.make,
-              model: driver.vehicle.model,
-              year: driver.vehicle.year,
-              color: driver.vehicle.color,
-              licensePlate: driver.vehicle.licensePlate,
-              registrationDocumentUrl: driver.vehicle.registrationDocumentUrl,
-              registrationExpiry: driver.vehicle.registrationExpiry,
-              insuranceDocumentUrl: driver.vehicle.insuranceDocumentUrl,
-              insuranceExpiry: driver.vehicle.insuranceExpiry,
-              dmvInspectionType: driver.vehicle.dmvInspectionType,
-              dmvInspectionDate: driver.vehicle.dmvInspectionDate,
-              dmvInspectionExpiry: driver.vehicle.dmvInspectionExpiry,
-              dmvInspectionImageUrl: driver.vehicle.dmvInspectionImageUrl,
-              dmvInspectionStatus: driver.vehicle.dmvInspectionStatus,
-              isOnline: driver.vehicle.isOnline,
-              totalEarnings: Number(driver.vehicle.totalEarnings),
-            }
-          : null,
+        // Vehicle info (primary vehicle from vehicles array)
+        vehicle: (() => {
+          const primaryVehicle = driver.vehicles?.find((v: any) => v.isPrimary) || driver.vehicles?.[0];
+          return primaryVehicle
+            ? {
+                id: primaryVehicle.id,
+                vehicleType: primaryVehicle.vehicleType,
+                vehicleModel: primaryVehicle.vehicleModel,
+                vehiclePlate: primaryVehicle.vehiclePlate,
+                make: primaryVehicle.make,
+                model: primaryVehicle.model,
+                year: primaryVehicle.year,
+                color: primaryVehicle.color,
+                licensePlate: primaryVehicle.licensePlate,
+                registrationDocumentUrl: primaryVehicle.registrationDocumentUrl,
+                registrationExpiry: primaryVehicle.registrationExpiry,
+                insuranceDocumentUrl: primaryVehicle.insuranceDocumentUrl,
+                insuranceExpiry: primaryVehicle.insuranceExpiry,
+                dmvInspectionType: primaryVehicle.dmvInspectionType,
+                dmvInspectionDate: primaryVehicle.dmvInspectionDate,
+                dmvInspectionExpiry: primaryVehicle.dmvInspectionExpiry,
+                dmvInspectionImageUrl: primaryVehicle.dmvInspectionImageUrl,
+                dmvInspectionStatus: primaryVehicle.dmvInspectionStatus,
+                isOnline: primaryVehicle.isOnline,
+                totalEarnings: Number(primaryVehicle.totalEarnings),
+              }
+            : null;
+        })(),
+        // All vehicles array
+        vehicles: driver.vehicles?.map((v: any) => ({
+          id: v.id,
+          vehicleType: v.vehicleType,
+          vehicleModel: v.vehicleModel,
+          make: v.make,
+          model: v.model,
+          year: v.year,
+          color: v.color,
+          licensePlate: v.licensePlate,
+          isPrimary: v.isPrimary,
+          isActive: v.isActive,
+        })) || [],
         // Stats
         totalTrips: driver.driverStats?.totalTrips || 0,
-        totalEarnings: driver.vehicle?.totalEarnings ? Number(driver.vehicle.totalEarnings) : 0,
+        totalEarnings: (() => {
+          const primaryVehicle = driver.vehicles?.find((v: any) => v.isPrimary) || driver.vehicles?.[0];
+          return primaryVehicle?.totalEarnings ? Number(primaryVehicle.totalEarnings) : 0;
+        })(),
         averageRating: driver.driverStats?.rating ? Number(driver.driverStats.rating) : 0,
         // Wallet
         walletBalance: driver.driverWallet?.balance ? Number(driver.driverWallet.balance) : 0,
@@ -1874,7 +1902,7 @@ router.patch("/drivers/:id/profile", checkPermission(Permission.MANAGE_DRIVERS),
             createdAt: true,
           },
         },
-        vehicle: true,
+        vehicles: true,
         driverStats: true,
         driverWallet: true,
       },
@@ -1882,19 +1910,20 @@ router.patch("/drivers/:id/profile", checkPermission(Permission.MANAGE_DRIVERS),
 
     // Return updated profile (exclude nidEncrypted)
     const { nidEncrypted, ...driverProfile } = updatedDriver as any;
+    const primaryVehicle = driverProfile.vehicles?.find((v: any) => v.isPrimary) || driverProfile.vehicles?.[0];
     
     res.json({
       message: "Driver profile updated successfully",
       driver: {
         ...driverProfile,
-        // Format vehicle totalEarnings as number
-        vehicle: driverProfile.vehicle ? {
-          ...driverProfile.vehicle,
-          totalEarnings: Number(driverProfile.vehicle.totalEarnings),
+        // Format vehicle totalEarnings as number (primary vehicle)
+        vehicle: primaryVehicle ? {
+          ...primaryVehicle,
+          totalEarnings: Number(primaryVehicle.totalEarnings),
         } : null,
         // Add computed fields
         totalTrips: driverProfile.driverStats?.totalTrips || 0,
-        totalEarnings: driverProfile.vehicle?.totalEarnings ? Number(driverProfile.vehicle.totalEarnings) : 0,
+        totalEarnings: primaryVehicle?.totalEarnings ? Number(primaryVehicle.totalEarnings) : 0,
         averageRating: driverProfile.driverStats?.rating ? Number(driverProfile.driverStats.rating) : 0,
         walletBalance: driverProfile.driverWallet?.balance ? Number(driverProfile.driverWallet.balance) : 0,
         negativeBalance: driverProfile.driverWallet?.negativeBalance ? Number(driverProfile.driverWallet.negativeBalance) : 0,
@@ -2037,7 +2066,7 @@ router.patch("/drivers/:id/usa-profile", checkPermission(Permission.MANAGE_DRIVE
             createdAt: true,
           },
         },
-        vehicle: true,
+        vehicles: true,
         driverStats: true,
         driverWallet: true,
       },
@@ -2045,17 +2074,18 @@ router.patch("/drivers/:id/usa-profile", checkPermission(Permission.MANAGE_DRIVE
 
     // Return updated profile (exclude ssnEncrypted)
     const { ssnEncrypted, ...driverProfile } = updatedDriver as any;
+    const primaryVehicle = driverProfile.vehicles?.find((v: any) => v.isPrimary) || driverProfile.vehicles?.[0];
     
     res.json({
       message: "USA driver profile updated successfully",
       driver: {
         ...driverProfile,
-        vehicle: driverProfile.vehicle ? {
-          ...driverProfile.vehicle,
-          totalEarnings: Number(driverProfile.vehicle.totalEarnings),
+        vehicle: primaryVehicle ? {
+          ...primaryVehicle,
+          totalEarnings: Number(primaryVehicle.totalEarnings),
         } : null,
         totalTrips: driverProfile.driverStats?.totalTrips || 0,
-        totalEarnings: driverProfile.vehicle?.totalEarnings ? Number(driverProfile.vehicle.totalEarnings) : 0,
+        totalEarnings: primaryVehicle?.totalEarnings ? Number(primaryVehicle.totalEarnings) : 0,
         averageRating: driverProfile.driverStats?.rating ? Number(driverProfile.driverStats.rating) : 0,
         walletBalance: driverProfile.driverWallet?.balance ? Number(driverProfile.driverWallet.balance) : 0,
         negativeBalance: driverProfile.driverWallet?.negativeBalance ? Number(driverProfile.driverWallet.negativeBalance) : 0,
@@ -2108,7 +2138,7 @@ router.patch("/drivers/:id/vehicle", checkPermission(Permission.MANAGE_DRIVERS),
       where: { id },
       include: {
         user: { select: { countryCode: true } },
-        vehicle: true,
+        vehicles: true,
       },
     });
 
@@ -2119,6 +2149,9 @@ router.patch("/drivers/:id/vehicle", checkPermission(Permission.MANAGE_DRIVERS),
     if (driver.user.countryCode !== "US") {
       return res.status(400).json({ error: "Vehicle updates only available for USA drivers" });
     }
+
+    // Get primary vehicle from vehicles array
+    const primaryVehicle = driver.vehicles?.find((v: any) => v.isPrimary) || driver.vehicles?.[0];
 
     // Prepare update data
     const updateData: any = {};
@@ -2147,14 +2180,14 @@ router.patch("/drivers/:id/vehicle", checkPermission(Permission.MANAGE_DRIVERS),
     
     // Compute DMV Inspection status
     if (data.dmvInspectionImageUrl || data.dmvInspectionExpiry) {
-      if (!data.dmvInspectionImageUrl && !driver.vehicle?.dmvInspectionImageUrl) {
+      if (!data.dmvInspectionImageUrl && !primaryVehicle?.dmvInspectionImageUrl) {
         updateData.dmvInspectionStatus = 'MISSING';
-      } else if (!data.dmvInspectionExpiry && !driver.vehicle?.dmvInspectionExpiry) {
+      } else if (!data.dmvInspectionExpiry && !primaryVehicle?.dmvInspectionExpiry) {
         updateData.dmvInspectionStatus = 'MISSING';
       } else {
         const expiryDate = data.dmvInspectionExpiry 
           ? new Date(data.dmvInspectionExpiry) 
-          : driver.vehicle?.dmvInspectionExpiry;
+          : primaryVehicle?.dmvInspectionExpiry;
         
         if (expiryDate && expiryDate < new Date()) {
           updateData.dmvInspectionStatus = 'EXPIRED';
@@ -2166,10 +2199,10 @@ router.patch("/drivers/:id/vehicle", checkPermission(Permission.MANAGE_DRIVERS),
 
     // Update or create vehicle
     let vehicle;
-    if (driver.vehicle) {
+    if (primaryVehicle) {
       // Update existing vehicle
       vehicle = await prisma.vehicle.update({
-        where: { id: driver.vehicle.id },
+        where: { id: primaryVehicle.id },
         data: updateData,
       });
     } else {
@@ -2181,6 +2214,7 @@ router.patch("/drivers/:id/vehicle", checkPermission(Permission.MANAGE_DRIVERS),
           vehicleType: data.vehicleType || "sedan",
           vehicleModel: data.model || "",
           vehiclePlate: data.licensePlate || "",
+          isPrimary: true,
           ...updateData,
         },
       });
@@ -4762,7 +4796,7 @@ router.get("/documents/drivers", checkPermission(Permission.MANAGE_DOCUMENT_REVI
               countryCode: true,
             },
           },
-          vehicle: true,
+          vehicles: true,
           vehicleDocuments: {
             select: {
               documentType: true,
@@ -5006,7 +5040,7 @@ router.get("/documents/drivers/:id/details", checkPermission(Permission.MANAGE_D
             countryCode: true,
           },
         },
-        vehicle: true,
+        vehicles: true,
         vehicleDocuments: true,
       },
     });
@@ -5016,6 +5050,7 @@ router.get("/documents/drivers/:id/details", checkPermission(Permission.MANAGE_D
     }
 
     const kycValidation = await validateDriverKYC(driver, driver.user.countryCode);
+    const primaryVehicle = driver.vehicles?.find((v: any) => v.isPrimary) || driver.vehicles?.[0];
 
     res.json({
       id: driver.id,
@@ -5088,18 +5123,18 @@ router.get("/documents/drivers/:id/details", checkPermission(Permission.MANAGE_D
       })),
       
       // Vehicle information (new fields)
-      vehicle: driver.vehicle ? {
-        id: driver.vehicle.id,
-        vehicleType: driver.vehicle.vehicleType,
-        make: driver.vehicle.make,
-        model: driver.vehicle.model,
-        year: driver.vehicle.year,
-        color: driver.vehicle.color,
-        licensePlate: driver.vehicle.licensePlate,
-        registrationDocumentUrl: driver.vehicle.registrationDocumentUrl,
-        registrationExpiry: driver.vehicle.registrationExpiry,
-        insuranceDocumentUrl: driver.vehicle.insuranceDocumentUrl,
-        insuranceExpiry: driver.vehicle.insuranceExpiry,
+      vehicle: primaryVehicle ? {
+        id: primaryVehicle.id,
+        vehicleType: primaryVehicle.vehicleType,
+        make: primaryVehicle.make,
+        model: primaryVehicle.model,
+        year: primaryVehicle.year,
+        color: primaryVehicle.color,
+        licensePlate: primaryVehicle.licensePlate,
+        registrationDocumentUrl: primaryVehicle.registrationDocumentUrl,
+        registrationExpiry: primaryVehicle.registrationExpiry,
+        insuranceDocumentUrl: primaryVehicle.insuranceDocumentUrl,
+        insuranceExpiry: primaryVehicle.insuranceExpiry,
       } : null,
       
       // Validation
@@ -5227,7 +5262,7 @@ router.post("/documents/drivers/:id/approve", checkPermission(Permission.MANAGE_
             countryCode: true,
           },
         },
-        vehicle: true,
+        vehicles: true,
         vehicleDocuments: true,
       },
     });
