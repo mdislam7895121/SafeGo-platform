@@ -1,527 +1,347 @@
 import { Router, type Response } from "express";
 import { prisma } from "../db";
-import { authenticateToken, type AuthRequest } from "../middleware/auth";
-import {
-  notifyCustomerTicketCreated,
-  notifyRestaurantTicketCreated,
-  notifyDriverTicketCreated,
-  notifyAdminHighPriorityTicket,
-} from "../services/support-notifications";
+import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
+import { getCustomerSupportContext } from "../utils/support-helpers";
+import { restaurantSupportService } from "../services/RestaurantSupportService";
+import { liveChatService } from "../services/LiveChatService";
+import { supportCallbackService } from "../services/SupportCallbackService";
+import { supportArticleService } from "../services/SupportArticleService";
 
 const router = Router();
 
-// Helper function to generate unique ticket code
-async function generateTicketCode(): Promise<string> {
-  const year = new Date().getFullYear();
-  const count = await prisma.supportTicket.count();
-  const paddedCount = String(count + 1).padStart(6, "0");
-  return `SG-SUP-${year}-${paddedCount}`;
-}
-
-// Helper function to get customer ID from user
-async function getCustomerIdFromUser(userId: string): Promise<string | null> {
-  const customer = await prisma.customerProfile.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  return customer?.id || null;
-}
-
-// Helper function to mask customer name for privacy
-function maskCustomerName(name: string): string {
-  if (!name || name.length < 3) return "***";
-  return name[0] + "*".repeat(name.length - 2) + name[name.length - 1];
-}
+// All routes require authentication and customer role
+router.use(authenticateToken);
+router.use(requireRole(["customer"]));
 
 /**
- * POST /api/customer/support/tickets
- * Create a new support ticket
- */
-router.post("/tickets", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-
-    // Get customer profile
-    const customer = await prisma.customerProfile.findUnique({
-      where: { userId },
-      include: { user: true },
-    });
-
-    if (!customer) {
-      return res.status(404).json({ error: "Customer profile not found" });
-    }
-
-    // Verify customer is verified (KYC requirement)
-    if (!customer.isVerified) {
-      return res.status(403).json({ 
-        error: "Account verification required to create support tickets" 
-      });
-    }
-
-    const {
-      serviceType,
-      serviceId,
-      issueCategory,
-      issueDescription,
-      photoUrls,
-      priority,
-    } = req.body;
-
-    // Validate required fields
-    if (!serviceType || !serviceId || !issueCategory || !issueDescription) {
-      return res.status(400).json({ error: "Missing required fields" });
-    }
-
-    // Validate service type
-    if (!["food_order", "ride", "delivery"].includes(serviceType)) {
-      return res.status(400).json({ error: "Invalid service type" });
-    }
-
-    // Check rate limiting: max 3 open tickets per service type
-    const openTicketsCount = await prisma.supportTicket.count({
-      where: {
-        customerId: customer.id,
-        serviceType,
-        customerVisibleStatus: {
-          in: ["open", "in_review", "awaiting_customer"]
-        }
-      }
-    });
-
-    if (openTicketsCount >= 3) {
-      return res.status(429).json({ 
-        error: "Rate limit exceeded",
-        message: `You can have a maximum of 3 open tickets per service type. Please wait for existing tickets to be resolved before creating new ones.`
-      });
-    }
-
-    // Verify service ownership and get details
-    let service: any = null;
-    let restaurantId: string | null = null;
-    let driverId: string | null = null;
-    let countryCode: string = customer.user.countryCode;
-    let cityCode: string | null = customer.cityCode;
-
-    if (serviceType === "food_order") {
-      service = await prisma.foodOrder.findUnique({
-        where: { id: serviceId },
-      });
-
-      if (!service) {
-        return res.status(404).json({ error: "Food order not found" });
-      }
-
-      if (service.customerId !== customer.id) {
-        return res.status(403).json({ 
-          error: "You can only create tickets for your own orders" 
-        });
-      }
-
-      restaurantId = service.restaurantId;
-      driverId = service.driverId;
-    } else if (serviceType === "ride") {
-      service = await prisma.ride.findUnique({
-        where: { id: serviceId },
-      });
-
-      if (!service) {
-        return res.status(404).json({ error: "Ride not found" });
-      }
-
-      if (service.customerId !== customer.id) {
-        return res.status(403).json({ 
-          error: "You can only create tickets for your own rides" 
-        });
-      }
-
-      driverId = service.driverId;
-      countryCode = service.countryCode || countryCode;
-      cityCode = service.cityCode || cityCode;
-    } else if (serviceType === "delivery") {
-      service = await prisma.delivery.findUnique({
-        where: { id: serviceId },
-      });
-
-      if (!service) {
-        return res.status(404).json({ error: "Delivery not found" });
-      }
-
-      if (service.customerId !== customer.id) {
-        return res.status(403).json({ 
-          error: "You can only create tickets for your own deliveries" 
-        });
-      }
-
-      driverId = service.driverId;
-    }
-
-    // Check for duplicate tickets (rate limiting - max 3 tickets per service)
-    const existingTicketCount = await prisma.supportTicket.count({
-      where: {
-        serviceType,
-        serviceId,
-        customerId: customer.id,
-      },
-    });
-
-    if (existingTicketCount >= 3) {
-      return res.status(429).json({ 
-        error: "Maximum number of tickets reached for this service" 
-      });
-    }
-
-    // Generate ticket code
-    const ticketCode = await generateTicketCode();
-
-    // Create support ticket
-    const ticket = await prisma.supportTicket.create({
-      data: {
-        ticketCode,
-        serviceType,
-        serviceId,
-        restaurantId,
-        customerId: customer.id,
-        driverId,
-        countryCode,
-        cityCode,
-        issueCategory,
-        issueDescription,
-        photoUrls: photoUrls || [],
-        customerVisibleStatus: "open",
-        internalStatus: restaurantId ? "assigned_restaurant" : "new",
-        priority: priority || "medium",
-        originChannel: "web",
-      },
-    });
-
-    // Create initial message
-    await prisma.supportTicketMessage.create({
-      data: {
-        ticketId: ticket.id,
-        actorId: userId,
-        actorRole: "customer",
-        messageType: "public",
-        messageBody: issueDescription,
-        attachmentUrls: photoUrls || [],
-      },
-    });
-
-    // Update service with ticket count
-    const updateData = {
-      supportTicketCount: existingTicketCount + 1,
-      lastSupportStatus: "open",
-    };
-
-    if (serviceType === "food_order") {
-      await prisma.foodOrder.update({
-        where: { id: serviceId },
-        data: updateData,
-      });
-    } else if (serviceType === "ride") {
-      await prisma.ride.update({
-        where: { id: serviceId },
-        data: updateData,
-      });
-    } else if (serviceType === "delivery") {
-      await prisma.delivery.update({
-        where: { id: serviceId },
-        data: updateData,
-      });
-    }
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        actorId: userId,
-        actorEmail: customer.user.email,
-        actorRole: "customer",
-        ipAddress: req.ip || "",
-        actionType: "support_ticket_created",
-        entityType: "support_ticket",
-        entityId: ticket.id,
-        description: `Customer created support ticket ${ticketCode} for ${serviceType} ${serviceId}`,
-        metadata: {
-          ticketCode,
-          serviceType,
-          serviceId,
-          issueCategory,
-          customerId: customer.id,
-        },
-        success: true,
-      },
-    });
-
-    // Send notifications (non-blocking)
-    const ticketData = {
-      id: ticket.id,
-      ticketCode: ticket.ticketCode,
-      serviceType: ticket.serviceType,
-      customerId: customer.id,
-      restaurantId: ticket.restaurantId,
-      driverId: ticket.driverId,
-      issueCategory: ticket.issueCategory,
-      internalStatus: ticket.internalStatus,
-      priority: ticket.priority,
-      country: ticket.countryCode,
-    };
-    
-    Promise.all([
-      notifyCustomerTicketCreated(ticketData),
-      restaurantId ? notifyRestaurantTicketCreated(ticketData) : null,
-      driverId ? notifyDriverTicketCreated(ticketData) : null,
-      notifyAdminHighPriorityTicket(ticketData),
-    ]).catch((error) => {
-      console.error("Failed to send support ticket notifications:", error);
-    });
-
-    return res.status(201).json({
-      id: ticket.id,
-      ticketCode: ticket.ticketCode,
-      serviceType: ticket.serviceType,
-      customerVisibleStatus: ticket.customerVisibleStatus,
-      issueCategory: ticket.issueCategory,
-      priority: ticket.priority,
-      createdAt: ticket.createdAt,
-    });
-  } catch (error) {
-    console.error("[Customer Support] Error creating ticket:", error);
-    return res.status(500).json({ error: "Failed to create support ticket" });
-  }
-});
-
-/**
- * GET /api/customer/support/tickets/my
+ * GET /api/customer/support-center/tickets
  * List customer's support tickets
  */
-router.get("/tickets/my", authenticateToken, async (req: AuthRequest, res: Response) => {
+router.get("/support-center/tickets", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
+    const context = await getCustomerSupportContext(userId);
+    
+    const tickets = await restaurantSupportService.listTickets(context.profileId);
+    return res.json({ tickets });
+  } catch (error: any) {
+    console.error("Error listing customer support tickets:", error);
+    if (error.message.includes("verification required") || error.message.includes("suspended")) {
+      return res.status(403).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to list tickets" });
+  }
+});
 
-    const customerId = await getCustomerIdFromUser(userId);
-    if (!customerId) {
-      return res.status(404).json({ error: "Customer profile not found" });
+/**
+ * GET /api/customer/support-center/tickets/:id
+ * Get specific ticket with messages
+ */
+router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+    const context = await getCustomerSupportContext(userId);
+
+    const ticket = await restaurantSupportService.getTicketById(ticketId, context.profileId);
+    return res.json({ ticket });
+  } catch (error: any) {
+    console.error("Error getting customer support ticket:", error);
+    if (error.message === "Access denied: You can only view your own tickets") {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.message === "Ticket not found") {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error.message.includes("verification required")) {
+      return res.status(403).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to get ticket" });
+  }
+});
+
+/**
+ * POST /api/customer/support-center/tickets
+ * Create a new support ticket
+ */
+router.post("/support-center/tickets", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { subject, category, priority, description, channel, attachmentUrls } = req.body;
+
+    if (!subject || !category || !description) {
+      return res.status(400).json({ error: "Subject, category, and description are required" });
     }
 
-    const { status, serviceType, page = "1", limit = "20" } = req.query;
-
-    const where: any = {
-      customerId,
-    };
-
-    if (status && typeof status === "string") {
-      where.customerVisibleStatus = status;
-    }
-
-    if (serviceType && typeof serviceType === "string") {
-      where.serviceType = serviceType;
-    }
-
-    const pageNum = parseInt(page as string, 10);
-    const limitNum = parseInt(limit as string, 10);
-    const skip = (pageNum - 1) * limitNum;
-
-    const [tickets, totalCount] = await Promise.all([
-      prisma.supportTicket.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        skip,
-        take: limitNum,
-        select: {
-          id: true,
-          ticketCode: true,
-          serviceType: true,
-          serviceId: true,
-          issueCategory: true,
-          customerVisibleStatus: true,
-          priority: true,
-          createdAt: true,
-          updatedAt: true,
-          resolvedAt: true,
-        },
-      }),
-      prisma.supportTicket.count({ where }),
+    const [context, user] = await Promise.all([
+      getCustomerSupportContext(userId),
+      prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
     ]);
-
-    return res.json({
-      tickets,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        totalCount,
-        totalPages: Math.ceil(totalCount / limitNum),
-      },
-    });
-  } catch (error) {
-    console.error("[Customer Support] Error listing tickets:", error);
-    return res.status(500).json({ error: "Failed to list support tickets" });
-  }
-});
-
-/**
- * GET /api/customer/support/tickets/:id
- * Get ticket details with messages
- */
-router.get("/tickets/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-
-    const customerId = await getCustomerIdFromUser(userId);
-    if (!customerId) {
-      return res.status(404).json({ error: "Customer profile not found" });
-    }
-
-    const { id } = req.params;
-
-    const ticket = await prisma.supportTicket.findUnique({
-      where: { id },
-      include: {
-        messages: {
-          where: {
-            OR: [
-              { messageType: "public" },
-              { actorId: userId }, // Customer can see their own messages
-            ],
-          },
-          orderBy: { createdAt: "asc" },
-          select: {
-            id: true,
-            actorId: true,
-            actorRole: true,
-            messageType: true,
-            messageBody: true,
-            attachmentUrls: true,
-            createdAt: true,
-          },
-        },
-      },
-    });
-
-    if (!ticket) {
-      return res.status(404).json({ error: "Support ticket not found" });
-    }
-
-    // Verify ownership
-    if (ticket.customerId !== customerId) {
-      return res.status(403).json({ 
-        error: "You can only view your own support tickets" 
-      });
-    }
-
-    // Remove internal status from customer view
-    const { internalStatus, ...ticketData } = ticket;
-
-    return res.json(ticketData);
-  } catch (error) {
-    console.error("[Customer Support] Error getting ticket:", error);
-    return res.status(500).json({ error: "Failed to get support ticket" });
-  }
-});
-
-/**
- * POST /api/customer/support/tickets/:id/messages
- * Add a message/reply to a ticket
- */
-router.post("/tickets/:id/messages", authenticateToken, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.user!.userId;
-
-    const customerId = await getCustomerIdFromUser(userId);
-    if (!customerId) {
-      return res.status(404).json({ error: "Customer profile not found" });
-    }
-
-    const { id } = req.params;
-    const { messageBody, attachmentUrls } = req.body;
-
-    if (!messageBody || messageBody.trim().length === 0) {
-      return res.status(400).json({ error: "Message body is required" });
-    }
-
-    // Get customer email
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
 
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Get ticket and verify ownership
-    const ticket = await prisma.supportTicket.findUnique({
-      where: { id },
+    const ticket = await restaurantSupportService.createTicket({
+      restaurantId: context.profileId,
+      subject,
+      category,
+      priority: priority || "normal",
+      description,
+      channel: channel || "web",
+      attachmentUrls
     });
 
-    if (!ticket) {
-      return res.status(404).json({ error: "Support ticket not found" });
-    }
-
-    if (ticket.customerId !== customerId) {
-      return res.status(403).json({ 
-        error: "You can only reply to your own support tickets" 
-      });
-    }
-
-    // Check if ticket is closed
-    if (ticket.customerVisibleStatus === "closed") {
-      return res.status(400).json({ 
-        error: "Cannot add messages to a closed ticket" 
-      });
-    }
-
-    // Create message
-    const message = await prisma.supportTicketMessage.create({
-      data: {
-        ticketId: id,
-        actorId: userId,
-        actorRole: "customer",
-        messageType: "public",
-        messageBody: messageBody.trim(),
-        attachmentUrls: attachmentUrls || [],
-      },
-    });
-
-    // Update ticket status if it was resolved
-    if (ticket.customerVisibleStatus === "resolved") {
-      await prisma.supportTicket.update({
-        where: { id },
-        data: {
-          customerVisibleStatus: "awaiting_customer",
-          updatedAt: new Date(),
-        },
-      });
-    }
-
-    // Create audit log
     await prisma.auditLog.create({
       data: {
         actorId: userId,
         actorEmail: user.email,
         actorRole: "customer",
         ipAddress: req.ip || "",
-        actionType: "support_ticket_reply",
-        entityType: "support_ticket",
+        actionType: "support_ticket_created",
+        entityType: "customer_support_ticket",
         entityId: ticket.id,
-        description: `Customer replied to support ticket ${ticket.ticketCode}`,
+        description: `Customer created support ticket ${ticket.ticketCode}`,
         metadata: {
           ticketCode: ticket.ticketCode,
-          messageId: message.id,
+          category: ticket.category,
+          priority: ticket.priority,
+          customerProfileId: context.profileId,
+          customerName: context.displayName
         },
-        success: true,
-      },
+        success: true
+      }
     });
 
-    // TODO: Send notification to restaurant/admin
+    return res.status(201).json({ ticket });
+  } catch (error: any) {
+    console.error("Error creating customer support ticket:", error);
+    if (error.message.includes("verification required")) {
+      return res.status(403).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to create ticket" });
+  }
+});
 
-    return res.status(201).json({
-      id: message.id,
-      actorRole: message.actorRole,
-      messageBody: message.messageBody,
-      createdAt: message.createdAt,
+/**
+ * POST /api/customer/support-center/tickets/:id/messages
+ * Add a message to a ticket
+ */
+router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+    const { messageBody, attachmentUrls } = req.body;
+
+    if (!messageBody || messageBody.trim().length === 0) {
+      return res.status(400).json({ error: "Message body is required" });
+    }
+
+    const context = await getCustomerSupportContext(userId);
+
+    const message = await restaurantSupportService.addMessage({
+      ticketId,
+      restaurantId: context.profileId,
+      senderRole: context.senderRole,
+      senderName: context.displayName,
+      messageBody,
+      attachmentUrls
     });
-  } catch (error) {
-    console.error("[Customer Support] Error adding message:", error);
+
+    return res.status(201).json({ message });
+  } catch (error: any) {
+    console.error("Error adding customer support message:", error);
+    if (error.message.includes("verification required") || error.message.includes("Access denied")) {
+      return res.status(403).json({ error: error.message });
+    }
     return res.status(500).json({ error: "Failed to add message" });
+  }
+});
+
+/**
+ * POST /api/customer/support-center/live-chat/start
+ * Start a live chat session
+ */
+router.post("/support-center/live-chat/start", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { initialMessage } = req.body;
+    const context = await getCustomerSupportContext(userId);
+
+    const session = await liveChatService.startSession({
+      restaurantId: context.profileId,
+      customerName: context.displayName,
+      initialMessage
+    });
+
+    return res.status(201).json({ session });
+  } catch (error: any) {
+    console.error("Error starting customer live chat:", error);
+    if (error.message.includes("verification required")) {
+      return res.status(403).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to start chat session" });
+  }
+});
+
+/**
+ * GET /api/customer/support-center/live-chat/:sessionId
+ * Get live chat session
+ */
+router.get("/support-center/live-chat/:sessionId", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const sessionId = req.params.sessionId;
+    const context = await getCustomerSupportContext(userId);
+
+    const session = await liveChatService.getSession(sessionId, context.profileId);
+    return res.json({ session });
+  } catch (error: any) {
+    console.error("Error getting customer live chat session:", error);
+    if (error.message.includes("verification required") || error.message.includes("Access denied")) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.message === "Chat session not found") {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to get chat session" });
+  }
+});
+
+/**
+ * POST /api/customer/support-center/live-chat/:sessionId/messages
+ * Send message in live chat
+ */
+router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const sessionId = req.params.sessionId;
+    const { messageBody } = req.body;
+
+    if (!messageBody || messageBody.trim().length === 0) {
+      return res.status(400).json({ error: "Message body is required" });
+    }
+
+    const context = await getCustomerSupportContext(userId);
+
+    const message = await liveChatService.sendMessage({
+      sessionId,
+      restaurantId: context.profileId,
+      senderRole: "restaurant",
+      senderName: context.displayName,
+      messageBody
+    });
+
+    return res.status(201).json({ message });
+  } catch (error: any) {
+    console.error("Error sending customer live chat message:", error);
+    if (error.message.includes("verification required") || error.message.includes("Access denied")) {
+      return res.status(403).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+/**
+ * POST /api/customer/support-center/live-chat/:sessionId/end
+ * End live chat session
+ */
+router.post("/support-center/live-chat/:sessionId/end", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const sessionId = req.params.sessionId;
+    const context = await getCustomerSupportContext(userId);
+
+    const session = await liveChatService.endSession(sessionId, context.profileId);
+    return res.json({ session });
+  } catch (error: any) {
+    console.error("Error ending customer live chat session:", error);
+    if (error.message.includes("verification required") || error.message.includes("Access denied")) {
+      return res.status(403).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to end chat session" });
+  }
+});
+
+/**
+ * POST /api/customer/support-center/callbacks
+ * Request phone callback
+ */
+router.post("/support-center/callbacks", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { phoneNumber, preferredTime, timezone, reason } = req.body;
+
+    if (!phoneNumber || !preferredTime || !timezone || !reason) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
+    const context = await getCustomerSupportContext(userId);
+
+    const callback = await supportCallbackService.requestCallback({
+      restaurantId: context.profileId,
+      phoneNumber,
+      preferredTime,
+      timezone,
+      reason
+    });
+
+    return res.status(201).json({ callback });
+  } catch (error: any) {
+    console.error("Error requesting customer callback:", error);
+    if (error.message.includes("verification required")) {
+      return res.status(403).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to request callback" });
+  }
+});
+
+/**
+ * GET /api/customer/support-center/articles
+ * Search support articles
+ */
+router.get("/support-center/articles", async (req: AuthRequest, res: Response) => {
+  try {
+    const query = req.query.query as string | undefined;
+    const category = req.query.category as string | undefined;
+
+    const articles = await supportArticleService.searchArticles(query, category);
+    return res.json({ articles });
+  } catch (error) {
+    console.error("Error searching articles:", error);
+    return res.status(500).json({ error: "Failed to search articles" });
+  }
+});
+
+/**
+ * GET /api/customer/support-center/articles/:slug
+ * Get article by slug
+ */
+router.get("/support-center/articles/:slug", async (req: AuthRequest, res: Response) => {
+  try {
+    const slug = req.params.slug;
+    const article = await supportArticleService.getArticleBySlug(slug);
+    return res.json({ article });
+  } catch (error: any) {
+    console.error("Error getting article:", error);
+    if (error.message === "Article not found" || error.message === "Article not available") {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to get article" });
+  }
+});
+
+/**
+ * GET /api/customer/support-center/categories
+ * Get article categories
+ */
+router.get("/support-center/categories", async (req: AuthRequest, res: Response) => {
+  try {
+    const categories = await supportArticleService.getCategories();
+    return res.json({ categories });
+  } catch (error) {
+    console.error("Error getting categories:", error);
+    return res.status(500).json({ error: "Failed to get categories" });
   }
 });
 

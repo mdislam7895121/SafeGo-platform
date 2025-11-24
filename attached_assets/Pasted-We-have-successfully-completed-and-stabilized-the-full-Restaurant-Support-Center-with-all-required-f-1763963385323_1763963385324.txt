@@ -1,0 +1,55 @@
+We have successfully completed and stabilized the full Restaurant Support Center with all required features (Live Chat, Phone Callbacks, Email/Ticketing, Help Center Articles, Audit Logging, RBAC, KYC, SafeGuard). Now extend this support system to all other SafeGo roles while keeping all existing rules, security requirements, and backward compatibility untouched.
+
+Your tasks:
+
+1. Enable Support Center access for these roles:
+   - driver
+   - customer
+   - admin
+
+2. For each role, create their own secure support namespace:
+   - /api/driver/support-center/*
+   - /api/customer/support-center/*
+   - /api/admin/support-center/*
+
+3. All support features must be available for all roles:
+   - Live Chat
+   - Phone Callback
+   - Ticketing (create, list, view, reply)
+   - Help Center Articles (search, view, list categories)
+
+4. Enforce role-specific RBAC:
+   - driver → requireRole(["driver"])
+   - customer → requireRole(["customer"])
+   - admin → requireRole(["admin"])
+
+5. Enforce KYC & SafeGuard rules exactly the same way as Restaurant:
+   - isVerified + verificationStatus === "APPROVED"
+   - apply SafeGuard rules for data privacy
+   - prevent cross-role data access
+   - proper session scoping
+
+6. Reuse the same internal support service logic:
+   - No new models or database tables
+   - No breaking schema changes
+   - No duplication of code
+   - Only extend routing with correct namespacing
+
+7. UI/UX:
+   - Ensure mobile, tablet, and desktop responsive layouts work across all roles
+   - Each role gets a support hub inside their own dashboard
+   - Follow the same design, spacing, and interaction patterns used in Restaurant Support Center
+
+8. Perform full system checks:
+   - Route validation
+   - Role-based isolation
+   - Live Chat message flow for all roles
+   - Phone callback request flow
+   - Ticket creation + replies across all roles
+   - Article browsing
+   - Audit logging verification
+   - Security verification (RBAC, KYC, SafeGuard)
+   - Production readiness and architect review
+
+Comply with all SafeGo rules, do not break any existing feature, and ensure backward compatibility. 
+Proceed with full implementation.

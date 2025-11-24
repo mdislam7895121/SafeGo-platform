@@ -1,7 +1,7 @@
 import { Router, type Response } from "express";
 import { prisma } from "../db";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
-import { getAdminSupportContext } from "../utils/support-helpers";
+import { getDriverSupportContext } from "../utils/support-helpers";
 import { restaurantSupportService } from "../services/RestaurantSupportService";
 import { liveChatService } from "../services/LiveChatService";
 import { supportCallbackService } from "../services/SupportCallbackService";
@@ -9,23 +9,23 @@ import { supportArticleService } from "../services/SupportArticleService";
 
 const router = Router();
 
-// All routes require authentication and admin role
+// All routes require authentication and driver role
 router.use(authenticateToken);
-router.use(requireRole(["admin"]));
+router.use(requireRole(["driver"]));
 
 /**
- * GET /api/admin/support-center/tickets
- * List admin's support tickets
+ * GET /api/driver/support-center/tickets
+ * List driver's support tickets
  */
 router.get("/support-center/tickets", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
     
     const tickets = await restaurantSupportService.listTickets(context.profileId);
     return res.json({ tickets });
   } catch (error: any) {
-    console.error("Error listing admin support tickets:", error);
+    console.error("Error listing driver support tickets:", error);
     if (error.message.includes("verification required") || error.message.includes("suspended")) {
       return res.status(403).json({ error: error.message });
     }
@@ -34,19 +34,19 @@ router.get("/support-center/tickets", async (req: AuthRequest, res: Response) =>
 });
 
 /**
- * GET /api/admin/support-center/tickets/:id
+ * GET /api/driver/support-center/tickets/:id
  * Get specific ticket with messages
  */
 router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const ticketId = req.params.id;
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
 
     const ticket = await restaurantSupportService.getTicketById(ticketId, context.profileId);
     return res.json({ ticket });
   } catch (error: any) {
-    console.error("Error getting admin support ticket:", error);
+    console.error("Error getting driver support ticket:", error);
     if (error.message === "Access denied: You can only view your own tickets") {
       return res.status(403).json({ error: error.message });
     }
@@ -61,7 +61,7 @@ router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response
 });
 
 /**
- * POST /api/admin/support-center/tickets
+ * POST /api/driver/support-center/tickets
  * Create a new support ticket
  */
 router.post("/support-center/tickets", async (req: AuthRequest, res: Response) => {
@@ -74,7 +74,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
     }
 
     const [context, user] = await Promise.all([
-      getAdminSupportContext(userId),
+      getDriverSupportContext(userId),
       prisma.user.findUnique({ where: { id: userId }, select: { email: true } })
     ]);
 
@@ -96,18 +96,18 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
       data: {
         actorId: userId,
         actorEmail: user.email,
-        actorRole: "admin",
+        actorRole: "driver",
         ipAddress: req.ip || "",
         actionType: "support_ticket_created",
-        entityType: "admin_support_ticket",
+        entityType: "driver_support_ticket",
         entityId: ticket.id,
-        description: `Admin created support ticket ${ticket.ticketCode}`,
+        description: `Driver created support ticket ${ticket.ticketCode}`,
         metadata: {
           ticketCode: ticket.ticketCode,
           category: ticket.category,
           priority: ticket.priority,
-          adminProfileId: context.profileId,
-          adminName: context.displayName
+          driverProfileId: context.profileId,
+          driverName: context.displayName
         },
         success: true
       }
@@ -115,7 +115,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
 
     return res.status(201).json({ ticket });
   } catch (error: any) {
-    console.error("Error creating admin support ticket:", error);
+    console.error("Error creating driver support ticket:", error);
     if (error.message.includes("verification required")) {
       return res.status(403).json({ error: error.message });
     }
@@ -124,7 +124,7 @@ router.post("/support-center/tickets", async (req: AuthRequest, res: Response) =
 });
 
 /**
- * POST /api/admin/support-center/tickets/:id/messages
+ * POST /api/driver/support-center/tickets/:id/messages
  * Add a message to a ticket
  */
 router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res: Response) => {
@@ -137,7 +137,7 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
       return res.status(400).json({ error: "Message body is required" });
     }
 
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
 
     const message = await restaurantSupportService.addMessage({
       ticketId,
@@ -150,7 +150,7 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
 
     return res.status(201).json({ message });
   } catch (error: any) {
-    console.error("Error adding admin support message:", error);
+    console.error("Error adding driver support message:", error);
     if (error.message.includes("verification required") || error.message.includes("Access denied")) {
       return res.status(403).json({ error: error.message });
     }
@@ -159,14 +159,14 @@ router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res
 });
 
 /**
- * POST /api/admin/support-center/live-chat/start
+ * POST /api/driver/support-center/live-chat/start
  * Start a live chat session
  */
 router.post("/support-center/live-chat/start", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const { initialMessage } = req.body;
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
 
     const session = await liveChatService.startSession({
       restaurantId: context.profileId,
@@ -176,7 +176,7 @@ router.post("/support-center/live-chat/start", async (req: AuthRequest, res: Res
 
     return res.status(201).json({ session });
   } catch (error: any) {
-    console.error("Error starting admin live chat:", error);
+    console.error("Error starting driver live chat:", error);
     if (error.message.includes("verification required")) {
       return res.status(403).json({ error: error.message });
     }
@@ -185,19 +185,19 @@ router.post("/support-center/live-chat/start", async (req: AuthRequest, res: Res
 });
 
 /**
- * GET /api/admin/support-center/live-chat/:sessionId
+ * GET /api/driver/support-center/live-chat/:sessionId
  * Get live chat session
  */
 router.get("/support-center/live-chat/:sessionId", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const sessionId = req.params.sessionId;
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
 
     const session = await liveChatService.getSession(sessionId, context.profileId);
     return res.json({ session });
   } catch (error: any) {
-    console.error("Error getting admin live chat session:", error);
+    console.error("Error getting driver live chat session:", error);
     if (error.message.includes("verification required") || error.message.includes("Access denied")) {
       return res.status(403).json({ error: error.message });
     }
@@ -209,7 +209,7 @@ router.get("/support-center/live-chat/:sessionId", async (req: AuthRequest, res:
 });
 
 /**
- * POST /api/admin/support-center/live-chat/:sessionId/messages
+ * POST /api/driver/support-center/live-chat/:sessionId/messages
  * Send message in live chat
  */
 router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthRequest, res: Response) => {
@@ -222,7 +222,7 @@ router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthReq
       return res.status(400).json({ error: "Message body is required" });
     }
 
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
 
     const message = await liveChatService.sendMessage({
       sessionId,
@@ -234,7 +234,7 @@ router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthReq
 
     return res.status(201).json({ message });
   } catch (error: any) {
-    console.error("Error sending admin live chat message:", error);
+    console.error("Error sending driver live chat message:", error);
     if (error.message.includes("verification required") || error.message.includes("Access denied")) {
       return res.status(403).json({ error: error.message });
     }
@@ -243,19 +243,19 @@ router.post("/support-center/live-chat/:sessionId/messages", async (req: AuthReq
 });
 
 /**
- * POST /api/admin/support-center/live-chat/:sessionId/end
+ * POST /api/driver/support-center/live-chat/:sessionId/end
  * End live chat session
  */
 router.post("/support-center/live-chat/:sessionId/end", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const sessionId = req.params.sessionId;
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
 
     const session = await liveChatService.endSession(sessionId, context.profileId);
     return res.json({ session });
   } catch (error: any) {
-    console.error("Error ending admin live chat session:", error);
+    console.error("Error ending driver live chat session:", error);
     if (error.message.includes("verification required") || error.message.includes("Access denied")) {
       return res.status(403).json({ error: error.message });
     }
@@ -264,7 +264,7 @@ router.post("/support-center/live-chat/:sessionId/end", async (req: AuthRequest,
 });
 
 /**
- * POST /api/admin/support-center/callbacks
+ * POST /api/driver/support-center/callbacks
  * Request phone callback
  */
 router.post("/support-center/callbacks", async (req: AuthRequest, res: Response) => {
@@ -276,7 +276,7 @@ router.post("/support-center/callbacks", async (req: AuthRequest, res: Response)
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    const context = await getAdminSupportContext(userId);
+    const context = await getDriverSupportContext(userId);
 
     const callback = await supportCallbackService.requestCallback({
       restaurantId: context.profileId,
@@ -288,7 +288,7 @@ router.post("/support-center/callbacks", async (req: AuthRequest, res: Response)
 
     return res.status(201).json({ callback });
   } catch (error: any) {
-    console.error("Error requesting admin callback:", error);
+    console.error("Error requesting driver callback:", error);
     if (error.message.includes("verification required")) {
       return res.status(403).json({ error: error.message });
     }
@@ -297,7 +297,7 @@ router.post("/support-center/callbacks", async (req: AuthRequest, res: Response)
 });
 
 /**
- * GET /api/admin/support-center/articles
+ * GET /api/driver/support-center/articles
  * Search support articles
  */
 router.get("/support-center/articles", async (req: AuthRequest, res: Response) => {
@@ -314,7 +314,7 @@ router.get("/support-center/articles", async (req: AuthRequest, res: Response) =
 });
 
 /**
- * GET /api/admin/support-center/articles/:slug
+ * GET /api/driver/support-center/articles/:slug
  * Get article by slug
  */
 router.get("/support-center/articles/:slug", async (req: AuthRequest, res: Response) => {
@@ -332,7 +332,7 @@ router.get("/support-center/articles/:slug", async (req: AuthRequest, res: Respo
 });
 
 /**
- * GET /api/admin/support-center/categories
+ * GET /api/driver/support-center/categories
  * Get article categories
  */
 router.get("/support-center/categories", async (req: AuthRequest, res: Response) => {
