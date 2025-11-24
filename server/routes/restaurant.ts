@@ -4214,7 +4214,7 @@ router.delete("/gallery/:id", requireKYCCompletion, async (req: AuthRequest, res
 // Get restaurant analytics and performance insights
 // Security: KYC required for financial data, restaurantId scoped
 // =====================================================
-router.get("/analytics", async (req: AuthRequest, res) => {
+router.get("/analytics", requireKYCCompletion, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const { range = "7d" } = req.query;
@@ -4227,21 +4227,6 @@ router.get("/analytics", async (req: AuthRequest, res) => {
 
     if (!restaurantProfile) {
       return res.status(404).json({ error: "Restaurant profile not found" });
-    }
-
-    // KYC validation for financial data access
-    const profileWithCountry = {
-      ...restaurantProfile,
-      countryCode: restaurantProfile.countryCode || restaurantProfile.user.countryCode,
-    };
-    const kycValidation = validateRestaurantKYC(profileWithCountry);
-    if (!kycValidation.isComplete) {
-      return res.status(403).json({
-        error: "KYC verification required",
-        message: "Please complete your KYC verification to view analytics",
-        missingFields: kycValidation.missingFields,
-        countryCode: kycValidation.countryCode,
-      });
     }
 
     // Calculate time range
@@ -4311,23 +4296,28 @@ router.get("/analytics", async (req: AuthRequest, res) => {
 
     // Calculate KPIs
     const totalOrders = orders.length;
-    const totalEarnings = orders.reduce((sum, order) => sum + Number(order.restaurantPayout || 0), 0);
-    const averageOrderValue = totalOrders > 0 ? totalEarnings / totalOrders : 0;
+    
+    // Completed orders: successfully delivered/completed
+    const completedOrders = orders.filter(o => 
+      o.status === "delivered" || o.status === "completed"
+    );
+    
+    // Calculate earnings and AOV from completed orders only (more accurate)
+    const totalEarnings = completedOrders.reduce((sum, order) => sum + Number(order.restaurantPayout || 0), 0);
+    const averageOrderValue = completedOrders.length > 0 ? totalEarnings / completedOrders.length : 0;
 
-    const placedOrders = orders.filter(o => o.status === "placed" || o.acceptedAt !== null);
+    // Acceptance rate: accepted orders / all orders (simple and transparent)
     const acceptedOrders = orders.filter(o => o.acceptedAt !== null);
-    const acceptanceRate = placedOrders.length > 0 ? (acceptedOrders.length / placedOrders.length) * 100 : 0;
+    const acceptanceRate = totalOrders > 0 ? (acceptedOrders.length / totalOrders) * 100 : 0;
 
+    // Cancellation rate: cancelled orders / total orders
     const cancelledOrders = orders.filter(o => 
       o.status.includes("cancelled") || o.whoCancelled !== null
     );
     const cancellationRate = totalOrders > 0 ? (cancelledOrders.length / totalOrders) * 100 : 0;
 
-    // On-time completion rate (delivered within expected time - simplified as deliveredAt exists)
-    const completedOrders = orders.filter(o => 
-      o.status === "delivered" || o.status === "completed" || o.deliveredAt !== null
-    );
-    const onTimeRate = completedOrders.length; // Simplified - just count completed orders
+    // On-time completion rate: completed orders / accepted orders (as percentage)
+    const onTimeCompletionRate = acceptedOrders.length > 0 ? (completedOrders.length / acceptedOrders.length) * 100 : 0;
 
     // Group orders by time bucket for charts
     const ordersOverTime: { [key: string]: number } = {};
@@ -4431,7 +4421,7 @@ router.get("/analytics", async (req: AuthRequest, res) => {
         averageOrderValue,
         acceptanceRate,
         cancellationRate,
-        onTimeCompletionCount: onTimeRate,
+        onTimeCompletionRate,
       },
       charts: {
         ordersOverTime: ordersTimeSeries,

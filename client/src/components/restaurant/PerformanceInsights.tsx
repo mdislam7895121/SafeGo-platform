@@ -42,7 +42,7 @@ interface AnalyticsData {
     averageOrderValue: number;
     acceptanceRate: number;
     cancellationRate: number;
-    onTimeCompletionCount: number;
+    onTimeCompletionRate: number;
   };
   charts: {
     ordersOverTime: { date: string; count: number }[];
@@ -86,7 +86,17 @@ export function PerformanceInsights() {
   }
 
   if (!data) {
-    return null;
+    return (
+      <Card>
+        <CardContent className="py-12">
+          <div className="text-center text-muted-foreground">
+            <BarChart3 className="h-16 w-16 mx-auto mb-4 opacity-20" />
+            <p className="font-medium">Unable to load analytics</p>
+            <p className="text-sm mt-2">Please try again later</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   const { kpis, charts, recentOrders } = data;
@@ -130,8 +140,22 @@ export function PerformanceInsights() {
         </Tabs>
       </div>
 
+      {/* Empty State - No Orders */}
+      {kpis.totalOrders === 0 && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center text-muted-foreground">
+              <ShoppingBag className="h-16 w-16 mx-auto mb-4 opacity-20" />
+              <p className="font-medium">No orders yet</p>
+              <p className="text-sm mt-2">Analytics will appear here once you start receiving orders</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {kpis.totalOrders > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Total Orders */}
         <Card>
           <CardContent className="pt-6">
@@ -159,7 +183,7 @@ export function PerformanceInsights() {
             <p className="text-2xl font-bold mt-2 text-green-600" data-testid="kpi-total-earnings">
               ${kpis.totalEarnings.toFixed(2)}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">After SafeGo fees</p>
+            <p className="text-xs text-muted-foreground mt-1">From completed orders</p>
           </CardContent>
         </Card>
 
@@ -175,6 +199,7 @@ export function PerformanceInsights() {
             <p className="text-2xl font-bold mt-2" data-testid="kpi-aov">
               ${kpis.averageOrderValue.toFixed(2)}
             </p>
+            <p className="text-xs text-muted-foreground mt-1">Per completed order</p>
           </CardContent>
         </Card>
 
@@ -190,6 +215,7 @@ export function PerformanceInsights() {
             <p className="text-2xl font-bold mt-2" data-testid="kpi-acceptance-rate">
               {kpis.acceptanceRate.toFixed(1)}%
             </p>
+            <p className="text-xs text-muted-foreground mt-1">Accepted vs total</p>
           </CardContent>
         </Card>
 
@@ -213,23 +239,33 @@ export function PerformanceInsights() {
           </CardContent>
         </Card>
 
-        {/* On-time Completion */}
+        {/* On-time Completion Rate */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Completed Orders</span>
+                <span className="text-sm text-muted-foreground">On-time Rate</span>
               </div>
             </div>
-            <p className="text-2xl font-bold mt-2" data-testid="kpi-completed">
-              {kpis.onTimeCompletionCount}
+            <p
+              className={`text-2xl font-bold mt-2 ${
+                kpis.onTimeCompletionRate >= 90 ? "text-green-600" : ""
+              }`}
+              data-testid="kpi-ontime-rate"
+            >
+              {kpis.onTimeCompletionRate.toFixed(1)}%
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Completed vs Accepted
             </p>
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
 
       {/* Charts Section */}
+      {kpis.totalOrders > 0 && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Orders Over Time */}
         <Card>
@@ -317,8 +353,11 @@ export function PerformanceInsights() {
         </Card>
       </div>
 
+      )}
+
       {/* Top Categories and Items */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {kpis.totalOrders > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Top Categories */}
         <Card>
           <CardHeader>
@@ -376,10 +415,12 @@ export function PerformanceInsights() {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      )}
 
       {/* Recent Orders Table */}
-      <Card>
+      {kpis.totalOrders > 0 && (
+        <Card>
         <CardHeader>
           <CardTitle className="text-base">Recent Orders</CardTitle>
         </CardHeader>
@@ -442,7 +483,8 @@ export function PerformanceInsights() {
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
