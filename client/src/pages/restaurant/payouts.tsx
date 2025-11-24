@@ -116,7 +116,7 @@ export default function RestaurantPayouts() {
 
   if (overviewLoading) {
     return (
-      <div className="space-y-4">
+      <div className="container mx-auto mt-6 py-6 px-4 md:px-6 space-y-4">
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
@@ -131,7 +131,7 @@ export default function RestaurantPayouts() {
   const canRequestPayout = overview?.canRequestPayout;
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto mt-6 py-6 px-4 md:px-6 space-y-6">
       <div>
         <h1 className="text-3xl font-bold" data-testid="text-payouts-title">
           Payouts & Wallet

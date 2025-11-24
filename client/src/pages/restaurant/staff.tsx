@@ -228,7 +228,7 @@ export default function StaffManagementPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 space-y-6">
+      <div className="container mx-auto mt-6 py-6 px-4 md:px-6 space-y-6">
         <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-10 w-32" />
@@ -247,7 +247,7 @@ export default function StaffManagementPage() {
   const blockedStaff = staff.filter((s) => !s.staffActive);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto mt-6 py-6 px-4 md:px-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Staff Management</h1>
@@ -423,7 +423,7 @@ export default function StaffManagementPage() {
 
       {/* Add Staff Dialog */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-lg mx-auto px-4 md:px-6">
           <DialogHeader>
             <DialogTitle>Add New Staff Member</DialogTitle>
             <DialogDescription>
@@ -622,7 +622,7 @@ export default function StaffManagementPage() {
       {/* Edit Permissions Dialog */}
       {editingStaff && (
         <Dialog open={!!editingStaff} onOpenChange={() => setEditingStaff(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-lg mx-auto px-4 md:px-6">
             <DialogHeader>
               <DialogTitle>Edit Permissions</DialogTitle>
               <DialogDescription>Update permissions for {editingStaff.user.name}</DialogDescription>
@@ -737,7 +737,7 @@ export default function StaffManagementPage() {
       {/* Block/Unblock Dialog */}
       {blockingStaff && (
         <Dialog open={!!blockingStaff} onOpenChange={() => setBlockingStaff(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-lg mx-auto px-4 md:px-6">
             <DialogHeader>
               <DialogTitle>{blockingStaff.staffActive ? "Block" : "Unblock"} Staff Member</DialogTitle>
               <DialogDescription>

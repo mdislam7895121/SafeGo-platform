@@ -113,7 +113,7 @@ export default function PayoutMethodsPage() {
   };
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="container mx-auto mt-6 py-6 px-4 md:px-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" data-testid="heading-payout-methods">Payout Methods</h1>
@@ -128,7 +128,7 @@ export default function PayoutMethodsPage() {
               Add Payout Method
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-lg mx-auto px-4 md:px-6 max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add Payout Method</DialogTitle>
               <DialogDescription>
