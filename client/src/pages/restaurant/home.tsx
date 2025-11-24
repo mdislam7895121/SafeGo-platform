@@ -44,13 +44,11 @@ import { KYCBanner } from "@/components/restaurant/KYCBanner";
 import { PayoutSummaryWidget } from "@/components/restaurant/PayoutSummaryWidget";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, BarChart3 } from "lucide-react";
-import { RestaurantReceivingOrdersButton } from "@/components/restaurant/RestaurantReceivingOrdersButton";
 
 type TimePeriod = 'today' | 'week' | 'month';
 
 export default function RestaurantHome() {
   const { user, logout } = useAuth();
-  const [isOnline, setIsOnline] = useState(true);
   const [rejectOrderId, setRejectOrderId] = useState<string | null>(null);
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('today');
   const { toast } = useToast();
@@ -271,52 +269,6 @@ export default function RestaurantHome() {
     <div className="space-y-6">
         {/* KYC Verification Banner */}
         <KYCBanner />
-
-        {/* Restaurant Header with Identity and Online/Offline Toggle */}
-        <div className="space-y-3 pb-4 border-b">
-          {/* Restaurant Identity Row */}
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold" data-testid="text-restaurant-name">
-                {profile?.restaurantName || "SafeGo Eats"}
-              </h1>
-              <Badge variant="default" className="bg-blue-500">
-                <Check className="h-3 w-3 mr-1" />
-                Verified
-              </Badge>
-            </div>
-            {profile?.restaurantId && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>ID: {profile.restaurantId}</span>
-                {profile?.address && (
-                  <>
-                    <span>•</span>
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {profile.address}
-                    </span>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Online/Offline Toggle - Centered under identity */}
-          <div className="flex justify-center">
-            <RestaurantReceivingOrdersButton 
-              isReceivingOrders={isOnline}
-              onToggle={(status) => {
-                setIsOnline(status);
-                toast({
-                  title: status ? "Restaurant is now Online" : "Restaurant is now Offline",
-                  description: status 
-                    ? "You are now accepting orders" 
-                    : "You are not accepting new orders",
-                });
-              }}
-            />
-          </div>
-        </div>
 
         {/* Performance Overview with Time Period Filter */}
         <div className="flex items-center justify-between">

@@ -276,13 +276,13 @@ export function RestaurantTopNav({
         </div>
       </div>
 
-      {/* ROW 2: RESTAURANT IDENTITY + STATUS */}
-      <div className="min-h-[56px] px-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 py-2">
-        {/* Left: Restaurant Name + Verified Badge + ID/Location */}
-        <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
+      {/* ROW 2: RESTAURANT IDENTITY + ONLINE/OFFLINE TOGGLE */}
+      <div className="px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+        {/* Left: Restaurant Identity (Name + Verified Badge + ID/Location) */}
+        <div className="flex flex-col gap-1 min-w-0">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h1 
-              className="font-bold text-base sm:text-lg truncate" 
+              className="font-bold text-lg md:text-xl" 
               data-testid="text-restaurant-name-topnav"
             >
               {restaurantName}
@@ -293,8 +293,7 @@ export function RestaurantTopNav({
               data-testid="badge-verified"
             >
               <ShieldCheck className="h-3 w-3" />
-              <span className="hidden sm:inline">Verified</span>
-              <span className="sm:hidden">✓</span>
+              <span>Verified</span>
             </Badge>
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
@@ -303,17 +302,16 @@ export function RestaurantTopNav({
                 ID: {restaurantId}
               </span>
             )}
-            <span className="hidden sm:inline">•</span>
+            <span>•</span>
             <span className="flex items-center gap-1">
               <MapPin className="h-3 w-3" />
-              <span className="hidden sm:inline">New York, USA</span>
-              <span className="sm:hidden">NY, USA</span>
+              <span>New York, USA</span>
             </span>
           </div>
         </div>
 
-        {/* Right: Capsule-Style Receiving Orders Button */}
-        <div className="shrink-0 w-full sm:w-auto">
+        {/* Right: Online/Offline Toggle (left-aligned on mobile, right-aligned on desktop) */}
+        <div className="shrink-0">
           <RestaurantReceivingOrdersButton
             isReceivingOrders={isOpen}
             onToggle={onToggleStatus || (() => {})}

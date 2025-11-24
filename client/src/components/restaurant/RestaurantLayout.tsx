@@ -134,7 +134,7 @@ export function RestaurantLayout({ children, userRole = "OWNER" }: RestaurantLay
       />
       
       <main
-        className="transition-all duration-300 pt-[140px] sm:pt-[152px] px-4 sm:px-6 lg:px-8 pb-8"
+        className="transition-all duration-300 pt-[180px] px-4 sm:px-6 lg:px-8 pb-8"
         style={{
           marginLeft: getSidebarWidth()
         }}

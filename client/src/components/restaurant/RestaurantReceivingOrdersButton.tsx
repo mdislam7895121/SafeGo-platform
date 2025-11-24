@@ -10,7 +10,7 @@ export function RestaurantReceivingOrdersButton({
   onToggle
 }: RestaurantReceivingOrdersButtonProps) {
   return (
-    <div className="flex justify-center items-center w-full sm:w-auto">
+    <div className="flex items-center w-full sm:w-auto">
       <button
         onClick={() => onToggle(!isReceivingOrders)}
         onKeyDown={(e) => {
