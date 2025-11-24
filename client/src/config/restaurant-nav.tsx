@@ -34,6 +34,7 @@ import {
   Award,
   LifeBuoy,
   Phone,
+  Mail,
   Gauge
 } from "lucide-react";
 
@@ -276,13 +277,28 @@ export const restaurantNavigation: NavItem[] = [
     section: "support",
     children: [
       {
-        label: "Help Center",
+        label: "Support Hub",
         icon: LifeBuoy,
+        path: "/restaurant/support"
+      },
+      {
+        label: "Help Center",
+        icon: HelpCircle,
         path: "/restaurant/support/help"
       },
       {
-        label: "Contact Support",
+        label: "Live Chat",
+        icon: MessageSquare,
+        path: "/restaurant/support/live-chat"
+      },
+      {
+        label: "Phone Support",
         icon: Phone,
+        path: "/restaurant/support/phone"
+      },
+      {
+        label: "Email Support",
+        icon: Mail,
         path: "/restaurant/support/contact"
       },
       {
