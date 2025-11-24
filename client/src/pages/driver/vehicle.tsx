@@ -55,8 +55,14 @@ export default function DriverVehicle() {
   // Mutation to register vehicle (POST)
   const registerVehicleMutation = useMutation({
     mutationFn: async (data: VehicleFormData) => {
-      const response = await apiRequest("POST", "/api/driver/vehicle", data);
-      return response.json();
+      const result = await apiRequest("/api/driver/vehicle", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
@@ -77,8 +83,14 @@ export default function DriverVehicle() {
   // Mutation to update vehicle (PATCH)
   const updateVehicleMutation = useMutation({
     mutationFn: async (data: VehicleFormData) => {
-      const response = await apiRequest("PATCH", "/api/driver/vehicle", data);
-      return response.json();
+      const result = await apiRequest("/api/driver/vehicle", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
