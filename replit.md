@@ -34,6 +34,7 @@ Core systems and features include:
 -   **Payment & Payout Configuration System**: Enterprise-grade implementation for managing customer payment methods and payout rails by country, service type, actor type, and KYC level.
 -   **Unified Payout System**: Production-ready payout infrastructure for individual withdrawals across all user roles with unified API routes. Features include automatic weekly payout scheduling, bank verification, and comprehensive withdrawal request validation.
 -   **Driver Profile System**: Supports multi-vehicle management with `isPrimary` and `isActive` flags, encrypted sensitive KYC fields (e.g., `nidNumber`, `dmvLicenseNumber`, `ssnLast4`), and a comprehensive document upload system.
+-   **Driver Image Upload System**: Production-ready profile photo upload with field name alignment, proper error handling, and null-safe responses.
 
 ### D1-A: Multi-Vehicle Backend APIs (COMPLETED - MVP)
 
@@ -65,19 +66,62 @@ Core systems and features include:
 - `getVerifiedDriverProfile()` - Centralized KYC + ownership checking
 - `verifyVehicleOwnership()` - Ownership enforcement
 
-**Known Limitations (MVP):**
-1. **No database-level unique constraint**: Prisma doesn't support partial unique indexes. Edge case: Concurrent writes could create duplicate primaries (< 0.1% probability).
-   - **Mitigation**: All operations use `$transaction` to enforce single primary application-level
-   - **Deferred to D1-B**: Add raw SQL migration: `CREATE UNIQUE INDEX idx_primary_vehicle ON vehicles(driver_id) WHERE is_primary = true`
+**Database Constraint (IMPLEMENTED):**
+- **UNIQUE partial index enforces single primary per driver**:
+  ```sql
+  CREATE UNIQUE INDEX idx_primary_vehicle_per_driver 
+  ON vehicles (driverId) WHERE isPrimary = true
+  ```
+- Database physically prevents duplicate primaries (P2002 constraint violation)
+- All operations use `$transaction` for atomic updates
+- Error handling surfaces P2002 as 409 Conflict responses
 
-2. **Row-level locking not implemented**: UPDATE/SET-PRIMARY don't use SELECT FOR UPDATE.
-   - **Deferred to D1-7**: Security hardening phase
+**Remaining Limitations (Deferred to D1-7):**
+1. **No SELECT FOR UPDATE row locking**: Edge case scenarios where soft-deleted vehicles could be modified by concurrent requests
+2. **Stale KYC validation risk**: KYC check happens before transaction (admin-only action, extremely rare)
 
-3. **Stale KYC validation risk**: KYC check happens before transaction.
-   - **Mitigation**: KYC revocation is admin-only and rare
-   - **Deferred to D1-7**: Move validation inside transactions
+**Rationale:** Current implementation handles 99.9% of production scenarios correctly. Remaining edge cases are extremely rare and will be resolved in security hardening phase (D1-7).
 
-**Rationale:** Current implementation handles 99.9% of production scenarios correctly. Edge cases are extremely rare and will be resolved in security hardening phase (D1-7).
+### D1-IMG: Driver Profile Photo Upload System (COMPLETED - MVP)
+
+**Implementation Status:** ✅ Complete (MVP with documented limitations)
+
+**API Endpoint:**
+- **POST /api/driver/upload/profile-photo**
+  - **Auth Required**: Driver role only
+  - **Request**: Multipart form with `file` field (max 5MB, JPEG/PNG/WebP only)
+  - **Response**: `{ success: boolean, message?: string, profilePhotoUrl?: string, error?: string }`
+  - **Validations**: Driver profile existence, file type/size limits
+
+**Security Features:**
+- Driver role authentication required (via `authenticateToken` + `requireRole`)
+- Profile existence validation before upload
+- File type validation (JPEG, PNG, WebP only)
+- File size limit enforcement (5MB max)
+- Consistent JSON responses with `success` field
+
+**Frontend Error Handling:**
+- Network error handling with user-friendly messages
+- Null response checks prevent crashes
+- Success field validation in JSON responses
+- Toast notifications for all outcomes
+
+**Field Name Alignment:**
+- Backend multer middleware: `.single("file")`
+- Frontend FormData: `formData.append("file", file)`
+- **Fix Applied**: Changed from mismatched `profilePhoto` to `file`
+
+**Known Limitations:**
+1. **No transactional file cleanup**: If DB update fails after file write, orphaned files remain
+   - **Deferred to D1-7**: Implement cleanup on DB failure
+2. **No KYC gating**: Any authenticated driver can upload profile photo regardless of KYC status
+   - **Rationale**: Profile photos are needed for onboarding before KYC completion
+   - **Note**: Restaurant image uploads require KYC completion via `requireKYCCompletion` middleware
+
+**Restaurant Upload Compatibility:**
+- Restaurant menu item uploads use `.single("menuItemImage")` field name (unchanged)
+- Restaurant review uploads use `.array("reviewImages", 5)` field name (unchanged)
+- No breaking changes to existing restaurant upload flows
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
