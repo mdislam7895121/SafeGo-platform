@@ -270,11 +270,11 @@ export default function RestaurantHome() {
         {/* KYC Verification Banner */}
         <KYCBanner />
 
-        {/* Performance Overview Section - Increased spacing from header for breathing room */}
-        <section className="mt-8 sm:mt-9 space-y-6">
-          {/* Performance Overview with Time Period Filter */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold whitespace-nowrap">Performance Overview</h2>
+        {/* Performance Overview Section - Responsive spacing: 32px mobile, 24px tablet, 20px desktop */}
+        <section className="mt-6 max-md:mt-8 xl:mt-5 space-y-6">
+          {/* Performance Overview Heading + Tabs Container */}
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold">Performance Overview</h2>
             <Tabs value={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)}>
               <TabsList data-testid="tabs-time-period">
                 <TabsTrigger value="today" data-testid="tab-today">Today</TabsTrigger>
