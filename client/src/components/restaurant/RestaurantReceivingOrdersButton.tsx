@@ -28,22 +28,22 @@ export function RestaurantReceivingOrdersButton({
         }
         data-testid="button-receiving-orders-toggle"
         className={`
-          inline-flex items-center justify-center gap-3 w-[134px] h-[58px] rounded-[29px] font-semibold text-[15px]
-          bg-[#111] dark:bg-[#111] transition-all duration-200 cursor-pointer
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
+          inline-flex items-center justify-center gap-3 px-5 h-[46px] rounded-[9999px] font-semibold text-[15px]
+          transition-all duration-150 cursor-pointer min-w-[44px] min-h-[44px]
+          focus-visible:outline-2 focus-visible:outline-[#4B9EFF] focus-visible:outline-offset-[3px]
           active:scale-[0.98]
           ${isReceivingOrders 
-            ? 'border-2 border-green-600 text-green-600 hover:border-green-500 hover:text-green-500 focus-visible:ring-green-600 shadow-[0_0_20px_rgba(34,197,94,0.3)]' 
-            : 'border-2 border-red-600 text-red-600 hover:border-red-500 hover:text-red-500 focus-visible:ring-red-600 shadow-[0_0_20px_rgba(220,38,38,0.3)]'
+            ? 'bg-[#0CCE6B] text-white shadow-[0_0_12px_rgba(12,206,107,0.5)] hover:bg-[#0BBD61]' 
+            : 'bg-[#E5E7EB] text-[#374151] border border-[#D1D5DB] hover:bg-[#D1D5DB]'
           }
         `}
       >
         {/* Power Icon */}
         <Power 
-          className="w-[18px] h-[18px] flex-shrink-0 transition-all duration-200"
+          className="w-[22px] h-[22px] flex-shrink-0 transition-all duration-150"
         />
         
-        {/* Label Text - Always visible */}
+        {/* Label Text - Always visible, no wrap */}
         <span className="whitespace-nowrap">
           {isReceivingOrders ? "Online" : "Offline"}
         </span>
