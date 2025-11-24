@@ -1666,7 +1666,9 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
     }
 
     const schema = z.object({
-      categoryId: z.string(),
+      categoryId: z.string().optional(), // Optional for backwards compatibility
+      primaryCategory: z.string().optional(), // New two-level category system
+      subCategories: z.array(z.string()).optional().default([]), // New two-level category system
       name: z.string().min(1).max(200),
       shortDescription: z.string().max(500).optional(),
       longDescription: z.string().optional(),
@@ -1685,22 +1687,26 @@ router.post("/menu/items", requireKYCCompletion, requireOwnerRole, async (req: A
 
     const data = schema.parse(req.body);
 
-    // Verify category belongs to restaurant
-    const category = await prisma.menuCategory.findFirst({
-      where: {
-        id: data.categoryId,
-        restaurantId: restaurantProfile.id,
-      },
-    });
+    // Verify category if categoryId is provided (backwards compatibility)
+    if (data.categoryId) {
+      const category = await prisma.menuCategory.findFirst({
+        where: {
+          id: data.categoryId,
+          restaurantId: restaurantProfile.id,
+        },
+      });
 
-    if (!category) {
-      return res.status(404).json({ error: "Category not found" });
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
     }
 
     const item = await prisma.menuItem.create({
       data: {
         restaurantId: restaurantProfile.id,
-        categoryId: data.categoryId,
+        categoryId: data.categoryId || null,
+        primaryCategory: data.primaryCategory || null,
+        subCategories: data.subCategories || [],
         name: data.name,
         shortDescription: data.shortDescription || null,
         longDescription: data.longDescription || null,
@@ -1775,6 +1781,8 @@ router.patch("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (r
 
     const schema = z.object({
       categoryId: z.string().optional(),
+      primaryCategory: z.string().optional(), // New two-level category system
+      subCategories: z.array(z.string()).optional(), // New two-level category system
       name: z.string().min(1).max(200).optional(),
       shortDescription: z.string().max(500).optional(),
       longDescription: z.string().optional(),
