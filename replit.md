@@ -33,7 +33,7 @@ Core systems and features include:
 -   **Customer-Facing Dynamic Pricing Display**: Real-time pricing transparency system showing surge multipliers, promotions, coupon eligibility, and pricing breakdowns.
 -   **Payment & Payout Configuration System**: Enterprise-grade management for customer payment methods and payout rails by country, service type, actor type, and KYC level.
 -   **Unified Payout System**: Production-ready payout infrastructure for individual withdrawals across all user roles with unified API routes, automatic weekly scheduling, bank verification, and comprehensive validation.
--   **Driver Profile System**: Supports multi-vehicle management with `isPrimary` and `isActive` flags, encrypted sensitive KYC fields, and a comprehensive document upload system.
+-   **Driver Profile System**: Supports multi-vehicle management with `isPrimary` and `isActive` flags, encrypted sensitive KYC fields, and a comprehensive document upload system. Features 181 vehicle models (180 predefined + "Other") across 25 manufacturers and 15 color options. Vehicle photo uploads removed per NYC/USA compliance requirements. Public driver profile endpoint (`GET /api/public/driver/:driverId/summary`) provides customer-facing Uber-style driver information with safe, non-sensitive fields (displayName, profilePhotoUrl, primary vehicle, stats).
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design
