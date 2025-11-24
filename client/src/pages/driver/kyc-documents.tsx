@@ -21,10 +21,18 @@ export default function DriverKYCDocuments() {
     lastName: "",
   });
   const [formInitialized, setFormInitialized] = useState(false);
+  const [vehicleFormInitialized, setVehicleFormInitialized] = useState(false);
   const [nidNumber, setNidNumber] = useState("");
   const [ssnNumber, setSsnNumber] = useState("");
   const [isEditingNID, setIsEditingNID] = useState(false);
   const [isEditingSSN, setIsEditingSSN] = useState(false);
+  
+  // Vehicle KYC text fields state
+  const [vehicleKYCForm, setVehicleKYCForm] = useState({
+    vehicleColor: "",
+    vehicleModel: "",
+    licensePlateNumber: "",
+  });
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
@@ -62,6 +70,21 @@ export default function DriverKYCDocuments() {
       setFormInitialized(true);
     }
   }, [profile, formInitialized]);
+
+  // Initialize vehicle KYC form from vehicle data
+  useEffect(() => {
+    if (driverData && !vehicleFormInitialized) {
+      const vehicle = (driverData as any)?.vehicle;
+      if (vehicle) {
+        setVehicleKYCForm({
+          vehicleColor: vehicle.color || "",
+          vehicleModel: vehicle.vehicleModel || "",
+          licensePlateNumber: vehicle.licensePlate || "",
+        });
+        setVehicleFormInitialized(true);
+      }
+    }
+  }, [driverData, vehicleFormInitialized]);
 
   // Helper for multipart form uploads using fetch (FormData not supported by apiRequest)
   const uploadFile = async (endpoint: string, fieldName: string, file: File, extraData?: Record<string, string>) => {
@@ -230,6 +253,43 @@ export default function DriverKYCDocuments() {
     },
   });
 
+  const updateVehicleKYCMutation = useMutation({
+    mutationFn: async (data: typeof vehicleKYCForm) => {
+      // Validate required fields for USA drivers
+      if (isUSA) {
+        if (!data.vehicleColor?.trim()) {
+          throw new Error("Vehicle color is required");
+        }
+        if (!data.vehicleModel?.trim()) {
+          throw new Error("Vehicle model is required");
+        }
+        if (!data.licensePlateNumber?.trim()) {
+          throw new Error("License plate number is required");
+        }
+      }
+      const result = await apiRequest("/api/driver/vehicle-kyc-details", {
+        method: "PUT",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result || { success: true };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Vehicle details updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update vehicle details",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Initialize USA name form when profile loads
   if (isLoading) {
     return (
@@ -260,7 +320,7 @@ export default function DriverKYCDocuments() {
     if (isNY && !profile?.tlcLicenseImageUrl) missingFields.push("TLC license");
     // Identity documents for USA
     if (!profile?.hasSSN) missingFields.push("Social Security Number");
-    if (!profile?.ssnCardImageUrl) missingFields.push("SSN card image");
+    // SSN card image upload removed - no longer required
   }
 
   if (isBD) {
@@ -274,7 +334,6 @@ export default function DriverKYCDocuments() {
   const hasVehicleInsurance = vehicleDocs.some((doc: any) => doc.documentType === "insurance");
   const hasVehicleInspection = vehicleDocs.some((doc: any) => doc.documentType === "vehicleInspection");
   const hasDriverLicenseVehicle = vehicleDocs.some((doc: any) => doc.documentType === "driverLicenseVehicle");
-  const hasLicensePlate = vehicleDocs.some((doc: any) => doc.documentType === "licensePlate");
   const hasTLCDiamond = vehicleDocs.some((doc: any) => doc.documentType === "tlcDiamond");
 
   // Check all required vehicle documents
@@ -294,13 +353,19 @@ export default function DriverKYCDocuments() {
     missingFields.push("Driver license document");
   }
   
-  if (!hasLicensePlate) {
-    missingFields.push("License plate document");
-  }
+  // License plate photo upload removed - now using text field instead
   
   // NYC-specific requirements
   if (isNYC && !hasTLCDiamond) {
     missingFields.push("TLC Diamond document");
+  }
+
+  // Check vehicle KYC text fields for USA drivers
+  const vehicle = (driverData as any)?.vehicle;
+  if (isUSA) {
+    if (!vehicle?.color) missingFields.push("Vehicle color");
+    if (!vehicle?.vehicleModel) missingFields.push("Vehicle model");
+    if (!vehicle?.licensePlate) missingFields.push("License plate number");
   }
 
   const isKYCComplete = missingFields.length === 0;
@@ -615,26 +680,66 @@ export default function DriverKYCDocuments() {
                     </p>
                   </div>
 
-                  <div className="space-y-2">
-                    <h4 className="font-medium">SSN Card Image</h4>
-                    <p className="text-sm text-muted-foreground">Upload a clear photo of your Social Security card</p>
-                    <FileUpload
-                      label=""
-                      accept="image/*"
-                      maxSizeMB={5}
-                      currentFileUrl={profile?.ssnCardImageUrl}
-                      onUpload={async (file) => {
-                        const result = await uploadSSNCardMutation.mutateAsync(file);
-                        return { url: result.ssnCardImageUrl };
-                      }}
-                      testId="ssn-card"
-                    />
-                  </div>
                 </>
               )}
             </CardContent>
           </Card>
         )}
+
+        {/* Vehicle Details (KYC Text Fields) */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Vehicle Details</CardTitle>
+            <CardDescription>{isUSA ? "Required for USA drivers" : "Vehicle information for KYC"}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="vehicleColor">Vehicle Color {isUSA && "*"}</Label>
+                <Input
+                  id="vehicleColor"
+                  data-testid="input-vehicle-color"
+                  value={vehicleKYCForm.vehicleColor}
+                  onChange={(e) => setVehicleKYCForm({ ...vehicleKYCForm, vehicleColor: e.target.value })}
+                  placeholder="e.g., Black, White, Silver"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Enter your vehicle's color</p>
+              </div>
+              <div>
+                <Label htmlFor="vehicleModel">Vehicle Model {isUSA && "*"}</Label>
+                <Input
+                  id="vehicleModel"
+                  data-testid="input-vehicle-model"
+                  value={vehicleKYCForm.vehicleModel}
+                  onChange={(e) => setVehicleKYCForm({ ...vehicleKYCForm, vehicleModel: e.target.value })}
+                  placeholder="e.g., Honda Accord 2018"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Enter make, model, and year</p>
+              </div>
+              <div>
+                <Label htmlFor="licensePlateNumber">License Plate Number {isUSA && "*"}</Label>
+                <Input
+                  id="licensePlateNumber"
+                  data-testid="input-license-plate"
+                  value={vehicleKYCForm.licensePlateNumber}
+                  onChange={(e) => setVehicleKYCForm({ ...vehicleKYCForm, licensePlateNumber: e.target.value.toUpperCase() })}
+                  placeholder="e.g., NYC1230"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Enter plate number (no photo needed)</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => updateVehicleKYCMutation.mutate(vehicleKYCForm)}
+              disabled={
+                (isUSA && (!vehicleKYCForm.vehicleColor || !vehicleKYCForm.vehicleModel || !vehicleKYCForm.licensePlateNumber)) ||
+                updateVehicleKYCMutation.isPending
+              }
+              data-testid="button-save-vehicle-kyc"
+            >
+              {updateVehicleKYCMutation.isPending ? "Saving..." : "Save Vehicle Details"}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Vehicle Documents */}
         <Card>
@@ -716,25 +821,6 @@ export default function DriverKYCDocuments() {
                   return { url: result.document.fileUrl };
                 }}
                 testId="driver-license-vehicle-doc"
-              />
-            </div>
-
-            {/* License Plate */}
-            <div className="space-y-2">
-              <h4 className="font-medium">License Plate</h4>
-              <p className="text-sm text-muted-foreground">Upload a clear photo showing the plate number</p>
-              <FileUpload
-                label=""
-                accept="image/*"
-                maxSizeMB={10}
-                onUpload={async (file) => {
-                  const result = await uploadVehicleDocMutation.mutateAsync({
-                    file,
-                    documentType: "licensePlate",
-                  });
-                  return { url: result.document.fileUrl };
-                }}
-                testId="license-plate-doc"
               />
             </div>
 

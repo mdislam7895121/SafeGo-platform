@@ -2109,6 +2109,106 @@ router.delete("/vehicle-documents/:id", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// PUT /api/driver/vehicle-kyc-details
+// Update vehicle KYC text fields (color, model, license plate)
+// ====================================================
+router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { vehicleColor, vehicleModel, licensePlateNumber } = req.body;
+
+    // Get driver profile with vehicles and user
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        vehicles: {
+          where: { isActive: true, isPrimary: true },
+        },
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const isUSA = driverProfile.user.countryCode === "US";
+
+    // Validation for USA drivers - trim first, then check for emptiness
+    if (isUSA) {
+      const colorTrimmed = vehicleColor?.trim();
+      const modelTrimmed = vehicleModel?.trim();
+      const plateTrimmed = licensePlateNumber?.trim();
+      
+      if (!colorTrimmed) {
+        return res.status(400).json({ error: "Vehicle color is required for USA drivers" });
+      }
+      if (!modelTrimmed) {
+        return res.status(400).json({ error: "Vehicle model is required for USA drivers" });
+      }
+      if (!plateTrimmed) {
+        return res.status(400).json({ error: "License plate number is required for USA drivers" });
+      }
+    }
+
+    // Find or create primary vehicle
+    let primaryVehicle = driverProfile.vehicles[0];
+
+    if (!primaryVehicle) {
+      // Create a new primary vehicle with provided details
+      primaryVehicle = await prisma.vehicle.create({
+        data: {
+          id: randomUUID(),
+          driverId: driverProfile.id,
+          vehicleType: "car", // Default type
+          vehicleModel: vehicleModel || "Not specified",
+          vehiclePlate: licensePlateNumber || "Not specified",
+          color: vehicleColor || null,
+          licensePlate: licensePlateNumber || null,
+          isPrimary: true,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      // Update existing primary vehicle
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+
+      if (vehicleColor) updateData.color = vehicleColor.trim();
+      if (vehicleModel) updateData.vehicleModel = vehicleModel.trim();
+      if (licensePlateNumber) {
+        updateData.licensePlate = licensePlateNumber.trim();
+        updateData.vehiclePlate = licensePlateNumber.trim(); // Also update vehiclePlate for consistency
+      }
+
+      primaryVehicle = await prisma.vehicle.update({
+        where: { id: primaryVehicle.id },
+        data: updateData,
+      });
+    }
+
+    res.json({
+      message: "Vehicle KYC details updated successfully",
+      vehicle: {
+        id: primaryVehicle.id,
+        color: primaryVehicle.color,
+        vehicleModel: primaryVehicle.vehicleModel,
+        licensePlate: primaryVehicle.licensePlate,
+      },
+    });
+  } catch (error) {
+    console.error("Vehicle KYC details update error:", error);
+    res.status(500).json({ error: "Failed to update vehicle KYC details" });
+  }
+});
+
+// ====================================================
 // WALLET & PAYOUT API
 // ====================================================
 
