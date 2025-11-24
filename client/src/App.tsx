@@ -189,6 +189,9 @@ import AdminSupportPhone from "@/pages/admin-portal/support-phone";
 import AdminSupportTickets from "@/pages/admin-portal/support-tickets";
 import AdminSupportTicketDetail2 from "@/pages/admin-portal/support-ticket-detail";
 
+// Test pages
+import TestDriverPublicCard from "@/pages/test/driver-public-card";
+
 import NotFound from "@/pages/not-found";
 
 function HomeRedirect() {
@@ -1319,6 +1322,11 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSupportHub />
         </ProtectedRoute>
+      </Route>
+
+      {/* Test routes - Development only */}
+      <Route path="/test/driver-public-card">
+        <TestDriverPublicCard />
       </Route>
 
       {/* 404 */}
