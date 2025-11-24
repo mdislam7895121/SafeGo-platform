@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +42,7 @@ export default function StaffActivityLogPage() {
   const [offset, setOffset] = useState(0);
 
   const { data: staffData } = useQuery<{ staff: StaffMember[] }>({
-    queryKey: ["/api/restaurant/staff"],
+    queryKey: queryKeys.restaurant.staff.list,
   });
 
   const queryParams = new URLSearchParams();
@@ -60,7 +61,7 @@ export default function StaffActivityLogPage() {
       hasMore: boolean;
     };
   }>({
-    queryKey: ["/api/restaurant/staff/activity-log", limit, offset, selectedStaffId],
+    queryKey: [...queryKeys.restaurant.staff.activity, limit, offset, selectedStaffId],
     enabled: true,
   });
 
