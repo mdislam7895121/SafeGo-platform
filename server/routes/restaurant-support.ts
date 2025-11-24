@@ -34,10 +34,10 @@ function checkSupportAccess(profile: any, requireOwner: boolean = false): boolea
 }
 
 /**
- * GET /api/restaurant/support/tickets
+ * GET /api/restaurant/support-center/tickets
  * List support tickets related to restaurant's food orders
  */
-router.get("/support/tickets", async (req: AuthRequest, res: Response) => {
+router.get("/support-center/tickets", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
 
@@ -157,7 +157,7 @@ router.get("/support/tickets", async (req: AuthRequest, res: Response) => {
  * GET /api/restaurant/support/tickets/:id
  * Get ticket details with messages
  */
-router.get("/support/tickets/:id", async (req: AuthRequest, res: Response) => {
+router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const ticketId = req.params.id;
@@ -251,7 +251,7 @@ router.get("/support/tickets/:id", async (req: AuthRequest, res: Response) => {
  * POST /api/restaurant/support/tickets/:id/messages
  * Add a message/reply to a ticket
  */
-router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Response) => {
+router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const ticketId = req.params.id;
@@ -408,7 +408,7 @@ router.post("/support/tickets/:id/messages", async (req: AuthRequest, res: Respo
  * PATCH /api/restaurant/support/tickets/:id/status
  * Update ticket status (limited options for restaurants)
  */
-router.patch("/support/tickets/:id/status", async (req: AuthRequest, res: Response) => {
+router.patch("/support-center/tickets/:id/status", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const ticketId = req.params.id;
@@ -531,7 +531,7 @@ router.patch("/support/tickets/:id/status", async (req: AuthRequest, res: Respon
  * Propose a resolution (refund, replacement, etc) - requires admin approval
  * OWNER ONLY - requires elevated permission
  */
-router.post("/support/tickets/:id/proposed-resolution", async (req: AuthRequest, res: Response) => {
+router.post("/support-center/tickets/:id/proposed-resolution", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
     const ticketId = req.params.id;
