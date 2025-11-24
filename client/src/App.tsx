@@ -18,6 +18,9 @@ import CustomerKYC from "@/pages/customer/kyc";
 import CustomerActivity from "@/pages/customer/activity";
 import RideRequest from "@/pages/customer/ride-request";
 import RideDetails from "@/pages/customer/ride-details";
+import RideAssigned from "@/pages/customer/ride-assigned";
+import OrderConfirmation from "@/pages/customer/order-confirmation";
+import CustomerDriverProfile from "@/pages/customer/driver-public-profile";
 import FoodRestaurants from "@/pages/customer/food-restaurants";
 import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
 import FoodOrdersHistory from "@/pages/customer/food-orders-history";
@@ -304,6 +307,21 @@ function Router() {
       <Route path="/customer/rides/:id">
         <ProtectedRoute allowedRoles={["customer"]}>
           <RideDetails />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/ride-assigned/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RideAssigned />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/order-confirmation/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <OrderConfirmation />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/driver/:driver_profile_id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerDriverProfile />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/wallet">

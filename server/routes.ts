@@ -51,21 +51,21 @@ type DriverPublicProfile = {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Public routes (no authentication required)
-  // D2: Public Driver Profile endpoint
-  app.get("/api/public/driver/:driverId", async (req, res) => {
+  // D2: Public Driver Profile endpoint - uses driver_profile_id
+  app.get("/api/driver/public-profile/:driver_profile_id", async (req, res) => {
     try {
-      const { driverId } = req.params;
+      const { driver_profile_id } = req.params;
 
       // Validate UUID format
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRegex.test(driverId)) {
-        res.status(400).json({ message: "Invalid driver ID format" });
+      if (!uuidRegex.test(driver_profile_id)) {
+        res.status(400).json({ message: "Invalid driver profile ID format" });
         return;
       }
 
       // Fetch driver profile with safe, non-sensitive fields only
       const driverProfile = await db.driverProfile.findUnique({
-        where: { id: driverId },
+        where: { id: driver_profile_id },
         select: {
           id: true,
           firstName: true,
@@ -84,7 +84,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate total rides from completed rides table
       const totalRides = await db.ride.count({
         where: {
-          driverId,
+          driverId: driver_profile_id,
           status: "COMPLETED",
         },
       });
@@ -92,7 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate rating from ride reviews
       const rideReviews = await db.ride.findMany({
         where: {
-          driverId,
+          driverId: driver_profile_id,
           status: "COMPLETED",
           customerRating: { not: null },
         },
@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch primary vehicle (safe fields only)
       const primaryVehicle = await db.vehicle.findFirst({
         where: {
-          driverId,
+          driverId: driver_profile_id,
           isPrimary: true,
           isActive: true,
         },

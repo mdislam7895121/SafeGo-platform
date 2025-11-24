@@ -37,11 +37,11 @@ export default function RideDetails() {
 
   // Fetch driver public profile when driver is assigned
   const ride = rideData?.ride;
-  const driverId = ride?.driver?.id;
+  const driverProfileId = ride?.driver?.id;
 
   const { data: driverProfile, isLoading: isLoadingDriver } = useQuery<DriverPublicProfile>({
-    queryKey: [`/api/public/driver/${driverId}`],
-    enabled: !!driverId, // Only fetch when driver is assigned
+    queryKey: [`/api/driver/public-profile/${driverProfileId}`],
+    enabled: !!driverProfileId, // Only fetch when driver is assigned
   });
 
   const cancelMutation = useMutation({

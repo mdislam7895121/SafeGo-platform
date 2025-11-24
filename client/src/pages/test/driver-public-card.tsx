@@ -28,7 +28,7 @@ export default function TestDriverPublicCard() {
   const driverId = params.get("id");
 
   const { data: profile, isLoading, error } = useQuery<DriverPublicProfile>({
-    queryKey: [`/api/public/driver/${driverId}`],
+    queryKey: [`/api/driver/public-profile/${driverId}`],
     enabled: !!driverId,
   });
 
