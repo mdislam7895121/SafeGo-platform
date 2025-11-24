@@ -1,7 +1,10 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Star, Car } from "lucide-react";
+import { AlertCircle, Star } from "lucide-react";
+import { Suspense, lazy } from "react";
+
+const VehicleViewer = lazy(() => import("@/components/3d/VehicleViewer"));
 
 type DriverPublicProfile = {
   name: string;
@@ -23,28 +26,21 @@ type DriverPublicProfile = {
 interface DriverPreviewCardProps {
   profile: DriverPublicProfile;
   className?: string;
+  show3DViewer?: boolean;
+  viewerHeight?: string | number;
 }
 
-export function DriverPreviewCard({ profile, className = "" }: DriverPreviewCardProps) {
-  // Format stats for display
+export function DriverPreviewCard({ 
+  profile, 
+  className = "",
+  show3DViewer = true,
+  viewerHeight = 180,
+}: DriverPreviewCardProps) {
   const formatRideCount = (count: number) => {
     if (count >= 1000) {
       return `${(count / 1000).toFixed(1)}k+`;
     }
     return count.toString();
-  };
-
-  // Get vehicle 3D render based on type and color
-  // Future implementation: Load from /assets/cars/<type>/<color>.png
-  // Current: Returns null to use icon fallback
-  const getVehicleImageUrl = (vehicle: DriverPublicProfile["vehicle"]) => {
-    if (!vehicle) return null;
-    
-    // Example path structure for when 3D renders are added:
-    // return `/assets/cars/${vehicle.type.toLowerCase()}/${vehicle.color.toLowerCase()}.png`;
-    
-    // Currently using icon fallback until 3D vehicle assets are available
-    return null;
   };
 
   // Get initials for avatar fallback
@@ -83,48 +79,65 @@ export function DriverPreviewCard({ profile, className = "" }: DriverPreviewCard
           </div>
         </div>
 
-        {/* Vehicle Section */}
+        {/* Vehicle Section with 3D Viewer */}
         {profile.vehicle && (
           <div className="space-y-3">
-            {/* Vehicle Render/Placeholder */}
-            <div className="relative bg-muted rounded-lg p-6 flex items-center justify-center min-h-[120px]">
-              {getVehicleImageUrl(profile.vehicle) ? (
-                <img
-                  src={getVehicleImageUrl(profile.vehicle)!}
-                  alt={`${profile.vehicle.color} ${profile.vehicle.model}`}
-                  className="max-h-24 object-contain"
-                  data-testid="img-vehicle-render"
+            {/* 3D Vehicle Render */}
+            {show3DViewer ? (
+              <Suspense
+                fallback={
+                  <div 
+                    className="w-full bg-muted rounded-lg flex items-center justify-center"
+                    style={{ height: typeof viewerHeight === 'number' ? `${viewerHeight}px` : viewerHeight }}
+                  >
+                    <div className="animate-pulse text-muted-foreground text-sm">
+                      Loading 3D vehicle...
+                    </div>
+                  </div>
+                }
+              >
+                <VehicleViewer
+                  vehicleType={profile.vehicle.type}
+                  vehicleColor={profile.vehicle.color}
+                  height={viewerHeight}
+                  autoRotate={true}
+                  showControls={true}
                 />
-              ) : (
-                <div className="text-center">
-                  <Car className="h-16 w-16 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {profile.vehicle.color} {profile.vehicle.type}
-                  </p>
-                </div>
-              )}
-            </div>
+              </Suspense>
+            ) : (
+              <div className="w-full bg-muted rounded-lg p-4 flex items-center justify-center min-h-[100px]">
+                <p className="text-sm text-muted-foreground">
+                  {profile.vehicle.color} {profile.vehicle.type}
+                </p>
+              </div>
+            )}
 
             {/* Vehicle Details */}
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-sm text-muted-foreground">Vehicle</p>
-                <p className="font-medium" data-testid="text-vehicle-model">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Vehicle</p>
+                <p className="font-medium text-sm" data-testid="text-vehicle-model">
                   {profile.vehicle.model}
                 </p>
               </div>
-
-              {/* License Plate */}
               <div>
-                <p className="text-sm text-muted-foreground">License Plate</p>
-                <Badge
-                  variant="outline"
-                  className="font-mono text-base px-4 py-2 bg-yellow-100 dark:bg-yellow-950 border-yellow-400 dark:border-yellow-600"
-                  data-testid="badge-license-plate"
-                >
-                  {profile.vehicle.plateNumber}
-                </Badge>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Color</p>
+                <p className="font-medium text-sm" data-testid="text-vehicle-color">
+                  {profile.vehicle.color}
+                </p>
               </div>
+            </div>
+
+            {/* License Plate */}
+            <div>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">License Plate</p>
+              <Badge
+                variant="outline"
+                className="font-mono text-base px-4 py-2 bg-yellow-100 dark:bg-yellow-950 border-yellow-400 dark:border-yellow-600"
+                data-testid="badge-license-plate"
+              >
+                {profile.vehicle.plateNumber}
+              </Badge>
             </div>
           </div>
         )}
