@@ -103,9 +103,12 @@ import SettingsDevices from "@/pages/restaurant/settings-devices";
 import DocumentsBusiness from "@/pages/restaurant/documents-business";
 import DocumentsHealth from "@/pages/restaurant/documents-health";
 import DocumentsKYC from "@/pages/restaurant/documents-kyc";
+import SupportHub from "@/pages/restaurant/support-hub";
 import SupportHelp from "@/pages/restaurant/support-help";
 import SupportContact from "@/pages/restaurant/support-contact";
 import SupportStatus from "@/pages/restaurant/support-status";
+import SupportLiveChat from "@/pages/restaurant/support-live-chat";
+import SupportPhone from "@/pages/restaurant/support-phone";
 import RestaurantProfile from "@/pages/restaurant/profile";
 import RestaurantSupport from "@/pages/restaurant/support";
 import RestaurantSupportTickets from "@/pages/restaurant/support-tickets";
@@ -836,6 +839,21 @@ function Router() {
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
+      {/* Phase 12.5: Support Center - Multi-channel support hub */}
+      <Route path="/restaurant/support/live-chat">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SupportLiveChat />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/restaurant/support/phone">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <SupportPhone />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/restaurant/support/help">
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
@@ -859,7 +877,9 @@ function Router() {
       </Route>
       <Route path="/restaurant/support">
         <ProtectedRoute allowedRoles={["restaurant"]}>
-          <Redirect to="/restaurant/support/help" />
+          <RestaurantLayout>
+            <SupportHub />
+          </RestaurantLayout>
         </ProtectedRoute>
       </Route>
 
