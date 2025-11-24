@@ -500,12 +500,67 @@ model MenuCategory {
   @@map("menu_categories")
 }
 
+// Phase 12 - Relational Category System
+model Category {
+  id            String        @id @default(uuid())
+  name          String        @unique
+  slug          String        @unique
+  type          String        @default("FOOD") // FOOD, DRINK, DESSERT, OTHER
+  isActive      Boolean       @default(true)
+  displayOrder  Int           @default(0)
+  isDemo        Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  subCategories SubCategory[]
+  menuItems     MenuItem[]    @relation("MenuItemMainCategory")
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([type])
+  @@map("categories")
+}
+
+model SubCategory {
+  id               String             @id @default(uuid())
+  categoryId       String
+  name             String
+  slug             String
+  isActive         Boolean            @default(true)
+  displayOrder     Int                @default(0)
+  isDemo           Boolean            @default(false)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  category         Category           @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  menuItemLinks    MenuItemCategory[]
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
+  @@index([slug])
+  @@index([isActive])
+  @@map("sub_categories")
+}
+
+model MenuItemCategory {
+  id            String      @id @default(uuid())
+  menuItemId    String
+  subCategoryId String
+  createdAt     DateTime    @default(now())
+  menuItem      MenuItem    @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  subCategory   SubCategory @relation(fields: [subCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([menuItemId, subCategoryId])
+  @@index([menuItemId])
+  @@index([subCategoryId])
+  @@map("menu_item_categories")
+}
+
 model MenuItem {
   id                     String              @id @default(uuid())
   restaurantId           String
-  categoryId             String?
-  primaryCategory        String?
-  subCategories          String[]            @default([])
+  categoryId             String?             // Legacy - kept for backwards compatibility
+  mainCategoryId         String?             // Phase 12 - new relational main category
+  primaryCategory        String?             // Legacy simple category - kept for migration
+  subCategories          String[]            @default([]) // Legacy simple category - kept for migration
   name                   String
   shortDescription       String?
   longDescription        String?
@@ -534,10 +589,13 @@ model MenuItem {
   updatedAt              DateTime            @updatedAt
   restaurant             RestaurantProfile   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   category               MenuCategory?       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  mainCategory           Category?           @relation("MenuItemMainCategory", fields: [mainCategoryId], references: [id], onDelete: SetNull)
+  subCategoryLinks       MenuItemCategory[]
   optionGroups           MenuOptionGroup[]
 
   @@index([restaurantId])
   @@index([categoryId])
+  @@index([mainCategoryId])
   @@index([primaryCategory])
   @@index([availabilityStatus])
   @@index([isFeatured])
