@@ -14,26 +14,18 @@ import { useToast } from "@/hooks/use-toast";
 
 const formSchema = z.object({
   countryCode: z.string().min(2, "Country is required"),
-  payoutRailType: z.string().min(1, "Payout method type is required"),
-  provider: z.string().min(1, "Provider is required"),
+  payoutType: z.string().min(1, "Payout method type is required"),
   currency: z.string().min(3, "Currency is required"),
   accountNumber: z.string().min(1, "Account number is required"),
   accountHolderName: z.string().min(1, "Account holder name is required"),
   bankName: z.string().optional(),
-  branchCode: z.string().optional(),
   routingNumber: z.string().optional(),
-  isDefault: z.boolean().default(false),
+  swiftCode: z.string().optional(),
+  mobileWalletProvider: z.string().optional(),
+  mobileWalletNumber: z.string().optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
-
-interface PayoutRail {
-  id: string;
-  payoutRailType: string;
-  provider: string;
-  minPayoutAmount: string;
-  requiresKycLevel: string;
-}
 
 interface AddPayoutMethodFormProps {
   onSuccess: () => void;
@@ -42,26 +34,22 @@ interface AddPayoutMethodFormProps {
 export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormProps) {
   const { toast } = useToast();
   const [selectedCountry, setSelectedCountry] = useState<string>("BD");
-  const [selectedRailType, setSelectedRailType] = useState<string>("");
+  const [selectedPayoutType, setSelectedPayoutType] = useState<string>("");
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       countryCode: "BD",
       currency: "BDT",
+      payoutType: "",
       accountNumber: "",
       accountHolderName: "",
       bankName: "",
-      branchCode: "",
       routingNumber: "",
-      isDefault: false,
+      swiftCode: "",
+      mobileWalletProvider: "",
+      mobileWalletNumber: "",
     },
-  });
-
-  // Fetch available payout rails for selected country
-  const { data: payoutRailsData, isLoading: isLoadingRails } = useQuery<{ payoutRails: PayoutRail[] }>({
-    queryKey: ["/api/config/payout/restaurant", selectedCountry],
-    enabled: !!selectedCountry,
   });
 
   // Update currency when country changes
@@ -73,43 +61,43 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
     }
   }, [selectedCountry, form]);
 
-  // Create payout method mutation
+  // Create payout account mutation using unified API
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      // Build masked details based on payout rail type
-      let maskedDetails = "";
-      if (data.payoutRailType.includes("MOBILE_MONEY")) {
-        maskedDetails = `${data.provider} ***${data.accountNumber.slice(-4)}`;
-      } else if (data.payoutRailType.includes("BANK")) {
-        maskedDetails = `${data.bankName || data.provider} ****${data.accountNumber.slice(-4)}`;
-      } else {
-        maskedDetails = `${data.provider} ****${data.accountNumber.slice(-4)}`;
+      // Build account details based on payout type
+      const accountDetails: Record<string, any> = {
+        accountNumber: data.accountNumber,
+        accountHolderName: data.accountHolderName,
+      };
+
+      if (data.payoutType === "bank_account") {
+        accountDetails.bankName = data.bankName;
+        accountDetails.routingNumber = data.routingNumber;
+        accountDetails.swiftCode = data.swiftCode;
+      } else if (data.payoutType === "mobile_wallet") {
+        accountDetails.mobileWalletProvider = data.mobileWalletProvider;
+        accountDetails.mobileWalletNumber = data.mobileWalletNumber || data.accountNumber;
       }
 
       const payload = {
-        countryCode: data.countryCode,
-        payoutRailType: data.payoutRailType,
-        provider: data.provider,
-        currency: data.currency,
-        maskedDetails,
-        metadata: {
-          accountNumber: data.accountNumber,
-          accountHolderName: data.accountHolderName,
-          bankName: data.bankName,
-          branchCode: data.branchCode,
-          routingNumber: data.routingNumber,
-        },
-        isDefault: data.isDefault,
+        payoutType: data.payoutType,
+        accountHolderName: data.accountHolderName,
+        accountNumber: data.accountNumber || data.mobileWalletNumber,
+        routingNumber: data.routingNumber,
+        swiftCode: data.swiftCode,
+        bankName: data.bankName || data.mobileWalletProvider || "",
+        branchName: "",
+        mobileWalletNumber: data.mobileWalletNumber,
       };
 
-      return apiRequest("/api/restaurants/me/payout-methods", {
+      return apiRequest("/api/payout/methods", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurants/me/payout-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payout/methods"] });
       toast({
         title: "Success",
         description: "Payout method added successfully",
@@ -119,7 +107,7 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to add payout method",
+        description: error.message || "Failed to add payout account",
         variant: "destructive",
       });
     },
@@ -129,12 +117,8 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
     createMutation.mutate(data);
   };
 
-  const selectedRail = payoutRailsData?.payoutRails?.find(
-    (rail) => rail.payoutRailType === selectedRailType
-  );
-
-  const showBankFields = selectedRailType.includes("BANK") || selectedRailType.includes("ACH");
-  const showMobileMoneyFields = selectedRailType.includes("MOBILE_MONEY");
+  const showBankFields = selectedPayoutType === "bank_account";
+  const showMobileWalletFields = selectedPayoutType === "mobile_wallet";
 
   return (
     <Form {...form}>
@@ -168,185 +152,198 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
           )}
         />
 
-        {isLoadingRails ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
+        <FormField
+          control={form.control}
+          name="payoutType"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Payout Method Type</FormLabel>
+              <Select
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  setSelectedPayoutType(value);
+                }}
+                value={field.value}
+                data-testid="select-payout-type"
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payout method type" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="bank_account">Bank Account</SelectItem>
+                  {selectedCountry === "BD" && (
+                    <SelectItem value="mobile_wallet">Mobile Wallet (bKash, Nagad, Rocket)</SelectItem>
+                  )}
+                  {selectedCountry === "US" && (
+                    <SelectItem value="stripe_connect">Stripe Connect</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {selectedPayoutType && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              This payout method requires <strong>FULL</strong> KYC verification. 
+              Please ensure your KYC documents are submitted and verified before using this method.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {selectedPayoutType && (
           <>
             <FormField
               control={form.control}
-              name="payoutRailType"
+              name="accountHolderName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Payout Method</FormLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      field.onChange(value);
-                      setSelectedRailType(value);
-                      // Auto-fill provider based on selection
-                      const rail = payoutRailsData?.payoutRails?.find(r => r.payoutRailType === value);
-                      if (rail) {
-                        form.setValue("provider", rail.provider);
-                      }
-                    }}
-                    value={field.value}
-                    data-testid="select-payout-rail-type"
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select payout method" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {payoutRailsData?.payoutRails?.map((rail) => (
-                        <SelectItem key={rail.id} value={rail.payoutRailType}>
-                          {rail.payoutRailType.replace(/_/g, " ")} - {rail.provider}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Account Holder Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} placeholder="Full name as per account" data-testid="input-account-holder-name" />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {selectedRail && selectedRail.requiresKycLevel !== "NONE" && (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  This payout method requires <strong>{selectedRail.requiresKycLevel}</strong> KYC verification. 
-                  Please ensure your KYC documents are submitted and verified before using this method.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {selectedRailType && (
+            {showMobileWalletFields && (
               <>
                 <FormField
                   control={form.control}
-                  name="accountHolderName"
+                  name="mobileWalletProvider"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Account Holder Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Full name as per account" data-testid="input-account-holder-name" />
-                      </FormControl>
+                      <FormLabel>Wallet Provider</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} data-testid="select-wallet-provider">
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select provider" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="bKash">bKash</SelectItem>
+                          <SelectItem value="Nagad">Nagad</SelectItem>
+                          <SelectItem value="Rocket">Rocket</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                {showMobileMoneyFields && (
-                  <FormField
-                    control={form.control}
-                    name="accountNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Mobile Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="01XXXXXXXXX" data-testid="input-mobile-number" />
-                        </FormControl>
-                        <FormDescription>
-                          Enter your {form.watch("provider")} registered mobile number
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                {showBankFields && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="bankName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Bank Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="e.g., Dutch Bangla Bank" data-testid="input-bank-name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="accountNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Account Number</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Enter account number" data-testid="input-account-number" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {selectedCountry === "BD" && (
-                      <FormField
-                        control={form.control}
-                        name="branchCode"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Branch Code (Optional)</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="Branch code" data-testid="input-branch-code" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
-                    {selectedCountry === "US" && (
-                      <FormField
-                        control={form.control}
-                        name="routingNumber"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Routing Number</FormLabel>
-                            <FormControl>
-                              <Input {...field} placeholder="9-digit routing number" data-testid="input-routing-number" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-                  </>
-                )}
-
                 <FormField
                   control={form.control}
-                  name="currency"
+                  name="mobileWalletNumber"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Currency</FormLabel>
+                      <FormLabel>Mobile Wallet Number</FormLabel>
                       <FormControl>
-                        <Input {...field} disabled data-testid="input-currency" />
+                        <Input {...field} placeholder="01XXXXXXXXX" data-testid="input-mobile-wallet-number" />
                       </FormControl>
-                      <FormDescription>Currency is automatically set based on country</FormDescription>
+                      <FormDescription>
+                        Enter your {form.watch("mobileWalletProvider") || "mobile wallet"} registered number
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </>
             )}
+
+            {showBankFields && (
+              <>
+                <FormField
+                  control={form.control}
+                  name="bankName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Bank Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., Dutch Bangla Bank" data-testid="input-bank-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="accountNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter account number" data-testid="input-account-number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {selectedCountry === "US" && (
+                  <FormField
+                    control={form.control}
+                    name="routingNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Routing Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="9-digit routing number" data-testid="input-routing-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {selectedCountry === "US" && (
+                  <FormField
+                    control={form.control}
+                    name="swiftCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>SWIFT Code (Optional)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="SWIFT/BIC code" data-testid="input-swift-code" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </>
+            )}
+
+            <FormField
+              control={form.control}
+              name="currency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Currency</FormLabel>
+                  <FormControl>
+                    <Input {...field} disabled data-testid="input-currency" />
+                  </FormControl>
+                  <FormDescription>Currency is automatically set based on country</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </>
         )}
 
         <div className="flex justify-end gap-2 pt-4">
           <Button
             type="submit"
-            disabled={createMutation.isPending || !selectedRailType}
+            disabled={createMutation.isPending || !selectedPayoutType}
             data-testid="button-submit-payout-method"
           >
             {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Add Payout Method
+            Add Payout Account
           </Button>
         </div>
       </form>

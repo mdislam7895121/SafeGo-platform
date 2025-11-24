@@ -12,13 +12,13 @@ import AddPayoutMethodForm from "@/components/restaurant/AddPayoutMethodForm";
 
 interface PayoutMethod {
   id: string;
-  payoutRailType: string;
-  provider: string;
-  currency: string;
-  countryCode: string;
-  maskedDetails: string;
-  status: string;
+  payoutType: string;
+  provider: string | null;
+  displayName: string;
+  accountHolderName: string;
+  maskedAccount: string;
   isDefault: boolean;
+  status: string;
   createdAt: string;
 }
 
@@ -26,52 +26,29 @@ export default function PayoutMethodsPage() {
   const { toast } = useToast();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
 
-  // Fetch payout methods
-  const { data, isLoading } = useQuery<{ payoutMethods: PayoutMethod[] }>({
-    queryKey: ["/api/restaurants/me/payout-methods"],
+  // Fetch payout methods using unified API
+  const { data, isLoading } = useQuery<{ methods: PayoutMethod[] }>({
+    queryKey: ["/api/payout/methods"],
   });
 
-  // Set as default mutation
-  const setDefaultMutation = useMutation({
+  // Delete mutation (DELETE endpoint instead of set-default/deactivate)
+  const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/restaurants/me/payout-methods/${id}/set-default`, {
-        method: "POST",
+      return apiRequest(`/api/payout/methods/${id}`, {
+        method: "DELETE",
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurants/me/payout-methods"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payout/methods"] });
       toast({
         title: "Success",
-        description: "Default payout method updated successfully",
+        description: "Payout method removed successfully",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update default payout method",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Disable mutation
-  const disableMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest(`/api/restaurants/me/payout-methods/${id}/disable`, {
-        method: "POST",
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/restaurants/me/payout-methods"] });
-      toast({
-        title: "Success",
-        description: "Payout method disabled successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to disable payout method",
+        description: error.message || "Failed to remove payout method",
         variant: "destructive",
       });
     },
@@ -79,25 +56,25 @@ export default function PayoutMethodsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "ACTIVE":
+      case "active":
         return (
           <Badge variant="default" className="gap-1" data-testid={`badge-status-active`}>
             <CheckCircle2 className="h-3 w-3" />
             Active
           </Badge>
         );
-      case "PENDING_VERIFICATION":
+      case "pending_verification":
         return (
           <Badge variant="secondary" className="gap-1" data-testid={`badge-status-pending`}>
             <Clock className="h-3 w-3" />
             Pending
           </Badge>
         );
-      case "DISABLED":
+      case "inactive":
         return (
-          <Badge variant="outline" className="gap-1" data-testid={`badge-status-disabled`}>
+          <Badge variant="outline" className="gap-1" data-testid={`badge-status-inactive`}>
             <Ban className="h-3 w-3" />
-            Disabled
+            Inactive
           </Badge>
         );
       default:
@@ -105,8 +82,8 @@ export default function PayoutMethodsPage() {
     }
   };
 
-  const getPayoutIcon = (railType: string) => {
-    if (railType.includes("BANK") || railType.includes("ACH")) {
+  const getPayoutIcon = (payoutType: string) => {
+    if (payoutType === "bank_account" || payoutType === "stripe_connect") {
       return <CreditCard className="h-5 w-5 text-muted-foreground" />;
     }
     return <Wallet className="h-5 w-5 text-muted-foreground" />;
@@ -150,20 +127,20 @@ export default function PayoutMethodsPage() {
             </Card>
           ))}
         </div>
-      ) : data?.payoutMethods && data.payoutMethods.length > 0 ? (
+      ) : data?.methods && data.methods.length > 0 ? (
         <div className="space-y-3">
-          {data.payoutMethods.map((method) => (
+          {data.methods.map((method) => (
             <Card key={method.id} data-testid={`card-payout-method-${method.id}`}>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
                     <div className="flex items-center justify-center w-12 h-12 rounded-full bg-muted">
-                      {getPayoutIcon(method.payoutRailType)}
+                      {getPayoutIcon(method.payoutType)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold" data-testid={`text-payout-provider-${method.id}`}>
-                          {method.provider}
+                        <h3 className="font-semibold" data-testid={`text-account-holder-${method.id}`}>
+                          {method.accountHolderName}
                         </h3>
                         {method.isDefault && (
                           <Badge variant="outline" className="text-xs" data-testid={`badge-default-${method.id}`}>
@@ -172,64 +149,44 @@ export default function PayoutMethodsPage() {
                         )}
                         {getStatusBadge(method.status)}
                       </div>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-masked-details-${method.id}`}>
-                        {method.maskedDetails}
+                      <p className="text-sm text-muted-foreground" data-testid={`text-masked-account-${method.id}`}>
+                        {method.displayName || method.provider || method.payoutType.replace(/_/g, " ")} ****{method.maskedAccount}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {method.payoutRailType} • {method.currency} • {method.countryCode}
+                        {method.payoutType.replace(/_/g, " ").toUpperCase()}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {!method.isDefault && method.status === "ACTIVE" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setDefaultMutation.mutate(method.id)}
-                        disabled={setDefaultMutation.isPending}
-                        data-testid={`button-set-default-${method.id}`}
-                      >
-                        Set as Default
-                      </Button>
-                    )}
-                    {method.status !== "DISABLED" && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={disableMutation.isPending}
-                            data-testid={`button-disable-${method.id}`}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={deleteMutation.isPending}
+                          data-testid={`button-delete-${method.id}`}
+                        >
+                          <Ban className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove Payout Method?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently remove <strong>{method.accountHolderName} (****{method.maskedAccount})</strong> from your payout methods. This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel data-testid={`button-cancel-delete-${method.id}`}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMutation.mutate(method.id)}
+                            data-testid={`button-confirm-delete-${method.id}`}
                           >
-                            <Ban className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Disable Payout Method?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will disable <strong>{method.maskedDetails}</strong>. You won't be able to receive payouts to this method until you re-enable it.
-                              {method.isDefault && (
-                                <span className="block mt-2 text-orange-600 dark:text-orange-400">
-                                  <AlertCircle className="h-4 w-4 inline mr-1" />
-                                  This is your default payout method. Please set another method as default before disabling.
-                                </span>
-                              )}
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel data-testid={`button-cancel-disable-${method.id}`}>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => disableMutation.mutate(method.id)}
-                              disabled={method.isDefault}
-                              data-testid={`button-confirm-disable-${method.id}`}
-                            >
-                              Disable Method
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
+                            Remove Method
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   </div>
                 </div>
               </CardContent>
