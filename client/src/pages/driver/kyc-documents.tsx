@@ -105,7 +105,7 @@ export default function DriverKYCDocuments() {
 
   // Upload mutations
   const uploadProfilePhotoMutation = useMutation({
-    mutationFn: async (file: File) => uploadFile("/api/driver/upload/profile-photo", "profilePhoto", file),
+    mutationFn: async (file: File) => uploadFile("/api/driver/upload/profile-photo", "file", file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
     },

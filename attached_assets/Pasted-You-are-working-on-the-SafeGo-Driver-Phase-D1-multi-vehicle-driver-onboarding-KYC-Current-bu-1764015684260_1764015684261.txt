@@ -1,0 +1,90 @@
+You are working on the SafeGo Driver Phase D1 (multi-vehicle + driver onboarding + KYC).
+
+Current bug to fix (high priority):
+
+Context:
+- App: SafeGo Driver web app.
+- Route: /driver/kyc-documents
+- All KYC document uploads (insurance, inspection, license, plate, TLC) are working.
+- Only the **Profile Photo** upload is failing.
+- UI shows red toast: `Upload failed {"message":"Unexpected field"}` as soon as we try to upload the profile photo.
+- Other driver uploads (for example driver profile photo in /driver/account/manage) are already working after your previous fixes.
+
+What this means:
+- The backend upload middleware (likely Multer) does not recognize the form field name used for the profile photo on /driver/kyc-documents.
+- Either the frontend is sending a different field name than the backend expects, or the profile photo field is missing from the Multer `.single()` / `.array()` / `.fields()` configuration for that endpoint.
+
+Your tasks:
+
+1. Locate the exact API endpoint used by the KYC "Profile Photo" upload on `/driver/kyc-documents`.
+   - Frontend file is probably `client/src/pages/driver/kyc-documents.tsx`.
+   - Find the mutation or handler that is called when the user uploads the profile photo on this page.
+   - Identify:
+     - The request URL (POST path)
+     - The HTTP method (POST)
+     - The multipart field name used on the frontend (e.g. "profilePhoto", "file", "kycProfilePhoto", etc.).
+
+2. Find the backend handler and upload middleware for this route.
+   - Likely in `server/routes/driver.ts` or a KYC-specific route file.
+   - Also inspect `server/middleware/upload.ts` or any shared upload middleware.
+   - Identify which Multer configuration is applied to this endpoint and which field names it allows.
+
+3. Fix the "Unexpected field" error by aligning the field names:
+   - Make sure the **same field name** is used:
+     - In the React/TSX form on `/driver/kyc-documents` for profile photo.
+     - In the Multer configuration (single/array/fields) for the corresponding backend endpoint.
+   - Preferred approach:
+     - Reuse the same secure upload pipeline you already use for the **driver profile photo** on `/driver/account/manage`, but scoped here as a KYC profile photo upload if needed.
+   - Ensure the profile photo upload for KYC respects:
+     - Authenticated driver only (driver role, not restaurant).
+     - Ownership checking (driver can only upload their own photo).
+     - Same file size and type limits as other KYC image uploads (max 5MB, image mime types only).
+     - Existing filename sanitization and safe storage path.
+
+4. Do NOT break any existing behavior:
+   - Restaurant uploads must keep working as-is.
+   - Existing driver profile photo upload in `/driver/account/manage` must continue to work.
+   - All other KYC document uploads on `/driver/kyc-documents` must continue to work.
+   - Keep all SafeGo security rules:
+     - No unauthenticated upload.
+     - No path traversal.
+     - Do not expose raw storage paths publicly. Use the same pattern you already implemented in D1-IMG.
+
+5. Improve error handling for this endpoint:
+   - Make sure the backend always returns a JSON object with either:
+     - `{ success: true, ... }` on success, or
+     - `{ success: false, message: "..." }` on failure.
+   - In the frontend `/driver/kyc-documents.tsx`, update the mutation to:
+     - Check for `response.ok` and for `json.success === true`.
+     - Show a clear toast message on failure using the backend `message` if available, instead of crashing on `null` or malformed payloads.
+
+6. Manual testing you MUST perform and confirm in your summary:
+   - Start the dev server and open the driver app as a logged-in driver.
+   - Go to `/driver/kyc-documents`.
+   - Upload a valid profile photo (jpg/png, < 5MB).
+   - Expected:
+     - No more `{"message":"Unexpected field"}` toast.
+     - A green success toast for profile photo upload.
+     - After refresh, the uploaded photo should appear where the KYC profile photo is expected.
+   - Verify that:
+     - Other KYC documents on this page still upload correctly.
+     - Driver profile photo upload on `/driver/account/manage` still works.
+     - Restaurant image uploads are unaffected.
+
+7. Documentation:
+   - Update `replit.md` with a short "D1-KYC-PROFILE-PHOTO FIX" section:
+     - Mention the correct endpoint.
+     - The accepted multipart field name for the KYC profile photo.
+     - Security validations applied.
+     - Any known limitations deferred to later hardening phases.
+
+8. Safety / Security reminders:
+   - Do not weaken any RBAC/KYC checks.
+   - Keep the SafeGo principles:
+     - Driver must complete KYC steps before going online.
+     - Admin can still review or revoke drivers without breaking uploads.
+
+Finally, reply with:
+- A short summary of what you changed.
+- The final backend route signature and field name for the KYC profile photo upload.
+- Confirmation that the error "Upload failed {\"message\":\"Unexpected field\"}" no longer appears when uploading a valid profile photo on `/driver/kyc-documents`.

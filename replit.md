@@ -57,6 +57,15 @@ Core systems and features include:
 - **Files Fixed**: manage.tsx, address.tsx, vehicle.tsx, navigation.tsx, privacy.tsx, language.tsx, work-hub.tsx, notifications.tsx, dark-mode.tsx, payout-methods.tsx, tax-info-edit.tsx, blocked-users.tsx, kyc-documents.tsx, support-chat.tsx, wallet.tsx
 - **Impact**: Eliminated "Cannot read properties of null (reading 'json'/'status')" errors across entire driver account experience
 
+**D1-KYC-PROFILE-PHOTO: Field Name Mismatch Fix (COMPLETED)**
+- **Issue**: KYC documents page profile photo upload failed with `{"message":"Unexpected field"}` error
+- **Root Cause**: Frontend (kyc-documents.tsx) sent field name "profilePhoto" but backend Multer middleware expected "file"
+- **Fix**: Updated kyc-documents.tsx to use "file" field name, matching the existing working pattern in manage.tsx
+- **Endpoint**: POST /api/driver/upload/profile-photo
+- **Field Name**: "file" (multipart form field)
+- **Security**: Driver-only authentication, 5MB limit, image types only (JPEG, PNG, WebP)
+- **Impact**: Profile photo upload now works on both /driver/kyc-documents and /driver/account/manage pages
+
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, and multi-role support models. It supports country-specific identity fields with AES-256-GCM encryption and includes flags for demo mode, US tax fields, driver preferences, and enhancements for promotions/coupons and review replies.
 
