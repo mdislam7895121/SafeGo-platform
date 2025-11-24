@@ -1,0 +1,138 @@
+SafeGo Eats – Staff Management page responsive & layout polish (restaurant portal only)
+
+GOAL
+Please clean up and redesign the Staff Management page UI at `/restaurant/staff` so that:
+- The page looks organized and professional.
+- The Staff list and Add Staff form are fully usable on mobile, tablet, and laptop.
+- No backend, routing, KYC, RBAC, or API behavior is changed.
+- All existing functionality (staff counts, permissions, activity log, add staff, etc.) continues to work as before.
+
+SCOPE
+1. Page: Restaurant portal Staff Management
+   - URL: `/restaurant/staff`
+2. Keep as-is:
+   - Global restaurant header (logo, Online toggle, restaurant identity block, search bar, notifications, profile avatar).
+   - Online/Offline toggle design and position.
+   - SafeGuard and KYC gating rules.
+   - All existing actions: Activity Log, Add Staff, staff counters, permissions toggles.
+3. You may adjust ONLY:
+   - Layout, spacing, alignment, typography, and responsive behavior of the Staff Management content area.
+   - Visual structure of the staff summary cards and Add Staff form (without changing the underlying data or endpoints).
+
+A. STAFF MANAGEMENT HEADER BLOCK (BELOW GLOBAL HEADER)
+1. Keep a single, clear section header:
+   - Title: “Staff Management”
+   - Subtitle: “Manage your restaurant staff and their permissions”
+2. Alignment:
+   - Left-aligned with the “mohammad” restaurant identity text block.
+   - On mobile, title should not wrap awkwardly; use max-width and proper line-height.
+3. Actions on the right:
+   - Keep the existing “Activity Log” and “Add Staff” controls.
+   - Layout on desktop:
+     - Right-aligned in the same row as “Staff Management”.
+     - Use horizontal spacing between Activity Log and Add Staff.
+   - Layout on mobile:
+     - Place Activity Log and Add Staff in a horizontal row under the title, but still within the same header section.
+4. Spacing:
+   - Top padding: 16–20px below the search bar.
+   - Bottom margin: 16–20px before the first content card (Total Staff, etc.).
+
+B. STAFF SUMMARY CARDS LAYOUT
+1. Summary cards: Total Staff, Active, Blocked (and any others) must:
+   - Stay in a clean card layout.
+   - Use consistent margins and padding.
+2. Desktop / wide screens:
+   - Use a responsive grid (e.g., 2–3 cards per row depending on width).
+3. Mobile:
+   - Single-column layout (one card per row).
+   - Full-width cards with 16px horizontal padding from screen edges.
+4. Ensure:
+   - No horizontal scroll on any breakpoint.
+   - Cards never overlap or get clipped by the keyboard.
+
+C. ADD STAFF FORM – RESPONSIVE & USABLE
+This is the main problem area on mobile right now. Fix it carefully.
+
+1. Form fields (Email, Phone, Temporary Password, etc.):
+   - On mobile and tablet:
+     - Single column layout.
+     - Labels above inputs, 14–16px font, left-aligned.
+     - Each input has enough vertical spacing (at least 12–16px margin between fields).
+   - On desktop:
+     - You may keep a 2-column layout where appropriate (e.g., Email + Phone side by side) as long as it never breaks on smaller screens.
+
+2. Permissions section:
+   - Ensure the “Permissions” title remains clearly visible above the list of toggles.
+   - Each permission line (e.g., Edit Categories, Edit Menu Items, Toggle Availability, Use Bulk Tools, View Analytics, View Payouts, Manage Orders, etc.) should:
+     - Use a two-column row:
+       - Left: permission label text.
+       - Right: toggle switch aligned vertically centered.
+   - On mobile:
+     - No text should be hidden behind the on-screen keyboard.
+     - The user must be able to scroll to the bottom of the form without any overlap.
+
+3. Scrolling behavior:
+   - When the keyboard is open on mobile:
+     - The page MUST be scrollable so that all fields (including the last permissions toggle and submit button) can be reached.
+   - Avoid fixed heights that cause the lower part of the form to be cut off.
+
+4. Submit / Save button:
+   - Place the primary action button immediately AFTER the permissions section.
+   - Ensure there is at least 16–24px padding below the button so it is not flush with the screen bottom.
+   - Button must be full-width on mobile; appropriate width on desktop.
+
+D. LAYOUT STRUCTURE BY BREAKPOINT
+
+1. Mobile (up to ~768px):
+   - Order:
+     1) Global restaurant header (already implemented – do not change).
+     2) Staff Management header block (title + subtitle + Activity Log / Add Staff).
+     3) Staff summary cards.
+     4) Add Staff form.
+   - All in a single vertical column.
+   - 16px horizontal page padding.
+   - No overlapping between search bar, tabs, headings, and the form.
+
+2. Tablet (~768–1024px):
+   - Same order as mobile.
+   - You may use 2 columns for summary cards.
+   - Add Staff form remains a single column for clarity.
+
+3. Desktop (>1024px):
+   - Option A (preferred):
+     - Keep a 2-column layout for the main content:
+       - Left: Staff summary cards and list.
+       - Right: Add Staff form card.
+     - Ensure spacing between columns and equal top alignment under the Staff Management header.
+   - The design must remain clean and not introduce any new headers.
+
+E. DO NOT DO
+- Do NOT modify any backend code, APIs, or data models.
+- Do NOT change routing or URLs.
+- Do NOT rename React components or files.
+- Do NOT change Online/Offline toggle logic or SafeGuard/KYC logic.
+- Do NOT remove or disable any existing staff-related functionality (Activity Log, Add Staff, staff counts, permissions).
+- Do NOT introduce new navigation items.
+
+F. ACCESSIBILITY & QUALITY
+1. Ensure:
+   - All form fields keep proper labels and focus styles.
+   - All toggles remain keyboard accessible (Tab + Space/Enter).
+2. No horizontal scroll on:
+   - `/restaurant/staff` on mobile, tablet, desktop.
+3. Font sizes and line height should be consistent with the rest of the restaurant portal.
+
+G. FINAL VERIFICATION
+After implementing:
+1. Test `/restaurant/staff` on:
+   - Narrow mobile viewport.
+   - Tablet viewport.
+   - Desktop viewport.
+2. Confirm:
+   - Staff Management header looks clean and aligned with the new Online toggle design.
+   - Staff summary cards do not overlap and remain readable.
+   - Add Staff form is fully usable on mobile with the keyboard open (all fields and the submit button reachable by scrolling).
+   - Permissions list and toggles are fully visible and not cut off.
+   - No layout regressions on other restaurant pages (dashboard, orders, menu, payouts, support, etc.).
+
+This task is a pure UI/responsive cleanup for the Staff Management page. Do not alter any underlying business logic, permissions, or security behavior.
