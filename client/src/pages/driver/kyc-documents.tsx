@@ -200,6 +200,44 @@ const VEHICLE_MODELS = [
   "Audi Q7",
   "Audi Q3",
   "Audi e-tron",
+  // Acura
+  "Acura TLX",
+  "Acura MDX",
+  "Acura RDX",
+  "Acura Integra",
+  "Acura ILX",
+  // Infiniti
+  "Infiniti Q50",
+  "Infiniti QX60",
+  "Infiniti QX80",
+  "Infiniti QX50",
+  // Cadillac
+  "Cadillac Escalade",
+  "Cadillac XT5",
+  "Cadillac XT4",
+  "Cadillac CT5",
+  // GMC
+  "GMC Sierra",
+  "GMC Yukon",
+  "GMC Terrain",
+  "GMC Acadia",
+  // Ram
+  "Ram 1500",
+  "Ram 2500",
+  "Ram 3500",
+  // Buick
+  "Buick Enclave",
+  "Buick Encore",
+  "Buick Envision",
+  // Lincoln
+  "Lincoln Navigator",
+  "Lincoln Aviator",
+  "Lincoln Corsair",
+  // Volvo
+  "Volvo XC90",
+  "Volvo XC60",
+  "Volvo S60",
+  "Volvo V60",
   // Other
   "Other",
 ] as const;
