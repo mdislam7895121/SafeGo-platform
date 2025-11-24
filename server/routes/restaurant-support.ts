@@ -647,4 +647,216 @@ router.post("/support/tickets/:id/proposed-resolution", async (req: AuthRequest,
   }
 });
 
+/**
+ * ===========================
+ * RESTAURANT SUPPORT CENTER ROUTES
+ * (Phase 12.5: General support tickets for restaurant-initiated requests)
+ * ===========================
+ */
+
+import { restaurantSupportService } from "../services/RestaurantSupportService";
+
+/**
+ * GET /api/restaurant/support-center/tickets
+ * List restaurant's support center tickets (general support requests)
+ */
+router.get("/support-center/tickets", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, restaurantName: true }
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const tickets = await restaurantSupportService.listTickets(restaurantProfile.id);
+
+    return res.json({ tickets });
+  } catch (error) {
+    console.error("Error listing support center tickets:", error);
+    return res.status(500).json({ error: "Failed to list tickets" });
+  }
+});
+
+/**
+ * GET /api/restaurant/support-center/tickets/:id
+ * Get specific support center ticket with messages
+ */
+router.get("/support-center/tickets/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, restaurantName: true }
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const ticket = await restaurantSupportService.getTicketById(ticketId, restaurantProfile.id);
+
+    return res.json({ ticket });
+  } catch (error: any) {
+    console.error("Error getting support center ticket:", error);
+    if (error.message === "Access denied: You can only view your own tickets") {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.message === "Ticket not found") {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to get ticket" });
+  }
+});
+
+/**
+ * POST /api/restaurant/support-center/tickets
+ * Create a new support center ticket
+ */
+router.post("/support-center/tickets", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const { subject, category, priority, description, channel, attachmentUrls } = req.body;
+
+    if (!subject || !category || !description) {
+      return res.status(400).json({ error: "Subject, category, and description are required" });
+    }
+
+    const [restaurantProfile, user] = await Promise.all([
+      prisma.restaurantProfile.findUnique({
+        where: { userId },
+        select: { id: true, restaurantName: true }
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      })
+    ]);
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const ticket = await restaurantSupportService.createTicket({
+      restaurantId: restaurantProfile.id,
+      subject,
+      category,
+      priority: priority || "normal",
+      description,
+      channel: channel || "web",
+      attachmentUrls
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: "restaurant_owner",
+        ipAddress: req.ip || "",
+        actionType: "support_ticket_created",
+        entityType: "restaurant_support_ticket",
+        entityId: ticket.id,
+        description: `Restaurant created support ticket ${ticket.ticketCode}`,
+        metadata: {
+          ticketCode: ticket.ticketCode,
+          category: ticket.category,
+          priority: ticket.priority,
+          restaurantId: restaurantProfile.id,
+          restaurantName: restaurantProfile.restaurantName
+        },
+        success: true
+      }
+    });
+
+    return res.status(201).json({ ticket });
+  } catch (error) {
+    console.error("Error creating support center ticket:", error);
+    return res.status(500).json({ error: "Failed to create ticket" });
+  }
+});
+
+/**
+ * POST /api/restaurant/support-center/tickets/:id/messages
+ * Add a message to a support center ticket
+ */
+router.post("/support-center/tickets/:id/messages", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+    const { messageBody, attachmentUrls } = req.body;
+
+    if (!messageBody || messageBody.trim().length === 0) {
+      return res.status(400).json({ error: "Message body is required" });
+    }
+
+    const [restaurantProfile, user] = await Promise.all([
+      prisma.restaurantProfile.findUnique({
+        where: { userId },
+        select: { id: true, restaurantName: true }
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true }
+      })
+    ]);
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const message = await restaurantSupportService.addMessage({
+      ticketId,
+      restaurantId: restaurantProfile.id,
+      senderRole: "restaurant",
+      senderName: restaurantProfile.restaurantName,
+      messageBody: messageBody.trim(),
+      attachmentUrls
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: "restaurant_owner",
+        ipAddress: req.ip || "",
+        actionType: "support_ticket_message_sent",
+        entityType: "restaurant_support_ticket",
+        entityId: ticketId,
+        description: `Restaurant added message to ticket`,
+        metadata: {
+          messageId: message.id,
+          restaurantId: restaurantProfile.id,
+          restaurantName: restaurantProfile.restaurantName
+        },
+        success: true
+      }
+    });
+
+    return res.status(201).json({ message });
+  } catch (error: any) {
+    console.error("Error adding message to support center ticket:", error);
+    if (error.message.includes("Access denied")) {
+      return res.status(403).json({ error: error.message });
+    }
+    if (error.message === "Ticket not found") {
+      return res.status(404).json({ error: error.message });
+    }
+    return res.status(500).json({ error: "Failed to add message" });
+  }
+});
+
 export default router;
