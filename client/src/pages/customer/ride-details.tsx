@@ -7,24 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { DriverPreviewCard } from "@/components/DriverPreviewCard";
-
-type DriverPublicProfile = {
-  name: string;
-  pronouns: string | null;
-  profilePhotoUrl: string | null;
-  vehicle: {
-    type: string;
-    model: string;
-    color: string;
-    plateNumber: string;
-  } | null;
-  stats: {
-    totalRides: number;
-    rating: number;
-    yearsActive: number;
-  };
-};
+import { DriverPreviewCard, DriverPublicProfile } from "@/components/DriverPreviewCard";
 
 export default function RideDetails() {
   const { id } = useParams();
@@ -32,22 +15,23 @@ export default function RideDetails() {
 
   const { data: rideData, isLoading: isLoadingRide } = useQuery<{ ride: any }>({
     queryKey: [`/api/rides/${id}`],
-    refetchInterval: 5000, // Refresh every 5 seconds for live updates
+    refetchInterval: 5000,
   });
 
-  // Fetch driver public profile when driver is assigned
   const ride = rideData?.ride;
   const driverProfileId = ride?.driver?.id;
 
   const { data: driverProfile, isLoading: isLoadingDriver } = useQuery<DriverPublicProfile>({
-    queryKey: [`/api/driver/public-profile/${driverProfileId}`],
-    enabled: !!driverProfileId, // Only fetch when driver is assigned
+    queryKey: ['/api/driver/public-profile', driverProfileId],
+    enabled: !!driverProfileId,
   });
 
   const cancelMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("PATCH", `/api/rides/${id}/status`, {
-        status: "cancelled_by_customer",
+      await apiRequest(`/api/rides/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled_by_customer" }),
       });
     },
     onSuccess: () => {
@@ -115,7 +99,6 @@ export default function RideDetails() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <div className="bg-primary text-primary-foreground p-6 sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <Link href="/customer/activity">
@@ -133,7 +116,6 @@ export default function RideDetails() {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Status Card */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -166,12 +148,10 @@ export default function RideDetails() {
           </CardContent>
         </Card>
 
-        {/* Driver Public Profile - D2 Implementation */}
         {ride.driver && driverProfile && !isLoadingDriver && (
-          <DriverPreviewCard profile={driverProfile} />
+          <DriverPreviewCard profile={driverProfile} show3DPreview={true} />
         )}
 
-        {/* Loading state for driver profile */}
         {ride.driver && isLoadingDriver && (
           <Card>
             <CardContent className="p-6 space-y-4">
@@ -188,7 +168,6 @@ export default function RideDetails() {
           </Card>
         )}
 
-        {/* Payment Info */}
         <Card>
           <CardHeader>
             <CardTitle>Payment Details</CardTitle>
@@ -217,7 +196,6 @@ export default function RideDetails() {
           </CardContent>
         </Card>
 
-        {/* Actions */}
         {canCancel(ride.status) && (
           <Button
             variant="destructive"

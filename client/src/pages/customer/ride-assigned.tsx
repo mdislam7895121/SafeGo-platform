@@ -4,43 +4,24 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DriverPreviewCard } from "@/components/DriverPreviewCard";
-import { ArrowLeft, MapPin, Navigation, Clock, DollarSign } from "lucide-react";
-
-type DriverPublicProfile = {
-  name: string;
-  pronouns: string | null;
-  profilePhotoUrl: string | null;
-  vehicle: {
-    type: string;
-    model: string;
-    color: string;
-    plateNumber: string;
-  } | null;
-  stats: {
-    totalRides: number;
-    rating: number;
-    yearsActive: number;
-  };
-};
+import { DriverPreviewCard, DriverPublicProfile } from "@/components/DriverPreviewCard";
+import { ArrowLeft, MapPin, Navigation, Clock, DollarSign, Phone, MessageCircle } from "lucide-react";
 
 export default function RideAssigned() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/customer/ride-assigned/:id");
   const id = params?.id;
 
-  // Fetch ride details
   const { data: rideData, isLoading: isLoadingRide } = useQuery<{ ride: any }>({
     queryKey: [`/api/rides/${id}`],
-    refetchInterval: 5000, // Refresh every 5 seconds for live updates
+    refetchInterval: 5000,
   });
 
   const ride = rideData?.ride;
   const driverProfileId = ride?.driver?.id;
 
-  // Fetch driver public profile
   const { data: driverProfile, isLoading: isLoadingDriver } = useQuery<DriverPublicProfile>({
-    queryKey: [`/api/driver/public-profile/${driverProfileId}`],
+    queryKey: ['/api/driver/public-profile', driverProfileId],
     enabled: !!driverProfileId,
   });
 
@@ -72,52 +53,68 @@ export default function RideAssigned() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setLocation("/customer/activity")}
-            data-testid="button-back"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">Driver Assigned!</h1>
-            <p className="text-sm text-muted-foreground">Your driver is on the way</p>
+    <div className="min-h-screen bg-background">
+      <div className="bg-gradient-to-r from-green-600 to-green-500 text-white p-6 sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation("/customer/activity")}
+              className="text-white hover:bg-white/10"
+              data-testid="button-back"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-2xl font-bold">Driver Assigned!</h1>
+              <p className="text-sm text-white/80">Your driver is on the way</p>
+            </div>
+            <Badge variant="secondary" className="bg-white/20 text-white border-0" data-testid="badge-status">
+              In Progress
+            </Badge>
           </div>
-          <Badge variant="default" data-testid="badge-status">
-            In Progress
-          </Badge>
         </div>
+      </div>
 
-        {/* Driver Profile Card */}
+      <div className="max-w-2xl mx-auto p-4 space-y-6">
         {driverProfileId && (
           <>
             {isLoadingDriver ? (
               <Card>
                 <CardContent className="p-6">
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-20 w-20 rounded-full" />
+                  <div className="flex items-center gap-4">
+                    <Skeleton className="h-24 w-24 rounded-full" />
                     <div className="flex-1 space-y-2">
-                      <Skeleton className="h-6 w-48" />
+                      <Skeleton className="h-8 w-48" />
                       <Skeleton className="h-4 w-64" />
                       <Skeleton className="h-4 w-40" />
                     </div>
                   </div>
+                  <Skeleton className="h-[180px] w-full mt-4" />
+                  <Skeleton className="h-16 w-full mt-4" />
                 </CardContent>
               </Card>
             ) : driverProfile ? (
-              <DriverPreviewCard profile={driverProfile} />
+              <DriverPreviewCard profile={driverProfile} show3DPreview={true} />
             ) : null}
           </>
         )}
 
-        {/* Ride Details */}
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" data-testid="button-call">
+            <Phone className="h-4 w-4 mr-2" />
+            Call Driver
+          </Button>
+          <Button variant="outline" className="flex-1" data-testid="button-message">
+            <MessageCircle className="h-4 w-4 mr-2" />
+            Message
+          </Button>
+        </div>
+
         <Card>
           <CardHeader>
-            <CardTitle>Ride Details</CardTitle>
+            <CardTitle className="text-lg">Ride Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-start gap-3">
@@ -143,7 +140,7 @@ export default function RideAssigned() {
             <div className="flex items-center gap-3 pt-4 border-t">
               <DollarSign className="h-5 w-5 text-muted-foreground" />
               <div className="flex-1">
-                <p className="text-sm text-muted-foreground">Fare</p>
+                <p className="text-sm text-muted-foreground">Estimated Fare</p>
                 <p className="text-lg font-bold" data-testid="text-fare">
                   ${Number(ride.serviceFare).toFixed(2)}
                 </p>
