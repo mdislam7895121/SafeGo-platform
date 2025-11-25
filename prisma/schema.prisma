@@ -260,6 +260,16 @@ model DriverProfile {
   notifyEmailTips       Boolean?           @default(false)
   preferredLanguage     String?            @default("en") // en, bn, es, fr, ar
   themePreference       String?            @default("system") // light, dark, system
+  // D14: Extended Driver Preferences
+  notifySms             Boolean?           @default(true)  // SMS notifications enabled
+  notifyPush            Boolean?           @default(true)  // Push notifications enabled
+  preferShortTrips      Boolean?           @default(false) // Short-trip mode preference
+  avoidHighways         Boolean?           @default(false) // Avoid highways in navigation
+  weeklyPayoutDay       String?            @default("friday") // monday, tuesday, wednesday, thursday, friday
+  instantPayoutEnabled  Boolean?           @default(false) // Instant payout enabled
+  shareTripStatus       Boolean?           @default(true)  // Share trip status with emergency contacts
+  emergencyShortcutEnabled Boolean?        @default(true)  // Emergency shortcut enabled
+  regionPreference      String?            @default("auto") // auto, us, bd, etc.
   deliveries            Delivery[]
   driverComplaints      DriverComplaint[]
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
