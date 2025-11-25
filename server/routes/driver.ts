@@ -5452,7 +5452,59 @@ function serializePromotion(promo: any) {
   };
 }
 
+// Helper function to get promotion status for driver
+function getPromotionStatusForDriver(promo: any, progress: any, selectedDate: Date): {
+  status: 'eligible' | 'in_progress' | 'completed' | 'expired';
+  rewardSummary: string;
+} {
+  const now = new Date();
+  const promoEnd = new Date(promo.endAt);
+  
+  // Check if expired
+  if (promoEnd < now) {
+    return { status: 'expired', rewardSummary: '' };
+  }
+  
+  // Build reward summary
+  let rewardSummary = '';
+  const reward = parseFloat(promo.rewardPerUnit) || 0;
+  
+  if (promo.type === 'PER_TRIP_BONUS') {
+    rewardSummary = `+$${reward.toFixed(2)} per trip`;
+    if (promo.maxRewardPerDriver) {
+      const maxTrips = Math.floor(parseFloat(promo.maxRewardPerDriver) / reward);
+      rewardSummary += ` (up to ${maxTrips} trips)`;
+    }
+  } else if (promo.type === 'QUEST_TRIPS') {
+    rewardSummary = `Complete ${promo.targetTrips} trips for $${reward.toFixed(2)} bonus`;
+  } else if (promo.type === 'EARNINGS_THRESHOLD') {
+    const target = parseFloat(promo.targetEarnings) || 0;
+    rewardSummary = `Earn $${target.toFixed(2)} to get $${reward.toFixed(2)} bonus`;
+  }
+  
+  // Determine status based on progress
+  if (!progress) {
+    return { status: 'eligible', rewardSummary };
+  }
+  
+  // Check if quest is completed
+  if (promo.type === 'QUEST_TRIPS' && promo.targetTrips && progress.currentTrips >= promo.targetTrips) {
+    return { status: 'completed', rewardSummary };
+  }
+  if (promo.type === 'EARNINGS_THRESHOLD' && promo.targetEarnings && parseFloat(progress.currentEarnings) >= parseFloat(promo.targetEarnings)) {
+    return { status: 'completed', rewardSummary };
+  }
+  
+  // Has progress but not completed
+  if (progress.currentTrips > 0 || parseFloat(progress.currentEarnings) > 0) {
+    return { status: 'in_progress', rewardSummary };
+  }
+  
+  return { status: 'eligible', rewardSummary };
+}
+
 // GET /api/driver/promotions/active - Get active promotions for current driver
+// Supports optional ?date=YYYY-MM-DD query parameter to filter promotions active on that date
 router.get(
   "/promotions/active",
   authenticateToken,
@@ -5460,6 +5512,7 @@ router.get(
   async (req: AuthRequest, res) => {
     try {
       const userId = req.user!.userId;
+      const { date } = req.query;
 
       const driverProfile = await prisma.driverProfile.findUnique({
         where: { userId },
@@ -5473,19 +5526,37 @@ router.get(
       }
 
       const countryCode = driverProfile.user.countryCode || "US";
-      const now = new Date();
+      
+      // Parse date parameter or default to today
+      let selectedDate: Date;
+      if (date && typeof date === 'string') {
+        selectedDate = new Date(date + 'T00:00:00');
+      } else {
+        selectedDate = new Date();
+      }
+      
+      // Set to start and end of day for date-based filtering
+      const dayStart = new Date(selectedDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(selectedDate);
+      dayEnd.setHours(23, 59, 59, 999);
 
+      // Fetch promotions that overlap with the selected date
       const promotions = await prisma.driverPromotion.findMany({
         where: {
           status: "ACTIVE",
-          startAt: { lte: now },
-          endAt: { gte: now },
+          // Promotion overlaps with the selected day: startAt <= dayEnd AND endAt >= dayStart
+          startAt: { lte: dayEnd },
+          endAt: { gte: dayStart },
           OR: [
             { countryCode: null },
             { countryCode: countryCode },
           ],
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [
+          { startAt: 'asc' },
+          { createdAt: 'desc' }
+        ],
       });
 
       const filteredPromotions = promotions.filter(promo => {
@@ -5504,8 +5575,12 @@ router.get(
             },
           });
 
+          const { status, rewardSummary } = getPromotionStatusForDriver(promo, progress, selectedDate);
+
           return {
             ...serializePromotion(promo),
+            status,
+            rewardSummary,
             progress: progress ? {
               currentTrips: progress.currentTrips,
               currentEarnings: serializeDecimal(progress.currentEarnings),
@@ -5516,7 +5591,10 @@ router.get(
         })
       );
 
-      res.json({ promotions: result });
+      res.json({ 
+        date: dayStart.toISOString().split('T')[0],
+        promotions: result 
+      });
     } catch (error) {
       console.error("Error fetching active promotions:", error);
       res.status(500).json({ error: "Failed to fetch active promotions" });

@@ -1,0 +1,280 @@
+SAFEGO GLOBAL RULES (ALWAYS APPLY)
+
+1. Core Roles & Apps
+- Roles: Customer, Driver, Restaurant, Admin (Platform).
+- Apps:
+  - Customer app: rides, food, parcel, wallet, promotions.
+  - Driver app: rides, food delivery, parcel delivery, earnings, promotions.
+  - Restaurant app: menu, orders, staff, payouts.
+  - Admin app: full platform control: KYC, approvals, promotions, payouts, disputes, settings.
+
+2. Authentication, KYC & Onboarding
+- All critical actions require authenticated user with correct role.
+- Country-aware onboarding:
+  - USA drivers: SSN (masked), driver license, TLC (for NYC), background check, address, DOB, vehicle details, insurance, bank info.
+  - BD drivers: NID, driving license, address, DOB, vehicle docs, bank info / bKash/Nagad.
+- KYC statuses: pending, approved, rejected, revoked.
+- Drivers must be KYC-approved AND have at least one active vehicle to receive trips or promotions that require active status.
+
+3. Data Models (Conceptual Collections)
+- rides: all trip requests (customer ↔ driver, includes status, timestamps, prices).
+- food_orders: restaurant orders (items, restaurant, driver, status).
+- deliveries: parcel deliveries (pickup/dropoff, status).
+- promotions: all promotions/quests/bonuses configured by admin.
+- wallets: wallet balances for customer, driver, restaurant, admin pool.
+- payouts: withdrawal requests and settlement records.
+- kyc_documents: identity and vehicle docs.
+- users, driver_profiles, restaurant_profiles, vehicles: core identity and relationship tables.
+
+4. Commission & Payout Logic
+- Commission stored per-service (ride, food, parcel) and per-region.
+- Driver earnings = gross_fare - platform_commission - other applicable fees.
+- Wallet & payouts must be atomic: no state where balance changes but payout record fails, or reverse.
+- Use database transactions for multi-step financial updates.
+
+5. Status Flows (High-Level)
+- Ride statuses: requested → driver_assigned → driver_arrived → in_progress → completed / cancelled_*.
+- Order statuses: placed → accepted → being_prepared → ready_for_pickup → picked_up → delivered / cancelled_*.
+- Delivery statuses: created → driver_assigned → picked_up → in_transit → delivered / cancelled_*.
+- Promotion usage: eligible → in_progress (if quest-type) → completed → rewarded / expired.
+
+6. Security Rules
+- Always enforce role-based access control (RBAC):
+  - Drivers may only see /edit their own data, vehicles, earnings, promotions.
+  - Customers see only their own trips, orders, promotions.
+  - Restaurants only their own orders, menus, staff.
+  - Admin has privileged access with audit logging.
+- Validate all IDs (UUID format or expected type) and ownership (e.g., driver cannot view others’ promotions).
+- For uploads: validate mime type, size limit, safe path; do not trust client file names.
+- Never break existing verified flows (no destructive schema changes unless explicitly requested).
+
+7. Notifications (Conceptual)
+- For meaningful events (new promotion, quest completed, payout processed), consider:
+  - In-app notifications.
+  - Optional push/email hooks (already abstracted; just call existing notification service where available).
+
+8. Non-Breaking Changes Rule
+- Do NOT modify unrelated schema or core logic.
+- Reuse existing models/fields wherever possible.
+- If a small extension is required (e.g., adding a date field), keep it backward compatible and document it.
+
+====================================================
+TASK: D7 – Driver Promotions & Incentives – Date-linked daily promotions + professional list UI
+====================================================
+
+You are working inside the existing SafeGo codebase on Replit.
+
+Goal:
+Make the driver “Promotions & Bonuses” screen behave like Uber’s Opportunities view:
+- Top date strip (already implemented) stays as-is visually.
+- When admin configures promotions/quests per day, the driver sees those items grouped by date.
+- Selecting a date chip filters the list to show promotions valid for that day.
+- The layout is professional and mobile-first (cards per promotion, grouped under a date header).
+
+VERY IMPORTANT CONSTRAINTS:
+- Follow all SafeGo global rules above.
+- Do NOT break any existing ride/food/delivery logic, wallets, or payouts.
+- Prefer reusing the existing promotions data model and APIs; avoid schema changes unless absolutely necessary.
+- Keep changes strictly within promotions-related files and shared utilities.
+
+--------------------------------
+A. Backend – Date-Based Promotions API
+--------------------------------
+
+1) Analyze CURRENT promotions data model and APIs
+- Locate:
+  - Admin promotions endpoints (likely under /api/admin/driver-promotions or similar).
+  - Driver promotions endpoint used by /driver/promotions page.
+- Confirm what fields we already have for timing:
+  - startDate / endDate OR validFrom / validTo OR single date field.
+  - serviceType (ride, food, delivery) and maybe “zone” or “city” filters.
+- Do NOT change existing column names unless necessary; instead, adapt logic around them.
+
+2) Implement a date-aware driver promotions endpoint
+- Add/extend an endpoint like:
+  - GET /api/driver/promotions?date=YYYY-MM-DD
+- Behavior:
+  - Read authenticated driver (from token/session).
+  - Parse `date` query param; if missing, default to "today" in driver’s timezone.
+  - Return all promotions that:
+    - Are active for that date (date between startDate and endDate inclusive, or exact match if single date).
+    - Match driver’s service(s) (ride/food/parcel) IF we already store this.
+    - Match driver’s country/region if promotions are region-scoped.
+  - For quest-style promotions:
+    - Include driver-specific progress (e.g., tripsCompleted, tripsRequired) if that data exists.
+  - For one-off bonuses:
+    - Include expected reward (flat amount or per-trip amount etc.).
+
+- Response shape (example – adjust to existing types, but keep these concepts):
+  {
+    "date": "2025-11-28",
+    "promotions": [
+      {
+        "id": "...",
+        "title": "Evening Stadium Surge",
+        "description": "Earn extra $3 per trip near Madison Square Garden.",
+        "type": "opportunity" | "quest" | "boost",
+        "serviceType": "ride" | "delivery" | "food",
+        "startTime": "18:00",
+        "endTime": "23:00",
+        "zone": "Madison Square Garden",
+        "rewardSummary": "+$3 per trip • up to 10 trips",
+        "progress": { "current": 3, "target": 10 },  // only for quests
+        "status": "eligible" | "in_progress" | "completed" | "expired"
+      }
+    ]
+  }
+
+- Important:
+  - Normalize Decimal values to numbers or strings consistently (the app already uses serializeDecimal; reuse that).
+  - All date/time handling must be timezone-safe (use UTC in DB, convert for display if needed).
+
+3) Optional: pre-computed daily index (only if needed)
+- If querying by date becomes heavy, you may:
+  - Create a small utility that converts date ranges into a list of active dates.
+  - But prefer simple “WHERE date BETWEEN start AND end” logic first.
+- Do not prematurely optimize; keep it simple and readable.
+
+--------------------------------
+B. Admin Panel – Day-Specific Promotions Config
+--------------------------------
+
+1) Extend admin promotions create/edit form (without breaking existing records)
+- Admin route: /admin/driver-promotions
+- Ensure each promotion has:
+  - Name/title
+  - Type (quest / per-trip bonus / flat bonus / opportunity)
+  - ServiceType(s) (ride/food/delivery)
+  - Date config:
+    - Either:
+      - Single day (dateOnly)
+      - Or startDate + endDate (for multi-day campaigns)
+  - Time window (optional): startTime, endTime
+  - Zone/area (optional text, for stadium or event areas)
+  - Reward structure fields already in model (amount per trip, total bonus, required trips, etc.)
+  - Active status toggle (active / paused / ended)
+
+2) Validation & saving
+- Frontend:
+  - Validate that at least a date is selected.
+  - Prevent malformed ranges (startDate <= endDate).
+- Backend:
+  - Validate inputs and persist into existing promotion schema.
+  - Keep compatibility for existing promotions (if some old records have null dates, treat them as always-visible or ignore them from date-strip filtering – choose safer behavior and document it in replit.md).
+
+3) Documentation
+- Update replit.md under Driver Promotions section:
+  - Explain how admin configures a daily promotion.
+  - Show example for:
+    - One-day event (Nov 28, 6PM–11PM)
+    - Multi-day quest (Nov 26–30 with 30 trips requirement).
+
+--------------------------------
+C. Driver UI – Professional Uber-like List for Selected Day
+--------------------------------
+
+Context:
+- Route: /driver/promotions
+- Top section already has the purple “Promotions & Bonuses” banner and horizontal date strip with swipe & selection.
+- Now implement the lower part like Uber’s Opportunities screen.
+
+1) Load promotions for selected date
+- On initial page load:
+  - Determine today’s date and mark the correct chip as selected.
+  - Call GET /api/driver/promotions?date=<today>.
+- On chip selection:
+  - Update selectedDate state.
+  - Fetch promotions for that date.
+  - Show a loading indicator while fetching; handle errors gracefully (toast + empty state message).
+
+2) Layout – grouped by date (similar to Uber, but within our brand)
+- Under the strip, show:
+  - A date header bar, e.g.:
+    - “Monday, Nov 24” 
+    - Use a subtle background card or divider similar to Uber screenshot.
+- Below that, render a list of promotion cards for that date.
+
+3) Promotion card design (per item)
+- Card details:
+  - Top-left: promotion title (bold).
+  - Under title: small text for time range and zone, e.g. “10:00 PM – 11:00 PM • Madison Square Garden”.
+  - Left or tag: badge for type (Quest / Bonus / Opportunity).
+  - Right side: small map/zone thumbnail if available; if not, show simple icon placeholder.
+  - Middle: short description text.
+  - Bottom row:
+    - For quests: progress bar or “3 / 10 trips” text.
+    - For per-trip bonuses: “+$3 per trip (up to 10 trips)”.
+    - Optional CTA: “View details” (if there is a separate details page; otherwise omit).
+
+- Style guidelines:
+  - Mobile-first layout (looks good in narrow width).
+  - Keep SafeGo colors (use existing theme tokens from design system).
+  - High contrast for readability on light background.
+  - Avoid dense clutter; enough padding around cards.
+
+4) Empty state for selected date
+- If API returns zero promotions for that date:
+  - Show a centered message:
+    - Title: “No promotions for this day”
+    - Subtitle: “Check back later or choose another date to see new earning opportunities.”
+  - Keep the header visible so drivers understand there is simply nothing for that day.
+
+5) Interactions
+- If a promotion card is tappable (e.g., links to details):
+  - Navigate to existing promotion details route if it exists; otherwise, keep cards non-clickable.
+- Future extension:
+  - We may later add “Save”/“Remind me” actions as separate tasks; do not implement now.
+
+--------------------------------
+D. Integration With Existing Quests/Bonuses Logic
+--------------------------------
+
+1) Ensure that:
+- Quest progress shown on cards matches data from the existing quest tracking logic (do not introduce a second source of truth).
+- Opportunity bonuses (per-trip add-ons) reflect current configuration and driver eligibility.
+
+2) If necessary, add a small helper on the backend:
+- A function like `getPromotionStatusForDriver(promotion, driver)` that returns:
+  - status, rewardSummary, progress.
+- Use this helper both in the API and any future UI to keep logic consistent.
+
+--------------------------------
+E. Testing & Safety Checks
+--------------------------------
+
+1) Manual test cases
+- As admin:
+  - Create a promotion only for one date (today) and one region.
+  - Create another for a different date (e.g., +2 days).
+  - Create a multi-day quest spanning several dates.
+- As driver:
+  - On /driver/promotions:
+    - Verify today’s date chip is selected and shows today’s promotion.
+    - Swipe to a date with promotions; ensure cards appear correctly.
+    - Swipe to a date without promotions; verify the “No promotions for this day” empty state.
+- Confirm:
+  - Switching dates triggers new API requests and updates the list correctly.
+  - No JS errors or crashes when quickly swiping or changing dates.
+
+2) Regression checks
+- Confirm:
+  - Existing earnings screens, wallet, payouts, and ride/food/parcel flows are unaffected.
+  - Admin promotions page still lists existing promotions and can edit them.
+  - Date strip still behaves correctly (selection, swipe, highlight).
+
+--------------------------------
+F. Deliverables
+--------------------------------
+
+- Updated backend endpoints for date-based driver promotions.
+- Updated admin promotions create/edit forms to support date/day logic (without breaking existing promotions).
+- Updated /driver/promotions UI:
+  - Date-strip-driven filtering.
+  - Professional, grouped-by-date promotion cards similar in spirit to Uber’s Opportunities screen.
+- Documentation update in replit.md:
+  - Short section “Driver Promotions – Date-based daily view” explaining:
+    - How admin configures promotions per day.
+    - How the driver screen behaves.
+- Confirm in comments / commit message that this implements D7 part: “date-linked daily promotions + professional driver promotions list”.
+
+End of prompt.
