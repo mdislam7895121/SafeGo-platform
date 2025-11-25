@@ -1,0 +1,198 @@
+SAFEGO MASTER RULES (ALWAYS FOLLOW)
+
+1) Core Roles
+- There are always four core roles: Customer, Driver, Restaurant, Admin.
+- Any new feature must respect role boundaries and permissions:
+  - Customers can place ride/food/parcel requests, see their own history, manage profile.
+  - Drivers can manage availability, accept/complete rides/deliveries, see earnings, training, and compliance.
+  - Restaurants can manage menus, orders, preparation status, payouts.
+  - Admin can configure system-wide rules, verify KYC, manage disputes, promotions, payouts, and content (like training).
+
+2) Global App Logic
+- SafeGo supports:
+  - Rides (point-to-point passenger trips)
+  - Food delivery (restaurant → customer)
+  - Parcel delivery (pickup → drop-off objects)
+- The system must be multi-city and multi-country ready, but current primary regions are:
+  - USA (with New York–specific rules for drivers)
+  - Bangladesh
+- Core collections / entities that must NOT be broken:
+  - rides
+  - food_orders
+  - deliveries
+  - users (with roles)
+  - driver_profiles
+  - vehicle_profiles
+  - payouts and transactions
+  - promotions and incentives
+  - notifications and audit logs
+
+3) KYC & Compliance (USA + BD)
+- For USA drivers:
+  - KYC must support: profile picture, full legal name, phone, DOB, license state + number + expiry, SSN (masked), residential address, emergency contact, background check status, bank info for payouts, and city-specific fields (e.g. NYC TLC license).
+- For Bangladesh drivers:
+  - NID/passport, phone, address, profile picture, emergency contact, bank/bKash/Nagad for payouts.
+- Training content must NEVER expose or require new PII fields. It can only read already existing driver identity status flags (like verified/unverified), if needed.
+
+4) Admin Panel Requirements
+- Admin panel must always remain capable of:
+  - Managing driver onboarding requirements (including training modules).
+  - Activating/deactivating training videos, tagging some as mandatory.
+  - Viewing completion stats per driver (later, not required in this first pass).
+  - Configuring which modules belong to onboarding vs ongoing education.
+- Do NOT hard-code admin data into front-end logic; keep training modules data-driven and easily extendable later via an admin UI.
+
+5) Commissions / Payout Logic
+- Existing commission and payout logic for rides / food / deliveries must not be modified by this task.
+- Training features must not change earnings calculations, only help drivers perform better.
+- Any persistence of training completion must be lightweight and safe (local state or minimal metadata) and must not interfere with payout cycles.
+
+6) Security & SafeGo Security Roadmap
+- Treat this feature as part of a “low-risk, content-only” phase:
+  - No new sensitive PII collections.
+  - No unsafe HTML injection or unsanitized user inputs.
+  - No new backend write endpoints unless absolutely necessary; prefer front-end state or existing safe APIs.
+- Never log sensitive data in console or analytics.
+- Respect auth/roles: only logged-in drivers can see driver training; customers/restaurant/admin must not accidentally see driver-only videos.
+
+7) Status Flows & Onboarding
+- Driver onboarding has checklists and statuses (e.g., profile complete, documents uploaded, background check, training done).
+- Training videos can be tagged as:
+  - REQUIRED_FOR_ACTIVATION
+  - RECOMMENDED
+  - OPTIONAL
+- Completion should be representable as simple flags, e.g., per-module completion and overall percentage.
+- Do not break existing onboarding steps; this is an enhancement of D9 (Driver Training & Onboarding System).
+
+8) Notifications
+- Where helpful, support:
+  - In-app banners/toasts to nudge drivers to watch required modules.
+  - Non-blocking UI: training helps, but does not hard-block the app in this iteration.
+- For this task, simple UI badges or labels are enough; no new push notification system is required.
+
+Follow all of the above strictly. Do not remove or refactor unrelated functionality.
+
+------------------------------------
+TASK: UPGRADE DRIVER TRAINING VIDEOS HUB (D9 EXPANSION)
+------------------------------------
+
+Goal:
+Transform the current “Training Videos” experience at /driver/tutorials from a single ‘Video Coming Soon’ modal into a full Driver Training Hub with multiple modules, categories, progress tracking, and clean mobile-friendly UI, without breaking any existing driver onboarding or navigation.
+
+Implementation Requirements:
+
+1) Route & Access
+- Keep the existing route /driver/tutorials under the authenticated Driver layout.
+- Ensure the “Training Videos” sidebar item for drivers always opens this page.
+- The main page should show a Training Hub, not just a centered modal by default.
+
+2) Page Layout
+- At the top of /driver/tutorials, add:
+  - Title: “Training Videos”
+  - Subtitle: “Learn everything you need to succeed as a SafeGo driver.”
+  - A small progress summary component:
+    - e.g. “3 of 10 modules completed • 30% complete”
+- Below that, add filter tabs:
+  - All
+  - Getting Started
+  - Rides
+  - Earnings
+  - Safety
+  - Support
+  - Advanced
+- Filters should work client-side and simply filter the list of modules by category.
+
+3) Training Module Data Model
+- Define a local data structure (e.g., a constant array) for training modules, something like:
+
+  - id (string)
+  - title (string)
+  - shortDescription (string)
+  - category (enum string: getting_started | rides | earnings | safety | support | advanced)
+  - estimatedDurationMinutes (number)
+  - difficulty (e.g. “Beginner”, “Intermediate”)
+  - status (enum: “available”, “coming_soon”, “locked”)
+  - isRequiredForActivation (boolean)
+  - videoUrl (string | null for now)
+  - lastUpdated (ISO string or simple date label)
+
+- Populate at least 10 realistic SafeGo-specific modules, for example:
+  1) Accepting Your First Ride (Getting Started, required, available, 3 min)
+  2) Completing Trips & Rating Riders (Rides, available, 5 min)
+  3) Going Online & Offline Properly (Getting Started, available, 4 min)
+  4) Navigation & Pick-up Best Practices (Rides, coming_soon, 6 min)
+  5) Handling Cancellations & No-shows (Rides, available, 5 min)
+  6) Earnings & Payouts Overview (Earnings, available, 4 min)
+  7) Incentives, Promotions & Bonuses (Earnings, coming_soon, 4 min)
+  8) Safety Basics & In-App SOS (Safety, available, 6 min)
+  9) Incident & Emergency Reporting (Safety, available, 7 min)
+  10) Getting Help from SafeGo Support (Support, available, 4 min)
+
+- For now, videoUrl can be null and replaced with a placeholder player. Mark only some modules as “coming_soon”.
+
+4) Module Card UI
+- Display modules as cards in a responsive grid or list.
+- Each card should show:
+  - Title
+  - Short description (one or two lines)
+  - Category pill (e.g., “Rides”, “Safety”)
+  - Duration (e.g., “3 min”)
+  - Badges:
+    - “Required” if isRequiredForActivation = true
+    - “Coming soon” if status = coming_soon
+    - “Completed” when the user has finished the module
+- Tapping/clicking a card should open a detail view.
+
+5) Detail View / Modal
+- Replace the current generic “Video Coming Soon” modal with a reusable detail component.
+- When opening a module:
+  - Show the module title and description.
+  - Show duration, category, difficulty, and last updated.
+  - If status = “available” and videoUrl is set:
+    - Show an embedded video player or a placeholder player container that is visually ready for a real video link.
+  - If status = “available” but videoUrl is null:
+    - Show a styled placeholder: “Video placeholder – the training video will be attached here.”
+  - If status = “coming_soon”:
+    - Clearly show: “Video Coming Soon” but keep it within the module context (not the current generic message).
+  - Include a “Key takeaways” section with 3–5 bullet points for each module (static text for now).
+  - Include buttons:
+    - “Mark as completed”
+    - “Close”
+
+6) Progress Tracking (Front-end Only)
+- Implement simple per-module completion state on the front end:
+  - Use React state and, if possible, localStorage to remember which modules are completed for this device/browser.
+  - Do NOT introduce any new backend tables or API writes in this task.
+  - Do NOT store PII; if you need an identifier, use a non-sensitive key (e.g., “driver-training-completed-modules” in localStorage).
+- When a module is marked completed:
+  - Update the module’s card to show a “Completed” badge or checkmark.
+  - Recalculate the overall progress and update the progress summary at the top.
+
+7) Onboarding Integration (Visual Only)
+- For modules with isRequiredForActivation = true:
+  - Add a small badge “Onboarding” on the card.
+  - In the header section, add a note: “Modules marked as ‘Required’ are part of your SafeGo onboarding.”
+- Do NOT actually enforce blocking rules yet (no hard blocks on going online). This is a visual and motivational step only for this iteration.
+
+8) Mobile & UX
+- Ensure the Training Hub works well on mobile screens:
+  - Cards should stack nicely.
+  - Modals should fit on small devices; allow scrolling within the modal if content is long.
+- Keep styling consistent with existing SafeGo driver UI (typography, spacing, buttons).
+- Do not modify the existing global theme or break other driver pages.
+
+9) Safety & Security Constraints
+- No new PII fields.
+- No injection of raw HTML from untrusted sources.
+- No logging of user identity data in console or analytics from this feature.
+- Ensure only authenticated drivers can reach /driver/tutorials via existing auth guards.
+
+10) Testing & Verification
+- After implementation, manually verify:
+  - The sidebar “Training Videos” item opens /driver/tutorials correctly.
+  - Filter tabs work and only show relevant modules.
+  - Available module → opens detail → “Mark as completed” updates the card and overall progress.
+  - Coming soon module → shows coming soon message but still within a module detail, not as a global generic modal.
+  - Page behaves correctly on narrow/mobile viewport.
+
+Finish the implementation end-to-end without breaking any existing driver or onboarding flows. If some behavior is already in place (like the current modal), refactor it cleanly into the new Training Hub design rather than duplicating code.
