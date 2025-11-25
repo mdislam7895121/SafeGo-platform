@@ -6,6 +6,7 @@ import {
   createEarningsTransaction,
   updateEarningsTransactionStatus,
 } from "../services/earningsCommissionService";
+import { promotionBonusService } from "../services/promotionBonusService";
 import crypto from "crypto";
 
 const router = Router();
@@ -597,6 +598,18 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
               deliveryAddress: foodOrder.deliveryAddress,
             }
           );
+
+          // Evaluate and apply promotion bonuses for driver (D5)
+          try {
+            await promotionBonusService.evaluateDriverBonuses({
+              driverId: foodOrder.driverId!,
+              tripId: foodOrder.id,
+              tripType: "food",
+              earnings: parseFloat(foodOrder.deliveryPayout?.toString() || "0"),
+            });
+          } catch (bonusError) {
+            console.error("Promotion bonus evaluation error (non-blocking):", bonusError);
+          }
         }
       }
     }

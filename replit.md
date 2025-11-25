@@ -48,6 +48,19 @@ Core systems and features include:
     - **Admin Payouts Page** (`/admin/payouts`): Enhanced with wallet balance and negative balance context for each payout request
     - All monetary values properly serialized using `serializeDecimal` helper function
     - Currency formatting supports both BDT (৳) and USD ($) based on user's country code
+-   **Driver Promotions & Incentives System (D5)**: ✅ COMPLETED - Comprehensive bonus management system allowing admins to create trip-based promotions with automated progress tracking and automatic payouts. Features include:
+    - **Promotion Types**: Three types supported - `PER_TRIP_BONUS` (bonus per completed trip), `QUEST_TRIPS` (complete X trips for bonus), `EARNINGS_THRESHOLD` (earn $X to get bonus)
+    - **Service Types**: Promotions can target `RIDES`, `FOOD`, `PARCEL`, or `ANY` service type
+    - **Geographic Targeting**: Country-specific (`countryCode`) and city-specific (`cityCode`) filtering
+    - **Status Management**: DRAFT → ACTIVE → PAUSED/ENDED workflow with admin controls
+    - **Prisma Models**: `DriverPromotion` (promotion definitions) and `DriverPromotionProgress` (per-driver tracking)
+    - **Backend Service**: `promotionBonusService.ts` with `evaluateDriverBonuses()` for automatic bonus evaluation
+    - **Trip Integration**: Bonus evaluation automatically triggered on ride, food delivery, and parcel delivery completion
+    - **Admin API**: Full CRUD at `/api/admin/promotions`, status controls (activate, pause, end), filtering by status/type/service
+    - **Driver API**: `/api/driver/promotions` for viewing eligible promotions with progress tracking
+    - **Admin UI**: `/admin/driver-promotions` with creation dialog, filtering tabs, status badges, quick actions
+    - **Driver UI**: `/driver/promotions` showing opportunity bonuses (per-trip) and quest promotions with progress bars
+    - **Wallet Integration**: Completed promotions automatically credit driver wallet with bonus amount
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Admin KYC Approvals Response Contract

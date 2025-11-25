@@ -177,6 +177,14 @@ export default function AdminHome() {
       bgColor: "bg-amber-50 dark:bg-amber-950",
     },
     {
+      name: "Driver Promotions",
+      icon: Gift,
+      href: "/admin/driver-promotions",
+      description: "Create and manage driver incentives, quests, and bonus campaigns",
+      color: "text-teal-600",
+      bgColor: "bg-teal-50 dark:bg-teal-950",
+    },
+    {
       name: "Earnings Analytics",
       icon: BarChart3,
       href: "/admin/earnings",

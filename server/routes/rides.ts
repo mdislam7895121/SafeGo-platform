@@ -2,6 +2,7 @@ import { Router } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { walletService } from "../services/walletService";
+import { promotionBonusService } from "../services/promotionBonusService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -476,6 +477,18 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
             dropoffAddress: ride.dropoffAddress,
           }
         );
+
+        // Evaluate and apply promotion bonuses (D5)
+        try {
+          await promotionBonusService.evaluateDriverBonuses({
+            driverId: ride.driverId,
+            tripId: ride.id,
+            tripType: "ride",
+            earnings: parseFloat(ride.driverPayout.toString()),
+          });
+        } catch (bonusError) {
+          console.error("Promotion bonus evaluation error (non-blocking):", bonusError);
+        }
       }
     }
 
