@@ -139,8 +139,8 @@ export function DriverSidebar() {
                 const isActive = location === item.href || location.startsWith(item.href + '/');
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <Link href={item.href} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
-                      <SidebarMenuButton isActive={isActive} className="px-4 py-3 w-full">
+                    <SidebarMenuButton asChild isActive={isActive} className="px-4 py-3 w-full">
+                      <Link href={item.href} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                         <div className="flex items-center gap-3 w-full text-sm font-medium">
                           <item.icon className="h-5 w-5 flex-shrink-0" />
                           <span className="flex-1">{item.title}</span>
@@ -155,8 +155,8 @@ export function DriverSidebar() {
                             </Badge>
                           )}
                         </div>
-                      </SidebarMenuButton>
-                    </Link>
+                      </Link>
+                    </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
               })}
