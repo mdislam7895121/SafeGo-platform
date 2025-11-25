@@ -619,15 +619,17 @@ export default function DriverPromotions() {
                 {[1, 2, 3].map(i => <Skeleton key={i} className="h-48" />)}
               </div>
             ) : activeQuests.length === 0 && perTripBonuses.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium" data-testid="text-empty-quests">No promotions for {formattedSelectedDate}</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Check back later or choose another date to see new earning opportunities
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Target className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2" data-testid="text-empty-quests">
+                  No promotions for this day
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Try selecting another date or check back later for new opportunities
+                </p>
+              </div>
             ) : (
               <div className="space-y-3">
                 {activeQuests.map(promo => (
@@ -667,15 +669,17 @@ export default function DriverPromotions() {
                 ))}
               </div>
             ) : (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Gift className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium" data-testid="text-empty-bonuses">No bonuses for {formattedSelectedDate}</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Check other dates or check back later for new opportunities
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Gift className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2" data-testid="text-empty-bonuses">
+                  No bonuses for this day
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Check other dates or check back later for new opportunities
+                </p>
+              </div>
             )}
           </TabsContent>
 
@@ -685,15 +689,15 @@ export default function DriverPromotions() {
                 {[1, 2, 3].map(i => <Skeleton key={i} className="h-40" />)}
               </div>
             ) : completedPromotions.length === 0 && expiredPromotions.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium">No Completed Promotions Yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Complete quests and earn bonuses to see them here
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Trophy className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">No completed promotions yet</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Complete quests and earn bonuses to see them here
+                </p>
+              </div>
             ) : (
               <div className="space-y-4">
                 {completedPromotions.length > 0 && (
