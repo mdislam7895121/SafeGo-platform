@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Search, Filter, FileText, Eye, Check, X, Car, Users, UtensilsCrossed } from "lucide-react";
+import { ArrowLeft, Search, Filter, FileText, Eye, Check, X, Car, Users, UtensilsCrossed, CheckCircle, XCircle, Clock, AlertTriangle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +73,59 @@ interface Restaurant {
   verificationStatus: string;
   isVerified: boolean;
   lastUpdated: string;
+}
+
+interface DriverDocumentSummary {
+  driverId: string;
+  email: string;
+  countryCode: string;
+  usaState?: string;
+  overallStatus: string;
+  documentProgress: {
+    completed: number;
+    total: number;
+    percentage: number;
+  };
+  documents: {
+    profilePhoto: {
+      status: string;
+      hasImage: boolean;
+      imageUrl?: string;
+      required: boolean;
+    };
+    driverLicense: {
+      status: string;
+      hasFront: boolean;
+      hasBack: boolean;
+      frontUrl?: string;
+      backUrl?: string;
+      expiry?: string;
+      required: boolean;
+    };
+    tlcLicense?: {
+      status: string;
+      hasFront: boolean;
+      hasBack: boolean;
+      frontUrl?: string;
+      backUrl?: string;
+      expiry?: string;
+      required: boolean;
+    };
+    nid?: {
+      status: string;
+      hasFront: boolean;
+      hasBack: boolean;
+      frontUrl?: string;
+      backUrl?: string;
+      required: boolean;
+    };
+  };
+  vehicleDocuments: Array<{
+    id: string;
+    documentType: string;
+    status: string;
+    fileUrl: string;
+  }>;
 }
 
 interface PaginatedResponse<T> {
@@ -272,6 +325,71 @@ export default function AdminDocumentCenter() {
     },
   });
 
+  // D7: Fetch driver document summary for individual status management
+  const { data: driverDocSummary, isLoading: isLoadingDocSummary, refetch: refetchDocSummary } = useQuery<{ success: boolean; data: DriverDocumentSummary }>({
+    queryKey: ['/api/admin/documents/drivers', reviewDialog.id, 'summary'],
+    queryFn: async () => {
+      const response = await fetch(`/api/admin/documents/drivers/${reviewDialog.id}/summary`, {
+        credentials: 'include',
+      });
+      return response.json();
+    },
+    enabled: reviewDialog.open && reviewDialog.type === "drivers" && !!reviewDialog.id,
+  });
+
+  // D7: Update individual document status mutation
+  const updateDocStatusMutation = useMutation({
+    mutationFn: async ({ driverId, documentType, status, rejectionReason }: { 
+      driverId: string; 
+      documentType: string; 
+      status: string; 
+      rejectionReason?: string 
+    }) => {
+      return apiRequest("POST", `/api/admin/documents/drivers/${driverId}/status`, { 
+        documentType, 
+        status, 
+        rejectionReason 
+      });
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: "Success",
+        description: `${variables.documentType.replace(/_/g, " ")} status updated to ${variables.status}`,
+      });
+      refetchDocSummary();
+      queryClient.invalidateQueries({ queryKey: [fullUrl] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update document status",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // D7: Approve all documents mutation
+  const approveAllDocsMutation = useMutation({
+    mutationFn: async (driverId: string) => {
+      return apiRequest("POST", `/api/admin/documents/drivers/${driverId}/approve-all`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "All documents approved successfully",
+      });
+      refetchDocSummary();
+      queryClient.invalidateQueries({ queryKey: [fullUrl] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to approve all documents",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleApprove = (id: string) => {
     approveMutation.mutate({ type: reviewDialog.type, id });
   };
@@ -279,6 +397,51 @@ export default function AdminDocumentCenter() {
   const handleReject = (id: string) => {
     const reason = prompt("Enter rejection reason (optional):");
     rejectMutation.mutate({ type: reviewDialog.type, id, reason: reason || undefined });
+  };
+
+  // D7: Handle individual document status change
+  const handleDocStatusChange = (documentType: string, status: string) => {
+    if (!reviewDialog.id) return;
+    
+    if (status === "REJECTED") {
+      const reason = prompt("Enter rejection reason:");
+      if (!reason) {
+        toast({
+          title: "Rejection cancelled",
+          description: "A reason is required to reject a document",
+          variant: "destructive",
+        });
+        return;
+      }
+      updateDocStatusMutation.mutate({ 
+        driverId: reviewDialog.id, 
+        documentType, 
+        status, 
+        rejectionReason: reason 
+      });
+    } else {
+      updateDocStatusMutation.mutate({ driverId: reviewDialog.id, documentType, status });
+    }
+  };
+
+  // D7: Get document status badge with appropriate styling
+  const getDocStatusBadge = (status: string) => {
+    switch (status) {
+      case "APPROVED":
+        return <Badge className="bg-green-500 text-white" data-testid="badge-doc-approved"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+      case "REJECTED":
+        return <Badge variant="destructive" data-testid="badge-doc-rejected"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+      case "UNDER_REVIEW":
+        return <Badge variant="secondary" data-testid="badge-doc-under-review"><Clock className="h-3 w-3 mr-1" />Under Review</Badge>;
+      case "NEEDS_UPDATE":
+        return <Badge className="bg-orange-500 text-white" data-testid="badge-doc-needs-update"><AlertTriangle className="h-3 w-3 mr-1" />Needs Update</Badge>;
+      case "EXPIRING_SOON":
+        return <Badge className="bg-yellow-500 text-white" data-testid="badge-doc-expiring"><AlertTriangle className="h-3 w-3 mr-1" />Expiring Soon</Badge>;
+      case "EXPIRED":
+        return <Badge variant="destructive" data-testid="badge-doc-expired"><XCircle className="h-3 w-3 mr-1" />Expired</Badge>;
+      default:
+        return <Badge variant="outline" data-testid="badge-doc-pending"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+    }
   };
 
   const getStatusBadge = (verificationStatus: string) => {
@@ -606,6 +769,239 @@ export default function AdminDocumentCenter() {
                   )}
                 </CardContent>
               </Card>
+
+              {/* D7: Individual Document Status Management (Drivers only) */}
+              {reviewDialog.type === "drivers" && driverDocSummary?.success && driverDocSummary.data && (
+                <Card className="border-primary/20">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Individual Document Status
+                      </CardTitle>
+                      <Badge variant="outline" data-testid="badge-doc-progress">
+                        {driverDocSummary.data.documentProgress.completed}/{driverDocSummary.data.documentProgress.total} Complete
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {isLoadingDocSummary ? (
+                      <div className="space-y-2">
+                        <Skeleton className="h-16 w-full" />
+                        <Skeleton className="h-16 w-full" />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Profile Photo */}
+                        <div className="flex items-center justify-between p-3 border rounded-lg" data-testid="doc-item-profile-photo">
+                          <div className="flex items-center gap-3">
+                            {driverDocSummary.data.documents.profilePhoto.imageUrl ? (
+                              <img 
+                                src={driverDocSummary.data.documents.profilePhoto.imageUrl} 
+                                alt="Profile" 
+                                className="w-12 h-12 rounded-full object-cover border"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                                <Users className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium">Profile Photo</p>
+                              <p className="text-sm text-muted-foreground">
+                                {driverDocSummary.data.documents.profilePhoto.hasImage ? "Uploaded" : "Not uploaded"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {getDocStatusBadge(driverDocSummary.data.documents.profilePhoto.status)}
+                            {driverDocSummary.data.documents.profilePhoto.hasImage && (
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2"
+                                  onClick={() => handleDocStatusChange("profile_photo", "APPROVED")}
+                                  disabled={updateDocStatusMutation.isPending || driverDocSummary.data.documents.profilePhoto.status === "APPROVED"}
+                                  data-testid="button-approve-profile-photo"
+                                >
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2"
+                                  onClick={() => handleDocStatusChange("profile_photo", "REJECTED")}
+                                  disabled={updateDocStatusMutation.isPending}
+                                  data-testid="button-reject-profile-photo"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Driver License (USA) */}
+                        {driverDocSummary.data.documents.driverLicense.required && (
+                          <div className="flex items-center justify-between p-3 border rounded-lg" data-testid="doc-item-driver-license">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                                <Car className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium">Driver License (DMV)</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Front: {driverDocSummary.data.documents.driverLicense.hasFront ? "Yes" : "No"} | 
+                                  Back: {driverDocSummary.data.documents.driverLicense.hasBack ? "Yes" : "No"}
+                                  {driverDocSummary.data.documents.driverLicense.expiry && (
+                                    <> | Exp: {format(new Date(driverDocSummary.data.documents.driverLicense.expiry), "PP")}</>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {getDocStatusBadge(driverDocSummary.data.documents.driverLicense.status)}
+                              {(driverDocSummary.data.documents.driverLicense.hasFront || driverDocSummary.data.documents.driverLicense.hasBack) && (
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    onClick={() => handleDocStatusChange("driver_license", "APPROVED")}
+                                    disabled={updateDocStatusMutation.isPending || driverDocSummary.data.documents.driverLicense.status === "APPROVED"}
+                                    data-testid="button-approve-driver-license"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    onClick={() => handleDocStatusChange("driver_license", "REJECTED")}
+                                    disabled={updateDocStatusMutation.isPending}
+                                    data-testid="button-reject-driver-license"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* TLC License (NY only) */}
+                        {driverDocSummary.data.documents.tlcLicense?.required && (
+                          <div className="flex items-center justify-between p-3 border rounded-lg" data-testid="doc-item-tlc-license">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                                <FileText className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium">TLC License (NYC)</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Front: {driverDocSummary.data.documents.tlcLicense.hasFront ? "Yes" : "No"} | 
+                                  Back: {driverDocSummary.data.documents.tlcLicense.hasBack ? "Yes" : "No"}
+                                  {driverDocSummary.data.documents.tlcLicense.expiry && (
+                                    <> | Exp: {format(new Date(driverDocSummary.data.documents.tlcLicense.expiry), "PP")}</>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {getDocStatusBadge(driverDocSummary.data.documents.tlcLicense.status)}
+                              {(driverDocSummary.data.documents.tlcLicense.hasFront || driverDocSummary.data.documents.tlcLicense.hasBack) && (
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    onClick={() => handleDocStatusChange("tlc_license", "APPROVED")}
+                                    disabled={updateDocStatusMutation.isPending || driverDocSummary.data.documents.tlcLicense.status === "APPROVED"}
+                                    data-testid="button-approve-tlc-license"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    onClick={() => handleDocStatusChange("tlc_license", "REJECTED")}
+                                    disabled={updateDocStatusMutation.isPending}
+                                    data-testid="button-reject-tlc-license"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* NID (Bangladesh) */}
+                        {driverDocSummary.data.documents.nid?.required && (
+                          <div className="flex items-center justify-between p-3 border rounded-lg" data-testid="doc-item-nid">
+                            <div className="flex items-center gap-3">
+                              <div className="w-12 h-12 rounded bg-muted flex items-center justify-center">
+                                <FileText className="h-5 w-5 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <p className="font-medium">National ID (NID)</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Front: {driverDocSummary.data.documents.nid.hasFront ? "Yes" : "No"} | 
+                                  Back: {driverDocSummary.data.documents.nid.hasBack ? "Yes" : "No"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {getDocStatusBadge(driverDocSummary.data.documents.nid.status)}
+                              {(driverDocSummary.data.documents.nid.hasFront || driverDocSummary.data.documents.nid.hasBack) && (
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    onClick={() => handleDocStatusChange("nid", "APPROVED")}
+                                    disabled={updateDocStatusMutation.isPending || driverDocSummary.data.documents.nid.status === "APPROVED"}
+                                    data-testid="button-approve-nid"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2"
+                                    onClick={() => handleDocStatusChange("nid", "REJECTED")}
+                                    disabled={updateDocStatusMutation.isPending}
+                                    data-testid="button-reject-nid"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Approve All Button */}
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            onClick={() => reviewDialog.id && approveAllDocsMutation.mutate(reviewDialog.id)}
+                            disabled={approveAllDocsMutation.isPending || driverDocSummary.data.documentProgress.percentage === 100}
+                            data-testid="button-approve-all-docs"
+                          >
+                            {approveAllDocsMutation.isPending ? (
+                              <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Approving...</>
+                            ) : (
+                              <><CheckCircle className="h-4 w-4 mr-2" />Approve All Documents</>
+                            )}
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Driver/Customer Identity Fields */}
               {(documentDetails.fullName || documentDetails.firstName) && (
@@ -1055,23 +1451,52 @@ export default function AdminDocumentCenter() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  variant="destructive"
-                  onClick={() => reviewDialog.id && handleReject(reviewDialog.id)}
-                  disabled={rejectMutation.isPending}
-                  data-testid="button-reject"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  Reject
-                </Button>
-                <Button
-                  onClick={() => reviewDialog.id && handleApprove(reviewDialog.id)}
-                  disabled={approveMutation.isPending || (documentDetails.missingFields && documentDetails.missingFields.length > 0)}
-                  data-testid="button-approve"
-                >
-                  <Check className="h-4 w-4 mr-1" />
-                  Approve
-                </Button>
+                
+                {/* D7: For drivers, use individual document status controls above. These buttons are for overall rejection or legacy approve. */}
+                {reviewDialog.type === "drivers" ? (
+                  <>
+                    <Button
+                      variant="destructive"
+                      onClick={() => reviewDialog.id && handleReject(reviewDialog.id)}
+                      disabled={rejectMutation.isPending}
+                      data-testid="button-reject"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Reject All
+                    </Button>
+                    <Button
+                      onClick={() => reviewDialog.id && approveAllDocsMutation.mutate(reviewDialog.id)}
+                      disabled={approveAllDocsMutation.isPending || (documentDetails.missingFields && documentDetails.missingFields.length > 0)}
+                      data-testid="button-approve-all"
+                    >
+                      {approveAllDocsMutation.isPending ? (
+                        <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Approving...</>
+                      ) : (
+                        <><Check className="h-4 w-4 mr-1" />Approve All</>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="destructive"
+                      onClick={() => reviewDialog.id && handleReject(reviewDialog.id)}
+                      disabled={rejectMutation.isPending}
+                      data-testid="button-reject"
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Reject
+                    </Button>
+                    <Button
+                      onClick={() => reviewDialog.id && handleApprove(reviewDialog.id)}
+                      disabled={approveMutation.isPending || (documentDetails.missingFields && documentDetails.missingFields.length > 0)}
+                      data-testid="button-approve"
+                    >
+                      <Check className="h-4 w-4 mr-1" />
+                      Approve
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           )}
