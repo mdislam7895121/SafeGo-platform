@@ -26,6 +26,7 @@ import {
   GraduationCap,
   Sparkles,
   FileText,
+  Car,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -50,6 +51,11 @@ const menuItems = [
     title: "Documents",
     icon: FileText,
     href: "/driver/documents",
+  },
+  {
+    title: "Vehicle",
+    icon: Car,
+    href: "/driver/vehicle",
   },
   {
     title: "Refer a Friend",

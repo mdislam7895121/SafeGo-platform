@@ -1,545 +1,738 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useRef, useEffect } from "react";
+import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Car,
+  Camera,
+  Edit2,
+  Save,
+  X,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  Upload,
+  Eye,
+  EyeOff,
+  Calendar,
+  Palette,
+  Hash,
+  FileText,
+  ChevronLeft,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Car, CheckCircle } from "lucide-react";
-import { useState, useEffect } from "react";
 
-// Comprehensive vehicle model options (100+ models, same as KYC documents page)
-const VEHICLE_MODELS = [
-  // Tesla
-  "Tesla Model 3",
-  "Tesla Model S",
-  "Tesla Model X",
-  "Tesla Model Y",
-  // Toyota
-  "Toyota Camry",
-  "Toyota Corolla",
-  "Toyota RAV4",
-  "Toyota Highlander",
-  "Toyota Prius",
-  "Toyota Tacoma",
-  "Toyota Tundra",
-  "Toyota 4Runner",
-  "Toyota Sienna",
-  "Toyota Avalon",
-  "Toyota C-HR",
-  "Toyota Venza",
-  // Honda
-  "Honda Civic",
-  "Honda Accord",
-  "Honda CR-V",
-  "Honda Pilot",
-  "Honda Odyssey",
-  "Honda HR-V",
-  "Honda Ridgeline",
-  "Honda Fit",
-  "Honda Passport",
-  "Honda Insight",
-  // Nissan
-  "Nissan Altima",
-  "Nissan Sentra",
-  "Nissan Maxima",
-  "Nissan Rogue",
-  "Nissan Murano",
-  "Nissan Pathfinder",
-  "Nissan Armada",
-  "Nissan Frontier",
-  "Nissan Titan",
-  "Nissan Kicks",
-  "Nissan Versa",
-  // Ford
-  "Ford F-150",
-  "Ford Mustang",
-  "Ford Explorer",
-  "Ford Escape",
-  "Ford Edge",
-  "Ford Expedition",
-  "Ford Ranger",
-  "Ford Bronco",
-  "Ford Fusion",
-  "Ford Focus",
-  "Ford EcoSport",
-  "Ford Maverick",
-  // Chevrolet
-  "Chevrolet Silverado",
-  "Chevrolet Equinox",
-  "Chevrolet Malibu",
-  "Chevrolet Traverse",
-  "Chevrolet Tahoe",
-  "Chevrolet Suburban",
-  "Chevrolet Colorado",
-  "Chevrolet Blazer",
-  "Chevrolet Trax",
-  "Chevrolet Camaro",
-  "Chevrolet Corvette",
-  // Hyundai
-  "Hyundai Elantra",
-  "Hyundai Sonata",
-  "Hyundai Tucson",
-  "Hyundai Santa Fe",
-  "Hyundai Palisade",
-  "Hyundai Kona",
-  "Hyundai Venue",
-  "Hyundai Ioniq",
-  "Hyundai Accent",
-  // Kia
-  "Kia Seltos",
-  "Kia Sportage",
-  "Kia Sorento",
-  "Kia Telluride",
-  "Kia Forte",
-  "Kia K5",
-  "Kia Soul",
-  "Kia Niro",
-  "Kia Carnival",
-  "Kia Stinger",
-  // BMW
-  "BMW 3 Series",
-  "BMW 5 Series",
-  "BMW X3",
-  "BMW X5",
-  "BMW X1",
-  "BMW X7",
-  "BMW 7 Series",
-  "BMW 4 Series",
-  "BMW i4",
-  "BMW iX",
-  // Mercedes-Benz
-  "Mercedes-Benz C-Class",
-  "Mercedes-Benz E-Class",
-  "Mercedes-Benz S-Class",
-  "Mercedes-Benz GLE",
-  "Mercedes-Benz GLC",
-  "Mercedes-Benz GLA",
-  "Mercedes-Benz GLB",
-  "Mercedes-Benz A-Class",
-  // Lexus
-  "Lexus RX",
-  "Lexus ES",
-  "Lexus NX",
-  "Lexus IS",
-  "Lexus GX",
-  "Lexus UX",
-  "Lexus LS",
-  "Lexus LX",
-  // Mazda
-  "Mazda CX-5",
-  "Mazda CX-9",
-  "Mazda Mazda3",
-  "Mazda Mazda6",
-  "Mazda CX-30",
-  "Mazda CX-50",
-  "Mazda MX-5 Miata",
-  // Subaru
-  "Subaru Outback",
-  "Subaru Forester",
-  "Subaru Crosstrek",
-  "Subaru Ascent",
-  "Subaru Impreza",
-  "Subaru Legacy",
-  "Subaru WRX",
-  // Volkswagen
-  "Volkswagen Jetta",
-  "Volkswagen Passat",
-  "Volkswagen Tiguan",
-  "Volkswagen Atlas",
-  "Volkswagen Taos",
-  "Volkswagen Golf",
-  "Volkswagen ID.4",
-  // Jeep
-  "Jeep Grand Cherokee",
-  "Jeep Wrangler",
-  "Jeep Cherokee",
-  "Jeep Compass",
-  "Jeep Renegade",
-  "Jeep Gladiator",
-  // Dodge
-  "Dodge Charger",
-  "Dodge Challenger",
-  "Dodge Durango",
-  "Dodge Ram 1500",
-  // Audi
-  "Audi A4",
-  "Audi A6",
-  "Audi Q5",
-  "Audi Q7",
-  "Audi Q3",
-  "Audi e-tron",
-  // Acura
-  "Acura TLX",
-  "Acura MDX",
-  "Acura RDX",
-  "Acura Integra",
-  "Acura ILX",
-  // Infiniti
-  "Infiniti Q50",
-  "Infiniti QX60",
-  "Infiniti QX80",
-  "Infiniti QX50",
-  // Cadillac
-  "Cadillac Escalade",
-  "Cadillac XT5",
-  "Cadillac XT4",
-  "Cadillac CT5",
-  // GMC
-  "GMC Sierra",
-  "GMC Yukon",
-  "GMC Terrain",
-  "GMC Acadia",
-  // Ram
-  "Ram 1500",
-  "Ram 2500",
-  "Ram 3500",
-  // Buick
-  "Buick Enclave",
-  "Buick Encore",
-  "Buick Envision",
-  // Lincoln
-  "Lincoln Navigator",
-  "Lincoln Aviator",
-  "Lincoln Corsair",
-  // Volvo
-  "Volvo XC90",
-  "Volvo XC60",
-  "Volvo S60",
-  "Volvo V60",
-  // Other
-  "Other",
-] as const;
+interface VehicleInfo {
+  make: string;
+  model: string;
+  year: string;
+  color: string;
+  licensePlate: string;
+  vin: string;
+  registrationExpiry: string;
+  insuranceExpiry: string;
+}
 
-// Vehicle registration schema
-const vehicleSchema = z.object({
-  vehicleType: z.string().min(1, "Vehicle type is required"),
-  vehicleModel: z.string().min(1, "Vehicle model is required").max(100),
-  vehiclePlate: z.string().min(1, "License plate is required").max(20),
-});
+interface VehiclePhoto {
+  type: "front" | "back" | "side";
+  url: string | null;
+  status: "not_submitted" | "pending" | "approved" | "rejected";
+}
 
-type VehicleFormData = z.infer<typeof vehicleSchema>;
+const STORAGE_KEY = "safego-driver-vehicle-info";
+const PHOTOS_STORAGE_KEY = "safego-driver-vehicle-photos";
+
+const VEHICLE_MAKES = [
+  "Toyota", "Honda", "Ford", "Chevrolet", "Nissan", "Hyundai", "Kia", 
+  "Volkswagen", "BMW", "Mercedes-Benz", "Audi", "Lexus", "Mazda", 
+  "Subaru", "Jeep", "Ram", "GMC", "Tesla", "Volvo", "Acura", "Infiniti",
+  "Cadillac", "Buick", "Lincoln", "Chrysler", "Dodge", "Other"
+];
+
+const VEHICLE_COLORS = [
+  "White", "Black", "Silver", "Gray", "Red", "Blue", "Brown", "Beige",
+  "Green", "Yellow", "Orange", "Gold", "Purple", "Other"
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: 30 }, (_, i) => (CURRENT_YEAR - i).toString());
+
+function getExpiryStatus(dateString: string): { status: "valid" | "warning" | "expired" | "missing"; label: string; daysLeft?: number } {
+  if (!dateString) {
+    return { status: "missing", label: "Not Set" };
+  }
+  
+  const expiryDate = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  const diffTime = expiryDate.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays < 0) {
+    return { status: "expired", label: "Expired", daysLeft: diffDays };
+  } else if (diffDays <= 30) {
+    return { status: "warning", label: `Expires in ${diffDays} days`, daysLeft: diffDays };
+  } else {
+    return { status: "valid", label: "Valid", daysLeft: diffDays };
+  }
+}
+
+function StatusBadge({ completed }: { completed: boolean }) {
+  return (
+    <Badge 
+      variant="outline" 
+      className={completed 
+        ? "bg-green-50 dark:bg-green-950 text-green-600 border-0" 
+        : "bg-yellow-50 dark:bg-yellow-950 text-yellow-600 border-0"
+      }
+    >
+      {completed ? (
+        <>
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          Completed
+        </>
+      ) : (
+        <>
+          <AlertTriangle className="w-3 h-3 mr-1" />
+          Missing
+        </>
+      )}
+    </Badge>
+  );
+}
+
+function PhotoStatusBadge({ status }: { status: string }) {
+  const config = {
+    not_submitted: { icon: Upload, color: "text-gray-600", bg: "bg-gray-50 dark:bg-gray-900", label: "Not Submitted" },
+    pending: { icon: Clock, color: "text-yellow-600", bg: "bg-yellow-50 dark:bg-yellow-950", label: "Pending" },
+    approved: { icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50 dark:bg-green-950", label: "Approved" },
+    rejected: { icon: X, color: "text-red-600", bg: "bg-red-50 dark:bg-red-950", label: "Rejected" },
+  };
+  
+  const c = config[status as keyof typeof config] || config.not_submitted;
+  const Icon = c.icon;
+  
+  return (
+    <Badge variant="outline" className={`${c.color} ${c.bg} border-0`}>
+      <Icon className="w-3 h-3 mr-1" />
+      {c.label}
+    </Badge>
+  );
+}
+
+function ExpiryBadge({ dateString }: { dateString: string }) {
+  const { status, label } = getExpiryStatus(dateString);
+  
+  const config = {
+    valid: { color: "text-green-600", bg: "bg-green-50 dark:bg-green-950", icon: CheckCircle2 },
+    warning: { color: "text-yellow-600", bg: "bg-yellow-50 dark:bg-yellow-950", icon: AlertTriangle },
+    expired: { color: "text-red-600", bg: "bg-red-50 dark:bg-red-950", icon: AlertTriangle },
+    missing: { color: "text-gray-600", bg: "bg-gray-50 dark:bg-gray-900", icon: Calendar },
+  };
+  
+  const c = config[status];
+  const Icon = c.icon;
+  
+  return (
+    <Badge variant="outline" className={`${c.color} ${c.bg} border-0`}>
+      <Icon className="w-3 h-3 mr-1" />
+      {label}
+    </Badge>
+  );
+}
+
+function VehicleInfoCard({
+  label,
+  value,
+  icon: Icon,
+  onSave,
+  options,
+  isMasked,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  icon: React.ComponentType<any>;
+  onSave: (value: string) => void;
+  options?: string[];
+  isMasked?: boolean;
+  placeholder?: string;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value);
+  const [showValue, setShowValue] = useState(false);
+  
+  const displayValue = isMasked && value && !showValue 
+    ? "*".repeat(Math.max(0, value.length - 4)) + value.slice(-4)
+    : value;
+
+  const handleSave = () => {
+    onSave(editValue);
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setEditValue(value);
+    setIsEditing(false);
+  };
+
+  useEffect(() => {
+    setEditValue(value);
+  }, [value]);
+
+  return (
+    <Card className="hover-elevate" data-testid={`card-vehicle-${label.toLowerCase().replace(/\s/g, "-")}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <div className={`p-2 rounded-lg flex-shrink-0 ${value ? "bg-primary/10" : "bg-muted"}`}>
+              <Icon className={`w-4 h-4 ${value ? "text-primary" : "text-muted-foreground"}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm text-muted-foreground">{label}</span>
+                <StatusBadge completed={!!value} />
+              </div>
+              
+              {isEditing ? (
+                <div className="space-y-2">
+                  {options ? (
+                    <Select value={editValue} onValueChange={setEditValue}>
+                      <SelectTrigger className="h-9" data-testid={`select-${label.toLowerCase().replace(/\s/g, "-")}`}>
+                        <SelectValue placeholder={placeholder || `Select ${label}`} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {options.map(opt => (
+                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      placeholder={placeholder || `Enter ${label}`}
+                      className="h-9"
+                      data-testid={`input-${label.toLowerCase().replace(/\s/g, "-")}`}
+                    />
+                  )}
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleSave} data-testid={`button-save-${label.toLowerCase().replace(/\s/g, "-")}`}>
+                      <Save className="w-3 h-3 mr-1" />
+                      Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleCancel}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className={`font-medium ${value ? "text-foreground" : "text-muted-foreground italic"}`}>
+                    {displayValue || "Not set"}
+                  </span>
+                  {isMasked && value && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => setShowValue(!showValue)}
+                    >
+                      {showValue ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {!isEditing && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setIsEditing(true)}
+              data-testid={`button-edit-${label.toLowerCase().replace(/\s/g, "-")}`}
+            >
+              <Edit2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ExpiryCard({
+  label,
+  value,
+  onSave,
+}: {
+  label: string;
+  value: string;
+  onSave: (value: string) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(value);
+
+  const handleSave = () => {
+    onSave(editValue);
+    setIsEditing(false);
+  };
+
+  useEffect(() => {
+    setEditValue(value);
+  }, [value]);
+
+  return (
+    <Card className="hover-elevate" data-testid={`card-${label.toLowerCase().replace(/\s/g, "-")}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 flex-1">
+            <div className={`p-2 rounded-lg flex-shrink-0 ${value ? "bg-primary/10" : "bg-muted"}`}>
+              <Calendar className={`w-4 h-4 ${value ? "text-primary" : "text-muted-foreground"}`} />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-sm text-muted-foreground">{label}</span>
+                <ExpiryBadge dateString={value} />
+              </div>
+              
+              {isEditing ? (
+                <div className="space-y-2">
+                  <Input
+                    type="date"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    className="h-9 max-w-[200px]"
+                    data-testid={`input-${label.toLowerCase().replace(/\s/g, "-")}`}
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handleSave}>
+                      <Save className="w-3 h-3 mr-1" />
+                      Save
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <span className={`font-medium ${value ? "text-foreground" : "text-muted-foreground italic"}`}>
+                  {value ? new Date(value).toLocaleDateString() : "Not set"}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {!isEditing && (
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setIsEditing(true)}
+              data-testid={`button-edit-${label.toLowerCase().replace(/\s/g, "-")}`}
+            >
+              <Edit2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PhotoUploadCard({
+  label,
+  photo,
+  onUpload,
+}: {
+  label: string;
+  photo: VehiclePhoto;
+  onUpload: (file: File) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert("File size must be less than 10MB");
+        return;
+      }
+      onUpload(file);
+    }
+  };
+
+  return (
+    <>
+      <Card className="hover-elevate" data-testid={`card-photo-${photo.type}`}>
+        <CardContent className="p-4">
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${photo.url ? "bg-primary/10" : "bg-muted"}`}>
+                  <Camera className={`w-4 h-4 ${photo.url ? "text-primary" : "text-muted-foreground"}`} />
+                </div>
+                <span className="font-medium">{label}</span>
+              </div>
+              <PhotoStatusBadge status={photo.status} />
+            </div>
+            
+            {photo.url ? (
+              <div className="space-y-2">
+                <div 
+                  className="relative w-full h-32 bg-muted rounded-lg overflow-hidden cursor-pointer group"
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  <img 
+                    src={photo.url} 
+                    alt={label} 
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                    <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full"
+                  onClick={() => fileInputRef.current?.click()}
+                  data-testid={`button-replace-${photo.type}`}
+                >
+                  <Upload className="w-3 h-3 mr-1" />
+                  Replace Photo
+                </Button>
+              </div>
+            ) : (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+              >
+                <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground">Click to upload</p>
+                <p className="text-xs text-muted-foreground mt-1">JPG, PNG (max 10MB)</p>
+              </div>
+            )}
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+              data-testid={`input-photo-${photo.type}`}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{label}</DialogTitle>
+          </DialogHeader>
+          {photo.url && (
+            <img 
+              src={photo.url} 
+              alt={label} 
+              className="w-full max-h-[70vh] object-contain rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 export default function DriverVehicle() {
   const { toast } = useToast();
-  const [, navigate] = useLocation();
+  
+  const [vehicleInfo, setVehicleInfo] = useState<VehicleInfo>(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : {
+      make: "",
+      model: "",
+      year: "",
+      color: "",
+      licensePlate: "",
+      vin: "",
+      registrationExpiry: "",
+      insuranceExpiry: "",
+    };
+  });
 
-  // Fetch driver home data to check if vehicle exists
+  const [photos, setPhotos] = useState<VehiclePhoto[]>(() => {
+    const saved = localStorage.getItem(PHOTOS_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [
+      { type: "front", url: null, status: "not_submitted" },
+      { type: "back", url: null, status: "not_submitted" },
+      { type: "side", url: null, status: "not_submitted" },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(vehicleInfo));
+  }, [vehicleInfo]);
+
+  useEffect(() => {
+    localStorage.setItem(PHOTOS_STORAGE_KEY, JSON.stringify(photos));
+  }, [photos]);
+
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
   });
 
-  const vehicle = (driverData as any)?.vehicle;
-  const hasVehicle = !!vehicle;
-
-  // Dropdown state for model
-  const [selectedModel, setSelectedModel] = useState<string>("");
-  const [customModel, setCustomModel] = useState<string>("");
-  const [modelInitialized, setModelInitialized] = useState(false);
-
-  const form = useForm<VehicleFormData>({
-    resolver: zodResolver(vehicleSchema),
-    defaultValues: {
-      vehicleType: vehicle?.vehicleType || "",
-      vehicleModel: "", // Start empty to force dropdown selection
-      vehiclePlate: vehicle?.vehiclePlate || "",
-    },
-  });
-
-  // Initialize model dropdown from existing vehicle data
-  useEffect(() => {
-    if (vehicle && !modelInitialized) {
-      const savedModel = vehicle.vehicleModel || "";
-      
-      // Check if saved model matches predefined options
-      const isModelPredefined = VEHICLE_MODELS.includes(savedModel as any);
-      if (isModelPredefined && savedModel !== "Other") {
-        setSelectedModel(savedModel);
-        setCustomModel("");
-        form.setValue("vehicleModel", savedModel);
-      } else if (savedModel) {
-        // Custom model - select "Other" and prefill custom field
-        setSelectedModel("Other");
-        setCustomModel(savedModel);
-        form.setValue("vehicleModel", savedModel);
-      }
-      setModelInitialized(true);
-    }
-  }, [vehicle, modelInitialized, form]);
-
-  // Reset form when vehicle data loads
-  if (vehicle && !form.getValues().vehicleType) {
-    form.reset({
-      vehicleType: vehicle.vehicleType,
-      vehicleModel: vehicle.vehicleModel,
-      vehiclePlate: vehicle.vehiclePlate,
+  const updateVehicleInfo = (field: keyof VehicleInfo, value: string) => {
+    setVehicleInfo(prev => ({ ...prev, [field]: value }));
+    toast({
+      title: "Saved",
+      description: `${field.replace(/([A-Z])/g, " $1").replace(/^./, str => str.toUpperCase())} updated successfully.`,
     });
-  }
-
-  // Mutation to register vehicle (POST)
-  const registerVehicleMutation = useMutation({
-    mutationFn: async (data: VehicleFormData) => {
-      const result = await apiRequest("/api/driver/vehicle", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      return result;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
-      toast({
-        title: "Vehicle registered",
-        description: "Your vehicle has been registered successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Registration failed",
-        description: error.message || "Unable to register vehicle. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Mutation to update vehicle (PATCH)
-  const updateVehicleMutation = useMutation({
-    mutationFn: async (data: VehicleFormData) => {
-      const result = await apiRequest("/api/driver/vehicle", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-      return result;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
-      toast({
-        title: "Vehicle updated",
-        description: "Your vehicle information has been updated successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Update failed",
-        description: error.message || "Unable to update vehicle. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const onSubmit = (data: VehicleFormData) => {
-    // Validate dropdown selection
-    if (!selectedModel) {
-      toast({
-        title: "Validation error",
-        description: "Please select a vehicle model",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Build final model value from dropdown selection + custom input
-    let finalModel = selectedModel;
-    
-    if (selectedModel === "Other") {
-      if (!customModel?.trim()) {
-        toast({
-          title: "Validation error",
-          description: "Please enter a custom vehicle model",
-          variant: "destructive",
-        });
-        return;
-      }
-      finalModel = customModel.trim();
-    }
-    
-    const submitData = {
-      ...data,
-      vehicleModel: finalModel,
-    };
-    
-    if (hasVehicle) {
-      updateVehicleMutation.mutate(submitData);
-    } else {
-      registerVehicleMutation.mutate(submitData);
-    }
   };
 
-  const isPending = registerVehicleMutation.isPending || updateVehicleMutation.isPending;
+  const handlePhotoUpload = (type: "front" | "back" | "side", file: File) => {
+    const url = URL.createObjectURL(file);
+    setPhotos(prev => prev.map(p => 
+      p.type === type ? { ...p, url, status: "pending" } : p
+    ));
+    toast({
+      title: "Photo Uploaded",
+      description: `Vehicle ${type} photo uploaded and pending review.`,
+    });
+  };
+
+  const requiredFields = ["make", "model", "year", "color", "licensePlate"];
+  const completedFields = requiredFields.filter(f => !!vehicleInfo[f as keyof VehicleInfo]);
+  const completedPhotos = photos.filter(p => p.url);
+  
+  const totalRequired = requiredFields.length + 3;
+  const totalCompleted = completedFields.length + completedPhotos.length;
+  const progressPercent = Math.round((totalCompleted / totalRequired) * 100);
+
+  const isComplete = totalCompleted === totalRequired;
+
+  useEffect(() => {
+    const checklistKey = "safego-driver-checklist-completed";
+    const saved = localStorage.getItem(checklistKey);
+    const checklist = saved ? JSON.parse(saved) : {};
+    
+    if (isComplete !== checklist.vehicleInfo) {
+      checklist.vehicleInfo = isComplete;
+      localStorage.setItem(checklistKey, JSON.stringify(checklist));
+    }
+  }, [isComplete]);
 
   if (isLoading) {
     return (
-      <div className="p-6 max-w-2xl mx-auto">
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-4 w-64 mt-2" />
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-          </CardContent>
-        </Card>
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-4 w-96" />
+        <Skeleton className="h-32 w-full" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[1, 2, 3, 4].map(i => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Car className="h-6 w-6" />
-            Vehicle {hasVehicle ? "Information" : "Registration"}
-          </CardTitle>
-          <CardDescription>
-            {hasVehicle
-              ? "Update your vehicle information"
-              : "Register your vehicle to start accepting rides"}
-          </CardDescription>
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">
+            Vehicle Information
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Add and manage your vehicle details to start driving with SafeGo
+          </p>
+        </div>
+        <Link href="/driver/getting-started">
+          <Button variant="outline" size="sm">
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Back
+          </Button>
+        </Link>
+      </div>
+
+      <Card data-testid="card-progress-summary">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-lg">Completion Status</CardTitle>
+            <Badge 
+              variant="outline" 
+              className={isComplete 
+                ? "bg-green-50 dark:bg-green-950 text-green-600 border-0" 
+                : "bg-yellow-50 dark:bg-yellow-950 text-yellow-600 border-0"
+              }
+            >
+              {isComplete ? (
+                <>
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  Complete
+                </>
+              ) : (
+                <>
+                  <Clock className="w-3 h-3 mr-1" />
+                  In Progress
+                </>
+              )}
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent>
-          {hasVehicle && (
-            <div className="mb-6 p-4 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
-                <CheckCircle className="h-5 w-5" />
-                <span className="font-medium">Vehicle Registered</span>
-              </div>
+          <div className="space-y-3">
+            <Progress value={progressPercent} className="h-2" data-testid="progress-vehicle" />
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">
+                {totalCompleted} of {totalRequired} items completed
+              </span>
+              <span className="font-medium">{progressPercent}%</span>
             </div>
-          )}
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Vehicle Type */}
-              <FormField
-                control={form.control}
-                name="vehicleType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Vehicle Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-vehicle-type">
-                          <SelectValue placeholder="Select vehicle type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="sedan">Sedan</SelectItem>
-                        <SelectItem value="suv">SUV</SelectItem>
-                        <SelectItem value="hatchback">Hatchback</SelectItem>
-                        <SelectItem value="van">Van</SelectItem>
-                        <SelectItem value="truck">Truck</SelectItem>
-                        <SelectItem value="motorcycle">Motorcycle</SelectItem>
-                        <SelectItem value="rickshaw">Rickshaw</SelectItem>
-                        <SelectItem value="auto-rickshaw">Auto Rickshaw</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Vehicle Model Dropdown */}
-              <FormItem>
-                <FormLabel>Vehicle Model</FormLabel>
-                <Select
-                  value={selectedModel}
-                  onValueChange={(value) => {
-                    setSelectedModel(value);
-                    if (value !== "Other") {
-                      setCustomModel("");
-                      form.setValue("vehicleModel", value);
-                    }
-                  }}
-                >
-                  <FormControl>
-                    <SelectTrigger data-testid="select-vehicle-model">
-                      <SelectValue placeholder="Select vehicle model" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {VEHICLE_MODELS.map((model) => (
-                      <SelectItem 
-                        key={model} 
-                        value={model}
-                        data-testid={`option-model-${model.toLowerCase().replace(/\s+/g, '-')}`}
-                      >
-                        {model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedModel === "Other" && (
-                  <Input
-                    id="customModel"
-                    data-testid="input-custom-model"
-                    value={customModel}
-                    onChange={(e) => {
-                      setCustomModel(e.target.value);
-                      form.setValue("vehicleModel", e.target.value);
-                    }}
-                    placeholder="Enter custom model (e.g., Honda Accord 2018)"
-                    className="mt-2"
-                  />
-                )}
-                <FormMessage />
-              </FormItem>
-
-              {/* License Plate */}
-              <FormField
-                control={form.control}
-                name="vehiclePlate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>License Plate Number</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., ABC-1234"
-                        data-testid="input-license-plate"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={
-                  isPending || 
-                  !selectedModel || 
-                  (selectedModel === "Other" && !customModel?.trim())
-                }
-                data-testid="button-submit-vehicle"
-              >
-                <Car className="h-4 w-4 mr-2" />
-                {isPending
-                  ? hasVehicle
-                    ? "Updating..."
-                    : "Registering..."
-                  : hasVehicle
-                  ? "Update Vehicle"
-                  : "Register Vehicle"}
-              </Button>
-            </form>
-          </Form>
+          </div>
         </CardContent>
       </Card>
+
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Vehicle Details</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <VehicleInfoCard
+            label="Vehicle Make"
+            value={vehicleInfo.make}
+            icon={Car}
+            onSave={(v) => updateVehicleInfo("make", v)}
+            options={VEHICLE_MAKES}
+            placeholder="Select make"
+          />
+          <VehicleInfoCard
+            label="Vehicle Model"
+            value={vehicleInfo.model}
+            icon={Car}
+            onSave={(v) => updateVehicleInfo("model", v)}
+            placeholder="Enter model"
+          />
+          <VehicleInfoCard
+            label="Vehicle Year"
+            value={vehicleInfo.year}
+            icon={Calendar}
+            onSave={(v) => updateVehicleInfo("year", v)}
+            options={YEARS}
+            placeholder="Select year"
+          />
+          <VehicleInfoCard
+            label="Color"
+            value={vehicleInfo.color}
+            icon={Palette}
+            onSave={(v) => updateVehicleInfo("color", v)}
+            options={VEHICLE_COLORS}
+            placeholder="Select color"
+          />
+          <VehicleInfoCard
+            label="License Plate"
+            value={vehicleInfo.licensePlate}
+            icon={Hash}
+            onSave={(v) => updateVehicleInfo("licensePlate", v)}
+            placeholder="Enter license plate"
+          />
+          <VehicleInfoCard
+            label="VIN"
+            value={vehicleInfo.vin}
+            icon={FileText}
+            onSave={(v) => updateVehicleInfo("vin", v)}
+            isMasked={true}
+            placeholder="Enter VIN (17 characters)"
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Document Expiry Dates</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ExpiryCard
+            label="Registration Expiry"
+            value={vehicleInfo.registrationExpiry}
+            onSave={(v) => updateVehicleInfo("registrationExpiry", v)}
+          />
+          <ExpiryCard
+            label="Insurance Expiry"
+            value={vehicleInfo.insuranceExpiry}
+            onSave={(v) => updateVehicleInfo("insuranceExpiry", v)}
+          />
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Vehicle Photos</h2>
+        <p className="text-sm text-muted-foreground">
+          Upload clear photos of your vehicle from different angles
+        </p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <PhotoUploadCard
+            label="Front View"
+            photo={photos.find(p => p.type === "front")!}
+            onUpload={(file) => handlePhotoUpload("front", file)}
+          />
+          <PhotoUploadCard
+            label="Back View"
+            photo={photos.find(p => p.type === "back")!}
+            onUpload={(file) => handlePhotoUpload("back", file)}
+          />
+          <PhotoUploadCard
+            label="Side View"
+            photo={photos.find(p => p.type === "side")!}
+            onUpload={(file) => handlePhotoUpload("side", file)}
+          />
+        </div>
+      </div>
+
+      {isComplete && (
+        <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+          <CardContent className="p-6 text-center">
+            <CheckCircle2 className="w-12 h-12 mx-auto text-green-600 mb-3" />
+            <h3 className="text-lg font-semibold text-green-800 dark:text-green-200 mb-1">
+              Vehicle Information Complete
+            </h3>
+            <p className="text-sm text-green-700 dark:text-green-300">
+              All required vehicle details and photos have been submitted
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground">
+          Need help?{" "}
+          <Link href="/driver/support-help-center" className="text-primary hover:underline">
+            Contact Support
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

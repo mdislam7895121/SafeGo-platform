@@ -1,0 +1,75 @@
+Follow all SafeGo Master Rules and implement D12: Driver Vehicle Center (Web Version).
+
+GOAL:
+Create a complete Uber-style Vehicle Information Center under /driver/vehicle. Drivers must be able to add, update, and view their vehicle information and upload vehicle photos. This page must integrate with D10 onboarding checklist and match the existing SafeGo design.
+
+1) ROUTE
+Create:
+- /driver/vehicle
+- Add navigation from D10 “Vehicle Information” checklist item
+- Optional sidebar item: “Vehicle”
+
+2) PAGE HEADER
+Add:
+- Title: “Vehicle Information”
+- Subtitle: “Add and manage your vehicle details to start driving with SafeGo.”
+
+3) VEHICLE INFO FIELDS (Editable UI)
+Create editable cards for:
+- Vehicle Make
+- Vehicle Model
+- Vehicle Year
+- Color
+- License Plate Number
+- VIN (store full but show masked: *****4321)
+Each card must include:
+- Edit button
+- Save button
+- Status indicator (Completed / Missing)
+
+4) VEHICLE PHOTOS (Upload Required)
+Create upload cards for:
+- Vehicle Front Photo
+- Vehicle Back Photo
+- Vehicle Side Photo
+Each card must have:
+- Upload button
+- Preview
+- Status (Not Submitted / Pending / Approved)
+- Replace option
+
+5) EXPIRY FIELDS
+Add fields with date selectors:
+- Registration Expiry
+- Insurance Expiry
+Auto-show warnings:
+- Yellow: expires in < 30 days
+- Red: expired
+- Green: valid
+
+6) LOCAL STATE LOGIC
+- Do not write to backend
+- Store vehicle details in local state or simple client store
+- Dynamically mark fields as Completed/Missing
+
+7) CHECKLIST INTEGRATION (D10)
+If all required vehicle fields + photos are completed:
+- Mark “Vehicle Information” item in /driver/getting-started as Completed
+- Recalculate progress
+
+8) UI STYLE
+- Uber-style clean cards
+- Consistent spacing, fonts, icons
+- Works on mobile
+- Clear badges: Approved / Pending / Missing
+
+9) SECURITY RULES
+- Mask VIN except last 4 digits
+- Do not log VIN or plate number
+- Safe image handling
+- Only authenticated drivers can access
+
+10) FINALIZE
+Build the entire page, link all buttons, validate mobile layout, ensure expiry warnings work, and integrate with D10 progress system.
+
+Complete all parts fully.
