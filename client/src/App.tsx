@@ -63,6 +63,9 @@ import DriverSupportLiveChat from "@/pages/driver/support-live-chat";
 import DriverSupportPhone from "@/pages/driver/support-phone";
 import DriverSupportTickets from "@/pages/driver/support-tickets";
 import DriverSupportTicketDetail from "@/pages/driver/support-ticket-detail";
+import DriverSupportHelpCenter from "@/pages/driver/support-help-center";
+import DriverSupportTicketsList from "@/pages/driver/support-tickets-list";
+import DriverSupportTicketView from "@/pages/driver/support-ticket-view";
 import DriverPoints from "@/pages/driver/points";
 import DriverPromotions from "@/pages/driver/promotions";
 import DriverHelp from "@/pages/driver/help";
@@ -438,6 +441,27 @@ function Router() {
       <Route path="/driver/support">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverSupport />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-help-center">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Help Center">
+            <DriverSupportHelpCenter />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-tickets">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Support Tickets">
+            <DriverSupportTicketsList />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support-ticket/:id">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Ticket Details">
+            <DriverSupportTicketView />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/wallet">
