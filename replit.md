@@ -63,6 +63,15 @@ Core systems and features include:
     - **Admin Panel** (`/admin/driver-support`): Ticket management dashboard with status counts, filters by status/category/priority, status updates with notes, internal admin notes (not visible to drivers), reply capability
     - **Status Workflow**: open → in_progress → resolved → closed with full audit trail
     - **API Routes**: Driver routes at `/api/driver/support-center/`, Admin routes at `/api/admin/support-center/driver-tickets`
+-   **Driver In-App Training & Onboarding System (D9)**: Uber-style driver onboarding and training system with:
+    - **Onboarding Wizard** (`/driver/onboarding`): 6-step guided onboarding (Welcome, Earnings, Payouts, Safety, Help Center, Completion)
+    - **Progress Tracking**: Step completion with timestamps, completion percentage, and resumable sessions
+    - **Training Videos** (`/driver/tutorials`): Tutorial library with 8 placeholder videos across 5 categories (rides, food, earnings, safety, general)
+    - **Category Filtering**: Filter tutorials by category with progress tracking
+    - **Skip/Reset**: Options to skip entire onboarding or reset progress for re-training
+    - **API Routes**: `GET /api/driver/onboarding/status`, `POST /api/driver/onboarding/complete-step`, `POST /api/driver/onboarding/skip`, `POST /api/driver/onboarding/reset`, `GET /api/driver/tutorials`, `POST /api/driver/tutorials/:id/view`
+    - **Database Model**: `DriverOnboarding` with step completion flags, timestamps, tutorialsViewed array, and completion status
+    - **Sidebar Integration**: "Getting Started" with "New" badge and "Training Videos" in driver sidebar navigation
 -   **Country-Specific Payment & Payout Configuration (D8)**: Comprehensive country-aware payout system with:
     - **Models Extended**: `Wallet` (holdAmount), `Payout` (feeAmount, netAmount, payoutMethodId), `CountryPayoutConfig` (serviceType, currency, maxPayoutAmount, platformFeeType, platformFeeValue, payoutDayOfWeek, payoutDayOfMonth)
     - **Driver Wallet APIs**: `GET /api/driver/wallet/summary` (balance, currency, hold, payout rules), `GET /api/driver/wallet/transactions` (paginated history)
