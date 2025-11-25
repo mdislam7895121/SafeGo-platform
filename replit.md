@@ -38,6 +38,16 @@ Core systems and features include:
 -   **Driver Public Profile Card**: Customer-facing driver preview with profile photo, vehicle details, driver stats, pronouns support, and integrated safety message.
 -   **Driver Earnings & Payout Dashboard**: Comprehensive earnings visibility and payout management system including summary, breakdown, transaction history, payout requests, and payout history.
 -   **Driver Promotions & Incentives System**: Comprehensive bonus management system allowing admins to create trip-based promotions with automated progress tracking and automatic payouts. Supports `PER_TRIP_BONUS`, `QUEST_TRIPS`, `EARNINGS_THRESHOLD` promotion types, service types targeting, geographic targeting, and DRAFT → ACTIVE → PAUSED/ENDED workflow.
+-   **Promotions Date Strip (D7)**: Uber/Lyft-style horizontal scrollable date carousel on the driver Promotions page (`/driver/promotions`). Features include:
+    - 14-day date range display with swipeable/scrollable pills
+    - Each pill shows weekday initial (M, T, W, etc.) and day number
+    - Today's date highlighted with a dot indicator
+    - Selected date visually distinguished with white background
+    - Client-side filtering of promotions by selected date using `startAt`/`endAt` date ranges
+    - Auto-scroll to center the selected date on load
+    - Date-aware empty states showing the selected date
+    - Component: `client/src/components/driver/PromotionsDateStrip.tsx`
+    - Integration: `client/src/pages/driver/promotions.tsx`
 -   **Driver Document Management System**: Comprehensive document upload, verification, and management infrastructure with granular status tracking for individual documents and country-specific requirements.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
