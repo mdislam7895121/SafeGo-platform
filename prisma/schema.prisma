@@ -278,8 +278,46 @@ model DriverProfile {
   driverSupportCallbacks DriverSupportCallback[] @relation("DriverSupportCallbacks") // Phase 12 Extension
   promotionProgress     DriverPromotionProgress[] // D5: Driver promotion progress
   promotionPayouts      DriverPromotionPayout[]   // D5: Driver promotion payouts
+  onboarding            DriverOnboarding?         // D9: Driver onboarding progress
 
   @@map("driver_profiles")
+}
+
+// D9: Driver In-App Training & Onboarding System
+model DriverOnboarding {
+  id                    String        @id @default(uuid())
+  driverId              String        @unique
+  driver                DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  // Onboarding Steps (6 steps total)
+  welcomeCompleted      Boolean       @default(false)
+  welcomeCompletedAt    DateTime?
+  earningsCompleted     Boolean       @default(false)
+  earningsCompletedAt   DateTime?
+  payoutsCompleted      Boolean       @default(false)
+  payoutsCompletedAt    DateTime?
+  safetyCompleted       Boolean       @default(false)
+  safetyCompletedAt     DateTime?
+  helpCenterCompleted   Boolean       @default(false)
+  helpCenterCompletedAt DateTime?
+  completionCompleted   Boolean       @default(false)
+  completionCompletedAt DateTime?
+  
+  // Tutorial Progress
+  tutorialsViewed       String[]      @default([]) // Array of tutorial IDs viewed
+  
+  // Overall Status
+  isOnboardingComplete  Boolean       @default(false)
+  completionPercentage  Int           @default(0)  // 0-100
+  startedAt             DateTime      @default(now())
+  completedAt           DateTime?
+  lastStepViewed        String?       // Last step the driver was on
+  
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@index([driverId])
+  @@map("driver_onboarding")
 }
 
 model BlockedRider {
