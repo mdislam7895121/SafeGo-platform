@@ -2225,7 +2225,7 @@ router.delete("/vehicle-documents/:id", async (req: AuthRequest, res) => {
 router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const { vehicleColor, vehicleModel, licensePlateNumber } = req.body;
+    const { vehicleMake, vehicleColor, vehicleModel, licensePlateNumber } = req.body;
 
     // Get driver profile with vehicles and user
     const driverProfile = await prisma.driverProfile.findUnique({
@@ -2275,6 +2275,8 @@ router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
           id: randomUUID(),
           driverId: driverProfile.id,
           vehicleType: "car", // Default type
+          make: vehicleMake || null,
+          model: vehicleModel || null,
           vehicleModel: vehicleModel || "Not specified",
           vehiclePlate: licensePlateNumber || "Not specified",
           color: vehicleColor || null,
@@ -2290,8 +2292,12 @@ router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
         updatedAt: new Date(),
       };
 
+      if (vehicleMake) updateData.make = vehicleMake.trim();
       if (vehicleColor) updateData.color = vehicleColor.trim();
-      if (vehicleModel) updateData.vehicleModel = vehicleModel.trim();
+      if (vehicleModel) {
+        updateData.model = vehicleModel.trim();
+        updateData.vehicleModel = vehicleModel.trim(); // Keep legacy field for compatibility
+      }
       if (licensePlateNumber) {
         updateData.licensePlate = licensePlateNumber.trim();
         updateData.vehiclePlate = licensePlateNumber.trim(); // Also update vehiclePlate for consistency

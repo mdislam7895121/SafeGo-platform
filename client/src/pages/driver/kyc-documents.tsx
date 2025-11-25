@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { FileUpload } from "@/components/file-upload";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Select,
   SelectContent,
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { VEHICLE_BRANDS_MODELS, VEHICLE_COLORS as STANDARD_COLORS } from "../../../../shared/vehicleCatalog";
 
 // Predefined vehicle color options
 const VEHICLE_COLORS = [
@@ -263,11 +264,20 @@ export default function DriverKYCDocuments() {
     licensePlateNumber: "",
   });
   
-  // Dropdown state for color and model
+  // Dropdown state for brand, color and model
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [customColor, setCustomColor] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [customModel, setCustomModel] = useState<string>("");
+
+  // Filter models based on selected brand
+  const availableModels = useMemo(() => {
+    if (!selectedBrand || selectedBrand === "Other") {
+      return [];
+    }
+    return VEHICLE_BRANDS_MODELS[selectedBrand as keyof typeof VEHICLE_BRANDS_MODELS] || [];
+  }, [selectedBrand]);
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
@@ -314,8 +324,28 @@ export default function DriverKYCDocuments() {
         const savedColor = vehicle.color || "";
         const savedModel = vehicle.vehicleModel || "";
         
+        // Initialize brand from vehicle.make or parse from vehicleModel
+        let savedBrand = vehicle.make || "";
+        if (!savedBrand && savedModel) {
+          // Try to parse brand from model (for legacy data like "Toyota Camry" or "Mercedes-Benz C-Class")
+          // Check all catalog brands to match multi-word brands
+          const catalogBrands = Object.keys(VEHICLE_BRANDS_MODELS);
+          for (const brand of catalogBrands) {
+            if (savedModel.startsWith(`${brand} `)) {
+              savedBrand = brand;
+              break;
+            }
+          }
+        }
+        if (savedBrand && Object.keys(VEHICLE_BRANDS_MODELS).includes(savedBrand)) {
+          setSelectedBrand(savedBrand);
+        } else if (savedBrand || savedModel) {
+          // If we have a model but no recognized brand, set to "Other" for custom entry
+          setSelectedBrand("Other");
+        }
+
         // Check if saved color matches predefined options
-        const isColorPredefined = VEHICLE_COLORS.includes(savedColor as any);
+        const isColorPredefined = STANDARD_COLORS.includes(savedColor as any);
         if (isColorPredefined && savedColor !== "Other") {
           setSelectedColor(savedColor);
           setCustomColor("");
@@ -325,13 +355,22 @@ export default function DriverKYCDocuments() {
           setCustomColor(savedColor);
         }
         
-        // Check if saved model matches predefined options
-        const isModelPredefined = VEHICLE_MODELS.includes(savedModel as any);
-        if (isModelPredefined && savedModel !== "Other") {
-          setSelectedModel(savedModel);
-          setCustomModel("");
+        // Check if saved model matches available models for the brand
+        if (savedBrand && savedBrand !== "Other") {
+          const brandModels = VEHICLE_BRANDS_MODELS[savedBrand as keyof typeof VEHICLE_BRANDS_MODELS] || [];
+          const modelOnly = savedModel.replace(`${savedBrand} `, ''); // Remove brand prefix for legacy data
+          if (brandModels.includes(modelOnly)) {
+            setSelectedModel(modelOnly);
+            setCustomModel("");
+          } else if (brandModels.includes(savedModel)) {
+            setSelectedModel(savedModel);
+            setCustomModel("");
+          } else if (savedModel) {
+            setSelectedModel("Other");
+            setCustomModel(savedModel);
+          }
         } else if (savedModel) {
-          // Custom model - select "Other" and prefill custom field
+          // No brand or custom brand - set model as custom
           setSelectedModel("Other");
           setCustomModel(savedModel);
         }
@@ -573,6 +612,7 @@ export default function DriverKYCDocuments() {
     }
     
     const data = {
+      vehicleMake: selectedBrand && selectedBrand !== "Other" ? selectedBrand : undefined,
       vehicleColor: finalColor,
       vehicleModel: finalModel,
       licensePlateNumber: vehicleKYCForm.licensePlateNumber,
@@ -582,7 +622,7 @@ export default function DriverKYCDocuments() {
   };
 
   const updateVehicleKYCMutation = useMutation({
-    mutationFn: async (data: { vehicleColor: string; vehicleModel: string; licensePlateNumber: string }) => {
+    mutationFn: async (data: { vehicleMake?: string; vehicleColor: string; vehicleModel: string; licensePlateNumber: string }) => {
       const result = await apiRequest("/api/driver/vehicle-kyc-details", {
         method: "PUT",
         body: JSON.stringify(data),
@@ -1009,7 +1049,78 @@ export default function DriverKYCDocuments() {
             <CardDescription>{isUSA ? "Required for USA drivers" : "Vehicle information for KYC"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Vehicle Brand Dropdown */}
+              <div className="space-y-2">
+                <Label htmlFor="vehicleBrand">Vehicle Brand {isUSA && "*"}</Label>
+                <Select
+                  value={selectedBrand}
+                  onValueChange={(value) => {
+                    setSelectedBrand(value);
+                    if (value === "Other") {
+                      // When brand is "Other", auto-enable custom model input
+                      setSelectedModel("Other");
+                    } else {
+                      setSelectedModel(""); // Reset model when brand changes to a catalog brand
+                      setCustomModel("");
+                    }
+                  }}
+                >
+                  <SelectTrigger id="vehicleBrand" data-testid="select-vehicle-brand">
+                    <SelectValue placeholder="Select vehicle brand" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(VEHICLE_BRANDS_MODELS).map((brand) => (
+                      <SelectItem key={brand} value={brand} data-testid={`option-brand-${brand.toLowerCase()}`}>
+                        {brand}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Select your vehicle manufacturer/brand
+                </p>
+              </div>
+
+              {/* Vehicle Model Dropdown */}
+              <div className="space-y-2">
+                <Label htmlFor="vehicleModel">Vehicle Model {isUSA && "*"}</Label>
+                <Select
+                  value={selectedModel}
+                  onValueChange={(value) => {
+                    setSelectedModel(value);
+                    if (value !== "Other") {
+                      setCustomModel("");
+                    }
+                  }}
+                  disabled={!selectedBrand || selectedBrand === "Other"}
+                >
+                  <SelectTrigger id="vehicleModel" data-testid="select-vehicle-model">
+                    <SelectValue placeholder={selectedBrand ? "Select model" : "Select brand first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableModels.map((model) => (
+                      <SelectItem key={model} value={model} data-testid={`option-model-${model.toLowerCase().replace(/\s+/g, '-')}`}>
+                        {model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedModel === "Other" && (
+                  <Input
+                    id="customModel"
+                    data-testid="input-custom-model"
+                    value={customModel}
+                    onChange={(e) => setCustomModel(e.target.value)}
+                    placeholder="Enter custom model (e.g., Accord 2018)"
+                    className="mt-2"
+                  />
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {!selectedBrand ? "Select brand first" : selectedModel === "Other" ? "Enter model and year" : "Select your vehicle model"}
+                </p>
+              </div>
+
               {/* Vehicle Color Dropdown */}
               <div className="space-y-2">
                 <Label htmlFor="vehicleColor">Vehicle Color {isUSA && "*"}</Label>
@@ -1026,7 +1137,7 @@ export default function DriverKYCDocuments() {
                     <SelectValue placeholder="Select vehicle color" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VEHICLE_COLORS.map((color) => (
+                    {STANDARD_COLORS.map((color) => (
                       <SelectItem key={color} value={color} data-testid={`option-color-${color.toLowerCase()}`}>
                         {color}
                       </SelectItem>
@@ -1045,44 +1156,6 @@ export default function DriverKYCDocuments() {
                 )}
                 <p className="text-xs text-muted-foreground">
                   {selectedColor === "Other" ? "Enter custom color" : "Select your vehicle's color"}
-                </p>
-              </div>
-
-              {/* Vehicle Model Dropdown */}
-              <div className="space-y-2">
-                <Label htmlFor="vehicleModel">Vehicle Model {isUSA && "*"}</Label>
-                <Select
-                  value={selectedModel}
-                  onValueChange={(value) => {
-                    setSelectedModel(value);
-                    if (value !== "Other") {
-                      setCustomModel("");
-                    }
-                  }}
-                >
-                  <SelectTrigger id="vehicleModel" data-testid="select-vehicle-model">
-                    <SelectValue placeholder="Select vehicle model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {VEHICLE_MODELS.map((model) => (
-                      <SelectItem key={model} value={model} data-testid={`option-model-${model.toLowerCase().replace(/\s+/g, '-')}`}>
-                        {model}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {selectedModel === "Other" && (
-                  <Input
-                    id="customModel"
-                    data-testid="input-custom-model"
-                    value={customModel}
-                    onChange={(e) => setCustomModel(e.target.value)}
-                    placeholder="Enter custom model (e.g., Honda Accord 2018)"
-                    className="mt-2"
-                  />
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {selectedModel === "Other" ? "Enter make, model, and year" : "Select your vehicle model"}
                 </p>
               </div>
 
