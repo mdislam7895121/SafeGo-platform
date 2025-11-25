@@ -133,7 +133,7 @@ export default function DriverGettingStarted() {
       },
     ];
 
-    if (isNYC || countryCode === "US") {
+    if (isNYC) {
       items.push({
         id: "tlc-license",
         title: "TLC License",
