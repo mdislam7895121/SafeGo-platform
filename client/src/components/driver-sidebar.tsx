@@ -37,7 +37,7 @@ const menuItems = [
   {
     title: "Getting Started",
     icon: Sparkles,
-    href: "/driver/onboarding",
+    href: "/driver/getting-started",
     isNew: true,
   },
   {

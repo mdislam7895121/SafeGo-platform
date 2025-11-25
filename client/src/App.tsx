@@ -92,6 +92,7 @@ import DriverEarnings from "@/pages/driver/earnings";
 import DriverPayouts from "@/pages/driver/payouts";
 import DriverDocuments from "@/pages/driver/documents";
 import DriverOnboarding from "@/pages/driver/onboarding";
+import DriverGettingStarted from "@/pages/driver/getting-started";
 import DriverTutorials from "@/pages/driver/tutorials";
 
 // Restaurant pages
@@ -529,9 +530,16 @@ function Router() {
           </DriverLayout>
         </ProtectedRoute>
       </Route>
-      <Route path="/driver/onboarding">
+      <Route path="/driver/getting-started">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Getting Started">
+            <DriverGettingStarted />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/onboarding">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Onboarding Wizard">
             <DriverOnboarding />
           </DriverLayout>
         </ProtectedRoute>
