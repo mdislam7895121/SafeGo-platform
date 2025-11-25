@@ -96,6 +96,8 @@ const notificationPreferencesSchema = z.object({
   notifySupport: z.boolean().optional(),
   notifyEmailWeekly: z.boolean().optional(),
   notifyEmailTips: z.boolean().optional(),
+  notifySms: z.boolean().optional(),
+  notifyPush: z.boolean().optional(),
 }).refine((data) => Object.keys(data).length > 0, {
   message: "At least one preference must be provided",
 });
@@ -106,6 +108,33 @@ const languagePreferenceSchema = z.object({
 
 const themePreferenceSchema = z.object({
   themePreference: z.enum(["light", "dark", "system"]),
+});
+
+// D14: Extended Preference Schemas
+const tripPreferencesSchema = z.object({
+  preferShortTrips: z.boolean().optional(),
+  avoidHighways: z.boolean().optional(),
+  acceptLongTrips: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: "At least one preference must be provided",
+});
+
+const earningsPreferencesSchema = z.object({
+  weeklyPayoutDay: z.enum(["monday", "tuesday", "wednesday", "thursday", "friday"]).optional(),
+  instantPayoutEnabled: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: "At least one preference must be provided",
+});
+
+const safetyPreferencesSchema = z.object({
+  shareTripStatus: z.boolean().optional(),
+  emergencyShortcutEnabled: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+  message: "At least one preference must be provided",
+});
+
+const regionPreferenceSchema = z.object({
+  regionPreference: z.enum(["auto", "us", "bd", "in", "pk", "gb"]),
 });
 
 // ====================================================
@@ -4374,8 +4403,17 @@ router.get("/preferences", async (req: AuthRequest, res) => {
         notifySupport: true,
         notifyEmailWeekly: true,
         notifyEmailTips: true,
+        notifySms: true,
+        notifyPush: true,
         preferredLanguage: true,
         themePreference: true,
+        preferShortTrips: true,
+        avoidHighways: true,
+        weeklyPayoutDay: true,
+        instantPayoutEnabled: true,
+        shareTripStatus: true,
+        emergencyShortcutEnabled: true,
+        regionPreference: true,
       },
     });
 
@@ -4606,6 +4644,136 @@ router.patch("/preferences/theme", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Update theme error:", error);
     res.status(500).json({ error: "Failed to update theme preference" });
+  }
+});
+
+// ====================================================
+// D14: PATCH /api/driver/preferences/trip
+// Update trip preferences
+// ====================================================
+router.patch("/preferences/trip", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = tripPreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: validationResult.data,
+    });
+
+    res.json({
+      message: "Trip preferences updated successfully",
+      preferShortTrips: updatedProfile.preferShortTrips,
+      avoidHighways: updatedProfile.avoidHighways,
+      acceptLongTrips: updatedProfile.acceptLongTrips,
+    });
+  } catch (error) {
+    console.error("Update trip preferences error:", error);
+    res.status(500).json({ error: "Failed to update trip preferences" });
+  }
+});
+
+// ====================================================
+// D14: PATCH /api/driver/preferences/earnings
+// Update earnings preferences
+// ====================================================
+router.patch("/preferences/earnings", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = earningsPreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: validationResult.data,
+    });
+
+    res.json({
+      message: "Earnings preferences updated successfully",
+      weeklyPayoutDay: updatedProfile.weeklyPayoutDay,
+      instantPayoutEnabled: updatedProfile.instantPayoutEnabled,
+    });
+  } catch (error) {
+    console.error("Update earnings preferences error:", error);
+    res.status(500).json({ error: "Failed to update earnings preferences" });
+  }
+});
+
+// ====================================================
+// D14: PATCH /api/driver/preferences/safety
+// Update safety preferences
+// ====================================================
+router.patch("/preferences/safety", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = safetyPreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: validationResult.data,
+    });
+
+    res.json({
+      message: "Safety preferences updated successfully",
+      shareTripStatus: updatedProfile.shareTripStatus,
+      emergencyShortcutEnabled: updatedProfile.emergencyShortcutEnabled,
+    });
+  } catch (error) {
+    console.error("Update safety preferences error:", error);
+    res.status(500).json({ error: "Failed to update safety preferences" });
+  }
+});
+
+// ====================================================
+// D14: PATCH /api/driver/preferences/region
+// Update region preference
+// ====================================================
+router.patch("/preferences/region", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = regionPreferenceSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { regionPreference } = validationResult.data;
+
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: { regionPreference },
+    });
+
+    res.json({
+      message: "Region preference updated successfully",
+      regionPreference: updatedProfile.regionPreference,
+    });
+  } catch (error) {
+    console.error("Update region preference error:", error);
+    res.status(500).json({ error: "Failed to update region preference" });
   }
 });
 
