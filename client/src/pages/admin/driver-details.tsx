@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation, useRoute } from "wouter";
 import { ArrowLeft, Car, Shield, Ban, Unlock, Trash2, Clock, DollarSign, Star, TrendingUp, AlertCircle, User, Edit, Wallet, Plus } from "lucide-react";
-import { VEHICLE_BRANDS_MODELS, STANDARD_COLORS } from "@shared/vehicleCatalog";
+import { VEHICLE_BRANDS_MODELS, VEHICLE_COLORS } from "@shared/vehicleCatalog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -827,7 +827,7 @@ export default function AdminDriverDetails() {
       }
 
       // Set color dropdown
-      if (STANDARD_COLORS.includes(savedColor as any)) {
+      if (VEHICLE_COLORS.includes(savedColor as any)) {
         setSelectedColor(savedColor);
         setCustomColor("");
       } else if (savedColor) {
@@ -2699,10 +2699,9 @@ export default function AdminDriverDetails() {
                   <SelectValue placeholder="Select color" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STANDARD_COLORS.map((color) => (
+                  {VEHICLE_COLORS.map((color) => (
                     <SelectItem key={color} value={color}>{color}</SelectItem>
                   ))}
-                  <SelectItem value="Other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
