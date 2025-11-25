@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation, useRoute } from "wouter";
 import { ArrowLeft, Car, Shield, Ban, Unlock, Trash2, Clock, DollarSign, Star, TrendingUp, AlertCircle, User, Edit, Wallet, Plus } from "lucide-react";
+import { VEHICLE_BRANDS_MODELS, STANDARD_COLORS } from "@shared/vehicleCatalog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -306,6 +307,23 @@ export default function AdminDriverDetails() {
     dmvInspectionExpiry: "",
     dmvInspectionImageUrl: "",
   });
+
+  // Vehicle dropdown state for admin edit
+  const [selectedBrand, setSelectedBrand] = useState<string>("");
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedColor, setSelectedColor] = useState<string>("");
+  const [customBrand, setCustomBrand] = useState<string>("");
+  const [customModel, setCustomModel] = useState<string>("");
+  const [customColor, setCustomColor] = useState<string>("");
+
+  // Filter models based on selected brand
+  const availableModels = useMemo(() => {
+    if (!selectedBrand || selectedBrand === "Other") {
+      return ["Other"];
+    }
+    const brandModels = VEHICLE_BRANDS_MODELS[selectedBrand as keyof typeof VEHICLE_BRANDS_MODELS] || [];
+    return [...brandModels, "Other"];
+  }, [selectedBrand]);
 
   // Payout Account dialog state
   const [showPayoutDialog, setShowPayoutDialog] = useState(false);
@@ -669,16 +687,46 @@ export default function AdminDriverDetails() {
     setShowEditUsaDialog(true);
   };
 
+  // Compute final vehicle values from dropdown state
+  const computeVehiclePayload = () => {
+    // Compute make
+    const finalMake = selectedBrand === "Other" ? customBrand.trim() : selectedBrand;
+    
+    // Compute model
+    let finalModel = "";
+    if (selectedBrand === "Other") {
+      finalModel = customModel.trim();
+    } else if (selectedModel === "Other") {
+      finalModel = customModel.trim();
+    } else {
+      finalModel = selectedModel;
+    }
+    
+    // Compute color
+    const finalColor = selectedColor === "Other" ? customColor.trim() : selectedColor;
+    
+    // Compute displayName for backward compatibility
+    const displayName = finalMake && finalModel 
+      ? `${finalMake} ${finalModel}`
+      : finalModel || finalMake || "";
+    
+    return { make: finalMake, model: finalModel, color: finalColor, displayName };
+  };
+
   // Update vehicle mutation  
   const updateVehicleMutation = useMutation({
     mutationFn: async (data: typeof editVehicleForm) => {
+      // Get computed values from dropdown state
+      const computed = computeVehiclePayload();
+      
       // Convert year string to number
       const payload: any = {};
       if (data.vehicleType) payload.vehicleType = data.vehicleType;
-      if (data.make) payload.make = data.make;
-      if (data.model) payload.model = data.model;
+      if (computed.make) payload.make = computed.make;
+      if (computed.model) payload.model = computed.model;
+      if (computed.displayName) payload.vehicleModel = computed.displayName; // Legacy field
       if (data.year) payload.year = parseInt(data.year);
-      if (data.color) payload.color = data.color;
+      if (computed.color) payload.color = computed.color;
       if (data.licensePlate) payload.licensePlate = data.licensePlate;
       if (data.registrationDocumentUrl) payload.registrationDocumentUrl = data.registrationDocumentUrl;
       if (data.registrationExpiry) payload.registrationExpiry = data.registrationExpiry;
@@ -701,6 +749,7 @@ export default function AdminDriverDetails() {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/drivers"] });
       setShowEditVehicleDialog(false);
+      // Reset form and dropdown state
       setEditVehicleForm({
         vehicleType: "",
         make: "",
@@ -717,6 +766,12 @@ export default function AdminDriverDetails() {
         dmvInspectionExpiry: "",
         dmvInspectionImageUrl: "",
       });
+      setSelectedBrand("");
+      setSelectedModel("");
+      setSelectedColor("");
+      setCustomBrand("");
+      setCustomModel("");
+      setCustomColor("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -726,12 +781,69 @@ export default function AdminDriverDetails() {
   // Handler to open vehicle edit dialog with existing data
   const handleOpenEditVehicleDialog = () => {
     if (driver && driver.vehicle) {
+      const savedMake = driver.vehicle.make || "";
+      const savedModel = driver.vehicle.model || driver.vehicle.vehicleModel || "";
+      const savedColor = driver.vehicle.color || "";
+
+      // Initialize brand dropdown
+      let derivedBrand = savedMake;
+      let derivedModel = savedModel;
+
+      // Try to parse brand from legacy combined model if make is missing
+      if (!derivedBrand && savedModel) {
+        const catalogBrands = Object.keys(VEHICLE_BRANDS_MODELS);
+        for (const brand of catalogBrands) {
+          if (savedModel.startsWith(`${brand} `)) {
+            derivedBrand = brand;
+            derivedModel = savedModel.substring(brand.length + 1);
+            break;
+          }
+        }
+      }
+
+      // Set brand dropdown
+      if (derivedBrand && Object.keys(VEHICLE_BRANDS_MODELS).includes(derivedBrand)) {
+        setSelectedBrand(derivedBrand);
+        setCustomBrand("");
+        // Check if model exists in catalog for this brand
+        const brandModels = VEHICLE_BRANDS_MODELS[derivedBrand as keyof typeof VEHICLE_BRANDS_MODELS] || [];
+        if (brandModels.includes(derivedModel)) {
+          setSelectedModel(derivedModel);
+          setCustomModel("");
+        } else {
+          setSelectedModel("Other");
+          setCustomModel(derivedModel);
+        }
+      } else if (derivedBrand || savedModel) {
+        setSelectedBrand("Other");
+        setCustomBrand(derivedBrand);
+        setSelectedModel("Other");
+        setCustomModel(derivedModel || savedModel);
+      } else {
+        setSelectedBrand("");
+        setCustomBrand("");
+        setSelectedModel("");
+        setCustomModel("");
+      }
+
+      // Set color dropdown
+      if (STANDARD_COLORS.includes(savedColor as any)) {
+        setSelectedColor(savedColor);
+        setCustomColor("");
+      } else if (savedColor) {
+        setSelectedColor("Other");
+        setCustomColor(savedColor);
+      } else {
+        setSelectedColor("");
+        setCustomColor("");
+      }
+
       setEditVehicleForm({
         vehicleType: driver.vehicle.vehicleType || "",
-        make: driver.vehicle.make || "",
-        model: driver.vehicle.model || driver.vehicle.vehicleModel || "",
+        make: derivedBrand,
+        model: derivedModel,
         year: driver.vehicle.year?.toString() || "",
-        color: driver.vehicle.color || "",
+        color: savedColor,
         licensePlate: driver.vehicle.licensePlate || driver.vehicle.vehiclePlate || "",
         registrationDocumentUrl: driver.vehicle.registrationDocumentUrl || "",
         registrationExpiry: driver.vehicle.registrationExpiry ? driver.vehicle.registrationExpiry.split('T')[0] : "",
@@ -742,6 +854,14 @@ export default function AdminDriverDetails() {
         dmvInspectionExpiry: driver.vehicle.dmvInspectionExpiry ? driver.vehicle.dmvInspectionExpiry.split('T')[0] : "",
         dmvInspectionImageUrl: driver.vehicle.dmvInspectionImageUrl || "",
       });
+    } else {
+      // Reset all dropdown state for new vehicle
+      setSelectedBrand("");
+      setSelectedModel("");
+      setSelectedColor("");
+      setCustomBrand("");
+      setCustomModel("");
+      setCustomColor("");
     }
     setShowEditVehicleDialog(true);
   };
@@ -2475,26 +2595,81 @@ export default function AdminDriverDetails() {
                 <option value="other">Other</option>
               </select>
             </div>
+            {/* Brand Dropdown */}
             <div className="grid gap-2">
-              <Label htmlFor="vehicle-make">Make</Label>
-              <Input
-                id="vehicle-make"
-                value={editVehicleForm.make}
-                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, make: e.target.value })}
-                placeholder="e.g., Toyota, Honda"
-                data-testid="input-vehicle-make"
-              />
+              <Label htmlFor="vehicle-brand">Brand</Label>
+              <Select
+                value={selectedBrand}
+                onValueChange={(value) => {
+                  setSelectedBrand(value);
+                  setSelectedModel("");
+                  setCustomModel("");
+                  if (value === "Other") {
+                    setCustomBrand("");
+                  }
+                }}
+              >
+                <SelectTrigger id="vehicle-brand" data-testid="select-vehicle-brand">
+                  <SelectValue placeholder="Select brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(VEHICLE_BRANDS_MODELS).map((brand) => (
+                    <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                  ))}
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {/* Custom Brand Input (when "Other" selected) */}
+            {selectedBrand === "Other" && (
+              <div className="grid gap-2">
+                <Label htmlFor="vehicle-custom-brand">Custom Brand</Label>
+                <Input
+                  id="vehicle-custom-brand"
+                  value={customBrand}
+                  onChange={(e) => setCustomBrand(e.target.value)}
+                  placeholder="Enter brand name"
+                  data-testid="input-vehicle-custom-brand"
+                />
+              </div>
+            )}
+            {/* Model Dropdown */}
             <div className="grid gap-2">
               <Label htmlFor="vehicle-model">Model</Label>
-              <Input
-                id="vehicle-model"
-                value={editVehicleForm.model}
-                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, model: e.target.value })}
-                placeholder="e.g., Camry, Accord"
-                data-testid="input-vehicle-model"
-              />
+              <Select
+                value={selectedModel}
+                onValueChange={(value) => {
+                  setSelectedModel(value);
+                  if (value !== "Other") {
+                    setCustomModel("");
+                  }
+                }}
+                disabled={!selectedBrand}
+              >
+                <SelectTrigger id="vehicle-model" data-testid="select-vehicle-model">
+                  <SelectValue placeholder={selectedBrand ? "Select model" : "Select brand first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModels.map((model) => (
+                    <SelectItem key={model} value={model}>{model}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+            {/* Custom Model Input (when "Other" selected) */}
+            {(selectedModel === "Other" || selectedBrand === "Other") && (
+              <div className="grid gap-2">
+                <Label htmlFor="vehicle-custom-model">Custom Model</Label>
+                <Input
+                  id="vehicle-custom-model"
+                  value={customModel}
+                  onChange={(e) => setCustomModel(e.target.value)}
+                  placeholder="Enter model name"
+                  data-testid="input-vehicle-custom-model"
+                />
+              </div>
+            )}
+            {/* Year Input */}
             <div className="grid gap-2">
               <Label htmlFor="vehicle-year">Year</Label>
               <Input
@@ -2508,16 +2683,42 @@ export default function AdminDriverDetails() {
                 data-testid="input-vehicle-year"
               />
             </div>
+            {/* Color Dropdown */}
             <div className="grid gap-2">
               <Label htmlFor="vehicle-color">Color</Label>
-              <Input
-                id="vehicle-color"
-                value={editVehicleForm.color}
-                onChange={(e) => setEditVehicleForm({ ...editVehicleForm, color: e.target.value })}
-                placeholder="e.g., Black, White"
-                data-testid="input-vehicle-color"
-              />
+              <Select
+                value={selectedColor}
+                onValueChange={(value) => {
+                  setSelectedColor(value);
+                  if (value !== "Other") {
+                    setCustomColor("");
+                  }
+                }}
+              >
+                <SelectTrigger id="vehicle-color" data-testid="select-vehicle-color">
+                  <SelectValue placeholder="Select color" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STANDARD_COLORS.map((color) => (
+                    <SelectItem key={color} value={color}>{color}</SelectItem>
+                  ))}
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            {/* Custom Color Input (when "Other" selected) */}
+            {selectedColor === "Other" && (
+              <div className="grid gap-2">
+                <Label htmlFor="vehicle-custom-color">Custom Color</Label>
+                <Input
+                  id="vehicle-custom-color"
+                  value={customColor}
+                  onChange={(e) => setCustomColor(e.target.value)}
+                  placeholder="Enter color"
+                  data-testid="input-vehicle-custom-color"
+                />
+              </div>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="vehicle-plate">License Plate</Label>
               <Input
