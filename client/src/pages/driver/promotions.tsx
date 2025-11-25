@@ -1,13 +1,14 @@
-import { Gift, TrendingUp, Clock, MapPin, Target, Zap, DollarSign, Trophy, CheckCircle, Car, UtensilsCrossed, Package, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Gift, TrendingUp, Clock, Target, Zap, DollarSign, Trophy, CheckCircle, Car, UtensilsCrossed, Package, ArrowLeft, AlertCircle, Timer, RefreshCw, Star, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { format, differenceInDays, differenceInHours } from "date-fns";
+import { format, differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, isPast } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface OpportunityBonus {
@@ -87,7 +88,7 @@ const bonusTypeIcons: Record<string, any> = {
 
 const promotionTypeLabels: Record<string, string> = {
   PER_TRIP_BONUS: "Per-Trip Bonus",
-  QUEST_TRIPS: "Complete Trips Quest",
+  QUEST_TRIPS: "Trip Quest",
   EARNINGS_THRESHOLD: "Earnings Goal",
 };
 
@@ -104,133 +105,310 @@ const serviceIcons: Record<string, any> = {
   ANY: Zap,
 };
 
+const serviceLabels: Record<string, string> = {
+  RIDES: "Rides",
+  FOOD: "Food Delivery",
+  PARCEL: "Parcels",
+  ANY: "All Services",
+};
+
 function formatCurrency(amount: number, country?: string): string {
   if (country === "BD") return `৳${amount.toFixed(2)}`;
   return `$${amount.toFixed(2)}`;
 }
 
-function getTimeRemaining(endAt: string): string {
-  const now = new Date();
-  const end = new Date(endAt);
-  const days = differenceInDays(end, now);
-  if (days > 0) return `${days} day${days > 1 ? "s" : ""} left`;
-  const hours = differenceInHours(end, now);
-  if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} left`;
-  return "Ending soon";
+function CountdownTimer({ endAt }: { endAt: string }) {
+  const [timeLeft, setTimeLeft] = useState("");
+  const [isUrgent, setIsUrgent] = useState(false);
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const end = new Date(endAt);
+      
+      if (isPast(end)) {
+        setTimeLeft("Ended");
+        return;
+      }
+
+      const days = differenceInDays(end, now);
+      const hours = differenceInHours(end, now) % 24;
+      const minutes = differenceInMinutes(end, now) % 60;
+      const seconds = differenceInSeconds(end, now) % 60;
+
+      setIsUrgent(days === 0 && hours < 6);
+
+      if (days > 0) {
+        setTimeLeft(`${days}d ${hours}h left`);
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m left`);
+      } else if (minutes > 0) {
+        setTimeLeft(`${minutes}m ${seconds}s left`);
+      } else {
+        setTimeLeft(`${seconds}s left`);
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [endAt]);
+
+  return (
+    <span className={`flex items-center gap-1 ${isUrgent ? "text-red-500 font-medium animate-pulse" : ""}`}>
+      <Timer className="h-3 w-3" />
+      {timeLeft}
+    </span>
+  );
 }
 
-function PromotionCard({ promotion, countryCode }: { promotion: DriverPromotion; countryCode?: string }) {
+function PromotionCard({ 
+  promotion, 
+  countryCode, 
+  variant = "active" 
+}: { 
+  promotion: DriverPromotion; 
+  countryCode?: string;
+  variant?: "active" | "completed" | "expired";
+}) {
   const TypeIcon = promotionTypeIcons[promotion.type] || Gift;
   const ServiceIcon = serviceIcons[promotion.serviceType] || Zap;
   
   const progress = promotion.progress;
   const isQuest = promotion.type === "QUEST_TRIPS";
   const isEarningsGoal = promotion.type === "EARNINGS_THRESHOLD";
+  const isPerTrip = promotion.type === "PER_TRIP_BONUS";
   
   let progressPercent = 0;
   let progressText = "";
+  let requirementText = "";
   
   if (isQuest && promotion.targetTrips) {
     const current = progress?.currentTrips || 0;
     progressPercent = Math.min((current / promotion.targetTrips) * 100, 100);
     progressText = `${current} / ${promotion.targetTrips} trips`;
+    requirementText = `Complete ${promotion.targetTrips} ${promotion.serviceType === "ANY" ? "" : serviceLabels[promotion.serviceType]?.toLowerCase()} trips`;
   } else if (isEarningsGoal && promotion.targetEarnings) {
     const current = progress?.currentEarnings || 0;
     progressPercent = Math.min((current / promotion.targetEarnings) * 100, 100);
     progressText = `${formatCurrency(current, countryCode)} / ${formatCurrency(promotion.targetEarnings, countryCode)}`;
+    requirementText = `Earn ${formatCurrency(promotion.targetEarnings, countryCode)} in ${serviceLabels[promotion.serviceType]?.toLowerCase() || "any"} service`;
+  } else if (isPerTrip) {
+    requirementText = `Earn bonus on each ${serviceLabels[promotion.serviceType]?.toLowerCase() || ""} trip`;
   }
 
   const isCompleted = progressPercent >= 100;
-  const timeRemaining = getTimeRemaining(promotion.endAt);
+  const isExpired = variant === "expired";
+  const showProgress = (isQuest || isEarningsGoal) && variant !== "expired";
+
+  const cardStyles = {
+    active: isCompleted ? "border-green-500/50 bg-green-50/10 dark:bg-green-950/20" : "",
+    completed: "border-green-500/50 bg-green-50/10 dark:bg-green-950/20",
+    expired: "opacity-75 border-muted"
+  };
 
   return (
     <Card 
-      className={`hover-elevate transition-all ${isCompleted ? "border-green-500/50 bg-green-50/10" : ""}`}
+      className={`transition-all ${cardStyles[variant]} ${variant === "active" && !isCompleted ? "hover-elevate" : ""}`}
       data-testid={`card-promotion-${promotion.id}`}
     >
       <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg ${isCompleted ? "bg-green-500/20" : "bg-primary/10"}`}>
-              <TypeIcon className={`h-5 w-5 ${isCompleted ? "text-green-600" : "text-primary"}`} />
+            <div className={`p-2.5 rounded-xl ${
+              variant === "completed" || isCompleted 
+                ? "bg-green-500/20" 
+                : variant === "expired" 
+                  ? "bg-muted" 
+                  : "bg-primary/10"
+            }`}>
+              <TypeIcon className={`h-5 w-5 ${
+                variant === "completed" || isCompleted 
+                  ? "text-green-600" 
+                  : variant === "expired"
+                    ? "text-muted-foreground"
+                    : "text-primary"
+              }`} />
             </div>
-            <div>
-              <CardTitle className="text-base leading-tight">{promotion.name}</CardTitle>
-              <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className="text-xs">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base leading-tight truncate">{promotion.name}</CardTitle>
+              <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                <Badge variant="outline" className="text-xs shrink-0">
                   <ServiceIcon className="h-3 w-3 mr-1" />
-                  {promotion.serviceType === "ANY" ? "All Services" : promotion.serviceType}
+                  {serviceLabels[promotion.serviceType]}
                 </Badge>
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {timeRemaining}
-                </span>
+                {variant === "active" && !isCompleted && (
+                  <span className="text-xs text-muted-foreground">
+                    <CountdownTimer endAt={promotion.endAt} />
+                  </span>
+                )}
               </div>
             </div>
           </div>
-          {isCompleted && (
-            <Badge className="bg-green-500">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Done
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="pb-3">
-        {promotion.description && (
-          <p className="text-sm text-muted-foreground mb-3">{promotion.description}</p>
-        )}
-        
-        <div className="space-y-3">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-green-600">
-              {promotion.type === "PER_TRIP_BONUS" 
-                ? `${formatCurrency(promotion.rewardPerUnit, countryCode)} per trip`
-                : `${formatCurrency(promotion.rewardPerUnit, countryCode)} bonus`
-              }
-            </span>
-            {progress && progress.totalBonusEarned > 0 && (
-              <span className="text-muted-foreground">
-                Earned: {formatCurrency(progress.totalBonusEarned, countryCode)}
-              </span>
+          <div className="shrink-0">
+            {(variant === "completed" || isCompleted) && (
+              <Badge className="bg-green-500">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Done
+              </Badge>
+            )}
+            {variant === "expired" && !isCompleted && (
+              <Badge variant="secondary">
+                <AlertCircle className="h-3 w-3 mr-1" />
+                Expired
+              </Badge>
             )}
           </div>
-
-          {(isQuest || isEarningsGoal) && (
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Progress</span>
-                <span>{progressText}</span>
-              </div>
-              <Progress 
-                value={progressPercent} 
-                className={`h-2 ${isCompleted ? "[&>div]:bg-green-500" : ""}`} 
-              />
-            </div>
-          )}
         </div>
+      </CardHeader>
+      <CardContent className="pb-3 space-y-3">
+        {promotion.description && (
+          <p className="text-sm text-muted-foreground">{promotion.description}</p>
+        )}
+
+        <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Target className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">Requirement:</span>
+            <span className="font-medium">{requirementText}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Gift className="h-4 w-4 text-green-600" />
+            <span className="text-muted-foreground">Reward:</span>
+            <span className="font-semibold text-green-600">
+              {isPerTrip 
+                ? `${formatCurrency(promotion.rewardPerUnit, countryCode)} per trip`
+                : formatCurrency(promotion.rewardPerUnit, countryCode)
+              }
+            </span>
+          </div>
+        </div>
+
+        {showProgress && (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Your Progress</span>
+              <span className="font-medium">{progressText}</span>
+            </div>
+            <Progress 
+              value={progressPercent} 
+              className={`h-3 ${isCompleted ? "[&>div]:bg-green-500" : ""}`} 
+            />
+            {progressPercent > 0 && progressPercent < 100 && (
+              <p className="text-xs text-muted-foreground text-center">
+                {Math.round(100 - progressPercent)}% more to complete
+              </p>
+            )}
+          </div>
+        )}
+
+        {progress && progress.totalBonusEarned > 0 && (
+          <div className="flex items-center justify-between pt-2 border-t">
+            <span className="text-sm text-muted-foreground">Total Earned</span>
+            <span className="font-semibold text-green-600">
+              {formatCurrency(progress.totalBonusEarned, countryCode)}
+            </span>
+          </div>
+        )}
       </CardContent>
-      <CardFooter className="pt-0 text-xs text-muted-foreground">
-        Ends {format(new Date(promotion.endAt), "MMM d, yyyy 'at' h:mm a")}
+      <CardFooter className="pt-0 text-xs text-muted-foreground flex items-center gap-1">
+        <Calendar className="h-3 w-3" />
+        {variant === "expired" ? "Ended" : "Ends"} {format(new Date(promotion.endAt), "MMM d, yyyy 'at' h:mm a")}
       </CardFooter>
+    </Card>
+  );
+}
+
+function OpportunityBonusCard({ bonus, index }: { bonus: OpportunityBonus; index: number }) {
+  const BonusIcon = bonusTypeIcons[bonus.bonusType] || Gift;
+  
+  return (
+    <Card className="border-l-4 border-l-purple-500 hover-elevate" data-testid={`card-bonus-${index}`}>
+      <CardHeader>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-950/30 flex items-center justify-center flex-shrink-0">
+              <BonusIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">{bonusTypeLabels[bonus.bonusType]}</CardTitle>
+              <CardDescription className="mt-1">
+                {bonusTypeDescriptions[bonus.bonusType]}
+              </CardDescription>
+            </div>
+          </div>
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 flex-shrink-0 ml-2">
+            Active
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="p-3 bg-purple-50/50 dark:bg-purple-950/20 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Bonus per Trip</p>
+              <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                {bonus.currencySymbol}{bonus.effectiveBonus}
+              </p>
+              {bonus.isPromoActive && (
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
+                    <Star className="h-3 w-3 mr-1" />
+                    Promo Active
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    Base: {bonus.currencySymbol}{bonus.baseAmount}
+                  </span>
+                </div>
+              )}
+            </div>
+            {bonus.zoneId && (
+              <Badge variant="outline" className="text-sm">
+                Zone: {bonus.zoneId}
+              </Badge>
+            )}
+          </div>
+        </div>
+        {bonus.endAt && (
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <Clock className="h-3.5 w-3.5" />
+              {bonus.isPromoActive ? "Promo ends" : "Available until"}
+            </span>
+            <span className="font-medium">
+              {format(new Date(bonus.endAt), "MMM d, h:mm a")}
+            </span>
+          </div>
+        )}
+      </CardContent>
     </Card>
   );
 }
 
 export default function DriverPromotions() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const countryCode = user?.countryCode || "US";
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data: bonusData, isLoading: loadingBonuses } = useQuery<{ bonuses: OpportunityBonus[] }>({
     queryKey: ["/api/driver/opportunity-bonuses"],
+    refetchInterval: 60000,
   });
 
-  const { data: promotionData, isLoading: loadingPromotions } = useQuery<{ promotions: DriverPromotion[] }>({
+  const { data: promotionData, isLoading: loadingPromotions, refetch: refetchPromotions } = useQuery<{ promotions: DriverPromotion[] }>({
     queryKey: ["/api/driver/promotions/active"],
+    refetchInterval: 30000,
+  });
+
+  const { data: completedData, isLoading: loadingCompleted } = useQuery<{ completed: DriverPromotion[]; expired: DriverPromotion[] }>({
+    queryKey: ["/api/driver/promotions/completed"],
+    refetchInterval: 60000,
   });
 
   const { data: stats, isLoading: loadingStats } = useQuery<PromotionStats>({
     queryKey: ["/api/driver/promotions/stats"],
+    refetchInterval: 30000,
   });
 
   const { data: history, isLoading: loadingHistory } = useQuery<{ 
@@ -240,23 +418,52 @@ export default function DriverPromotions() {
     queryKey: ["/api/driver/promotions/history"],
   });
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/active"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/completed"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/stats"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/history"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/opportunity-bonuses"] }),
+    ]);
+    setIsRefreshing(false);
+  };
+
   const bonuses = bonusData?.bonuses || [];
   const promotions = promotionData?.promotions || [];
+  const completedPromotions = completedData?.completed || [];
+  const expiredPromotions = completedData?.expired || [];
   const bonusHistory = history?.payouts || [];
+
+  const activeQuests = promotions.filter(p => p.type !== "PER_TRIP_BONUS");
+  const perTripBonuses = promotions.filter(p => p.type === "PER_TRIP_BONUS");
 
   return (
     <div className="bg-background min-h-screen pb-20">
       <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Link href="/driver">
-            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <Gift className="h-6 w-6" />
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Promotions</h1>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-3">
+            <Link href="/driver">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <Gift className="h-6 w-6" />
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Promotions & Bonuses</h1>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="text-white hover:bg-white/20"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            data-testid="button-refresh"
+          >
+            <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
+          </Button>
         </div>
-        <p className="text-sm opacity-90">Active bonuses, quests, and special offers</p>
+        <p className="text-sm opacity-90">Active bonuses, quests, and earning opportunities</p>
       </div>
 
       <div className="p-4 space-y-4">
@@ -275,7 +482,7 @@ export default function DriverPromotions() {
                   <div>
                     <p className="text-xs text-muted-foreground">Total Earned</p>
                     <p className="text-lg font-bold" data-testid="text-total-earned">
-                      {formatCurrency(stats.totalBonusEarned, countryCode)}
+                      {formatCurrency(stats.totalBonusEarned || 0, countryCode)}
                     </p>
                   </div>
                 </div>
@@ -290,7 +497,7 @@ export default function DriverPromotions() {
                   <div>
                     <p className="text-xs text-muted-foreground">This Month</p>
                     <p className="text-lg font-bold" data-testid="text-monthly-earned">
-                      {formatCurrency(stats.monthlyBonusEarned, countryCode)}
+                      {formatCurrency(stats.monthlyBonusEarned || 0, countryCode)}
                     </p>
                   </div>
                 </div>
@@ -305,7 +512,7 @@ export default function DriverPromotions() {
                   <div>
                     <p className="text-xs text-muted-foreground">Active</p>
                     <p className="text-lg font-bold" data-testid="text-active-count">
-                      {stats.activePromotions}
+                      {stats.activePromotions || 0}
                     </p>
                   </div>
                 </div>
@@ -320,7 +527,7 @@ export default function DriverPromotions() {
                   <div>
                     <p className="text-xs text-muted-foreground">In Progress</p>
                     <p className="text-lg font-bold" data-testid="text-in-progress">
-                      {stats.inProgressQuests}
+                      {stats.inProgressQuests || 0}
                     </p>
                   </div>
                 </div>
@@ -330,18 +537,29 @@ export default function DriverPromotions() {
         )}
 
         <Tabs defaultValue="quests" className="w-full">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="quests" data-testid="tab-quests">Quests</TabsTrigger>
+          <TabsList className="w-full grid grid-cols-4">
+            <TabsTrigger value="quests" data-testid="tab-quests">
+              Quests
+              {activeQuests.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0">{activeQuests.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="bonuses" data-testid="tab-bonuses">Bonuses</TabsTrigger>
+            <TabsTrigger value="completed" data-testid="tab-completed">
+              Done
+              {completedPromotions.length > 0 && (
+                <Badge variant="secondary" className="ml-1.5 px-1.5 py-0">{completedPromotions.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history" data-testid="tab-history">History</TabsTrigger>
           </TabsList>
 
           <TabsContent value="quests" className="mt-4 space-y-4">
             {loadingPromotions ? (
               <div className="space-y-3">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-40" />)}
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-48" />)}
               </div>
-            ) : promotions.length === 0 ? (
+            ) : activeQuests.length === 0 && perTripBonuses.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center">
                   <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
@@ -352,10 +570,30 @@ export default function DriverPromotions() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {promotions.map(promo => (
-                  <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} />
-                ))}
+              <div className="space-y-4">
+                {activeQuests.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      Trip Quests
+                    </h3>
+                    {activeQuests.map(promo => (
+                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="active" />
+                    ))}
+                  </div>
+                )}
+
+                {perTripBonuses.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Per-Trip Bonuses
+                    </h3>
+                    {perTripBonuses.map(promo => (
+                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="active" />
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </TabsContent>
@@ -364,70 +602,15 @@ export default function DriverPromotions() {
             {loadingBonuses ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-40 w-full" />
+                  <Skeleton key={i} className="h-48 w-full" />
                 ))}
               </div>
             ) : bonuses.length > 0 ? (
-              bonuses.map((bonus, index) => {
-                const BonusIcon = bonusTypeIcons[bonus.bonusType] || Gift;
-                return (
-                  <Card key={index} className="border-l-4 border-l-purple-500" data-testid={`card-bonus-${index}`}>
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-950/30 flex items-center justify-center flex-shrink-0">
-                            <BonusIcon className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                          </div>
-                          <div>
-                            <CardTitle className="text-lg">{bonusTypeLabels[bonus.bonusType]}</CardTitle>
-                            <CardDescription className="mt-1">
-                              {bonusTypeDescriptions[bonus.bonusType]}
-                              {bonus.zoneId && (
-                                <Badge variant="secondary" className="ml-2">
-                                  {bonus.zoneId}
-                                </Badge>
-                              )}
-                            </CardDescription>
-                          </div>
-                        </div>
-                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 flex-shrink-0 ml-2">
-                          Active
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Current Bonus</p>
-                          <p className="text-lg font-semibold text-purple-600 dark:text-purple-400">
-                            {bonus.currencySymbol}{bonus.effectiveBonus}
-                            {bonus.isPromoActive && (
-                              <Badge variant="secondary" className="ml-2 bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
-                                Promo
-                              </Badge>
-                            )}
-                          </p>
-                          {bonus.isPromoActive && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Base: {bonus.currencySymbol}{bonus.baseAmount}
-                            </p>
-                          )}
-                        </div>
-                        {bonus.endAt && (
-                          <div className="text-right">
-                            <p className="text-sm text-muted-foreground">
-                              {bonus.isPromoActive ? "Promo Ends" : "Ends"}
-                            </p>
-                            <p className="text-sm font-medium">
-                              {new Date(bonus.endAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })
+              <div className="space-y-4">
+                {bonuses.map((bonus, index) => (
+                  <OpportunityBonusCard key={index} bonus={bonus} index={index} />
+                ))}
+              </div>
             ) : (
               <Card>
                 <CardContent className="py-12 text-center">
@@ -438,6 +621,50 @@ export default function DriverPromotions() {
                   </p>
                 </CardContent>
               </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="completed" className="mt-4 space-y-4">
+            {loadingCompleted ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-40" />)}
+              </div>
+            ) : completedPromotions.length === 0 && expiredPromotions.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                  <p className="font-medium">No Completed Promotions Yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Complete quests and earn bonuses to see them here
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {completedPromotions.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-green-600 flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      Completed ({completedPromotions.length})
+                    </h3>
+                    {completedPromotions.map(promo => (
+                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="completed" />
+                    ))}
+                  </div>
+                )}
+
+                {expiredPromotions.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Expired ({expiredPromotions.length})
+                    </h3>
+                    {expiredPromotions.map(promo => (
+                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="expired" />
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </TabsContent>
 
@@ -461,7 +688,7 @@ export default function DriverPromotions() {
                 {bonusHistory.map((bonus) => {
                   const ServiceIcon = serviceIcons[bonus.serviceType] || Zap;
                   return (
-                    <Card key={bonus.id} data-testid={`card-history-${bonus.id}`}>
+                    <Card key={bonus.id} className="hover-elevate" data-testid={`card-history-${bonus.id}`}>
                       <CardContent className="py-3 px-4">
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
@@ -470,10 +697,16 @@ export default function DriverPromotions() {
                             </div>
                             <div>
                               <p className="font-medium text-sm">{bonus.promotionName}</p>
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <ServiceIcon className="h-3 w-3" />
-                                {promotionTypeLabels[bonus.promotionType] || bonus.promotionType}
-                              </p>
+                                <span>{promotionTypeLabels[bonus.promotionType] || bonus.promotionType}</span>
+                                {bonus.tripType && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="capitalize">{bonus.tripType}</span>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
                           <div className="text-right">

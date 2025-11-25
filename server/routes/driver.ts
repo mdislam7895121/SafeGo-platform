@@ -5250,7 +5250,7 @@ router.get(
   requireRole(["driver"]),
   async (req: AuthRequest, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const driverProfile = await prisma.driverProfile.findUnique({
         where: { userId },
@@ -5315,6 +5315,74 @@ router.get(
   }
 );
 
+// GET /api/driver/promotions/completed - Get completed and expired promotions for driver
+router.get(
+  "/promotions/completed",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        include: {
+          user: { select: { countryCode: true } },
+        },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+
+      const countryCode = driverProfile.user.countryCode || "US";
+      const now = new Date();
+
+      // Get all progress records for this driver with promotion details
+      const progressRecords = await prisma.driverPromotionProgress.findMany({
+        where: { driverId: driverProfile.id },
+        include: {
+          promotion: true,
+        },
+        orderBy: { lastUpdatedAt: "desc" },
+      });
+
+      const completed: any[] = [];
+      const expired: any[] = [];
+
+      for (const record of progressRecords) {
+        const promo = record.promotion;
+        const isExpired = new Date(promo.endAt) < now;
+        const isCompleted = 
+          (promo.type === "QUEST_TRIPS" && promo.targetTrips && record.currentTrips >= promo.targetTrips) ||
+          (promo.type === "EARNINGS_THRESHOLD" && promo.targetEarnings && 
+           parseFloat(record.currentEarnings.toString()) >= parseFloat(promo.targetEarnings.toString()));
+
+        const promoData = {
+          ...serializePromotion(promo),
+          progress: {
+            currentTrips: record.currentTrips,
+            currentEarnings: serializeDecimal(record.currentEarnings),
+            totalBonusEarned: serializeDecimal(record.totalBonusEarned),
+            lastUpdatedAt: record.lastUpdatedAt,
+          },
+        };
+
+        if (isCompleted) {
+          completed.push(promoData);
+        } else if (isExpired) {
+          expired.push(promoData);
+        }
+      }
+
+      res.json({ completed, expired });
+    } catch (error) {
+      console.error("Error fetching completed promotions:", error);
+      res.status(500).json({ error: "Failed to fetch completed promotions" });
+    }
+  }
+);
+
 // GET /api/driver/promotions/stats - Get driver's promotion statistics
 router.get(
   "/promotions/stats",
@@ -5322,7 +5390,7 @@ router.get(
   requireRole(["driver"]),
   async (req: AuthRequest, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
 
       const driverProfile = await prisma.driverProfile.findUnique({
         where: { userId },
@@ -5389,7 +5457,7 @@ router.get(
   requireRole(["driver"]),
   async (req: AuthRequest, res) => {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.userId;
       const { page = "1", limit = "20" } = req.query;
       const pageNum = parseInt(page as string, 10);
       const limitNum = Math.min(parseInt(limit as string, 10), 100);
