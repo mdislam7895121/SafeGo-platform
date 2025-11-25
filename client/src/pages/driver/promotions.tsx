@@ -163,7 +163,7 @@ function CountdownTimer({ endAt }: { endAt: string }) {
   );
 }
 
-function PromotionCard({ 
+function UberStylePromotionCard({ 
   promotion, 
   countryCode, 
   variant = "active" 
@@ -172,7 +172,6 @@ function PromotionCard({
   countryCode?: string;
   variant?: "active" | "completed" | "expired";
 }) {
-  const TypeIcon = promotionTypeIcons[promotion.type] || Gift;
   const ServiceIcon = serviceIcons[promotion.serviceType] || Zap;
   
   const progress = promotion.progress;
@@ -182,141 +181,130 @@ function PromotionCard({
   
   let progressPercent = 0;
   let progressText = "";
-  let requirementText = "";
+  let rewardText = "";
   
   if (isQuest && promotion.targetTrips) {
     const current = progress?.currentTrips || 0;
     progressPercent = Math.min((current / promotion.targetTrips) * 100, 100);
-    progressText = `${current} / ${promotion.targetTrips} trips`;
-    requirementText = `Complete ${promotion.targetTrips} ${promotion.serviceType === "ANY" ? "" : serviceLabels[promotion.serviceType]?.toLowerCase()} trips`;
+    progressText = `${current} of ${promotion.targetTrips} trips`;
+    rewardText = `Earn ${formatCurrency(promotion.rewardPerUnit, countryCode)} extra`;
   } else if (isEarningsGoal && promotion.targetEarnings) {
     const current = progress?.currentEarnings || 0;
     progressPercent = Math.min((current / promotion.targetEarnings) * 100, 100);
-    progressText = `${formatCurrency(current, countryCode)} / ${formatCurrency(promotion.targetEarnings, countryCode)}`;
-    requirementText = `Earn ${formatCurrency(promotion.targetEarnings, countryCode)} in ${serviceLabels[promotion.serviceType]?.toLowerCase() || "any"} service`;
+    progressText = `${formatCurrency(current, countryCode)} of ${formatCurrency(promotion.targetEarnings, countryCode)}`;
+    rewardText = `Up to ${formatCurrency(promotion.rewardPerUnit, countryCode)} extra`;
   } else if (isPerTrip) {
-    requirementText = `Earn bonus on each ${serviceLabels[promotion.serviceType]?.toLowerCase() || ""} trip`;
+    rewardText = `${formatCurrency(promotion.rewardPerUnit, countryCode)} extra per trip`;
+    if (promotion.maxRewardPerDriver) {
+      rewardText = `Up to ${formatCurrency(promotion.maxRewardPerDriver, countryCode)} extra`;
+    }
   }
 
   const isCompleted = progressPercent >= 100;
-  const isExpired = variant === "expired";
-  const showProgress = (isQuest || isEarningsGoal) && variant !== "expired";
+  const showProgress = (isQuest || isEarningsGoal) && variant !== "expired" && (progress?.currentTrips || 0) > 0;
 
-  const cardStyles = {
-    active: isCompleted ? "border-green-500/50 bg-green-50/10 dark:bg-green-950/20" : "",
-    completed: "border-green-500/50 bg-green-50/10 dark:bg-green-950/20",
-    expired: "opacity-75 border-muted"
+  const badgeConfig = {
+    QUEST_TRIPS: { label: "Quest", bg: "bg-purple-600" },
+    EARNINGS_THRESHOLD: { label: "Goal", bg: "bg-blue-600" },
+    PER_TRIP_BONUS: { label: "Bonus", bg: "bg-green-600" },
   };
+  const badge = badgeConfig[promotion.type] || { label: "Promo", bg: "bg-primary" };
+
+  const timeText = `${format(new Date(promotion.startAt), "h:mm a")} - ${format(new Date(promotion.endAt), "h:mm a")}`;
+  const locationText = promotion.countryCode ? (promotion.countryCode === "BD" ? "Bangladesh" : "United States") : "All Regions";
+
+  const cardBg = variant === "completed" || isCompleted 
+    ? "bg-green-50/50 dark:bg-green-950/30 border-green-200 dark:border-green-800" 
+    : variant === "expired" 
+      ? "bg-muted/30 opacity-70" 
+      : "bg-card hover-elevate";
 
   return (
-    <Card 
-      className={`transition-all ${cardStyles[variant]} ${variant === "active" && !isCompleted ? "hover-elevate" : ""}`}
+    <div 
+      className={`rounded-xl border p-4 shadow-sm transition-all ${cardBg}`}
       data-testid={`card-promotion-${promotion.id}`}
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${
-              variant === "completed" || isCompleted 
-                ? "bg-green-500/20" 
-                : variant === "expired" 
-                  ? "bg-muted" 
-                  : "bg-primary/10"
-            }`}>
-              <TypeIcon className={`h-5 w-5 ${
-                variant === "completed" || isCompleted 
-                  ? "text-green-600" 
-                  : variant === "expired"
-                    ? "text-muted-foreground"
-                    : "text-primary"
-              }`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-base leading-tight truncate">{promotion.name}</CardTitle>
-              <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                <Badge variant="outline" className="text-xs shrink-0">
-                  <ServiceIcon className="h-3 w-3 mr-1" />
-                  {serviceLabels[promotion.serviceType]}
+      <div className="flex gap-4">
+        <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex items-start justify-between gap-2">
+            <h3 className="font-semibold text-base leading-tight line-clamp-2">{promotion.name}</h3>
+            <Badge className={`${badge.bg} text-white shrink-0 text-xs px-2`}>
+              {badge.label}
+            </Badge>
+          </div>
+          
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>{timeText}</span>
+            <span className="mx-1">·</span>
+            <ServiceIcon className="h-3 w-3" />
+            <span>{serviceLabels[promotion.serviceType]}</span>
+            {promotion.countryCode && (
+              <>
+                <span className="mx-1">·</span>
+                <span>{locationText}</span>
+              </>
+            )}
+          </div>
+          
+          {promotion.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {promotion.description}
+            </p>
+          )}
+          
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2">
+              <span className={`font-bold text-sm ${isCompleted ? "text-green-600" : "text-primary"}`}>
+                {rewardText}
+              </span>
+              {(variant === "completed" || isCompleted) && (
+                <Badge variant="outline" className="border-green-500 text-green-600 text-xs">
+                  <CheckCircle className="h-3 w-3 mr-1" />
+                  Completed
                 </Badge>
-                {variant === "active" && !isCompleted && (
-                  <span className="text-xs text-muted-foreground">
-                    <CountdownTimer endAt={promotion.endAt} />
-                  </span>
-                )}
+              )}
+              {variant === "expired" && !isCompleted && (
+                <Badge variant="secondary" className="text-xs">
+                  Expired
+                </Badge>
+              )}
+            </div>
+            
+            {showProgress && (
+              <div className="flex items-center gap-2">
+                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${isCompleted ? "bg-green-500" : "bg-primary"}`}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">{progressText}</span>
               </div>
-            </div>
-          </div>
-          <div className="shrink-0">
-            {(variant === "completed" || isCompleted) && (
-              <Badge className="bg-green-500">
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Done
-              </Badge>
             )}
-            {variant === "expired" && !isCompleted && (
-              <Badge variant="secondary">
-                <AlertCircle className="h-3 w-3 mr-1" />
-                Expired
-              </Badge>
+          </div>
+          
+          {variant === "active" && !isCompleted && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground pt-1">
+              <Timer className="h-3 w-3" />
+              <CountdownTimer endAt={promotion.endAt} />
+            </div>
+          )}
+        </div>
+        
+        <div className="hidden sm:flex shrink-0 items-center">
+          <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 flex items-center justify-center">
+            {isQuest ? (
+              <Target className="h-8 w-8 text-purple-500" />
+            ) : isEarningsGoal ? (
+              <TrendingUp className="h-8 w-8 text-blue-500" />
+            ) : (
+              <DollarSign className="h-8 w-8 text-green-500" />
             )}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="pb-3 space-y-3">
-        {promotion.description && (
-          <p className="text-sm text-muted-foreground">{promotion.description}</p>
-        )}
-
-        <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Target className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground">Requirement:</span>
-            <span className="font-medium">{requirementText}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Gift className="h-4 w-4 text-green-600" />
-            <span className="text-muted-foreground">Reward:</span>
-            <span className="font-semibold text-green-600">
-              {isPerTrip 
-                ? `${formatCurrency(promotion.rewardPerUnit, countryCode)} per trip`
-                : formatCurrency(promotion.rewardPerUnit, countryCode)
-              }
-            </span>
-          </div>
-        </div>
-
-        {showProgress && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Your Progress</span>
-              <span className="font-medium">{progressText}</span>
-            </div>
-            <Progress 
-              value={progressPercent} 
-              className={`h-3 ${isCompleted ? "[&>div]:bg-green-500" : ""}`} 
-            />
-            {progressPercent > 0 && progressPercent < 100 && (
-              <p className="text-xs text-muted-foreground text-center">
-                {Math.round(100 - progressPercent)}% more to complete
-              </p>
-            )}
-          </div>
-        )}
-
-        {progress && progress.totalBonusEarned > 0 && (
-          <div className="flex items-center justify-between pt-2 border-t">
-            <span className="text-sm text-muted-foreground">Total Earned</span>
-            <span className="font-semibold text-green-600">
-              {formatCurrency(progress.totalBonusEarned, countryCode)}
-            </span>
-          </div>
-        )}
-      </CardContent>
-      <CardFooter className="pt-0 text-xs text-muted-foreground flex items-center gap-1">
-        <Calendar className="h-3 w-3" />
-        {variant === "expired" ? "Ended" : "Ends"} {format(new Date(promotion.endAt), "MMM d, yyyy 'at' h:mm a")}
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -641,30 +629,13 @@ export default function DriverPromotions() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {activeQuests.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <Target className="h-4 w-4" />
-                      Trip Quests
-                    </h3>
-                    {activeQuests.map(promo => (
-                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="active" />
-                    ))}
-                  </div>
-                )}
-
-                {perTripBonuses.length > 0 && (
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                      <DollarSign className="h-4 w-4" />
-                      Per-Trip Bonuses
-                    </h3>
-                    {perTripBonuses.map(promo => (
-                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="active" />
-                    ))}
-                  </div>
-                )}
+              <div className="space-y-3">
+                {activeQuests.map(promo => (
+                  <UberStylePromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="active" />
+                ))}
+                {perTripBonuses.map(promo => (
+                  <UberStylePromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="active" />
+                ))}
               </div>
             )}
           </TabsContent>
@@ -732,7 +703,7 @@ export default function DriverPromotions() {
                       Completed ({completedPromotions.length})
                     </h3>
                     {completedPromotions.map(promo => (
-                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="completed" />
+                      <UberStylePromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="completed" />
                     ))}
                   </div>
                 )}
@@ -744,7 +715,7 @@ export default function DriverPromotions() {
                       Expired ({expiredPromotions.length})
                     </h3>
                     {expiredPromotions.map(promo => (
-                      <PromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="expired" />
+                      <UberStylePromotionCard key={promo.id} promotion={promo} countryCode={countryCode} variant="expired" />
                     ))}
                   </div>
                 )}

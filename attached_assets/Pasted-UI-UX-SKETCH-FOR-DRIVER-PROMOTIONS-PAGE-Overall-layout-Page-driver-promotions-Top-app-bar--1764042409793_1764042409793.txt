@@ -1,0 +1,96 @@
+UI/UX SKETCH FOR DRIVER PROMOTIONS PAGE:
+
+Overall layout:
+- Page: /driver/promotions
+- Top app bar: "SafeGo" logo + "Opportunity" title (already exists, keep as-is)
+- Section header: "Promotions & Bonuses" with subtitle "Active bonuses, quests, and earning opportunities" (keep or refine copy).
+
+Date strip (already implemented, just refine behavior):
+- Horizontal scrollable list of day pills, each showing:
+  • First letter of weekday (M, T, W, T, F, S, S)
+  • Numeric day (24, 25, 26, etc.)
+- Selected day pill:
+  • Filled background (strong color)
+  • White bold text
+  • Slightly larger scale than others
+- Non-selected pills:
+  • Semi-transparent background
+  • Normal text
+
+- When a pill is tapped:
+  • Visually update selection state
+  • Immediately fetch promotions for that specific date via GET /api/driver/promotions?date=YYYY-MM-DD
+  • Smooth, no full-page reload.
+
+Daily promotion section:
+- For the selected date, render a vertical list.
+
+- Date header:
+  • Format: "Monday, Nov 24"
+  • Full-width row above cards.
+  • Sticky at top while scrolling (optional, if easy).
+
+Promotion card design (similar to Uber Opportunities):
+- Container:
+  • Full-width card with rounded corners and soft shadow
+  • Padding inside: 16px all sides
+  • Margin between cards: 12–16px
+
+- Card content layout:
+  1) Top row:
+     - Left: Title text (e.g., "Madison Square Garden Event Quest")
+         • Font: bold, medium-large
+     - Right: Small pill badge aligned to top-right
+         • Variants: "Quest", "Bonus", "Opportunity"
+         • Background color depends on type; text in white.
+
+  2) Second row:
+     - Small muted text line:
+       • "<startTime> – <endTime> · <zone or city name>"
+       • Example: "10:00 PM – 11:00 PM · Madison Square Garden"
+       • If no time, only show location; if no location, only time.
+
+  3) Third row:
+     - Description text:
+       • 2–3 lines max, ellipsis if longer.
+       • Example copy: "Complete 3 trips starting or ending near Madison Square Garden to earn an extra $30."
+
+  4) Right-side visual:
+     - On medium or larger screens, place a small thumbnail on the right side of the card (aligned middle vertically):
+       • Placeholder map tile or generic "event" image
+       • Square, 56–72px.
+     - On very small screens, thumbnail can stack above or below text, whichever is easier.
+
+  5) Bottom row:
+     - Left: reward summary
+       • Example: "Up to $40 extra" or "$5 extra per trip"
+       • Style: slightly highlighted, bold.
+     - Right: quest progress (if applicable):
+       • Variant A: text "3 of 10 trips"
+       • Variant B: small horizontal progress bar with percentage
+       • Only show if type == quest and driver has some progress.
+
+Empty state:
+- If no promotions are returned for the selected date:
+  • Show a centered card with:
+    - Title: "No promotions for this day"
+    - Subtitle: "Try selecting another date or check back later for new opportunities."
+  • Keep the date header visible so driver still knows which day is selected.
+
+Interaction notes:
+- When switching dates, smoothly fade/animate between card lists if easy.
+- Do NOT scroll back to top of page; only the cards should update.
+- Refresh icon in the header should re-fetch promotions for the currently selected date.
+
+Responsiveness:
+- Must look good on:
+  • Mobile width (single column, full-width cards)
+  • Tablet / desktop (cards still in a single centered column, max-width container)
+- All fonts and paddings should be consistent with the rest of the SafeGo driver UI.
+
+Admin linkage:
+- Each promotion created by admin with a date or date range must appear on:
+  • All dates that fall within its active date(s).
+- For now, no inline editing from driver side; driver only views.
+
+Use this sketch to refine the current implementation so that the final result feels as polished and professional as Uber's Opportunities screen while staying consistent with the existing SafeGo design system.
