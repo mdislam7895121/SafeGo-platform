@@ -108,7 +108,117 @@ const themePreferenceSchema = z.object({
   themePreference: z.enum(["light", "dark", "system"]),
 });
 
-// All routes require authentication and driver role
+// ====================================================
+// PUBLIC ENDPOINT - GET /api/driver/public-profile/:driverProfileId
+// Get driver public profile for customer-facing views (no auth required)
+// ====================================================
+router.get("/public-profile/:driverProfileId", async (req, res) => {
+  try {
+    const { driverProfileId } = req.params;
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(driverProfileId)) {
+      return res.status(400).json({ error: "Invalid driver profile ID format" });
+    }
+
+    // Get driver profile with user and primary vehicle
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { id: driverProfileId },
+      include: {
+        user: {
+          select: {
+            email: true,
+            countryCode: true,
+            createdAt: true,
+          },
+        },
+        vehicles: {
+          where: { isActive: true },
+          orderBy: [
+            { isPrimary: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: 1,
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    // Only show verified drivers
+    if (!driverProfile.isVerified) {
+      return res.status(404).json({ error: "Driver not found" });
+    }
+
+    const vehicle = driverProfile.vehicles[0] || null;
+
+    // Calculate stats from actual data (not driverStats table)
+    const completedRidesCount = await prisma.ride.count({
+      where: {
+        driverId: driverProfile.id,
+        status: 'completed',
+      },
+    });
+
+    // Get average rating from customer reviews
+    const reviews = await prisma.review.findMany({
+      where: {
+        entityId: driverProfile.id,
+        entityType: 'driver',
+      },
+      select: {
+        rating: true,
+      },
+    });
+
+    const averageRating = reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + Number(r.rating), 0) / reviews.length
+      : 0;
+
+    // Calculate years active from account creation
+    const accountCreatedAt = driverProfile.user.createdAt;
+    const yearsActive = (Date.now() - new Date(accountCreatedAt).getTime()) / (1000 * 60 * 60 * 24 * 365);
+
+    // Build name from country-specific fields
+    let driverName = '';
+    if (driverProfile.user.countryCode === 'US') {
+      const parts = [
+        driverProfile.firstName,
+        driverProfile.middleName,
+        driverProfile.lastName
+      ].filter(Boolean);
+      driverName = parts.join(' ') || driverProfile.usaFullLegalName || 'Driver';
+    } else {
+      driverName = driverProfile.fullName || 'Driver';
+    }
+
+    // Return public profile (safe, non-sensitive fields only)
+    return res.json({
+      name: driverName,
+      pronouns: null, // Reserved for future schema update
+      profilePhotoUrl: driverProfile.profilePhotoUrl,
+      vehicle: vehicle ? {
+        type: vehicle.vehicleType || 'car',
+        model: vehicle.model || vehicle.vehicleModel || 'Vehicle',
+        color: vehicle.color || 'Gray',
+        plateNumber: vehicle.licensePlate || vehicle.vehiclePlate || '',
+      } : null,
+      stats: {
+        totalRides: completedRidesCount,
+        rating: Math.round(averageRating * 100) / 100,
+        yearsActive: Math.max(0.1, Math.round(yearsActive * 10) / 10),
+      },
+    });
+  } catch (error) {
+    console.error("Get driver public profile error:", error);
+    res.status(500).json({ error: "Failed to fetch driver profile" });
+  }
+});
+
+// All routes below require authentication and driver role
 router.use(authenticateToken);
 router.use(requireRole(["driver"]));
 

@@ -1615,8 +1615,10 @@ router.get("/drivers", checkPermission(Permission.VIEW_USER), async (req: AuthRe
         negativeBalance: driver.driverWallet?.negativeBalance ? Number(driver.driverWallet.negativeBalance) : 0,
         commissionPaid: Number(commissionMap.get(driver.id) || 0).toFixed(2),
         vehicleType: primaryVehicle?.vehicleType,
-        vehicleModel: primaryVehicle?.vehicleModel,
-        vehiclePlate: primaryVehicle?.vehiclePlate,
+        vehicleMake: primaryVehicle?.make,
+        vehicleModel: primaryVehicle?.model || primaryVehicle?.vehicleModel,
+        vehicleColor: primaryVehicle?.color,
+        vehiclePlate: primaryVehicle?.licensePlate || primaryVehicle?.vehiclePlate,
         createdAt: driver.user.createdAt,
       };
     });

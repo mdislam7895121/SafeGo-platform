@@ -28,7 +28,10 @@ interface Driver {
   lastActive: string | null;
   isBlocked: boolean;
   vehicleType: string | null;
+  vehicleMake: string | null;
   vehicleModel: string | null;
+  vehicleColor: string | null;
+  vehiclePlate: string | null;
   isOnline: boolean;
   totalEarnings: string;
   averageRating: string;
@@ -257,36 +260,60 @@ export default function AdminDrivers() {
                             {getStatusBadge(driver)}
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
-                            <div>
-                              <p className="text-muted-foreground">Vehicle</p>
-                              <p className="font-medium" data-testid={`text-vehicle-${driver.id}`}>
-                                {driver.vehicleType || "No vehicle"}
-                              </p>
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Vehicle Type</p>
+                                <p className="font-medium" data-testid={`text-vehicle-type-${driver.id}`}>
+                                  {driver.vehicleType || "N/A"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Make & Model</p>
+                                <p className="font-medium" data-testid={`text-vehicle-model-${driver.id}`}>
+                                  {driver.vehicleMake && driver.vehicleModel 
+                                    ? `${driver.vehicleMake} ${driver.vehicleModel}` 
+                                    : driver.vehicleModel || "N/A"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Color</p>
+                                <p className="font-medium" data-testid={`text-vehicle-color-${driver.id}`}>
+                                  {driver.vehicleColor || "N/A"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">License Plate</p>
+                                <p className="font-medium font-mono" data-testid={`text-vehicle-plate-${driver.id}`}>
+                                  {driver.vehiclePlate || "N/A"}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-muted-foreground">Rating</p>
-                              <p className="font-medium" data-testid={`text-rating-${driver.id}`}>
-                                {driver.averageRating || "N/A"} ⭐
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Trips</p>
-                              <p className="font-medium" data-testid={`text-trips-${driver.id}`}>
-                                {driver.totalTrips}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Earnings</p>
-                              <p className="font-medium" data-testid={`text-earnings-${driver.id}`}>
-                                {driver.countryCode === "BD" ? "৳" : "$"}{driver.totalEarnings}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Commission Paid</p>
-                              <p className="font-medium text-primary" data-testid={`text-commission-${driver.id}`}>
-                                {driver.countryCode === "BD" ? "৳" : "$"}{driver.commissionPaid}
-                              </p>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              <div>
+                                <p className="text-muted-foreground">Rating</p>
+                                <p className="font-medium" data-testid={`text-rating-${driver.id}`}>
+                                  {driver.averageRating || "N/A"} ⭐
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Trips</p>
+                                <p className="font-medium" data-testid={`text-trips-${driver.id}`}>
+                                  {driver.totalTrips}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Earnings</p>
+                                <p className="font-medium" data-testid={`text-earnings-${driver.id}`}>
+                                  {driver.countryCode === "BD" ? "৳" : "$"}{driver.totalEarnings}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Commission Paid</p>
+                                <p className="font-medium text-primary" data-testid={`text-commission-${driver.id}`}>
+                                  {driver.countryCode === "BD" ? "৳" : "$"}{driver.commissionPaid}
+                                </p>
+                              </div>
                             </div>
                           </div>
 
