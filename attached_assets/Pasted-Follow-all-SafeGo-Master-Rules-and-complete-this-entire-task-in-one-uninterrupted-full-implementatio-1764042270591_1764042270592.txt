@@ -1,0 +1,58 @@
+Follow all SafeGo Master Rules and complete this entire task in one uninterrupted full implementation.
+
+TASK: Make the Driver Promotions & Bonuses page fully professional like Uber.  
+Complete the entire system end-to-end (frontend + backend).  
+Use the UI/UX sketch below exactly as the visual/functional blueprint.
+
+REQUIRED OUTCOME:
+1. Fix date strip interactions (swipe/tap must work perfectly)
+2. Load promotions by exact date selection
+3. Show different promotions for different days (day-by-day)
+4. Admin-created promotions must correctly map to selected date(s)
+5. Build professional promotion cards like Uber (layout exactly as sketch)
+6. Implement empty states, sticky headers, progress bars, and reward summaries
+7. No UI breaking, no scrolling reset, no page reloads
+8. Completely maintain all SafeGo rules and do not break any existing flows
+
+API REQUIREMENTS:
+- GET /api/driver/promotions?date=YYYY-MM-DD  
+  Should return only the promotions active on that specific day.
+- Support both single-date and date-range promotions from admin.
+- Map admin promotions to driver dates dynamically.
+
+FRONTEND REQUIREMENTS:
+- Date pills: swipeable, tappable, animated selection, dynamic fetch
+- Promotions list: Uber-style cards, scrollable, responsive
+- Daily header: “Monday, Nov 24”
+- Card components:
+  • Title
+  • Badge (Quest / Bonus / Opportunity)
+  • Time + location line
+  • Description (2–3 lines then truncate)
+  • Thumbnail (image placeholder)
+  • Earnings summary (e.g., “Earn up to $40 extra”)
+  • Quest progress (text or bar)
+- Empty state for days with no promotions
+
+STRICT RULES:
+- Do not break restaurant, customer, or driver flows
+- No schema changes unless absolutely required (and explain why)
+- Keep all existing components functional
+- Must test with multiple dates before finishing
+- Perform full implementation in one pass
+
+---------------------------------------
+UI/UX SKETCH FOR DRIVER PROMOTIONS PAGE  
+(Use exactly as blueprint)
+---------------------------------------
+
+[**The full sketch I gave earlier — paste the entire block here**]
+(You already have it — include it below this line without modification.)
+
+---------------------------------------
+
+When you finish:
+- Confirm backend is returning correct date-based promotions
+- Confirm UI matches Uber-level polish
+- Confirm swipe, tap, reload, progress, and cards work on all screen sizes
+- Provide a screenshot and a final status summary
