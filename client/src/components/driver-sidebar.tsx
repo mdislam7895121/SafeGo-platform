@@ -60,7 +60,7 @@ const menuItems = [
   {
     title: "Help Center",
     icon: HelpCircle,
-    href: "/driver/help",
+    href: "/driver/support-help-center",
   },
 ];
 

@@ -54,6 +54,15 @@ Core systems and features include:
     - **Query Architecture**: Uses dynamic query keys `["/api/driver/promotions/active", selectedDate]` for proper cache management
     - **Bug Fix (Nov 2025)**: Fixed off-by-one date selection bug caused by JavaScript's `new Date()` UTC parsing. Now uses `parseISO()` from date-fns with `startOfDay()` normalization to ensure correct local timezone handling. All date comparisons use normalized start-of-day values for consistency.
 -   **Driver Document Management System**: Comprehensive document upload, verification, and management infrastructure with granular status tracking for individual documents and country-specific requirements.
+-   **Driver Support & Help Center System (D8)**: Uber-style driver support system with:
+    - **Help Center Navigation**: "Help Center" link in driver sidebar (`/driver/support-help-center`) - appears on both desktop and mobile drawer
+    - **Category Selection Page**: 6 support categories (Account & Documents, Trip Issues, Payment & Earnings, Incentives & Promotions, Safety & Emergency, App & Technical) with dynamic subcategories
+    - **Ticket Creation**: Subject, description, optional trip association, category/subcategory selection, file attachments
+    - **Ticket List Page** (`/driver/support-tickets`): Active/Resolved tabs, status badges, message counts, search and filters
+    - **Ticket Detail Page** (`/driver/support-ticket/:id`): Complete timeline with status changes and messages, reply functionality
+    - **Admin Panel** (`/admin/driver-support`): Ticket management dashboard with status counts, filters by status/category/priority, status updates with notes, internal admin notes (not visible to drivers), reply capability
+    - **Status Workflow**: open → in_progress → resolved → closed with full audit trail
+    - **API Routes**: Driver routes at `/api/driver/support-center/`, Admin routes at `/api/admin/support-center/driver-tickets`
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Admin KYC Approvals Response Contract
