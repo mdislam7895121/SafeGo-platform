@@ -122,12 +122,14 @@ export function PromotionsDateStrip({
             <span className={`text-lg font-bold ${isSelected ? "text-purple-600" : ""}`}>
               {dayNumber}
             </span>
-            {isToday && !hasPromotions && (
-              <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-purple-500" : "bg-white"}`} />
-            )}
-            {hasPromotions && (
-              <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-green-500" : "bg-green-400"}`} />
-            )}
+            <div className="flex items-center gap-0.5 mt-0.5 h-1.5">
+              {isToday && (
+                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-purple-500" : "bg-white"}`} />
+              )}
+              {hasPromotions && (
+                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-green-500" : "bg-green-400"}`} />
+              )}
+            </div>
           </button>
         );
       })}
