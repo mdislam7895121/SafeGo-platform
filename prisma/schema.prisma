@@ -267,6 +267,8 @@ model DriverProfile {
   driverSupportTickets  DriverSupportTicket[] @relation("DriverSupportTickets") // Phase 12 Extension
   driverLiveChatSessions DriverLiveChatSession[] @relation("DriverLiveChatSessions") // Phase 12 Extension
   driverSupportCallbacks DriverSupportCallback[] @relation("DriverSupportCallbacks") // Phase 12 Extension
+  promotionProgress     DriverPromotionProgress[] // D5: Driver promotion progress
+  promotionPayouts      DriverPromotionPayout[]   // D5: Driver promotion payouts
 
   @@map("driver_profiles")
 }
@@ -2651,4 +2653,107 @@ model EarningsSummary {
   @@index([periodStart])
   @@index([isDemo])
   @@map("earnings_summaries")
+}
+
+// ====================================================
+// D5: DRIVER PROMOTIONS & INCENTIVES SYSTEM
+// ====================================================
+
+enum DriverPromotionType {
+  PER_TRIP_BONUS       // Fixed bonus per completed trip
+  QUEST_TRIPS          // Complete X trips to earn bonus
+  EARNINGS_THRESHOLD   // Earn X amount to get bonus
+}
+
+enum DriverPromotionStatus {
+  DRAFT    // Not yet active, being configured
+  ACTIVE   // Currently running
+  PAUSED   // Temporarily stopped
+  ENDED    // Completed or expired
+}
+
+enum DriverPromotionServiceType {
+  RIDES    // Ride-hailing trips only
+  FOOD     // Food delivery only
+  PARCEL   // Parcel delivery only
+  ANY      // All service types
+}
+
+model DriverPromotion {
+  id                   String                    @id @default(uuid())
+  name                 String
+  description          String?                   @db.Text
+  type                 DriverPromotionType
+  serviceType          DriverPromotionServiceType @default(ANY)
+  countryCode          String?                   // null = all countries
+  cityCode             String?                   // null = all cities in country
+  minDriverRating      Decimal?                  @db.Decimal(3, 2) // e.g., 4.50
+  requireKycApproved   Boolean                   @default(true)
+  startAt              DateTime
+  endAt                DateTime
+  rewardPerUnit        Decimal                   @db.Decimal(10, 2) // Bonus per trip or per threshold
+  targetTrips          Int?                      // For QUEST_TRIPS type
+  targetEarnings       Decimal?                  @db.Decimal(10, 2) // For EARNINGS_THRESHOLD type
+  maxRewardPerDriver   Decimal?                  @db.Decimal(10, 2) // Cap per driver
+  globalBudget         Decimal?                  @db.Decimal(12, 2) // Total budget for promotion
+  currentSpend         Decimal                   @default(0) @db.Decimal(12, 2) // Track spending
+  status               DriverPromotionStatus     @default(DRAFT)
+  createdByAdminId     String?
+  updatedByAdminId     String?
+  isDemo               Boolean                   @default(false)
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+  
+  progress             DriverPromotionProgress[]
+  payouts              DriverPromotionPayout[]
+
+  @@index([status])
+  @@index([startAt])
+  @@index([endAt])
+  @@index([countryCode])
+  @@index([cityCode])
+  @@index([serviceType])
+  @@index([type])
+  @@index([isDemo])
+  @@map("driver_promotions")
+}
+
+model DriverPromotionProgress {
+  id                   String          @id @default(uuid())
+  promotionId          String
+  driverId             String          // References driver_profile.id
+  currentTrips         Int             @default(0)
+  currentEarnings      Decimal         @default(0) @db.Decimal(10, 2)
+  totalBonusEarned     Decimal         @default(0) @db.Decimal(10, 2)
+  lastUpdatedAt        DateTime        @default(now())
+  createdAt            DateTime        @default(now())
+  
+  promotion            DriverPromotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  driver               DriverProfile   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, driverId])
+  @@index([promotionId])
+  @@index([driverId])
+  @@index([lastUpdatedAt])
+  @@map("driver_promotion_progress")
+}
+
+model DriverPromotionPayout {
+  id                   String          @id @default(uuid())
+  promotionId          String
+  driverId             String          // References driver_profile.id
+  walletTransactionId  String?         // Reference to wallet transaction
+  amount               Decimal         @db.Decimal(10, 2)
+  tripType             String?         // "ride", "food", "parcel"
+  tripId               String?         // Reference to the triggering trip
+  createdAt            DateTime        @default(now())
+  
+  promotion            DriverPromotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  driver               DriverProfile   @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([promotionId])
+  @@index([driverId])
+  @@index([tripId])
+  @@index([createdAt])
+  @@map("driver_promotion_payouts")
 }

@@ -1,0 +1,171 @@
+SAFEGO GLOBAL RULES (ALWAYS APPLY)
+
+1. Core Actors
+• Customer: books rides, food, parcel.
+• Driver: earns by driving/delivering.
+• Restaurant: manages menu & orders.
+• Admin: full control over entire platform.
+
+2. Global App Logic
+• Rides, Food, Parcel — 3 service lines.
+• One user can be both customer & driver.
+• Platform must remain safe, stable, non-breaking.
+• No removal/modification of existing logic except additive enhancements.
+
+3. KYC & Compliance
+• USA: SSN masked, Driver License, TLC license (NY), background check.
+• BD: NID/Passport, Driving License.
+• KYC must be approved before driver can earn or get payout.
+
+4. Admin Panel Requirements
+Admin must always manage:
+• Users, drivers, restaurants
+• KYC approvals
+• Promotions & coupons
+• Commissions & payouts
+• Dashboard analytics
+
+5. Collections (Do NOT break)
+• rides
+• food_orders
+• deliveries (parcel)
+• users
+• drivers / driver_profiles
+• vehicles
+• wallets / payouts / transactions
+
+6. Commission & Payout
+• All bonuses must create new wallet transactions (type = BONUS)
+• Must not alter historical transactions
+• Must not break payout logic
+
+7. Security
+• Validate ownership, UUIDs, KYC state
+• No sensitive leaks
+• Safe error handling
+
+8. Implementation Principles
+• Fully production-safe
+• Zero breaking changes
+• All UX consistent with design system
+• Build entire feature start-to-finish in one pass
+
+9. Driver Phases Context
+• D1 – Multi vehicle + KYC docs (DONE)
+• D2 – Driver public profile card (DONE)
+• D3 – Vehicle brand/model/color dropdown (DONE)
+• D4 – Earnings & payouts (DONE)
+• YOU ARE NOW IMPLEMENTING → D5 Driver Promotions & Incentives
+
+====================================================
+D5 PURPOSE (High Level)
+====================================================
+Implement a complete Driver Promotions & Incentives system:
+• Admin can create/manage promotions.
+• Driver can view active promotions, see progress.
+• Bonuses apply automatically when a trip/order completes.
+• Bonus appears in driver earnings & wallet.
+• ZERO breaking changes allowed.
+
+====================================================
+A. DATA MODEL (BACKEND)
+====================================================
+
+ADD these Prisma models (additive only, no destructive change):
+
+Model: Promotion
+• id (UUID, PK)
+• name (string)
+• description (string optional)
+• type: "PER_TRIP_BONUS" | "QUEST_TRIPS" | "EARNINGS_THRESHOLD"
+• serviceType: "RIDES" | "FOOD" | "PARCEL" | "ANY"
+• country (optional)
+• city (optional)
+• minDriverRating (decimal optional)
+• requireKycApproved (boolean optional)
+• startAt, endAt (DateTime)
+• rewardPerUnit (Decimal)
+• targetTrips (int optional)
+• targetEarnings (Decimal optional)
+• maxRewardPerDriver (Decimal optional)
+• globalBudget (Decimal optional)
+• status: "DRAFT" | "ACTIVE" | "PAUSED" | "ENDED"
+• createdAt, updatedAt
+
+Model: PromotionProgress
+• id (UUID, PK)
+• promotionId (FK)
+• driverId (FK → driver_profile)
+• currentTrips (int)
+• currentEarnings (Decimal)
+• totalBonusEarned (Decimal)
+• lastUpdatedAt (DateTime)
+
+Model: PromotionPayout
+• id (UUID, PK)
+• promotionId (FK)
+• driverId (FK)
+• transactionId (FK → wallet/transactions)
+• amount (Decimal)
+• createdAt (DateTime)
+
+RULES:
+• No existing enum can be deleted.
+• No table/column can be removed.
+• New models must be fully indexed.
+
+====================================================
+B. BONUS EVALUATION LOGIC
+====================================================
+
+TRIGGER BONUS WHEN:
+• A ride/food/parceled order becomes COMPLETED
+AND
+• Driver KYC = APPROVED
+AND
+• Promotion is ACTIVE & within date range
+
+For each completed trip:
+1) Load all matching promotions:
+   • serviceType matches or ANY
+   • date within range
+   • rating/min conditions pass
+   • KYC checked if required
+
+2) Update PromotionProgress:
+   • currentTrips += 1
+   • currentEarnings += trip fare
+   • Compute eligible bonus
+
+3) Create wallet transaction:
+   • type = "BONUS"
+   • description = "Promotion Bonus – <promotion.name>"
+   • amount = calculated bonus
+
+4) Create PromotionPayout entry referencing the transaction.
+
+5) Enforce:
+   • maxRewardPerDriver
+   • globalBudget
+   • no duplicate bonuses
+
+====================================================
+C. API ENDPOINTS (BACKEND)
+====================================================
+
+ADMIN API
+GET /api/admin/promotions
+POST /api/admin/promotions
+PATCH /api/admin/promotions/:id
+GET /api/admin/promotions/:id
+GET /api/admin/promotions/:id/progress
+
+DRIVER API
+GET /api/driver/promotions/active
+GET /api/driver/promotions/history
+
+GENERAL RULES
+• Validate UUIDs
+• Validate KYC
+• Use existing driver_profile ID (NOT user ID)
+• Clean error responses (never leak internals)
