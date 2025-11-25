@@ -2220,6 +2220,215 @@ router.delete("/vehicle-documents/:id", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// D7: DRIVER DOCUMENT CENTER ENDPOINTS
+// ====================================================
+
+// GET /api/driver/documents/summary
+// Get comprehensive document status summary for the driver
+// ====================================================
+router.get("/documents/summary", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Driver profile not found" 
+      });
+    }
+
+    const { getDriverDocumentSummary } = await import("../services/driverDocumentService");
+    const summary = await getDriverDocumentSummary(driverProfile.id);
+
+    if (!summary) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Document summary not found" 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: summary,
+    });
+  } catch (error) {
+    console.error("Get document summary error:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to fetch document summary" 
+    });
+  }
+});
+
+// POST /api/driver/documents/upload/:documentType
+// Upload a specific document type
+// ====================================================
+router.post("/documents/upload/:documentType", uploadVehicleDocument, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { documentType } = req.params;
+    const { vehicleId, expiresAt } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "No file uploaded" 
+      });
+    }
+
+    const validDocTypes = [
+      "profile_photo",
+      "driver_license",
+      "tlc_license", 
+      "nid",
+      "insurance",
+      "registration",
+      "vehicle_inspection",
+    ];
+
+    if (!validDocTypes.includes(documentType)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid document type. Must be one of: ${validDocTypes.join(", ")}`,
+      });
+    }
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        user: { select: { countryCode: true } },
+        vehicles: { where: { isPrimary: true }, take: 1 },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ 
+        success: false, 
+        error: "Driver profile not found" 
+      });
+    }
+
+    const fileUrl = getFileUrl(req.file.filename);
+    const primaryVehicle = driverProfile.vehicles[0];
+
+    // Update the appropriate field based on document type
+    switch (documentType) {
+      case "profile_photo":
+        await prisma.driverProfile.update({
+          where: { id: driverProfile.id },
+          data: { 
+            profilePhotoUrl: fileUrl,
+            profilePhotoStatus: "UNDER_REVIEW" as any,
+          },
+        });
+        break;
+
+      case "driver_license":
+        await prisma.driverProfile.update({
+          where: { id: driverProfile.id },
+          data: { 
+            dmvLicenseFrontUrl: fileUrl,
+            dmvLicenseExpiry: expiresAt ? new Date(expiresAt) : undefined,
+            driverLicenseStatus: "UNDER_REVIEW" as any,
+          },
+        });
+        break;
+
+      case "tlc_license":
+        await prisma.driverProfile.update({
+          where: { id: driverProfile.id },
+          data: { 
+            tlcLicenseFrontUrl: fileUrl,
+            tlcLicenseExpiry: expiresAt ? new Date(expiresAt) : undefined,
+            tlcLicenseDocStatus: "UNDER_REVIEW" as any,
+          },
+        });
+        break;
+
+      case "nid":
+        await prisma.driverProfile.update({
+          where: { id: driverProfile.id },
+          data: { 
+            nidFrontImageUrl: fileUrl,
+            nidStatus: "UNDER_REVIEW" as any,
+          },
+        });
+        break;
+
+      case "insurance":
+        if (!primaryVehicle) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "No primary vehicle found. Please add a vehicle first." 
+          });
+        }
+        await prisma.vehicle.update({
+          where: { id: primaryVehicle.id },
+          data: {
+            insuranceDocumentUrl: fileUrl,
+            insuranceExpiry: expiresAt ? new Date(expiresAt) : undefined,
+            insuranceStatus: "UNDER_REVIEW",
+            insuranceLastUpdated: new Date(),
+          },
+        });
+        break;
+
+      case "registration":
+        if (!primaryVehicle) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "No primary vehicle found. Please add a vehicle first." 
+          });
+        }
+        await prisma.vehicle.update({
+          where: { id: primaryVehicle.id },
+          data: {
+            registrationDocumentUrl: fileUrl,
+            registrationExpiry: expiresAt ? new Date(expiresAt) : undefined,
+            registrationStatus: "UNDER_REVIEW",
+            registrationLastUpdated: new Date(),
+          },
+        });
+        break;
+
+      case "vehicle_inspection":
+        if (!primaryVehicle) {
+          return res.status(400).json({ 
+            success: false, 
+            error: "No primary vehicle found. Please add a vehicle first." 
+          });
+        }
+        await prisma.vehicle.update({
+          where: { id: primaryVehicle.id },
+          data: {
+            dmvInspectionImageUrl: fileUrl,
+            dmvInspectionExpiry: expiresAt ? new Date(expiresAt) : undefined,
+            inspectionStatus: "UNDER_REVIEW",
+            inspectionLastUpdated: new Date(),
+          },
+        });
+        break;
+    }
+
+    res.json({
+      success: true,
+      message: `${documentType.replace(/_/g, " ")} uploaded successfully`,
+      fileUrl,
+    });
+  } catch (error) {
+    console.error("Document upload error:", error);
+    res.status(500).json({ 
+      success: false, 
+      error: "Failed to upload document" 
+    });
+  }
+});
+
+// ====================================================
 // PUT /api/driver/vehicle-kyc-details
 // Update vehicle KYC text fields (color, model, license plate)
 // ====================================================

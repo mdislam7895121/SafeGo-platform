@@ -225,6 +225,15 @@ model DriverProfile {
   tlcLicenseBackUrl     String?
   tlcLicenseExpiry      DateTime?
   tlcLicenseNumber      String?
+  // D7: Document Status Tracking
+  profilePhotoStatus       DocumentStatus    @default(PENDING)
+  profilePhotoRejectionReason String?
+  driverLicenseStatus      DocumentStatus    @default(PENDING)
+  driverLicenseRejectionReason String?
+  tlcLicenseDocStatus      DocumentStatus    @default(PENDING)
+  tlcLicenseRejectionReason String?
+  nidStatus                DocumentStatus    @default(PENDING)
+  nidRejectionReason       String?
   taxClassification     String?            // Individual, Sole proprietor, etc.
   w9Status              String?            // pending, submitted, approved
   w9SubmittedAt         DateTime?
@@ -749,21 +758,26 @@ model Document {
 }
 
 model VehicleDocument {
-  id           String         @id
-  driverId     String
-  documentType String
-  uploadedAt   DateTime       @default(now())
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime
-  description  String?
-  expiresAt    DateTime?
-  fileUrl      String
-  vehicleId    String?
-  driver       DriverProfile  @relation(fields: [driverId], references: [id], onDelete: Cascade)
-  vehicle      Vehicle?       @relation(fields: [vehicleId], references: [id])
+  id              String         @id
+  driverId        String
+  documentType    String
+  uploadedAt      DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime
+  description     String?
+  expiresAt       DateTime?
+  fileUrl         String
+  vehicleId       String?
+  status          DocumentStatus @default(PENDING)  // D7: Document status tracking
+  rejectionReason String?                           // D7: Reason for rejection
+  reviewedAt      DateTime?                         // D7: When admin reviewed
+  reviewedBy      String?                           // D7: Admin who reviewed
+  driver          DriverProfile  @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle?       @relation(fields: [vehicleId], references: [id])
 
   @@index([driverId])
   @@index([vehicleId])
+  @@index([status])
   @@map("vehicle_documents")
 }
 
