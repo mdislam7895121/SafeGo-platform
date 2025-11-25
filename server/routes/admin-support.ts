@@ -302,7 +302,7 @@ router.post("/support-center/callbacks", async (req: AuthRequest, res: Response)
  */
 router.get("/support-center/articles", async (req: AuthRequest, res: Response) => {
   try {
-    const query = req.query.query as string | undefined;
+    const query = (req.query.query as string) || "";
     const category = req.query.category as string | undefined;
 
     const articles = await supportArticleService.searchArticles(query, category);
@@ -337,11 +337,477 @@ router.get("/support-center/articles/:slug", async (req: AuthRequest, res: Respo
  */
 router.get("/support-center/categories", async (req: AuthRequest, res: Response) => {
   try {
-    const categories = await supportArticleService.getCategories();
+    const categories = await supportArticleService.getAllCategories();
     return res.json({ categories });
   } catch (error) {
     console.error("Error getting categories:", error);
     return res.status(500).json({ error: "Failed to get categories" });
+  }
+});
+
+// ============================================
+// DRIVER SUPPORT TICKET MANAGEMENT (D8)
+// Admin routes for managing driver support tickets
+// ============================================
+
+/**
+ * GET /api/admin/support-center/driver-tickets
+ * List all driver support tickets (admin view)
+ */
+router.get("/support-center/driver-tickets", async (req: AuthRequest, res: Response) => {
+  try {
+    const { status, category, priority, driverId, search, limit = "20", offset = "0" } = req.query;
+    
+    const whereClause: any = {};
+    
+    if (status && status !== "all") {
+      whereClause.status = status;
+    }
+    if (category && category !== "all") {
+      whereClause.category = category;
+    }
+    if (priority && priority !== "all") {
+      whereClause.priority = priority;
+    }
+    if (driverId) {
+      whereClause.driverId = driverId;
+    }
+    if (search) {
+      whereClause.OR = [
+        { ticketCode: { contains: search as string, mode: "insensitive" } },
+        { subject: { contains: search as string, mode: "insensitive" } },
+        { description: { contains: search as string, mode: "insensitive" } }
+      ];
+    }
+
+    const [tickets, total] = await Promise.all([
+      prisma.driverSupportTicket.findMany({
+        where: whereClause,
+        include: {
+          driver: {
+            select: { 
+              id: true,
+              firstName: true, 
+              lastName: true,
+              phoneNumber: true
+            }
+          },
+          assignedAdmin: {
+            select: { email: true }
+          },
+          messages: { orderBy: { createdAt: "desc" }, take: 1 },
+          _count: { select: { messages: true } }
+        },
+        orderBy: [
+          { priority: "desc" },
+          { createdAt: "desc" }
+        ],
+        take: parseInt(limit as string),
+        skip: parseInt(offset as string)
+      }),
+      prisma.driverSupportTicket.count({ where: whereClause })
+    ]);
+
+    // Get counts by status for dashboard
+    const statusCounts = await prisma.driverSupportTicket.groupBy({
+      by: ["status"],
+      _count: { status: true }
+    });
+
+    return res.json({ 
+      tickets, 
+      total,
+      statusCounts: statusCounts.reduce((acc: any, item) => {
+        acc[item.status] = item._count.status;
+        return acc;
+      }, {}),
+      pagination: { 
+        limit: parseInt(limit as string), 
+        offset: parseInt(offset as string) 
+      } 
+    });
+  } catch (error: any) {
+    console.error("Error listing driver support tickets (admin):", error);
+    return res.status(500).json({ error: "Failed to list driver tickets" });
+  }
+});
+
+/**
+ * GET /api/admin/support-center/driver-tickets/:id
+ * Get specific driver ticket with full details (admin view)
+ */
+router.get("/support-center/driver-tickets/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const ticketId = req.params.id;
+
+    const ticket = await prisma.driverSupportTicket.findUnique({
+      where: { id: ticketId },
+      include: {
+        driver: {
+          select: { 
+            id: true,
+            firstName: true, 
+            lastName: true,
+            phoneNumber: true,
+            email: true,
+            city: true,
+            countryCode: true
+          }
+        },
+        assignedAdmin: {
+          select: { id: true, email: true }
+        },
+        messages: { 
+          orderBy: { createdAt: "asc" }
+        },
+        statusHistory: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            changedBy: { select: { email: true } }
+          }
+        }
+      }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    return res.json({ ticket });
+  } catch (error: any) {
+    console.error("Error getting driver support ticket (admin):", error);
+    return res.status(500).json({ error: "Failed to get ticket" });
+  }
+});
+
+/**
+ * PATCH /api/admin/support-center/driver-tickets/:id/status
+ * Update driver ticket status
+ */
+router.patch("/support-center/driver-tickets/:id/status", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+    const { status, note } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: "Status is required" });
+    }
+
+    const validStatuses = ["open", "in_progress", "resolved", "closed"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    const ticket = await prisma.driverSupportTicket.findUnique({
+      where: { id: ticketId },
+      select: { id: true, status: true, ticketCode: true }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    // Update ticket and create status history in transaction
+    const updatedTicket = await prisma.$transaction(async (tx) => {
+      const updated = await tx.driverSupportTicket.update({
+        where: { id: ticketId },
+        data: {
+          status,
+          resolvedAt: status === "resolved" || status === "closed" ? new Date() : null,
+          updatedAt: new Date()
+        }
+      });
+
+      await tx.driverSupportStatusHistory.create({
+        data: {
+          ticketId,
+          previousStatus: ticket.status,
+          newStatus: status,
+          changedById: userId,
+          changedByRole: "admin",
+          note: note || null
+        }
+      });
+
+      return updated;
+    });
+
+    // Create audit log
+    await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorEmail: user?.email || "",
+        actorRole: "admin",
+        ipAddress: req.ip || "",
+        actionType: "driver_ticket_status_updated",
+        entityType: "driver_support_ticket",
+        entityId: ticketId,
+        description: `Admin updated driver ticket ${ticket.ticketCode} status from ${ticket.status} to ${status}`,
+        metadata: {
+          ticketCode: ticket.ticketCode,
+          previousStatus: ticket.status,
+          newStatus: status,
+          note
+        },
+        success: true
+      }
+    });
+
+    return res.json({ ticket: updatedTicket, message: "Status updated successfully" });
+  } catch (error: any) {
+    console.error("Error updating driver ticket status:", error);
+    return res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+/**
+ * PATCH /api/admin/support-center/driver-tickets/:id/admin-notes
+ * Update internal admin notes (not visible to driver)
+ */
+router.patch("/support-center/driver-tickets/:id/admin-notes", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+    const { adminNotes } = req.body;
+
+    const ticket = await prisma.driverSupportTicket.findUnique({
+      where: { id: ticketId },
+      select: { id: true, ticketCode: true }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    const updatedTicket = await prisma.driverSupportTicket.update({
+      where: { id: ticketId },
+      data: { adminNotes, updatedAt: new Date() }
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorEmail: user?.email || "",
+        actorRole: "admin",
+        ipAddress: req.ip || "",
+        actionType: "driver_ticket_notes_updated",
+        entityType: "driver_support_ticket",
+        entityId: ticketId,
+        description: `Admin updated internal notes for ticket ${ticket.ticketCode}`,
+        metadata: { ticketCode: ticket.ticketCode },
+        success: true
+      }
+    });
+
+    return res.json({ ticket: updatedTicket, message: "Notes updated successfully" });
+  } catch (error: any) {
+    console.error("Error updating admin notes:", error);
+    return res.status(500).json({ error: "Failed to update notes" });
+  }
+});
+
+/**
+ * PATCH /api/admin/support-center/driver-tickets/:id/assign
+ * Assign ticket to an admin
+ */
+router.patch("/support-center/driver-tickets/:id/assign", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+    const { assignedAdminId } = req.body;
+
+    const ticket = await prisma.driverSupportTicket.findUnique({
+      where: { id: ticketId },
+      select: { id: true, ticketCode: true, assignedAdminId: true }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    // Validate admin exists if assigning
+    if (assignedAdminId) {
+      const admin = await prisma.user.findUnique({
+        where: { id: assignedAdminId, role: "admin" }
+      });
+      if (!admin) {
+        return res.status(400).json({ error: "Invalid admin ID" });
+      }
+    }
+
+    const updatedTicket = await prisma.driverSupportTicket.update({
+      where: { id: ticketId },
+      data: {
+        assignedAdminId: assignedAdminId || null,
+        updatedAt: new Date()
+      },
+      include: {
+        assignedAdmin: { select: { email: true } }
+      }
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorEmail: user?.email || "",
+        actorRole: "admin",
+        ipAddress: req.ip || "",
+        actionType: "driver_ticket_assigned",
+        entityType: "driver_support_ticket",
+        entityId: ticketId,
+        description: assignedAdminId 
+          ? `Ticket ${ticket.ticketCode} assigned to admin`
+          : `Ticket ${ticket.ticketCode} unassigned`,
+        metadata: { 
+          ticketCode: ticket.ticketCode,
+          previousAssignee: ticket.assignedAdminId,
+          newAssignee: assignedAdminId
+        },
+        success: true
+      }
+    });
+
+    return res.json({ ticket: updatedTicket, message: "Assignment updated successfully" });
+  } catch (error: any) {
+    console.error("Error assigning ticket:", error);
+    return res.status(500).json({ error: "Failed to assign ticket" });
+  }
+});
+
+/**
+ * POST /api/admin/support-center/driver-tickets/:id/messages
+ * Admin reply to driver ticket
+ */
+router.post("/support-center/driver-tickets/:id/messages", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+    const ticketId = req.params.id;
+    const { messageBody, attachmentUrls } = req.body;
+
+    if (!messageBody || messageBody.trim().length === 0) {
+      return res.status(400).json({ error: "Message body is required" });
+    }
+
+    const ticket = await prisma.driverSupportTicket.findUnique({
+      where: { id: ticketId },
+      select: { id: true, status: true, ticketCode: true }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({ error: "Ticket not found" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true }
+    });
+
+    const message = await prisma.driverSupportMessage.create({
+      data: {
+        ticketId,
+        senderRole: "support",
+        senderName: user?.email || "Support Team",
+        messageBody: messageBody.trim(),
+        attachmentUrls: attachmentUrls || null
+      }
+    });
+
+    // Update ticket timestamp
+    await prisma.driverSupportTicket.update({
+      where: { id: ticketId },
+      data: { updatedAt: new Date() }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        actorId: userId,
+        actorEmail: user?.email || "",
+        actorRole: "admin",
+        ipAddress: req.ip || "",
+        actionType: "driver_ticket_reply",
+        entityType: "driver_support_message",
+        entityId: message.id,
+        description: `Admin replied to driver ticket ${ticket.ticketCode}`,
+        metadata: { ticketCode: ticket.ticketCode, messageId: message.id },
+        success: true
+      }
+    });
+
+    return res.status(201).json({ message });
+  } catch (error: any) {
+    console.error("Error adding admin reply:", error);
+    return res.status(500).json({ error: "Failed to add reply" });
+  }
+});
+
+/**
+ * GET /api/admin/support-center/driver-tickets/stats
+ * Get driver support ticket statistics
+ */
+router.get("/support-center/driver-tickets-stats", async (req: AuthRequest, res: Response) => {
+  try {
+    const [
+      totalTickets,
+      openTickets,
+      inProgressTickets,
+      resolvedTickets,
+      closedTickets,
+      urgentTickets,
+      recentTickets
+    ] = await Promise.all([
+      prisma.driverSupportTicket.count(),
+      prisma.driverSupportTicket.count({ where: { status: "open" } }),
+      prisma.driverSupportTicket.count({ where: { status: "in_progress" } }),
+      prisma.driverSupportTicket.count({ where: { status: "resolved" } }),
+      prisma.driverSupportTicket.count({ where: { status: "closed" } }),
+      prisma.driverSupportTicket.count({ where: { priority: "urgent", status: { not: "closed" } } }),
+      prisma.driverSupportTicket.count({
+        where: {
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+        }
+      })
+    ]);
+
+    // Category breakdown
+    const categoryBreakdown = await prisma.driverSupportTicket.groupBy({
+      by: ["category"],
+      _count: { category: true }
+    });
+
+    return res.json({
+      stats: {
+        total: totalTickets,
+        open: openTickets,
+        inProgress: inProgressTickets,
+        resolved: resolvedTickets,
+        closed: closedTickets,
+        urgent: urgentTickets,
+        last24Hours: recentTickets
+      },
+      categoryBreakdown: categoryBreakdown.map(item => ({
+        category: item.category,
+        count: item._count.category
+      }))
+    });
+  } catch (error: any) {
+    console.error("Error getting driver ticket stats:", error);
+    return res.status(500).json({ error: "Failed to get statistics" });
   }
 });
 
