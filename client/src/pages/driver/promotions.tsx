@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Gift, TrendingUp, Clock, Target, Zap, DollarSign, Trophy, CheckCircle, Car, UtensilsCrossed, Package, ArrowLeft, AlertCircle, Timer, RefreshCw, Star, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { format, differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, isPast } from "date-fns";
+import { format, differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, isPast, isWithinInterval, parseISO, startOfDay, endOfDay } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
+import { PromotionsDateStrip } from "@/components/driver/PromotionsDateStrip";
 
 interface OpportunityBonus {
   bonusType: "trip_boost" | "surge_boost" | "peak_hour_boost" | "per_ride_bonus";
@@ -390,6 +391,7 @@ export default function DriverPromotions() {
   const queryClient = useQueryClient();
   const countryCode = user?.countryCode || "US";
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(() => format(new Date(), "yyyy-MM-dd"));
 
   const { data: bonusData, isLoading: loadingBonuses } = useQuery<{ bonuses: OpportunityBonus[] }>({
     queryKey: ["/api/driver/opportunity-bonuses"],
@@ -436,12 +438,45 @@ export default function DriverPromotions() {
   const expiredPromotions = completedData?.expired || [];
   const bonusHistory = history?.payouts || [];
 
-  const activeQuests = promotions.filter(p => p.type !== "PER_TRIP_BONUS");
-  const perTripBonuses = promotions.filter(p => p.type === "PER_TRIP_BONUS");
+  const isPromotionActiveOnDate = (promo: DriverPromotion, dateStr: string): boolean => {
+    try {
+      const checkDate = parseISO(dateStr);
+      const start = startOfDay(parseISO(promo.startAt));
+      const end = endOfDay(parseISO(promo.endAt));
+      return isWithinInterval(checkDate, { start, end });
+    } catch {
+      return false;
+    }
+  };
+
+  const isBonusActiveOnDate = (bonus: OpportunityBonus, dateStr: string): boolean => {
+    if (!bonus.startAt || !bonus.endAt) return true;
+    try {
+      const checkDate = parseISO(dateStr);
+      const start = startOfDay(parseISO(bonus.startAt));
+      const end = endOfDay(parseISO(bonus.endAt));
+      return isWithinInterval(checkDate, { start, end });
+    } catch {
+      return false;
+    }
+  };
+
+  const filteredPromotions = useMemo(() => 
+    promotions.filter(p => isPromotionActiveOnDate(p, selectedDate)),
+    [promotions, selectedDate]
+  );
+
+  const filteredBonuses = useMemo(() =>
+    bonuses.filter(b => isBonusActiveOnDate(b, selectedDate)),
+    [bonuses, selectedDate]
+  );
+
+  const activeQuests = filteredPromotions.filter(p => p.type !== "PER_TRIP_BONUS");
+  const perTripBonuses = filteredPromotions.filter(p => p.type === "PER_TRIP_BONUS");
 
   return (
     <div className="bg-background min-h-screen pb-20">
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6 pb-4">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-3">
             <Link href="/driver">
@@ -463,7 +498,13 @@ export default function DriverPromotions() {
             <RefreshCw className={`h-5 w-5 ${isRefreshing ? "animate-spin" : ""}`} />
           </Button>
         </div>
-        <p className="text-sm opacity-90">Active bonuses, quests, and earning opportunities</p>
+        <p className="text-sm opacity-90 mb-4">Active bonuses, quests, and earning opportunities</p>
+        
+        <PromotionsDateStrip
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
+          days={14}
+        />
       </div>
 
       <div className="p-4 space-y-4">
@@ -563,9 +604,9 @@ export default function DriverPromotions() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium">No Active Quests</p>
+                  <p className="font-medium">No Quests for {format(parseISO(selectedDate), "MMM d")}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Check back later for new earning opportunities
+                    Try selecting a different date or check back later for new opportunities
                   </p>
                 </CardContent>
               </Card>
@@ -605,9 +646,9 @@ export default function DriverPromotions() {
                   <Skeleton key={i} className="h-48 w-full" />
                 ))}
               </div>
-            ) : bonuses.length > 0 ? (
+            ) : filteredBonuses.length > 0 ? (
               <div className="space-y-4">
-                {bonuses.map((bonus, index) => (
+                {filteredBonuses.map((bonus, index) => (
                   <OpportunityBonusCard key={index} bonus={bonus} index={index} />
                 ))}
               </div>
@@ -615,9 +656,9 @@ export default function DriverPromotions() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Gift className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium">No Active Bonuses</p>
+                  <p className="font-medium">No Bonuses for {format(parseISO(selectedDate), "MMM d")}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Check back later for new bonus opportunities
+                    Check other dates or check back later for new opportunities
                   </p>
                 </CardContent>
               </Card>
