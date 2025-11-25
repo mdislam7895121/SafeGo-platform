@@ -91,6 +91,8 @@ import DriverAccountAbout from "@/pages/driver/account/about";
 import DriverEarnings from "@/pages/driver/earnings";
 import DriverPayouts from "@/pages/driver/payouts";
 import DriverDocuments from "@/pages/driver/documents";
+import DriverOnboarding from "@/pages/driver/onboarding";
+import DriverTutorials from "@/pages/driver/tutorials";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -524,6 +526,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Help Center">
             <DriverHelp />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/onboarding">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Getting Started">
+            <DriverOnboarding />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/tutorials">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Training Videos">
+            <DriverTutorials />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

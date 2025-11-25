@@ -23,6 +23,8 @@ import {
   LayoutDashboard,
   Target,
   HelpCircle,
+  GraduationCap,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -31,6 +33,17 @@ const menuItems = [
     title: "Dashboard",
     icon: LayoutDashboard,
     href: "/driver/dashboard",
+  },
+  {
+    title: "Getting Started",
+    icon: Sparkles,
+    href: "/driver/onboarding",
+    isNew: true,
+  },
+  {
+    title: "Training Videos",
+    icon: GraduationCap,
+    href: "/driver/tutorials",
   },
   {
     title: "Refer a Friend",
@@ -131,9 +144,14 @@ export function DriverSidebar() {
                         <div className="flex items-center gap-3 w-full text-sm font-medium">
                           <item.icon className="h-5 w-5 flex-shrink-0" />
                           <span className="flex-1">{item.title}</span>
+                          {(item as any).isNew && (
+                            <Badge variant="secondary" className="ml-auto bg-primary/20 text-primary border-primary/30">
+                              New
+                            </Badge>
+                          )}
                           {item.title === "SafeGo Points" && (
                             <Badge variant="secondary" className="ml-auto bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30">
-                              New
+                              Pro
                             </Badge>
                           )}
                         </div>
