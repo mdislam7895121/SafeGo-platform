@@ -109,22 +109,22 @@ export function PromotionsDateStrip({
               flex flex-col items-center justify-center min-w-[48px] h-[64px] rounded-xl
               transition-all duration-200 ease-out shrink-0 relative
               ${isSelected 
-                ? "bg-white text-purple-600 shadow-lg scale-105" 
-                : "bg-white/20 text-white hover:bg-white/30"
+                ? "bg-background text-primary shadow-lg scale-105 border border-border" 
+                : "bg-white/20 text-white/90 hover:bg-white/30 active:scale-95"
               }
-              ${isToday && !isSelected ? "ring-2 ring-white/50" : ""}
+              ${isToday && !isSelected ? "ring-2 ring-white/60" : ""}
             `}
             data-testid={`date-pill-${dateStr}`}
           >
-            <span className={`text-xs font-medium ${isSelected ? "text-purple-400" : "opacity-80"}`}>
+            <span className={`text-xs font-medium ${isSelected ? "text-muted-foreground" : "opacity-80"}`}>
               {WEEKDAY_INITIALS[dayOfWeek]}
             </span>
-            <span className={`text-lg font-bold ${isSelected ? "text-purple-600" : ""}`}>
+            <span className={`text-lg font-bold ${isSelected ? "text-foreground" : ""}`}>
               {dayNumber}
             </span>
             <div className="flex items-center gap-0.5 mt-0.5 h-1.5">
               {isToday && (
-                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-purple-500" : "bg-white"}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-primary" : "bg-white"}`} />
               )}
               {hasPromotions && (
                 <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? "bg-green-500" : "bg-green-400"}`} />

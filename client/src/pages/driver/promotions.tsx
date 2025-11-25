@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Gift, TrendingUp, Clock, Target, Zap, DollarSign, Trophy, CheckCircle, Car, UtensilsCrossed, Package, ArrowLeft, AlertCircle, Timer, RefreshCw, Star, Calendar } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -121,14 +121,24 @@ function formatCurrency(amount: number, country?: string): string {
 function CountdownTimer({ endAt }: { endAt: string }) {
   const [timeLeft, setTimeLeft] = useState("");
   const [isUrgent, setIsUrgent] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    const clearTimerInterval = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+    
     const updateTimer = () => {
       const now = new Date();
       const end = new Date(endAt);
       
       if (isPast(end)) {
         setTimeLeft("Ended");
+        setIsUrgent(false);
+        clearTimerInterval();
         return;
       }
 
@@ -150,14 +160,18 @@ function CountdownTimer({ endAt }: { endAt: string }) {
       }
     };
 
+    clearTimerInterval();
     updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
+    
+    if (!isPast(new Date(endAt))) {
+      intervalRef.current = setInterval(updateTimer, 1000);
+    }
+    
+    return clearTimerInterval;
   }, [endAt]);
 
   return (
-    <span className={`flex items-center gap-1 ${isUrgent ? "text-red-500 font-medium animate-pulse" : ""}`}>
-      <Timer className="h-3 w-3" />
+    <span className={`${isUrgent ? "text-red-500 dark:text-red-400 font-medium animate-pulse" : ""}`}>
       {timeLeft}
     </span>
   );
@@ -255,11 +269,11 @@ function UberStylePromotionCard({
           
           <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-2">
-              <span className={`font-bold text-sm ${isCompleted ? "text-green-600" : "text-primary"}`}>
+              <span className={`font-bold text-sm ${isCompleted ? "text-green-600 dark:text-green-400" : "text-primary"}`}>
                 {rewardText}
               </span>
               {(variant === "completed" || isCompleted) && (
-                <Badge variant="outline" className="border-green-500 text-green-600 text-xs">
+                <Badge variant="outline" className="border-green-500 dark:border-green-400 text-green-600 dark:text-green-400 text-xs">
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Completed
                 </Badge>
@@ -295,11 +309,11 @@ function UberStylePromotionCard({
         <div className="hidden sm:flex shrink-0 items-center">
           <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 dark:from-purple-900/30 dark:to-pink-900/30 flex items-center justify-center">
             {isQuest ? (
-              <Target className="h-8 w-8 text-purple-500" />
+              <Target className="h-8 w-8 text-purple-500 dark:text-purple-400" />
             ) : isEarningsGoal ? (
-              <TrendingUp className="h-8 w-8 text-blue-500" />
+              <TrendingUp className="h-8 w-8 text-blue-500 dark:text-blue-400" />
             ) : (
-              <DollarSign className="h-8 w-8 text-green-500" />
+              <DollarSign className="h-8 w-8 text-green-500 dark:text-green-400" />
             )}
           </div>
         </div>
@@ -733,15 +747,15 @@ export default function DriverPromotions() {
                 {[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-16" />)}
               </div>
             ) : bonusHistory.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Trophy className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium">No Bonus History</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Complete trips and promotions to earn bonuses
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Trophy className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h3 className="font-semibold text-lg mb-2">No bonus history</h3>
+                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                  Complete trips and promotions to earn bonuses
+                </p>
+              </div>
             ) : (
               <div className="space-y-2">
                 {bonusHistory.map((bonus) => {
