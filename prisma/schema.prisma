@@ -721,6 +721,8 @@ model User {
   adminSessions     AdminSession[] @relation("AdminSessions")
   createdAdjustments FinancialAdjustment[] @relation("CreatedAdjustments")
   approvedAdjustments FinancialAdjustment[] @relation("ApprovedAdjustments")
+  assignedDriverTickets DriverSupportTicket[] @relation("AssignedDriverTickets")
+  driverTicketStatusChanges DriverSupportStatusHistory[] @relation("DriverTicketStatusChanges")
 
   @@index([isDemo])
   @@map("users")
@@ -2193,30 +2195,64 @@ model RestaurantSupportMessage {
   @@map("restaurant_support_messages")
 }
 
-// Driver Support Center Models (Phase 12 Extension)
+// Driver Support Center Models (Phase 12 Extension - D8 Enhanced)
+enum DriverSupportCategory {
+  account_documents
+  trip_issues
+  payment_earnings
+  incentives_promotions
+  safety_emergency
+  app_technical
+}
+
 model DriverSupportTicket {
   id              String                      @id @default(uuid())
   ticketCode      String                      @unique // e.g., "DST-2025-000123"
   driverId        String
   subject         String
-  category        RestaurantSupportCategory
+  category        DriverSupportCategory
+  subcategory     String?                     // Dynamic subcategory within main category
+  tripId          String?                     // Optional: linked ride/delivery ID
   priority        RestaurantSupportPriority   @default(normal)
   status          RestaurantSupportStatus     @default(open)
   description     String                      @db.Text
   attachmentUrls  Json?                       // Array of attachment URLs
   channel         String                      @default("web") // email, phone, chat
+  adminNotes      String?                     @db.Text // Internal notes (not visible to driver)
+  assignedAdminId String?                     // Admin assigned to this ticket
   createdAt       DateTime                    @default(now())
   updatedAt       DateTime                    @updatedAt
   resolvedAt      DateTime?
   
   driver          DriverProfile               @relation("DriverSupportTickets", fields: [driverId], references: [id], onDelete: Cascade)
+  assignedAdmin   User?                       @relation("AssignedDriverTickets", fields: [assignedAdminId], references: [id])
   messages        DriverSupportMessage[]
+  statusHistory   DriverSupportStatusHistory[]
   
   @@index([driverId])
   @@index([status])
   @@index([category])
+  @@index([assignedAdminId])
   @@index([createdAt])
   @@map("driver_support_tickets")
+}
+
+model DriverSupportStatusHistory {
+  id              String                      @id @default(uuid())
+  ticketId        String
+  previousStatus  RestaurantSupportStatus?
+  newStatus       RestaurantSupportStatus
+  changedById     String?                     // User who made the change
+  changedByRole   String                      // "driver" | "admin" | "system"
+  note            String?                     // Optional note about the status change
+  createdAt       DateTime                    @default(now())
+  
+  ticket          DriverSupportTicket         @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changedBy       User?                       @relation("DriverTicketStatusChanges", fields: [changedById], references: [id])
+  
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("driver_support_status_history")
 }
 
 model DriverSupportMessage {
