@@ -1,0 +1,261 @@
+You are working on the SafeGo super-app project. Follow ALL rules below strictly and completely. Do not skip or partially apply any rule.
+
+==================================================
+SAFEGO MASTER RULES (ALWAYS APPLY)
+==================================================
+
+1. Multi-role platform (must ALWAYS preserve)
+   - The system has FOUR core roles:
+     1) Customer (rider + food customer + parcel sender/receiver)
+     2) Driver (rides + food delivery + parcel delivery)
+     3) Restaurant (SafeGo Eats merchant dashboard)
+     4) Admin (SafeGo Platform Management)
+   - Any change you make must NOT break existing flows for any role.
+   - Permissions:
+     - Customers: can only see their own data and public info (e.g., driver public card).
+     - Drivers: can only see their own profile, vehicles, earnings, quests, and eligible promotions.
+     - Restaurants: can only manage their own menus, orders, staff, and payouts.
+     - Admins: full access but must go through proper admin routes and guards.
+
+2. Global app services (must remain intact)
+   - SafeGo is a combined Ride + Food + Parcel platform.
+   - Shared concepts:
+     - Users table, driver_profile, restaurant, vehicles, wallet, payouts, KYC.
+     - Shared wallet + commission logic across rides, food orders, and parcel deliveries.
+   - Collections that must NEVER be broken:
+     - rides
+     - food_orders
+     - deliveries
+     - wallets / wallet_transactions
+     - payouts / payout_requests
+     - promotions / promotion_assignments / quests (or equivalent promotion tables)
+   - Do NOT rename or drop core collections or their primary keys.
+
+3. Commission & payout rules (do not change in this task)
+   - Platform uses commission on completed rides/food_orders/deliveries.
+   - Wallet → Payout pipeline must remain:
+     1) Service completes (ride/food/delivery).
+     2) Commission + driver earnings recorded in wallet_transactions.
+     3) Driver can request payout according to existing rules.
+     4) Admin can approve/deny payout; payments reflected in wallet.
+   - For this task you MUST NOT modify commission calculation or payout business logic.
+   - You may only READ earnings/quest status to display them.
+
+4. Security & KYC rules (must always respect)
+   - All driver-facing endpoints must:
+     - Use authenticated driver session.
+     - Verify driver_profile linkage.
+     - Respect KYC and verification status where already enforced.
+   - All admin pages must be admin-only and NEVER exposed to normal users.
+   - Do not weaken auth checks, field validation, or ownership checks.
+   - For this task, DO NOT add new sensitive data fields; only use existing ones.
+
+5. Status flows (do not break)
+   - Rides / food / deliveries have lifecycle statuses (e.g., pending → accepted → on_trip → completed → cancelled).
+   - KYC statuses (pending / approved / rejected) already exist and must not be changed.
+   - Promotions/quests/bonuses may have statuses such as active / upcoming / expired / completed.
+   - Your changes in this task may filter or display based on existing statuses, but MUST NOT change state transitions or introduce breaking changes.
+
+6. Onboarding requirements (keep intact)
+   - Driver onboarding:
+     - Account + email verification
+     - Identity documents (KYC)
+     - Vehicle registration (brand, model, color, plate, etc.)
+     - Driver profile photo
+   - You MUST NOT relax or bypass any required step. This task is purely UI/UX for promotions display.
+
+7. Admin panel invariants (do not break)
+   - Existing admin routes and dashboards must remain functional:
+     - Admin driver list and detail
+     - Admin KYC approvals
+     - Admin promotions / bonuses management
+   - For this task, DO NOT change admin-side logic for promotions. Only reuse existing APIs on the driver side.
+
+8. Safe, incremental development (VERY IMPORTANT)
+   - No breaking schema changes.
+   - No renaming existing API routes.
+   - Additive changes only: new components, props, or optional query parameters.
+   - Reuse existing hooks, services, and types where possible.
+   - Always keep TypeScript types in sync if you touch them.
+
+9. Security phase for this task (display-only)
+   - This D7 task is a **display/UX enhancement**.
+   - Security requirements:
+     - Use existing authenticated driver context to fetch promotions data.
+     - Do NOT expose internal IDs in a way that allows other drivers’ data to be accessed.
+     - Only filter within the already authorized driver’s own eligible promotions.
+     - Handle all API errors gracefully (no crashes, only user-friendly messages).
+
+10. Implementation completeness rule (critical for this prompt)
+   - You MUST deliver a complete, end-to-end implementation for this task in ONE pass:
+     - All necessary frontend components
+     - Any small, safe backend changes (if required for filtering), without breaking existing behavior
+     - Wiring, state management, error handling, loading states
+     - Basic tests or at least clear test instructions
+   - Do NOT leave TODOs. Finish the feature to a shippable MVP level.
+
+==================================================
+TASK CONTEXT (DRIVER PHASE D7)
+==================================================
+
+We are in Driver Phase D (D1–D7). Previous steps have already implemented:
+
+- D1: Multi-vehicle support, driver profile documents, and basic driver dashboard.
+- D2: Driver public profile card (Uber/Lyft-style) for customers.
+- D3: Driver vehicle brand/model/color dropdowns + enhanced preview.
+- D4: Driver earnings & payouts dashboard (wallet + history).
+- D5: Driver promotions & incentives system:
+  - Admin: create & manage driver promotions/quests/bonuses.
+  - Driver: “Opportunity” page at `/driver/opportunity` (or `/driver/promotions`) with “Promotions & Bonuses” header and stats.
+
+You must NOT rewrite these; you should enhance the existing driver promotions page.
+
+The screenshot context:
+- The driver “Opportunity” page shows a purple header banner titled “Promotions & Bonuses”.
+- Below it there are summary stats like Total Earned, This Month, Active, In Progress, and tabs (Quests, Bonuses, Done, History).
+- We want to add a **swipeable date strip** directly under the “Promotions & Bonuses” banner.
+
+==================================================
+D7 TASK: SWIPEABLE DATE STRIP UNDER "PROMOTIONS & BONUSES"
+==================================================
+
+Goal:
+Create a professional, Uber/Lyft-style date carousel under the “Promotions & Bonuses” header on the driver Opportunity page. Drivers can swipe/scroll horizontally through dates, tap a date, and see promotions/quests filtered for that date. The design must work well on mobile and desktop.
+
+High-level behavior:
+1. Add a horizontal, swipeable date strip directly under the “Promotions & Bonuses” banner on the driver Opportunity page.
+2. Each date “pill” should show:
+   - Weekday initial (M, T, W, T, F, S, S)
+   - Day number (e.g., 24)
+3. The current day should be visually highlighted as the default selection.
+4. Horizontal scrolling/swiping:
+   - On mobile: allow swipe/scroll (overflow-x scroll).
+   - On desktop: allow horizontal scrolling (e.g., mouse wheel + trackpad).
+5. Selecting a date:
+   - Updates a `selectedDate` state.
+   - Filters the visible quests/bonuses and stats to that date or date-range.
+   - If no promotion is available for that date, show a friendly “No active quests for this date” message, but keep the rest of the page usable.
+
+==================================================
+IMPLEMENTATION DETAILS
+==================================================
+
+1. Locate existing driver promotions page
+   - Find the existing React/TypeScript page that renders the driver “Promotions & Bonuses” view. It may be something like:
+     - `client/src/pages/driver/opportunity.tsx`
+     - or `client/src/pages/driver/promotions.tsx`
+   - Confirm it is the page used for `/driver/opportunity` or `/driver/promotions`.
+   - Do NOT create a new route; enhance the existing page.
+
+2. Add a reusable DateStrip component
+   - Create a new component in a sensible location, for example:
+     - `client/src/components/driver/PromotionsDateStrip.tsx`
+   - Responsibilities:
+     - Render a horizontally scrollable list of date pills.
+     - Accept props such as:
+       - `startDate` (default: today minus a small offset, e.g., 0–3 days)
+       - `days` (how many days to render, e.g., 14 days total)
+       - `selectedDate` (Date or ISO string)
+       - `onDateChange(newDate: string)` callback.
+     - Generate dates locally using JavaScript/TypeScript (no backend schema change).
+     - For each date pill:
+       - Show top: weekday initial (e.g., `"M"` for Monday).
+       - Show bottom: day of month (`24`).
+       - Apply SafeGo’s design system (border radius, spacing, typography) consistent with existing buttons/tabs.
+       - Indicate selected state (e.g., filled background, bold text).
+     - Enable horizontal scrolling:
+       - `display: flex; overflow-x: auto; white-space: nowrap;`
+       - Ensure scrollbars don’t break layout on desktop.
+     - Ensure the component is responsive:
+       - On small screens, pills remain tappable and legible.
+       - Use sensible min-width for each pill.
+
+3. Integrate DateStrip into the Opportunity page
+   - Insert the new `PromotionsDateStrip` directly under the “Promotions & Bonuses” header/banner section, before the stats summary.
+   - Wire it to state:
+     - Add `const [selectedDate, setSelectedDate] = useState<string>(todayInAppTimezoneIso);`
+     - Pass `selectedDate` into `PromotionsDateStrip`.
+     - Implement `onDateChange` to update `selectedDate`.
+   - Use the app’s existing date/time helpers (if present) to ensure consistency with server timezone.
+
+4. Connect date selection to promotions data
+   - Identify how promotions/quests are currently loaded on the driver page:
+     - If there is a custom hook like `useDriverPromotions()` or an API call like `/api/driver/promotions`, reuse it.
+   - Filter strategy (pick the safest non-breaking option):
+     Option A: Client-side filtering (preferred if data set is small and already loaded)
+       - Keep existing API request unchanged (no backend modifications).
+       - After fetching promotions, filter them by `selectedDate` using existing fields like `startDate`, `endDate`, or similar.
+       - A promotion is “available” for a given date if `selectedDate` falls between its valid range.
+     Option B: Optional query parameter (only if required and safe)
+       - If client-side filtering is not practical, extend the existing driver promotions API to accept an OPTIONAL `date` query parameter.
+       - DO NOT change existing behavior when `date` is not provided.
+       - Implementation should:
+         - Validate the date.
+         - Filter promotions server-side by validity window.
+         - Return the same response shape as before.
+   - Do NOT change promotion schemas or status flows. Only filter.
+
+5. Update stats and list views based on selected date
+   - Wherever the page currently shows:
+     - Total Earned
+     - This Month
+     - Active / In Progress counts
+     - Quests/Bonuses/Done/History tabs
+   - Adjust the logic so that:
+     - The main promotions list respects the `selectedDate` filter.
+     - For stats tied to active quests, adapt them to reflect the currently selected date or clearly label them (e.g., “Today’s Opportunities”, “Selected Date”).
+   - Keep monthly or lifetime totals if they are clearly labeled; do not confuse the user by silently changing semantics.
+
+6. UX & visual polish
+   - The date strip must look professional and consistent with the existing SafeGo UI:
+     - Use the same purple/brand palette where appropriate.
+     - Respect existing spacing (padding/margins between header, date strip, and stats).
+   - Add small quality-of-life touches:
+     - Auto-scroll the strip so that the selected date is visible when the page loads.
+     - When the user changes date, smoothly update loading states (spinner or skeleton) for the promotions list.
+
+7. Error handling and loading states
+   - If promotions fetch fails:
+     - Show a non-technical message like “Unable to load promotions right now. Please try again later.”
+     - Log the error to the console or existing logging utility.
+   - If there are no promotions for the selected date:
+     - Show a friendly empty state under the date strip, e.g.:
+       - “No active quests for this date. Check back later for new earning opportunities.”
+   - Do NOT show raw error JSON or stack traces to the user.
+
+8. Tests and manual verification (required)
+   - If automated tests exist (React Testing Library, etc.), add or update at least one test to:
+     - Render the Opportunity page with the new `PromotionsDateStrip`.
+     - Simulate selecting a different date.
+     - Assert that the filter function or hook is called with the expected date (or that the UI shows the correct filtered items).
+   - Provide a short manual test checklist in code comments or documentation (e.g. `replit.md` or a driver D7 section), including:
+     1) Open `/driver/opportunity` as a verified driver.
+     2) Verify that today’s date is selected by default and highlighted.
+     3) Swipe/scroll horizontally and tap another date.
+     4) Confirm that the promotions list and counts update according to the selected date.
+     5) Confirm that if the driver has no promotions on a date, a friendly empty state appears.
+     6) Confirm mobile layout on a narrow viewport.
+     7) Confirm that no admin/customer/restaurant pages are affected.
+
+9. Documentation
+   - Update the project documentation file (for example `replit.md`) in the Driver Phase section with a new D7 entry:
+     - Describe:
+       - The purpose of the Promotions Date Strip.
+       - How it works (client-side or server-side filtering).
+       - Which file(s) implement the component and integration.
+       - Any optional API parameters you added (if you used Option B).
+   - Keep the description concise but clear so future developers understand how to reuse the date strip for other views if needed.
+
+==================================================
+DELIVERABLE
+==================================================
+
+Implement all of the above in one complete, end-to-end change set:
+- New reusable date strip component.
+- Integrated into the driver Opportunity / Promotions page under the “Promotions & Bonuses” banner.
+- Correctly wired to promotions data with safe filtering.
+- Professional, responsive UI.
+- Proper error/empty states.
+- Documentation and (if applicable) tests.
+
+Do NOT ask the user what to do next. Just implement this D7 feature fully according to these instructions.
