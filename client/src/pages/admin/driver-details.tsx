@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { ArrowLeft, Car, Shield, Ban, Unlock, Trash2, Clock, DollarSign, Star, TrendingUp, AlertCircle, User, Edit, Wallet, Plus } from "lucide-react";
 import { VEHICLE_BRANDS_MODELS, VEHICLE_COLORS } from "@shared/vehicleCatalog";
@@ -308,22 +308,40 @@ export default function AdminDriverDetails() {
     dmvInspectionImageUrl: "",
   });
 
-  // Vehicle dropdown state for admin edit
+  // Vehicle dropdown state for admin edit with staged hydration
   const [selectedBrand, setSelectedBrand] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>("");
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [customBrand, setCustomBrand] = useState<string>("");
   const [customModel, setCustomModel] = useState<string>("");
   const [customColor, setCustomColor] = useState<string>("");
+  const [pendingModel, setPendingModel] = useState<string>(""); // For staged hydration
+  const [brandHydrated, setBrandHydrated] = useState<boolean>(false);
 
-  // Filter models based on selected brand
+  // Filter models based on selected brand (catalog already includes "Other")
   const availableModels = useMemo(() => {
     if (!selectedBrand || selectedBrand === "Other") {
       return ["Other"];
     }
     const brandModels = VEHICLE_BRANDS_MODELS[selectedBrand as keyof typeof VEHICLE_BRANDS_MODELS] || [];
-    return [...brandModels, "Other"];
+    return brandModels; // Don't append "Other" - catalog already has it
   }, [selectedBrand]);
+
+  // Staged hydration: Phase 2 - when brand changes and we have a pending model, wait for options
+  useEffect(() => {
+    if (brandHydrated && pendingModel && selectedBrand && selectedBrand !== "Other") {
+      // Check if pending model is in available models
+      if (availableModels.includes(pendingModel)) {
+        setSelectedModel(pendingModel);
+        setCustomModel("");
+      } else if (pendingModel) {
+        setSelectedModel("Other");
+        setCustomModel(pendingModel);
+      }
+      setPendingModel("");
+      setBrandHydrated(false);
+    }
+  }, [brandHydrated, selectedBrand, availableModels, pendingModel]);
 
   // Payout Account dialog state
   const [showPayoutDialog, setShowPayoutDialog] = useState(false);
@@ -772,62 +790,75 @@ export default function AdminDriverDetails() {
       setCustomBrand("");
       setCustomModel("");
       setCustomColor("");
+      setPendingModel("");
+      setBrandHydrated(false);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
-  // Handler to open vehicle edit dialog with existing data
+  // Handler to open vehicle edit dialog with existing data using staged hydration
   const handleOpenEditVehicleDialog = () => {
     if (driver && driver.vehicle) {
       const savedMake = driver.vehicle.make || "";
-      const savedModel = driver.vehicle.model || driver.vehicle.vehicleModel || "";
+      const savedModel = driver.vehicle.model || "";
+      const legacyVehicleModel = driver.vehicle.vehicleModel || "";
       const savedColor = driver.vehicle.color || "";
 
-      // Initialize brand dropdown
+      // Initialize brand and model
       let derivedBrand = savedMake;
       let derivedModel = savedModel;
 
-      // Try to parse brand from legacy combined model if make is missing
-      if (!derivedBrand && savedModel) {
+      // Normalize: If make is present, use it; otherwise try to parse from legacy vehicleModel
+      if (!derivedBrand && legacyVehicleModel) {
         const catalogBrands = Object.keys(VEHICLE_BRANDS_MODELS);
         for (const brand of catalogBrands) {
-          if (savedModel.startsWith(`${brand} `)) {
+          if (legacyVehicleModel.startsWith(`${brand} `)) {
             derivedBrand = brand;
-            derivedModel = savedModel.substring(brand.length + 1);
+            derivedModel = legacyVehicleModel.substring(brand.length + 1);
             break;
           }
         }
+        // If no brand found from legacy vehicleModel, use it as-is
+        if (!derivedBrand) {
+          derivedModel = legacyVehicleModel;
+        }
       }
 
-      // Set brand dropdown
+      // If we still have no model but have legacyVehicleModel, use it
+      if (!derivedModel && legacyVehicleModel && derivedBrand) {
+        // Check if legacyVehicleModel starts with brand, extract model portion
+        if (legacyVehicleModel.startsWith(`${derivedBrand} `)) {
+          derivedModel = legacyVehicleModel.substring(derivedBrand.length + 1);
+        }
+      }
+
+      // Phase 1: Set brand and trigger staged hydration for model
       if (derivedBrand && Object.keys(VEHICLE_BRANDS_MODELS).includes(derivedBrand)) {
         setSelectedBrand(derivedBrand);
         setCustomBrand("");
-        // Check if model exists in catalog for this brand
-        const brandModels = VEHICLE_BRANDS_MODELS[derivedBrand as keyof typeof VEHICLE_BRANDS_MODELS] || [];
-        if (brandModels.includes(derivedModel)) {
-          setSelectedModel(derivedModel);
-          setCustomModel("");
-        } else {
-          setSelectedModel("Other");
-          setCustomModel(derivedModel);
-        }
-      } else if (derivedBrand || savedModel) {
+        // Stage the model for Phase 2 hydration
+        setPendingModel(derivedModel);
+        setBrandHydrated(true);
+      } else if (derivedBrand || derivedModel || legacyVehicleModel) {
         setSelectedBrand("Other");
         setCustomBrand(derivedBrand);
         setSelectedModel("Other");
-        setCustomModel(derivedModel || savedModel);
+        setCustomModel(derivedModel || legacyVehicleModel);
+        setPendingModel("");
+        setBrandHydrated(false);
       } else {
         setSelectedBrand("");
         setCustomBrand("");
         setSelectedModel("");
         setCustomModel("");
+        setPendingModel("");
+        setBrandHydrated(false);
       }
 
-      // Set color dropdown
-      if (VEHICLE_COLORS.includes(savedColor as any)) {
+      // Set color dropdown (directly, no staging needed for color)
+      if (savedColor && VEHICLE_COLORS.includes(savedColor as any)) {
         setSelectedColor(savedColor);
         setCustomColor("");
       } else if (savedColor) {
@@ -862,6 +893,8 @@ export default function AdminDriverDetails() {
       setCustomBrand("");
       setCustomModel("");
       setCustomColor("");
+      setPendingModel("");
+      setBrandHydrated(false);
     }
     setShowEditVehicleDialog(true);
   };
