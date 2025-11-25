@@ -43,6 +43,16 @@ Core systems and features include:
 -   **Driver In-App Training & Onboarding System (D9)**: Uber-style driver onboarding and training system with a 6-step guided onboarding wizard, progress tracking, and a comprehensive training hub with modules, progress persistence, and API integration.
 -   **Driver Getting Started Page (D10)**: Uber-style onboarding checklist page with a progress summary, 12 dynamic checklist items adapting to country/city, and action links to relevant sections.
 -   **Driver Document Center (D11)**: Uber-style document management page at `/driver/documents` with page header, progress summary card, document cards (License Front/Back, Registration, Insurance, Profile Photo), NYC-only TLC logic (Manhattan, Brooklyn, Queens, Bronx, Staten Island detection), SSN verification card (US only, masked display), upload modal with preview, status badges (Not Submitted/Pending/Approved/Rejected/Verified), and sidebar navigation link.
+-   **Driver Vehicle Center (D12)**: Uber-style vehicle management page at `/driver/vehicle` with:
+    - **Page Header**: "Vehicle Information" title with subtitle
+    - **Progress Summary**: Completion status card with progress bar
+    - **Editable Vehicle Cards**: Make (dropdown), Model, Year (dropdown), Color (dropdown), License Plate, VIN (masked display)
+    - **Expiry Date Cards**: Registration Expiry, Insurance Expiry with color-coded warnings (green=valid, yellow=<30 days, red=expired)
+    - **Vehicle Photo Upload**: Front, Back, Side view cards with preview, replace option, status badges
+    - **Edit/Save Flow**: Each card has edit button, save/cancel in edit mode
+    - **D10 Integration**: Updates `safego-driver-checklist-completed` localStorage when all fields complete
+    - **VIN Security**: Masked display showing only last 4 digits with show/hide toggle
+    - **Sidebar Navigation**: "Vehicle" link with Car icon
 -   **Country-Specific Payment & Payout Configuration (D8)**: Comprehensive country-aware payout system with extended models for wallets and payouts, driver wallet APIs, payout methods, payout requests with KYC enforcement, admin configuration APIs, and monitoring, supporting various currencies and business rules.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 

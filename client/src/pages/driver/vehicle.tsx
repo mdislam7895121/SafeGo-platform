@@ -222,8 +222,8 @@ function VehicleInfoCard({
                         <SelectValue placeholder={placeholder || `Select ${label}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        {options.map(opt => (
-                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        {options.map((opt, index) => (
+                          <SelectItem key={`${opt}-${index}`} value={opt}>{opt}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
