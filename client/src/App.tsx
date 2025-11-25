@@ -94,6 +94,7 @@ import DriverDocuments from "@/pages/driver/documents";
 import DriverOnboarding from "@/pages/driver/onboarding";
 import DriverGettingStarted from "@/pages/driver/getting-started";
 import DriverTutorials from "@/pages/driver/tutorials";
+import DriverSettings from "@/pages/driver/settings";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -411,6 +412,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Vehicles">
             <DriverVehicle />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/settings">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Settings">
+            <DriverSettings />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
