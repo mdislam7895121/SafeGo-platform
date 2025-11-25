@@ -66,12 +66,17 @@ Core systems and features include:
 -   **Driver In-App Training & Onboarding System (D9)**: Uber-style driver onboarding and training system with:
     - **Onboarding Wizard** (`/driver/onboarding`): 6-step guided onboarding (Welcome, Earnings, Payouts, Safety, Help Center, Completion)
     - **Progress Tracking**: Step completion with timestamps, completion percentage, and resumable sessions
-    - **Training Videos** (`/driver/tutorials`): Tutorial library with 8 placeholder videos across 5 categories (rides, food, earnings, safety, general)
-    - **Category Filtering**: Filter tutorials by category with progress tracking
+    - **Training Hub** (`/driver/tutorials`): Comprehensive training platform with 13 modules across 6 categories:
+      - **Module Data Model**: id, title, shortDescription, category, estimatedDurationMinutes, difficulty (Beginner/Intermediate/Advanced), status (available/coming_soon/locked), isRequiredForActivation, videoUrl, lastUpdated, keyTakeaways[]
+      - **Categories**: Getting Started, Rides, Earnings, Safety, Support, Advanced with category filter tabs
+      - **Module Cards**: Responsive grid with category pills, duration, difficulty badges, Required/Coming Soon/Completed status badges
+      - **Detail Modal**: Video placeholder or "Coming Soon" state, key takeaways bullet points, "Mark as Completed" button
+      - **Progress Tracking**: localStorage-based completion persistence (`safego-driver-training-completed`), overall and onboarding-required completion percentages
+      - **Onboarding Integration**: Visual badges for required modules, onboarding progress widget
     - **Skip/Reset**: Options to skip entire onboarding or reset progress for re-training
     - **API Routes**: `GET /api/driver/onboarding/status`, `POST /api/driver/onboarding/complete-step`, `POST /api/driver/onboarding/skip`, `POST /api/driver/onboarding/reset`, `GET /api/driver/tutorials`, `POST /api/driver/tutorials/:id/view`
     - **Database Model**: `DriverOnboarding` with step completion flags, timestamps, tutorialsViewed array, and completion status
-    - **Sidebar Integration**: "Getting Started" with "New" badge and "Training Videos" in driver sidebar navigation
+    - **Sidebar Integration**: "Getting Started" with "New" badge and "Training Videos" in driver sidebar navigation (uses `asChild` prop for proper Link navigation)
 -   **Country-Specific Payment & Payout Configuration (D8)**: Comprehensive country-aware payout system with:
     - **Models Extended**: `Wallet` (holdAmount), `Payout` (feeAmount, netAmount, payoutMethodId), `CountryPayoutConfig` (serviceType, currency, maxPayoutAmount, platformFeeType, platformFeeValue, payoutDayOfWeek, payoutDayOfMonth)
     - **Driver Wallet APIs**: `GET /api/driver/wallet/summary` (balance, currency, hold, payout rules), `GET /api/driver/wallet/transactions` (paginated history)
