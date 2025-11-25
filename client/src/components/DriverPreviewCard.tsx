@@ -14,7 +14,8 @@ export type DriverPublicProfile = {
   profilePhotoUrl: string | null;
   vehicle: {
     type: string;
-    model: string;
+    make: string | null; // Vehicle brand/manufacturer
+    model: string; // Can be "Brand Model" combined or just model
     color: string;
     plateNumber: string;
   } | null;
@@ -135,8 +136,14 @@ export function DriverPreviewCard({
                     <Car className="h-8 w-8 text-primary" />
                   </div>
                   <div className="text-left">
-                    <p className="font-semibold text-lg">{profile.vehicle.color} {profile.vehicle.type}</p>
-                    <p className="text-sm text-muted-foreground">{profile.vehicle.model}</p>
+                    <p className="font-semibold text-lg" data-testid="text-vehicle-info">
+                      {profile.vehicle.color} {profile.vehicle.model || profile.vehicle.type}
+                    </p>
+                    {profile.vehicle.make && !profile.vehicle.model.includes(profile.vehicle.make) && (
+                      <p className="text-sm text-muted-foreground" data-testid="text-vehicle-make">
+                        {profile.vehicle.make}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <Button

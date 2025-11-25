@@ -202,7 +202,8 @@ router.get("/public-profile/:driverProfileId", async (req, res) => {
       profilePhotoUrl: driverProfile.profilePhotoUrl,
       vehicle: vehicle ? {
         type: vehicle.vehicleType || 'car',
-        model: vehicle.model || vehicle.vehicleModel || 'Vehicle',
+        make: vehicle.make || null, // Vehicle brand/manufacturer
+        model: vehicle.vehicleModel || 'Vehicle', // Combined "Brand Model" for display
         color: vehicle.color || 'Gray',
         plateNumber: vehicle.licensePlate || vehicle.vehiclePlate || '',
       } : null,
@@ -2225,7 +2226,7 @@ router.delete("/vehicle-documents/:id", async (req: AuthRequest, res) => {
 router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
-    const { vehicleMake, vehicleColor, vehicleModel, licensePlateNumber } = req.body;
+    const { vehicleMake, vehicleColor, vehicleModel, vehicleDisplayName, licensePlateNumber } = req.body;
 
     // Get driver profile with vehicles and user
     const driverProfile = await prisma.driverProfile.findUnique({
@@ -2268,6 +2269,10 @@ router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
     // Find or create primary vehicle
     let primaryVehicle = driverProfile.vehicles[0];
 
+    // Use vehicleDisplayName for legacy vehicleModel field (backward compatibility)
+    // vehicleDisplayName = "Brand Model" combined, vehicleModel = model-only
+    const legacyVehicleModel = vehicleDisplayName || vehicleModel || "Not specified";
+    
     if (!primaryVehicle) {
       // Create a new primary vehicle with provided details
       primaryVehicle = await prisma.vehicle.create({
@@ -2276,8 +2281,7 @@ router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
           driverId: driverProfile.id,
           vehicleType: "car", // Default type
           make: vehicleMake || null,
-          model: vehicleModel || null,
-          vehicleModel: vehicleModel || "Not specified",
+          vehicleModel: legacyVehicleModel, // Store combined "Brand Model" for backward compatibility
           vehiclePlate: licensePlateNumber || "Not specified",
           color: vehicleColor || null,
           licensePlate: licensePlateNumber || null,
@@ -2294,9 +2298,11 @@ router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
 
       if (vehicleMake) updateData.make = vehicleMake.trim();
       if (vehicleColor) updateData.color = vehicleColor.trim();
-      if (vehicleModel) {
-        updateData.model = vehicleModel.trim();
-        updateData.vehicleModel = vehicleModel.trim(); // Keep legacy field for compatibility
+      // Always use vehicleDisplayName for the combined "Brand Model" format
+      if (vehicleDisplayName) {
+        updateData.vehicleModel = vehicleDisplayName.trim(); // Combined "Brand Model" for backward compatibility
+      } else if (vehicleModel) {
+        updateData.vehicleModel = vehicleModel.trim(); // Fallback to model-only
       }
       if (licensePlateNumber) {
         updateData.licensePlate = licensePlateNumber.trim();
@@ -2313,8 +2319,9 @@ router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
       message: "Vehicle KYC details updated successfully",
       vehicle: {
         id: primaryVehicle.id,
+        make: primaryVehicle.make,
         color: primaryVehicle.color,
-        vehicleModel: primaryVehicle.vehicleModel,
+        vehicleModel: primaryVehicle.vehicleModel, // Combined "Brand Model" for display
         licensePlate: primaryVehicle.licensePlate,
       },
     });
