@@ -600,7 +600,11 @@ export default function DriverDocuments() {
   });
 
   const profile = (driverData as any)?.profile as DriverProfile | undefined;
-  const isNYC = profile?.usaCity === "New York" || profile?.usaCity === "NYC" || profile?.state === "NY";
+  
+  const nycCities = ["New York", "NYC", "Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"];
+  const isNYC = profile?.usaCity ? nycCities.some(city => 
+    profile.usaCity?.toLowerCase().includes(city.toLowerCase())
+  ) : false;
   const countryCode = profile?.countryCode || "US";
 
   const uploadMutation = useMutation({
@@ -657,8 +661,24 @@ export default function DriverDocuments() {
     setPreviewOpen(true);
   };
 
-  const documents = summaryData?.data?.documents || DEFAULT_DOCUMENTS;
-  const allDocuments = isNYC ? [...documents.filter(d => d.type !== "tlc_license"), TLC_DOCUMENT] : documents.filter(d => d.type !== "tlc_license");
+  const backendDocs = summaryData?.data?.documents || [];
+  const defaultDocTypes = DEFAULT_DOCUMENTS.map(d => d.type);
+  
+  const mergedDocs = DEFAULT_DOCUMENTS.map(defaultDoc => {
+    const backendDoc = backendDocs.find(d => d.type === defaultDoc.type);
+    return backendDoc ? { ...defaultDoc, ...backendDoc } : defaultDoc;
+  });
+  
+  const additionalBackendDocs = backendDocs.filter(d => 
+    !defaultDocTypes.includes(d.type) && d.type !== "tlc_license"
+  );
+  
+  const backendTLC = backendDocs.find(d => d.type === "tlc_license");
+  const tlcDocument = backendTLC ? { ...TLC_DOCUMENT, ...backendTLC } : TLC_DOCUMENT;
+  
+  const allDocuments = isNYC 
+    ? [...mergedDocs, tlcDocument, ...additionalBackendDocs] 
+    : [...mergedDocs, ...additionalBackendDocs];
   
   const approvedCount = allDocuments.filter(d => d.status === "APPROVED").length;
   const totalRequired = allDocuments.filter(d => d.required).length;
