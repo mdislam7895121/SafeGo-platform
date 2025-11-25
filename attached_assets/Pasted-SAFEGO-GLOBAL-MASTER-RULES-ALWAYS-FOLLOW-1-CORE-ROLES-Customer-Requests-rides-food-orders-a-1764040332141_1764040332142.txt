@@ -1,0 +1,189 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS FOLLOW)
+
+1) CORE ROLES
+- Customer: Requests rides, food orders, and parcel deliveries.
+- Driver: Fulfills rides, food, and parcel tasks; needs KYC, vehicle, and payout setup.
+- Restaurant: Manages menu, orders, prep & handoff for SafeGo Eats.
+- Admin: Full platform oversight; manages KYC, payouts, fraud checks, promotions, and configuration.
+
+2) GLOBAL APP LOGIC (ALL SERVICES)
+- Three main services must always stay supported and not broken:
+  1. Rides (customer ↔ driver, with pickup/dropoff, ETA, pricing, matching).
+  2. SafeGo Eats (customer ↔ restaurant ↔ driver, food ordering and delivery).
+  3. Parcels (customer ↔ driver for package pickup & dropoff).
+- Any change you make must keep all three service types functional. If you touch shared code (auth, users, KYC, wallet, payments, notifications), verify that rides, food, and parcels are not broken.
+
+3) COUNTRY / KYC RULES
+- USA:
+  - Drivers: require identity docs (ID, license), SSN (masked in UI), DOB, address, vehicle details, background check status.
+  - Payouts: bank info or supported payout method; follow existing validation rules.
+- Bangladesh:
+  - Drivers: National ID, driving license, phone, address; keep existing fields intact.
+- Never remove existing required KYC fields; you may extend them but not break current flows.
+- KYC flows exist for customers, drivers, and restaurants; keep approval logic consistent and secure.
+
+4) ADMIN PANEL REQUIREMENTS
+- Admin must always retain:
+  - User, driver, and restaurant lists with filters and search.
+  - KYC approval queues for all roles.
+  - Wallet & payouts overview and controls.
+  - Promotions & bonuses management for drivers (and later for other roles).
+  - Basic analytics / stats panels (do not break existing summaries).
+- Do not hard-code environment or credentials; reuse existing configuration.
+
+5) DATA & COLLECTIONS (BACKEND)
+- Core collections / tables that must stay valid (names may be Prisma models, SQL tables, or similar):
+  - users, driver_profiles, vehicles, restaurants, menu_items, orders / food_orders, rides, deliveries, wallet, payouts, transactions, promotions / driver_promotions.
+- If you add new fields:
+  - Use safe migrations (no data loss, backward compatible).
+  - Default values must be safe for existing rows.
+- Never delete or rename critical columns without explicit migration and compatibility handling.
+
+6) COMMISSION & PAYOUT LOGIC
+- Platform commission and driver earnings already exist; do not change core math unless explicitly asked.
+- Any feature (like promotions) that affects earnings must:
+  - Record its effect in transactions / earnings breakdown.
+  - Not break existing wallet, payouts, and driver earnings pages.
+- Keep decimal/monetary handling consistent with existing serializeDecimal / parsing utilities.
+
+7) SECURITY RULES
+- Always validate ownership (driver can only see/edit own data; admin can see all).
+- Enforce authentication and role checks on every new endpoint and route.
+- Validate IDs (UUID / numeric) and reject malformed input.
+- File / upload handling must keep existing protections (size, type, path).
+- Never log secrets, tokens, or sensitive PII.
+
+8) STATUS & LIFE-CYCLE FLOWS
+- Keep existing status flows for rides, food orders, parcels, payouts, and promotions intact.
+- When extending promotions, support:
+  - draft / scheduled / active / paused / ended.
+- Driver dashboards and opportunity pages must show only relevant, currently active or scheduled items as designed.
+
+9) ONBOARDING REQUIREMENTS
+- Drivers: must complete KYC, vehicle, documents, and payout info before going fully online.
+- Restaurants: must finish onboarding (KYC, menu, hours).
+- Customers: must have basic profile and verified contact as existing logic defines.
+- Do not break these onboarding guards.
+
+10) NOTIFICATIONS
+- If you add or change behavior that should trigger notifications (for example, date-specific promotions), reuse existing notification utilities if present and keep behavior consistent.
+- Do not spam; only trigger when state actually changes.
+
+11) IMPLEMENTATION RULES FOR THIS PROJECT
+- Never do schema-breaking changes unless absolutely necessary, and then use migrations with defaults.
+- Keep code modular and reusable; do not copy-paste large chunks if they can be refactored cleanly.
+- Maintain existing coding style (TypeScript/React/Prisma/etc.) and folder structure.
+- Before changing a shared component or hook, check where else it is used (customer, driver, restaurant, admin).
+- After any change, manually verify:
+  - Affected feature (here: driver Opportunity → Promotions & Bonuses).
+  - That other flows on that page still work.
+- For every task below, you must complete the full start-to-finish implementation in one loop: backend, frontend, and basic tests / manual verification where applicable.
+
+12) NEW RULES FROM OWNER (MUST FOLLOW)
+- For each new request, carefully analyze the provided screenshots and current behavior first; fix the real problem, not just symptoms.
+- Every task prompt must be implemented fully in a single pass (no partial work).
+- Do not introduce new bugs or TODOs; finish the feature.
+- Keep all existing SafeGo features working (rides, Eats, parcel, wallets, KYC, admin).
+- Always respect the project’s D-phase sequencing (D1–D7 for drivers) and do not break earlier phases.
+
+
+TASK: FIX PROMOTIONS DATE PICKER BUG + DAY-BY-DAY PROMOTION VIEW (D7)
+
+You are working on the Driver Opportunity → “Promotions & Bonuses” page in the driver app (D7 phase). Right now there is a horizontal date pill row (F 21, S 22, …, 27, 28, 29, 30, …). The user reported:
+
+- When they tap on date “28”, nothing happens.
+- When they tap on date “29”, the UI moves/acts as if “28” was selected.
+- In general, the selection looks “shifted” by one day (off-by-one).
+- Also, promotions should be controllable day-by-day: admin might set a promotion for the 30th, a different one for the 31st, etc., and the driver’s screen should respect that selection.
+
+Your job is to completely fix and finalize this feature end-to-end in ONE pass, following all SafeGo rules above.
+
+REQUIREMENTS
+
+1) Analyze existing implementation
+- Locate the driver Promotions & Bonuses page (under driver opportunity). It might be something like:
+  - `client/src/pages/driver/opportunity.tsx` or a similar route, plus shared components for the date scroller.
+- Find the date picker component that shows:
+  - Day initial (F, S, M, etc.)
+  - Day number (21, 22, …)
+- Identify:
+  - How the dates array is generated (e.g., from today ± N days).
+  - How the selected state is stored (index vs actual Date).
+  - How the click / tap handler works.
+  - How promotions for a given day are loaded (API call, filter, query param, etc.).
+
+2) Fix the off-by-one selection bug
+- Carefully debug to find the root cause of: “tapping 28 doesn’t work; tapping 29 selects 28”.
+  - Check for any use of `index - 1`, `index + 1`, or similar in the click handler.
+  - Check if the rendered day comes from `dates[index + something]` while the handler uses `index`.
+  - Verify that the state storing the selected index and the array used for rendering are in sync.
+- Implement a clean fix:
+  - Internally track the selected date by an actual `Date` (or string like `YYYY-MM-DD`), not by a fragile index if possible.
+  - Ensure that when a pill is tapped, the highlighted pill AND the loaded data both correspond to that exact pill (same date).
+  - Do not break keyboard / mouse / touch handling differences if any exist.
+- After the fix, manually verify:
+  - Tapping any pill (including the ones in the middle like 24, 27, 28, 29) correctly selects that day and does NOT shift by one.
+  - No console errors.
+  - The default selected day (likely today) still works on initial load.
+
+3) Day-by-day promotions behavior (driver view)
+- Use the existing promotions data model and APIs from D5; do NOT break them.
+- Implement (or fix) logic so that, for the driver:
+  - When a date pill is selected, the page queries promotions that are relevant for that specific calendar day.
+  - If promotions already have `startDate` and `endDate`:
+    - A promotion is considered active for date `d` if `startDate <= d <= endDate` and status is active.
+  - If there is already a concept of “quest windows” or “opportunity windows”, reuse that.
+- On the UI:
+  - Clearly reflect when there are no active promotions for a given day (e.g., “No promotions for this date yet”).
+  - Keep the existing total earned / this month / active / in progress counters intact; just make sure they match the selected day or overall period, depending on the current UX.
+- Ensure time zone behavior is consistent:
+  - Use the same time zone as other earnings/promotion logic (likely server-side or driver’s local).
+  - Avoid off-by-one problems due to midnight/time zone differences.
+
+4) Day-by-day configuration (admin behavior) – WITHOUT breaking existing data
+- Check the admin promotions management page(s), such as `/admin/driver-promotions`.
+- Confirm how admin currently defines promotions:
+  - Does each promotion already have date fields or schedule windows?
+- Ensure that the driver’s day-by-day view respects whatever schedule admin sets:
+  - If admin sets a promotion for the 30th and a different promo for the 31st, drivers selecting 30 should ONLY see the 30th promotion, and 31 should show only the 31st promotion (subject to existing rules).
+- If any minimal backend changes are needed to better support exact per-day mapping:
+  - Make them backward compatible (no loss of existing promos).
+  - Use proper migrations with safe defaults.
+  - Keep existing APIs working for any other consumers (e.g., admin, analytics).
+- Do NOT change business rules (rates, payouts, commission) unless strictly necessary; only adjust filtering / querying.
+
+5) UI / UX polish for the date strip
+- Keep the current visual style (rounded pills, gradient header) but fix interactions:
+  - The selected day should be visually distinct (highlighted).
+  - Scrolling/swiping the strip should keep the selected day centered or visible when possible.
+- Ensure:
+  - The current day is automatically selected on first load.
+  - When the user scrolls or taps another day, the selected style updates correctly and stays in sync with loaded data.
+- Do not degrade performance; avoid heavy re-renders on each tap.
+
+6) Safety, tests, and regression checks
+- Confirm that:
+  - Admin promotions list & filters still work.
+  - Driver earnings and opportunity pages still load correctly.
+  - No breaking changes to rides, Eats, or parcel flows.
+- Add / update tests where appropriate:
+  - At least basic unit or integration tests for the date selection logic (index/date mapping).
+- Check console/network logs for:
+  - No 4xx/5xx errors when switching dates.
+  - Correct API query parameters or request body when loading promotions for a given date.
+
+7) Documentation
+- Update `replit.md` (or the main project documentation file) with a short section for:
+  - “D7 Promotions Date Strip – Day-by-Day Behavior”
+  - How the date selection works.
+  - How admin scheduling maps to driver view.
+- Mention any new props, hooks, or utility functions you created.
+
+EXECUTION NOTES
+
+- Implement everything in one loop: fix the off-by-one bug, finalize day-by-day driver behavior, ensure admin scheduling is respected, and update documentation.
+- Do not leave TODOs, commented-out code, or half-implemented logic.
+- After finishing, summarize:
+  - Files changed.
+  - Root cause of the off-by-one bug and how you fixed it.
+  - How to test: exact steps for admin and driver to verify that tapping 28 selects 28, 29 selects 29, and day-by-day promotions are working.

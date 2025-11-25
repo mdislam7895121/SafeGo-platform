@@ -1,5 +1,5 @@
-import { useRef, useEffect } from "react";
-import { format, addDays, isSameDay, startOfDay } from "date-fns";
+import { useRef, useEffect, useMemo } from "react";
+import { format, addDays, isSameDay, startOfDay, parseISO } from "date-fns";
 
 interface PromotionsDateStripProps {
   startDate?: Date;
@@ -20,14 +20,24 @@ export function PromotionsDateStrip({
   const selectedRef = useRef<HTMLButtonElement>(null);
 
   const baseDate = startDate || startOfDay(new Date());
-  const dates: Date[] = [];
   
-  for (let i = -3; i < days - 3; i++) {
-    dates.push(addDays(baseDate, i));
-  }
+  const dates = useMemo(() => {
+    const result: Date[] = [];
+    for (let i = -3; i < days - 3; i++) {
+      result.push(startOfDay(addDays(baseDate, i)));
+    }
+    return result;
+  }, [baseDate, days]);
 
-  const selectedDateObj = new Date(selectedDate);
-  const todayObj = startOfDay(new Date());
+  const selectedDateObj = useMemo(() => {
+    try {
+      return startOfDay(parseISO(selectedDate));
+    } catch {
+      return startOfDay(new Date());
+    }
+  }, [selectedDate]);
+  
+  const todayObj = useMemo(() => startOfDay(new Date()), []);
 
   useEffect(() => {
     if (selectedRef.current && scrollContainerRef.current) {
