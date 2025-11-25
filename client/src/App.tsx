@@ -198,6 +198,7 @@ import AdminSupportLiveChat from "@/pages/admin-portal/support-live-chat";
 import AdminSupportPhone from "@/pages/admin-portal/support-phone";
 import AdminSupportTickets from "@/pages/admin-portal/support-tickets";
 import AdminSupportTicketDetail2 from "@/pages/admin-portal/support-ticket-detail";
+import AdminDriverSupportCenter from "@/pages/admin/driver-support";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -1347,6 +1348,11 @@ function Router() {
       <Route path="/admin/security-center">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminSecurityCenter />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/driver-support">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminDriverSupportCenter />
         </ProtectedRoute>
       </Route>
       {/* Admin Support Center Routes */}
