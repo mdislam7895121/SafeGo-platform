@@ -18,16 +18,22 @@ export function PromotionsDateStrip({
 }: PromotionsDateStripProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
+  const prevSelectedDateRef = useRef<string>(selectedDate);
+  const hasInitialScrolledRef = useRef(false);
 
-  const baseDate = startDate || startOfDay(new Date());
+  const baseDateStr = useMemo(() => {
+    const date = startDate || new Date();
+    return format(startOfDay(date), "yyyy-MM-dd");
+  }, [startDate]);
   
   const dates = useMemo(() => {
+    const baseDate = parseISO(baseDateStr);
     const result: Date[] = [];
     for (let i = -3; i < days - 3; i++) {
       result.push(startOfDay(addDays(baseDate, i)));
     }
     return result;
-  }, [baseDate, days]);
+  }, [baseDateStr, days]);
 
   const selectedDateObj = useMemo(() => {
     try {
@@ -37,23 +43,11 @@ export function PromotionsDateStrip({
     }
   }, [selectedDate]);
   
-  const todayObj = useMemo(() => startOfDay(new Date()), []);
+  const todayStr = useMemo(() => format(new Date(), "yyyy-MM-dd"), []);
+  const todayObj = useMemo(() => startOfDay(parseISO(todayStr)), [todayStr]);
 
   useEffect(() => {
-    if (selectedRef.current && scrollContainerRef.current) {
-      const container = scrollContainerRef.current;
-      const selectedEl = selectedRef.current;
-      const containerWidth = container.clientWidth;
-      const selectedLeft = selectedEl.offsetLeft;
-      const selectedWidth = selectedEl.offsetWidth;
-      
-      const scrollPosition = selectedLeft - (containerWidth / 2) + (selectedWidth / 2);
-      container.scrollTo({ left: Math.max(0, scrollPosition), behavior: "smooth" });
-    }
-  }, [selectedDate]);
-
-  useEffect(() => {
-    if (selectedRef.current && scrollContainerRef.current) {
+    if (!hasInitialScrolledRef.current && selectedRef.current && scrollContainerRef.current) {
       const container = scrollContainerRef.current;
       const selectedEl = selectedRef.current;
       const containerWidth = container.clientWidth;
@@ -62,8 +56,23 @@ export function PromotionsDateStrip({
       
       const scrollPosition = selectedLeft - (containerWidth / 2) + (selectedWidth / 2);
       container.scrollTo({ left: Math.max(0, scrollPosition), behavior: "auto" });
+      hasInitialScrolledRef.current = true;
     }
-  }, []);
+  }, [dates]);
+
+  useEffect(() => {
+    if (prevSelectedDateRef.current !== selectedDate && selectedRef.current && scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      const selectedEl = selectedRef.current;
+      const containerWidth = container.clientWidth;
+      const selectedLeft = selectedEl.offsetLeft;
+      const selectedWidth = selectedEl.offsetWidth;
+      
+      const scrollPosition = selectedLeft - (containerWidth / 2) + (selectedWidth / 2);
+      container.scrollTo({ left: Math.max(0, scrollPosition), behavior: "smooth" });
+      prevSelectedDateRef.current = selectedDate;
+    }
+  }, [selectedDate]);
 
   return (
     <div 
