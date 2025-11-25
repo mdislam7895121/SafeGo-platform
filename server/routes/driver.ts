@@ -5527,19 +5527,38 @@ router.get(
 
       const countryCode = driverProfile.user.countryCode || "US";
       
-      // Parse date parameter or default to today
-      let selectedDate: Date;
-      if (date && typeof date === 'string') {
-        selectedDate = new Date(date + 'T00:00:00');
-      } else {
-        selectedDate = new Date();
-      }
+      // Parse and validate date parameter (YYYY-MM-DD format)
+      let dayStart: Date;
+      let dayEnd: Date;
       
-      // Set to start and end of day for date-based filtering
-      const dayStart = new Date(selectedDate);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(selectedDate);
-      dayEnd.setHours(23, 59, 59, 999);
+      if (date && typeof date === 'string') {
+        // Validate date format
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(date)) {
+          return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+        }
+        
+        // Parse date parts and validate
+        const [year, month, day] = date.split('-').map(Number);
+        if (!year || !month || !day || month < 1 || month > 12 || day < 1 || day > 31) {
+          return res.status(400).json({ error: "Invalid date values" });
+        }
+        
+        // Create UTC date and validate it represents the intended day (catches Feb 31 -> Mar 3, etc.)
+        const testDate = new Date(Date.UTC(year, month - 1, day));
+        if (testDate.getUTCFullYear() !== year || testDate.getUTCMonth() !== month - 1 || testDate.getUTCDate() !== day) {
+          return res.status(400).json({ error: "Invalid calendar date" });
+        }
+        
+        // Create UTC-based dates for timezone-agnostic day boundaries
+        dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+        dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+      } else {
+        // Default to today in UTC for consistency
+        const now = new Date();
+        dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+        dayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+      }
 
       // Fetch promotions that overlap with the selected date
       const promotions = await prisma.driverPromotion.findMany({
@@ -5575,7 +5594,7 @@ router.get(
             },
           });
 
-          const { status, rewardSummary } = getPromotionStatusForDriver(promo, progress, selectedDate);
+          const { status, rewardSummary } = getPromotionStatusForDriver(promo, progress, dayStart);
 
           return {
             ...serializePromotion(promo),

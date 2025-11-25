@@ -41,15 +41,17 @@ Core systems and features include:
 -   **Promotions Date Strip (D7)**: Uber/Lyft-style horizontal scrollable date carousel on the driver Promotions page (`/driver/promotions`). Features include:
     - 14-day date range display with swipeable/scrollable pills (3 days past, 11 days future)
     - Each pill shows weekday initial (M, T, W, etc.) and day number
-    - Today's date highlighted with a ring indicator
+    - Today's date highlighted with a ring indicator (side-by-side with promotion indicator if both apply)
     - Selected date visually distinguished with white background and scale effect
     - **Calendar Indicators**: Green dots on date pills indicating days with active promotions/bonuses
-    - Client-side filtering of promotions by selected date using `startAt`/`endAt` date ranges
+    - **Server-side date filtering**: `GET /api/driver/promotions/active?date=YYYY-MM-DD` returns promotions active for specified date
+    - **Professional date header**: Shows formatted date (e.g., "Monday, Nov 25") with promotion count badge
     - Auto-scroll to center the selected date on load
-    - Date-aware empty states showing the selected date (e.g., "No Quests for Nov 28")
+    - Date-aware empty states (e.g., "No promotions for Monday, Nov 25")
     - Component: `client/src/components/driver/PromotionsDateStrip.tsx`
     - Integration: `client/src/pages/driver/promotions.tsx`
     - **API**: `GET /api/driver/promotions/calendar` - Returns aggregated calendar data with promotion counts per date
+    - **Query Architecture**: Uses dynamic query keys `["/api/driver/promotions/active", selectedDate]` for proper cache management
     - **Bug Fix (Nov 2025)**: Fixed off-by-one date selection bug caused by JavaScript's `new Date()` UTC parsing. Now uses `parseISO()` from date-fns with `startOfDay()` normalization to ensure correct local timezone handling. All date comparisons use normalized start-of-day values for consistency.
 -   **Driver Document Management System**: Comprehensive document upload, verification, and management infrastructure with granular status tracking for individual documents and country-specific requirements.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
