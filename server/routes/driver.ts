@@ -5727,4 +5727,108 @@ router.get(
   }
 );
 
+// GET /api/driver/promotions/calendar - Get dates with active promotions for calendar indicators (D7)
+router.get(
+  "/promotions/calendar",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { startDate, endDate } = req.query;
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        include: {
+          user: { select: { countryCode: true } },
+        },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+
+      const countryCode = driverProfile.user.countryCode || "US";
+      
+      // Parse date range from query or default to 14 days around today
+      const rangeStart = startDate 
+        ? new Date(startDate as string)
+        : new Date(new Date().setDate(new Date().getDate() - 3));
+      const rangeEnd = endDate 
+        ? new Date(endDate as string)
+        : new Date(new Date().setDate(new Date().getDate() + 11));
+      
+      // Set to start/end of day for proper comparison
+      rangeStart.setHours(0, 0, 0, 0);
+      rangeEnd.setHours(23, 59, 59, 999);
+
+      // Get all active promotions that overlap with the date range
+      const promotions = await prisma.driverPromotion.findMany({
+        where: {
+          status: "ACTIVE",
+          // Promotion overlaps with range: promotion.startAt <= rangeEnd AND promotion.endAt >= rangeStart
+          startAt: { lte: rangeEnd },
+          endAt: { gte: rangeStart },
+          OR: [
+            { countryCode: null },
+            { countryCode: countryCode },
+          ],
+        },
+        select: {
+          id: true,
+          startAt: true,
+          endAt: true,
+          type: true,
+        },
+      });
+
+      // Filter by KYC if required
+      const filteredPromotions = promotions.filter(promo => {
+        // Note: For calendar view, we show all eligible promotions
+        // KYC check is handled at the actual promotion display level
+        return true;
+      });
+
+      // Build a map of dates that have at least one promotion
+      const datesWithPromotions: Record<string, { count: number; types: string[] }> = {};
+      
+      for (const promo of filteredPromotions) {
+        const promoStart = new Date(promo.startAt);
+        const promoEnd = new Date(promo.endAt);
+        
+        // Clamp to our range
+        const effectiveStart = promoStart < rangeStart ? rangeStart : promoStart;
+        const effectiveEnd = promoEnd > rangeEnd ? rangeEnd : promoEnd;
+        
+        // Iterate through each day in the promotion's effective range
+        const currentDate = new Date(effectiveStart);
+        while (currentDate <= effectiveEnd) {
+          const dateKey = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
+          
+          if (!datesWithPromotions[dateKey]) {
+            datesWithPromotions[dateKey] = { count: 0, types: [] };
+          }
+          datesWithPromotions[dateKey].count++;
+          if (!datesWithPromotions[dateKey].types.includes(promo.type)) {
+            datesWithPromotions[dateKey].types.push(promo.type);
+          }
+          
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+      }
+
+      res.json({
+        calendar: datesWithPromotions,
+        range: {
+          startDate: rangeStart.toISOString().split('T')[0],
+          endDate: rangeEnd.toISOString().split('T')[0],
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching promotion calendar:", error);
+      res.status(500).json({ error: "Failed to fetch promotion calendar" });
+    }
+  }
+);
+
 export default router;

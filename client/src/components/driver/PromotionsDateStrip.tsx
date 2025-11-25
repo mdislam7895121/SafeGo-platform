@@ -1,11 +1,17 @@
 import { useRef, useEffect, useMemo } from "react";
 import { format, addDays, isSameDay, startOfDay, parseISO } from "date-fns";
 
+interface CalendarEntry {
+  count: number;
+  types: string[];
+}
+
 interface PromotionsDateStripProps {
   startDate?: Date;
   days?: number;
   selectedDate: string;
   onDateChange: (date: string) => void;
+  calendar?: Record<string, CalendarEntry>;
 }
 
 const WEEKDAY_INITIALS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -15,6 +21,7 @@ export function PromotionsDateStrip({
   days = 14,
   selectedDate,
   onDateChange,
+  calendar,
 }: PromotionsDateStripProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef<HTMLButtonElement>(null);
@@ -91,6 +98,7 @@ export function PromotionsDateStrip({
         const dateStr = format(date, "yyyy-MM-dd");
         const dayOfWeek = date.getDay();
         const dayNumber = date.getDate();
+        const hasPromotions = calendar && calendar[dateStr] && calendar[dateStr].count > 0;
 
         return (
           <button
@@ -99,7 +107,7 @@ export function PromotionsDateStrip({
             onClick={() => onDateChange(dateStr)}
             className={`
               flex flex-col items-center justify-center min-w-[48px] h-[64px] rounded-xl
-              transition-all duration-200 ease-out shrink-0
+              transition-all duration-200 ease-out shrink-0 relative
               ${isSelected 
                 ? "bg-white text-purple-600 shadow-lg scale-105" 
                 : "bg-white/20 text-white hover:bg-white/30"
@@ -114,8 +122,11 @@ export function PromotionsDateStrip({
             <span className={`text-lg font-bold ${isSelected ? "text-purple-600" : ""}`}>
               {dayNumber}
             </span>
-            {isToday && (
+            {isToday && !hasPromotions && (
               <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-purple-500" : "bg-white"}`} />
+            )}
+            {hasPromotions && (
+              <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${isSelected ? "bg-green-500" : "bg-green-400"}`} />
             )}
           </button>
         );

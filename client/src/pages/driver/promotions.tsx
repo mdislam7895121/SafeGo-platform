@@ -386,6 +386,16 @@ function OpportunityBonusCard({ bonus, index }: { bonus: OpportunityBonus; index
   );
 }
 
+interface CalendarEntry {
+  count: number;
+  types: string[];
+}
+
+interface CalendarResponse {
+  calendar: Record<string, CalendarEntry>;
+  range: { startDate: string; endDate: string };
+}
+
 export default function DriverPromotions() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -420,6 +430,11 @@ export default function DriverPromotions() {
     queryKey: ["/api/driver/promotions/history"],
   });
 
+  const { data: calendarData } = useQuery<CalendarResponse>({
+    queryKey: ["/api/driver/promotions/calendar"],
+    refetchInterval: 60000,
+  });
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([
@@ -428,6 +443,7 @@ export default function DriverPromotions() {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/stats"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/history"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/driver/opportunity-bonuses"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/calendar"] }),
     ]);
     setIsRefreshing(false);
   };
@@ -504,6 +520,7 @@ export default function DriverPromotions() {
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
           days={14}
+          calendar={calendarData?.calendar}
         />
       </div>
 
