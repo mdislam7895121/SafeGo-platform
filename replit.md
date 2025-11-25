@@ -63,6 +63,15 @@ Core systems and features include:
     - **Admin Panel** (`/admin/driver-support`): Ticket management dashboard with status counts, filters by status/category/priority, status updates with notes, internal admin notes (not visible to drivers), reply capability
     - **Status Workflow**: open → in_progress → resolved → closed with full audit trail
     - **API Routes**: Driver routes at `/api/driver/support-center/`, Admin routes at `/api/admin/support-center/driver-tickets`
+-   **Country-Specific Payment & Payout Configuration (D8)**: Comprehensive country-aware payout system with:
+    - **Models Extended**: `Wallet` (holdAmount), `Payout` (feeAmount, netAmount, payoutMethodId), `CountryPayoutConfig` (serviceType, currency, maxPayoutAmount, platformFeeType, platformFeeValue, payoutDayOfWeek, payoutDayOfMonth)
+    - **Driver Wallet APIs**: `GET /api/driver/wallet/summary` (balance, currency, hold, payout rules), `GET /api/driver/wallet/transactions` (paginated history)
+    - **Driver Payout Methods**: `GET/POST /api/driver/payout-methods`, `PATCH /:id/set-primary`, `DELETE /:id`
+    - **Driver Payout Requests**: `POST /api/driver/payouts` with KYC enforcement, country config validation, fee calculation
+    - **Admin Config APIs**: `GET/POST/PATCH /api/admin/payout-configs` for country-specific payout rules
+    - **Admin Monitoring**: `GET /api/admin/payouts` (filtered list), `POST /:id/mark-processed` (success/fail with reversal)
+    - **Business Rules**: KYC APPROVED required for payouts, country-specific minPayoutAmount, fee types (NONE/FLAT/PERCENT), schedule enforcement (DAILY/WEEKLY/MONTHLY/ON_DEMAND)
+    - **Currency Support**: USD (US), BDT (BD) with proper symbols
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Admin KYC Approvals Response Contract

@@ -1174,6 +1174,7 @@ model Wallet {
   ownerType        WalletOwnerType
   countryCode      String
   availableBalance Decimal           @default(0) @db.Decimal(12, 2)
+  holdAmount       Decimal           @default(0) @db.Decimal(12, 2) // D8: Amount on hold (pending payouts)
   negativeBalance  Decimal           @default(0) @db.Decimal(12, 2)
   currency         String
   isDemo           Boolean           @default(false)
@@ -1225,6 +1226,8 @@ model Payout {
   ownerType           WalletOwnerType
   ownerId             String
   amount              Decimal       @db.Decimal(12, 2)
+  feeAmount           Decimal       @default(0) @db.Decimal(12, 2) // D8: Platform fee charged
+  netAmount           Decimal       @default(0) @db.Decimal(12, 2) // D8: Amount after fee (amount - feeAmount)
   method              PayoutMethod
   status              PayoutStatus  @default(pending)
   failureReason       String?
@@ -1235,6 +1238,7 @@ model Payout {
   processedAt         DateTime?
   externalReferenceId String?
   batchId             String?
+  payoutMethodId      String?       // D8: Link to driver/restaurant payout method used
   wallet              Wallet        @relation(fields: [walletId], references: [id], onDelete: Cascade)
   batch               PayoutBatch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
 
@@ -1308,11 +1312,18 @@ model CountryPayoutConfig {
   id                   String   @id @default(uuid())
   countryCode          String   // BD, US, etc.
   actorType            String   // RESTAURANT, DRIVER
+  serviceType          String   @default("GLOBAL") // D8: RIDE, FOOD, PARCEL, GLOBAL
   payoutRailType       String   // PayoutRailType enum value
   provider             String   // PayoutProvider enum value
+  currency             String   @default("USD") // D8: Currency code
   isEnabled            Boolean  @default(true)
   minPayoutAmount      Decimal  @default(0) @db.Decimal(12, 2)
+  maxPayoutAmount      Decimal? @db.Decimal(12, 2) // D8: Maximum single payout
   payoutSchedule       String   @default("WEEKLY") // DAILY, WEEKLY, BIWEEKLY, MONTHLY, ON_DEMAND
+  payoutDayOfWeek      Int?     // D8: 0-6 (Sun-Sat) for WEEKLY
+  payoutDayOfMonth     Int?     // D8: 1-28 for MONTHLY
+  platformFeeType      String   @default("NONE") // D8: NONE, FLAT, PERCENT
+  platformFeeValue     Decimal  @default(0) @db.Decimal(10, 4) // D8: Fee amount or percentage
   requiresKycLevel     String   @default("BASIC") // NONE, BASIC, FULL
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
@@ -1321,6 +1332,7 @@ model CountryPayoutConfig {
 
   @@unique([countryCode, actorType, payoutRailType, provider])
   @@index([countryCode, actorType])
+  @@index([countryCode, actorType, serviceType])
   @@index([isEnabled])
   @@index([createdByAdminId])
   @@map("country_payout_configs")

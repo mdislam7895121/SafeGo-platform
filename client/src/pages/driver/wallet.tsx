@@ -26,34 +26,62 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 
 interface WalletSummary {
-  currentBalance: number;
-  negativeBalance: number;
-  pendingBalance: number;
-  nextScheduledPayoutDate: string | null;
+  balance: string;
+  holdAmount: string;
+  negativeBalance: string;
+  availableForPayout: string;
   currency: string;
+  currencySymbol: string;
+  countryCode: string;
+  totalEarnings: string;
+  totalPayouts: string;
+  pendingPayoutsCount: number;
+  kycStatus: string;
+  kycApproved: boolean;
+  payoutRules: {
+    minPayoutAmount: string;
+    maxPayoutAmount: string | null;
+    payoutSchedule: string;
+    payoutDayOfWeek: number | null;
+    payoutDayOfMonth: number | null;
+    platformFeeType: string;
+    platformFeeValue: string;
+    requiresKycLevel: string;
+  } | null;
 }
 
 interface Payout {
   id: string;
-  amount: number;
-  method: string;
+  amount: string;
+  feeAmount: string;
+  netAmount: string;
+  currency: string;
   status: string;
-  initiatedAt: string;
-  completedAt: string | null;
-  scheduledAt: string | null;
+  payoutMethodId: string | null;
+  payoutRailType: string;
+  provider: string;
+  maskedDetails: string;
+  notes: string | null;
   failureReason: string | null;
+  createdAt: string;
+  processedAt: string | null;
 }
 
 interface PayoutMethod {
-  hasPayoutMethod: boolean;
-  method: {
-    id: string;
-    type: string;
-    provider: string | null;
-    displayName: string;
-    maskedAccount: string;
-    accountHolderName: string;
-  } | null;
+  id: string;
+  payoutRailType: string;
+  provider: string;
+  maskedDetails: string;
+  accountHolderName: string | null;
+  isDefault: boolean;
+  status: string;
+  createdAt: string;
+}
+
+interface PayoutMethodsResponse {
+  methods: PayoutMethod[];
+  kycStatus: string;
+  canAddMethod: boolean;
 }
 
 export default function DriverWallet() {
@@ -61,46 +89,52 @@ export default function DriverWallet() {
   const { toast } = useToast();
   const [cashOutOpen, setCashOutOpen] = useState(false);
 
-  // Fetch wallet summary
+  // Fetch wallet summary (D8 API)
   const { data: summary, isLoading: loadingSummary } = useQuery<WalletSummary>({
     queryKey: ["/api/driver/wallet/summary"],
   });
 
-  // Fetch recent payouts
+  // Fetch recent payouts (D8 API)
   const { data: payoutsData, isLoading: loadingPayouts } = useQuery<{
     payouts: Payout[];
+    total: number;
+    pagination: { limit: number; offset: number };
   }>({
-    queryKey: ["/api/driver/wallet/payouts"],
+    queryKey: ["/api/driver/payouts"],
   });
 
-  // Fetch payout method
-  const { data: payoutMethod, isLoading: loadingMethod } = useQuery<PayoutMethod>({
-    queryKey: ["/api/driver/payout-method"],
+  // Fetch payout methods (D8 API - plural)
+  const { data: payoutMethodsData, isLoading: loadingMethod } = useQuery<PayoutMethodsResponse>({
+    queryKey: ["/api/driver/payout-methods"],
   });
 
-  // Cash out mutation
+  // Cash out / payout request mutation (D8 API)
   const cashOutMutation = useMutation({
-    mutationFn: async () => {
-      const result = await apiRequest("/api/driver/wallet/cash-out", {
+    mutationFn: async (amount: string) => {
+      const defaultMethod = payoutMethodsData?.methods.find(m => m.isDefault);
+      const result = await apiRequest("/api/driver/payouts", {
         method: "POST",
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          amount,
+          payoutMethodId: defaultMethod?.id,
+        }),
         headers: { "Content-Type": "application/json" },
       });
       return result;
     },
     onSuccess: (data: any) => {
       toast({
-        title: "Cash Out Successful",
-        description: data.message || "Your cash out request has been submitted",
+        title: "Payout Requested",
+        description: data.message || "Your payout request has been submitted",
       });
       setCashOutOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/driver/wallet/summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/wallet/payouts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/payouts"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Cash Out Failed",
-        description: error.message || "Failed to process cash out request",
+        title: "Payout Request Failed",
+        description: error.message || "Failed to process payout request",
         variant: "destructive",
       });
     },
@@ -113,17 +147,19 @@ export default function DriverWallet() {
     return `$${amount.toFixed(2)}`;
   };
 
-  const formatPayoutMethod = (method: PayoutMethod["method"]) => {
-    if (!method) return "";
+  const formatPayoutMethod = (method: PayoutMethod | undefined) => {
+    if (!method) return "Add payout method";
     
-    if (method.type === "mobile_wallet" && method.provider) {
-      return `${method.provider.charAt(0).toUpperCase() + method.provider.slice(1)} ${method.maskedAccount}`;
-    } else if (method.type === "bank_account") {
-      return `Bank Account ${method.maskedAccount}`;
-    } else if (method.type === "stripe_connect") {
-      return `Stripe ${method.maskedAccount}`;
-    }
-    return method.displayName;
+    const railLabels: Record<string, string> = {
+      MOBILE_WALLET: "Mobile Wallet",
+      BANK_TRANSFER: "Bank Transfer",
+      STRIPE_CONNECT: "Stripe",
+      PAYONEER: "Payoneer",
+    };
+    
+    const railLabel = railLabels[method.payoutRailType] || method.payoutRailType;
+    const provider = method.provider ? ` (${method.provider})` : "";
+    return `${railLabel}${provider} ${method.maskedDetails}`;
   };
 
   const getPayoutStatusBadge = (status: string) => {
@@ -138,14 +174,19 @@ export default function DriverWallet() {
     return <Badge variant={config.variant} data-testid={`badge-payout-${status}`}>{config.label}</Badge>;
   };
 
-  const getPayoutType = (method: string) => {
-    const methodLabels: Record<string, string> = {
-      auto_weekly: "Weekly payout",
-      manual_request: "Instant Pay",
-      manual_admin_settlement: "Adjustment",
+  const getPayoutRailLabel = (railType: string) => {
+    const railLabels: Record<string, string> = {
+      MOBILE_WALLET: "Mobile Wallet",
+      BANK_TRANSFER: "Bank Transfer",
+      STRIPE_CONNECT: "Stripe Payout",
+      PAYONEER: "Payoneer",
     };
-    return methodLabels[method] || method;
+    return railLabels[railType] || railType;
   };
+
+  // Get default payout method
+  const defaultPayoutMethod = payoutMethodsData?.methods.find(m => m.isDefault);
+  const hasPayoutMethod = payoutMethodsData?.methods && payoutMethodsData.methods.length > 0;
 
   if (loadingSummary || loadingPayouts || loadingMethod) {
     return (
@@ -159,9 +200,12 @@ export default function DriverWallet() {
     );
   }
 
-  const currentBalance = summary?.currentBalance || 0;
+  const availableForPayout = parseFloat(summary?.availableForPayout || "0");
   const currency = summary?.currency || "USD";
-  const hasNegativeBalance = (summary?.negativeBalance || 0) > 0;
+  const currencySymbol = summary?.currencySymbol || "$";
+  const hasNegativeBalance = parseFloat(summary?.negativeBalance || "0") > 0;
+  const holdAmount = parseFloat(summary?.holdAmount || "0");
+  const kycApproved = summary?.kycApproved || false;
 
   return (
     <div className="bg-background min-h-screen">
@@ -172,26 +216,52 @@ export default function DriverWallet() {
             <div className="space-y-6">
               {/* Balance Amount */}
               <div>
-                <p className="text-sm text-muted-foreground mb-2">Available Balance</p>
+                <p className="text-sm text-muted-foreground mb-2">Available for Payout</p>
                 <h1 className="text-5xl font-bold mb-2" data-testid="text-balance">
-                  {formatCurrency(currentBalance, currency)}
+                  {currencySymbol}{availableForPayout.toFixed(2)}
                 </h1>
                 
-                {/* Payout Schedule or Negative Balance Warning */}
+                {/* KYC Warning */}
+                {!kycApproved && (
+                  <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 mb-2">
+                    <span>Complete KYC verification to enable payouts</span>
+                  </div>
+                )}
+                
+                {/* Negative Balance / Hold Warning */}
                 {hasNegativeBalance ? (
                   <div className="flex items-center gap-2 text-sm text-destructive">
                     <span>
-                      Outstanding debt: {formatCurrency(summary?.negativeBalance || 0, currency)}
+                      Outstanding debt: {currencySymbol}{parseFloat(summary?.negativeBalance || "0").toFixed(2)}
                     </span>
                   </div>
-                ) : summary?.nextScheduledPayoutDate ? (
+                ) : holdAmount > 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Payout scheduled: {format(new Date(summary.nextScheduledPayoutDate), "MMMM d, yyyy")}
+                    On hold: {currencySymbol}{holdAmount.toFixed(2)}
+                  </p>
+                ) : summary?.payoutRules ? (
+                  <p className="text-sm text-muted-foreground">
+                    Min payout: {currencySymbol}{parseFloat(summary.payoutRules.minPayoutAmount).toFixed(2)} • 
+                    {summary.payoutRules.payoutSchedule === "WEEKLY" ? " Weekly payouts" : 
+                     summary.payoutRules.payoutSchedule === "DAILY" ? " Daily payouts" : 
+                     summary.payoutRules.payoutSchedule === "ON_DEMAND" ? " On-demand payouts" : " Monthly payouts"}
                   </p>
                 ) : (
-                  <p className="text-sm text-muted-foreground">No payout scheduled</p>
+                  <p className="text-sm text-muted-foreground">Payout rules not configured</p>
                 )}
               </div>
+
+              {/* Fee Information */}
+              {summary?.payoutRules && summary.payoutRules.platformFeeType !== "NONE" && (
+                <div className="bg-muted/50 px-4 py-2 rounded-lg text-sm">
+                  <span className="text-muted-foreground">Platform fee: </span>
+                  <span className="font-medium">
+                    {summary.payoutRules.platformFeeType === "FLAT" 
+                      ? `${currencySymbol}${parseFloat(summary.payoutRules.platformFeeValue).toFixed(2)} per payout`
+                      : `${parseFloat(summary.payoutRules.platformFeeValue).toFixed(1)}% per payout`}
+                  </span>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-3">
@@ -199,7 +269,7 @@ export default function DriverWallet() {
                   size="lg"
                   className="flex-1"
                   onClick={() => setCashOutOpen(true)}
-                  disabled={currentBalance <= 0 || hasNegativeBalance}
+                  disabled={availableForPayout <= 0 || hasNegativeBalance || !kycApproved || !hasPayoutMethod}
                   data-testid="button-cash-out"
                 >
                   <DollarSign className="h-5 w-5 mr-2" />
@@ -209,10 +279,10 @@ export default function DriverWallet() {
                   size="lg"
                   variant="outline"
                   className="flex-1"
-                  onClick={() => navigate("/driver/wallet/balance")}
+                  onClick={() => navigate("/driver/earnings")}
                   data-testid="button-view-details"
                 >
-                  View balance details
+                  View earnings
                 </Button>
               </div>
             </div>
@@ -221,12 +291,12 @@ export default function DriverWallet() {
 
         {/* Payout Activity */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-4">
             <CardTitle className="text-xl">Payout activity</CardTitle>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/driver/wallet/balance")}
+              onClick={() => navigate("/driver/payouts")}
               data-testid="link-see-all-payouts"
             >
               See all
@@ -243,19 +313,31 @@ export default function DriverWallet() {
                     data-testid={`payout-item-${payout.id}`}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium">{getPayoutType(payout.method)}</p>
+                      <p className="font-medium">{getPayoutRailLabel(payout.payoutRailType)}</p>
                       <p className="text-sm text-muted-foreground">
-                        Initiated {format(new Date(payout.initiatedAt), "MMM d, yyyy")}
+                        {format(new Date(payout.createdAt), "MMM d, yyyy")} • {payout.maskedDetails}
                       </p>
+                      {payout.feeAmount && parseFloat(payout.feeAmount) > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Fee: {currencySymbol}{parseFloat(payout.feeAmount).toFixed(2)}
+                        </p>
+                      )}
                       {payout.failureReason && (
                         <p className="text-sm text-destructive mt-1">{payout.failureReason}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-4">
                       {getPayoutStatusBadge(payout.status)}
-                      <p className="font-semibold text-lg whitespace-nowrap">
-                        {formatCurrency(payout.amount, currency)}
-                      </p>
+                      <div className="text-right">
+                        <p className="font-semibold text-lg whitespace-nowrap">
+                          {currencySymbol}{parseFloat(payout.netAmount || payout.amount).toFixed(2)}
+                        </p>
+                        {payout.feeAmount && parseFloat(payout.feeAmount) > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Gross: {currencySymbol}{parseFloat(payout.amount).toFixed(2)}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -286,13 +368,12 @@ export default function DriverWallet() {
                 </div>
                 <div className="text-left">
                   <p className="font-semibold mb-1">Payout method</p>
-                  {payoutMethod?.hasPayoutMethod && payoutMethod.method ? (
-                    <p className="text-sm text-muted-foreground">
-                      {formatPayoutMethod(payoutMethod.method)}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Add payout method
+                  <p className="text-sm text-muted-foreground">
+                    {formatPayoutMethod(defaultPayoutMethod)}
+                  </p>
+                  {hasPayoutMethod && payoutMethodsData!.methods.length > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      +{payoutMethodsData!.methods.length - 1} more
                     </p>
                   )}
                 </div>
@@ -330,24 +411,38 @@ export default function DriverWallet() {
           <DialogHeader>
             <DialogTitle>Cash out</DialogTitle>
             <DialogDescription>
-              Request instant payout to your linked account
+              Request payout to your linked account
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             {/* Balance */}
             <div className="bg-muted p-4 rounded-lg">
-              <p className="text-sm text-muted-foreground mb-1">Available balance</p>
-              <p className="text-2xl font-bold">{formatCurrency(currentBalance, currency)}</p>
+              <p className="text-sm text-muted-foreground mb-1">Available for payout</p>
+              <p className="text-2xl font-bold">{currencySymbol}{availableForPayout.toFixed(2)}</p>
             </div>
 
+            {/* Fee Calculation */}
+            {summary?.payoutRules && summary.payoutRules.platformFeeType !== "NONE" && (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-1">Payout Fee</p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  {summary.payoutRules.platformFeeType === "FLAT" 
+                    ? `${currencySymbol}${parseFloat(summary.payoutRules.platformFeeValue).toFixed(2)} flat fee`
+                    : `${parseFloat(summary.payoutRules.platformFeeValue).toFixed(1)}% of payout amount`}
+                </p>
+              </div>
+            )}
+
             {/* Payout Method */}
-            {payoutMethod?.hasPayoutMethod && payoutMethod.method ? (
+            {hasPayoutMethod && defaultPayoutMethod ? (
               <div>
                 <p className="text-sm font-medium mb-2">Payout method</p>
                 <div className="border rounded-lg p-3">
-                  <p className="font-medium">{formatPayoutMethod(payoutMethod.method)}</p>
-                  <p className="text-sm text-muted-foreground">{payoutMethod.method.accountHolderName}</p>
+                  <p className="font-medium">{formatPayoutMethod(defaultPayoutMethod)}</p>
+                  {defaultPayoutMethod.accountHolderName && (
+                    <p className="text-sm text-muted-foreground">{defaultPayoutMethod.accountHolderName}</p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -359,10 +454,20 @@ export default function DriverWallet() {
               </div>
             )}
 
+            {/* KYC Warning */}
+            {!kycApproved && (
+              <div className="border border-amber-500 rounded-lg p-4 bg-amber-50 dark:bg-amber-900/20">
+                <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">KYC verification required</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Complete your identity verification to enable payouts
+                </p>
+              </div>
+            )}
+
             {/* Info */}
             <div className="bg-muted p-4 rounded-lg">
               <p className="text-sm text-muted-foreground">
-                Funds will be transferred within 1-2 business days. A small processing fee may apply.
+                Funds will be transferred within 1-2 business days.
               </p>
             </div>
           </div>
@@ -377,11 +482,11 @@ export default function DriverWallet() {
               Cancel
             </Button>
             <Button
-              onClick={() => cashOutMutation.mutate()}
-              disabled={!payoutMethod?.hasPayoutMethod || cashOutMutation.isPending}
+              onClick={() => cashOutMutation.mutate(availableForPayout.toString())}
+              disabled={!hasPayoutMethod || !kycApproved || availableForPayout <= 0 || cashOutMutation.isPending}
               data-testid="button-confirm-cash-out"
             >
-              {cashOutMutation.isPending ? "Processing..." : "Confirm cash out"}
+              {cashOutMutation.isPending ? "Processing..." : `Cash out ${currencySymbol}${availableForPayout.toFixed(2)}`}
             </Button>
           </DialogFooter>
         </DialogContent>
