@@ -5227,4 +5227,227 @@ router.post("/payouts/request", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// D5: DRIVER PROMOTIONS & INCENTIVES (Driver-facing)
+// ====================================================
+
+function serializePromotion(promo: any) {
+  return {
+    ...promo,
+    rewardPerUnit: serializeDecimal(promo.rewardPerUnit),
+    targetEarnings: promo.targetEarnings ? serializeDecimal(promo.targetEarnings) : null,
+    maxRewardPerDriver: promo.maxRewardPerDriver ? serializeDecimal(promo.maxRewardPerDriver) : null,
+    globalBudget: promo.globalBudget ? serializeDecimal(promo.globalBudget) : null,
+    currentSpend: serializeDecimal(promo.currentSpend),
+    minDriverRating: promo.minDriverRating ? serializeDecimal(promo.minDriverRating) : null,
+  };
+}
+
+// GET /api/driver/promotions/active - Get active promotions for current driver
+router.get(
+  "/promotions/active",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        include: {
+          user: { select: { countryCode: true } },
+        },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+
+      const countryCode = driverProfile.user.countryCode || "US";
+      const now = new Date();
+
+      const promotions = await prisma.driverPromotion.findMany({
+        where: {
+          status: "ACTIVE",
+          startAt: { lte: now },
+          endAt: { gte: now },
+          OR: [
+            { countryCode: null },
+            { countryCode: countryCode },
+          ],
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      const filteredPromotions = promotions.filter(promo => {
+        if (promo.requireKycApproved && driverProfile.verificationStatus !== "approved") return false;
+        return true;
+      });
+
+      const result = await Promise.all(
+        filteredPromotions.map(async (promo) => {
+          const progress = await prisma.driverPromotionProgress.findUnique({
+            where: {
+              promotionId_driverId: {
+                promotionId: promo.id,
+                driverId: driverProfile.id,
+              },
+            },
+          });
+
+          return {
+            ...serializePromotion(promo),
+            progress: progress ? {
+              currentTrips: progress.currentTrips,
+              currentEarnings: serializeDecimal(progress.currentEarnings),
+              totalBonusEarned: serializeDecimal(progress.totalBonusEarned),
+              lastUpdatedAt: progress.lastUpdatedAt,
+            } : null,
+          };
+        })
+      );
+
+      res.json({ promotions: result });
+    } catch (error) {
+      console.error("Error fetching active promotions:", error);
+      res.status(500).json({ error: "Failed to fetch active promotions" });
+    }
+  }
+);
+
+// GET /api/driver/promotions/stats - Get driver's promotion statistics
+router.get(
+  "/promotions/stats",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+
+      const [totalPayouts, currentMonth, activeProgress] = await Promise.all([
+        prisma.driverPromotionPayout.aggregate({
+          where: { driverId: driverProfile.id },
+          _sum: { amount: true },
+          _count: true,
+        }),
+
+        prisma.driverPromotionPayout.aggregate({
+          where: {
+            driverId: driverProfile.id,
+            createdAt: {
+              gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            },
+          },
+          _sum: { amount: true },
+          _count: true,
+        }),
+
+        prisma.driverPromotionProgress.findMany({
+          where: {
+            driverId: driverProfile.id,
+            promotion: {
+              status: "ACTIVE",
+              endAt: { gte: new Date() },
+            },
+          },
+          include: {
+            promotion: true,
+          },
+        }),
+      ]);
+
+      res.json({
+        totalBonusEarned: serializeDecimal(totalPayouts._sum.amount),
+        totalBonusCount: totalPayouts._count,
+        monthlyBonusEarned: serializeDecimal(currentMonth._sum.amount),
+        monthlyBonusCount: currentMonth._count,
+        activePromotions: activeProgress.length,
+        inProgressQuests: activeProgress.filter((p: any) =>
+          p.promotion.type === "QUEST_TRIPS" &&
+          p.currentTrips < (p.promotion.targetTrips || 0)
+        ).length,
+      });
+    } catch (error) {
+      console.error("Error fetching promotion stats:", error);
+      res.status(500).json({ error: "Failed to fetch promotion stats" });
+    }
+  }
+);
+
+// GET /api/driver/promotions/history - Get driver's promotion payout history
+router.get(
+  "/promotions/history",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.id;
+      const { page = "1", limit = "20" } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = Math.min(parseInt(limit as string, 10), 100);
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+      });
+
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+
+      const [payouts, total] = await Promise.all([
+        prisma.driverPromotionPayout.findMany({
+          where: { driverId: driverProfile.id },
+          include: {
+            promotion: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                serviceType: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          skip: (pageNum - 1) * limitNum,
+          take: limitNum,
+        }),
+        prisma.driverPromotionPayout.count({
+          where: { driverId: driverProfile.id },
+        }),
+      ]);
+
+      res.json({
+        payouts: payouts.map((p: any) => ({
+          id: p.id,
+          promotionId: p.promotionId,
+          promotionName: p.promotion.name,
+          promotionType: p.promotion.type,
+          serviceType: p.promotion.serviceType,
+          amount: serializeDecimal(p.amount),
+          tripType: p.tripType,
+          tripId: p.tripId,
+          createdAt: p.createdAt,
+        })),
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching promotion history:", error);
+      res.status(500).json({ error: "Failed to fetch promotion history" });
+    }
+  }
+);
+
 export default router;

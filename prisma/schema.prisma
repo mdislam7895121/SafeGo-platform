@@ -1136,6 +1136,7 @@ enum WalletTransactionReferenceType {
   manual_adjustment
   auto_settlement
   referral_bonus
+  promotion_bonus
 }
 
 enum PayoutMethod {

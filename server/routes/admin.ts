@@ -10439,4 +10439,545 @@ router.use("/analytics", analyticsRouter);
 // ====================================================
 router.use("/performance", performanceRouter);
 
+// ====================================================
+// D5: DRIVER PROMOTIONS & INCENTIVES SYSTEM (Admin CRUD)
+// ====================================================
+
+const createPromotionSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100),
+  description: z.string().optional(),
+  type: z.enum(["PER_TRIP_BONUS", "QUEST_TRIPS", "EARNINGS_THRESHOLD"]),
+  serviceType: z.enum(["RIDES", "FOOD", "PARCEL", "ANY"]).default("ANY"),
+  countryCode: z.string().length(2).optional().nullable(),
+  cityCode: z.string().optional().nullable(),
+  minDriverRating: z.number().min(0).max(5).optional().nullable(),
+  requireKycApproved: z.boolean().default(true),
+  startAt: z.string().refine((s) => !isNaN(Date.parse(s)), { message: "Invalid date format" }),
+  endAt: z.string().refine((s) => !isNaN(Date.parse(s)), { message: "Invalid date format" }),
+  rewardPerUnit: z.number().positive("Reward must be positive"),
+  targetTrips: z.number().int().positive().optional().nullable(),
+  targetEarnings: z.number().positive().optional().nullable(),
+  maxRewardPerDriver: z.number().positive().optional().nullable(),
+  globalBudget: z.number().positive().optional().nullable(),
+  status: z.enum(["DRAFT", "ACTIVE", "PAUSED", "ENDED"]).default("DRAFT"),
+});
+
+const updatePromotionSchema = createPromotionSchema.partial();
+
+function serializeDecimal(value: any): number {
+  if (value === null || value === undefined) return 0;
+  return parseFloat(value.toString());
+}
+
+function serializePromotion(promo: any) {
+  return {
+    ...promo,
+    rewardPerUnit: serializeDecimal(promo.rewardPerUnit),
+    targetEarnings: promo.targetEarnings ? serializeDecimal(promo.targetEarnings) : null,
+    maxRewardPerDriver: promo.maxRewardPerDriver ? serializeDecimal(promo.maxRewardPerDriver) : null,
+    globalBudget: promo.globalBudget ? serializeDecimal(promo.globalBudget) : null,
+    currentSpend: serializeDecimal(promo.currentSpend),
+    minDriverRating: promo.minDriverRating ? serializeDecimal(promo.minDriverRating) : null,
+  };
+}
+
+// GET /api/admin/driver-promotions - List all driver promotions
+router.get(
+  "/driver-promotions",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { status, type, countryCode, page = "1", limit = "20" } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = Math.min(parseInt(limit as string, 10), 100);
+
+      const where: any = {};
+      if (status) where.status = status;
+      if (type) where.type = type;
+      if (countryCode) where.countryCode = countryCode;
+
+      const [promotions, total] = await Promise.all([
+        prisma.driverPromotion.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          skip: (pageNum - 1) * limitNum,
+          take: limitNum,
+          include: {
+            _count: {
+              select: {
+                progress: true,
+                payouts: true,
+              },
+            },
+          },
+        }),
+        prisma.driverPromotion.count({ where }),
+      ]);
+
+      res.json({
+        promotions: promotions.map(serializePromotion),
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching driver promotions:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch promotions" });
+    }
+  }
+);
+
+// GET /api/admin/driver-promotions/:id - Get single promotion with stats
+router.get(
+  "/driver-promotions/:id",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      const promotion = await prisma.driverPromotion.findUnique({
+        where: { id },
+        include: {
+          progress: {
+            orderBy: { totalBonusEarned: "desc" },
+            take: 10,
+            include: {
+              driver: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  firstName: true,
+                  lastName: true,
+                  profilePhotoUrl: true,
+                  user: {
+                    select: { email: true },
+                  },
+                },
+              },
+            },
+          },
+          payouts: {
+            orderBy: { createdAt: "desc" },
+            take: 20,
+          },
+          _count: {
+            select: {
+              progress: true,
+              payouts: true,
+            },
+          },
+        },
+      });
+
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      const stats = await prisma.driverPromotionPayout.aggregate({
+        where: { promotionId: id },
+        _sum: { amount: true },
+        _count: true,
+      });
+
+      res.json({
+        promotion: serializePromotion(promotion),
+        stats: {
+          totalPaidOut: serializeDecimal(stats._sum.amount),
+          totalPayouts: stats._count,
+          participatingDrivers: promotion._count.progress,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching driver promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch promotion" });
+    }
+  }
+);
+
+// POST /api/admin/driver-promotions - Create new promotion
+router.post(
+  "/driver-promotions",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const validation = createPromotionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: validation.error.errors 
+        });
+      }
+
+      const data = validation.data;
+      const adminId = req.adminUser?.id;
+
+      // Validate type-specific requirements
+      if (data.type === "QUEST_TRIPS" && !data.targetTrips) {
+        return res.status(400).json({ error: "QUEST_TRIPS type requires targetTrips" });
+      }
+      if (data.type === "EARNINGS_THRESHOLD" && !data.targetEarnings) {
+        return res.status(400).json({ error: "EARNINGS_THRESHOLD type requires targetEarnings" });
+      }
+
+      const promotion = await prisma.driverPromotion.create({
+        data: {
+          name: data.name,
+          description: data.description,
+          type: data.type,
+          serviceType: data.serviceType,
+          countryCode: data.countryCode,
+          cityCode: data.cityCode,
+          minDriverRating: data.minDriverRating,
+          requireKycApproved: data.requireKycApproved,
+          startAt: new Date(data.startAt),
+          endAt: new Date(data.endAt),
+          rewardPerUnit: data.rewardPerUnit,
+          targetTrips: data.targetTrips,
+          targetEarnings: data.targetEarnings,
+          maxRewardPerDriver: data.maxRewardPerDriver,
+          globalBudget: data.globalBudget,
+          status: data.status,
+          createdByAdminId: adminId,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId || "",
+        actorEmail: req.user!.email,
+        actorRole: req.adminUser?.adminRole || "SUPER_ADMIN",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.CREATE,
+        entityType: EntityType.DRIVER,
+        entityId: promotion.id,
+        description: `Created driver promotion: ${promotion.name}`,
+        metadata: { promotion_id: promotion.id, type: promotion.type },
+      });
+
+      res.status(201).json({ 
+        message: "Promotion created successfully", 
+        promotion: serializePromotion(promotion) 
+      });
+    } catch (error: any) {
+      console.error("Error creating driver promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to create promotion" });
+    }
+  }
+);
+
+// PATCH /api/admin/driver-promotions/:id - Update promotion
+router.patch(
+  "/driver-promotions/:id",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const validation = updatePromotionSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: validation.error.errors 
+        });
+      }
+
+      const existing = await prisma.driverPromotion.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      const data = validation.data;
+      const adminId = req.adminUser?.id;
+
+      const promotion = await prisma.driverPromotion.update({
+        where: { id },
+        data: {
+          ...data,
+          startAt: data.startAt ? new Date(data.startAt) : undefined,
+          endAt: data.endAt ? new Date(data.endAt) : undefined,
+          updatedByAdminId: adminId,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId || "",
+        actorEmail: req.user!.email,
+        actorRole: req.adminUser?.adminRole || "SUPER_ADMIN",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.UPDATE,
+        entityType: EntityType.DRIVER,
+        entityId: promotion.id,
+        description: `Updated driver promotion: ${promotion.name}`,
+        metadata: { promotion_id: promotion.id, changes: Object.keys(data) },
+      });
+
+      res.json({ 
+        message: "Promotion updated successfully", 
+        promotion: serializePromotion(promotion) 
+      });
+    } catch (error: any) {
+      console.error("Error updating driver promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to update promotion" });
+    }
+  }
+);
+
+// POST /api/admin/driver-promotions/:id/activate - Activate promotion
+router.post(
+  "/driver-promotions/:id/activate",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.adminUser?.id;
+
+      const existing = await prisma.driverPromotion.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      if (existing.status === "ACTIVE") {
+        return res.status(400).json({ error: "Promotion is already active" });
+      }
+
+      const promotion = await prisma.driverPromotion.update({
+        where: { id },
+        data: {
+          status: "ACTIVE",
+          updatedByAdminId: adminId,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId || "",
+        actorEmail: req.user!.email,
+        actorRole: req.adminUser?.adminRole || "SUPER_ADMIN",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.UPDATE,
+        entityType: EntityType.DRIVER,
+        entityId: promotion.id,
+        description: `Activated driver promotion: ${promotion.name}`,
+        metadata: { promotion_id: promotion.id },
+      });
+
+      res.json({ 
+        message: "Promotion activated successfully", 
+        promotion: serializePromotion(promotion) 
+      });
+    } catch (error: any) {
+      console.error("Error activating driver promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to activate promotion" });
+    }
+  }
+);
+
+// POST /api/admin/driver-promotions/:id/pause - Pause promotion
+router.post(
+  "/driver-promotions/:id/pause",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.adminUser?.id;
+
+      const existing = await prisma.driverPromotion.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      const promotion = await prisma.driverPromotion.update({
+        where: { id },
+        data: {
+          status: "PAUSED",
+          updatedByAdminId: adminId,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId || "",
+        actorEmail: req.user!.email,
+        actorRole: req.adminUser?.adminRole || "SUPER_ADMIN",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.UPDATE,
+        entityType: EntityType.DRIVER,
+        entityId: promotion.id,
+        description: `Paused driver promotion: ${promotion.name}`,
+        metadata: { promotion_id: promotion.id },
+      });
+
+      res.json({ 
+        message: "Promotion paused successfully", 
+        promotion: serializePromotion(promotion) 
+      });
+    } catch (error: any) {
+      console.error("Error pausing driver promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to pause promotion" });
+    }
+  }
+);
+
+// POST /api/admin/driver-promotions/:id/end - End promotion
+router.post(
+  "/driver-promotions/:id/end",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.adminUser?.id;
+
+      const existing = await prisma.driverPromotion.findUnique({
+        where: { id },
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      const promotion = await prisma.driverPromotion.update({
+        where: { id },
+        data: {
+          status: "ENDED",
+          updatedByAdminId: adminId,
+        },
+      });
+
+      await logAuditEvent({
+        actorId: adminId || "",
+        actorEmail: req.user!.email,
+        actorRole: req.adminUser?.adminRole || "SUPER_ADMIN",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.UPDATE,
+        entityType: EntityType.DRIVER,
+        entityId: promotion.id,
+        description: `Ended driver promotion: ${promotion.name}`,
+        metadata: { promotion_id: promotion.id },
+      });
+
+      res.json({ 
+        message: "Promotion ended successfully", 
+        promotion: serializePromotion(promotion) 
+      });
+    } catch (error: any) {
+      console.error("Error ending driver promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to end promotion" });
+    }
+  }
+);
+
+// DELETE /api/admin/driver-promotions/:id - Delete promotion (only if DRAFT)
+router.delete(
+  "/driver-promotions/:id",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.adminUser?.id;
+
+      const existing = await prisma.driverPromotion.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: { payouts: true },
+          },
+        },
+      });
+
+      if (!existing) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      if (existing.status !== "DRAFT" && existing._count.payouts > 0) {
+        return res.status(400).json({ 
+          error: "Cannot delete a promotion that has been active and has payouts. Use 'End' instead." 
+        });
+      }
+
+      await prisma.driverPromotion.delete({
+        where: { id },
+      });
+
+      await logAuditEvent({
+        actorId: adminId || "",
+        actorEmail: req.user!.email,
+        actorRole: req.adminUser?.adminRole || "SUPER_ADMIN",
+        ipAddress: getClientIp(req),
+        actionType: ActionType.DELETE,
+        entityType: EntityType.DRIVER,
+        entityId: id,
+        description: `Deleted driver promotion: ${existing.name}`,
+        metadata: { promotion_id: id },
+      });
+
+      res.json({ message: "Promotion deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting driver promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to delete promotion" });
+    }
+  }
+);
+
+// GET /api/admin/driver-promotions/:id/payouts - Get promotion payouts
+router.get(
+  "/driver-promotions/:id/payouts",
+  checkPermission(Permission.MANAGE_EARNINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { page = "1", limit = "50" } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = Math.min(parseInt(limit as string, 10), 100);
+
+      const [payouts, total] = await Promise.all([
+        prisma.driverPromotionPayout.findMany({
+          where: { promotionId: id },
+          orderBy: { createdAt: "desc" },
+          skip: (pageNum - 1) * limitNum,
+          take: limitNum,
+          include: {
+            driver: {
+              select: {
+                id: true,
+                fullName: true,
+                firstName: true,
+                lastName: true,
+                profilePhotoUrl: true,
+                user: {
+                  select: { email: true, countryCode: true },
+                },
+              },
+            },
+          },
+        }),
+        prisma.driverPromotionPayout.count({ where: { promotionId: id } }),
+      ]);
+
+      res.json({
+        payouts: payouts.map((p: any) => ({
+          ...p,
+          amount: serializeDecimal(p.amount),
+        })),
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching promotion payouts:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch payouts" });
+    }
+  }
+);
+
 export default router;
