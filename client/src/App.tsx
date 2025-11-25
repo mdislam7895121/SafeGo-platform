@@ -87,6 +87,7 @@ import DriverAccountPermissions from "@/pages/driver/account/permissions";
 import DriverAccountAbout from "@/pages/driver/account/about";
 import DriverEarnings from "@/pages/driver/earnings";
 import DriverPayouts from "@/pages/driver/payouts";
+import DriverDocuments from "@/pages/driver/documents";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -424,6 +425,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Documents">
             <DriverKYCDocuments />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/documents">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Document Center">
+            <DriverDocuments />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

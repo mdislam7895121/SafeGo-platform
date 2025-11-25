@@ -5265,6 +5265,103 @@ router.get("/documents/restaurants/:id/details", checkPermission(Permission.MANA
 });
 
 // ====================================================
+// D7: GET /api/admin/documents/drivers/:id/summary
+// Get driver document summary with individual status tracking
+// ====================================================
+router.get("/documents/drivers/:id/summary", checkPermission(Permission.MANAGE_DOCUMENT_REVIEW), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { getDriverDocumentSummary } = await import("../services/driverDocumentService");
+    
+    const summary = await getDriverDocumentSummary(id);
+    
+    if (!summary) {
+      return res.status(404).json({ success: false, error: "Driver not found" });
+    }
+
+    res.json({ success: true, data: summary });
+  } catch (error) {
+    console.error("Get driver document summary error:", error);
+    res.status(500).json({ success: false, error: "Failed to fetch document summary" });
+  }
+});
+
+// ====================================================
+// D7: POST /api/admin/documents/drivers/:id/status
+// Update individual document status
+// ====================================================
+router.post("/documents/drivers/:id/status", checkPermission(Permission.MANAGE_DRIVER_KYC), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { documentType, status, rejectionReason } = req.body;
+    const adminId = req.user!.userId;
+
+    if (!documentType || !status) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "documentType and status are required" 
+      });
+    }
+
+    const validStatuses = ["PENDING", "UNDER_REVIEW", "APPROVED", "REJECTED", "NEEDS_UPDATE"];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` 
+      });
+    }
+
+    if (status === "REJECTED" && !rejectionReason) {
+      return res.status(400).json({ 
+        success: false, 
+        error: "Rejection reason is required when rejecting a document" 
+      });
+    }
+
+    const { updateDocumentStatus } = await import("../services/driverDocumentService");
+    const result = await updateDocumentStatus(id, documentType, status, adminId, rejectionReason);
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+
+    res.json({ 
+      success: true, 
+      message: `${documentType.replace(/_/g, " ")} status updated to ${status}` 
+    });
+  } catch (error) {
+    console.error("Update document status error:", error);
+    res.status(500).json({ success: false, error: "Failed to update document status" });
+  }
+});
+
+// ====================================================
+// D7: POST /api/admin/documents/drivers/:id/approve-all
+// Approve all uploaded documents for a driver
+// ====================================================
+router.post("/documents/drivers/:id/approve-all", checkPermission(Permission.MANAGE_DRIVER_KYC), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const adminId = req.user!.userId;
+
+    const { approveAllDocuments } = await import("../services/driverDocumentService");
+    const result = await approveAllDocuments(id, adminId);
+
+    if (!result.success) {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "All driver documents approved successfully" 
+    });
+  } catch (error) {
+    console.error("Approve all documents error:", error);
+    res.status(500).json({ success: false, error: "Failed to approve documents" });
+  }
+});
+
+// ====================================================
 // POST /api/admin/documents/drivers/:id/approve
 // Approve driver documents
 // ====================================================
