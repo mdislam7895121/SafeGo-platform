@@ -7292,6 +7292,8 @@ router.get("/payouts", checkPermission(Permission.MANAGE_PAYOUTS), async (req: A
           processedByAdminId: payout.createdByAdminId,
           rejectionReason: payout.failureReason,
           owner,
+          walletBalance: payout.wallet ? Number(payout.wallet.balance) : 0,
+          negativeBalance: payout.wallet ? Number(payout.wallet.negativeBalance) : 0,
         };
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);

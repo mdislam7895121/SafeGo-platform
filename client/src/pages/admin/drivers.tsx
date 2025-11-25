@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Search, Filter, Car, Shield, UserX, Clock, Eye, Ban, Unlock } from "lucide-react";
+import { ArrowLeft, Search, Filter, Car, Shield, UserX, Clock, Eye, Ban, Unlock, Wallet, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,8 @@ interface Driver {
   averageRating: string;
   totalTrips: number;
   commissionPaid: string;
+  walletBalance: number;
+  negativeBalance: number;
 }
 
 interface DriversResponse {
@@ -302,6 +304,27 @@ export default function AdminDrivers() {
                                   {driver.totalTrips}
                                 </p>
                               </div>
+                              <div>
+                                <p className="text-muted-foreground">Wallet Balance</p>
+                                <p className="font-medium text-green-600 dark:text-green-400" data-testid={`text-wallet-${driver.id}`}>
+                                  {driver.countryCode === "BD" ? "৳" : "$"}{(driver.walletBalance ?? 0).toFixed(2)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground">Negative Balance</p>
+                                <p className={`font-medium ${(driver.negativeBalance ?? 0) > 0 ? "text-destructive" : "text-muted-foreground"}`} data-testid={`text-negative-${driver.id}`}>
+                                  {(driver.negativeBalance ?? 0) > 0 ? (
+                                    <span className="flex items-center gap-1">
+                                      <AlertCircle className="h-3 w-3" />
+                                      {driver.countryCode === "BD" ? "৳" : "$"}{(driver.negativeBalance ?? 0).toFixed(2)}
+                                    </span>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                               <div>
                                 <p className="text-muted-foreground">Earnings</p>
                                 <p className="font-medium" data-testid={`text-earnings-${driver.id}`}>

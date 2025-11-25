@@ -256,9 +256,9 @@ export default function DriverPayouts() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Payout Method</CardTitle>
                 <Link href="/driver/account/payout-methods">
-                  <Button variant="link" size="sm" className="p-0" data-testid="link-manage-methods">
+                  <span className="inline-flex items-center text-sm text-primary hover:underline cursor-pointer" data-testid="link-manage-methods">
                     Manage <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
+                  </span>
                 </Link>
               </div>
             </CardHeader>

@@ -174,9 +174,9 @@ export default function DriverEarnings() {
                 {formatCurrency(summary?.availableBalance || 0)}
               </p>
               <Link href="/driver/wallet">
-                <Button variant="link" size="sm" className="p-0 h-auto mt-1" data-testid="link-view-wallet">
+                <span className="inline-flex items-center text-sm text-primary hover:underline mt-1 cursor-pointer" data-testid="link-view-wallet">
                   View Wallet <ChevronRight className="h-3 w-3 ml-1" />
-                </Button>
+                </span>
               </Link>
             </CardContent>
           </Card>
@@ -206,9 +206,9 @@ export default function DriverEarnings() {
                 {formatCurrency(summary?.pendingPayouts || 0)}
               </p>
               <Link href="/driver/payouts">
-                <Button variant="link" size="sm" className="p-0 h-auto mt-1" data-testid="link-view-payouts">
+                <span className="inline-flex items-center text-sm text-primary hover:underline mt-1 cursor-pointer" data-testid="link-view-payouts">
                   View Payouts <ChevronRight className="h-3 w-3 ml-1" />
-                </Button>
+                </span>
               </Link>
             </CardContent>
           </Card>

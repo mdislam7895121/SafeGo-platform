@@ -35,6 +35,8 @@ interface PayoutRequest {
   processedAt: string | null;
   processedByAdminId: string | null;
   rejectionReason: string | null;
+  walletBalance?: number;
+  negativeBalance?: number;
   owner?: {
     email?: string;
     countryCode?: string;
@@ -361,11 +363,30 @@ export default function AdminPayouts() {
                           {getStatusBadge(payout.status)}
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
                           <div>
-                            <p className="text-muted-foreground">Amount</p>
+                            <p className="text-muted-foreground">Payout Amount</p>
                             <p className="font-semibold text-lg text-green-600 dark:text-green-400" data-testid={`text-amount-${payout.id}`}>
                               {formatCurrency(payout.amount, payout.owner?.currency)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Wallet Balance</p>
+                            <p className="font-medium" data-testid={`text-wallet-${payout.id}`}>
+                              {formatCurrency((payout.walletBalance ?? 0).toFixed(2), payout.owner?.currency)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Negative Balance</p>
+                            <p className={`font-medium ${(payout.negativeBalance ?? 0) > 0 ? "text-destructive" : "text-muted-foreground"}`} data-testid={`text-negative-${payout.id}`}>
+                              {(payout.negativeBalance ?? 0) > 0 ? (
+                                <span className="flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  {formatCurrency((payout.negativeBalance ?? 0).toFixed(2), payout.owner?.currency)}
+                                </span>
+                              ) : (
+                                "-"
+                              )}
                             </p>
                           </div>
                           <div>

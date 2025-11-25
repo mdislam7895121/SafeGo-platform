@@ -85,6 +85,8 @@ import DriverAccountNavigation from "@/pages/driver/account/navigation";
 import DriverAccountBlockedUsers from "@/pages/driver/account/blocked-users";
 import DriverAccountPermissions from "@/pages/driver/account/permissions";
 import DriverAccountAbout from "@/pages/driver/account/about";
+import DriverEarnings from "@/pages/driver/earnings";
+import DriverPayouts from "@/pages/driver/payouts";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -440,6 +442,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Balance">
             <DriverWalletBalance />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/earnings">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Earnings">
+            <DriverEarnings />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/payouts">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Payouts">
+            <DriverPayouts />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
