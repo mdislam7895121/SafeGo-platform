@@ -408,8 +408,15 @@ export default function DriverPromotions() {
     refetchInterval: 60000,
   });
 
-  const { data: promotionData, isLoading: loadingPromotions, refetch: refetchPromotions } = useQuery<{ promotions: DriverPromotion[] }>({
-    queryKey: ["/api/driver/promotions/active"],
+  const { data: promotionData, isLoading: loadingPromotions, refetch: refetchPromotions } = useQuery<{ date: string; promotions: DriverPromotion[] }>({
+    queryKey: ["/api/driver/promotions/active", selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/driver/promotions/active?date=${selectedDate}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to fetch promotions');
+      return res.json();
+    },
     refetchInterval: 30000,
   });
 
@@ -438,7 +445,7 @@ export default function DriverPromotions() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/active"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/active", selectedDate] }),
       queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/completed"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/stats"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/driver/promotions/history"] }),
@@ -454,17 +461,6 @@ export default function DriverPromotions() {
   const expiredPromotions = completedData?.expired || [];
   const bonusHistory = history?.payouts || [];
 
-  const isPromotionActiveOnDate = (promo: DriverPromotion, dateStr: string): boolean => {
-    try {
-      const checkDate = parseISO(dateStr);
-      const start = startOfDay(parseISO(promo.startAt));
-      const end = endOfDay(parseISO(promo.endAt));
-      return isWithinInterval(checkDate, { start, end });
-    } catch {
-      return false;
-    }
-  };
-
   const isBonusActiveOnDate = (bonus: OpportunityBonus, dateStr: string): boolean => {
     if (!bonus.startAt || !bonus.endAt) return true;
     try {
@@ -477,18 +473,22 @@ export default function DriverPromotions() {
     }
   };
 
-  const filteredPromotions = useMemo(() => 
-    promotions.filter(p => isPromotionActiveOnDate(p, selectedDate)),
-    [promotions, selectedDate]
-  );
-
   const filteredBonuses = useMemo(() =>
     bonuses.filter(b => isBonusActiveOnDate(b, selectedDate)),
     [bonuses, selectedDate]
   );
 
-  const activeQuests = filteredPromotions.filter(p => p.type !== "PER_TRIP_BONUS");
-  const perTripBonuses = filteredPromotions.filter(p => p.type === "PER_TRIP_BONUS");
+  const activeQuests = promotions.filter(p => p.type !== "PER_TRIP_BONUS");
+  const perTripBonuses = promotions.filter(p => p.type === "PER_TRIP_BONUS");
+  
+  const formattedSelectedDate = useMemo(() => {
+    try {
+      const date = parseISO(selectedDate);
+      return format(date, "EEEE, MMM d");
+    } catch {
+      return format(new Date(), "EEEE, MMM d");
+    }
+  }, [selectedDate]);
 
   return (
     <div className="bg-background min-h-screen pb-20">
@@ -613,6 +613,19 @@ export default function DriverPromotions() {
           </TabsList>
 
           <TabsContent value="quests" className="mt-4 space-y-4">
+            <div 
+              className="flex items-center gap-2 py-2 px-3 bg-muted/50 rounded-lg border"
+              data-testid="date-header"
+            >
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">{formattedSelectedDate}</span>
+              {promotions.length > 0 && (
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {promotions.length} {promotions.length === 1 ? 'promotion' : 'promotions'}
+                </Badge>
+              )}
+            </div>
+            
             {loadingPromotions ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => <Skeleton key={i} className="h-48" />)}
@@ -621,9 +634,9 @@ export default function DriverPromotions() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Target className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium">No Quests for {format(parseISO(selectedDate), "MMM d")}</p>
+                  <p className="font-medium" data-testid="text-empty-quests">No promotions for {formattedSelectedDate}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Try selecting a different date or check back later for new opportunities
+                    Check back later or choose another date to see new earning opportunities
                   </p>
                 </CardContent>
               </Card>
@@ -657,6 +670,19 @@ export default function DriverPromotions() {
           </TabsContent>
 
           <TabsContent value="bonuses" className="mt-4 space-y-4">
+            <div 
+              className="flex items-center gap-2 py-2 px-3 bg-muted/50 rounded-lg border"
+              data-testid="date-header-bonuses"
+            >
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">{formattedSelectedDate}</span>
+              {filteredBonuses.length > 0 && (
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {filteredBonuses.length} {filteredBonuses.length === 1 ? 'bonus' : 'bonuses'}
+                </Badge>
+              )}
+            </div>
+            
             {loadingBonuses ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
@@ -673,7 +699,7 @@ export default function DriverPromotions() {
               <Card>
                 <CardContent className="py-12 text-center">
                   <Gift className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="font-medium">No Bonuses for {format(parseISO(selectedDate), "MMM d")}</p>
+                  <p className="font-medium" data-testid="text-empty-bonuses">No bonuses for {formattedSelectedDate}</p>
                   <p className="text-sm text-muted-foreground mt-1">
                     Check other dates or check back later for new opportunities
                   </p>
