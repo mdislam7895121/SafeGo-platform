@@ -360,10 +360,10 @@ function SSNCard({ ssnLast4, verified }: { ssnLast4?: string; verified?: boolean
         </div>
         
         <div className="flex gap-2 mt-4 pt-3 border-t">
-          <Link href="/driver/profile">
+          <Link href="/driver/kyc-documents">
             <Button variant="outline" size="sm" data-testid="button-update-ssn">
-              <User className="w-4 h-4 mr-1" />
-              {ssnLast4 ? "Update in Profile" : "Add in Profile"}
+              <Lock className="w-4 h-4 mr-1" />
+              {ssnLast4 ? "Manage SSN" : "Add SSN"}
             </Button>
           </Link>
         </div>

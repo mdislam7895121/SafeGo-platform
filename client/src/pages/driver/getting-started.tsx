@@ -93,7 +93,7 @@ export default function DriverGettingStarted() {
         icon: Camera,
         status: profile?.profilePhotoUrl ? "completed" : "pending",
         actionLabel: profile?.profilePhotoUrl ? "Update" : "Upload",
-        actionLink: "/driver/profile",
+        actionLink: "/driver/account/manage",
       },
       {
         id: "full-name",
@@ -102,7 +102,7 @@ export default function DriverGettingStarted() {
         icon: User,
         status: profile?.fullName || (profile?.firstName && profile?.lastName) ? "completed" : "pending",
         actionLabel: profile?.fullName || profile?.firstName ? "Update" : "Continue",
-        actionLink: "/driver/profile",
+        actionLink: "/driver/account/manage",
       },
       {
         id: "phone-verification",
@@ -111,7 +111,7 @@ export default function DriverGettingStarted() {
         icon: Phone,
         status: profile?.phoneVerified ? "completed" : "pending",
         actionLabel: profile?.phoneVerified ? "Verified" : "Verify",
-        actionLink: "/driver/profile",
+        actionLink: "/driver/account/manage",
       },
       {
         id: "date-of-birth",
@@ -120,7 +120,7 @@ export default function DriverGettingStarted() {
         icon: Calendar,
         status: profile?.dateOfBirth ? "completed" : "pending",
         actionLabel: profile?.dateOfBirth ? "Update" : "Continue",
-        actionLink: "/driver/profile",
+        actionLink: "/driver/account/manage",
       },
       {
         id: "driver-license",
@@ -154,7 +154,7 @@ export default function DriverGettingStarted() {
         icon: Lock,
         status: profile?.ssnLast4 ? "completed" : "pending",
         actionLabel: profile?.ssnLast4 ? "Update" : "Continue",
-        actionLink: "/driver/profile",
+        actionLink: "/driver/kyc-documents",
         isMasked: true,
         maskedValue: profile?.ssnLast4 ? `***-**-${profile.ssnLast4}` : undefined,
       });
@@ -177,7 +177,7 @@ export default function DriverGettingStarted() {
         icon: AlertCircle,
         status: profile?.emergencyContactName && profile?.emergencyContactPhone ? "completed" : "pending",
         actionLabel: profile?.emergencyContactName ? "Update" : "Add",
-        actionLink: "/driver/profile",
+        actionLink: "/driver/account/manage",
       },
       {
         id: "background-check",

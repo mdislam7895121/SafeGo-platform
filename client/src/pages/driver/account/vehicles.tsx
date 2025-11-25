@@ -91,6 +91,11 @@ export default function DriverVehicles() {
                     </CardDescription>
                   </div>
                 </div>
+                <Link href="/driver/vehicle">
+                  <Button variant="outline" size="sm" data-testid="button-manage-vehicle">
+                    Manage
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent>
@@ -227,7 +232,7 @@ export default function DriverVehicles() {
                   </div>
                 )}
 
-                <Link href="/driver/kyc-documents">
+                <Link href="/driver/documents">
                   <Button className="w-full mt-4" variant="outline" data-testid="button-upload-documents">
                     <FileText className="h-4 w-4 mr-2" />
                     Upload Documents
