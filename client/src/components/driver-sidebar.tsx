@@ -17,6 +17,7 @@ import {
   Users,
   Wallet,
   Settings,
+  SlidersHorizontal,
   Star,
   MapPin,
   LogOut,
@@ -78,9 +79,14 @@ const menuItems = [
     href: "/driver/wallet",
   },
   {
-    title: "Account Settings",
+    title: "Account",
     icon: Settings,
     href: "/driver/account",
+  },
+  {
+    title: "Settings",
+    icon: SlidersHorizontal,
+    href: "/driver/settings",
   },
   {
     title: "Help Center",
