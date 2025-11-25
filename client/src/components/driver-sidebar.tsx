@@ -25,6 +25,7 @@ import {
   HelpCircle,
   GraduationCap,
   Sparkles,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -44,6 +45,11 @@ const menuItems = [
     title: "Training Videos",
     icon: GraduationCap,
     href: "/driver/tutorials",
+  },
+  {
+    title: "Documents",
+    icon: FileText,
+    href: "/driver/documents",
   },
   {
     title: "Refer a Friend",

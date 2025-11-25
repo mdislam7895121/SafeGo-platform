@@ -1,0 +1,85 @@
+Follow all SafeGo Master Rules and implement D11: Driver Document Center (Web Version).
+
+GOAL:
+Create a complete Uber-style Driver Document Center under /driver/documents, where drivers can upload, view, and manage all required documents. This page must include document cards, upload modals, status badges, expiry indicators, and NYC-specific TLC logic.
+
+1) ROUTE
+Create and connect:
+- /driver/documents
+- Add navigation from Getting Started checklist
+- Add optional sidebar link: “Documents”
+
+2) PAGE HEADER
+Add:
+- Title: “Driver Documents”
+- Subtitle: “Upload and manage all required documents to activate your SafeGo driver account.”
+
+3) DOCUMENT CARDS (Each with full UI)
+Create document cards for:
+- Driver License (front)
+- Driver License (back)
+- TLC License (NYC only)
+- Vehicle Registration
+- Vehicle Insurance
+- Profile Picture
+- SSN Verification (masked; read-only)
+
+For each card include:
+- Title
+- Short instructions
+- Status badge (Pending, Approved, Rejected, Not Submitted)
+- Expiry date field for license, registration, insurance
+- “Upload” button
+- “Update” button if existing file present
+- “View Uploaded File” link
+- Icon (license, ID card, car, shield)
+
+4) UPLOAD MODAL
+For each upload:
+- File picker
+- Preview image or PDF
+- Replace option
+- Success + error handling
+- Mobile responsive layout
+
+5) STATUS LOGIC (Front-end only)
+Represent document statuses using local state or simple data structure:
+- "not_submitted"
+- "pending"
+- "approved"
+- "rejected”
+Include rejected reason field if needed.
+
+6) NYC TLC LOGIC
+Show TLC License card ONLY if:
+driverProfile.state === "NY" OR driverProfile.city === "New York".
+Hide completely for all other drivers.
+
+7) SSN VERIFICATION CARD
+- Read-only
+- Masked format (***-**-1234)
+- Add a “Verified” badge if status=true
+
+8) INTEGRATION WITH D10 CHECKLIST
+- When document uploaded → update checklist item visually
+- When approved → mark as completed
+
+9) UI STYLE
+- Clean Uber-style card layout
+- Clear spacing
+- Proper typography
+- Color-coded badges
+- Smooth mobile layout
+- Do NOT modify global theme
+
+10) SECURITY RULES
+- No raw PII logged
+- Mask SSN always
+- Safe file handling
+- No backend write logic unless minimal state storage
+- Strict role-check: only drivers can access
+
+11) FINALIZE
+Build entire page, connect all buttons, test on mobile preview, ensure TLC logic works, and integrate with Getting Started progress.
+
+Complete the full D11 implementation end-to-end.

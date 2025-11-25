@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useState, useRef } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { 
   FileText, 
   Upload, 
@@ -17,12 +17,17 @@ import {
   FileCheck,
   ChevronRight,
   X,
+  Lock,
+  Building,
+  User,
+  EyeOff,
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +44,7 @@ interface DocumentInfo {
   id: string;
   type: string;
   label: string;
+  description?: string;
   status: string;
   fileUrl: string | null;
   expiresAt: string | null;
@@ -58,7 +64,17 @@ interface DocumentSummary {
   rejectedCount: number;
 }
 
+interface DriverProfile {
+  usaCity?: string;
+  state?: string;
+  countryCode?: string;
+  ssnLast4?: string;
+  ssnVerified?: boolean;
+  profilePhotoUrl?: string;
+}
+
 const STATUS_CONFIG: Record<string, { icon: React.ComponentType<any>; color: string; label: string; bgColor: string }> = {
+  NOT_SUBMITTED: { icon: Upload, color: "text-gray-600", label: "Not Submitted", bgColor: "bg-gray-50 dark:bg-gray-900" },
   PENDING: { icon: Clock, color: "text-yellow-600", label: "Pending", bgColor: "bg-yellow-50 dark:bg-yellow-950" },
   UNDER_REVIEW: { icon: Clock, color: "text-blue-600", label: "Under Review", bgColor: "bg-blue-50 dark:bg-blue-950" },
   APPROVED: { icon: CheckCircle2, color: "text-green-600", label: "Approved", bgColor: "bg-green-50 dark:bg-green-950" },
@@ -66,16 +82,92 @@ const STATUS_CONFIG: Record<string, { icon: React.ComponentType<any>; color: str
   NEEDS_UPDATE: { icon: AlertTriangle, color: "text-orange-600", label: "Needs Update", bgColor: "bg-orange-50 dark:bg-orange-950" },
   EXPIRING_SOON: { icon: AlertTriangle, color: "text-orange-600", label: "Expiring Soon", bgColor: "bg-orange-50 dark:bg-orange-950" },
   EXPIRED: { icon: XCircle, color: "text-red-600", label: "Expired", bgColor: "bg-red-50 dark:bg-red-950" },
+  VERIFIED: { icon: CheckCircle2, color: "text-green-600", label: "Verified", bgColor: "bg-green-50 dark:bg-green-950" },
 };
 
 const DOCUMENT_ICONS: Record<string, React.ComponentType<any>> = {
   profile_photo: Camera,
   driver_license: CreditCard,
-  tlc_license: CreditCard,
+  driver_license_front: CreditCard,
+  driver_license_back: CreditCard,
+  tlc_license: Building,
   nid: CreditCard,
   insurance: Shield,
+  vehicle_insurance: Shield,
   registration: Car,
+  vehicle_registration: Car,
   vehicle_inspection: FileCheck,
+  ssn: Lock,
+};
+
+const DEFAULT_DOCUMENTS: DocumentInfo[] = [
+  {
+    id: "driver_license_front",
+    type: "driver_license_front",
+    label: "Driver License (Front)",
+    description: "Upload the front side of your driver license showing your photo and details.",
+    status: "NOT_SUBMITTED",
+    fileUrl: null,
+    expiresAt: null,
+    rejectionReason: null,
+    required: true,
+  },
+  {
+    id: "driver_license_back",
+    type: "driver_license_back",
+    label: "Driver License (Back)",
+    description: "Upload the back side of your driver license with barcode.",
+    status: "NOT_SUBMITTED",
+    fileUrl: null,
+    expiresAt: null,
+    rejectionReason: null,
+    required: true,
+  },
+  {
+    id: "vehicle_registration",
+    type: "vehicle_registration",
+    label: "Vehicle Registration",
+    description: "Upload your current vehicle registration document.",
+    status: "NOT_SUBMITTED",
+    fileUrl: null,
+    expiresAt: null,
+    rejectionReason: null,
+    required: true,
+  },
+  {
+    id: "vehicle_insurance",
+    type: "vehicle_insurance",
+    label: "Vehicle Insurance",
+    description: "Upload proof of valid vehicle insurance coverage.",
+    status: "NOT_SUBMITTED",
+    fileUrl: null,
+    expiresAt: null,
+    rejectionReason: null,
+    required: true,
+  },
+  {
+    id: "profile_photo",
+    type: "profile_photo",
+    label: "Profile Picture",
+    description: "Upload a clear photo of yourself for passengers to identify you.",
+    status: "NOT_SUBMITTED",
+    fileUrl: null,
+    expiresAt: null,
+    rejectionReason: null,
+    required: true,
+  },
+];
+
+const TLC_DOCUMENT: DocumentInfo = {
+  id: "tlc_license",
+  type: "tlc_license",
+  label: "TLC License",
+  description: "Upload your NYC Taxi and Limousine Commission license (required for NYC drivers).",
+  status: "NOT_SUBMITTED",
+  fileUrl: null,
+  expiresAt: null,
+  rejectionReason: null,
+  required: true,
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -100,77 +192,180 @@ function DocumentCard({
   onPreview 
 }: { 
   doc: DocumentInfo;
-  onUpload: (docType: string) => void;
+  onUpload: (docType: string, label: string) => void;
   onPreview: (fileUrl: string, label: string) => void;
 }) {
   const Icon = DOCUMENT_ICONS[doc.type] || FileText;
   const hasFile = !!doc.fileUrl;
   const isRejected = doc.status === "REJECTED";
-  const needsUpload = !hasFile || isRejected || doc.status === "NEEDS_UPDATE";
+  const isNotSubmitted = doc.status === "NOT_SUBMITTED";
+  const needsUpload = isNotSubmitted || isRejected || doc.status === "NEEDS_UPDATE";
+  const isExpiringSoon = doc.expiresAt && new Date(doc.expiresAt) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
   return (
     <Card 
-      className={`hover-elevate ${isRejected ? "border-red-200 dark:border-red-800" : ""}`}
+      className={`hover-elevate transition-all ${isRejected ? "border-red-200 dark:border-red-800" : ""}`}
       data-testid={`card-document-${doc.type}`}
     >
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
-          <div className={`p-3 rounded-lg ${hasFile && !isRejected ? "bg-primary/10" : "bg-muted"}`}>
-            <Icon className={`w-5 h-5 ${hasFile && !isRejected ? "text-primary" : "text-muted-foreground"}`} />
+          <div className={`p-3 rounded-lg flex-shrink-0 ${
+            hasFile && !isRejected && !isNotSubmitted 
+              ? "bg-primary/10" 
+              : isRejected 
+                ? "bg-red-100 dark:bg-red-950" 
+                : "bg-muted"
+          }`}>
+            <Icon className={`w-5 h-5 ${
+              hasFile && !isRejected && !isNotSubmitted 
+                ? "text-primary" 
+                : isRejected 
+                  ? "text-red-600" 
+                  : "text-muted-foreground"
+            }`} />
           </div>
           
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <h3 className="font-medium text-foreground truncate">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h3 className="font-medium text-foreground">
                 {doc.label}
               </h3>
               <StatusBadge status={doc.status} />
             </div>
             
-            {doc.required && (
-              <span className="text-xs text-muted-foreground">Required</span>
-            )}
-            
-            {doc.expiresAt && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Expires: {new Date(doc.expiresAt).toLocaleDateString()}
+            {doc.description && (
+              <p className="text-sm text-muted-foreground mb-2 line-clamp-2">
+                {doc.description}
               </p>
             )}
             
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              {doc.required && (
+                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">Required</span>
+              )}
+              {doc.expiresAt && (
+                <span className={`px-2 py-0.5 rounded ${
+                  isExpiringSoon 
+                    ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400" 
+                    : "bg-muted"
+                }`}>
+                  Expires: {new Date(doc.expiresAt).toLocaleDateString()}
+                </span>
+              )}
+              {doc.uploadedAt && (
+                <span>
+                  Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            
             {isRejected && doc.rejectionReason && (
-              <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded-md">
+              <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 rounded-md border border-red-200 dark:border-red-800">
                 <p className="text-xs text-red-700 dark:text-red-300">
-                  <strong>Reason:</strong> {doc.rejectionReason}
+                  <strong>Rejection reason:</strong> {doc.rejectionReason}
                 </p>
               </div>
             )}
           </div>
         </div>
         
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-2 mt-4 pt-3 border-t">
           {hasFile && (
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => onPreview(doc.fileUrl!, doc.label)}
-              data-testid={`button-preview-${doc.type}`}
+              data-testid={`button-view-${doc.type}`}
             >
               <Eye className="w-4 h-4 mr-1" />
-              View
+              View File
             </Button>
           )}
           
-          {needsUpload && (
-            <Button 
-              size="sm"
-              onClick={() => onUpload(doc.type)}
-              variant={isRejected ? "destructive" : "default"}
-              data-testid={`button-upload-${doc.type}`}
-            >
-              {isRejected ? <RefreshCw className="w-4 h-4 mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
-              {hasFile ? "Re-upload" : "Upload"}
+          <Button 
+            size="sm"
+            onClick={() => onUpload(doc.type, doc.label)}
+            variant={isRejected ? "destructive" : needsUpload ? "default" : "outline"}
+            data-testid={`button-upload-${doc.type}`}
+          >
+            {isRejected ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Re-upload
+              </>
+            ) : hasFile ? (
+              <>
+                <Upload className="w-4 h-4 mr-1" />
+                Update
+              </>
+            ) : (
+              <>
+                <Upload className="w-4 h-4 mr-1" />
+                Upload
+              </>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SSNCard({ ssnLast4, verified }: { ssnLast4?: string; verified?: boolean }) {
+  const [showSSN, setShowSSN] = useState(false);
+  
+  return (
+    <Card className="hover-elevate" data-testid="card-document-ssn">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className={`p-3 rounded-lg flex-shrink-0 ${
+            verified ? "bg-green-100 dark:bg-green-950" : "bg-muted"
+          }`}>
+            <Lock className={`w-5 h-5 ${verified ? "text-green-600" : "text-muted-foreground"}`} />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h3 className="font-medium text-foreground">
+                SSN Verification
+              </h3>
+              <StatusBadge status={verified ? "VERIFIED" : ssnLast4 ? "PENDING" : "NOT_SUBMITTED"} />
+            </div>
+            
+            <p className="text-sm text-muted-foreground mb-3">
+              Your Social Security Number for background check and tax purposes.
+            </p>
+            
+            {ssnLast4 ? (
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm bg-muted px-3 py-1.5 rounded-md">
+                  {showSSN ? `***-**-${ssnLast4}` : "***-**-****"}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setShowSSN(!showSSN)}
+                  data-testid="button-toggle-ssn"
+                >
+                  {showSSN ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                SSN not yet provided
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex gap-2 mt-4 pt-3 border-t">
+          <Link href="/driver/profile">
+            <Button variant="outline" size="sm" data-testid="button-update-ssn">
+              <User className="w-4 h-4 mr-1" />
+              {ssnLast4 ? "Update in Profile" : "Add in Profile"}
             </Button>
-          )}
+          </Link>
         </div>
       </CardContent>
     </Card>
@@ -193,10 +388,15 @@ function UploadDialog({
   isUploading: boolean;
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const requiresExpiry = ["driver_license", "tlc_license", "insurance", "registration", "vehicle_inspection"].includes(documentType);
+  const requiresExpiry = [
+    "driver_license", "driver_license_front", "driver_license_back", 
+    "tlc_license", "insurance", "vehicle_insurance", 
+    "registration", "vehicle_registration", "vehicle_inspection"
+  ].includes(documentType);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -206,6 +406,13 @@ function UploadDialog({
         return;
       }
       setSelectedFile(file);
+      
+      if (file.type.startsWith("image/")) {
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+      } else {
+        setPreviewUrl(null);
+      }
     }
   };
 
@@ -216,6 +423,7 @@ function UploadDialog({
 
   const handleClose = () => {
     setSelectedFile(null);
+    setPreviewUrl(null);
     setExpiresAt("");
     onClose();
   };
@@ -226,7 +434,7 @@ function UploadDialog({
         <DialogHeader>
           <DialogTitle>Upload {documentLabel}</DialogTitle>
           <DialogDescription>
-            Select a file to upload. Accepted formats: JPG, PNG, PDF (max 10MB)
+            Select a clear, readable image or PDF file (max 10MB)
           </DialogDescription>
         </DialogHeader>
         
@@ -247,25 +455,39 @@ function UploadDialog({
               className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
             >
               {selectedFile ? (
-                <div className="flex items-center justify-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" />
-                  <span className="text-sm font-medium">{selectedFile.name}</span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedFile(null);
-                    }}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
+                <div className="space-y-3">
+                  {previewUrl && (
+                    <img 
+                      src={previewUrl} 
+                      alt="Preview" 
+                      className="max-h-40 mx-auto rounded-lg object-contain"
+                    />
+                  )}
+                  <div className="flex items-center justify-center gap-2">
+                    <FileText className="w-5 h-5 text-primary" />
+                    <span className="text-sm font-medium truncate max-w-[200px]">{selectedFile.name}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedFile(null);
+                        setPreviewUrl(null);
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
-                  <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">
+                  <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground mb-1">
                     Click to select a file
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    JPG, PNG, or PDF
                   </p>
                 </>
               )}
@@ -274,7 +496,7 @@ function UploadDialog({
           
           {requiresExpiry && (
             <div className="space-y-2">
-              <Label htmlFor="expires-at">Expiration Date (Optional)</Label>
+              <Label htmlFor="expires-at">Expiration Date</Label>
               <Input
                 id="expires-at"
                 type="date"
@@ -283,6 +505,9 @@ function UploadDialog({
                 min={new Date().toISOString().split("T")[0]}
                 data-testid="input-expires-at"
               />
+              <p className="text-xs text-muted-foreground">
+                Enter the document expiration date if applicable
+              </p>
             </div>
           )}
         </div>
@@ -366,9 +591,17 @@ export default function DriverDocuments() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewLabel, setPreviewLabel] = useState("");
 
-  const { data: summaryData, isLoading, error } = useQuery<{ success: boolean; data: DocumentSummary }>({
+  const { data: driverData } = useQuery({
+    queryKey: ["/api/driver/home"],
+  });
+
+  const { data: summaryData, isLoading } = useQuery<{ success: boolean; data: DocumentSummary }>({
     queryKey: ["/api/driver/documents/summary"],
   });
+
+  const profile = (driverData as any)?.profile as DriverProfile | undefined;
+  const isNYC = profile?.usaCity === "New York" || profile?.usaCity === "NYC" || profile?.state === "NY";
+  const countryCode = profile?.countryCode || "US";
 
   const uploadMutation = useMutation({
     mutationFn: async ({ docType, file, expiresAt }: { docType: string; file: File; expiresAt?: string }) => {
@@ -408,10 +641,9 @@ export default function DriverDocuments() {
     },
   });
 
-  const handleOpenUpload = (docType: string) => {
-    const doc = summaryData?.data?.documents.find(d => d.type === docType);
+  const handleOpenUpload = (docType: string, label: string) => {
     setUploadDocType(docType);
-    setUploadDocLabel(doc?.label || docType.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()));
+    setUploadDocLabel(label);
     setUploadDialogOpen(true);
   };
 
@@ -425,100 +657,74 @@ export default function DriverDocuments() {
     setPreviewOpen(true);
   };
 
+  const documents = summaryData?.data?.documents || DEFAULT_DOCUMENTS;
+  const allDocuments = isNYC ? [...documents.filter(d => d.type !== "tlc_license"), TLC_DOCUMENT] : documents.filter(d => d.type !== "tlc_license");
+  
+  const approvedCount = allDocuments.filter(d => d.status === "APPROVED").length;
+  const totalRequired = allDocuments.filter(d => d.required).length;
+  const progressPercent = totalRequired > 0 ? Math.round((approvedCount / totalRequired) * 100) : 0;
+  const pendingCount = allDocuments.filter(d => d.status === "PENDING" || d.status === "UNDER_REVIEW").length;
+  const rejectedCount = allDocuments.filter(d => d.status === "REJECTED").length;
+
   if (isLoading) {
     return (
-      <div className="container max-w-4xl mx-auto p-4 space-y-6">
+      <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
         <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-24 w-full" />
-        <div className="grid gap-4 md:grid-cols-2">
+        <Skeleton className="h-4 w-96" />
+        <Skeleton className="h-32 w-full" />
+        <div className="grid gap-4 sm:grid-cols-2">
           {[1, 2, 3, 4].map(i => (
-            <Skeleton key={i} className="h-40" />
+            <Skeleton key={i} className="h-48" />
           ))}
         </div>
       </div>
     );
   }
 
-  if (error || !summaryData?.success) {
-    return (
-      <div className="container max-w-4xl mx-auto p-4">
-        <Card>
-          <CardContent className="p-8 text-center">
-            <XCircle className="w-12 h-12 mx-auto text-destructive mb-4" />
-            <h2 className="text-lg font-semibold mb-2">Unable to Load Documents</h2>
-            <p className="text-muted-foreground mb-4">
-              Please make sure you have completed your driver profile setup first.
-            </p>
-            <Button onClick={() => navigate("/driver/kyc-documents")}>
-              Go to KYC Setup
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const summary = summaryData.data;
-  const progressPercent = summary.requiredCount > 0 
-    ? Math.round((summary.completedCount / summary.requiredCount) * 100) 
-    : 0;
-
-  const requiredDocs = summary.documents.filter(d => d.required);
-  const optionalDocs = summary.documents.filter(d => !d.required);
-
   return (
-    <div className="container max-w-4xl mx-auto p-4 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground" data-testid="text-page-title">
-            Document Center
-          </h1>
-          <p className="text-muted-foreground">
-            Manage and track your driver documents
-          </p>
-        </div>
-        <Button 
-          variant="outline" 
-          onClick={() => navigate("/driver/dashboard")}
-          data-testid="button-back-dashboard"
-        >
-          <ChevronRight className="w-4 h-4 mr-1 rotate-180" />
-          Back
-        </Button>
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold" data-testid="text-page-title">
+          Driver Documents
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Upload and manage all required documents to activate your SafeGo driver account
+        </p>
       </div>
 
       <Card data-testid="card-progress-summary">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-lg">Verification Progress</CardTitle>
-            <StatusBadge status={summary.overallStatus === "approved" ? "APPROVED" : 
-              summary.overallStatus === "rejected" ? "REJECTED" : 
-              summary.overallStatus === "pending_review" ? "UNDER_REVIEW" : "PENDING"} 
-            />
+            <StatusBadge status={
+              progressPercent === 100 ? "APPROVED" : 
+              rejectedCount > 0 ? "REJECTED" : 
+              pendingCount > 0 ? "UNDER_REVIEW" : "PENDING"
+            } />
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <Progress value={progressPercent} className="h-2" />
+            <Progress value={progressPercent} className="h-2" data-testid="progress-documents" />
             
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                {summary.completedCount} of {summary.requiredCount} required documents approved
+                {approvedCount} of {totalRequired} required documents approved
               </span>
               <span className="font-medium">{progressPercent}%</span>
             </div>
             
             <div className="flex gap-4 flex-wrap">
-              {summary.pendingCount > 0 && (
+              {pendingCount > 0 && (
                 <div className="flex items-center gap-1 text-sm">
                   <Clock className="w-4 h-4 text-blue-600" />
-                  <span>{summary.pendingCount} pending review</span>
+                  <span>{pendingCount} pending review</span>
                 </div>
               )}
-              {summary.rejectedCount > 0 && (
+              {rejectedCount > 0 && (
                 <div className="flex items-center gap-1 text-sm">
                   <XCircle className="w-4 h-4 text-red-600" />
-                  <span className="text-red-600 font-medium">{summary.rejectedCount} rejected</span>
+                  <span className="text-red-600 font-medium">{rejectedCount} rejected</span>
                 </div>
               )}
             </div>
@@ -526,37 +732,59 @@ export default function DriverDocuments() {
         </CardContent>
       </Card>
 
-      {requiredDocs.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Required Documents</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {requiredDocs.map(doc => (
-              <DocumentCard
-                key={doc.id}
-                doc={doc}
-                onUpload={handleOpenUpload}
-                onPreview={handlePreview}
-              />
-            ))}
-          </div>
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Required Documents</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {allDocuments.filter(d => d.required).map(doc => (
+            <DocumentCard
+              key={doc.id}
+              doc={doc}
+              onUpload={handleOpenUpload}
+              onPreview={handlePreview}
+            />
+          ))}
         </div>
+      </div>
+
+      {countryCode === "US" && (
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Identity Verification</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SSNCard ssnLast4={profile?.ssnLast4} verified={profile?.ssnVerified} />
+            </div>
+          </div>
+        </>
       )}
 
-      {optionalDocs.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Additional Documents</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            {optionalDocs.map(doc => (
-              <DocumentCard
-                key={doc.id}
-                doc={doc}
-                onUpload={handleOpenUpload}
-                onPreview={handlePreview}
-              />
-            ))}
+      {allDocuments.filter(d => !d.required).length > 0 && (
+        <>
+          <Separator />
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Additional Documents</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {allDocuments.filter(d => !d.required).map(doc => (
+                <DocumentCard
+                  key={doc.id}
+                  doc={doc}
+                  onUpload={handleOpenUpload}
+                  onPreview={handlePreview}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        </>
       )}
+
+      <div className="text-center py-4">
+        <p className="text-sm text-muted-foreground">
+          Need help with documents?{" "}
+          <Link href="/driver/support-help-center" className="text-primary hover:underline">
+            Contact Support
+          </Link>
+        </p>
+      </div>
 
       <UploadDialog
         isOpen={uploadDialogOpen}
