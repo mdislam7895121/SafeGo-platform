@@ -17,7 +17,7 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 
 Core systems and features include:
 -   **Admin Capabilities**: Interactive admin panel with dashboards, document management, wallet settlement, and global analytics.
--   **Security & Compliance**: Admin Activity Audit Trail, Global Admin Notification Center, RBAC, secure UX, real-time threat monitoring, and fraud detection.
+-   **Security & Compliance**: Admin Activity Audit Trail, Global Admin Notification Center, RBAC, secure UX, real-time threat monitoring, fraud detection, HTTP security headers (HSTS, CSP, X-Frame-Options), rate limiting (admin login, analytics, payout, support routes), 2FA for admin and payout verification, AES-256-GCM field encryption, session management with JWT tokens.
 -   **Wallet & Earnings System**: Manages earnings, commissions, negative balances, and automated/manual payouts.
 -   **Tax & Fees System**: Multi-country tax management with city-level overrides.
 -   **Multi-Role Multi-Channel Support Center**: AI-first chat with 4-role support and a two-tier escalation system.
