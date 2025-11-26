@@ -21,6 +21,8 @@ import {
   Building,
   User,
   EyeOff,
+  Hash,
+  Edit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -372,6 +374,218 @@ function SSNCard({ ssnLast4, verified }: { ssnLast4?: string; verified?: boolean
   );
 }
 
+interface LicensePlateInfo {
+  plateNumber: string | null;
+  country: string | null;
+  state: string | null;
+  status: string;
+  lastUpdated: string | null;
+  rejectionReason: string | null;
+}
+
+function LicensePlateCard({ 
+  plate, 
+  onEdit 
+}: { 
+  plate: LicensePlateInfo;
+  onEdit: () => void;
+}) {
+  const hasPlate = !!plate.plateNumber;
+  const isRejected = plate.status === "REJECTED";
+  const isNotSubmitted = plate.status === "PENDING" && !plate.plateNumber;
+  const needsUpdate = isNotSubmitted || isRejected || plate.status === "NEEDS_UPDATE";
+
+  return (
+    <Card 
+      className={`hover-elevate transition-all ${isRejected ? "border-red-200 dark:border-red-800" : ""}`}
+      data-testid="card-document-license_plate"
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className={`p-3 rounded-lg flex-shrink-0 ${
+            hasPlate && !isRejected && !isNotSubmitted 
+              ? "bg-primary/10" 
+              : isRejected 
+                ? "bg-red-100 dark:bg-red-950" 
+                : "bg-muted"
+          }`}>
+            <Hash className={`w-5 h-5 ${
+              hasPlate && !isRejected && !isNotSubmitted 
+                ? "text-primary" 
+                : isRejected 
+                  ? "text-red-600" 
+                  : "text-muted-foreground"
+            }`} />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <h3 className="font-medium text-foreground">
+                License Plate Number
+              </h3>
+              <StatusBadge status={plate.status} />
+            </div>
+            
+            <p className="text-sm text-muted-foreground mb-2">
+              Enter your vehicle's license plate number for verification.
+            </p>
+            
+            {hasPlate && (
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-mono text-sm bg-muted px-3 py-1.5 rounded-md font-medium">
+                  {plate.plateNumber}
+                </span>
+                {plate.state && (
+                  <span className="text-xs text-muted-foreground">
+                    ({plate.state})
+                  </span>
+                )}
+              </div>
+            )}
+            
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded">Required</span>
+              {plate.lastUpdated && (
+                <span>
+                  Updated: {new Date(plate.lastUpdated).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            
+            {isRejected && plate.rejectionReason && (
+              <div className="mt-3 p-2 bg-red-50 dark:bg-red-950 rounded-md border border-red-200 dark:border-red-800">
+                <p className="text-xs text-red-700 dark:text-red-300">
+                  <strong>Rejection reason:</strong> {plate.rejectionReason}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex gap-2 mt-4 pt-3 border-t">
+          <Button 
+            size="sm"
+            onClick={onEdit}
+            variant={isRejected ? "destructive" : needsUpdate ? "default" : "outline"}
+            data-testid="button-edit-license_plate"
+          >
+            {isRejected ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Re-submit
+              </>
+            ) : hasPlate ? (
+              <>
+                <Edit className="w-4 h-4 mr-1" />
+                Update
+              </>
+            ) : (
+              <>
+                <Hash className="w-4 h-4 mr-1" />
+                Enter Plate
+              </>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LicensePlateDialog({
+  isOpen,
+  onClose,
+  currentPlate,
+  onSubmit,
+  isSubmitting,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  currentPlate: string;
+  onSubmit: (plateNumber: string, plateState?: string) => void;
+  isSubmitting: boolean;
+}) {
+  const [plateNumber, setPlateNumber] = useState(currentPlate);
+  const [plateState, setPlateState] = useState("");
+
+  const handleSubmit = () => {
+    if (!plateNumber.trim()) return;
+    onSubmit(plateNumber.trim(), plateState.trim() || undefined);
+  };
+
+  const handleClose = () => {
+    setPlateNumber(currentPlate);
+    setPlateState("");
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>License Plate Number</DialogTitle>
+          <DialogDescription>
+            Enter your vehicle's license plate number exactly as it appears on your plate
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="plate-number">License Plate Number *</Label>
+            <Input
+              id="plate-number"
+              value={plateNumber}
+              onChange={(e) => setPlateNumber(e.target.value.toUpperCase())}
+              placeholder="ABC-1234"
+              className="font-mono text-lg"
+              maxLength={15}
+              data-testid="input-license-plate-number"
+            />
+            <p className="text-xs text-muted-foreground">
+              Enter letters and numbers only (e.g., ABC1234, ABC-123)
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="plate-state">State / Province (Optional)</Label>
+            <Input
+              id="plate-state"
+              value={plateState}
+              onChange={(e) => setPlateState(e.target.value.toUpperCase())}
+              placeholder="NY"
+              maxLength={10}
+              data-testid="input-license-plate-state"
+            />
+          </div>
+        </div>
+        
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={handleClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit} 
+            disabled={!plateNumber.trim() || isSubmitting}
+            data-testid="button-submit-license-plate"
+          >
+            {isSubmitting ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-1" />
+                Submit
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function UploadDialog({
   isOpen,
   onClose,
@@ -590,6 +804,8 @@ export default function DriverDocuments() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState("");
   const [previewLabel, setPreviewLabel] = useState("");
+  
+  const [licensePlateDialogOpen, setLicensePlateDialogOpen] = useState(false);
 
   const { data: driverData } = useQuery({
     queryKey: ["/api/driver/home"],
@@ -645,6 +861,35 @@ export default function DriverDocuments() {
     },
   });
 
+  const licensePlateMutation = useMutation({
+    mutationFn: async ({ plateNumber, plateState }: { plateNumber: string; plateState?: string }) => {
+      return await apiRequest("/api/driver/documents/license-plate", {
+        method: "PATCH",
+        body: JSON.stringify({ 
+          licensePlateNumber: plateNumber,
+          plateState: plateState,
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "License Plate Submitted",
+        description: "Your license plate number has been submitted and is pending review.",
+      });
+      setLicensePlateDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/documents/summary"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Submission Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleOpenUpload = (docType: string, label: string) => {
     setUploadDocType(docType);
     setUploadDocLabel(label);
@@ -659,6 +904,10 @@ export default function DriverDocuments() {
     setPreviewUrl(fileUrl);
     setPreviewLabel(label);
     setPreviewOpen(true);
+  };
+
+  const handleSubmitLicensePlate = (plateNumber: string, plateState?: string) => {
+    licensePlateMutation.mutate({ plateNumber, plateState });
   };
 
   const backendDocs = summaryData?.data?.documents || [];
@@ -766,6 +1015,24 @@ export default function DriverDocuments() {
         </div>
       </div>
 
+      <Separator />
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Vehicle Information</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <LicensePlateCard
+            plate={{
+              plateNumber: (driverData as any)?.vehicleDocuments?.plate?.plateNumber || null,
+              country: (driverData as any)?.vehicleDocuments?.plate?.country || null,
+              state: (driverData as any)?.vehicleDocuments?.plate?.state || null,
+              status: (driverData as any)?.vehicleDocuments?.plate?.status || "PENDING",
+              lastUpdated: (driverData as any)?.vehicleDocuments?.plate?.lastUpdated || null,
+              rejectionReason: (driverData as any)?.vehicleDocuments?.plate?.rejectionReason || null,
+            }}
+            onEdit={() => setLicensePlateDialogOpen(true)}
+          />
+        </div>
+      </div>
+
       {countryCode === "US" && (
         <>
           <Separator />
@@ -820,6 +1087,14 @@ export default function DriverDocuments() {
         onClose={() => setPreviewOpen(false)}
         fileUrl={previewUrl}
         label={previewLabel}
+      />
+
+      <LicensePlateDialog
+        isOpen={licensePlateDialogOpen}
+        onClose={() => setLicensePlateDialogOpen(false)}
+        currentPlate={(driverData as any)?.vehicleDocuments?.plate?.plateNumber || ""}
+        onSubmit={handleSubmitLicensePlate}
+        isSubmitting={licensePlateMutation.isPending}
       />
     </div>
   );
