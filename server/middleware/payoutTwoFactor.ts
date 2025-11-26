@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../db';
-import { verifyTwoFactorToken, getTwoFactorSecret, isTwoFactorEnabled } from '../services/twoFactorService';
+import { verifyTwoFactorToken } from '../services/twoFactorService';
+import { sendOtp, verifyOtp, type OtpPurpose } from '../services/otpService';
 import { logAuditEvent } from '../utils/audit';
+import { logPayoutChange } from '../services/tamperProofAuditService';
 import { getClientIp } from '../utils/ip';
 
 export interface PayoutAuthRequest extends Request {
@@ -12,7 +14,7 @@ export interface PayoutAuthRequest extends Request {
   };
   payoutAuth?: {
     verified: boolean;
-    method: '2fa' | 'password' | 'none';
+    method: '2fa' | 'otp' | 'password' | 'none';
   };
 }
 
@@ -24,11 +26,36 @@ export async function requirePayoutVerification(
   try {
     const userId = req.user?.userId;
     const role = req.user?.role;
-    const { twoFactorCode, password } = req.body;
+    const { twoFactorCode, otpCode, password, requestOtp } = req.body;
 
     if (!userId || !role) {
       res.status(401).json({ error: 'Authentication required' });
       return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, passwordHash: true }
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    let phone: string | null = null;
+    if (role === 'driver') {
+      const driver = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: { phoneNumber: true }
+      });
+      phone = driver?.phoneNumber || null;
+    } else if (role === 'restaurant') {
+      const restaurant = await prisma.restaurantProfile.findUnique({
+        where: { userId },
+        select: { emergencyContactPhone: true }
+      });
+      phone = restaurant?.emergencyContactPhone || null;
     }
 
     if (role === 'admin') {
@@ -55,7 +82,7 @@ export async function requirePayoutVerification(
         if (!isValid) {
           await logAuditEvent({
             actorId: userId,
-            actorEmail: req.user?.email || '',
+            actorEmail: user.email,
             actorRole: 'admin',
             ipAddress: getClientIp(req),
             actionType: 'PAYOUT_2FA_FAILED',
@@ -68,6 +95,7 @@ export async function requirePayoutVerification(
           return;
         }
 
+        logPayoutChange(req, userId, user.email, 'admin', 'PAYOUT_2FA_VERIFIED', '', 'Admin verified 2FA for payout change');
         req.payoutAuth = { verified: true, method: '2fa' };
         next();
         return;
@@ -75,56 +103,79 @@ export async function requirePayoutVerification(
     }
 
     if (role === 'driver' || role === 'restaurant') {
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { passwordHash: true, email: true }
-      });
+      if (requestOtp) {
+        const result = await sendOtp(
+          userId,
+          user.email,
+          phone,
+          'PAYOUT_CHANGE' as OtpPurpose,
+          phone ? 'SMS' : 'EMAIL'
+        );
 
-      if (!user) {
-        res.status(404).json({ error: 'User not found' });
-        return;
-      }
-
-      if (!password) {
-        res.status(403).json({ 
-          error: 'Password verification required for payout method changes',
-          requiresPassword: true
+        res.status(200).json({
+          otpSent: result.success,
+          message: result.message,
+          channel: result.channel
         });
         return;
       }
 
-      const bcrypt = await import('bcrypt');
-      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-      
-      if (!isValidPassword) {
-        await logAuditEvent({
-          actorId: userId,
-          actorEmail: user.email,
-          actorRole: role,
-          ipAddress: getClientIp(req),
-          actionType: 'PAYOUT_PASSWORD_VERIFICATION_FAILED',
-          entityType: 'payout',
-          description: `${role} failed password verification for payout method change`,
-          success: false
-        });
+      if (otpCode) {
+        const otpResult = await verifyOtp(userId, 'PAYOUT_CHANGE', otpCode);
+        
+        if (!otpResult.valid) {
+          await logAuditEvent({
+            actorId: userId,
+            actorEmail: user.email,
+            actorRole: role,
+            ipAddress: getClientIp(req),
+            actionType: 'PAYOUT_OTP_VERIFICATION_FAILED',
+            entityType: 'payout',
+            description: `${role} failed OTP verification for payout method change`,
+            success: false
+          });
 
-        res.status(401).json({ error: 'Invalid password' });
+          res.status(401).json({ error: otpResult.message });
+          return;
+        }
+
+        logPayoutChange(req, userId, user.email, role, 'PAYOUT_OTP_VERIFIED', '', `${role} verified OTP for payout change`);
+        req.payoutAuth = { verified: true, method: 'otp' };
+        next();
         return;
       }
 
-      await logAuditEvent({
-        actorId: userId,
-        actorEmail: user.email,
-        actorRole: role,
-        ipAddress: getClientIp(req),
-        actionType: 'PAYOUT_PASSWORD_VERIFIED',
-        entityType: 'payout',
-        description: `${role} verified password for payout method change`,
-        success: true
-      });
+      if (password) {
+        const bcrypt = await import('bcrypt');
+        const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+        
+        if (!isValidPassword) {
+          await logAuditEvent({
+            actorId: userId,
+            actorEmail: user.email,
+            actorRole: role,
+            ipAddress: getClientIp(req),
+            actionType: 'PAYOUT_PASSWORD_VERIFICATION_FAILED',
+            entityType: 'payout',
+            description: `${role} failed password verification for payout method change`,
+            success: false
+          });
 
-      req.payoutAuth = { verified: true, method: 'password' };
-      next();
+          res.status(401).json({ error: 'Invalid password' });
+          return;
+        }
+
+        logPayoutChange(req, userId, user.email, role, 'PAYOUT_PASSWORD_VERIFIED', '', `${role} verified password for payout change`);
+        req.payoutAuth = { verified: true, method: 'password' };
+        next();
+        return;
+      }
+
+      res.status(403).json({ 
+        error: 'Verification required for payout method changes',
+        requiresVerification: true,
+        methods: ['otp', 'password']
+      });
       return;
     }
 
