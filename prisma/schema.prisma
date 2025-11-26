@@ -292,6 +292,7 @@ model DriverProfile {
   incentiveCycles       DriverIncentiveCycle[]    // D19: Driver incentive cycles
   achievements          DriverAchievement[]       // D19: Driver achievements
   rewardLedger          DriverRewardLedger[]      // D19: Driver reward ledger
+  safetyIncidents       DriverSafetyIncident[]    // D20: Driver safety incidents
 
   @@map("driver_profiles")
 }
@@ -331,6 +332,57 @@ model DriverOnboarding {
 
   @@index([driverId])
   @@map("driver_onboarding")
+}
+
+// D20: Driver Safety Center & Incident Reporting System
+enum SafetyIncidentCategory {
+  RIDER_MISCONDUCT
+  VEHICLE_DAMAGE
+  PAYMENT_DISPUTE
+  LOST_AND_FOUND
+  HARASSMENT_THREAT
+  UNSAFE_LOCATION
+  OTHER
+}
+
+enum SafetyIncidentStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
+
+model DriverSafetyIncident {
+  id                String                  @id @default(uuid())
+  driverId          String
+  driver            DriverProfile           @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  category          SafetyIncidentCategory
+  description       String                  @db.Text
+  incidentDate      DateTime
+  status            SafetyIncidentStatus    @default(SUBMITTED)
+  
+  // Optional fields
+  tripId            String?                 // Associated trip if applicable
+  tripType          String?                 // RIDE, FOOD, PARCEL
+  locationAddress   String?
+  locationLat       Float?
+  locationLng       Float?
+  attachments       String[]                @default([]) // Array of image URLs
+  
+  // Resolution
+  resolution        String?                 @db.Text
+  resolvedAt        DateTime?
+  resolvedBy        String?                 // Admin user ID who resolved
+  
+  // Metadata
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  @@index([driverId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("driver_safety_incidents")
 }
 
 model BlockedRider {
