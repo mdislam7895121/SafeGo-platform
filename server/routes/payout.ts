@@ -3,6 +3,7 @@ import { prisma } from "../db";
 import { payoutService } from "../services/payoutService";
 import { bankVerificationService } from "../services/bankVerificationService";
 import { authenticateToken, type AuthRequest } from "../middleware/auth";
+import { requirePayoutVerification, type PayoutAuthRequest } from "../middleware/payoutTwoFactor";
 import { logAuditEvent, getClientIp } from "../utils/audit";
 import type { WalletOwnerType, PayoutMethod } from "@prisma/client";
 
@@ -263,7 +264,7 @@ router.get("/methods", authenticateToken, async (req: AuthRequest, res) => {
  * POST /api/payout/methods
  * Add a new payout method
  */
-router.post("/methods", authenticateToken, async (req: AuthRequest, res) => {
+router.post("/methods", authenticateToken, requirePayoutVerification, async (req: PayoutAuthRequest, res) => {
   try {
     const owner = await getOwnerDetails(req);
     if (!owner) {
@@ -339,7 +340,7 @@ router.post("/methods", authenticateToken, async (req: AuthRequest, res) => {
  * DELETE /api/payout/methods/:id
  * Delete a payout method
  */
-router.delete("/methods/:id", authenticateToken, async (req: AuthRequest, res) => {
+router.delete("/methods/:id", authenticateToken, requirePayoutVerification, async (req: PayoutAuthRequest, res) => {
   try {
     const owner = await getOwnerDetails(req);
     if (!owner) {

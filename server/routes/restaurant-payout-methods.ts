@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../db";
 import { RestaurantPayoutMethodService } from "../services/RestaurantPayoutMethodService";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
+import { requirePayoutVerification, type PayoutAuthRequest } from "../middleware/payoutTwoFactor";
 import { logAuditEvent, getClientIp } from "../utils/audit";
 import type { CountryCode, PayoutRailType, PayoutProvider, PayoutMethodStatus } from "../../shared/types";
 
@@ -60,7 +61,7 @@ router.get("/me/payout-methods", authenticateToken, requireRole("RESTAURANT"), r
  * Requires: OWNER role only
  * Body: { countryCode, payoutRailType, provider, currency, maskedDetails, metadata, isDefault }
  */
-router.post("/me/payout-methods", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, async (req: AuthRequest, res) => {
+router.post("/me/payout-methods", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, requirePayoutVerification, async (req: PayoutAuthRequest, res) => {
   try {
     const restaurantId = (req as any).restaurantId;
     const restaurantEmail = (req as any).restaurantEmail;
@@ -131,7 +132,7 @@ router.post("/me/payout-methods", authenticateToken, requireRole("RESTAURANT"), 
  * Requires: OWNER role only
  * Body: { status, isDefault }
  */
-router.patch("/me/payout-methods/:id", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, async (req: AuthRequest, res) => {
+router.patch("/me/payout-methods/:id", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, requirePayoutVerification, async (req: PayoutAuthRequest, res) => {
   try {
     const restaurantId = (req as any).restaurantId;
     const restaurantEmail = (req as any).restaurantEmail;
@@ -185,7 +186,7 @@ router.patch("/me/payout-methods/:id", authenticateToken, requireRole("RESTAURAN
  * Disable a payout method
  * Requires: OWNER role only
  */
-router.post("/me/payout-methods/:id/disable", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, async (req: AuthRequest, res) => {
+router.post("/me/payout-methods/:id/disable", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, requirePayoutVerification, async (req: PayoutAuthRequest, res) => {
   try {
     const restaurantId = (req as any).restaurantId;
     const restaurantEmail = (req as any).restaurantEmail;
@@ -226,7 +227,7 @@ router.post("/me/payout-methods/:id/disable", authenticateToken, requireRole("RE
  * Set a payout method as default
  * Requires: OWNER role only
  */
-router.post("/me/payout-methods/:id/set-default", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, async (req: AuthRequest, res) => {
+router.post("/me/payout-methods/:id/set-default", authenticateToken, requireRole("RESTAURANT"), requireOwnerRole, requirePayoutVerification, async (req: PayoutAuthRequest, res) => {
   try {
     const restaurantId = (req as any).restaurantId;
     const restaurantEmail = (req as any).restaurantEmail;
