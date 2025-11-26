@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   User, 
   MapPin, 
@@ -17,8 +18,72 @@ import {
   CheckCircle2,
   Trophy,
   Target,
-  Clock
+  Clock,
+  AlertTriangle,
+  FileText,
+  Car,
+  Shield,
+  BadgeCheck,
+  ChevronRight,
 } from "lucide-react";
+
+interface TrustScoreData {
+  trustScore: number;
+  status: { color: string; label: string; description: string };
+  bonusEligible: boolean;
+  penaltyApplied: boolean;
+}
+
+interface DocumentInfo {
+  name: string;
+  status: string;
+  expiryDate?: string;
+  daysUntilExpiry?: number;
+}
+
+function getDocumentExpiryWarnings(driverData: any): DocumentInfo[] {
+  const warnings: DocumentInfo[] = [];
+  const vehicleDocuments = driverData?.vehicleDocuments || {};
+  const profile = driverData?.profile;
+  
+  const checkExpiry = (name: string, expiryDate: string | null | undefined, status: string) => {
+    if (expiryDate) {
+      const expiry = new Date(expiryDate);
+      const now = new Date();
+      const daysUntil = Math.floor((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (daysUntil <= 30) {
+        warnings.push({
+          name,
+          status: daysUntil <= 0 ? 'EXPIRED' : 'EXPIRING_SOON',
+          expiryDate,
+          daysUntilExpiry: daysUntil
+        });
+      }
+    }
+  };
+
+  if (profile?.driverLicenseExpiry) {
+    checkExpiry("Driver's License", profile.driverLicenseExpiry, "");
+  }
+  if (profile?.dmvLicenseExpiry) {
+    checkExpiry("DMV License", profile.dmvLicenseExpiry, "");
+  }
+  if (profile?.tlcLicenseExpiry) {
+    checkExpiry("TLC License", profile.tlcLicenseExpiry, "");
+  }
+  if (vehicleDocuments?.insuranceExpiry) {
+    checkExpiry("Vehicle Insurance", vehicleDocuments.insuranceExpiry, "");
+  }
+  if (vehicleDocuments?.registrationExpiry) {
+    checkExpiry("Vehicle Registration", vehicleDocuments.registrationExpiry, "");
+  }
+  if (vehicleDocuments?.inspectionExpiry) {
+    checkExpiry("Vehicle Inspection", vehicleDocuments.inspectionExpiry, "");
+  }
+
+  return warnings;
+}
 
 export default function DriverProfile() {
   const { data: driverData, isLoading: driverLoading } = useQuery({
@@ -27,6 +92,10 @@ export default function DriverProfile() {
 
   const { data: pointsData, isLoading: pointsLoading } = useQuery({
     queryKey: ["/api/driver/points"],
+  });
+
+  const { data: trustScoreData, isLoading: trustScoreLoading } = useQuery<TrustScoreData>({
+    queryKey: ["/api/driver/trust-score"],
   });
 
   const isLoading = driverLoading || pointsLoading;
@@ -86,6 +155,13 @@ export default function DriverProfile() {
     { id: "2", title: "1 year with SafeGo", icon: Calendar, earned: diffYears >= 1 },
     { id: "3", title: "Weekend hero", icon: Trophy, earned: false }, // Sample
   ];
+
+  // Document expiry warnings
+  const documentWarnings = getDocumentExpiryWarnings(driverData);
+
+  // Trust score data
+  const trustScore = trustScoreData?.trustScore || 0;
+  const trustStatus = trustScoreData?.status;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -165,6 +241,111 @@ export default function DriverProfile() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Document Expiry Warnings */}
+      {documentWarnings.length > 0 && (
+        <div className="space-y-3" data-testid="section-document-warnings">
+          {documentWarnings.map((doc, index) => (
+            <Alert 
+              key={index} 
+              variant={doc.status === 'EXPIRED' ? 'destructive' : 'default'}
+              className={doc.status === 'EXPIRING_SOON' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20' : ''}
+            >
+              <AlertTriangle className={`h-4 w-4 ${doc.status === 'EXPIRED' ? '' : 'text-yellow-600'}`} />
+              <AlertTitle className={doc.status === 'EXPIRED' ? '' : 'text-yellow-700 dark:text-yellow-400'}>
+                {doc.status === 'EXPIRED' ? `${doc.name} Expired` : `${doc.name} Expiring Soon`}
+              </AlertTitle>
+              <AlertDescription className={doc.status === 'EXPIRED' ? '' : 'text-yellow-600 dark:text-yellow-500'}>
+                {doc.status === 'EXPIRED' 
+                  ? `Your ${doc.name.toLowerCase()} has expired. Please update it immediately to continue driving.`
+                  : `Your ${doc.name.toLowerCase()} expires in ${doc.daysUntilExpiry} days. Update it before expiration.`
+                }
+                <Link href="/driver/documents">
+                  <Button variant="outline" size="sm" className="mt-2" data-testid={`button-update-doc-${index}`}>
+                    Update Document
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                </Link>
+              </AlertDescription>
+            </Alert>
+          ))}
+        </div>
+      )}
+
+      {/* Trust Score Card */}
+      {profile?.isVerified && (
+        <Card data-testid="card-trust-score-summary">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <BadgeCheck className="h-5 w-5" />
+                Trust Score
+              </CardTitle>
+              <CardDescription>
+                Your driver reliability and performance score
+              </CardDescription>
+            </div>
+            <Link href="/driver/trust-score">
+              <Button variant="outline" size="sm" data-testid="button-view-trust-score">
+                View Details
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <div className="relative w-20 h-20">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="8"
+                    className="text-muted/20"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                    className={
+                      trustStatus?.color === "green" 
+                        ? "stroke-green-500" 
+                        : trustStatus?.color === "yellow" 
+                        ? "stroke-yellow-500" 
+                        : "stroke-red-500"
+                    }
+                    style={{
+                      strokeDasharray: 2 * Math.PI * 45,
+                      strokeDashoffset: 2 * Math.PI * 45 - (trustScore / 100) * 2 * Math.PI * 45,
+                      transition: "stroke-dashoffset 0.5s ease-in-out",
+                    }}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold" data-testid="text-trust-score">{trustScore}</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <Badge
+                  variant={trustStatus?.color === "green" ? "default" : trustStatus?.color === "yellow" ? "secondary" : "destructive"}
+                  className="mb-2"
+                  data-testid="badge-trust-status"
+                >
+                  {trustStatus?.label || "Loading..."}
+                </Badge>
+                <p className="text-sm text-muted-foreground">
+                  {trustStatus?.description || "Your trust score is being calculated."}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* SafeGo Points and Tier Card */}
       <Card>
