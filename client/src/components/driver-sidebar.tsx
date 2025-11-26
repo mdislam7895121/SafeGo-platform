@@ -29,6 +29,7 @@ import {
   FileText,
   Car,
   MessageSquare,
+  History,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -73,6 +74,11 @@ const menuItems = [
     title: "SafeGo Points",
     icon: Star,
     href: "/driver/points",
+  },
+  {
+    title: "Trip History",
+    icon: History,
+    href: "/driver/trips",
   },
   {
     title: "Wallet",

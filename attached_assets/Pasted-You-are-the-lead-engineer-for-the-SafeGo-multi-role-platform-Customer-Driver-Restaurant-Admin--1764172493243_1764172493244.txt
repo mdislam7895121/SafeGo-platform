@@ -1,0 +1,221 @@
+You are the lead engineer for the SafeGo multi-role platform (Customer, Driver, Restaurant, Admin).  
+We are now on: D17 – Driver Trip History & Earnings Breakdown.
+
+Follow ALL existing SafeGo global rules and do NOT break any previously implemented features:
+
+GLOBAL SAFEGO RULESET (ALWAYS ACTIVE)
+1. Roles: customer, driver, restaurant, admin. All new features must respect role boundaries and RBAC.
+2. Services: rides, food delivery, parcel. Any trip/earning logic must support multi-service, even if some are not yet used in UI.
+3. Countries: Bangladesh + USA.  
+   - KYC/verification is required for any money/earnings/payout-related views.  
+   - Keep existing country-specific rules intact (BD: NID, mobile wallets; US: SSN/EIN, bank accounts).
+4. Security & Compliance (SafeGo Security Roadmap):
+   - All protected pages must use existing auth middleware and role checks.
+   - Respect KYC gating, verificationStatus, isVerified, and driver status (active/suspended).
+   - Preserve and extend audit logging where appropriate.
+   - NO public unauthenticated endpoints. NO leaking of other users’ data.
+5. Unified Payout System:
+   - Current state is FROZEN and PRODUCTION-READY for individual withdrawals.  
+   - DO NOT modify payout routes, schema, or business rules. You may only READ from payout/earnings data to display information.
+6. Non-breaking changes only:
+   - No breaking schema changes.
+   - No renaming/removing existing fields, routes, or components.
+   - Any new field must be additive and carefully reviewed by the architect.
+7. Support Center:
+   - Multi-role support (restaurant, driver, customer, admin) is already implemented and stable.  
+   - Do not alter support routes/logic beyond using them for links or display when needed.
+
+--------------------------------
+D17 GOAL – DRIVER TRIP HISTORY & EARNINGS BREAKDOWN
+--------------------------------
+
+Objective:  
+Build a complete, Uber-style **Driver Trip History & Earnings Center** that is mobile / tablet / desktop friendly.  
+This center should allow drivers to:
+
+1. See a paginated list of all trips (rides, food, parcel) with key information.
+2. View detailed breakdown for a single trip (fare components, SafeGo commission, tips, adjustments).
+3. Understand how each trip contributes to their wallet/earnings (completed, cancelled, adjusted).
+4. Filter and search their trip history in a professional, production-ready way.
+
+IMPORTANT:  
+Use existing trip/ride/order models if they already exist (e.g., `Ride`, `Delivery`, `FoodOrder`, or similar).  
+Do NOT create duplicate models. Instead, create **view models/adapters** that aggregate the existing data into a unified “DriverTrip” view.
+
+--------------------------------
+A. BACKEND – TRIP HISTORY & EARNINGS LOGIC
+--------------------------------
+
+1) Inventory existing models and services:
+   - Locate all models relevant to driver trips and earnings, such as:  
+     - Rides (passenger trips)  
+     - Food delivery orders  
+     - Parcel deliveries  
+   - Identify existing relations between driver, trips/orders, and payments/commissions.  
+   - Do NOT modify the core payout system. You may reference wallet/earnings data if needed.
+
+2) Design a unified DriverTrip view (service layer):
+   - Create a service (or adapter) like `DriverTripHistoryService` that exposes read-only methods, for example:
+     - `listDriverTrips(driverId, filters, pagination)`
+     - `getDriverTripDetail(driverId, tripId)`
+   - The unified model returned to the frontend should include fields such as:
+     - `id`
+     - `serviceType` (RIDE | FOOD | PARCEL)
+     - `dateTime` (start/end or completed time)
+     - `pickupLocation`, `dropoffLocation` (or restaurant name + customer area for deliveries)
+     - `status` (COMPLETED, CANCELLED, ADJUSTED, REFUNDED, etc.)
+     - `baseFare`, `distanceFare`, `timeFare` (where applicable)
+     - `deliveryFee` (for food/parcel)
+     - `surgeOrBoost`, `bonus`, `promotion`
+     - `tipAmount`
+     - `safeGoCommission`
+     - `driverEarnings` (net from this trip)
+     - `paymentMethod` (cash, card, wallet)
+     - `tripCode` or `reference`
+   - For `getDriverTripDetail`, also include:
+     - Full breakdown of fare components.
+     - Any adjustments/refunds.
+     - Link/refs for related support tickets (if exist).
+   - All methods must:
+     - Scope by `driverId` (never allow cross-driver leakage).
+     - Support filters and pagination.
+
+3) Filters & queries:
+   - Implement safe filtering options (all optional):
+     - Date range (e.g., last 7 days, 30 days, custom).
+     - Service type (RIDE/FOOD/PARCEL).
+     - Status (COMPLETED, CANCELLED, etc.).
+     - Earnings range (min/max).
+   - Ensure queries are indexed or efficient where possible. If adding new indexes is needed, keep them non-breaking and architect-approved.
+   - Always apply `driverId` scoping + KYC/verification checks before returning any data.
+
+4) API endpoints:
+   - Add new **driver-scoped** read-only endpoints under `/api/driver/trips/*` (or use existing driver namespace):
+     - `GET /api/driver/trips` – list with filters & pagination (query params).
+     - `GET /api/driver/trips/:id` – detail view for a single trip.
+   - Apply existing auth + role guards:
+     - `authenticateToken`
+     - `requireRole(["driver"])`
+     - KYC/verification check (similar to wallet/support access).
+   - Add audit logging:
+     - Log when a driver views trip history or a specific trip detail (include driverId, tripId, filters, timestamp).
+   - DO NOT perform write operations here. History is read-only.
+
+--------------------------------
+B. FRONTEND – DRIVER TRIP HISTORY CENTER (D17)
+--------------------------------
+
+Create/extend driver pages under a clear route structure (non-breaking):
+
+   - `/driver/trips`              → trip history list + filters.
+   - `/driver/trips/:id`          → single trip detail with full breakdown.
+   - Optional: integrate a quick summary widget into existing driver dashboard if architect-safe.
+
+1) Trip History List – `/driver/trips`
+   - Layout:
+     - Mobile: single column list.
+     - Tablet: 2-column responsive layout where applicable.
+     - Desktop: table or card grid with clear columns.
+   - Each row/card should show at least:
+     - Service type icon + label (Ride / Food / Parcel).
+     - Short route or context (Pickup → Dropoff OR Restaurant → Customer area).
+     - Date & time.
+     - Status badge.
+     - Driver earnings for that trip (net).
+     - Tap/click → navigates to `/driver/trips/:id`.
+   - Filters section:
+     - Quick filters: “Today”, “7 days”, “30 days”.
+     - Drop-downs or chips for: Service type, Status.
+     - Optional earnings range slider or min/max input.
+   - Pagination / infinite scroll:
+     - Implement a backend-backed pagination solution; no client-only fake paging.
+   - Empty state:
+     - Clean message and call-to-action: e.g., “No trips yet. Complete your first trip to see history here.”
+
+2) Trip Detail View – `/driver/trips/:id`
+   - Show:
+     - Trip reference/code, date & time.
+     - Service type and status.
+     - Map placeholder or route summary (don’t introduce heavy map dependencies unless they already exist).
+     - Section: “Fare Breakdown”
+       - Base fare, distance/time fare, delivery fee, surges, promotions, etc.
+       - Tips (separate line).
+       - SafeGo commission (explicitly labeled).
+       - Final **Driver Earnings** (highlighted).
+     - Section: “Payment & Adjustments”
+       - Payment method.
+       - Refunds/adjustments if any.
+       - Links to payout/wallet history if relevant (view only; do not alter payout logic).
+     - Section: “Support”
+       - Button to open a prefilled support ticket or live chat for this trip (reuse existing driver support system; no new support backends).
+   - All sensitive amounts and fields must use consistent formatting with wallet/payout pages.
+
+3) UI/UX Quality & Responsiveness
+   - Follow the existing SafeGo driver UI style:
+     - Typography, spacing, buttons, cards consistent with current driver dashboard/wallet/support.
+   - Responsiveness:
+     - Verify on 320px (mobile), 768px (tablet), 1024px+ (desktop).
+     - No horizontal scrolling.
+   - Accessibility:
+     - Clear labels, status badges with text, not color-only.
+     - Proper error/empty states.
+
+--------------------------------
+C. SECURITY, PRIVACY, AND COMPLIANCE
+--------------------------------
+
+1) Access control:
+   - Require:
+     - Authenticated driver session.
+     - Driver KYC verification if full earnings breakdown is shown (similar rules as wallet).
+   - If driver is not verified:
+     - Show a clear banner/CTA: “Complete your verification to view full trip earnings,” and link to existing KYC flow.
+     - Do not show sensitive financial details, but you may show limited non-sensitive trip counts.
+
+2) Data privacy:
+   - Never expose:
+     - Other drivers’ data.
+     - Internal commission configuration beyond the per-trip commission value.
+   - Mask any personally identifiable customer data (names, phone, exact address) according to existing privacy rules.  
+     Use same masking pattern as other parts of the app.
+
+3) Audit logging:
+   - Extend existing audit logs for:
+     - `driver_view_trip_history`
+     - `driver_view_trip_detail`
+   - Include driverId, filters, tripId, and timestamp.
+
+--------------------------------
+D. IMPLEMENTATION & VERIFICATION
+--------------------------------
+
+1) Implementation steps:
+   - Implement backend service/adapter and routes as described.
+   - Implement frontend pages `/driver/trips` and `/driver/trips/:id`.
+   - Integrate navigation links:
+     - From existing driver dashboard or menu (“Trip History”).
+     - Ensure back navigation from detail → list works.
+
+2) Tests and manual verification:
+   - Create seed/demo data for a test driver (rides, food orders, parcels with various statuses and earnings).
+   - Manually verify flows:
+     1. Driver logs in → opens `/driver/trips` → sees list with correct totals and filters.
+     2. Applies different filters (date range, service type, status) → list updates correctly.
+     3. Clicks any trip → `/driver/trips/:id` shows correct breakdown and earnings.
+     4. From the detail page, opens support link → driver support center opens prefilled (trip reference included).
+   - Confirm:
+     - No schema errors.
+     - No breaking changes to payouts, wallet, or support.
+     - All role/KYC checks behave as expected (verified vs not verified driver).
+
+3) Final report back to me:
+   - Summarize:
+     - New/updated routes (`/api/driver/trips`, `/api/driver/trips/:id`).
+     - Any new service/adapter files and interfaces created.
+     - Screenshots of:
+       - Trip history list page (mobile & desktop).
+       - Trip detail page with full earnings breakdown.
+   - Confirm:
+     - “D17 Driver Trip History & Earnings Center is production-ready, with non-breaking changes and full adherence to SafeGo security, KYC, RBAC, and payout freeze rules.”
+
+Only proceed when all architect/security checks pass and no existing SafeGo rule is violated.

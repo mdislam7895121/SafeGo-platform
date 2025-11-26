@@ -60,6 +60,15 @@ Core systems and features include:
     - **Payout History** (`/driver/wallet/history`): Paginated history using `/api/payout/history` with status filtering, stats cards from `/api/payout/stats`, and empty state handling.
     - **KYC/Verification Behavior**: KYC banners shown when driver is not fully verified, graceful 403 handling, and disabled payout actions until verification complete.
     - **Mobile-First Design**: Responsive layouts working at 320px width, stacked cards, and consistent SafeGo design language.
+-   **Driver Trip History & Earnings Breakdown (D17)**: Uber-style trip history center with comprehensive earnings visibility:
+    - **Trip History List** (`/driver/trips`): Paginated list of all trips (rides, food, parcel) with service type icons, route summary, status badges, driver earnings, and customer ratings.
+    - **Filters & Search**: Quick date filters (Today/7 days/30 days/Custom), service type filter (Ride/Food/Parcel), status filter (Completed/Cancelled/In Progress/Pending).
+    - **Summary Cards**: Total trips, completed trips, cancelled trips, and total earnings (KYC-gated).
+    - **Trip Detail View** (`/driver/trips/:id`): Full trip breakdown with fare components (base fare, delivery fee, surge/boost, tips), SafeGo commission, driver earnings, payment method, and route information.
+    - **Unified Trip Adapter**: Backend service that aggregates Ride, FoodOrder, and Delivery models into a unified DriverTrip view with consistent status mapping.
+    - **KYC/Verification Behavior**: Earnings breakdown hidden for unverified drivers with clear verification CTAs.
+    - **Audit Logging**: Driver trip history and detail views are logged for compliance.
+    - **Support Integration**: Direct links to support center with trip code prefilled for issue reporting.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design
