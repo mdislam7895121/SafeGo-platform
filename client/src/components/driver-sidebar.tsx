@@ -33,6 +33,7 @@ import {
   BarChart3,
   Trophy,
   Shield,
+  BadgeCheck,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -87,6 +88,12 @@ const menuItems = [
     title: "Performance",
     icon: BarChart3,
     href: "/driver/performance",
+  },
+  {
+    title: "Trust Score",
+    icon: BadgeCheck,
+    href: "/driver/trust-score",
+    isNew: true,
   },
   {
     title: "Incentives",

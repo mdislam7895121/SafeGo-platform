@@ -108,6 +108,7 @@ import DriverSafetyReport from "@/pages/driver/safety-report";
 import DriverSafetyHistory from "@/pages/driver/safety-history";
 import DriverSafetyDetail from "@/pages/driver/safety-detail";
 import DriverSafetyEmergency from "@/pages/driver/safety-emergency";
+import DriverTrustScore from "@/pages/driver/trust-score";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -628,6 +629,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Emergency Toolkit">
             <DriverSafetyEmergency />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/trust-score">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Trust Score">
+            <DriverTrustScore />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
