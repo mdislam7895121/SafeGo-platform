@@ -289,6 +289,9 @@ model DriverProfile {
   promotionProgress     DriverPromotionProgress[] // D5: Driver promotion progress
   promotionPayouts      DriverPromotionPayout[]   // D5: Driver promotion payouts
   onboarding            DriverOnboarding?         // D9: Driver onboarding progress
+  incentiveCycles       DriverIncentiveCycle[]    // D19: Driver incentive cycles
+  achievements          DriverAchievement[]       // D19: Driver achievements
+  rewardLedger          DriverRewardLedger[]      // D19: Driver reward ledger
 
   @@map("driver_profiles")
 }
@@ -2817,6 +2820,7 @@ model DriverPromotion {
   
   progress             DriverPromotionProgress[]
   payouts              DriverPromotionPayout[]
+  rewardLedger         DriverRewardLedger[]      // D19: Reward ledger entries
 
   @@index([status])
   @@index([startAt])
@@ -2867,4 +2871,136 @@ model DriverPromotionPayout {
   @@index([tripId])
   @@index([createdAt])
   @@map("driver_promotion_payouts")
+}
+
+// ====================================================
+// D19: Driver Incentives & Milestones Center
+// ====================================================
+
+enum IncentiveGoalPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum IncentiveGoalType {
+  TRIPS        // Complete X trips
+  EARNINGS     // Earn X amount
+  RATING       // Maintain X rating
+}
+
+enum IncentiveCycleStatus {
+  ACTIVE       // Currently in progress
+  COMPLETED    // Goal achieved
+  EXPIRED      // Period ended without completion
+  BONUS_PAID   // Completed and bonus issued
+}
+
+enum AchievementType {
+  FIVE_STAR_WEEK       // Maintain 5.0 rating for 7 days
+  ZERO_CANCEL_STREAK   // 0 cancellations for X trips
+  HUNDRED_RIDES        // Complete 100 trips lifetime
+  WEEKLY_PRO_DRIVER    // Meet weekly pro criteria
+  THOUSAND_TRIPS       // Complete 1000 trips lifetime
+  FIRST_TRIP           // Complete first trip ever
+  EARLY_BIRD           // Complete 10 trips before 8am
+  NIGHT_OWL            // Complete 10 trips after 10pm
+  FIVE_STAR_MONTH      // Maintain 4.9+ rating for 30 days
+  PERFECT_STREAK_10    // 10 trips with 5-star ratings
+  LOYALTY_30_DAYS      // Active for 30 consecutive days
+  LOYALTY_90_DAYS      // Active for 90 consecutive days
+}
+
+enum RewardType {
+  TIER_BONUS           // Bonus for reaching new tier
+  PROMO_BONUS          // Bonus from promotion completion
+  ACHIEVEMENT_BONUS    // Bonus from achievement unlock
+  INCENTIVE_BONUS      // Bonus from incentive goal completion
+  REFERRAL_BONUS       // Bonus from referral program
+}
+
+enum DriverRewardTier {
+  BRONZE   // Entry level: 0-499 points
+  SILVER   // Mid level: 500-1499 points
+  GOLD     // High level: 1500+ points
+}
+
+model DriverIncentiveCycle {
+  id                   String               @id @default(uuid())
+  driverId             String
+  period               IncentiveGoalPeriod
+  goalType             IncentiveGoalType
+  targetValue          Int                  // Target trips count or earnings amount (in cents)
+  currentValue         Int                  @default(0) // Current progress
+  periodStart          DateTime
+  periodEnd            DateTime
+  bonusAmount          Decimal              @db.Decimal(10, 2) // Bonus for completing goal
+  currency             String               @default("USD")
+  status               IncentiveCycleStatus @default(ACTIVE)
+  completedAt          DateTime?
+  bonusPaidAt          DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  driver               DriverProfile        @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, period, goalType, periodStart])
+  @@index([driverId])
+  @@index([status])
+  @@index([periodEnd])
+  @@map("driver_incentive_cycles")
+}
+
+model DriverAchievement {
+  id                   String            @id @default(uuid())
+  driverId             String
+  achievementType      AchievementType
+  isUnlocked           Boolean           @default(false)
+  unlockedAt           DateTime?
+  progressCount        Int               @default(0) // Current progress towards unlock
+  requiredCount        Int               // Required count to unlock
+  streakCount          Int               @default(0) // For streak-based achievements
+  streakStartDate      DateTime?         // When current streak started
+  bonusAmount          Decimal?          @db.Decimal(10, 2) // Bonus for unlocking
+  currency             String            @default("USD")
+  bonusPaid            Boolean           @default(false)
+  bonusPaidAt          DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  driver               DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@unique([driverId, achievementType])
+  @@index([driverId])
+  @@index([achievementType])
+  @@index([isUnlocked])
+  @@map("driver_achievements")
+}
+
+model DriverRewardLedger {
+  id                   String           @id @default(uuid())
+  driverId             String
+  rewardType           RewardType
+  tier                 DriverRewardTier?
+  amount               Decimal          @db.Decimal(10, 2)
+  currency             String           @default("USD")
+  description          String
+  promotionId          String?          // Reference to promotion if applicable
+  achievementId        String?          // Reference to achievement if applicable
+  incentiveCycleId     String?          // Reference to incentive cycle if applicable
+  walletTransactionId  String?          // Reference to wallet transaction if paid out
+  isPaid               Boolean          @default(false)
+  paidAt               DateTime?
+  issuedAt             DateTime         @default(now())
+  createdAt            DateTime         @default(now())
+
+  driver               DriverProfile    @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  promotion            DriverPromotion? @relation(fields: [promotionId], references: [id], onDelete: SetNull)
+
+  @@index([driverId])
+  @@index([rewardType])
+  @@index([tier])
+  @@index([issuedAt])
+  @@index([isPaid])
+  @@map("driver_reward_ledger")
 }
