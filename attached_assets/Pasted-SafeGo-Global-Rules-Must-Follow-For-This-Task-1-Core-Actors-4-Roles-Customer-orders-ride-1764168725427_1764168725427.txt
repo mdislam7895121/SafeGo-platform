@@ -1,0 +1,250 @@
+SafeGo Global Rules (Must Follow For This Task)
+
+1. Core Actors (4 Roles)
+   - Customer: orders rides, food, parcel; can contact support, view wallet.
+   - Driver: accepts rides/deliveries, manages earnings, payout methods, support.
+   - Restaurant: manages menu, orders, payouts, support.
+   - Admin: oversees all, manual payouts, support escalations, audits, configuration.
+
+2. Platform Domains
+   - Rides, Food Delivery (SafeGo Eats), Parcels – all share common:
+     - Auth, KYC, RBAC
+     - Wallet + Unified Payout
+     - Support Center (tickets, live chat, phone, email)
+     - Notifications + Logging
+
+3. Security & Compliance (DO NOT BREAK)
+   - KYC: Bangladesh + USA specific validation already implemented.
+   - RBAC: Role-based routes; each role can only see its own data.
+   - SafeGuard Security:
+     - authenticateToken on protected routes
+     - restaurant/driver/customer scoping by ID
+     - audit logging for critical actions
+   - No new public unauthenticated routes.
+   - No schema changes or new DB tables unless explicitly requested (NOT allowed here).
+
+4. Wallet & Payout (Read-Only Context For This Task)
+   - Unified payout system is PRODUCTION-READY and FROZEN for individual withdrawals.
+   - Batch processing intentionally not implemented (by user decision).
+   - Payout routes under `/api/payout/*` are stable; DO NOT modify their contracts.
+   - Driver + Restaurant wallet UI already integrated with payout system.
+
+5. Support Center Global Logic
+   - Existing multi-role Support Center with:
+     - Tickets (create, list, view, reply)
+     - Live Chat (real-time messaging)
+     - Phone callback requests
+     - Help Center articles
+   - Routes already exist under a shared “support-center” namespace for restaurants.
+   - Enterprise-grade logging, KYC gating, and RBAC already confirmed by previous architect checks.
+   - For this task, you MUST reuse the existing SupportService architecture and simply add/adapt for the Driver role. No schema changes.
+
+6. Non-Breaking Change Policy
+   - Do NOT break any existing flows (restaurant, driver, admin, customer).
+   - DO NOT remove or rename existing routes, models, or types.
+   - Only extend with safe, backwards-compatible changes.
+   - If duplication is found, consolidate internally without changing external contracts.
+
+7. UX & Responsiveness
+   - Mobile-first (320px), then tablet, then desktop.
+   - No horizontal scroll on mobile.
+   - Clean layout, clear labels, accessible contrast.
+   - Keep existing SafeGo branding and color palette.
+
+----------------------------------------------------
+D15: Build the Complete Driver Chat Support Center
+----------------------------------------------------
+
+Goal:
+Implement a full, production-ready Driver Support Center focused on chat + ticket support, using the existing multi-role Support Center backend. This must be as strong as the Restaurant Support implementation, but tailored for drivers, and must NOT break any existing contracts.
+
+High-Level Requirements:
+1) Driver-facing Support Hub
+2) Driver ticket management (list, filter, view, reply)
+3) Driver live chat experience (real-time)
+4) Attachments + secure audit logging
+5) Clean navigation from the Driver app
+6) Full reuse of existing support services and models
+
+A. Analysis (Use Existing Code First)
+1. Locate existing Support Center implementation used by restaurants/admin:
+   - Backend: Support services, controllers, routes, models.
+   - Frontend: Restaurant support pages (support hub, tickets, live chat, articles).
+2. Identify the adapter / service abstraction already used for multi-role support (e.g., RestaurantSupportService, SupportDomainConfig, etc.).
+3. Confirm existing driver-related support routes or stubs (if any) and their current state.
+
+B. Driver Support Routes & Architecture
+Implement driver support functionality WITHOUT altering existing contracts:
+
+1. Backend Route Layer
+   - Add or confirm driver routes under a consistent namespace, such as:
+     - `GET  /api/driver/support-center/tickets`
+     - `POST /api/driver/support-center/tickets`
+     - `GET  /api/driver/support-center/tickets/:id`
+     - `POST /api/driver/support-center/tickets/:id/reply`
+     - `GET  /api/driver/support-center/live-chat/:ticketId/session`
+     - `POST /api/driver/support-center/live-chat/:ticketId/message`
+   - All routes must:
+     - Use `authenticateToken`
+     - Enforce driver role via RBAC helper (e.g., `requireRole(["driver"])`)
+     - Scope by driver ID so a driver can see ONLY their tickets and chats.
+
+2. Service Layer (Reuse Generic Support Service)
+   - Create a driver-specific adapter that reuses the generic support service patterns:
+     - e.g., `DriverSupportService` using `GenericSupportService<Ticket, Message>` and `SupportDomainConfig`.
+   - Ensure driver ticket code prefix is unique:
+     - Use pattern like `DST-2025-xxxxx` (as already used by the system).
+   - Preserve:
+     - Existing audit logging
+     - Error handling
+     - KYC gating logic (driver must be fully verified to access full support features).
+
+3. Data & Integrity
+   - Do NOT add new tables or columns.
+   - Reuse existing ticket/message schemas with driver-specific scoping fields.
+   - Ensure no cross-driver or cross-restaurant data leakage.
+
+C. Driver Support UI / Frontend
+
+1. Driver Support Hub Page
+   - Route: `/driver/support`
+   - Content:
+     - Overview cards:
+       - “Open tickets”
+       - “Pending replies from SafeGo”
+       - “Last updated ticket”
+     - Actions:
+       - “Start Live Chat”
+       - “Create Support Ticket”
+       - “Request Phone Callback” (if feature already exists globally)
+   - Responsive layout:
+     - Mobile: single column, stacked cards
+     - Tablet/Desktop: grid layout similar to Restaurant Support.
+
+2. Ticket List Page
+   - Route: `/driver/support/tickets`
+   - Features:
+     - Table or card list of tickets:
+       - Ticket ID (DST-2025-xxxxx)
+       - Subject / short description
+       - Status (Open, In Progress, Resolved, Closed)
+       - Last update timestamp
+     - Filters:
+       - Status filter tabs (All, Open, In Progress, Resolved)
+       - Optional date filter (Last 7 days, 30 days, All)
+     - Clicking a ticket opens the ticket detail + message thread.
+
+3. Ticket Detail + Conversation Thread
+   - Route: `/driver/support/tickets/:id`
+   - Show:
+     - Ticket header (subject, ID, status, created at, last updated)
+     - Conversation thread (driver messages vs SafeGo support messages)
+       - Clear alignment for “Me” vs “Support”
+       - Timestamps on messages
+     - Reply box:
+       - Text input for message
+       - Attachment option (image/pdf, reusing existing attachment infra)
+   - Respect read-only states for closed tickets.
+
+4. Create New Ticket
+   - Route: `/driver/support/new`
+   - Form fields:
+     - Category (dropdown – e.g., “Trip issue”, “Payment & Payouts”, “Account & Documents”, “App technical issue”, “Other”)
+     - Subject (short text)
+     - Description (multiline)
+     - Optional attachment uploader
+   - Validation:
+     - Required: category, subject, description.
+     - Attachment size/type check (reuse existing support validation).
+   - On success:
+     - Show success toast
+     - Redirect to new ticket detail page.
+
+5. Live Chat Interface
+   - Route: `/driver/support/live-chat/:ticketId`
+   - Features:
+     - Real-time messaging using existing live chat backend (`/api/restaurant/support-center/live-chat/*` equivalent for drivers).
+     - Typing/send box, enter-to-send, send button.
+     - Show connection/online status (e.g., “Connected to SafeGo Support”).
+     - Disable input with clear message if:
+       - Driver not verified (KYC requirement).
+       - Ticket is closed or chat session ended.
+   - Attachments:
+     - Allow sending images/files if supported globally by current chat engine.
+   - Make sure:
+     - Messages are appended in real time.
+     - Scroll-to-latest behavior works on mobile.
+
+D. Navigation & Integration
+
+1. Add “Support” Entry Point in Driver UI
+   - Add a “Support” item into the driver sidebar / menu.
+   - Clicking it opens `/driver/support`.
+
+2. Notification Badges
+   - If there is an existing notifications system:
+     - Show badge on “Support” menu item when there are:
+       - Unread support messages
+       - Open tickets awaiting driver reply
+   - Use existing notification hooks; do NOT invent a new system.
+
+E. Security, KYC, and Logging
+
+1. KYC Rules
+   - Ensure only fully verified drivers (per current KYC logic: e.g., `isVerified` + `verificationStatus === "APPROVED"`) can:
+     - Start live chat
+     - Create tickets about financial topics (payouts, bank issues)
+   - If KYC is incomplete:
+     - Show a clear UI message:
+       - Example: “Please complete your driver verification to access full support features.”
+
+2. RBAC & Scoping
+   - All backend calls must:
+     - Confirm `role === "driver"`.
+     - Filter by the authenticated driver’s ID.
+   - Test that:
+     - A driver cannot access restaurant tickets, other drivers’ tickets, or internal admin data.
+
+3. Audit Logging
+   - Reuse existing audit logger:
+     - Log ticket creation, status changes, chat messages, and file attachments with:
+       - Actor role (driver)
+       - Driver ID
+       - Ticket ID
+       - Timestamp
+   - Ensure logs remain consistent with existing Restaurant Support logging.
+
+F. Regression & Responsiveness Checks
+
+1. Regression
+   - Confirm that:
+     - Restaurant Support pages still work exactly as before.
+     - Admin Support tools remain unchanged.
+     - Payout system remains stable and untouched.
+
+2. Responsiveness
+   - Test driver support pages on:
+     - Mobile (320px)
+     - Tablet (~768px)
+     - Desktop (~1024px+)
+   - No horizontal scroll on mobile; text and buttons must be readable.
+
+G. Final Confirmation
+
+After implementation, provide a short, structured report:
+1. List of new driver routes added (frontend + backend).
+2. Summary of driver support flows that were tested:
+   - Open Support Hub
+   - Create ticket
+   - Reply to ticket
+   - Start live chat and exchange messages
+3. Security recap:
+   - KYC gating
+   - RBAC checks
+   - Audit logging entries confirmed.
+4. Explicit confirmation that:
+   - No database schema changes were made.
+   - No existing routes or models were modified in a breaking way.
+   - All SafeGo global rules were followed.
+
+Implement D15 as a complete, production-ready Driver Chat Support Center in one continuous pass, without leaving partial or stubbed functionality.
