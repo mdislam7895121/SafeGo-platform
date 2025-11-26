@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { rateLimitPayout, rateLimitSupport, rateLimitSensitive } from "./middleware/rateLimit";
 import authRoutes from "./routes/auth";
 import driverRoutes from "./routes/driver";
 import driverSupportRoutes from "./routes/driver-support"; // Phase 12
@@ -180,7 +181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/auth", authRoutes);
   app.use("/api/driver", driverRoutes);
   app.use("/api/driver", driverSupportRoutes); // Phase 12
-  app.use("/api/driver", driverWalletRoutes); // D8: Country-specific payout configuration
+  app.use("/api/driver", rateLimitSensitive, driverWalletRoutes); // D8: Country-specific payout configuration - rate limited
   app.use("/api/driver", driverOnboardingRoutes); // D9: Driver onboarding & training
   app.use("/api/driver/trips", driverTripsRoutes); // D17: Driver Trip History & Earnings Breakdown
   app.use("/api/driver/performance", driverPerformanceRoutes); // D18: Driver Performance & Ratings Center
@@ -197,7 +198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/restaurant/settings", restaurantSettingsRoutes); // Phase 10
   app.use("/api/restaurants", restaurantPayoutMethodsRoutes); // Payment & Payout Configuration
   app.use("/api/config", paymentConfigRoutes); // Payment & Payout Configuration
-  app.use("/api/payout", payoutRoutes); // Unified Payout System for all roles
+  app.use("/api/payout", rateLimitPayout, payoutRoutes); // Unified Payout System for all roles - rate limited
   app.use("/api/admin", adminRoutes);
   app.use("/api/admin", adminSupportRoutes); // Phase 12
   app.use("/api/admin", adminRestaurantSettingsRoutes); // Phase 10
@@ -206,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/rides", rideRoutes);
   app.use("/api/food-orders", foodOrderRoutes);
   app.use("/api/deliveries", deliveryRoutes);
-  app.use("/api/support", supportChatRoutes);
+  app.use("/api/support", rateLimitSupport, supportChatRoutes); // Rate limited
   app.use("/api", documentRoutes);
   app.use("/api/admin/auth/2fa", twoFactorRoutes);
   app.use("/api/coupons", couponRoutes); // R4: Coupon validation

@@ -198,3 +198,101 @@ setInterval(() => {
     }
   }
 }, ANALYTICS_WINDOW_MS);
+
+// ====================================================
+// Generic API Rate Limiter
+// For sensitive routes like payout, support, auth
+// ====================================================
+
+interface ApiRequest {
+  count: number;
+  windowStart: number;
+}
+
+const apiRequests = new Map<string, ApiRequest>();
+
+interface RateLimitConfig {
+  maxRequests: number;
+  windowMs: number;
+  routePrefix: string;
+}
+
+const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
+  auth: { maxRequests: 10, windowMs: 60 * 1000, routePrefix: '/api/auth' },
+  payout: { maxRequests: 20, windowMs: 60 * 1000, routePrefix: '/api/payout' },
+  support: { maxRequests: 30, windowMs: 60 * 1000, routePrefix: '/api/support' },
+  sensitive: { maxRequests: 15, windowMs: 60 * 1000, routePrefix: '/api/driver/wallet' }
+};
+
+export function createRateLimiter(configKey: keyof typeof RATE_LIMIT_CONFIGS) {
+  const config = RATE_LIMIT_CONFIGS[configKey];
+  
+  return async function rateLimiter(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    const userId = (req as any).user?.id;
+    const ip = getClientIp(req);
+    const key = `${configKey}:${userId ? `user:${userId}` : `ip:${ip}`}`;
+
+    const now = Date.now();
+    let request = apiRequests.get(key);
+
+    if (!request || (now - request.windowStart > config.windowMs)) {
+      request = {
+        count: 0,
+        windowStart: now
+      };
+      apiRequests.set(key, request);
+    }
+
+    request.count++;
+    apiRequests.set(key, request);
+
+    if (request.count > config.maxRequests) {
+      const remainingSec = Math.ceil((config.windowMs - (now - request.windowStart)) / 1000);
+
+      await logAuditEvent({
+        actorId: userId || null,
+        actorEmail: (req as any).user?.email || null,
+        actorRole: (req as any).user?.role || 'unknown',
+        ipAddress: ip,
+        actionType: 'API_RATE_LIMITED',
+        entityType: configKey,
+        description: `${configKey} API rate limited for ${userId ? 'user ' + userId : 'IP ' + ip}`,
+        metadata: {
+          requestCount: request.count,
+          route: req.path,
+          remainingSeconds: remainingSec
+        },
+        success: false
+      });
+
+      res.status(429).json({
+        error: `Too many requests. Please try again in ${remainingSec} seconds.`
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+export const rateLimitAuth = createRateLimiter('auth');
+export const rateLimitPayout = createRateLimiter('payout');
+export const rateLimitSupport = createRateLimiter('support');
+export const rateLimitSensitive = createRateLimiter('sensitive');
+
+// Cleanup old API request tracking
+setInterval(() => {
+  const now = Date.now();
+  const entries = Array.from(apiRequests.entries());
+  for (const [key, request] of entries) {
+    const configKey = key.split(':')[0] as keyof typeof RATE_LIMIT_CONFIGS;
+    const config = RATE_LIMIT_CONFIGS[configKey];
+    if (config && now - request.windowStart > config.windowMs * 2) {
+      apiRequests.delete(key);
+    }
+  }
+}, 60 * 1000);

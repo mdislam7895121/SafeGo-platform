@@ -1,0 +1,58 @@
+SafeGo Security Hardening Phase (D-Security-01)
+
+Goal:
+Strengthen SafeGo’s security to Uber-level without adding any visible UI features. Focus only on backend, API, and account protection. Do NOT change business logic or flows.
+
+Scope and rules:
+- Keep all existing features and routes working exactly as now.
+- No new customer/driver/restaurant UI pages.
+- Only invisible security improvements, configuration, and backend checks.
+- Maintain full multi-country (BD + US) logic, KYC rules, and RBAC.
+- All changes must be documented in replit.md under a new section: "Security Hardening – Phase 1".
+
+Tasks:
+
+1) Account & session security
+- Add 2FA requirement for:
+  - Admin logins
+  - Driver/Restaurant when adding or changing payout methods
+- Harden session management:
+  - Short-lived access tokens with refresh token rotation
+  - Revoke all sessions on password change
+  - Block reused refresh tokens
+
+2) API and rate limiting
+- Implement global rate limiting middleware and apply to:
+  - /api/auth/*
+  - /api/payout/*
+  - /api/support/*
+  - Other sensitive driver/restaurant/admin routes
+- Ensure clean error messages without leaking internal details.
+
+3) Data protection
+- Verify all secrets are loaded only from environment variables.
+- Encrypt at rest (or field-level encrypt) highly-sensitive PII:
+  - SSN, NID, license numbers, tax IDs
+- Make sure ID and document uploads are stored in private storage (no public URL without signed access).
+
+4) Security logging and alerts
+- For now, implement a simple security event logger that records:
+  - multiple failed login attempts
+  - new device/location login
+  - payout method add/remove/change
+  - large withdrawal requests
+- Expose an internal-only admin endpoint or log file reader to review these events (protected by RBAC).
+- Do NOT build a full UI dashboard, only the backend and logging.
+
+5) HTTP and frontend security headers
+- Add strict security headers:
+  - HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+- Make sure they do not break the current frontend.
+
+Validation:
+- Run a full architect review focused on:
+  - RBAC correctness after changes
+  - No regression in payout, wallet, and support flows
+- Update replit.md with:
+  - exact list of new protections
+  - how to configure rate limits and 2FA in production
