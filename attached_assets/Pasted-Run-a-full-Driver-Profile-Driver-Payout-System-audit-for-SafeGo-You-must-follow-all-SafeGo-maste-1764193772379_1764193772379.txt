@@ -1,0 +1,71 @@
+Run a full Driver Profile + Driver Payout System audit for SafeGo.
+
+You must follow all SafeGo master rules, keep all existing security layers (KYC, RBAC, OTP/2FA, encryption, audit logs, rate-limits) untouched, and perform a deep architectural check to ensure nothing is missing or inconsistent.
+
+Goal:
+Fix the specific missing fields AND detect any additional profile/payout inconsistencies.
+
+Already identified issues to fix:
+1. Driver personal profile (/driver/profile)
+   - Missing Date of Birth field
+   - Missing Phone Number field
+
+2. Driver payout setup
+   - Missing Account Type dropdown for BANK payouts (Checking/Savings/Other)
+
+Your tasks:
+A) Fix the above three issues completely across:
+   - UI pages
+   - TypeScript interfaces
+   - Database models
+   - API request/response DTOs
+   - Validation layers (Zod/Yup/server validation)
+   - Encryption for sensitive fields where applicable
+   - Driver-side RBAC rules
+
+B) Perform a FULL audit on all connected systems:
+   - driverProfile model
+   - driverKYC model
+   - unifiedPayout model (shared)
+   - payout method creation/update flows
+   - server/routes for profile & payout
+   - client/src/pages/driver/profile
+   - client/src/pages/driver/wallet + payout-methods
+   - any consistency between GET and PUT endpoints
+
+Look for:
+- hidden fields that exist in the model but not in UI
+- fields shown in UI but not persisted correctly
+- missing validation rules
+- inconsistent naming between DB/model/DTO/UI
+- fields stored in one model and forgotten in the other
+- mismatched data types
+- missing sensitive-field encryption
+- missing KYC sync between driver profile and payout
+- missing migration defaults that could break existing rows
+
+C) If you find any additional issues (even if not requested), FIX THEM —
+but only if they are directly related to:
+- driver profile
+- driver phone identity
+- DOB identity
+- payout method setup
+- payout verification logic
+Do NOT add any new features outside these scopes.
+
+D) After completing fixes:
+   - Apply database migrations safely (non-breaking)
+   - Restart Start application
+   - Run the architect review
+   - Confirm that all UI pages load successfully
+   - Confirm data saves and persists correctly
+   - Confirm RBAC still protects all driver routes
+   - Provide screenshots of each updated page
+
+E) Final deliverables:
+   - Clean working Driver Profile with DOB + phone
+   - Updated Driver Payout form with Account Type
+   - Confirmation that NO further missing fields or inconsistencies remain
+   - Updated replit.md with a short summary of the audit and fixes
+
+Everything must be implemented professionally with production stability like Uber.

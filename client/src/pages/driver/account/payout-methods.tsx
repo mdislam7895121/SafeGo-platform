@@ -56,6 +56,7 @@ export default function PayoutMethods() {
   const [accountNumber, setAccountNumber] = useState("");
   const [routingNumber, setRoutingNumber] = useState("");
   const [bankName, setBankName] = useState("");
+  const [accountType, setAccountType] = useState<"checking" | "savings" | "other">("checking");
 
   // Fetch payout methods
   const { data, isLoading } = useQuery<PayoutMethodsResponse>({
@@ -79,6 +80,7 @@ export default function PayoutMethods() {
           accountNumber,
           routingNumber: payoutType === "bank_account" ? routingNumber : undefined,
           bankName: payoutType === "bank_account" ? bankName : undefined,
+          accountType: payoutType === "bank_account" ? accountType : undefined,
         }),
         headers: { "Content-Type": "application/json" },
       });
@@ -163,6 +165,7 @@ export default function PayoutMethods() {
     setAccountNumber("");
     setRoutingNumber("");
     setBankName("");
+    setAccountType("checking");
   };
 
   const handleAddMethod = () => {
@@ -428,6 +431,20 @@ export default function PayoutMethods() {
                     placeholder="Name of your bank"
                     data-testid="input-bank-name"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="accountType">Account Type</Label>
+                  <Select value={accountType} onValueChange={(v: "checking" | "savings" | "other") => setAccountType(v)}>
+                    <SelectTrigger data-testid="select-account-type">
+                      <SelectValue placeholder="Select account type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="checking">Checking</SelectItem>
+                      <SelectItem value="savings">Savings</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </>
             )}

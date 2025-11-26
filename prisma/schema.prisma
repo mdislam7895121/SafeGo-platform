@@ -1131,6 +1131,8 @@ model PayoutAccount {
   encryptedDetails   String
   accountNumber_encrypted String?
   routingNumber_encrypted String?
+  accountType        String?              // For bank accounts: checking, savings, other
+  bankName           String?              // Bank name for display
   isDefault          Boolean              @default(false)
   status             PayoutAccountStatus  @default(pending_verification)
   createdAt          DateTime             @default(now())

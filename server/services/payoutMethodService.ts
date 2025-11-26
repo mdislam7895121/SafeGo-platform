@@ -15,18 +15,24 @@ export const createPayoutMethodSchema = z.object({
   accountNumber: z.string().min(4, "Account number too short").max(50, "Account number too long"),
   routingNumber: z.string().min(9, "Routing number must be at least 9 digits").max(9, "Routing number must be 9 digits").regex(/^\d{9}$/, "Routing number must be 9 digits").optional(),
   bankName: z.string().min(2, "Bank name must be at least 2 characters").max(100, "Bank name too long").optional(),
+  accountType: z.enum(["checking", "savings", "other"], { required_error: "Account type is required for bank accounts" }).optional(),
 }).refine((data) => {
   // Mobile wallets require provider
   if (data.payoutType === "mobile_wallet" && !data.provider) {
     return false;
   }
-  // US bank accounts require routing number
-  if (data.payoutType === "bank_account" && data.countryCode === "US" && !data.routingNumber) {
+  // US bank accounts require routing number and account type
+  if (data.payoutType === "bank_account" && data.countryCode === "US") {
+    if (!data.routingNumber) return false;
+    if (!data.accountType) return false;
+  }
+  // All bank accounts require account type
+  if (data.payoutType === "bank_account" && !data.accountType) {
     return false;
   }
   return true;
 }, {
-  message: "Invalid payout method configuration",
+  message: "Invalid payout method configuration. Bank accounts require account type.",
 });
 
 export type CreatePayoutMethodInput = z.infer<typeof createPayoutMethodSchema>;
@@ -174,6 +180,7 @@ export async function createPayoutMethod(input: CreatePayoutMethodInput) {
     accountNumber: accountNumberEncrypted,
     routingNumber: routingNumberEncrypted,
     bankName: input.bankName,
+    accountType: input.accountType,
   });
 
   const payoutAccount = await prisma.payoutAccount.create({
@@ -189,6 +196,8 @@ export async function createPayoutMethod(input: CreatePayoutMethodInput) {
       encryptedDetails,
       accountNumber_encrypted: accountNumberEncrypted,
       routingNumber_encrypted: routingNumberEncrypted,
+      accountType: input.accountType,
+      bankName: input.bankName,
       isDefault: isFirstMethod,
       status: "active",
     },

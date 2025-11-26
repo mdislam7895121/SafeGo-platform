@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, User, Mail, Calendar, Lock, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, User, Mail, Calendar, Lock, Trash2, Upload, Phone, Cake } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ export default function ManageAccount() {
 
   const [editNameOpen, setEditNameOpen] = useState(false);
   const [editEmailOpen, setEditEmailOpen] = useState(false);
+  const [editPhoneOpen, setEditPhoneOpen] = useState(false);
+  const [editDobOpen, setEditDobOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
 
@@ -28,6 +30,8 @@ export default function ManageAccount() {
   const [lastName, setLastName] = useState("");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -92,6 +96,56 @@ export default function ManageAccount() {
     onError: (error: any) => {
       toast({
         title: "Failed to update email",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update phone mutation
+  const updatePhoneMutation = useMutation({
+    mutationFn: async (phone: string) => {
+      const result = await apiRequest("/api/driver/profile/phone", {
+        method: "PATCH",
+        body: JSON.stringify({ phoneNumber: phone }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+      toast({ title: "Phone number updated successfully" });
+      setEditPhoneOpen(false);
+      setPhoneNumber("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update phone number",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update date of birth mutation
+  const updateDobMutation = useMutation({
+    mutationFn: async (dob: string) => {
+      const result = await apiRequest("/api/driver/profile/dob", {
+        method: "PATCH",
+        body: JSON.stringify({ dateOfBirth: dob }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return result;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+      toast({ title: "Date of birth updated successfully" });
+      setEditDobOpen(false);
+      setDateOfBirth("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update date of birth",
         description: error.message || "Please try again",
         variant: "destructive",
       });
@@ -261,6 +315,45 @@ export default function ManageAccount() {
     updateEmailMutation.mutate(email);
   };
 
+  const handleEditPhone = () => {
+    setPhoneNumber(profile?.phoneNumber || "");
+    setEditPhoneOpen(true);
+  };
+
+  const handleSavePhone = () => {
+    if (!phoneNumber.trim()) {
+      toast({
+        title: "Validation error",
+        description: "Phone number is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    updatePhoneMutation.mutate(phoneNumber);
+  };
+
+  const handleEditDob = () => {
+    if (profile?.dateOfBirth) {
+      const date = new Date(profile.dateOfBirth);
+      setDateOfBirth(date.toISOString().split('T')[0]);
+    } else {
+      setDateOfBirth("");
+    }
+    setEditDobOpen(true);
+  };
+
+  const handleSaveDob = () => {
+    if (!dateOfBirth.trim()) {
+      toast({
+        title: "Validation error",
+        description: "Date of birth is required",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateDobMutation.mutate(dateOfBirth);
+  };
+
   const handleChangePassword = () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       toast({
@@ -409,6 +502,36 @@ export default function ManageAccount() {
             </div>
 
             <div className="space-y-2">
+              <Label>Phone Number</Label>
+              <div className="flex gap-2">
+                <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
+                  <span data-testid="text-phone">{profile?.phoneNumber || "Not set"}</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleEditPhone} data-testid="button-edit-phone">
+                  Edit
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Date of Birth</Label>
+              <div className="flex gap-2">
+                <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
+                  <Cake className="h-4 w-4 text-muted-foreground" />
+                  <span data-testid="text-dob">
+                    {profile?.dateOfBirth 
+                      ? new Date(profile.dateOfBirth).toLocaleDateString() 
+                      : "Not set"}
+                  </span>
+                </div>
+                <Button variant="outline" size="sm" onClick={handleEditDob} data-testid="button-edit-dob">
+                  Edit
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label>Member Since</Label>
               <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -549,6 +672,68 @@ export default function ManageAccount() {
             </Button>
             <Button onClick={handleSaveEmail} disabled={updateEmailMutation.isPending} data-testid="button-save-email">
               {updateEmailMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Phone Dialog */}
+      <Dialog open={editPhoneOpen} onOpenChange={setEditPhoneOpen}>
+        <DialogContent data-testid="dialog-edit-phone">
+          <DialogHeader>
+            <DialogTitle>Edit Phone Number</DialogTitle>
+            <DialogDescription>Update your phone number</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number *</Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+1 (555) 123-4567"
+                data-testid="input-phone"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPhoneOpen(false)} data-testid="button-cancel-phone">
+              Cancel
+            </Button>
+            <Button onClick={handleSavePhone} disabled={updatePhoneMutation.isPending} data-testid="button-save-phone">
+              {updatePhoneMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Date of Birth Dialog */}
+      <Dialog open={editDobOpen} onOpenChange={setEditDobOpen}>
+        <DialogContent data-testid="dialog-edit-dob">
+          <DialogHeader>
+            <DialogTitle>Edit Date of Birth</DialogTitle>
+            <DialogDescription>Update your date of birth</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="dateOfBirth">Date of Birth *</Label>
+              <Input
+                id="dateOfBirth"
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                data-testid="input-dob"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDobOpen(false)} data-testid="button-cancel-dob">
+              Cancel
+            </Button>
+            <Button onClick={handleSaveDob} disabled={updateDobMutation.isPending} data-testid="button-save-dob">
+              {updateDobMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -313,6 +313,9 @@ router.get("/home", async (req: AuthRequest, res) => {
         isVerified: driverProfile.isVerified,
         rejectionReason: driverProfile.rejectionReason,
         createdAt: driverProfile.createdAt,
+        // Personal info
+        phoneNumber: driverProfile.phoneNumber,
+        dateOfBirth: driverProfile.dateOfBirth,
         // Common KYC fields
         profilePhotoUrl: driverProfile.profilePhotoUrl,
         // USA structured name fields
@@ -4267,6 +4270,90 @@ router.patch("/email", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Email update error:", error);
     res.status(500).json({ error: "Failed to update email" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/profile/phone
+// Update driver phone number
+// ====================================================
+const updatePhoneSchema = z.object({
+  phoneNumber: z.string().min(1, "Phone number is required"),
+});
+
+router.patch("/profile/phone", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = updatePhoneSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { phoneNumber } = validationResult.data;
+
+    // Update driver profile phone number
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: { phoneNumber },
+    });
+
+    res.json({
+      message: "Phone number updated successfully",
+      phoneNumber: updatedProfile.phoneNumber,
+    });
+  } catch (error) {
+    console.error("Phone update error:", error);
+    res.status(500).json({ error: "Failed to update phone number" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/profile/dob
+// Update driver date of birth
+// ====================================================
+const updateDobSchema = z.object({
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+});
+
+router.patch("/profile/dob", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = updateDobSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { dateOfBirth } = validationResult.data;
+
+    // Parse and validate the date
+    const parsedDate = new Date(dateOfBirth);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({ error: "Invalid date format" });
+    }
+
+    // Update driver profile date of birth
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: { dateOfBirth: parsedDate },
+    });
+
+    res.json({
+      message: "Date of birth updated successfully",
+      dateOfBirth: updatedProfile.dateOfBirth,
+    });
+  } catch (error) {
+    console.error("DOB update error:", error);
+    res.status(500).json({ error: "Failed to update date of birth" });
   }
 });
 
