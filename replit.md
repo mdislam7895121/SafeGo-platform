@@ -79,6 +79,16 @@ Core systems and features include:
     - **KYC/Verification Behavior**: Earnings data hidden for unverified drivers with verification CTAs.
     - **Audit Logging**: Performance views are logged for compliance.
     - **Mobile-First Design**: Responsive layouts with tabbed interface for different metric categories.
+-   **Driver Incentives & Milestones Center (D19)**: Uber-style gamified incentives system with goals, achievements, and tier-based rewards:
+    - **Goals Dashboard** (`/driver/incentives`): Daily/weekly/monthly trip and earnings goals with progress tracking, tier status card, and upcoming milestones.
+    - **Achievement Badges** (`/driver/incentives/achievements`): 12 unlockable badges (First Trip, Century Club, Road Warrior, 5-Star Week/Month, Zero Cancel Streak, Weekly Pro Driver, Early Bird, Night Owl, Perfect 10, 30/90 Day Loyalty) with progress bars and bonus rewards.
+    - **Tier Rewards** (`/driver/incentives/rewards`): 3-tier system (Bronze/Silver/Gold) with point thresholds (0/500/1500), tier benefits, active promotions list, and reward history table.
+    - **Backend Routes**: `/api/driver/incentives`, `/api/driver/incentives/achievements`, `/api/driver/incentives/rewards`, `/api/driver/incentives/stats`.
+    - **Prisma Models**: DriverIncentiveCycle (goal tracking), DriverAchievement (badge progress), DriverRewardLedger (reward history).
+    - **KYC/Verification Behavior**: Earnings goals and bonus payouts hidden for unverified drivers with clear verification CTAs.
+    - **Audit Logging**: Incentive views and achievement unlocks logged for compliance.
+    - **Mobile-First Design**: Responsive card layouts with progress indicators and tier progression visualization.
+    - **Integration**: Reads from existing Ride/FoodOrder/Delivery/Wallet data without duplication (single source of truth).
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design

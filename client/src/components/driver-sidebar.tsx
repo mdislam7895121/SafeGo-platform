@@ -31,6 +31,7 @@ import {
   MessageSquare,
   History,
   BarChart3,
+  Trophy,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -85,6 +86,11 @@ const menuItems = [
     title: "Performance",
     icon: BarChart3,
     href: "/driver/performance",
+  },
+  {
+    title: "Incentives",
+    icon: Trophy,
+    href: "/driver/incentives",
   },
   {
     title: "Wallet",

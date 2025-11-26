@@ -100,6 +100,9 @@ import DriverOnboarding from "@/pages/driver/onboarding";
 import DriverGettingStarted from "@/pages/driver/getting-started";
 import DriverTutorials from "@/pages/driver/tutorials";
 import DriverSettings from "@/pages/driver/settings";
+import DriverIncentives from "@/pages/driver/incentives";
+import DriverIncentivesAchievements from "@/pages/driver/incentives-achievements";
+import DriverIncentivesRewards from "@/pages/driver/incentives-rewards";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -564,6 +567,27 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Performance">
             <DriverPerformance />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/incentives">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Incentives & Milestones">
+            <DriverIncentives />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/incentives/achievements">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Achievements">
+            <DriverIncentivesAchievements />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/incentives/rewards">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Rewards & Tiers">
+            <DriverIncentivesRewards />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
