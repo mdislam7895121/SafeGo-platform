@@ -126,6 +126,51 @@ export enum PayoutMethodStatus {
   DISABLED = "DISABLED",
 }
 
+// ===== BANK ACCOUNT TYPES =====
+
+export enum BankAccountType {
+  CHECKING = "CHECKING",
+  SAVINGS = "SAVINGS",
+  BUSINESS_CHECKING = "BUSINESS_CHECKING",
+  BUSINESS_SAVINGS = "BUSINESS_SAVINGS",
+  OTHER = "OTHER",
+}
+
+export function isValidBankAccountType(type: string): type is BankAccountType {
+  return Object.values(BankAccountType).includes(type as BankAccountType);
+}
+
+// User-friendly labels for bank account types
+export const BankAccountTypeLabels: Record<BankAccountType, string> = {
+  [BankAccountType.CHECKING]: "Checking",
+  [BankAccountType.SAVINGS]: "Savings",
+  [BankAccountType.BUSINESS_CHECKING]: "Business Checking",
+  [BankAccountType.BUSINESS_SAVINGS]: "Business Savings",
+  [BankAccountType.OTHER]: "Other",
+};
+
+// User-friendly labels for payout rail types
+export const PayoutRailTypeLabels: Record<PayoutRailType, string> = {
+  [PayoutRailType.BANK_ACCOUNT]: "Bank Account",
+  [PayoutRailType.CARD_PAYOUT]: "Debit Card",
+  [PayoutRailType.MOBILE_WALLET]: "Mobile Wallet",
+  [PayoutRailType.EXTERNAL_PROVIDER]: "External Provider",
+  [PayoutRailType.CASH_SETTLEMENT]: "Cash Settlement",
+  [PayoutRailType.OTHER_RAIL]: "Other",
+};
+
+// Country-specific payout type availability
+export const CountryPayoutTypes: Record<string, PayoutRailType[]> = {
+  BD: [PayoutRailType.BANK_ACCOUNT, PayoutRailType.MOBILE_WALLET],
+  US: [PayoutRailType.BANK_ACCOUNT, PayoutRailType.EXTERNAL_PROVIDER],
+};
+
+// Country-specific mobile wallet providers
+export const CountryMobileWalletProviders: Record<string, string[]> = {
+  BD: ["bKash", "Nagad", "Rocket"],
+  US: [],
+};
+
 // ===== TYPE GUARDS =====
 
 export function isValidCountryCode(code: string): code is CountryCode {
