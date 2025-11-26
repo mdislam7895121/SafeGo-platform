@@ -47,6 +47,10 @@ Core systems and features include:
     - **Payout Method Status**: PENDING_VERIFICATION (for Stripe Connect), ACTIVE, DISABLED
     - Driver and Restaurant roles have consistent Add Payout Method UX with country-restricted options and dynamic form fields
 -   **Driver Systems**: Comprehensive driver profile management (multi-vehicle, encrypted KYC, document upload), public profile card, earnings & payout dashboard, promotions & incentives system, document management, support & help center, in-app training & onboarding, getting started page, vehicle center, wallet center, trip history & earnings breakdown, performance & ratings center, incentives & milestones center, and Safety Center with incident reporting and emergency toolkit.
+    - **Driver KYC Field Validation**:
+      - Phone: E.164 format with country-specific patterns (US: +1XXX format, BD: +880XXX format) with normalization and storage in canonical format
+      - Date of Birth: 18+ age requirement enforced on both frontend and backend
+      - License Plate: Text-only input via dedicated endpoint without image upload requirement
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design
