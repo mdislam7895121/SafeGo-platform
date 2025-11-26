@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings } from "lucide-react";
+import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings, DollarSign, Car, Gift, MessageSquare, Shield, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -118,20 +118,21 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
     }
   };
 
-  const getNotificationIcon = (type: string) => {
+  const NotificationIcon = ({ type }: { type: string }) => {
+    const iconClass = "h-4 w-4 text-muted-foreground";
     switch (type) {
       case "earnings":
-        return "💰";
+        return <DollarSign className={iconClass} />;
       case "trip":
-        return "🚗";
+        return <Car className={iconClass} />;
       case "promo":
-        return "🎁";
+        return <Gift className={iconClass} />;
       case "support":
-        return "💬";
+        return <MessageSquare className={iconClass} />;
       case "safety":
-        return "🛡️";
+        return <Shield className={iconClass} />;
       default:
-        return "📢";
+        return <Megaphone className={iconClass} />;
     }
   };
 
@@ -215,9 +216,9 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
                         data-testid={`notification-item-${notification.id}`}
                       >
                         <div className="flex gap-3">
-                          <span className="text-lg flex-shrink-0">
-                            {getNotificationIcon(notification.type)}
-                          </span>
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                            <NotificationIcon type={notification.type} />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <p className={`text-sm font-medium truncate ${
