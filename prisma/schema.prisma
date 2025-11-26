@@ -946,6 +946,9 @@ model Vehicle {
   plateCountry            String?
   plateState              String?
   plateStatus             DocumentStatus    @default(PENDING)
+  licensePlateLastUpdated DateTime?
+  licensePlateVerificationStatus String?   @default("pending_review")
+  licensePlateRejectionReason    String?
   tlcLicenseNumber        String?
   tlcLicenseStatus        DocumentStatus    @default(PENDING)
   vehicleDocuments        VehicleDocument[]
