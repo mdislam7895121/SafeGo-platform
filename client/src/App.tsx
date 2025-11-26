@@ -452,7 +452,44 @@ function Router() {
       </Route>
       <Route path="/driver/support">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverSupport />
+          <DriverLayout pageTitle="Support">
+            <DriverSupportHub />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support/help">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Help Center">
+            <DriverSupportHelp />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support/contact">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Contact Support">
+            <DriverSupportContact />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support/live-chat">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Live Chat">
+            <DriverSupportLiveChat />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support/phone">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Phone Support">
+            <DriverSupportPhone />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/support/status">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="System Status">
+            <DriverSupportStatus />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/support-help-center">
