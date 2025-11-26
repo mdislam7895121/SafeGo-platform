@@ -82,7 +82,7 @@ export function calculateVehicleDocumentStatuses(vehicle: Vehicle) {
     plateStatus: calculateDocumentStatus({
       documentUrl: vehicle.licensePlate, // License plate is a text field, not a URL
       expiryDate: null,
-      verificationStatus: null,
+      verificationStatus: vehicle.licensePlateVerificationStatus,
     }),
     tlcLicenseStatus: vehicle.tlcLicenseNumber
       ? DocumentStatus.APPROVED
@@ -179,6 +179,8 @@ export function getVehicleDocumentsPayload(vehicle: Vehicle | null, driverProfil
       plateNumber: vehicle.licensePlate,
       country: vehicle.plateCountry,
       state: vehicle.plateState,
+      lastUpdated: vehicle.licensePlateLastUpdated,
+      rejectionReason: vehicle.licensePlateRejectionReason,
     },
     tlcLicense: {
       status: statuses.tlcLicenseStatus,

@@ -2573,6 +2573,105 @@ router.put("/vehicle-kyc-details", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// PATCH /api/driver/documents/license-plate
+// Update license plate number (text-based document)
+// ====================================================
+const updateLicensePlateSchema = z.object({
+  licensePlateNumber: z.string().min(1, "License plate number is required").max(20, "License plate too long"),
+  plateCountry: z.string().optional(),
+  plateState: z.string().optional(),
+});
+
+router.patch("/documents/license-plate", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body with Zod
+    const validationResult = updateLicensePlateSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { licensePlateNumber, plateCountry, plateState } = validationResult.data;
+
+    // Get driver profile with primary vehicle
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        vehicles: {
+          where: { isActive: true, isPrimary: true },
+        },
+        user: {
+          select: { countryCode: true },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    let primaryVehicle = driverProfile.vehicles[0];
+
+    if (!primaryVehicle) {
+      // Create a new primary vehicle with license plate
+      primaryVehicle = await prisma.vehicle.create({
+        data: {
+          id: randomUUID(),
+          driverId: driverProfile.id,
+          vehicleType: "car",
+          vehicleModel: "Not specified",
+          vehiclePlate: licensePlateNumber.trim(),
+          licensePlate: licensePlateNumber.trim(),
+          plateCountry: plateCountry || driverProfile.user.countryCode || null,
+          plateState: plateState || null,
+          plateStatus: "UNDER_REVIEW",
+          licensePlateLastUpdated: new Date(),
+          licensePlateVerificationStatus: "pending_review",
+          isPrimary: true,
+          isActive: true,
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      // Update existing primary vehicle with license plate
+      primaryVehicle = await prisma.vehicle.update({
+        where: { id: primaryVehicle.id },
+        data: {
+          licensePlate: licensePlateNumber.trim(),
+          vehiclePlate: licensePlateNumber.trim(),
+          plateCountry: plateCountry || driverProfile.user.countryCode || primaryVehicle.plateCountry,
+          plateState: plateState || primaryVehicle.plateState,
+          plateStatus: "UNDER_REVIEW",
+          licensePlateLastUpdated: new Date(),
+          licensePlateVerificationStatus: "pending_review",
+          licensePlateRejectionReason: null, // Clear any previous rejection
+          updatedAt: new Date(),
+        },
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "License plate number submitted successfully",
+      plate: {
+        plateNumber: primaryVehicle.licensePlate,
+        country: primaryVehicle.plateCountry,
+        state: primaryVehicle.plateState,
+        status: primaryVehicle.plateStatus,
+        lastUpdated: primaryVehicle.licensePlateLastUpdated,
+      },
+    });
+  } catch (error) {
+    console.error("License plate update error:", error);
+    res.status(500).json({ error: "Failed to update license plate" });
+  }
+});
+
+// ====================================================
 // WALLET & PAYOUT API
 // ====================================================
 
