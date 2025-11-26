@@ -1,0 +1,67 @@
+Fix the SafeGo Driver navigation bugs so the UI behaves like a modern rideshare app (Uber-style). Focus only on driver web UI; do not change any business logic, RBAC, KYC, or payout rules.
+
+Issues observed:
+1) Driver sidebar (drawer) does not close after selecting a menu item.
+   - On /driver/account and other driver pages, when the user taps the menu icon, the sidebar opens.
+   - When the user taps an item like "Account", "Wallet", or "Performance", the page content changes, but the sidebar stays open and the user must tap again to close it.
+
+2) Notification bell icon does nothing.
+   - The bell icon with a badge (e.g., "3") is visible in the top bar, but tapping it does not open any notifications panel or page.
+
+3) Globe icon (language/region) does nothing.
+   - The globe icon in the header is meant for language/region selection, but tapping it has no visible effect.
+
+Implementation requirements:
+
+A. Sidebar / Drawer behavior
+1. When the driver taps the menu icon and the sidebar opens, selecting ANY navigation item in the sidebar must:
+   - Navigate to the correct route (existing behavior), AND
+   - Automatically close the sidebar/drawer after navigation.
+2. Make sure the following also close the sidebar:
+   - Tapping on the dark overlay/background.
+   - Pressing the Escape key on desktop.
+3. Ensure this behavior is consistent on all driver routes that use the sidebar:
+   - /driver/account
+   - /driver/profile
+   - /driver/wallet
+   - /driver/documents
+   - /driver/trips, /driver/performance, /driver/trust-score
+   - /driver/support, /driver/settings, /driver/safety, etc.
+4. Run an architect review to confirm:
+   - Sidebar state is handled in a single source of truth (e.g., React state, context, or layout component).
+   - There are no remaining cases where a menu item navigation leaves the drawer open.
+
+B. Notification bell behavior
+1. Implement a basic, non-destructive notifications UI for the driver:
+   - Tapping the bell icon should open either:
+     a) a small dropdown panel anchored under the bell, OR
+     b) navigate to an existing notifications page like /driver/notifications if available.
+   - The dropdown/panel can show a simple list of recent notifications with title, short message, and time. It can use mock/demo data if needed, but must be wired to the existing notification infrastructure if one already exists.
+2. Make sure:
+   - Tapping the bell again closes the dropdown.
+   - Clicking outside the dropdown also closes it.
+   - The badge count does not have to be fully dynamic, but should not break any existing logic.
+3. Do NOT introduce any backend-breaking changes; keep this as a lightweight UI integration with existing APIs or placeholder data.
+
+C. Globe (language/region) icon behavior
+1. Connect the globe icon to the existing driver settings / preferences center:
+   - When the driver taps the globe icon, open a small language/region selection dropdown OR navigate to the Driver Settings & Preferences Center with the Language tab focused.
+   - Use the existing regionPreference / languagePreference fields that were already implemented.
+2. At minimum, allow selecting between the currently supported languages/regions (e.g., English, default region), and make sure that:
+   - The selection is stored using the existing settings mechanism.
+   - Any text that already supports i18n reacts correctly when the preference changes (if implemented).
+3. Ensure the globe icon has hover/focus states and an accessible label (e.g., aria-label="Language and region settings").
+
+D. Verification
+1. After implementing these changes, restart the application and verify:
+   - From /driver/documents, open the sidebar, tap "Account": the account page loads and the sidebar closes automatically.
+   - From /driver/account, tap the menu icon again: sidebar opens and closes correctly.
+   - Tapping the bell icon shows a notification dropdown or navigates to the notifications page.
+   - Tapping the globe icon opens the language/region UI or navigates to the settings screen with the language section visible.
+2. Take screenshots of:
+   - The driver account page with the sidebar closed.
+   - The sidebar open state.
+   - The notifications dropdown or notifications page.
+   - The language/region selection UI.
+
+Do not modify any payout, KYC, wallet, or security logic. This task is strictly about fixing navigation UX for the driver so it behaves like a professional rideshare app.

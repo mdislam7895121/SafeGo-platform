@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -135,10 +136,17 @@ const menuItems = [
 export function DriverSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+  const { setOpenMobile, isMobile } = useSidebar();
 
   const { data: driverData } = useQuery({
     queryKey: ["/api/driver/home"],
   });
+
+  const handleNavigation = () => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  };
 
   const profile = (driverData as any)?.profile;
   const stats = (driverData as any)?.stats;
@@ -156,7 +164,7 @@ export function DriverSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <Link href="/driver/profile">
+        <Link href="/driver/profile" onClick={handleNavigation}>
           <div className="flex items-center gap-3 p-2 cursor-pointer hover-elevate rounded-lg">
             <Avatar className="h-14 w-14">
               <AvatarImage src={profile?.profilePhotoUrl} alt={driverName} />
@@ -195,7 +203,7 @@ export function DriverSidebar() {
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton asChild isActive={isActive} className="px-4 py-3 w-full">
-                      <Link href={item.href} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
+                      <Link href={item.href} onClick={handleNavigation} data-testid={`link-${item.title.toLowerCase().replace(/\s+/g, '-')}`}>
                         <div className="flex items-center gap-3 w-full text-sm font-medium">
                           <item.icon className="h-5 w-5 flex-shrink-0" />
                           <span className="flex-1">{item.title}</span>
@@ -222,7 +230,10 @@ export function DriverSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <button
-          onClick={logout}
+          onClick={() => {
+            handleNavigation();
+            logout();
+          }}
           className="flex items-center gap-3 w-full px-4 py-3 text-sm font-medium rounded-lg hover-elevate active-elevate-2 text-muted-foreground hover:text-foreground"
           data-testid="button-logout-sidebar"
         >
