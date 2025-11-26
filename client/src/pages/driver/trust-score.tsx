@@ -55,6 +55,8 @@ interface TrustScoreData {
     lateArrivals: number;
     cancellations: number;
   };
+  kyc_required?: boolean;
+  error?: string;
 }
 
 const breakdownConfig = {
@@ -234,10 +236,6 @@ export default function DriverTrustScore() {
   }
 
   if (error) {
-    const errorMessage = (error as any)?.message || "";
-    if (errorMessage.includes("KYC") || errorMessage.includes("verification")) {
-      return <KYCRequiredAlert />;
-    }
     return (
       <Alert variant="destructive">
         <AlertTriangle className="h-4 w-4" />
@@ -247,7 +245,11 @@ export default function DriverTrustScore() {
     );
   }
 
-  if (!data) {
+  if (!data || data.kyc_required || data.error?.includes("KYC")) {
+    return <KYCRequiredAlert />;
+  }
+
+  if (!data.breakdown || !data.status) {
     return <KYCRequiredAlert />;
   }
 

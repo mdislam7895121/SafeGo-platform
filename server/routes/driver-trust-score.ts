@@ -1,5 +1,6 @@
 import { Router, Response } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
 
 const router = Router();
@@ -300,7 +301,7 @@ router.post("/recalculate-all", async (req: AuthRequest, res: Response) => {
 
     await prisma.auditLog.create({
       data: {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         actorId: userId,
         actorEmail: user.email,
         actorRole: "admin",
@@ -372,7 +373,7 @@ router.post("/recalculate", async (req: AuthRequest, res: Response) => {
 
     await prisma.auditLog.create({
       data: {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         actorId: userId,
         actorEmail: "driver@safego.app",
         actorRole: "driver",
