@@ -403,6 +403,26 @@ model DriverStats {
   driverId   String        @unique
   rating     Decimal       @default(5.0) @db.Decimal(3, 2)
   totalTrips Int           @default(0)
+  
+  // D21: Trust Score System (0-100)
+  trustScore              Int           @default(75)  // Current trust score (0-100)
+  trustScoreBreakdown     Json?         // JSON breakdown of score components
+  lastTrustScoreUpdate    DateTime?     // Last time score was recalculated
+  
+  // D21: Trust Score Input Metrics
+  onTimeArrivalRate       Decimal       @default(0.85) @db.Decimal(5, 4) // % of on-time arrivals
+  riderRatingAvg          Decimal       @default(5.0) @db.Decimal(3, 2)  // Average rider rating
+  cancellationRate        Decimal       @default(0.05) @db.Decimal(5, 4) // % trip cancellations
+  safetyViolationCount    Int           @default(0)   // Speeding, harsh braking flags
+  supportTicketScore      Int           @default(100) // Based on dispute outcomes (0-100)
+  
+  // D21: Historical Tracking
+  totalOnTimeArrivals     Int           @default(0)
+  totalLateArrivals       Int           @default(0)
+  totalCancellations      Int           @default(0)
+  totalRatingsReceived    Int           @default(0)
+  ratingsSum              Decimal       @default(0) @db.Decimal(10, 2) // Sum of all ratings for avg calculation
+  
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
   driver     DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)

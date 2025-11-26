@@ -1,0 +1,77 @@
+# SafeGo Global Rules (Always Apply)
+1. Roles: customer, driver, restaurant, admin — চার রোলের জন্য ফিচার আলাদা ও সঠিক RBAC অনুযায়ী কাজ করতে হবে।
+2. Three product modules: Rides, Food Delivery (SafeGo Eats), Parcel Delivery — তিনটিই এক সিস্টেমে সংযুক্ত থাকবে।
+3. Country KYC rules: BD (NID/Passport + BL), USA (SSN/EIN + Routing), দেশভেদে payout & identity rules প্রযোজ্য।
+4. Mandatory Admin Panel: users, drivers, restaurants, orders, payouts, disputes, safety, ratings, incentives, analytics সব থাকতে হবে।
+5. Mandatory Collections: rides, food_orders, deliveries — status flows Ride: Requested→Accepted→Arrived→Picked→Completed→Paid, Food: Placed→Accepted→Cooking→Ready→Picked→Delivered→Paid, Parcel: Requested→Accepted→Picked→In-Transit→Delivered→Paid।
+6. Payout Logic: Unified Payout System ব্যবহার করতে হবে (individual withdrawals only), commission deduction, negative balance support, KYC gating।
+7. Security: RBAC, KYC Validation, AES-256-GCM encryption, audit logs, IP/device logging, abuse detection, rate-limit সব সঠিকভাবে থাকবে।
+8. Any task must be complete end-to-end: UI + backend + API + model + validation + routing + test IDs + error states।
+9. Never break existing work. সব পরিবর্তন non-breaking হতে হবে।
+10. Before any change, analyze current architecture and align properly.
+
+# D21 — Driver Profile Optimization & Trust Score (Start-to-Finish Implementation)
+Please implement the complete D21 module with the following specifications:
+
+## 1. Driver Profile Enhancements
+Add a fully professional, Uber-grade driver profile center with:
+- Profile photo (upload + crop + preview)
+- Legal name (readonly after KYC approval)
+- Contact info (phone/email change with verification)
+- Vehicle info (model, year, plate number, document expiry reminders)
+- Residency address
+- Work region preference (already in schema—display it cleanly)
+- Online/Offline toggle (with proper service availability checks)
+- Required test-id attributes throughout
+
+## 2. Trust Score System (Uber-style)
+Implement a **dynamic trust score** between 0–100.
+
+Trust score inputs:
+- On-time arrivals (weight 25%)
+- Rider ratings (weight 25%)
+- Trip cancellation rate (weight 20%)
+- Safety behavior (speeding, harsh braking flags — weight 20%)
+- Support ticket behavior / dispute outcomes (weight 10%)
+
+Trust score must include:
+- Real-time recalculation on trip completion
+- Background recalculation job (daily)
+- Color states: Red <40, Yellow 40–79, Green 80+
+- Driver penalties if <40 (reduced trip priority)
+- Driver bonuses if >90 (incentive boost)
+
+Add `/driver/trust-score` endpoint:
+GET → return score + breakdown + suggestions  
+POST → internal recalculation trigger (admin only)
+
+## 3. UI Requirements
+Add a new “Trust Score” section inside Driver Profile:
+- Circular progress indicator (0–100)
+- Breakdown table
+- Improvement tips
+- Warning cards (if <40)
+- Data-testid attributes for each element
+- KYC gating: Trust Score visible only if driver is fully verified
+
+## 4. API & Backend
+Add/update:
+- `/driver/profile/update`
+- `/driver/vehicle/update`
+- `/driver/trust-score`
+- Background cron: `/cron/trust-score/recalculate`
+
+Validation:
+- All updates must be strictly validated
+- Document uploads must comply with existing file rules
+- No security regressions, RBAC enforced
+
+## 5. Final Deliverables
+- New profile center page
+- Trust score dashboard
+- Backend models & utilities
+- Background job
+- All routes added to router
+- Architect review → pass
+- Screenshot + verification
+- Completion checkpoint
