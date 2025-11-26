@@ -51,6 +51,8 @@ import DriverPublicProfile from "@/pages/driver/profile-public";
 import DriverVehicle from "@/pages/driver/vehicle";
 import DriverWallet from "@/pages/driver/wallet";
 import DriverWalletBalance from "@/pages/driver/wallet-balance";
+import DriverWalletMethods from "@/pages/driver/wallet-methods";
+import DriverWalletHistory from "@/pages/driver/wallet-history";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
 import DriverRefer from "@/pages/driver/refer";
@@ -524,6 +526,20 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Balance">
             <DriverWalletBalance />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/wallet/methods">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Payout Methods">
+            <DriverWalletMethods />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/wallet/history">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Payout History">
+            <DriverWalletHistory />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

@@ -54,6 +54,12 @@ Core systems and features include:
     - **VIN Security**: Masked display showing only last 4 digits with show/hide toggle
     - **Sidebar Navigation**: "Vehicle" link with Car icon
 -   **Country-Specific Payment & Payout Configuration (D8)**: Comprehensive country-aware payout system with extended models for wallets and payouts, driver wallet APIs, payout methods, payout requests with KYC enforcement, admin configuration APIs, and monitoring, supporting various currencies and business rules.
+-   **Driver Earnings & Wallet Center (D16)**: Production-ready driver wallet experience using the unified payout system:
+    - **Wallet Snapshot** (`/driver/wallet`): Balance card with KYC warnings, payout activity preview, cash out dialog, and quick links to methods/history/help.
+    - **Payout Methods** (`/driver/wallet/methods`): Full CRUD for payout methods using `/api/payout/methods` with add/delete dialogs, KYC error handling, bank account and mobile wallet support.
+    - **Payout History** (`/driver/wallet/history`): Paginated history using `/api/payout/history` with status filtering, stats cards from `/api/payout/stats`, and empty state handling.
+    - **KYC/Verification Behavior**: KYC banners shown when driver is not fully verified, graceful 403 handling, and disabled payout actions until verification complete.
+    - **Mobile-First Design**: Responsive layouts working at 320px width, stacked cards, and consistent SafeGo design language.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design

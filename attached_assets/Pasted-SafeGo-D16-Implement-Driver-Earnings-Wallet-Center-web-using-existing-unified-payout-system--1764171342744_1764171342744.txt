@@ -1,0 +1,160 @@
+SafeGo D16 – Implement Driver Earnings & Wallet Center (web, using existing unified payout system)
+
+You are upgrading the SafeGo multi-role platform. Follow ALL SafeGo master rules and DO NOT break any existing routes, models, or database schema.
+
+GLOBAL SAFEGO RULES (DO NOT VIOLATE)
+1. Four roles must always be respected: customer, driver, restaurant, admin.
+2. Platform supports rides, food delivery, and parcel in a single unified system:
+   - Shared trip/order IDs, shared wallet and payout infrastructure.
+   - Commission, refunds, and negative balances are handled centrally.
+3. Country-specific KYC and compliance:
+   - Bangladesh: NID/Passport + business license for restaurants, NID + driving license for drivers.
+   - USA: SSN/EIN + routing/ACH details, driver’s license, TLC license where needed.
+4. Admin panel is the source of truth for verification, suspension, and manual overrides.
+5. Security MUST stay intact:
+   - KYC + RBAC gating on all sensitive routes.
+   - No direct exposure of internal IDs or raw error stacks in the UI.
+   - All payout actions must remain audited (no change to audit logging).
+6. You must NOT change existing database schema, payout models, or API contracts.
+   - Use the existing unified payout system exactly as implemented.
+
+CURRENT STATE (BACKEND + FRONTEND) – DO NOT BREAK
+1. Unified payout system:
+   - API namespace: /api/payout/*
+   - Core endpoints (already implemented and production-ready for individual withdrawals):
+     - GET    /api/payout/methods     – list payout methods for current user
+     - POST   /api/payout/methods     – add payout method
+     - DELETE /api/payout/methods/:id – remove payout method
+     - POST   /api/payout/verify      – verify payout account (KYC/bank checks)
+     - POST   /api/payout/withdraw    – request manual withdrawal
+     - POST   /api/payout/schedule    – schedule automatic payouts
+     - GET    /api/payout/history     – view payout transaction history
+     - GET    /api/payout/stats       – payout statistics
+   - Role scoping and security:
+     - Drivers, restaurants, and admins share these endpoints; scoping is done via auth + role checks.
+     - KYC gating is active: isVerified + verificationStatus === "APPROVED" required for full wallet features.
+     - Audit logging and negative balance support already exist. DO NOT MODIFY.
+2. Restaurant payout UI is already production-ready and FROZEN in its current state.
+   - You may REUSE patterns but must NOT edit restaurant or admin payout pages.
+3. Driver role currently has basic wallet integration only:
+   - /driver/wallet exists but UI is not yet at the same quality level as restaurant.
+   - Driver support (D15) and driver settings (D14) are already completed and must remain untouched.
+
+TASK GOAL – D16 DRIVER EARNINGS & WALLET CENTER
+Implement a professional, production-ready Driver Earnings & Wallet Center for the driver web app, reusing the unified payout backend. Focus on mobile-first responsive design, then tablet and desktop.
+
+SCOPE (FRONTEND ONLY – React/TSX, no schema changes)
+Create/upgrade the following driver pages under the existing app routing:
+
+1) /driver/wallet  – Driver Wallet Snapshot
+   - Show a card-based dashboard similar to the restaurant wallet, but optimized for drivers:
+     - Wallet snapshot:
+       - Current Balance
+       - Pending Payouts (if available from existing wallet API)
+       - Next scheduled payout (if any from /api/payout/stats or existing wallet endpoint)
+     - Primary actions:
+       - "View Wallet Details"
+       - "Manage Payout Methods"
+       - "Request Withdrawal"
+   - Show a clear KYC/verification banner when the driver is not fully verified:
+       - If the payout endpoints return 403 with message like "Driver verification required to access support system" or KYC-related text:
+         - Display a friendly banner:
+           - Title: "Verification required to cash out earnings"
+           - Message: brief explanation (e.g., "Please complete your identity and bank verification to enable payouts.")
+           - Button: "Review Account Status" (link to existing driver account/KYC page).
+       - Do NOT show raw JSON errors in the UI.
+   - When no payout methods exist:
+       - Show empty state with CTA: "Add payout method to receive earnings".
+
+2) /driver/wallet/methods  – Manage Payout Methods
+   - Use the unified /api/payout/methods endpoints for the current driver:
+     - On page load: GET /api/payout/methods and render a list of methods:
+       - Bank transfer (account name, masked account, bank name)
+       - Mobile money (provider + masked number)
+       - Stripe/other providers (label + last 4 digits or masked id)
+   - Provide UI actions (buttons/icons) per method:
+     - "Delete" (use DELETE /api/payout/methods/:id with confirmation dialog).
+   - Add new payout method:
+     - Show a form or modal with fields that match the existing PayoutMethod interface and backend expectations.
+       - For example: type, bankName/provider, accountName, accountNumber (masked in UI where appropriate), routing or mobile number where required.
+     - Submit via POST /api/payout/methods.
+     - After success, refetch methods and show success toast.
+   - Verification:
+     - If the backend requires /api/payout/verify, call it where appropriate (for methods needing verification) and reflect status in the UI (e.g., "Pending verification", "Verified").
+   - Handle disabled state when KYC is not complete:
+     - If adding a method returns 403 or a KYC error, show a clear message and disable the form instead of crashing.
+
+3) /driver/wallet/history  – Payout History & Earnings Timeline
+   - Call GET /api/payout/history and render a clean, paginated or scrollable list:
+     - Columns/fields: Date, Method (short label), Amount, Status (Pending, Completed, Failed, Refunded), and reference/ID if already available in the response.
+   - Show summary badges or small stats at the top using /api/payout/stats if available:
+     - Total paid out (last 30 days)
+     - Last payout date
+   - Empty state when there is no history:
+     - "You haven’t received any payouts yet."
+
+4) Withdraw Flow Integration (from driver wallet)
+   - Wherever "Request Withdrawal" appears (in /driver/wallet or a separate modal):
+     - Use POST /api/payout/withdraw with the payload shape expected by the existing backend.
+     - Enforce:
+       - An active payout method must exist; if none, redirect to /driver/wallet/methods with an info toast.
+       - Minimum withdrawal limits:
+         - Respect the backend rules (BD: ৳100, US: $10, Others: $20), but don’t hardcode new logic; instead, use the API’s validation and show clear error messages from the backend.
+     - On success:
+       - Show a success toast and update wallet balance / stats by refetching the relevant endpoints.
+   - DO NOT implement any batch payouts or admin-specific flows; those remain frozen as per earlier decision.
+
+UX & RESPONSIVENESS REQUIREMENTS
+1. Mobile first:
+   - All driver wallet pages must work perfectly at ~320px width with no horizontal scroll.
+   - Use stacked cards for summary, actions, and lists.
+2. Tablet and desktop:
+   - On larger screens, you may use a two-column layout (e.g., snapshot on left, history preview on right), but keep it consistent with the existing SafeGo design.
+3. Visual consistency:
+   - Keep SafeGo brand colors (green primary, clean white background) and typography as in the existing driver and restaurant dashboards.
+4. Error handling:
+   - Display friendly toasts or inline alerts for API errors.
+   - Never show raw JSON error blobs.
+   - Always handle 401/403 by:
+     - Either redirecting to login (401) or showing a "Verification required" or "Access not allowed" banner (403).
+
+SECURITY & LOGGING (MUST REMAIN INTACT)
+1. Do NOT modify any RBAC, KYC, or audit logging logic.
+2. All payout actions must continue to be logged using the existing audit logging system.
+3. Do NOT add any new public API endpoints.
+4. Do NOT bypass KYC checks or hardcode test shortcuts in production code.
+
+NON-BREAKING CHANGE REQUIREMENTS
+1. No database migrations. No new tables or models.
+2. No changes to Restaurant or Admin payout UIs.
+3. Only add or adjust driver-facing React components and wiring to the existing payout endpoints.
+4. Keep all existing TypeScript interfaces backward compatible:
+   - If you must extend UI types, do it in a way that does not change backend contracts.
+
+TESTING CHECKLIST (RUN BEFORE YOU FINISH)
+1. As a driver with:
+   - KYC incomplete: verify banners and disabled payout actions show correctly.
+   - Fully verified (isVerified + APPROVED): full wallet features are usable.
+2. Verify flows:
+   - /driver/wallet loads snapshot without console errors.
+   - /driver/wallet/methods:
+     - Lists existing methods.
+     - Adds a new method (valid + invalid data).
+     - Deletes a method.
+   - /driver/wallet/history:
+     - Shows history or empty state.
+   - Withdrawal:
+     - Request withdrawal succeeds when requirements are met.
+     - Request fails gracefully for under-minimum amounts or missing payout method.
+3. Confirm that:
+   - All calls go through the existing /api/payout/* endpoints.
+   - No existing routes for restaurant, driver, or admin break.
+   - No TypeScript build errors or ESLint violations are introduced.
+
+Once everything passes, update the README/replit.md with a short “D16 Driver Earnings & Wallet Center” section, summarizing:
+- Pages added/updated.
+- Endpoints used.
+- KYC/verification behavior for drivers.
+- Any important notes for future developers.
+
+Follow these instructions exactly and keep the implementation clean, incremental, and production-ready.

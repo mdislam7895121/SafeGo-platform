@@ -66,8 +66,137 @@ async function getOwnerDetails(req: AuthRequest): Promise<{
 }
 
 /**
+ * GET /api/payout/summary
+ * Get wallet summary for authenticated user
+ */
+router.get("/summary", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const owner = await getOwnerDetails(req);
+    if (!owner) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    // Get or create wallet
+    let wallet = await prisma.wallet.findFirst({
+      where: {
+        ownerId: owner.ownerId,
+        ownerType: owner.ownerType,
+      },
+    });
+
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: {
+          ownerId: owner.ownerId,
+          ownerType: owner.ownerType,
+          balance: "0",
+          holdAmount: "0",
+          negativeBalance: "0",
+          currency: owner.countryCode === "BD" ? "BDT" : "USD",
+        },
+      });
+    }
+
+    // Get payout configuration
+    const payoutConfig = await prisma.countryPayoutConfig.findFirst({
+      where: {
+        countryCode: owner.countryCode,
+        actorType: owner.ownerType.toUpperCase(),
+        isActive: true,
+      },
+    });
+
+    // Get KYC status
+    let kycStatus = "NOT_STARTED";
+    let kycApproved = false;
+    if (owner.ownerType === "driver") {
+      const driver = await prisma.driverProfile.findUnique({
+        where: { id: owner.ownerId },
+        select: { kycStatus: true, kycRejectionReason: true },
+      });
+      if (driver) {
+        kycStatus = driver.kycStatus || "NOT_STARTED";
+        kycApproved = kycStatus === "APPROVED";
+      }
+    } else if (owner.ownerType === "restaurant") {
+      const restaurant = await prisma.restaurantProfile.findUnique({
+        where: { id: owner.ownerId },
+        select: { kycStatus: true },
+      });
+      if (restaurant) {
+        kycStatus = restaurant.kycStatus || "NOT_STARTED";
+        kycApproved = kycStatus === "APPROVED";
+      }
+    }
+
+    // Calculate total earnings and payouts
+    const [earningsAgg, payoutsAgg, pendingPayouts] = await Promise.all([
+      prisma.walletTransaction.aggregate({
+        where: {
+          walletId: wallet.id,
+          type: "CREDIT",
+        },
+        _sum: { amount: true },
+      }),
+      prisma.walletTransaction.aggregate({
+        where: {
+          walletId: wallet.id,
+          type: "PAYOUT",
+          status: "COMPLETED",
+        },
+        _sum: { amount: true },
+      }),
+      prisma.payout.count({
+        where: {
+          ownerId: owner.ownerId,
+          ownerType: owner.ownerType,
+          status: { in: ["PENDING", "PROCESSING"] },
+        },
+      }),
+    ]);
+
+    const balance = parseFloat(wallet.balance as any) || 0;
+    const holdAmount = parseFloat(wallet.holdAmount as any) || 0;
+    const negativeBalance = parseFloat(wallet.negativeBalance as any) || 0;
+    const availableForPayout = Math.max(0, balance - holdAmount - negativeBalance);
+
+    const currencySymbol = wallet.currency === "BDT" ? "৳" : "$";
+
+    res.json({
+      balance: wallet.balance,
+      holdAmount: wallet.holdAmount,
+      negativeBalance: wallet.negativeBalance,
+      availableForPayout: availableForPayout.toFixed(2),
+      currency: wallet.currency,
+      currencySymbol,
+      countryCode: owner.countryCode,
+      totalEarnings: (earningsAgg._sum.amount || 0).toString(),
+      totalPayouts: (payoutsAgg._sum.amount || 0).toString(),
+      pendingPayoutsCount: pendingPayouts,
+      kycStatus,
+      kycApproved,
+      payoutRules: payoutConfig
+        ? {
+            minPayoutAmount: payoutConfig.minPayoutAmount,
+            maxPayoutAmount: payoutConfig.maxPayoutAmount,
+            payoutSchedule: payoutConfig.payoutSchedule,
+            payoutDayOfWeek: payoutConfig.payoutDayOfWeek,
+            payoutDayOfMonth: payoutConfig.payoutDayOfMonth,
+            platformFeeType: payoutConfig.platformFeeType,
+            platformFeeValue: payoutConfig.platformFeeValue,
+            requiresKycLevel: payoutConfig.requiresKycLevel,
+          }
+        : null,
+    });
+  } catch (error: any) {
+    console.error("Get wallet summary error:", error);
+    res.status(500).json({ error: "Failed to fetch wallet summary" });
+  }
+});
+
+/**
  * GET /api/payout/methods
- * Get all payout methods for authenticated user
+ * Get all payout methods for authenticated user (includes KYC status for gating)
  */
 router.get("/methods", authenticateToken, async (req: AuthRequest, res) => {
   try {
@@ -95,7 +224,35 @@ router.get("/methods", authenticateToken, async (req: AuthRequest, res) => {
       },
     });
 
-    res.json({ methods });
+    // Get KYC status for method gating
+    let kycStatus = "NOT_STARTED";
+    let kycApproved = false;
+    if (owner.ownerType === "driver") {
+      const driver = await prisma.driverProfile.findUnique({
+        where: { id: owner.ownerId },
+        select: { kycStatus: true },
+      });
+      if (driver) {
+        kycStatus = driver.kycStatus || "NOT_STARTED";
+        kycApproved = kycStatus === "APPROVED";
+      }
+    } else if (owner.ownerType === "restaurant") {
+      const restaurant = await prisma.restaurantProfile.findUnique({
+        where: { id: owner.ownerId },
+        select: { kycStatus: true },
+      });
+      if (restaurant) {
+        kycStatus = restaurant.kycStatus || "NOT_STARTED";
+        kycApproved = kycStatus === "APPROVED";
+      }
+    }
+
+    res.json({
+      methods,
+      kycStatus,
+      kycApproved,
+      canAddMethod: kycApproved,
+    });
   } catch (error: any) {
     console.error("Get payout methods error:", error);
     res.status(500).json({ error: "Failed to fetch payout methods" });

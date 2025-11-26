@@ -89,30 +89,45 @@ export default function DriverWallet() {
   const { toast } = useToast();
   const [cashOutOpen, setCashOutOpen] = useState(false);
 
-  // Fetch wallet summary (D8 API)
+  // Fetch wallet summary (unified payout API)
   const { data: summary, isLoading: loadingSummary } = useQuery<WalletSummary>({
-    queryKey: ["/api/driver/wallet/summary"],
+    queryKey: ["/api/payout/summary"],
+    queryFn: async () => {
+      const response = await fetch("/api/payout/summary", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch wallet summary");
+      return response.json();
+    },
   });
 
-  // Fetch recent payouts (D8 API)
+  // Fetch recent payouts (unified payout API)
   const { data: payoutsData, isLoading: loadingPayouts } = useQuery<{
     payouts: Payout[];
     total: number;
-    pagination: { limit: number; offset: number };
+    hasMore: boolean;
   }>({
-    queryKey: ["/api/driver/payouts"],
+    queryKey: ["/api/payout/history"],
+    queryFn: async () => {
+      const response = await fetch("/api/payout/history?limit=5", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch payouts");
+      return response.json();
+    },
   });
 
-  // Fetch payout methods (D8 API - plural)
+  // Fetch payout methods (unified payout API)
   const { data: payoutMethodsData, isLoading: loadingMethod } = useQuery<PayoutMethodsResponse>({
-    queryKey: ["/api/driver/payout-methods"],
+    queryKey: ["/api/payout/methods"],
+    queryFn: async () => {
+      const response = await fetch("/api/payout/methods", { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch payout methods");
+      return response.json();
+    },
   });
 
-  // Cash out / payout request mutation (D8 API)
+  // Cash out / payout request mutation (unified payout API)
   const cashOutMutation = useMutation({
     mutationFn: async (amount: string) => {
       const defaultMethod = payoutMethodsData?.methods.find(m => m.isDefault);
-      const result = await apiRequest("/api/driver/payouts", {
+      const result = await apiRequest("/api/payout/withdraw", {
         method: "POST",
         body: JSON.stringify({
           amount,
@@ -128,8 +143,8 @@ export default function DriverWallet() {
         description: data.message || "Your payout request has been submitted",
       });
       setCashOutOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/wallet/summary"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/driver/payouts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payout/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payout/history"] });
     },
     onError: (error: any) => {
       toast({
@@ -296,7 +311,7 @@ export default function DriverWallet() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/driver/payouts")}
+              onClick={() => navigate("/driver/wallet/history")}
               data-testid="link-see-all-payouts"
             >
               See all
@@ -358,7 +373,7 @@ export default function DriverWallet() {
         <Card>
           <CardContent className="p-0">
             <button
-              onClick={() => navigate("/driver/account/payout-methods")}
+              onClick={() => navigate("/driver/wallet/methods")}
               className="flex items-center justify-between w-full p-6 hover-elevate active-elevate-2 rounded-lg"
               data-testid="button-payout-method"
             >
@@ -387,7 +402,7 @@ export default function DriverWallet() {
         <Card>
           <CardContent className="p-0">
             <button
-              onClick={() => navigate("/driver/help")}
+              onClick={() => navigate("/driver/support/help")}
               className="flex items-center justify-between w-full p-6 hover-elevate active-elevate-2 rounded-lg"
               data-testid="link-help"
             >
