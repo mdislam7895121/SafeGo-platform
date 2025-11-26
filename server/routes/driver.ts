@@ -253,6 +253,97 @@ router.use(authenticateToken);
 router.use(requireRole(["driver"]));
 
 // ====================================================
+// GET /api/driver/notifications
+// Get driver notifications with unread count
+// ====================================================
+router.get("/notifications", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    // Get notifications for this user
+    const notifications = await prisma.notification.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      skip: offset,
+    });
+
+    // Get unread count
+    const unreadCount = await prisma.notification.count({
+      where: { userId, isRead: false },
+    });
+
+    // Get total count for pagination
+    const totalCount = await prisma.notification.count({
+      where: { userId },
+    });
+
+    res.json({
+      notifications,
+      unreadCount,
+      totalCount,
+      hasMore: offset + limit < totalCount,
+    });
+  } catch (error) {
+    console.error("Get driver notifications error:", error);
+    res.status(500).json({ error: "Failed to fetch notifications" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/notifications/:id/read
+// Mark a notification as read
+// ====================================================
+router.patch("/notifications/:id/read", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const notificationId = req.params.id;
+
+    // Verify notification belongs to user
+    const notification = await prisma.notification.findFirst({
+      where: { id: notificationId, userId },
+    });
+
+    if (!notification) {
+      return res.status(404).json({ error: "Notification not found" });
+    }
+
+    // Mark as read
+    const updated = await prisma.notification.update({
+      where: { id: notificationId },
+      data: { isRead: true },
+    });
+
+    res.json({ success: true, notification: updated });
+  } catch (error) {
+    console.error("Mark notification read error:", error);
+    res.status(500).json({ error: "Failed to update notification" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/notifications/read-all
+// Mark all notifications as read
+// ====================================================
+router.patch("/notifications/read-all", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    await prisma.notification.updateMany({
+      where: { userId, isRead: false },
+      data: { isRead: true },
+    });
+
+    res.json({ success: true, message: "All notifications marked as read" });
+  } catch (error) {
+    console.error("Mark all notifications read error:", error);
+    res.status(500).json({ error: "Failed to update notifications" });
+  }
+});
+
+// ====================================================
 // GET /api/driver/home
 // Get driver dashboard data
 // ====================================================
