@@ -16,7 +16,7 @@ export default function DriverSafetyEmergency() {
 
   const sosMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/driver/safety/emergency", {
+      const response = await apiRequest("POST", "/api/driver/safety/emergency/sos", {
         type: "SOS",
         message: "Emergency SOS triggered",
         location: { lat: null, lng: null }
@@ -41,7 +41,7 @@ export default function DriverSafetyEmergency() {
 
   const supportMutation = useMutation({
     mutationFn: async (message: string) => {
-      const response = await apiRequest("POST", "/api/driver/safety/contact-support", {
+      const response = await apiRequest("POST", "/api/driver/safety/emergency/quick-support", {
         message,
         urgency: "high"
       });

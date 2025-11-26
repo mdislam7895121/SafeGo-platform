@@ -323,7 +323,7 @@ router.post("/report", async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post("/emergency", async (req: AuthRequest, res: Response) => {
+router.post("/emergency/sos", async (req: AuthRequest, res: Response) => {
   try {
     const ctx = await getDriverContext(req.user!.userId);
 
@@ -359,7 +359,7 @@ router.post("/emergency", async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.post("/contact-support", async (req: AuthRequest, res: Response) => {
+router.post("/emergency/quick-support", async (req: AuthRequest, res: Response) => {
   try {
     const ctx = await getDriverContext(req.user!.userId);
 
