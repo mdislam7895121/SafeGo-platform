@@ -4465,8 +4465,57 @@ router.patch("/email", async (req: AuthRequest, res) => {
 
 // ====================================================
 // PATCH /api/driver/profile/phone
-// Update driver phone number
+// Update driver phone number with E.164 format validation
 // ====================================================
+
+// E.164 phone validation patterns by country
+const PHONE_PATTERNS: Record<string, { pattern: RegExp; example: string; minLength: number; maxLength: number }> = {
+  US: { 
+    pattern: /^\+1[2-9]\d{9}$/, 
+    example: "+1XXXXXXXXXX (10 digits after +1)",
+    minLength: 12,
+    maxLength: 12
+  },
+  BD: { 
+    pattern: /^\+880[1-9]\d{9}$/, 
+    example: "+880XXXXXXXXXX (10 digits after +880)",
+    minLength: 14,
+    maxLength: 14
+  },
+};
+
+// General E.164 pattern for unsupported countries
+const GENERAL_E164_PATTERN = /^\+[1-9]\d{6,14}$/;
+
+function validatePhoneNumber(phone: string, countryCode?: string): { valid: boolean; error?: string } {
+  // Remove any spaces or dashes for validation
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
+  
+  // Must start with +
+  if (!cleanPhone.startsWith('+')) {
+    return { valid: false, error: "Phone number must start with + and include country code (E.164 format)" };
+  }
+  
+  // Country-specific validation
+  if (countryCode && PHONE_PATTERNS[countryCode]) {
+    const pattern = PHONE_PATTERNS[countryCode];
+    if (!pattern.pattern.test(cleanPhone)) {
+      return { 
+        valid: false, 
+        error: `Invalid phone format for ${countryCode}. Expected: ${pattern.example}` 
+      };
+    }
+    return { valid: true };
+  }
+  
+  // General E.164 validation for other countries
+  if (!GENERAL_E164_PATTERN.test(cleanPhone)) {
+    return { valid: false, error: "Invalid phone number format. Use E.164 format: +[country code][number]" };
+  }
+  
+  return { valid: true };
+}
+
 const updatePhoneSchema = z.object({
   phoneNumber: z.string().min(1, "Phone number is required"),
 });
@@ -4485,11 +4534,29 @@ router.patch("/profile/phone", async (req: AuthRequest, res) => {
     }
 
     const { phoneNumber } = validationResult.data;
+    
+    // Get driver profile to check country code for validation
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      select: { usaState: true, district: true },
+    });
+    
+    // Determine country code from profile
+    const countryCode = driverProfile?.usaState ? "US" : (driverProfile?.district ? "BD" : undefined);
+    
+    // Validate phone number format
+    const phoneValidation = validatePhoneNumber(phoneNumber, countryCode);
+    if (!phoneValidation.valid) {
+      return res.status(400).json({ error: phoneValidation.error });
+    }
+    
+    // Store clean phone number (with + prefix)
+    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
 
     // Update driver profile phone number
     const updatedProfile = await prisma.driverProfile.update({
       where: { userId },
-      data: { phoneNumber },
+      data: { phoneNumber: cleanPhone },
     });
 
     res.json({
@@ -4504,8 +4571,52 @@ router.patch("/profile/phone", async (req: AuthRequest, res) => {
 
 // ====================================================
 // PATCH /api/driver/profile/dob
-// Update driver date of birth
+// Update driver date of birth with age validation
 // ====================================================
+
+// Minimum age requirement for drivers
+const MINIMUM_DRIVER_AGE = 18;
+const MAXIMUM_DRIVER_AGE = 100;
+
+function calculateAge(birthDate: Date): number {
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  
+  return age;
+}
+
+function validateDateOfBirth(dateString: string): { valid: boolean; error?: string; parsedDate?: Date } {
+  const parsedDate = new Date(dateString);
+  
+  // Check if valid date
+  if (isNaN(parsedDate.getTime())) {
+    return { valid: false, error: "Invalid date format. Please use YYYY-MM-DD format." };
+  }
+  
+  // Check if date is in the future
+  if (parsedDate > new Date()) {
+    return { valid: false, error: "Date of birth cannot be in the future." };
+  }
+  
+  // Calculate and validate age
+  const age = calculateAge(parsedDate);
+  
+  if (age < MINIMUM_DRIVER_AGE) {
+    return { valid: false, error: `You must be at least ${MINIMUM_DRIVER_AGE} years old to drive with SafeGo.` };
+  }
+  
+  if (age > MAXIMUM_DRIVER_AGE) {
+    return { valid: false, error: "Please enter a valid date of birth." };
+  }
+  
+  return { valid: true, parsedDate };
+}
+
 const updateDobSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of birth is required"),
 });
@@ -4525,16 +4636,16 @@ router.patch("/profile/dob", async (req: AuthRequest, res) => {
 
     const { dateOfBirth } = validationResult.data;
 
-    // Parse and validate the date
-    const parsedDate = new Date(dateOfBirth);
-    if (isNaN(parsedDate.getTime())) {
-      return res.status(400).json({ error: "Invalid date format" });
+    // Validate date of birth with age requirements
+    const dobValidation = validateDateOfBirth(dateOfBirth);
+    if (!dobValidation.valid) {
+      return res.status(400).json({ error: dobValidation.error });
     }
 
     // Update driver profile date of birth
     const updatedProfile = await prisma.driverProfile.update({
       where: { userId },
-      data: { dateOfBirth: parsedDate },
+      data: { dateOfBirth: dobValidation.parsedDate },
     });
 
     res.json({

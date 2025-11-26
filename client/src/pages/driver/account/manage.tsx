@@ -682,7 +682,7 @@ export default function ManageAccount() {
         <DialogContent data-testid="dialog-edit-phone">
           <DialogHeader>
             <DialogTitle>Edit Phone Number</DialogTitle>
-            <DialogDescription>Update your phone number</DialogDescription>
+            <DialogDescription>Update your phone number in international format</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -692,9 +692,17 @@ export default function ManageAccount() {
                 type="tel"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="+1 (555) 123-4567"
+                placeholder={isUSDriver ? "+1 555 123 4567" : "+880 1XXXXXXXXX"}
                 data-testid="input-phone"
               />
+              <p className="text-xs text-muted-foreground">
+                {isUSDriver 
+                  ? "Enter your number in E.164 format: +1 followed by 10 digits (e.g., +1 555 123 4567)"
+                  : countryCode === "BD"
+                    ? "Enter your number in E.164 format: +880 followed by 10 digits (e.g., +880 1712345678)"
+                    : "Enter your number with country code starting with + (e.g., +1234567890)"
+                }
+              </p>
             </div>
           </div>
           <DialogFooter>
@@ -713,7 +721,7 @@ export default function ManageAccount() {
         <DialogContent data-testid="dialog-edit-dob">
           <DialogHeader>
             <DialogTitle>Edit Date of Birth</DialogTitle>
-            <DialogDescription>Update your date of birth</DialogDescription>
+            <DialogDescription>Update your date of birth for identity verification</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -723,9 +731,12 @@ export default function ManageAccount() {
                 type="date"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                max={new Date(new Date().setFullYear(new Date().getFullYear() - 18)).toISOString().split('T')[0]}
                 data-testid="input-dob"
               />
+              <p className="text-xs text-muted-foreground">
+                You must be at least 18 years old to drive with SafeGo. Your date of birth is used for identity verification.
+              </p>
             </div>
           </div>
           <DialogFooter>
