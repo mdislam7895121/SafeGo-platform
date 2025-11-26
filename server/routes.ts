@@ -6,6 +6,7 @@ import driverSupportRoutes from "./routes/driver-support"; // Phase 12
 import driverWalletRoutes from "./routes/driver-wallet"; // D8: Country-specific payout configuration
 import driverOnboardingRoutes from "./routes/driver-onboarding"; // D9: Driver onboarding & training
 import driverTripsRoutes from "./routes/driver-trips"; // D17: Driver Trip History & Earnings Breakdown
+import driverPerformanceRoutes from "./routes/driver-performance"; // D18: Driver Performance & Ratings Center
 import customerRoutes from "./routes/customer";
 import customerFoodRoutes from "./routes/customer-food";
 import customerSupportRoutes from "./routes/customer-support"; // Phase 12
@@ -179,6 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/driver", driverWalletRoutes); // D8: Country-specific payout configuration
   app.use("/api/driver", driverOnboardingRoutes); // D9: Driver onboarding & training
   app.use("/api/driver/trips", driverTripsRoutes); // D17: Driver Trip History & Earnings Breakdown
+  app.use("/api/driver/performance", driverPerformanceRoutes); // D18: Driver Performance & Ratings Center
   app.use("/api/customer", customerRoutes);
   app.use("/api/customer", customerSupportRoutes); // Phase 12
   app.use("/api/customer/food", customerFoodRoutes);
