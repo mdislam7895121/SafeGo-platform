@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { DeviceInfo, LoginRiskAssessment } from './deviceSecurityService';
 
 export type AlertType = 

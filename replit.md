@@ -17,7 +17,20 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 
 Core systems and features include:
 -   **Admin Capabilities**: Interactive admin panel with dashboards, document management, wallet settlement, and global analytics.
--   **Security & Compliance**: Admin Activity Audit Trail, Global Admin Notification Center, RBAC, secure UX, real-time threat monitoring, fraud detection, HTTP security headers (HSTS, CSP, X-Frame-Options), rate limiting (admin login, analytics, payout, support routes), 2FA for admin and payout verification, AES-256-GCM field encryption, session management with JWT tokens.
+-   **Security & Compliance (Phase 2 Hardening)**: 
+    - **HTTP Security Headers**: HSTS, CSP, X-Frame-Options, X-Content-Type-Options via securityHeaders middleware
+    - **Rate Limiting**: Admin login (5/min), analytics (30/min), payout (10/min), support (20/min) routes
+    - **2FA System**: TOTP for admin, OTP (email/SMS) for driver/restaurant payout changes and password reset
+    - **OTP Service** (otpService.ts): 6-digit codes, 10-min expiry, 3 max attempts, 3 req/15min rate limit per identifier
+    - **Device Security** (deviceSecurityService.ts): User-Agent fingerprinting, IP geolocation detection, new device/location flagging
+    - **Session Security** (sessionSecurityService.ts): Auto-revocation on suspicious login, device tracking, login history
+    - **Security Alerts** (securityAlertService.ts): Multi-channel notifications for new device/location logins
+    - **Tamper-Proof Audit Logs** (tamperProofAuditService.ts): Append-only SHA-256 hash chain, no edit/delete, verifiable integrity
+    - **Secure Audit Routes** (secure-audit.ts): Admin-only internal endpoints for log viewing/querying/verification
+    - **Payout 2FA Middleware**: OTP + password verification for driver/restaurant, TOTP for admin payout operations
+    - **Audit Categories**: ADMIN_ACTION, PAYOUT_CHANGE, KYC_EVENT, SUPPORT_EVENT, AUTH_EVENT, SECURITY_EVENT, DATA_ACCESS
+    - **Severity Levels**: INFO, WARNING, CRITICAL
+    - AES-256-GCM field encryption, Admin Activity Audit Trail, Global Admin Notification Center, RBAC.
 -   **Wallet & Earnings System**: Manages earnings, commissions, negative balances, and automated/manual payouts.
 -   **Tax & Fees System**: Multi-country tax management with city-level overrides.
 -   **Multi-Role Multi-Channel Support Center**: AI-first chat with 4-role support and a two-tier escalation system.
@@ -38,4 +51,5 @@ The schema utilizes UUID primary keys, indexed foreign keys, and decimal types f
 -   **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.
 -   **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 -   **UI Components**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
--   **Environment Variables**: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV`, `ENCRYPTION_KEY`.
+-   **Environment Variables**: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV`, `ENCRYPTION_KEY`, `SESSION_SECRET`.
+-   **Optional Integrations**: Twilio (SMS OTP), AgentMail (Email OTP) - services degrade gracefully to console logging when not configured.

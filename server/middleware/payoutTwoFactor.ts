@@ -120,62 +120,57 @@ export async function requirePayoutVerification(
         return;
       }
 
-      if (otpCode) {
-        const otpResult = await verifyOtp(userId, 'PAYOUT_CHANGE', otpCode);
-        
-        if (!otpResult.valid) {
-          await logAuditEvent({
-            actorId: userId,
-            actorEmail: user.email,
-            actorRole: role,
-            ipAddress: getClientIp(req),
-            actionType: 'PAYOUT_OTP_VERIFICATION_FAILED',
-            entityType: 'payout',
-            description: `${role} failed OTP verification for payout method change`,
-            success: false
-          });
-
-          res.status(401).json({ error: otpResult.message });
-          return;
-        }
-
-        logPayoutChange(req, userId, user.email, role, 'PAYOUT_OTP_VERIFIED', '', `${role} verified OTP for payout change`);
-        req.payoutAuth = { verified: true, method: 'otp' };
-        next();
+      if (!otpCode || !password) {
+        res.status(403).json({ 
+          error: 'Both OTP and password required for payout method changes',
+          requiresVerification: true,
+          methods: ['otp', 'password'],
+          missingOtp: !otpCode,
+          missingPassword: !password
+        });
         return;
       }
 
-      if (password) {
-        const bcrypt = await import('bcrypt');
-        const isValidPassword = await bcrypt.compare(password, user.passwordHash);
-        
-        if (!isValidPassword) {
-          await logAuditEvent({
-            actorId: userId,
-            actorEmail: user.email,
-            actorRole: role,
-            ipAddress: getClientIp(req),
-            actionType: 'PAYOUT_PASSWORD_VERIFICATION_FAILED',
-            entityType: 'payout',
-            description: `${role} failed password verification for payout method change`,
-            success: false
-          });
+      const bcrypt = await import('bcrypt');
+      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      
+      if (!isValidPassword) {
+        await logAuditEvent({
+          actorId: userId,
+          actorEmail: user.email,
+          actorRole: role,
+          ipAddress: getClientIp(req),
+          actionType: 'PAYOUT_PASSWORD_VERIFICATION_FAILED',
+          entityType: 'payout',
+          description: `${role} failed password verification for payout method change`,
+          success: false
+        });
 
-          res.status(401).json({ error: 'Invalid password' });
-          return;
-        }
-
-        logPayoutChange(req, userId, user.email, role, 'PAYOUT_PASSWORD_VERIFIED', '', `${role} verified password for payout change`);
-        req.payoutAuth = { verified: true, method: 'password' };
-        next();
+        res.status(401).json({ error: 'Invalid password' });
         return;
       }
 
-      res.status(403).json({ 
-        error: 'Verification required for payout method changes',
-        requiresVerification: true,
-        methods: ['otp', 'password']
-      });
+      const otpResult = await verifyOtp(userId, 'PAYOUT_CHANGE', otpCode);
+      
+      if (!otpResult.valid) {
+        await logAuditEvent({
+          actorId: userId,
+          actorEmail: user.email,
+          actorRole: role,
+          ipAddress: getClientIp(req),
+          actionType: 'PAYOUT_OTP_VERIFICATION_FAILED',
+          entityType: 'payout',
+          description: `${role} failed OTP verification for payout method change`,
+          success: false
+        });
+
+        res.status(401).json({ error: otpResult.message });
+        return;
+      }
+
+      logPayoutChange(req, userId, user.email, role, 'PAYOUT_2FA_VERIFIED', '', `${role} verified OTP + password for payout change`);
+      req.payoutAuth = { verified: true, method: 'otp' };
+      next();
       return;
     }
 

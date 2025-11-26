@@ -18,15 +18,14 @@ interface OtpConfig {
 }
 
 const OTP_CONFIGS: Record<OtpPurpose, OtpConfig> = {
-  ADMIN_LOGIN: { length: 6, expiryMinutes: 5, maxAttempts: 3, cooldownMinutes: 15 },
-  PAYOUT_CHANGE: { length: 6, expiryMinutes: 10, maxAttempts: 3, cooldownMinutes: 30 },
-  PASSWORD_RESET: { length: 6, expiryMinutes: 15, maxAttempts: 3, cooldownMinutes: 60 },
+  ADMIN_LOGIN: { length: 6, expiryMinutes: 10, maxAttempts: 3, cooldownMinutes: 15 },
+  PAYOUT_CHANGE: { length: 6, expiryMinutes: 10, maxAttempts: 3, cooldownMinutes: 15 },
+  PASSWORD_RESET: { length: 6, expiryMinutes: 10, maxAttempts: 3, cooldownMinutes: 15 },
   NEW_DEVICE_LOGIN: { length: 6, expiryMinutes: 10, maxAttempts: 3, cooldownMinutes: 15 },
-  HIGH_RISK_ACTION: { length: 8, expiryMinutes: 5, maxAttempts: 2, cooldownMinutes: 30 },
+  HIGH_RISK_ACTION: { length: 6, expiryMinutes: 10, maxAttempts: 3, cooldownMinutes: 15 },
 };
 
 const otpStore = new Map<string, {
-  code: string;
   hashedCode: string;
   expiresAt: Date;
   attempts: number;
@@ -34,6 +33,10 @@ const otpStore = new Map<string, {
   channel: OtpChannel;
   createdAt: Date;
 }>();
+
+const requestCountStore = new Map<string, { count: number; windowStart: Date }>();
+const RATE_LIMIT_WINDOW_MINUTES = 15;
+const MAX_REQUESTS_PER_WINDOW = 3;
 
 const cooldownStore = new Map<string, Date>();
 
@@ -55,6 +58,31 @@ function getStoreKey(userId: string, purpose: OtpPurpose): string {
   return `${userId}:${purpose}`;
 }
 
+function checkRateLimit(key: string): { allowed: boolean; remainingMinutes?: number } {
+  const now = new Date();
+  const record = requestCountStore.get(key);
+  
+  if (!record) {
+    requestCountStore.set(key, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+  
+  const windowElapsed = (now.getTime() - record.windowStart.getTime()) / 60000;
+  
+  if (windowElapsed >= RATE_LIMIT_WINDOW_MINUTES) {
+    requestCountStore.set(key, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+  
+  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+    const remainingMinutes = Math.ceil(RATE_LIMIT_WINDOW_MINUTES - windowElapsed);
+    return { allowed: false, remainingMinutes };
+  }
+  
+  record.count++;
+  return { allowed: true };
+}
+
 export async function sendOtp(
   userId: string,
   email: string,
@@ -65,12 +93,21 @@ export async function sendOtp(
   const config = OTP_CONFIGS[purpose];
   const key = getStoreKey(userId, purpose);
   
+  const rateCheck = checkRateLimit(key);
+  if (!rateCheck.allowed) {
+    return {
+      success: false,
+      message: `Too many requests. Please wait ${rateCheck.remainingMinutes} minutes.`,
+      channel: preferredChannel
+    };
+  }
+  
   const cooldownUntil = cooldownStore.get(key);
   if (cooldownUntil && cooldownUntil > new Date()) {
     const remainingMinutes = Math.ceil((cooldownUntil.getTime() - Date.now()) / 60000);
     return {
       success: false,
-      message: `Too many attempts. Please wait ${remainingMinutes} minutes.`,
+      message: `Too many failed attempts. Please wait ${remainingMinutes} minutes.`,
       channel: preferredChannel
     };
   }
@@ -93,16 +130,6 @@ export async function sendOtp(
 
   const channel = (preferredChannel === 'SMS' && phone) ? 'SMS' : 'EMAIL';
 
-  otpStore.set(key, {
-    code: otp,
-    hashedCode,
-    expiresAt,
-    attempts: 0,
-    purpose,
-    channel,
-    createdAt: new Date()
-  });
-
   const delivered = await deliverOtp(email, phone, otp, purpose, channel);
 
   if (!delivered) {
@@ -112,6 +139,15 @@ export async function sendOtp(
       channel
     };
   }
+
+  otpStore.set(key, {
+    hashedCode,
+    expiresAt,
+    attempts: 0,
+    purpose,
+    channel,
+    createdAt: new Date()
+  });
 
   return {
     success: true,
