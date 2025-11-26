@@ -103,6 +103,11 @@ import DriverSettings from "@/pages/driver/settings";
 import DriverIncentives from "@/pages/driver/incentives";
 import DriverIncentivesAchievements from "@/pages/driver/incentives-achievements";
 import DriverIncentivesRewards from "@/pages/driver/incentives-rewards";
+import DriverSafety from "@/pages/driver/safety";
+import DriverSafetyReport from "@/pages/driver/safety-report";
+import DriverSafetyHistory from "@/pages/driver/safety-history";
+import DriverSafetyDetail from "@/pages/driver/safety-detail";
+import DriverSafetyEmergency from "@/pages/driver/safety-emergency";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -588,6 +593,41 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Rewards & Tiers">
             <DriverIncentivesRewards />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/safety">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Safety Center">
+            <DriverSafety />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/safety/report">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Report Incident">
+            <DriverSafetyReport />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/safety/history">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Incident History">
+            <DriverSafetyHistory />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/safety/history/:id">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Incident Details">
+            <DriverSafetyDetail />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/safety/emergency">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Emergency Toolkit">
+            <DriverSafetyEmergency />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

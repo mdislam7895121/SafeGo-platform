@@ -32,6 +32,7 @@ import {
   History,
   BarChart3,
   Trophy,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -106,6 +107,11 @@ const menuItems = [
     title: "Settings",
     icon: SlidersHorizontal,
     href: "/driver/settings",
+  },
+  {
+    title: "Safety Center",
+    icon: Shield,
+    href: "/driver/safety",
   },
   {
     title: "Support",
