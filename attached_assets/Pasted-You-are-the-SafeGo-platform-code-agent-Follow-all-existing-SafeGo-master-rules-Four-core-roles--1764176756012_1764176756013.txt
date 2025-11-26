@@ -1,0 +1,127 @@
+You are the SafeGo platform code agent. Follow all existing SafeGo master rules:
+
+- Four core roles: customer, driver, restaurant, admin.
+- Multi-service platform: rides, food, parcel — with shared wallet, payouts, and support.
+- Country-specific KYC: Bangladesh (NID/passport, mobile wallet), USA (SSN/EIN + bank account).
+- Security: KYC + RBAC gating, audit logging, no public unsafe endpoints, no breaking DB/schema changes, encrypted sensitive data.
+- Unified payout system is already FROZEN for individual withdrawals. Do NOT change payout models, tables, or business rules.
+
+Context:
+- The Driver Performance & Ratings Dashboard (D18) and Driver Incentives & Milestones Center (D19) are implemented and architect-verified.
+- On the `/driver/performance` page the UI currently shows: "Unable to load performance data. Please try again later."
+- This is happening because there is no real trip/earnings/rating data for the demo driver account in the database.
+
+Goal:
+Make the driver performance and incentives dashboards fully usable in the current Replit environment by seeding realistic DEMO data for one or more drivers — WITHOUT changing any schemas or breaking production rules.
+
+High-level requirements:
+1. Do NOT modify database schemas, existing models, or payout logic.
+2. Do NOT change any production business rules for payouts, KYC, or RBAC.
+3. Implement a safe, repeatable DEMO DATA seeding mechanism that:
+   - Only runs in non-production (Replit dev) environment.
+   - Can be easily disabled or removed later.
+   - Does not interfere with real data once the platform goes live.
+
+Detailed implementation plan:
+
+1) Inspect existing driver performance dependencies
+- Find the backend service(s) and endpoints used by `/driver/performance` and related driver analytics, for example:
+  - DriverPerformanceService (or similar)
+  - Trip/Ride models and queries
+  - Earnings/Wallet models used for driver stats
+  - Any rating/review models referenced in D18 and D19
+- Confirm exactly which collections/tables and fields are read for:
+  - Total completed trips
+  - Cancelled trips
+  - Distances / durations
+  - Earnings per trip and total earnings
+  - Average rating and rating breakdown
+  - Incentive/milestone progress (if applicable)
+
+2) Create a non-production demo data seeding script
+- Add a new script file in a suitable location, for example:
+  - `server/scripts/seedDriverDemoData.ts`
+- This script must:
+  - Check an environment guard such as `NODE_ENV !== "production"` or a dedicated flag like `SAFEGO_DEMO_SEED=true`.
+  - Query for one or two existing VERIFIED driver profiles:
+    - isVerified === true
+    - verificationStatus === "APPROVED"
+  - If no verified drivers exist, create a single DEMO driver with clearly marked fields, e.g.:
+    - name: "Demo Driver"
+    - email/phone marked as demo
+    - proper KYC flags set to satisfy RBAC checks, but still clearly non-real.
+
+3) Seed realistic trip and earnings data
+- For the selected demo driver(s), insert a realistic set of trips, for example:
+  - 30–60 trips over the past 30 days
+  - Mix of ride types (short, medium, long) consistent with the existing schema.
+  - Reasonable fields: timestamps, pickup/dropoff locations (cities/areas only, no sensitive real addresses), distance, duration, fare, commission, net earnings.
+  - Include at least a few cancelled or failed trips if the performance dashboard uses them.
+- Ensure all inserted trips:
+  - Fully match the existing Trip/Ride schema (no new fields).
+  - Correctly reference driver ID, customer ID (dummy/test customers), and any order IDs if required.
+- For earnings:
+  - Make sure the seeded trips correctly feed into whatever aggregate queries the performance dashboard uses.
+  - If there is a separate earnings or driver-earning model, insert matching rows so totals and graphs look consistent with the trips.
+
+4) Seed ratings and incentives data
+- If the performance dashboard or D19 incentives depend on ratings:
+  - Insert realistic rating records (4.7–4.9 average) with:
+    - rating value (1–5)
+    - comment text (short generic demo comments)
+    - timestamps linked to trips where possible.
+- If incentives/milestones use separate models:
+  - Seed progress entries so the D19 Incentives & Milestones Center shows:
+    - At least one completed milestone
+    - At least one in-progress incentive
+    - Zero critical errors in the UI.
+
+5) Integrate seeding into development workflow
+- Make sure running the script is straightforward:
+  - Add an npm script in `package.json`, e.g. `"seed:driver-demo": "ts-node server/scripts/seedDriverDemoData.ts"` or equivalent for this codebase.
+- Do NOT run seeding automatically on every app start.
+  - Instead, clearly document in `replit.md` how to run:
+    - `npm run seed:driver-demo`
+- Ensure the script is idempotent:
+  - If it runs multiple times, it should either:
+    - Detect existing demo trips and not duplicate them, OR
+    - Safely reset DEMO data for the selected demo driver(s) before inserting fresh records.
+
+6) Preserve KYC, RBAC, and audit logging
+- All seeded trips/earnings must respect:
+  - Driver must pass the same KYC/RBAC checks used by the performance endpoints.
+  - Existing audit logging should record created rows if logging is triggered through normal services.
+- Do NOT create any new public debug endpoints.
+  - The seeding should be done via the script or an admin-only internal method.
+- Confirm that:
+  - `/driver/performance`
+  - Any linked pages (earnings breakdown, incentives, ratings view)
+  now load successfully for the demo driver account once the script has been run and the driver is logged in.
+
+7) Verification & tests
+- After implementing the script:
+  - Run the database seeding in the Replit environment.
+  - Log in as the demo driver used for seeding.
+  - Visit `/driver/performance` and confirm:
+    - No more "Unable to load performance data" error.
+    - All charts, metrics, and breakdown components render with realistic values.
+  - Visit any related pages (e.g. incentives/ratings) and confirm they also behave correctly.
+- If there are existing unit/integration tests touching driver performance:
+  - Ensure they still pass and are not affected by the seeding script (tests should not rely on demo data unless explicitly configured to do so).
+
+8) Documentation update
+- Update `replit.md` with a short "Driver Demo Data" section:
+  - Purpose: to visualize the driver performance and incentives dashboards in dev.
+  - How to run: command to execute the seed script.
+  - Environment note: clearly state that this is for non-production environments only, and should not be enabled in live deployments.
+
+Strict constraints:
+- Do NOT alter payout models, payout routes, or unified payout logic (it is frozen by design).
+- Do NOT relax KYC or RBAC checks.
+- Do NOT introduce any new public endpoints accessible to customers, drivers, or restaurants.
+- Do NOT introduce breaking changes to existing API contracts.
+
+Once complete, give me:
+- A summary of what was seeded (number of trips, date range, driver used).
+- Confirmation that `/driver/performance` and related dashboards now load without errors for the demo driver.
+- Any commands I need to run in Replit to reseed or reset the demo data.
