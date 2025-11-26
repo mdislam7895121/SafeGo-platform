@@ -93,6 +93,7 @@ interface SeedResult {
   achievementsCreated: number;
   incentiveCyclesCreated: number;
   rewardsCreated: number;
+  safetyIncidentsCreated: number;
 }
 
 async function findOrCreateDemoDriver(): Promise<{ driverId: string; userId: string; email: string }> {
@@ -263,6 +264,11 @@ async function cleanExistingDemoData(driverId: string): Promise<void> {
   });
 
   await prisma.driverRewardLedger.deleteMany({
+    where: { driverId },
+  });
+
+  // Clean safety incidents data
+  await prisma.driverSafetyIncident.deleteMany({
     where: { driverId },
   });
 
@@ -605,6 +611,57 @@ async function seedRewardLedger(driverId: string): Promise<number> {
   return created;
 }
 
+// Safety incident categories and data
+const SAFETY_CATEGORIES = [
+  "RIDER_MISCONDUCT",
+  "VEHICLE_DAMAGE",
+  "PAYMENT_DISPUTE",
+  "LOST_AND_FOUND",
+  "HARASSMENT_THREAT",
+  "UNSAFE_LOCATION",
+  "OTHER",
+] as const;
+
+const INCIDENT_DESCRIPTIONS = [
+  { category: "RIDER_MISCONDUCT", description: "Passenger was intoxicated and behaved inappropriately during the ride. Had to end trip early for safety.", location: "456 Oak Avenue, Downtown" },
+  { category: "LOST_AND_FOUND", description: "Passenger left a phone in the back seat. Returned it to them within 2 hours.", location: "789 Market Street" },
+  { category: "VEHICLE_DAMAGE", description: "Minor scratch on rear bumper from luggage being loaded roughly.", location: "Airport Terminal 2" },
+  { category: "PAYMENT_DISPUTE", description: "Customer claimed they were overcharged due to traffic delay. Requested fare adjustment.", location: "123 Main Street" },
+  { category: "UNSAFE_LOCATION", description: "Pickup location was in a poorly lit area with suspicious activity nearby.", location: "Industrial District Warehouse Zone" },
+  { category: "HARASSMENT_THREAT", description: "Received threatening messages after declining a ride request.", location: "N/A - App Communication" },
+  { category: "OTHER", description: "Navigation app malfunction caused significant route deviation.", location: "Highway 101" },
+];
+
+async function seedSafetyIncidents(driverId: string): Promise<number> {
+  console.log("Seeding safety incidents...");
+  
+  const statuses = ["SUBMITTED", "UNDER_REVIEW", "RESOLVED", "CLOSED"] as const;
+  
+  let created = 0;
+  for (const incident of INCIDENT_DESCRIPTIONS) {
+    const status = statuses[Math.floor(Math.random() * statuses.length)];
+    const createdDate = randomDate(60, 0);
+    const isResolved = status === "RESOLVED" || status === "CLOSED";
+    
+    await prisma.driverSafetyIncident.create({
+      data: {
+        driverId,
+        category: incident.category,
+        description: incident.description,
+        incidentDate: randomDate(65, 5),
+        locationAddress: incident.location,
+        status,
+        resolution: isResolved ? "Issue investigated and appropriate action taken. Reviewed by support team." : null,
+        resolvedAt: isResolved ? randomDate(30, 0) : null,
+      },
+    });
+    created++;
+  }
+
+  console.log(`Created ${created} safety incidents.`);
+  return created;
+}
+
 async function main(): Promise<SeedResult> {
   console.log("\n======================================");
   console.log("SafeGo Driver Demo Data Seeding Script");
@@ -640,6 +697,9 @@ async function main(): Promise<SeedResult> {
   const achievementsCreated = await seedAchievements(driverId, totalTrips);
   const incentiveCyclesCreated = await seedIncentiveCycles(driverId);
   const rewardsCreated = await seedRewardLedger(driverId);
+  
+  // Seed safety incidents (D20)
+  const safetyIncidentsCreated = await seedSafetyIncidents(driverId);
 
   console.log("\n======================================");
   console.log("Demo Data Seeding Complete!");
@@ -653,11 +713,13 @@ async function main(): Promise<SeedResult> {
   console.log(`Achievements Created: ${achievementsCreated}`);
   console.log(`Incentive Cycles Created: ${incentiveCyclesCreated}`);
   console.log(`Reward Entries Created: ${rewardsCreated}`);
+  console.log(`Safety Incidents Created: ${safetyIncidentsCreated}`);
   console.log("======================================\n");
   console.log("You can now log in as the demo driver and visit:");
   console.log("  - /driver/performance");
   console.log("  - /driver/incentives");
   console.log("  - /driver/trips");
+  console.log("  - /driver/safety");
   console.log("\n");
 
   return {
@@ -669,6 +731,7 @@ async function main(): Promise<SeedResult> {
     achievementsCreated,
     incentiveCyclesCreated,
     rewardsCreated,
+    safetyIncidentsCreated,
   };
 }
 
