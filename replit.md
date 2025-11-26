@@ -69,6 +69,16 @@ Core systems and features include:
     - **KYC/Verification Behavior**: Earnings breakdown hidden for unverified drivers with clear verification CTAs.
     - **Audit Logging**: Driver trip history and detail views are logged for compliance.
     - **Support Integration**: Direct links to support center with trip code prefilled for issue reporting.
+-   **Driver Performance & Ratings Center (D18)**: Uber-style performance dashboard with comprehensive metrics:
+    - **Performance Summary** (`/driver/performance`): Overall rating, total trips, completion rate, cancellation rate with time range filters (7d/30d/All).
+    - **Rating Breakdown**: Star distribution (5★ to 1★) with visual progress bars and average calculation.
+    - **Service Breakdown**: Performance metrics split by service type (Ride/Food/Parcel) with trip counts, ratings, and earnings.
+    - **Customer Reviews**: Paginated list of customer feedback with ratings, comments, and trip codes.
+    - **Quality Guidelines**: Informational thresholds for priority access, minimum rating, cancellation limits, and quality bonuses.
+    - **Backend Routes**: `/api/driver/performance/summary`, `/api/driver/performance/ratings`, `/api/driver/performance/reviews`, `/api/driver/performance/service-breakdown`.
+    - **KYC/Verification Behavior**: Earnings data hidden for unverified drivers with verification CTAs.
+    - **Audit Logging**: Performance views are logged for compliance.
+    - **Mobile-First Design**: Responsive layouts with tabbed interface for different metric categories.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design

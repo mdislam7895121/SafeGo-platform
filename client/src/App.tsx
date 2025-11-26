@@ -55,6 +55,7 @@ import DriverWalletMethods from "@/pages/driver/wallet-methods";
 import DriverWalletHistory from "@/pages/driver/wallet-history";
 import DriverTrips from "@/pages/driver/trips";
 import DriverTripDetail from "@/pages/driver/trip-detail";
+import DriverPerformance from "@/pages/driver/performance";
 import DriverKYCDocuments from "@/pages/driver/kyc-documents";
 import DriverSupport from "@/pages/driver/support";
 import DriverRefer from "@/pages/driver/refer";
@@ -556,6 +557,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Trip Details">
             <DriverTripDetail />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/performance">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Performance">
+            <DriverPerformance />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

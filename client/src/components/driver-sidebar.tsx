@@ -30,6 +30,7 @@ import {
   Car,
   MessageSquare,
   History,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -79,6 +80,11 @@ const menuItems = [
     title: "Trip History",
     icon: History,
     href: "/driver/trips",
+  },
+  {
+    title: "Performance",
+    icon: BarChart3,
+    href: "/driver/performance",
   },
   {
     title: "Wallet",
