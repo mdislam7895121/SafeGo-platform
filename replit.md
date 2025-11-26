@@ -40,6 +40,12 @@ Core systems and features include:
 -   **Restaurant Management Systems**: Includes Performance Insights, Review & Rating Management, Media Gallery, Branding, Operational Settings, Order Management, Staff & Role Management, and Promotions & Coupon Management.
 -   **Customer-Facing Dynamic Pricing Display**: Real-time pricing transparency with surge multipliers, promotions, and breakdowns.
 -   **Unified Payout System**: Enterprise-grade management for customer payment methods and payout rails by country, service type, actor type, and KYC level, including automatic weekly scheduling and bank verification.
+    - **Supported Payout Types by Country**:
+      - Bangladesh (BD): Bank Account, Mobile Wallet (bKash, Nagad, Rocket)
+      - United States (US): Bank Account, Stripe Connect
+    - **Bank Account Types**: CHECKING, SAVINGS, BUSINESS_CHECKING, BUSINESS_SAVINGS, OTHER (required for all bank account payout methods)
+    - **Payout Method Status**: PENDING_VERIFICATION (for Stripe Connect), ACTIVE, DISABLED
+    - Driver and Restaurant roles have consistent Add Payout Method UX with country-restricted options and dynamic form fields
 -   **Driver Systems**: Comprehensive driver profile management (multi-vehicle, encrypted KYC, document upload), public profile card, earnings & payout dashboard, promotions & incentives system, document management, support & help center, in-app training & onboarding, getting started page, vehicle center, wallet center, trip history & earnings breakdown, performance & ratings center, incentives & milestones center, and Safety Center with incident reporting and emergency toolkit.
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 

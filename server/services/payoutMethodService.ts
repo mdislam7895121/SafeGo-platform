@@ -2,37 +2,34 @@ import { db } from "../db";
 import { encryptSensitive, decryptSensitive, maskSensitive } from "../utils/crypto";
 import { logAuditEvent, ActionType, EntityType } from "../utils/audit";
 import { z } from "zod";
+import { BankAccountType } from "@shared/types";
 
 const prisma = db;
 
-// Zod validation schemas
+const bankAccountTypeValues = Object.values(BankAccountType) as [string, ...string[]];
+
 export const createPayoutMethodSchema = z.object({
   userId: z.string().uuid("Invalid user ID"),
   countryCode: z.enum(["US", "BD"], { required_error: "Country code is required" }),
-  payoutType: z.enum(["mobile_wallet", "bank_account"], { required_error: "Payout type is required" }),
+  payoutType: z.enum(["mobile_wallet", "bank_account", "stripe_connect"], { required_error: "Payout type is required" }),
   provider: z.string().min(1, "Provider is required for mobile wallets").optional(),
   accountHolderName: z.string().min(2, "Account holder name must be at least 2 characters").max(100, "Account holder name too long"),
-  accountNumber: z.string().min(4, "Account number too short").max(50, "Account number too long"),
+  accountNumber: z.string().max(50, "Account number too long").optional(),
   routingNumber: z.string().min(9, "Routing number must be at least 9 digits").max(9, "Routing number must be 9 digits").regex(/^\d{9}$/, "Routing number must be 9 digits").optional(),
   bankName: z.string().min(2, "Bank name must be at least 2 characters").max(100, "Bank name too long").optional(),
-  accountType: z.enum(["checking", "savings", "other"], { required_error: "Account type is required for bank accounts" }).optional(),
+  accountType: z.enum(bankAccountTypeValues, { required_error: "Account type is required for bank accounts" }).optional(),
 }).refine((data) => {
-  // Mobile wallets require provider
   if (data.payoutType === "mobile_wallet" && !data.provider) {
     return false;
   }
-  // US bank accounts require routing number and account type
-  if (data.payoutType === "bank_account" && data.countryCode === "US") {
-    if (!data.routingNumber) return false;
+  if (data.payoutType === "bank_account") {
+    if (!data.accountNumber || data.accountNumber.length < 4) return false;
     if (!data.accountType) return false;
-  }
-  // All bank accounts require account type
-  if (data.payoutType === "bank_account" && !data.accountType) {
-    return false;
+    if (data.countryCode === "US" && !data.routingNumber) return false;
   }
   return true;
 }, {
-  message: "Invalid payout method configuration. Bank accounts require account type.",
+  message: "Invalid payout method configuration. Bank accounts require account number and account type.",
 });
 
 export type CreatePayoutMethodInput = z.infer<typeof createPayoutMethodSchema>;
@@ -158,13 +155,17 @@ export async function createPayoutMethod(input: CreatePayoutMethodInput) {
   const isFirstMethod = existingMethods === 0;
 
   // Encrypt sensitive data
-  const accountNumberEncrypted = encryptSensitive(input.accountNumber);
+  const accountNumberEncrypted = input.accountNumber 
+    ? encryptSensitive(input.accountNumber)
+    : null;
   const routingNumberEncrypted = input.routingNumber
     ? encryptSensitive(input.routingNumber)
     : null;
 
   // Create masked account number for display
-  const maskedAccount = maskSensitive(input.accountNumber, 4);
+  const maskedAccount = input.accountNumber 
+    ? maskSensitive(input.accountNumber, 4)
+    : "";
 
   // Generate display name
   let displayName = "";
@@ -173,6 +174,8 @@ export async function createPayoutMethod(input: CreatePayoutMethodInput) {
   } else if (input.payoutType === "bank_account") {
     const bankName = input.bankName || "Bank Account";
     displayName = `${bankName} ${maskedAccount}`;
+  } else if (input.payoutType === "stripe_connect") {
+    displayName = "Stripe Connect";
   }
 
   // Create encrypted details JSON
@@ -189,25 +192,25 @@ export async function createPayoutMethod(input: CreatePayoutMethodInput) {
       ownerId: driverProfile.id,
       countryCode: input.countryCode,
       payoutType: input.payoutType,
-      provider: input.provider,
+      provider: input.provider || (input.payoutType === "stripe_connect" ? "stripe" : null),
       displayName,
       accountHolderName: input.accountHolderName,
       maskedAccount,
       encryptedDetails,
-      accountNumber_encrypted: accountNumberEncrypted,
+      accountNumber_encrypted: accountNumberEncrypted || "",
       routingNumber_encrypted: routingNumberEncrypted,
       accountType: input.accountType,
       bankName: input.bankName,
       isDefault: isFirstMethod,
-      status: "active",
+      status: input.payoutType === "stripe_connect" ? "pending_verification" : "active",
     },
   });
 
   await logAuditEvent({
     actorId: input.userId,
-    actorEmail: null,
+    actorEmail: "",
     actorRole: "driver",
-    ipAddress: null,
+    ipAddress: "",
     actionType: ActionType.CREATE,
     entityType: EntityType.PAYOUT_ACCOUNT,
     entityId: payoutAccount.id,
@@ -275,9 +278,9 @@ export async function setDefaultPayoutMethod(methodId: string, userId: string) {
 
   await logAuditEvent({
     actorId: userId,
-    actorEmail: null,
+    actorEmail: "",
     actorRole: "driver",
-    ipAddress: null,
+    ipAddress: "",
     actionType: ActionType.UPDATE,
     entityType: EntityType.PAYOUT_ACCOUNT,
     entityId: methodId,
@@ -322,9 +325,9 @@ export async function deletePayoutMethod(methodId: string, userId: string) {
 
   await logAuditEvent({
     actorId: userId,
-    actorEmail: null,
+    actorEmail: "",
     actorRole: "driver",
-    ipAddress: null,
+    ipAddress: "",
     actionType: ActionType.DELETE,
     entityType: EntityType.PAYOUT_ACCOUNT,
     entityId: methodId,

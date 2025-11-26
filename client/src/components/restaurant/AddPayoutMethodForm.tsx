@@ -2,27 +2,67 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Building2, Smartphone, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  PayoutRailType,
+  BankAccountType,
+  BankAccountTypeLabels,
+  CountryPayoutTypes,
+  CountryMobileWalletProviders,
+} from "@shared/types";
 
 const formSchema = z.object({
   countryCode: z.string().min(2, "Country is required"),
   payoutType: z.string().min(1, "Payout method type is required"),
   currency: z.string().min(3, "Currency is required"),
-  accountNumber: z.string().min(1, "Account number is required"),
+  accountNumber: z.string().optional(),
   accountHolderName: z.string().min(1, "Account holder name is required"),
   bankName: z.string().optional(),
   routingNumber: z.string().optional(),
   swiftCode: z.string().optional(),
+  accountType: z.string().optional(),
   mobileWalletProvider: z.string().optional(),
   mobileWalletNumber: z.string().optional(),
+}).refine((data) => {
+  if (data.payoutType === "bank_account") {
+    return !!data.accountNumber && data.accountNumber.length > 0;
+  }
+  return true;
+}, {
+  message: "Account number is required for bank accounts",
+  path: ["accountNumber"],
+}).refine((data) => {
+  if (data.payoutType === "bank_account") {
+    return !!data.accountType && data.accountType.length > 0;
+  }
+  return true;
+}, {
+  message: "Account type is required for bank accounts",
+  path: ["accountType"],
+}).refine((data) => {
+  if (data.payoutType === "mobile_wallet") {
+    return !!data.mobileWalletProvider && data.mobileWalletProvider.length > 0;
+  }
+  return true;
+}, {
+  message: "Wallet provider is required for mobile wallets",
+  path: ["mobileWalletProvider"],
+}).refine((data) => {
+  if (data.payoutType === "mobile_wallet") {
+    return !!data.mobileWalletNumber && data.mobileWalletNumber.length > 0;
+  }
+  return true;
+}, {
+  message: "Wallet number is required for mobile wallets",
+  path: ["mobileWalletNumber"],
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -47,48 +87,49 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
       bankName: "",
       routingNumber: "",
       swiftCode: "",
+      accountType: "",
       mobileWalletProvider: "",
       mobileWalletNumber: "",
     },
   });
 
-  // Update currency when country changes
   useEffect(() => {
     if (selectedCountry === "BD") {
       form.setValue("currency", "BDT");
     } else if (selectedCountry === "US") {
       form.setValue("currency", "USD");
     }
+    setSelectedPayoutType("");
+    form.setValue("payoutType", "");
+    form.setValue("accountType", "");
+    form.setValue("mobileWalletProvider", "");
   }, [selectedCountry, form]);
 
-  // Create payout account mutation using unified API
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      // Build account details based on payout type
-      const accountDetails: Record<string, any> = {
-        accountNumber: data.accountNumber,
+      const payload: Record<string, any> = {
+        payoutType: data.payoutType,
         accountHolderName: data.accountHolderName,
+        countryCode: data.countryCode,
+        currency: data.currency,
       };
 
       if (data.payoutType === "bank_account") {
-        accountDetails.bankName = data.bankName;
-        accountDetails.routingNumber = data.routingNumber;
-        accountDetails.swiftCode = data.swiftCode;
+        payload.accountNumber = data.accountNumber;
+        payload.bankName = data.bankName;
+        payload.routingNumber = data.routingNumber;
+        payload.swiftCode = data.swiftCode;
+        payload.accountType = data.accountType;
+        payload.branchName = "";
       } else if (data.payoutType === "mobile_wallet") {
-        accountDetails.mobileWalletProvider = data.mobileWalletProvider;
-        accountDetails.mobileWalletNumber = data.mobileWalletNumber || data.accountNumber;
+        payload.mobileWalletProvider = data.mobileWalletProvider;
+        payload.mobileWalletNumber = data.mobileWalletNumber;
+        payload.accountNumber = data.mobileWalletNumber;
+        payload.bankName = data.mobileWalletProvider;
+      } else if (data.payoutType === "stripe_connect") {
+        payload.accountNumber = "";
+        payload.bankName = "Stripe Connect";
       }
-
-      const payload = {
-        payoutType: data.payoutType,
-        accountHolderName: data.accountHolderName,
-        accountNumber: data.accountNumber || data.mobileWalletNumber,
-        routingNumber: data.routingNumber,
-        swiftCode: data.swiftCode,
-        bankName: data.bankName || data.mobileWalletProvider || "",
-        branchName: "",
-        mobileWalletNumber: data.mobileWalletNumber,
-      };
 
       return apiRequest("/api/payout/methods", {
         method: "POST",
@@ -119,6 +160,23 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
 
   const showBankFields = selectedPayoutType === "bank_account";
   const showMobileWalletFields = selectedPayoutType === "mobile_wallet";
+  const showStripeFields = selectedPayoutType === "stripe_connect";
+
+  const availablePayoutTypes = CountryPayoutTypes[selectedCountry] || [PayoutRailType.BANK_ACCOUNT];
+  const availableWalletProviders = CountryMobileWalletProviders[selectedCountry] || [];
+
+  const getPayoutTypeIcon = (type: string) => {
+    switch (type) {
+      case "bank_account":
+        return <Building2 className="h-4 w-4 mr-2" />;
+      case "mobile_wallet":
+        return <Smartphone className="h-4 w-4 mr-2" />;
+      case "stripe_connect":
+        return <CreditCard className="h-4 w-4 mr-2" />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <Form {...form}>
@@ -162,6 +220,8 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
                 onValueChange={(value) => {
                   field.onChange(value);
                   setSelectedPayoutType(value);
+                  form.setValue("accountType", "");
+                  form.setValue("mobileWalletProvider", "");
                 }}
                 value={field.value}
                 data-testid="select-payout-type"
@@ -172,12 +232,29 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
                   </SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  <SelectItem value="bank_account">Bank Account</SelectItem>
-                  {selectedCountry === "BD" && (
-                    <SelectItem value="mobile_wallet">Mobile Wallet (bKash, Nagad, Rocket)</SelectItem>
+                  {availablePayoutTypes.includes(PayoutRailType.BANK_ACCOUNT) && (
+                    <SelectItem value="bank_account">
+                      <span className="flex items-center">
+                        <Building2 className="h-4 w-4 mr-2" />
+                        Bank Account
+                      </span>
+                    </SelectItem>
                   )}
-                  {selectedCountry === "US" && (
-                    <SelectItem value="stripe_connect">Stripe Connect</SelectItem>
+                  {availablePayoutTypes.includes(PayoutRailType.MOBILE_WALLET) && (
+                    <SelectItem value="mobile_wallet">
+                      <span className="flex items-center">
+                        <Smartphone className="h-4 w-4 mr-2" />
+                        Mobile Wallet (bKash, Nagad, Rocket)
+                      </span>
+                    </SelectItem>
+                  )}
+                  {availablePayoutTypes.includes(PayoutRailType.EXTERNAL_PROVIDER) && (
+                    <SelectItem value="stripe_connect">
+                      <span className="flex items-center">
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Stripe Connect
+                      </span>
+                    </SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -227,9 +304,11 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="bKash">bKash</SelectItem>
-                          <SelectItem value="Nagad">Nagad</SelectItem>
-                          <SelectItem value="Rocket">Rocket</SelectItem>
+                          {availableWalletProviders.map((provider) => (
+                            <SelectItem key={provider} value={provider}>
+                              {provider}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -273,6 +352,34 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
 
                 <FormField
                   control={form.control}
+                  name="accountType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Account Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} data-testid="select-account-type">
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select account type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Object.entries(BankAccountTypeLabels).map(([value, label]) => (
+                            <SelectItem key={value} value={value}>
+                              {label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Select the type of bank account (checking, savings, or business)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="accountNumber"
                   render={({ field }) => (
                     <FormItem>
@@ -295,6 +402,9 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
                         <FormControl>
                           <Input {...field} placeholder="9-digit routing number" data-testid="input-routing-number" />
                         </FormControl>
+                        <FormDescription>
+                          The 9-digit ABA routing number for your bank
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -317,6 +427,16 @@ export default function AddPayoutMethodForm({ onSuccess }: AddPayoutMethodFormPr
                   />
                 )}
               </>
+            )}
+
+            {showStripeFields && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Stripe Connect setup will be initiated after saving. You'll be redirected to complete 
+                  the Stripe onboarding process to verify your business and connect your bank account.
+                </AlertDescription>
+              </Alert>
             )}
 
             <FormField

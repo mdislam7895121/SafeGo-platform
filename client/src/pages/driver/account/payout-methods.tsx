@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CreditCard, Plus, Check, Trash2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Plus, Check, Trash2, Building2, Smartphone, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
   DialogContent,
@@ -25,6 +26,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  PayoutRailType,
+  BankAccountType,
+  BankAccountTypeLabels,
+  CountryPayoutTypes,
+  CountryMobileWalletProviders,
+} from "@shared/types";
 
 interface PayoutMethod {
   id: string;
@@ -43,45 +51,72 @@ interface PayoutMethodsResponse {
   methods: PayoutMethod[];
 }
 
+interface DriverProfile {
+  countryCode?: string;
+}
+
+type PayoutType = "bank_account" | "mobile_wallet" | "stripe_connect";
+
 export default function PayoutMethods() {
   const { toast } = useToast();
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<PayoutMethod | null>(null);
 
-  // Form state
-  const [payoutType, setPayoutType] = useState<"bank_account" | "mobile_wallet">("bank_account");
+  const [payoutType, setPayoutType] = useState<PayoutType>("bank_account");
   const [provider, setProvider] = useState("");
   const [accountHolderName, setAccountHolderName] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
   const [routingNumber, setRoutingNumber] = useState("");
   const [bankName, setBankName] = useState("");
-  const [accountType, setAccountType] = useState<"checking" | "savings" | "other">("checking");
+  const [accountType, setAccountType] = useState<string>(BankAccountType.CHECKING);
 
-  // Fetch payout methods
   const { data, isLoading } = useQuery<PayoutMethodsResponse>({
     queryKey: ["/api/driver/payout-methods"],
   });
 
-  const methods = data?.methods || [];
-  
-  // Detect country from first method if available, otherwise default to US
-  const countryCode = methods.length > 0 ? methods[0].countryCode : "US";
+  const { data: profileData } = useQuery<DriverProfile>({
+    queryKey: ["/api/driver/profile"],
+  });
 
-  // Create payout method mutation
+  const methods = data?.methods || [];
+  const countryCode = profileData?.countryCode || (methods.length > 0 ? methods[0].countryCode : "US");
+
+  const availablePayoutTypes = CountryPayoutTypes[countryCode] || [PayoutRailType.BANK_ACCOUNT];
+  const availableWalletProviders = CountryMobileWalletProviders[countryCode] || [];
+
+  useEffect(() => {
+    if (!availablePayoutTypes.includes(PayoutRailType.BANK_ACCOUNT) && payoutType === "bank_account") {
+      if (availablePayoutTypes.includes(PayoutRailType.MOBILE_WALLET)) {
+        setPayoutType("mobile_wallet");
+      } else if (availablePayoutTypes.includes(PayoutRailType.EXTERNAL_PROVIDER)) {
+        setPayoutType("stripe_connect");
+      }
+    }
+  }, [countryCode, availablePayoutTypes, payoutType]);
+
   const createMutation = useMutation({
     mutationFn: async () => {
+      const payload: Record<string, any> = {
+        payoutType,
+        accountHolderName,
+      };
+
+      if (payoutType === "bank_account") {
+        payload.accountNumber = accountNumber;
+        payload.routingNumber = routingNumber;
+        payload.bankName = bankName;
+        payload.accountType = accountType;
+      } else if (payoutType === "mobile_wallet") {
+        payload.provider = provider;
+        payload.accountNumber = accountNumber;
+      } else if (payoutType === "stripe_connect") {
+        payload.accountNumber = "";
+      }
+
       return await apiRequest("/api/driver/payout-methods", {
         method: "POST",
-        body: JSON.stringify({
-          payoutType,
-          provider: payoutType === "mobile_wallet" ? provider : undefined,
-          accountHolderName,
-          accountNumber,
-          routingNumber: payoutType === "bank_account" ? routingNumber : undefined,
-          bankName: payoutType === "bank_account" ? bankName : undefined,
-          accountType: payoutType === "bank_account" ? accountType : undefined,
-        }),
+        body: JSON.stringify(payload),
         headers: { "Content-Type": "application/json" },
       });
     },
@@ -92,6 +127,7 @@ export default function PayoutMethods() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/driver/payout-methods"] });
       queryClient.invalidateQueries({ queryKey: ["/api/driver/payout-method"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payout/methods"] });
       setAddDialogOpen(false);
       resetForm();
     },
@@ -104,7 +140,6 @@ export default function PayoutMethods() {
     },
   });
 
-  // Set default mutation
   const setDefaultMutation = useMutation({
     mutationFn: async (id: string) => {
       return await apiRequest(`/api/driver/payout-methods/${id}/set-default`, {
@@ -120,6 +155,7 @@ export default function PayoutMethods() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/driver/payout-methods"] });
       queryClient.invalidateQueries({ queryKey: ["/api/driver/payout-method"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payout/methods"] });
     },
     onError: (error: any) => {
       toast({
@@ -130,7 +166,6 @@ export default function PayoutMethods() {
     },
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       return await apiRequest(`/api/driver/payout-methods/${id}`, {
@@ -146,6 +181,7 @@ export default function PayoutMethods() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/driver/payout-methods"] });
       queryClient.invalidateQueries({ queryKey: ["/api/driver/payout-method"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payout/methods"] });
       setDeleteDialogOpen(false);
       setSelectedMethod(null);
     },
@@ -165,29 +201,76 @@ export default function PayoutMethods() {
     setAccountNumber("");
     setRoutingNumber("");
     setBankName("");
-    setAccountType("checking");
+    setAccountType(BankAccountType.CHECKING);
   };
 
   const handleAddMethod = () => {
-    if (!accountHolderName || !accountNumber) {
+    if (!accountHolderName) {
       toast({
         title: "Missing information",
-        description: "Please fill in all required fields",
+        description: "Please enter the account holder name",
         variant: "destructive",
       });
       return;
     }
 
-    if (payoutType === "mobile_wallet" && !provider) {
-      toast({
-        title: "Missing information",
-        description: "Please select a provider for mobile wallet",
-        variant: "destructive",
-      });
-      return;
+    if (payoutType === "bank_account") {
+      if (!accountNumber) {
+        toast({
+          title: "Missing information",
+          description: "Please enter the account number",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!accountType) {
+        toast({
+          title: "Missing information",
+          description: "Please select an account type",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (payoutType === "mobile_wallet") {
+      if (!provider) {
+        toast({
+          title: "Missing information",
+          description: "Please select a wallet provider",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!accountNumber) {
+        toast({
+          title: "Missing information",
+          description: "Please enter your mobile wallet number",
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     createMutation.mutate();
+  };
+
+  const handlePayoutTypeChange = (value: PayoutType) => {
+    setPayoutType(value);
+    setProvider("");
+    setAccountNumber("");
+    setRoutingNumber("");
+    setBankName("");
+    setAccountType(BankAccountType.CHECKING);
+  };
+
+  const getPayoutTypeLabel = () => {
+    if (countryCode === "BD") {
+      return "Add a bank account or mobile wallet to receive payments";
+    } else if (countryCode === "US") {
+      return "Add a bank account or connect with Stripe to receive payments";
+    }
+    return "Add a bank account to receive payments";
   };
 
   if (isLoading) {
@@ -213,7 +296,6 @@ export default function PayoutMethods() {
 
   return (
     <div className="bg-background min-h-screen">
-      {/* Header */}
       <div className="bg-primary text-primary-foreground p-6">
         <div className="flex items-center gap-4">
           <Link href="/driver/wallet">
@@ -226,7 +308,6 @@ export default function PayoutMethods() {
       </div>
 
       <div className="p-6 max-w-2xl mx-auto space-y-6">
-        {/* Empty state */}
         {methods.length === 0 && (
           <Card>
             <CardContent className="p-8 text-center">
@@ -243,7 +324,6 @@ export default function PayoutMethods() {
           </Card>
         )}
 
-        {/* Methods list */}
         {methods.length > 0 && (
           <>
             <Card>
@@ -260,10 +340,14 @@ export default function PayoutMethods() {
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <CreditCard className="h-6 w-6 text-primary" />
+                        {method.type === "mobile_wallet" ? (
+                          <Smartphone className="h-6 w-6 text-primary" />
+                        ) : (
+                          <Building2 className="h-6 w-6 text-primary" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <p className="font-medium truncate">{method.displayName}</p>
                           {method.isDefault && (
                             <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
@@ -322,61 +406,79 @@ export default function PayoutMethods() {
                 <CardTitle>About Payouts</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>• Payouts are processed weekly or on-demand via cash out</p>
-                <p>• It may take 1-3 business days for funds to arrive</p>
-                <p>• Ensure your payout method information is accurate</p>
-                <p>• You can change your primary payout method at any time</p>
+                <p>Payouts are processed weekly or on-demand via cash out</p>
+                <p>It may take 1-3 business days for funds to arrive</p>
+                <p>Ensure your payout method information is accurate</p>
+                <p>You can change your primary payout method at any time</p>
               </CardContent>
             </Card>
           </>
         )}
       </div>
 
-      {/* Add Method Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
-        <DialogContent data-testid="dialog-add-payout-method">
+        <DialogContent className="max-w-md" data-testid="dialog-add-payout-method">
           <DialogHeader>
             <DialogTitle>Add Payout Method</DialogTitle>
             <DialogDescription>
-              {countryCode === "BD"
-                ? "Add a bank account or mobile wallet to receive payments"
-                : "Add a bank account to receive payments"}
+              {getPayoutTypeLabel()}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Payout Type */}
             <div className="space-y-2">
               <Label htmlFor="payoutType">Payout Type</Label>
-              <Select value={payoutType} onValueChange={(v: any) => setPayoutType(v)}>
+              <Select value={payoutType} onValueChange={handlePayoutTypeChange}>
                 <SelectTrigger data-testid="select-payout-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="bank_account">Bank Account</SelectItem>
-                  {countryCode === "BD" && <SelectItem value="mobile_wallet">Mobile Wallet</SelectItem>}
+                  {availablePayoutTypes.includes(PayoutRailType.BANK_ACCOUNT) && (
+                    <SelectItem value="bank_account">
+                      <span className="flex items-center">
+                        <Building2 className="h-4 w-4 mr-2" />
+                        Bank Account
+                      </span>
+                    </SelectItem>
+                  )}
+                  {availablePayoutTypes.includes(PayoutRailType.MOBILE_WALLET) && (
+                    <SelectItem value="mobile_wallet">
+                      <span className="flex items-center">
+                        <Smartphone className="h-4 w-4 mr-2" />
+                        Mobile Wallet
+                      </span>
+                    </SelectItem>
+                  )}
+                  {availablePayoutTypes.includes(PayoutRailType.EXTERNAL_PROVIDER) && (
+                    <SelectItem value="stripe_connect">
+                      <span className="flex items-center">
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Stripe Connect
+                      </span>
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Mobile Wallet Provider (BD only) */}
-            {payoutType === "mobile_wallet" && countryCode === "BD" && (
+            {payoutType === "mobile_wallet" && availableWalletProviders.length > 0 && (
               <div className="space-y-2">
-                <Label htmlFor="provider">Provider</Label>
+                <Label htmlFor="provider">Wallet Provider</Label>
                 <Select value={provider} onValueChange={setProvider}>
                   <SelectTrigger data-testid="select-provider">
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bkash">bKash</SelectItem>
-                    <SelectItem value="nagad">Nagad</SelectItem>
-                    <SelectItem value="rocket">Rocket</SelectItem>
+                    {availableWalletProviders.map((walletProvider) => (
+                      <SelectItem key={walletProvider} value={walletProvider.toLowerCase()}>
+                        {walletProvider}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             )}
 
-            {/* Account Holder Name */}
             <div className="space-y-2">
               <Label htmlFor="accountHolderName">Account Holder Name</Label>
               <Input
@@ -388,40 +490,27 @@ export default function PayoutMethods() {
               />
             </div>
 
-            {/* Account Number */}
-            <div className="space-y-2">
-              <Label htmlFor="accountNumber">
-                {payoutType === "mobile_wallet" ? "Mobile Number" : "Account Number"}
-              </Label>
-              <Input
-                id="accountNumber"
-                value={accountNumber}
-                onChange={(e) => setAccountNumber(e.target.value)}
-                placeholder={
-                  payoutType === "mobile_wallet"
-                    ? "01XXXXXXXXX"
-                    : "Account number"
-                }
-                data-testid="input-account-number"
-              />
-            </div>
+            {payoutType !== "stripe_connect" && (
+              <div className="space-y-2">
+                <Label htmlFor="accountNumber">
+                  {payoutType === "mobile_wallet" ? "Mobile Number" : "Account Number"}
+                </Label>
+                <Input
+                  id="accountNumber"
+                  value={accountNumber}
+                  onChange={(e) => setAccountNumber(e.target.value)}
+                  placeholder={
+                    payoutType === "mobile_wallet"
+                      ? "01XXXXXXXXX"
+                      : "Account number"
+                  }
+                  data-testid="input-account-number"
+                />
+              </div>
+            )}
 
-            {/* Bank-specific fields */}
             {payoutType === "bank_account" && (
               <>
-                {countryCode === "US" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="routingNumber">Routing Number</Label>
-                    <Input
-                      id="routingNumber"
-                      value={routingNumber}
-                      onChange={(e) => setRoutingNumber(e.target.value)}
-                      placeholder="9-digit routing number"
-                      data-testid="input-routing-number"
-                    />
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <Label htmlFor="bankName">Bank Name</Label>
                   <Input
@@ -435,19 +524,58 @@ export default function PayoutMethods() {
 
                 <div className="space-y-2">
                   <Label htmlFor="accountType">Account Type</Label>
-                  <Select value={accountType} onValueChange={(v: "checking" | "savings" | "other") => setAccountType(v)}>
+                  <Select value={accountType} onValueChange={setAccountType}>
                     <SelectTrigger data-testid="select-account-type">
                       <SelectValue placeholder="Select account type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="checking">Checking</SelectItem>
-                      <SelectItem value="savings">Savings</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      {Object.entries(BankAccountTypeLabels).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-sm text-muted-foreground">
+                    Select the type of bank account (checking, savings, or business)
+                  </p>
                 </div>
+
+                {countryCode === "US" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="routingNumber">Routing Number</Label>
+                    <Input
+                      id="routingNumber"
+                      value={routingNumber}
+                      onChange={(e) => setRoutingNumber(e.target.value)}
+                      placeholder="9-digit routing number"
+                      data-testid="input-routing-number"
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      The 9-digit ABA routing number for your bank
+                    </p>
+                  </div>
+                )}
               </>
             )}
+
+            {payoutType === "stripe_connect" && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Stripe Connect setup will be initiated after saving. You'll be redirected to complete 
+                  the Stripe onboarding process to verify your identity and connect your bank account.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                This payout method requires <strong>FULL</strong> KYC verification. 
+                Please ensure your identity documents are submitted and verified.
+              </AlertDescription>
+            </Alert>
           </div>
 
           <DialogFooter>
@@ -468,7 +596,6 @@ export default function PayoutMethods() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent data-testid="dialog-delete-confirmation">
           <DialogHeader>
