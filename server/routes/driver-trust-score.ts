@@ -251,6 +251,80 @@ router.get("/history", async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.post("/recalculate-all", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const allDriverStats = await prisma.driverStats.findMany({
+      include: {
+        driver: {
+          select: { id: true, isVerified: true }
+        }
+      }
+    });
+
+    let updated = 0;
+    let skipped = 0;
+
+    for (const stats of allDriverStats) {
+      if (!stats.driver.isVerified) {
+        skipped++;
+        continue;
+      }
+
+      const { score, breakdown } = calculateTrustScore({
+        onTimeArrivalRate: serializeDecimal(stats.onTimeArrivalRate),
+        riderRatingAvg: serializeDecimal(stats.riderRatingAvg),
+        cancellationRate: serializeDecimal(stats.cancellationRate),
+        safetyViolationCount: stats.safetyViolationCount,
+        supportTicketScore: stats.supportTicketScore,
+        totalTrips: stats.totalTrips
+      });
+
+      await prisma.driverStats.update({
+        where: { id: stats.id },
+        data: {
+          trustScore: score,
+          trustScoreBreakdown: breakdown as unknown as Prisma.InputJsonValue,
+          lastTrustScoreUpdate: new Date()
+        }
+      });
+
+      updated++;
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        id: crypto.randomUUID(),
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: "admin",
+        actionType: "TRUST_SCORE_BATCH_RECALCULATE",
+        entityType: "driver_stats",
+        entityId: "batch",
+        description: `Admin triggered batch trust score recalculation. Updated: ${updated}, Skipped: ${skipped}`,
+        metadata: { updated, skipped, totalProcessed: allDriverStats.length }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: "Batch trust score recalculation complete",
+      updated,
+      skipped,
+      totalProcessed: allDriverStats.length
+    });
+  } catch (error) {
+    console.error("Batch recalculate trust scores error:", error);
+    res.status(500).json({ error: "Failed to recalculate trust scores" });
+  }
+});
+
 router.post("/recalculate", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.userId;
