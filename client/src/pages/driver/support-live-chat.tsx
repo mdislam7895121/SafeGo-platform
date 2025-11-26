@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
   Clock,
   CheckCircle2,
   Loader2,
+  ArrowLeft,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -119,14 +121,21 @@ export default function SupportLiveChat() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
-              Live Chat Support
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Get instant help from our support team
-            </p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Link href="/driver/support">
+              <Button variant="ghost" size="icon" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight" data-testid="text-page-title">
+                Live Chat Support
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Get instant help from our support team
+              </p>
+            </div>
           </div>
           {sessionId && (
             <Button
@@ -226,26 +235,26 @@ export default function SupportLiveChat() {
                 )}
 
                 {messages.map((msg: any) => {
-                  const isFromRestaurant = msg.senderRole === "restaurant";
+                  const isFromDriver = msg.senderRole === "driver";
                   return (
                     <div
                       key={msg.id}
-                      className={`flex gap-3 ${isFromRestaurant ? "flex-row-reverse" : ""}`}
+                      className={`flex gap-3 ${isFromDriver ? "flex-row-reverse" : ""}`}
                       data-testid={`message-${msg.id}`}
                     >
                       <Avatar className="h-8 w-8">
-                        <AvatarFallback className={isFromRestaurant ? "bg-primary/10" : "bg-blue-100 dark:bg-blue-900/20"}>
-                          {isFromRestaurant ? (
+                        <AvatarFallback className={isFromDriver ? "bg-primary/10" : "bg-blue-100 dark:bg-blue-900/20"}>
+                          {isFromDriver ? (
                             <User className="h-4 w-4" />
                           ) : (
                             <Headphones className="h-4 w-4 text-blue-600" />
                           )}
                         </AvatarFallback>
                       </Avatar>
-                      <div className={`flex-1 space-y-1 ${isFromRestaurant ? "items-end" : "items-start"}`}>
+                      <div className={`flex-1 space-y-1 ${isFromDriver ? "items-end" : "items-start"}`}>
                         <div
                           className={`inline-block px-4 py-2 rounded-2xl max-w-[80%] ${
-                            isFromRestaurant
+                            isFromDriver
                               ? "bg-primary text-primary-foreground rounded-br-sm"
                               : "bg-muted rounded-bl-sm"
                           }`}

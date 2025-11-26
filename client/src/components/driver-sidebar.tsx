@@ -28,6 +28,7 @@ import {
   Sparkles,
   FileText,
   Car,
+  MessageSquare,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -89,9 +90,14 @@ const menuItems = [
     href: "/driver/settings",
   },
   {
+    title: "Support",
+    icon: MessageSquare,
+    href: "/driver/support",
+  },
+  {
     title: "Help Center",
     icon: HelpCircle,
-    href: "/driver/support-help-center",
+    href: "/driver/support/help",
   },
 ];
 
