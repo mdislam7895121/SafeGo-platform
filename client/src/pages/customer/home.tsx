@@ -648,7 +648,7 @@ export default function CustomerHome() {
                         hideIcon={true}
                         inputClassName="pr-10 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500 font-medium"
                       />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 z-20">
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 z-20 pointer-events-none">
                         <ChevronRight className="h-4 w-4 text-gray-400" />
                       </div>
                       

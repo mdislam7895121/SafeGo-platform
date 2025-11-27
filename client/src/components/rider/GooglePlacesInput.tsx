@@ -63,7 +63,7 @@ export function GooglePlacesInput({
       return;
     }
 
-    console.log("[GooglePlacesInput] Initializing Autocomplete widget...");
+    console.log(`[GooglePlacesInput:${variant}] Initializing Autocomplete widget...`);
 
     const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
       fields: ["formatted_address", "geometry", "place_id", "name"],
@@ -131,7 +131,7 @@ export function GooglePlacesInput({
       }, 200);
     });
 
-    console.log("[GooglePlacesInput] Autocomplete initialized successfully");
+    console.log(`[GooglePlacesInput:${variant}] Autocomplete initialized successfully`);
 
     return () => {
       if (dropdownListenerRef.current) {
