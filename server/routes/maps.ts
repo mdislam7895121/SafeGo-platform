@@ -238,6 +238,100 @@ router.post("/directions", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/maps/route
+// Get route with traffic-aware alternatives for ride planning
+// Returns multiple routes with traffic data for route selection
+// ====================================================
+router.get("/route", async (req: AuthRequest, res) => {
+  try {
+    if (!GOOGLE_MAPS_API_KEY) {
+      return res.status(503).json({ success: false, message: "Maps service not configured" });
+    }
+
+    const userId = req.user!.userId;
+    
+    if (!checkRateLimit(userId)) {
+      return res.status(429).json({ success: false, message: "Too many requests" });
+    }
+
+    const { origin, destination } = req.query;
+    
+    if (!origin || !destination) {
+      return res.status(400).json({ success: false, message: "Missing origin or destination" });
+    }
+
+    // Validate coordinate format "lat,lng"
+    const originMatch = String(origin).match(/^(-?\d+\.?\d*),(-?\d+\.?\d*)$/);
+    const destMatch = String(destination).match(/^(-?\d+\.?\d*),(-?\d+\.?\d*)$/);
+    
+    if (!originMatch || !destMatch) {
+      return res.status(400).json({ success: false, message: "Invalid coordinate format. Use lat,lng" });
+    }
+
+    const params = new URLSearchParams({
+      origin: String(origin),
+      destination: String(destination),
+      key: GOOGLE_MAPS_API_KEY,
+      mode: "driving",
+      alternatives: "true",
+      departure_time: "now",
+      traffic_model: "best_guess",
+      units: "imperial",
+      language: "en",
+    });
+
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      console.error("[Maps] Route API error:", response.status);
+      return res.status(502).json({ success: false, message: "Maps service error" });
+    }
+
+    const data = await response.json();
+
+    if (data.status !== "OK") {
+      console.error("[Maps] Route status:", data.status, data.error_message);
+      return res.json({ success: false, message: data.status });
+    }
+
+    // Map routes to clean format
+    const routes = data.routes.map((r: any, index: number) => {
+      const leg = r.legs?.[0];
+      if (!leg) return null;
+
+      const distanceMeters = leg.distance?.value || 0;
+      const durationSeconds = leg.duration?.value || 0;
+      const durationInTrafficSeconds = leg.duration_in_traffic?.value || durationSeconds;
+
+      return {
+        id: index,
+        summary: r.summary || `Route ${index + 1}`,
+        polyline: r.overview_polyline?.points || "",
+        distanceMeters,
+        distanceMiles: Math.round((distanceMeters / 1609.344) * 10) / 10,
+        distanceText: leg.distance?.text || "",
+        durationSeconds,
+        durationInTrafficSeconds,
+        durationText: leg.duration?.text || "",
+        durationInTrafficText: leg.duration_in_traffic?.text || leg.duration?.text || "",
+        startAddress: leg.start_address,
+        endAddress: leg.end_address,
+      };
+    }).filter(Boolean);
+
+    res.json({
+      success: true,
+      routes,
+    });
+  } catch (error) {
+    console.error("[Maps] Route error:", error);
+    res.status(500).json({ success: false, message: "Failed to calculate routes" });
+  }
+});
+
+// ====================================================
 // POST /api/maps/distance-matrix
 // Get distance/duration for multiple origins/destinations
 // ====================================================

@@ -80,3 +80,72 @@ export function getTrafficConditionLabel(date: Date = new Date()): string {
   }
   return "Light traffic";
 }
+
+/**
+ * Compute traffic level based on the ratio of traffic duration to base duration.
+ */
+export function getTrafficLevel(durationInTrafficSeconds: number, durationSeconds: number): "light" | "moderate" | "heavy" {
+  if (durationSeconds <= 0) return "light";
+  const ratio = durationInTrafficSeconds / durationSeconds;
+  if (ratio < 1.1) return "light";
+  if (ratio < 1.3) return "moderate";
+  return "heavy";
+}
+
+/**
+ * Get traffic label based on computed traffic level.
+ */
+export function getTrafficLevelLabel(level: "light" | "moderate" | "heavy"): string {
+  switch (level) {
+    case "light": return "Light traffic on this route";
+    case "moderate": return "Some traffic expected";
+    case "heavy": return "Heavy traffic expected";
+  }
+}
+
+/**
+ * Decode a Google polyline string into an array of [lat, lng] coordinates.
+ * Implementation based on the Google Polyline Algorithm.
+ */
+export function decodePolyline(encoded: string): [number, number][] {
+  if (!encoded) return [];
+  
+  const points: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte: number;
+
+    // Decode latitude
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    // Decode longitude
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    // Convert to actual coordinates (divide by 1e5)
+    points.push([lat / 1e5, lng / 1e5]);
+  }
+
+  return points;
+}

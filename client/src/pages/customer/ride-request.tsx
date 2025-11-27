@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Navigation, Crosshair, Loader2, Clock, Home, Briefcase, Star, ChevronRight, CreditCard, Wallet, AlertCircle, Car } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, Crosshair, Loader2, Clock, Home, Briefcase, Star, ChevronRight, CreditCard, Wallet, AlertCircle, Car, Route as RouteIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,7 +18,12 @@ import {
   type SavedPlace,
   type RecentLocation
 } from "@/lib/locationService";
-import { formatDurationMinutes, getTrafficAwareDuration, getTrafficConditionLabel } from "@/lib/formatters";
+import { 
+  formatDurationMinutes, 
+  getTrafficLevel, 
+  getTrafficLevelLabel, 
+  decodePolyline 
+} from "@/lib/formatters";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -30,6 +35,21 @@ interface LocationData {
   name?: string;
 }
 
+interface RouteData {
+  id: number;
+  summary: string;
+  polyline: string;
+  distanceMeters: number;
+  distanceMiles: number;
+  distanceText: string;
+  durationSeconds: number;
+  durationInTrafficSeconds: number;
+  durationText: string;
+  durationInTrafficText: string;
+  startAddress: string;
+  endAddress: string;
+}
+
 interface FareEstimate {
   baseFare: number;
   distanceFare: number;
@@ -39,7 +59,8 @@ interface FareEstimate {
   etaMinutes: number;
   etaWithTrafficMinutes: number;
   distanceKm: number;
-  trafficCondition: string;
+  trafficLevel: "light" | "moderate" | "heavy";
+  trafficLabel: string;
 }
 
 function createPickupIcon() {
@@ -114,7 +135,7 @@ function MapBoundsHandler({
   return null;
 }
 
-function generateRoutePolyline(pickup: LocationData, dropoff: LocationData): [number, number][] {
+function generateFallbackPolyline(pickup: LocationData, dropoff: LocationData): [number, number][] {
   const points: [number, number][] = [];
   const steps = 20;
   
@@ -189,14 +210,31 @@ export default function RideRequest() {
   const [hasCheckedStorage, setHasCheckedStorage] = useState(false);
   const [pickupIcon, setPickupIcon] = useState<any>(null);
   const [dropoffIcon, setDropoffIcon] = useState<any>(null);
+  
+  const [routes, setRoutes] = useState<RouteData[]>([]);
+  const [activeRouteId, setActiveRouteId] = useState<number>(0);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeFetchCompleted, setRouteFetchCompleted] = useState(false);
 
-  const routePolyline = useMemo(() => {
+  const activeRoute = useMemo(() => routes.find(r => r.id === activeRouteId), [routes, activeRouteId]);
+  
+  const routePolylines = useMemo(() => {
+    if (typeof window === "undefined" || !routes.length) return [];
+    return routes.map(route => ({
+      id: route.id,
+      points: decodePolyline(route.polyline),
+    }));
+  }, [routes]);
+
+  const fallbackPolyline = useMemo(() => {
     if (typeof window === "undefined") return [];
-    if (pickup && dropoff) {
-      return generateRoutePolyline(pickup, dropoff);
+    // Only show fallback when fetch completed but no routes available
+    if (pickup && dropoff && routeFetchCompleted && routes.length === 0) {
+      return generateFallbackPolyline(pickup, dropoff);
     }
     return [];
-  }, [pickup, dropoff]);
+  }, [pickup, dropoff, routeFetchCompleted, routes.length]);
 
   // Read pickup/destination from sessionStorage (passed from home page)
   useEffect(() => {
@@ -305,34 +343,58 @@ export default function RideRequest() {
     }
   }, [isClient, hasCheckedStorage, pickup, handleGetCurrentLocation]);
 
-  useEffect(() => {
-    if (pickup && dropoff) {
-      calculateFareEstimate();
-    } else {
-      setFareEstimate(null);
+  // Fetch routes when both locations are set
+  const fetchRoutes = useCallback(async () => {
+    if (!pickup || !dropoff) {
+      setRoutes([]);
+      setRouteFetchCompleted(false);
+      return;
+    }
+    
+    setIsLoadingRoutes(true);
+    setRouteError(null);
+    setRouteFetchCompleted(false);
+    
+    try {
+      const origin = `${pickup.lat},${pickup.lng}`;
+      const destination = `${dropoff.lat},${dropoff.lng}`;
+      
+      const response = await apiRequest(`/api/maps/route?origin=${origin}&destination=${destination}`);
+      
+      if (response?.success && response.routes?.length > 0) {
+        setRoutes(response.routes);
+        setActiveRouteId(0); // Default to first route (fastest)
+        setRouteFetchCompleted(true);
+      } else {
+        console.warn("[RideRequest] No routes returned, using fallback");
+        setRoutes([]);
+        setRouteError("Could not find driving routes. Showing estimated path.");
+        setRouteFetchCompleted(true);
+      }
+    } catch (error) {
+      console.error("[RideRequest] Route fetch error:", error);
+      setRoutes([]);
+      setRouteError("Could not load routes. Showing estimated path.");
+      setRouteFetchCompleted(true);
+    } finally {
+      setIsLoadingRoutes(false);
     }
   }, [pickup, dropoff]);
 
-  const calculateFareEstimate = useCallback(async () => {
-    if (!pickup || !dropoff) return;
-    
+  const calculateFareFromRoute = useCallback((route: RouteData) => {
     setIsCalculatingFare(true);
     
-    const routeInfo = calculateRouteInfo(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    // Apply traffic-aware duration for pricing
-    const now = new Date();
-    const etaWithTrafficMinutes = getTrafficAwareDuration(routeInfo.etaMinutes, now);
-    const trafficCondition = getTrafficConditionLabel(now);
+    const distanceKm = route.distanceMeters / 1000;
+    const etaMinutes = Math.ceil(route.durationSeconds / 60);
+    const etaWithTrafficMinutes = Math.ceil(route.durationInTrafficSeconds / 60);
+    const trafficLevel = getTrafficLevel(route.durationInTrafficSeconds, route.durationSeconds);
+    const trafficLabel = getTrafficLevelLabel(trafficLevel);
     
     const baseFare = 2.50;
     const perKmRate = 1.25;
     const perMinRate = 0.30;
     
-    const distanceFare = routeInfo.distanceKm * perKmRate;
-    // Use traffic-aware duration for time-based fare calculation
+    const distanceFare = distanceKm * perKmRate;
     const timeFare = etaWithTrafficMinutes * perMinRate;
     const totalFare = baseFare + distanceFare + timeFare;
     
@@ -342,14 +404,65 @@ export default function RideRequest() {
       timeFare: Math.round(timeFare * 100) / 100,
       totalFare: Math.round(totalFare * 100) / 100,
       currency: "USD",
-      etaMinutes: routeInfo.etaMinutes,
+      etaMinutes,
       etaWithTrafficMinutes,
+      distanceKm: Math.round(distanceKm * 10) / 10,
+      trafficLevel,
+      trafficLabel,
+    });
+    
+    setIsCalculatingFare(false);
+  }, []);
+
+  const calculateFareEstimateFallback = useCallback(() => {
+    if (!pickup || !dropoff) return;
+    
+    setIsCalculatingFare(true);
+    
+    const routeInfo = calculateRouteInfo(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+    
+    const baseFare = 2.50;
+    const perKmRate = 1.25;
+    const perMinRate = 0.30;
+    
+    const distanceFare = routeInfo.distanceKm * perKmRate;
+    const timeFare = routeInfo.etaMinutes * perMinRate;
+    const totalFare = baseFare + distanceFare + timeFare;
+    
+    setFareEstimate({
+      baseFare,
+      distanceFare: Math.round(distanceFare * 100) / 100,
+      timeFare: Math.round(timeFare * 100) / 100,
+      totalFare: Math.round(totalFare * 100) / 100,
+      currency: "USD",
+      etaMinutes: routeInfo.etaMinutes,
+      etaWithTrafficMinutes: routeInfo.etaMinutes,
       distanceKm: routeInfo.distanceKm,
-      trafficCondition,
+      trafficLevel: "moderate",
+      trafficLabel: "Estimated traffic",
     });
     
     setIsCalculatingFare(false);
   }, [pickup, dropoff]);
+
+  useEffect(() => {
+    if (pickup && dropoff) {
+      fetchRoutes();
+    } else {
+      setRoutes([]);
+      setFareEstimate(null);
+    }
+  }, [pickup, dropoff, fetchRoutes]);
+
+  // Calculate fare when active route changes
+  useEffect(() => {
+    if (activeRoute) {
+      calculateFareFromRoute(activeRoute);
+    } else if (pickup && dropoff && routeFetchCompleted && routes.length === 0) {
+      // Fallback to Haversine calculation when routes fetch failed
+      calculateFareEstimateFallback();
+    }
+  }, [activeRoute, pickup, dropoff, routeFetchCompleted, routes.length, calculateFareFromRoute, calculateFareEstimateFallback]);
 
   const handlePickupSelect = useCallback((location: { address: string; lat: number; lng: number }) => {
     setPickup(location);
@@ -498,9 +611,27 @@ export default function RideRequest() {
             {dropoff && dropoffIcon && (
               <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />
             )}
-            {routePolyline.length > 0 && (
+            
+            {/* Render all routes - inactive routes first (dimmed), active route on top */}
+            {routePolylines.map(({ id, points }) => (
               <Polyline
-                positions={routePolyline}
+                key={id}
+                positions={points}
+                pathOptions={{
+                  color: id === activeRouteId ? "#3B82F6" : "#94A3B8",
+                  weight: id === activeRouteId ? 5 : 3,
+                  opacity: id === activeRouteId ? 0.9 : 0.4,
+                }}
+                eventHandlers={{
+                  click: () => setActiveRouteId(id),
+                }}
+              />
+            ))}
+            
+            {/* Fallback dashed line when no routes available */}
+            {fallbackPolyline.length > 0 && (
+              <Polyline
+                positions={fallbackPolyline}
                 pathOptions={{
                   color: "#3B82F6",
                   weight: 4,
@@ -650,15 +781,51 @@ export default function RideRequest() {
                 </div>
               </div>
               <div className="mt-2 flex items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="text-xs">
+                <Badge 
+                  variant="secondary" 
+                  className={`text-xs ${
+                    fareEstimate.trafficLevel === "heavy" 
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" 
+                      : fareEstimate.trafficLevel === "moderate"
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                  }`}
+                >
                   <Car className="h-3 w-3 mr-1" />
-                  {fareEstimate.trafficCondition}
+                  {fareEstimate.trafficLabel}
                 </Badge>
                 <Badge variant="secondary" className="text-xs">
                   <Wallet className="h-3 w-3 mr-1" />
                   Card/Wallet only
                 </Badge>
               </div>
+              
+              {/* Route Selection */}
+              {routes.length > 1 && (
+                <div className="mt-3 pt-3 border-t">
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">Choose route:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {routes.map((route, index) => {
+                      const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
+                      const isActive = route.id === activeRouteId;
+                      return (
+                        <Button
+                          key={route.id}
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          className={`text-xs h-8 ${isActive ? "" : "opacity-70"}`}
+                          onClick={() => setActiveRouteId(route.id)}
+                          data-testid={`button-route-${route.id}`}
+                        >
+                          <RouteIcon className="h-3 w-3 mr-1" />
+                          {index === 0 ? "Fastest" : route.summary || `Route ${index + 1}`}
+                          <span className="ml-1 opacity-75">({formatDurationMinutes(etaMin)})</span>
+                        </Button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
