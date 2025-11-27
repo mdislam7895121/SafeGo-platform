@@ -1077,4 +1077,639 @@ router.post(
   }
 );
 
+interface PendingTripRequest {
+  id: string;
+  serviceType: "RIDE" | "FOOD" | "PARCEL";
+  customerName: string;
+  customerRating: number | null;
+  pickupAddress: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  dropoffAddress: string;
+  dropoffLat: number | null;
+  dropoffLng: number | null;
+  estimatedFare: number;
+  distanceToPickup: number | null;
+  etaMinutes: number | null;
+  surgeMultiplier: number | null;
+  boostAmount: number | null;
+  requestedAt: Date;
+  expiresAt: Date;
+}
+
+function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function calculateEtaFromDistance(distanceKm: number, avgSpeedKmh: number = 30): number {
+  return Math.ceil((distanceKm / avgSpeedKmh) * 60);
+}
+
+router.get(
+  "/requests/pending",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        include: { vehicle: true },
+      });
+      
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      
+      if (!driverProfile.isVerified) {
+        return res.status(403).json({ error: "Driver must be verified to receive requests" });
+      }
+      
+      const primaryVehicle = await prisma.vehicle.findFirst({
+        where: { driverId: driverProfile.id, isPrimary: true, isActive: true },
+      });
+      
+      if (!primaryVehicle || !primaryVehicle.isOnline) {
+        return res.status(403).json({ error: "Driver must be online to receive requests" });
+      }
+      
+      const hasActiveTrip = await prisma.ride.findFirst({
+        where: {
+          driverId: driverProfile.id,
+          status: { in: ["accepted", "arrived", "started", "in_progress"] },
+        },
+      });
+      
+      if (hasActiveTrip) {
+        return res.json({ requests: [], message: "Driver has active trip" });
+      }
+      
+      const pendingRequests: PendingTripRequest[] = [];
+      const driverLat = driverProfile.currentLat || 0;
+      const driverLng = driverProfile.currentLng || 0;
+      
+      const pendingRides = await prisma.ride.findMany({
+        where: {
+          status: { in: ["requested", "searching_driver"] },
+          driverId: null,
+          isDemo: false,
+        },
+        include: {
+          customer: {
+            include: {
+              user: { select: { email: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      });
+      
+      for (const ride of pendingRides) {
+        const distanceToPickup = (ride.pickupLat && ride.pickupLng && driverLat && driverLng)
+          ? calculateDistance(driverLat, driverLng, ride.pickupLat, ride.pickupLng)
+          : null;
+        
+        pendingRequests.push({
+          id: ride.id,
+          serviceType: "RIDE",
+          customerName: ride.customer?.user?.email?.split("@")[0] || "Customer",
+          customerRating: null,
+          pickupAddress: ride.pickupAddress,
+          pickupLat: ride.pickupLat,
+          pickupLng: ride.pickupLng,
+          dropoffAddress: ride.dropoffAddress,
+          dropoffLat: ride.dropoffLat,
+          dropoffLng: ride.dropoffLng,
+          estimatedFare: serializeDecimal(ride.serviceFare),
+          distanceToPickup,
+          etaMinutes: distanceToPickup ? calculateEtaFromDistance(distanceToPickup) : null,
+          surgeMultiplier: null,
+          boostAmount: null,
+          requestedAt: ride.createdAt,
+          expiresAt: new Date(ride.createdAt.getTime() + 30000),
+        });
+      }
+      
+      const pendingDeliveries = await prisma.delivery.findMany({
+        where: {
+          status: { in: ["requested", "searching_driver"] },
+          driverId: null,
+          isDemo: false,
+        },
+        include: {
+          customer: {
+            include: {
+              user: { select: { email: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      });
+      
+      for (const delivery of pendingDeliveries) {
+        const distanceToPickup = (delivery.pickupLat && delivery.pickupLng && driverLat && driverLng)
+          ? calculateDistance(driverLat, driverLng, delivery.pickupLat, delivery.pickupLng)
+          : null;
+        
+        pendingRequests.push({
+          id: delivery.id,
+          serviceType: "PARCEL",
+          customerName: delivery.customer?.user?.email?.split("@")[0] || "Customer",
+          customerRating: null,
+          pickupAddress: delivery.pickupAddress,
+          pickupLat: delivery.pickupLat,
+          pickupLng: delivery.pickupLng,
+          dropoffAddress: delivery.dropoffAddress,
+          dropoffLat: delivery.dropoffLat,
+          dropoffLng: delivery.dropoffLng,
+          estimatedFare: serializeDecimal(delivery.serviceFare),
+          distanceToPickup,
+          etaMinutes: distanceToPickup ? calculateEtaFromDistance(distanceToPickup) : null,
+          surgeMultiplier: null,
+          boostAmount: null,
+          requestedAt: delivery.createdAt,
+          expiresAt: new Date(delivery.createdAt.getTime() + 30000),
+        });
+      }
+      
+      const readyFoodOrders = await prisma.foodOrder.findMany({
+        where: {
+          status: "ready_for_pickup",
+          driverId: null,
+        },
+        include: {
+          customer: {
+            include: {
+              user: { select: { email: true } },
+            },
+          },
+          restaurant: { select: { businessName: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+      });
+      
+      for (const order of readyFoodOrders) {
+        pendingRequests.push({
+          id: order.id,
+          serviceType: "FOOD",
+          customerName: order.customer?.user?.email?.split("@")[0] || "Customer",
+          customerRating: null,
+          pickupAddress: order.restaurant?.businessName || "Restaurant",
+          pickupLat: null,
+          pickupLng: null,
+          dropoffAddress: order.deliveryAddress,
+          dropoffLat: null,
+          dropoffLng: null,
+          estimatedFare: serializeDecimal(order.deliveryFee || 0),
+          distanceToPickup: null,
+          etaMinutes: null,
+          surgeMultiplier: null,
+          boostAmount: null,
+          requestedAt: order.createdAt,
+          expiresAt: new Date(order.createdAt.getTime() + 60000),
+        });
+      }
+      
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: "",
+        actorRole: "driver",
+        actionType: "TRIP_REQUESTS_VIEWED",
+        entityType: "driver",
+        entityId: driverProfile.id,
+        description: `Driver viewed ${pendingRequests.length} pending requests`,
+        metadata: {
+          requestCount: pendingRequests.length,
+          timestamp: new Date().toISOString(),
+          ip: req.ip,
+        },
+      });
+      
+      res.json({ requests: pendingRequests });
+    } catch (error: any) {
+      console.error("Error fetching pending requests:", error);
+      res.status(500).json({ error: "Failed to fetch pending requests" });
+    }
+  }
+);
+
+const acceptRequestSchema = z.object({
+  serviceType: z.enum(["RIDE", "FOOD", "PARCEL"]),
+  driverLat: z.number().optional(),
+  driverLng: z.number().optional(),
+});
+
+router.post(
+  "/requests/:requestId/accept",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    const requestShownAt = new Date();
+    
+    try {
+      const userId = req.user!.userId;
+      const { requestId } = req.params;
+      const validatedData = acceptRequestSchema.parse(req.body);
+      const { serviceType, driverLat, driverLng } = validatedData;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        include: { vehicle: true },
+      });
+      
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      
+      if (!driverProfile.isVerified) {
+        return res.status(403).json({ error: "Driver must be verified" });
+      }
+      
+      if (driverProfile.isSuspended) {
+        return res.status(403).json({ error: "Driver account is suspended" });
+      }
+      
+      const primaryVehicle = await prisma.vehicle.findFirst({
+        where: { driverId: driverProfile.id, isPrimary: true, isActive: true },
+      });
+      
+      if (!primaryVehicle || !primaryVehicle.isOnline) {
+        return res.status(403).json({ error: "Driver must be online" });
+      }
+      
+      const hasActiveTrip = await prisma.ride.findFirst({
+        where: {
+          driverId: driverProfile.id,
+          status: { in: ["accepted", "arrived", "started", "in_progress"] },
+        },
+      });
+      
+      if (hasActiveTrip) {
+        return res.status(409).json({ error: "Driver already has an active trip" });
+      }
+      
+      let result;
+      const decisionTime = Date.now() - requestShownAt.getTime();
+      
+      if (serviceType === "RIDE") {
+        const ride = await prisma.ride.findUnique({ where: { id: requestId } });
+        
+        if (!ride) {
+          return res.status(404).json({ error: "Ride not found" });
+        }
+        
+        if (ride.status !== "requested" && ride.status !== "searching_driver") {
+          return res.status(400).json({ error: "Ride no longer available" });
+        }
+        
+        if (ride.driverId) {
+          return res.status(409).json({ error: "Ride already accepted by another driver" });
+        }
+        
+        result = await prisma.ride.update({
+          where: { id: requestId },
+          data: {
+            driverId: driverProfile.id,
+            status: "accepted",
+          },
+        });
+        
+        const customerUser = await prisma.user.findFirst({
+          where: { customerProfile: { id: ride.customerId } },
+        });
+        
+        if (customerUser) {
+          await prisma.notification.create({
+            data: {
+              userId: customerUser.id,
+              type: "ride_update",
+              title: "Driver Found!",
+              body: "Your ride has been accepted. Driver is on the way.",
+            },
+          });
+        }
+      } else if (serviceType === "PARCEL") {
+        const delivery = await prisma.delivery.findUnique({ where: { id: requestId } });
+        
+        if (!delivery) {
+          return res.status(404).json({ error: "Delivery not found" });
+        }
+        
+        if (delivery.status !== "requested" && delivery.status !== "searching_driver") {
+          return res.status(400).json({ error: "Delivery no longer available" });
+        }
+        
+        if (delivery.driverId) {
+          return res.status(409).json({ error: "Delivery already accepted by another driver" });
+        }
+        
+        result = await prisma.delivery.update({
+          where: { id: requestId },
+          data: {
+            driverId: driverProfile.id,
+            status: "accepted",
+          },
+        });
+        
+        const customerUser = await prisma.user.findFirst({
+          where: { customerProfile: { id: delivery.customerId } },
+        });
+        
+        if (customerUser) {
+          await prisma.notification.create({
+            data: {
+              userId: customerUser.id,
+              type: "delivery_update",
+              title: "Driver Found!",
+              body: "Your parcel delivery has been accepted.",
+            },
+          });
+        }
+      } else if (serviceType === "FOOD") {
+        const foodOrder = await prisma.foodOrder.findUnique({ where: { id: requestId } });
+        
+        if (!foodOrder) {
+          return res.status(404).json({ error: "Food order not found" });
+        }
+        
+        if (foodOrder.status !== "ready_for_pickup") {
+          return res.status(400).json({ error: "Order not ready for pickup" });
+        }
+        
+        if (foodOrder.driverId) {
+          return res.status(409).json({ error: "Order already accepted by another driver" });
+        }
+        
+        result = await prisma.foodOrder.update({
+          where: { id: requestId },
+          data: {
+            driverId: driverProfile.id,
+            status: "picked_up",
+          },
+        });
+        
+        const customerUser = await prisma.user.findFirst({
+          where: { customerProfile: { id: foodOrder.customerId } },
+        });
+        
+        if (customerUser) {
+          await prisma.notification.create({
+            data: {
+              id: crypto.randomUUID(),
+              userId: customerUser.id,
+              type: "food_order_update",
+              title: "Driver Assigned",
+              body: "Your order has been picked up and is on the way!",
+            },
+          });
+        }
+      } else {
+        return res.status(400).json({ error: "Invalid service type" });
+      }
+      
+      if (driverLat !== undefined && driverLng !== undefined) {
+        await prisma.driverProfile.update({
+          where: { id: driverProfile.id },
+          data: { currentLat: driverLat, currentLng: driverLng },
+        });
+      }
+      
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: "",
+        actorRole: "driver",
+        actionType: "TRIP_REQUEST_ACCEPTED",
+        entityType: serviceType.toLowerCase(),
+        entityId: requestId,
+        description: `Driver accepted ${serviceType} request`,
+        metadata: {
+          serviceType,
+          requestShownAt: requestShownAt.toISOString(),
+          actionTaken: "accept",
+          decisionTimeMs: decisionTime,
+          driverLat,
+          driverLng,
+          ip: req.ip,
+        },
+      });
+      
+      res.json({
+        success: true,
+        message: `${serviceType} request accepted successfully`,
+        tripId: requestId,
+        serviceType,
+      });
+    } catch (error: any) {
+      console.error("Error accepting request:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to accept request" });
+    }
+  }
+);
+
+const declineRequestSchema = z.object({
+  serviceType: z.enum(["RIDE", "FOOD", "PARCEL"]),
+  reason: z.string().optional(),
+  autoDeclined: z.boolean().optional(),
+});
+
+router.post(
+  "/requests/:requestId/decline",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    const requestShownAt = new Date();
+    
+    try {
+      const userId = req.user!.userId;
+      const { requestId } = req.params;
+      const validatedData = declineRequestSchema.parse(req.body);
+      const { serviceType, reason, autoDeclined } = validatedData;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+      });
+      
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      
+      const decisionTime = Date.now() - requestShownAt.getTime();
+      
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: "",
+        actorRole: "driver",
+        actionType: "TRIP_REQUEST_DECLINED",
+        entityType: serviceType.toLowerCase(),
+        entityId: requestId,
+        description: `Driver ${autoDeclined ? "auto-" : ""}declined ${serviceType} request`,
+        metadata: {
+          serviceType,
+          requestShownAt: requestShownAt.toISOString(),
+          actionTaken: autoDeclined ? "auto_decline" : "decline",
+          decisionTimeMs: decisionTime,
+          reason: reason || (autoDeclined ? "timeout" : "not_specified"),
+          ip: req.ip,
+        },
+      });
+      
+      res.json({
+        success: true,
+        message: `${serviceType} request declined`,
+      });
+    } catch (error: any) {
+      console.error("Error declining request:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to decline request" });
+    }
+  }
+);
+
+router.get(
+  "/driver-status",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: {
+          id: true,
+          isVerified: true,
+          isSuspended: true,
+          availabilityStatus: true,
+          currentLat: true,
+          currentLng: true,
+        },
+      });
+      
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      
+      const primaryVehicle = await prisma.vehicle.findFirst({
+        where: { driverId: driverProfile.id, isPrimary: true, isActive: true },
+        select: { isOnline: true },
+      });
+      
+      const hasActiveTrip = await prisma.ride.findFirst({
+        where: {
+          driverId: driverProfile.id,
+          status: { in: ["accepted", "arrived", "started", "in_progress"] },
+        },
+        select: { id: true, status: true },
+      });
+      
+      res.json({
+        isOnline: primaryVehicle?.isOnline || false,
+        isVerified: driverProfile.isVerified,
+        isSuspended: driverProfile.isSuspended,
+        availabilityStatus: driverProfile.availabilityStatus,
+        hasActiveTrip: !!hasActiveTrip,
+        activeTripId: hasActiveTrip?.id || null,
+        currentLat: driverProfile.currentLat,
+        currentLng: driverProfile.currentLng,
+      });
+    } catch (error: any) {
+      console.error("Error fetching driver status:", error);
+      res.status(500).json({ error: "Failed to fetch driver status" });
+    }
+  }
+);
+
+router.post(
+  "/driver-status",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { isOnline } = req.body;
+      
+      if (typeof isOnline !== "boolean") {
+        return res.status(400).json({ error: "isOnline must be a boolean" });
+      }
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+      });
+      
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      
+      if (!driverProfile.isVerified) {
+        return res.status(403).json({ error: "Driver must be verified to go online" });
+      }
+      
+      if (driverProfile.isSuspended) {
+        return res.status(403).json({ error: "Driver account is suspended" });
+      }
+      
+      const primaryVehicle = await prisma.vehicle.findFirst({
+        where: { driverId: driverProfile.id, isPrimary: true, isActive: true },
+      });
+      
+      if (!primaryVehicle) {
+        return res.status(400).json({ error: "No primary vehicle found" });
+      }
+      
+      await prisma.vehicle.update({
+        where: { id: primaryVehicle.id },
+        data: { isOnline },
+      });
+      
+      await prisma.driverProfile.update({
+        where: { id: driverProfile.id },
+        data: {
+          availabilityStatus: isOnline ? "available" : "offline",
+        },
+      });
+      
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: "",
+        actorRole: "driver",
+        actionType: isOnline ? "DRIVER_WENT_ONLINE" : "DRIVER_WENT_OFFLINE",
+        entityType: "driver",
+        entityId: driverProfile.id,
+        description: `Driver ${isOnline ? "went online" : "went offline"}`,
+        metadata: {
+          previousStatus: primaryVehicle.isOnline ? "online" : "offline",
+          newStatus: isOnline ? "online" : "offline",
+          timestamp: new Date().toISOString(),
+          ip: req.ip,
+        },
+      });
+      
+      res.json({
+        success: true,
+        isOnline,
+        message: `Driver is now ${isOnline ? "online" : "offline"}`,
+      });
+    } catch (error: any) {
+      console.error("Error updating driver status:", error);
+      res.status(500).json({ error: "Failed to update driver status" });
+    }
+  }
+);
+
 export default router;
