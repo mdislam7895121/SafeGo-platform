@@ -1,0 +1,214 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS APPLY)
+
+1. Roles (4):
+   - Customer: books rides, food, parcel, courier; manages profile, addresses, payments.
+   - Driver: accepts rides/deliveries; manages vehicle, documents, payouts.
+   - Restaurant: manages menu, orders, payouts (for SafeGo Eats).
+   - Admin: full control panel for all roles, KYC, disputes, payouts, risk & audit logs.
+
+2. Global products:
+   - Rides (everyday Uber-like rides).
+   - Food delivery (SafeGo Eats).
+   - Parcel / Courier delivery.
+   - Same web/app shell, different feature flags per country and per phase.
+
+3. Country/KYC rules (US focus now, BD later):
+   - US: customers must have validated email + phone; drivers need license, SSN/ITIN, background check; restaurants need EIN/Tax info.
+   - BD: later phase; keep country-specific fields extensible but do not mix with current US flows.
+
+4. Data models (must already exist or be extended, not broken):
+   - Core collections/tables: Users, Customers, Drivers, Restaurants, Rides, FoodOrders, Deliveries, Vehicles, PayoutAccounts, Cards/PaymentMethods, Documents, Notifications, AuditLogs.
+   - Never break existing migrations or seed data; always extend safely.
+
+5. Admin panel (must remain compatible):
+   - Admin can view/edit users, KYC, documents, vehicles, payouts, disputes, global configs.
+   - Any new customer-visible setting (name, phone, default address, payment method) must remain readable from admin tools.
+
+6. Commissions & payouts:
+   - Platform keeps a commission per ride/order.
+   - Drivers/restaurants get net payout via external payout provider; never store bank credentials or full card data in plain text.
+   - Any new UI must not leak internal commission values.
+
+7. Status flows (high level, do not break):
+   - Rides: REQUESTED → DRIVER_ASSIGNED → DRIVER_ARRIVING → IN_PROGRESS → COMPLETED or CANCELLED.
+   - Food: PLACED → ACCEPTED → PREPARING → PICKED_UP → DELIVERED or CANCELLED.
+   - Parcel: CREATED → PICKUP_CONFIRMED → IN_TRANSIT → DELIVERED or CANCELLED.
+   - New profile or payment features must not alter these flows.
+
+8. Onboarding & documents:
+   - Drivers/restaurants: photo, ID, licenses, insurance, bank or payout account, background check status.
+   - Customers: minimal friction – email, phone, optional saved addresses and payments.
+
+9. Security rules (always):
+   - Auth required for any profile or payment page.
+   - Strict access control: user can only see/edit their own data.
+   - Never log secrets, API keys, full card numbers, CVV, or SSN.
+   - Use tokenization for cards (Stripe-like pattern). Store only last4, brand, expiry month/year, and a token/id from the PSP.
+
+10. Privacy:
+    - Show only masked card info (e.g., Visa •••• 4242).
+    - No SSN, full address, or phone shown in logs, URLs, or analytics.
+
+11. Notifications:
+    - Changes to core account data (email, phone, new payment method) should be confirmable via email/SMS hooks even if implementation is stubbed.
+
+12. Phase & environment:
+    - This is a development/staging environment on Replit.
+    - Use test-only payment behavior (no real charges).
+    - Keep map, ride flow, and existing features working; do not introduce breaking changes.
+
+13. Frontend architecture:
+    - React/TypeScript on the client; use existing UI components (buttons, inputs, layout).
+    - Reuse existing patterns/hooks (e.g., for forms, API calls, auth guard).
+
+14. Backend architecture:
+    - Node/TypeScript with routing (likely in `server/routes/*`) and services in `server/*` or `client/src/lib`.
+    - Use existing database abstraction (e.g., Prisma) consistently.
+
+15. Our current focus:
+    - SafeGo CUSTOMER web app – Account menu items:
+      - “Profile Settings”
+      - “Payment Methods”
+    - We must replace “Soon” placeholders with working, secure, user-friendly screens.
+
+SECURITY PHASE FOR THIS TASK
+
+- Phase: Authenticated UX + Sensitive Data Hardening.
+- Requirements:
+  - Only logged-in customer can access profile and payment pages.
+  - All requests must be authenticated.
+  - No raw card data stored or logged; only tokens/masked data.
+  - Protect all APIs against cross-user access.
+
+TASK: IMPLEMENT CUSTOMER PROFILE SETTINGS + PAYMENT METHODS (ACCOUNT MENU)
+
+Goal
+- Turn the “Profile Settings” and “Payment Methods” menu items in the customer web app into fully working pages.
+- Keep the current ride booking flow, Google Maps integration, and payment selection (e.g., card •••• 4242) working.
+
+1. Discover current structure
+   - Find the components/routes that render:
+     - The bottom navigation (Home, Activity, Support, Account).
+     - The Account screen and its menu with:
+       - Profile Settings (currently “Soon”)
+       - Payment Methods (currently “Soon”)
+   - Inspect client files such as:
+     - `client/src/pages/customer/*`
+     - `client/src/components/account/*` or similar.
+   - Identify any placeholder components for profile and payments.
+
+2. Implement Customer Profile Settings page
+   - Create/extend a route like: `/customer/account/profile` (or whatever matches existing patterns) and wire it to the Account menu “Profile Settings”.
+   - Profile form fields (customer-facing):
+     - First name
+     - Last name
+     - Display name (if used in greetings)
+     - Email (read-only if email change flows are not implemented; otherwise allow edit with proper verification)
+     - Phone number (E.164 format; US examples)
+     - Default pickup address (using the same Google Places autocomplete component already used in ride booking)
+   - Behavior:
+     - On page load, fetch current customer profile from a secure API (e.g., `GET /api/customer/profile`).
+     - Populate the form with existing data.
+     - On change, allow editing.
+     - On “Save changes”:
+       - Call `PUT /api/customer/profile` (or similar) with validated fields.
+       - Show loading state and success/error message.
+     - Validation:
+       - Required: first name, email, phone.
+       - Phone: basic pattern + length checks.
+       - Default address: store full formatted address, plus lat/lng if backend supports it.
+   - Security:
+     - Only the logged-in user can access this page.
+     - Backend must enforce that the user can only update their own profile.
+     - Do not allow arbitrary role changes, flags, or admin-only fields from this UI.
+
+3. Implement Payment Methods page (customer side)
+   - Create/extend a route like: `/customer/account/payment-methods`.
+   - Wire “Payment Methods” in the Account menu to this route (remove “Soon” badge).
+   - UI layout:
+     - List of saved payment methods (cards only for now).
+       - Show for each card: brand (Visa/Mastercard/etc), last4, expiry month/year, and a “Default” badge if it’s the default.
+     - “Add payment method” button.
+   - Data model:
+     - Use existing backend model/table for customer cards (e.g., `PaymentMethod`, `Card`, or similar). If none exists, create a safe minimal model:
+       - `id`
+       - `customerId`
+       - `provider` (e.g., "stripe_test")
+       - `providerCardId` (token/id)
+       - `brand`
+       - `last4`
+       - `expMonth`
+       - `expYear`
+       - `isDefault`
+       - timestamps.
+   - Fetching:
+     - On page load, call `GET /api/customer/payment-methods`.
+     - Show empty state if there are no saved cards.
+   - Adding a payment method:
+     - For now, implement a test/stub-friendly flow:
+       - Either:
+         - Use existing payment provider integration if already present (e.g., Stripe test mode), or
+         - Create a simple form where the “card number” is NOT stored directly; instead:
+           - If the backend has a fake/tokenization service, send it there.
+           - Save only a fake token + last4, brand, expiry.
+       - Mark the new card as default if it is the first card or if user selects “Make default”.
+     - Absolutely DO NOT log or persist full card number or CVV in plain text.
+   - Managing cards:
+     - Allow user to:
+       - Set a card as default.
+       - Remove a non-default card (or remove with confirmation if only one).
+     - Update the currently used payment method in the ride booking flow so it reflects the default card (e.g., the “•••• 4242” indicator).
+   - Security:
+     - All routes must verify authenticated customer and ownership of the payment methods.
+     - Prevent one user from seeing/updating another user’s cards.
+
+4. Integrate with ride booking flow (read-only)
+   - Keep the existing payment selector in the ride booking screen (where it currently shows card •••• 4242).
+   - Ensure that:
+     - It reads the default payment method from the same source as the Payment Methods page.
+     - If the user changes default card on the Payment Methods page, the ride booking screen reflects this on next load.
+   - Do not implement actual charging logic here; that can remain test/dummy.
+
+5. Do not break anything that is already working
+   - The following must continue to work as before:
+     - Current location detection and Google Places autocomplete.
+     - Ride price estimation and duration.
+     - Sign-in/out and session handling.
+   - Keep the existing “Sign Out” menu item functioning.
+
+6. UX details
+   - Use existing design language (SafeGo style, buttons, typography).
+   - Mobile-first: everything must be usable on small screens (like the current web view on iPhone).
+   - Provide clear feedback:
+     - Success banners/toasts after saving profile or cards.
+     - Error messages for network or validation issues.
+
+7. Testing checklist (you must actually run through these)
+   - Scenario 1: Profile
+     - Log in as a normal customer.
+     - Open Account → Profile Settings.
+     - Edit first name and phone; save.
+     - Refresh the page: confirm the changes persisted.
+     - Go back to Home: greeting (“Good evening, islam789” or equivalent) should use updated name/display name if that is wired.
+
+   - Scenario 2: Payment Methods
+     - Open Account → Payment Methods.
+     - Add a test card; confirm it appears with brand + masked number and “Default” label.
+     - Go to the ride booking screen: confirm the card indicator matches the default card.
+     - Add a second card and set it as default; confirm both the list and the booking screen update.
+     - Remove a card and confirm it no longer appears.
+
+   - Scenario 3: Access control
+     - Confirm that anonymous (not logged in) users cannot load `/customer/account/profile` or `/customer/account/payment-methods` and are redirected to login or receive an appropriate error.
+     - Confirm no sensitive card data appears in console logs or network responses (only masked values and tokens/ids).
+
+8. Report back
+   - List all files you created or modified (frontend + backend).
+   - Describe:
+     - What was previously blocking Profile Settings and Payment Methods (e.g., placeholders).
+     - How profile data is now loaded and saved.
+     - How payment methods are stored, masked, and linked to the booking flow.
+   - Confirm that:
+     - Profile Settings works end-to-end.
+     - Payment Methods works end-to-end in a secure, test-only manner.
+     - No regressions were introduced in the existing ride booking experience.

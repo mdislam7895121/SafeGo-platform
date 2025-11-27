@@ -698,4 +698,285 @@ router.get("/reviews/my", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// PAYMENT METHODS
+// ====================================================
+
+// Validation schema for adding payment method (test mode)
+const addPaymentMethodSchema = z.object({
+  brand: z.enum(["visa", "mastercard", "amex", "discover"]),
+  last4: z.string().length(4).regex(/^\d{4}$/),
+  expMonth: z.number().min(1).max(12),
+  expYear: z.number().min(new Date().getFullYear()).max(new Date().getFullYear() + 20),
+  makeDefault: z.boolean().optional().default(false),
+});
+
+// GET /api/customer/payment-methods - List all payment methods
+router.get("/payment-methods", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const paymentMethods = await prisma.paymentMethod.findMany({
+      where: {
+        customerId: customerProfile.id,
+        status: "active",
+      },
+      orderBy: [
+        { isDefault: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json({
+      paymentMethods: paymentMethods.map((pm: any) => ({
+        id: pm.id,
+        brand: pm.brand,
+        last4: pm.last4,
+        expMonth: pm.expMonth,
+        expYear: pm.expYear,
+        isDefault: pm.isDefault,
+        createdAt: pm.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get payment methods error:", error);
+    res.status(500).json({ error: "Failed to get payment methods" });
+  }
+});
+
+// POST /api/customer/payment-methods - Add a new payment method (test mode)
+router.post("/payment-methods", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const validation = addPaymentMethodSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Invalid payment method data",
+        details: validation.error.errors,
+      });
+    }
+
+    const { brand, last4, expMonth, expYear, makeDefault } = validation.data;
+
+    // Generate a fake provider method ID for test mode
+    const providerMethodId = `test_pm_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+    // Check if this is the first payment method
+    const existingMethods = await prisma.paymentMethod.count({
+      where: {
+        customerId: customerProfile.id,
+        status: "active",
+      },
+    });
+
+    const isFirstMethod = existingMethods === 0;
+    const shouldBeDefault = makeDefault || isFirstMethod;
+
+    // If setting as default, unset any existing default
+    if (shouldBeDefault) {
+      await prisma.paymentMethod.updateMany({
+        where: {
+          customerId: customerProfile.id,
+          isDefault: true,
+        },
+        data: { isDefault: false },
+      });
+    }
+
+    const newPaymentMethod = await prisma.paymentMethod.create({
+      data: {
+        customerId: customerProfile.id,
+        provider: "test_stripe",
+        providerMethodId,
+        brand,
+        last4,
+        expMonth,
+        expYear,
+        isDefault: shouldBeDefault,
+        status: "active",
+      },
+    });
+
+    res.status(201).json({
+      paymentMethod: {
+        id: newPaymentMethod.id,
+        brand: newPaymentMethod.brand,
+        last4: newPaymentMethod.last4,
+        expMonth: newPaymentMethod.expMonth,
+        expYear: newPaymentMethod.expYear,
+        isDefault: newPaymentMethod.isDefault,
+        createdAt: newPaymentMethod.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("Add payment method error:", error);
+    res.status(500).json({ error: "Failed to add payment method" });
+  }
+});
+
+// PUT /api/customer/payment-methods/:id/default - Set as default
+router.put("/payment-methods/:id/default", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify ownership
+    const paymentMethod = await prisma.paymentMethod.findFirst({
+      where: {
+        id,
+        customerId: customerProfile.id,
+        status: "active",
+      },
+    });
+
+    if (!paymentMethod) {
+      return res.status(404).json({ error: "Payment method not found" });
+    }
+
+    // Unset all defaults first
+    await prisma.paymentMethod.updateMany({
+      where: {
+        customerId: customerProfile.id,
+        isDefault: true,
+      },
+      data: { isDefault: false },
+    });
+
+    // Set new default
+    await prisma.paymentMethod.update({
+      where: { id },
+      data: { isDefault: true },
+    });
+
+    res.json({ message: "Payment method set as default" });
+  } catch (error) {
+    console.error("Set default payment method error:", error);
+    res.status(500).json({ error: "Failed to set default payment method" });
+  }
+});
+
+// DELETE /api/customer/payment-methods/:id - Remove payment method
+router.delete("/payment-methods/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify ownership
+    const paymentMethod = await prisma.paymentMethod.findFirst({
+      where: {
+        id,
+        customerId: customerProfile.id,
+        status: "active",
+      },
+    });
+
+    if (!paymentMethod) {
+      return res.status(404).json({ error: "Payment method not found" });
+    }
+
+    // Soft delete by setting status to inactive
+    await prisma.paymentMethod.update({
+      where: { id },
+      data: { status: "inactive" },
+    });
+
+    // If this was the default, set another as default
+    if (paymentMethod.isDefault) {
+      const nextDefault = await prisma.paymentMethod.findFirst({
+        where: {
+          customerId: customerProfile.id,
+          status: "active",
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (nextDefault) {
+        await prisma.paymentMethod.update({
+          where: { id: nextDefault.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+
+    res.json({ message: "Payment method removed" });
+  } catch (error) {
+    console.error("Delete payment method error:", error);
+    res.status(500).json({ error: "Failed to remove payment method" });
+  }
+});
+
+// GET /api/customer/payment-methods/default - Get default payment method
+router.get("/payment-methods/default", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const defaultMethod = await prisma.paymentMethod.findFirst({
+      where: {
+        customerId: customerProfile.id,
+        isDefault: true,
+        status: "active",
+      },
+    });
+
+    if (!defaultMethod) {
+      return res.json({ paymentMethod: null });
+    }
+
+    res.json({
+      paymentMethod: {
+        id: defaultMethod.id,
+        brand: defaultMethod.brand,
+        last4: defaultMethod.last4,
+        expMonth: defaultMethod.expMonth,
+        expYear: defaultMethod.expYear,
+        isDefault: defaultMethod.isDefault,
+      },
+    });
+  } catch (error) {
+    console.error("Get default payment method error:", error);
+    res.status(500).json({ error: "Failed to get default payment method" });
+  }
+});
+
 export default router;
