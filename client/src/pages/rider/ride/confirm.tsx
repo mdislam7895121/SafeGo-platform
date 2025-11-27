@@ -129,6 +129,7 @@ export default function RideConfirmPage() {
   const PaymentIcon = getPaymentIcon(state.paymentMethod.type);
   const distanceMiles = state.routeData?.distanceMiles ?? 0;
   const durationMins = state.routeData?.durationMinutes ?? 0;
+  const hasRouteData = distanceMiles > 0 && durationMins > 0;
 
   return (
     <div className="flex flex-col h-full" data-testid="ride-confirm-page">
@@ -174,6 +175,16 @@ export default function RideConfirmPage() {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Booking Failed</AlertTitle>
             <AlertDescription>{requestError}</AlertDescription>
+          </Alert>
+        )}
+
+        {!hasRouteData && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Route Information Unavailable</AlertTitle>
+            <AlertDescription>
+              Distance and travel time couldn't be calculated. The fare is based on estimated distance.
+            </AlertDescription>
           </Alert>
         )}
 

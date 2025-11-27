@@ -71,7 +71,7 @@ type RideBookingAction =
   | { type: "SET_STEP"; step: RideBookingState["step"] }
   | { type: "SET_PICKUP"; pickup: LocationData }
   | { type: "SET_DROPOFF"; dropoff: LocationData }
-  | { type: "SET_ROUTE_DATA"; routeData: RouteData }
+  | { type: "SET_ROUTE_DATA"; routeData: RouteData | null }
   | { type: "SET_OPTION"; option: RideOption }
   | { type: "SET_PAYMENT"; payment: PaymentMethod }
   | { type: "SET_PROMO"; code: string; valid: boolean }
@@ -131,7 +131,7 @@ interface RideBookingContextType {
   setStep: (step: RideBookingState["step"]) => void;
   setPickup: (pickup: LocationData) => void;
   setDropoff: (dropoff: LocationData) => void;
-  setRouteData: (routeData: RouteData) => void;
+  setRouteData: (routeData: RouteData | null) => void;
   setSelectedOption: (option: RideOption) => void;
   setPaymentMethod: (payment: PaymentMethod) => void;
   setPromoCode: (code: string, valid: boolean) => void;
@@ -200,7 +200,7 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_DROPOFF", dropoff });
   }, []);
 
-  const setRouteData = useCallback((routeData: RouteData) => {
+  const setRouteData = useCallback((routeData: RouteData | null) => {
     dispatch({ type: "SET_ROUTE_DATA", routeData });
   }, []);
 

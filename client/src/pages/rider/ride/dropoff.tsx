@@ -138,6 +138,8 @@ export default function RideDropoffPage() {
           });
           if (routeResult.polyline) {
             setGoogleRoutePolyline(decodePolyline(routeResult.polyline));
+          } else {
+            setGoogleRoutePolyline([]);
           }
           const newRouteData: RouteData = {
             distanceMiles: routeResult.distanceMiles,
@@ -151,13 +153,19 @@ export default function RideDropoffPage() {
         } else {
           setLocalRouteInfo(null);
           setGoogleRoutePolyline([]);
+          setRouteData(null);
         }
+      }).catch(() => {
+        setLocalRouteInfo(null);
+        setGoogleRoutePolyline([]);
+        setRouteData(null);
       }).finally(() => {
         setIsCalculatingRoute(false);
       });
     } else {
       setLocalRouteInfo(null);
       setGoogleRoutePolyline([]);
+      setRouteData(null);
     }
   }, [state.pickup, state.dropoff, setRouteData]);
 
