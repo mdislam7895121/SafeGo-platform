@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -17,6 +17,8 @@ import {
   TrendingUp,
   AlertCircle,
   Loader2,
+  Battery,
+  BatteryLow,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { TripRequestMapPreview } from "./TripRequestMapPreview";
 
 export interface TripRequest {
   id: string;
@@ -71,7 +74,7 @@ const serviceColors = {
   PARCEL: "bg-purple-500",
 };
 
-export function IncomingTripRequest({
+function IncomingTripRequestComponent({
   request,
   onAccept,
   onDecline,
@@ -376,25 +379,14 @@ export function IncomingTripRequest({
                 </Card>
               </div>
 
-              {request.pickupLat && request.pickupLng && (
-                <div className="relative h-32 rounded-xl overflow-hidden border-2 border-border bg-muted">
-                  <img
-                    src={`https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-s-a+22c55e(${request.pickupLng},${request.pickupLat})/${request.pickupLng},${request.pickupLat},14,0/400x200@2x?access_token=pk.placeholder&logo=false&attribution=false`}
-                    alt="Pickup location map"
-                    className="w-full h-full object-cover opacity-0"
-                    data-testid="img-map-preview"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-muted">
-                    <div className="text-center">
-                      <MapPin className="h-8 w-8 mx-auto text-green-500 mb-2" />
-                      <p className="text-xs text-muted-foreground">Pickup location</p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              <TripRequestMapPreview
+                pickupLat={request.pickupLat}
+                pickupLng={request.pickupLng}
+                dropoffLat={request.dropoffLat}
+                dropoffLng={request.dropoffLng}
+                pickupAddress={request.pickupAddress}
+                dropoffAddress={request.dropoffAddress}
+              />
             </div>
           </div>
 
@@ -464,4 +456,5 @@ export function IncomingTripRequest({
   );
 }
 
+export const IncomingTripRequest = memo(IncomingTripRequestComponent);
 export default IncomingTripRequest;
