@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings, Car, UtensilsCrossed, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,17 @@ export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [activeService, setActiveService] = useState<ServiceType>("ride");
+  const [location, setLocation] = useLocation();
+
+  const handleServiceClick = (type: ServiceType) => {
+    setActiveService(type);
+    const routes: Record<ServiceType, string> = {
+      ride: "/rider/home",
+      food: "/customer/food",
+      parcel: "/rider/parcels",
+    };
+    setLocation(routes[type]);
+  };
 
   const { data: notificationsData } = useQuery<NotificationsResponse>({
     queryKey: ["/api/customer/notifications"],
@@ -127,7 +138,7 @@ export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
               variant={activeService === type ? "default" : "ghost"}
               size="sm"
               className={`rounded-full px-4 ${activeService === type ? "" : "text-muted-foreground"}`}
-              onClick={() => setActiveService(type)}
+              onClick={() => handleServiceClick(type)}
               data-testid={`button-service-${type}`}
             >
               <Icon className="h-4 w-4 mr-2" />
