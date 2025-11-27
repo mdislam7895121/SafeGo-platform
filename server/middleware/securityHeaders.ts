@@ -37,14 +37,15 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
 
+  // Google Maps requires: maps.googleapis.com (scripts, API), maps.gstatic.com (static assets)
   const cspDirectives = isProduction
     ? [
         "default-src 'self'",
-        "script-src 'self'",
+        "script-src 'self' https://maps.googleapis.com https://maps.gstatic.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com data:",
-        "img-src 'self' data: blob: https:",
-        "connect-src 'self' wss: https:",
+        "img-src 'self' data: blob: https: https://maps.googleapis.com https://maps.gstatic.com",
+        "connect-src 'self' wss: https: https://maps.googleapis.com",
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
@@ -53,11 +54,11 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
       ]
     : [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com data:",
-        "img-src 'self' data: blob: https:",
-        "connect-src 'self' ws: wss: https:",
+        "img-src 'self' data: blob: https: https://maps.googleapis.com https://maps.gstatic.com",
+        "connect-src 'self' ws: wss: https: https://maps.googleapis.com",
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
