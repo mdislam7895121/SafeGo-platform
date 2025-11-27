@@ -1,0 +1,46 @@
+SafeGo System Status Audit – DO NOT CHANGE ANY CODE IN THIS RUN
+
+Context:
+You are the SafeGo project architect and code reviewer. SafeGo is a unified Ride + Food + Parcel platform with four roles: customer, driver, restaurant, and admin. The system already has:
+- Unified payout system (driver + restaurant)
+- Driver app features D1–D22 (profile, documents, wallet, payouts, safety, support, performance, incentives, trust score, navigation drawer, etc.)
+- Restaurant app features C1+ (dashboard, status controls, payouts, etc.)
+Security hardening phase 1 and 2 are also implemented (headers, rate limiting, OTP, audit logs, payout 2FA, etc.).
+
+Goal of this task:
+Give me a precise STATUS REPORT only. Do NOT build new features, do NOT refactor code, and do NOT change the database in this run. I just want to know what is DONE, what is PARTIAL, and what is MISSING.
+
+Instructions:
+1. Scan the current codebase and documentation (including replit.md and any task notes) for:
+   - Driver app (D1–D22 or similar sections)
+   - Restaurant app (C1+ sections)
+   - Payout & wallet system
+   - Security hardening and KYC flows
+   - Navigation and header actions (drawer, notifications, language globe, profile icon)
+
+2. For each area, produce a structured summary with three clear lists:
+   A) COMPLETED – implemented, wired to real routes/APIs, and working in UI
+   B) PARTIAL / BUGGY – implemented but with missing pieces, broken routes, or bad UX
+   C) NOT IMPLEMENTED / MISSING – planned or referenced but not actually built
+
+3. Pay special attention to:
+   - Driver side menu / drawer behaviour (open/close, overlay, tap outside to close)
+   - Header icons (notifications bell, language globe, profile/avatar actions)
+   - Driver profile: date of birth, phone, license plate, and validation rules
+   - Driver/restaurant payout methods: payout type dropdown and account type selection
+   - Restaurant dashboard (C-1): open/busy switches, quick actions, error states
+   - Training / getting started and documents pages for driver and restaurant
+
+4. In your answer:
+   - First, give a high-level table: each module vs. Completed / Partial / Missing.
+   - Then, for each module, list the key items under the three categories (Completed, Partial, Missing).
+   - Finally, give a SHORT, prioritized TODO list ONLY for:
+     - Fixing partial/buggy items
+     - Finishing clearly missing pieces that are required for a professional Uber-level web app.
+
+5. Very important:
+   - Do NOT invent totally new product ideas.
+   - Only suggest work that is directly needed to finish or polish the existing flows.
+   - Do NOT apply any code changes in this run; this is an analysis/status pass only.
+
+Now run your analysis and return the full status report as described.
