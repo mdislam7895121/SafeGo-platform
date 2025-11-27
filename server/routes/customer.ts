@@ -166,7 +166,10 @@ router.get("/rides", async (req: AuthRequest, res) => {
                 email: true,
               },
             },
-            vehicle: true,
+            vehicles: {
+              take: 1,
+              orderBy: { createdAt: 'desc' },
+            },
           },
         },
       },
@@ -176,27 +179,30 @@ router.get("/rides", async (req: AuthRequest, res) => {
     });
 
     res.json({
-      rides: rides.map(ride => ({
-        id: ride.id,
-        pickupAddress: ride.pickupAddress,
-        dropoffAddress: ride.dropoffAddress,
-        serviceFare: ride.serviceFare,
-        driverPayout: ride.driverPayout,
-        paymentMethod: ride.paymentMethod,
-        status: ride.status,
-        driver: ride.driver ? {
-          email: ride.driver.user.email,
-          vehicle: ride.driver.vehicle ? {
-            vehicleType: ride.driver.vehicle.vehicleType,
-            vehicleModel: ride.driver.vehicle.vehicleModel,
-            vehiclePlate: ride.driver.vehicle.vehiclePlate,
+      rides: rides.map(ride => {
+        const vehicle = ride.driver?.vehicles?.[0];
+        return {
+          id: ride.id,
+          pickupAddress: ride.pickupAddress,
+          dropoffAddress: ride.dropoffAddress,
+          serviceFare: ride.serviceFare,
+          driverPayout: ride.driverPayout,
+          paymentMethod: ride.paymentMethod,
+          status: ride.status,
+          driver: ride.driver ? {
+            email: ride.driver.user.email,
+            vehicle: vehicle ? {
+              vehicleType: vehicle.vehicleType,
+              vehicleModel: vehicle.vehicleModel,
+              vehiclePlate: vehicle.vehiclePlate,
+            } : null,
           } : null,
-        } : null,
-        customerRating: ride.customerRating,
-        driverRating: ride.driverRating,
-        createdAt: ride.createdAt,
-        completedAt: ride.completedAt,
-      })),
+          customerRating: ride.customerRating,
+          driverRating: ride.driverRating,
+          createdAt: ride.createdAt,
+          completedAt: ride.completedAt,
+        };
+      }),
     });
   } catch (error) {
     console.error("Get customer rides error:", error);
@@ -306,7 +312,7 @@ router.get("/wallet", async (req: AuthRequest, res) => {
         id: ride.id,
         type: "ride",
         description: "Ride payment",
-        amount: -parseFloat(ride.serviceFare), // Negative for debit
+        amount: -parseFloat(String(ride.serviceFare)), // Negative for debit
         createdAt: ride.completedAt || ride.createdAt,
         referenceId: ride.id,
       })),
@@ -314,7 +320,7 @@ router.get("/wallet", async (req: AuthRequest, res) => {
         id: order.id,
         type: "food",
         description: "Food order payment",
-        amount: -parseFloat(order.serviceFare), // Negative for debit
+        amount: -parseFloat(String(order.serviceFare)), // Negative for debit
         createdAt: order.deliveredAt || order.createdAt,
         referenceId: order.id,
       })),
@@ -322,7 +328,7 @@ router.get("/wallet", async (req: AuthRequest, res) => {
         id: delivery.id,
         type: "parcel",
         description: "Parcel delivery payment",
-        amount: -parseFloat(delivery.serviceFare), // Negative for debit
+        amount: -parseFloat(String(delivery.serviceFare)), // Negative for debit
         createdAt: delivery.deliveredAt || delivery.createdAt,
         referenceId: delivery.id,
       })),

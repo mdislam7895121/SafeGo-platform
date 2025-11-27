@@ -6,9 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Car, Package, UtensilsCrossed, User, Clock, HelpCircle, MapPin, 
   ChevronDown, ChevronRight, Calendar, ShoppingCart, Smartphone, Bus,
-  Briefcase, CreditCard, Navigation, Circle, Square, Home, Settings,
-  LogOut, Shield, Star, ArrowRight, Apple, Play, Globe, Check, Crosshair,
-  BadgeCheck, Sun, Moon, Sunset
+  Briefcase, CreditCard, Navigation, Home, Settings,
+  LogOut, Star, ArrowRight, Apple, Play, Globe, Check, Crosshair,
+  BadgeCheck, Sun, Moon, Sunset, Key
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,8 @@ const suggestionTiles = [
   { id: "grocery", label: "Grocery", icon: ShoppingCart, color: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-900 dark:text-white", active: false },
   { id: "courier", label: "Courier", icon: Package, color: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-900 dark:text-white", active: false },
   { id: "reserve", label: "Reserve", icon: Calendar, color: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-900 dark:text-white", active: false },
+  { id: "rental", label: "Rental", icon: Key, color: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-900 dark:text-white", active: false },
+  { id: "shuttle", label: "Shuttle", icon: Bus, color: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-900 dark:text-white", active: false },
   { id: "business", label: "Business", icon: Briefcase, color: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-900 dark:text-white", active: false },
 ];
 
@@ -56,8 +58,6 @@ export default function CustomerHome() {
   const [pickupAddress, setPickupAddress] = useState("");
   const [destinationAddress, setDestinationAddress] = useState("");
   const [isLocating, setIsLocating] = useState(false);
-  const [reserveDate, setReserveDate] = useState("");
-  const [reserveTime, setReserveTime] = useState("");
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [recentLocations, setRecentLocations] = useState<RecentLocation[]>([]);
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
@@ -74,7 +74,6 @@ export default function CustomerHome() {
 
   const profile = customerData?.profile || user?.profile;
   const recentRides = customerData?.recentRides || [];
-  const activeTrip = customerData?.activeTrip;
   const greeting = getGreeting();
   const GreetingIcon = greeting.icon;
 
@@ -159,13 +158,13 @@ export default function CustomerHome() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24" data-testid="customer-home-page">
-      {/* SECTION 1: COMPACT TOP HEADER - Uber Style */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b" data-testid="header">
-        <div className="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
+    <div className="min-h-screen bg-background pb-20" data-testid="customer-home-page">
+      {/* UBER-STYLE STICKY HEADER */}
+      <header className="sticky top-0 z-50 bg-background border-b shadow-sm" data-testid="header">
+        <div className="max-w-lg mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-bold tracking-tight" data-testid="logo">SafeGo</h1>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium" data-testid="region-badge">
+            <Badge variant="outline" className="text-[9px] px-1.5 py-0 font-medium h-5" data-testid="region-badge">
               <Globe className="h-2.5 w-2.5 mr-0.5" />
               {getCountryLabel()}
             </Badge>
@@ -173,14 +172,14 @@ export default function CustomerHome() {
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="flex items-center gap-2 px-2 h-9" data-testid="profile-pill">
-                <Avatar className="h-7 w-7">
+              <Button variant="ghost" size="sm" className="flex items-center gap-1.5 px-2 h-8" data-testid="profile-pill">
+                <Avatar className="h-6 w-6">
                   <AvatarImage src={profile?.avatarUrl} />
-                  <AvatarFallback className="text-[10px] font-medium bg-primary text-primary-foreground">
+                  <AvatarFallback className="text-[9px] font-semibold bg-primary text-primary-foreground">
                     {getInitials(getUserDisplayName(), profile?.email || user?.email)}
                   </AvatarFallback>
                 </Avatar>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64" data-testid="profile-dropdown">
@@ -223,201 +222,211 @@ export default function CustomerHome() {
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-6 space-y-8">
-        {/* SECTION 2: GREETING HERO */}
-        <section className="space-y-1" data-testid="greeting-section">
+      <main className="max-w-lg mx-auto px-4 py-5 space-y-6">
+        {/* GREETING SECTION */}
+        <section className="space-y-0.5" data-testid="greeting-section">
           <div className="flex items-center gap-2">
             <GreetingIcon className="h-5 w-5 text-amber-500" />
-            <h2 className="text-2xl font-bold tracking-tight" data-testid="greeting-text">
+            <h2 className="text-xl font-bold" data-testid="greeting-text">
               {greeting.text}, {getUserDisplayName().split(" ")[0]}
             </h2>
           </div>
-          <p className="text-sm text-muted-foreground" data-testid="greeting-subtitle">
-            Where would you like to go today?
+          <p className="text-sm text-muted-foreground pl-7" data-testid="greeting-subtitle">
+            Where are you going?
           </p>
         </section>
 
-        {/* SECTION 3: RIDE REQUEST BLOCK - Uber Style */}
+        {/* UBER-STYLE RIDE REQUEST CARD */}
         <section ref={heroRef} data-testid="hero-section">
-          <Card className="overflow-hidden shadow-lg border-2">
-            <CardContent className="p-5 space-y-4">
-              {/* Pickup Input with Location Button */}
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1 z-10">
-                  <div className="h-3 w-3 rounded-full bg-gray-900 dark:bg-white ring-4 ring-gray-900/10 dark:ring-white/10" />
-                  <div className="w-0.5 h-10 bg-gray-300 dark:bg-gray-600" />
+          <Card className="overflow-hidden shadow-xl border-0 bg-card">
+            <CardContent className="p-0">
+              {/* Uber-style Location Inputs with Timeline */}
+              <div className="p-4 space-y-0">
+                <div className="flex">
+                  {/* Uber Vertical Timeline Indicator */}
+                  <div className="flex flex-col items-center mr-3 py-4">
+                    <div className="h-2.5 w-2.5 rounded-full bg-gray-400 dark:bg-gray-500" />
+                    <div className="w-0.5 flex-1 bg-gray-300 dark:bg-gray-600 my-1 min-h-[40px]" />
+                    <div className="h-2.5 w-2.5 bg-gray-900 dark:bg-white" />
+                  </div>
+                  
+                  {/* Input Fields */}
+                  <div className="flex-1 space-y-2">
+                    {/* Pickup Input */}
+                    <div className="relative">
+                      <Input
+                        placeholder={isLocating ? "Detecting location..." : "Pickup location"}
+                        value={pickupAddress}
+                        onChange={(e) => setPickupAddress(e.target.value)}
+                        onFocus={() => setShowPickupSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowPickupSuggestions(false), 200)}
+                        className="h-12 pr-20 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500"
+                        data-testid="input-pickup"
+                      />
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+                          onClick={autoDetectLocation}
+                          disabled={isLocating}
+                          data-testid="button-detect-location"
+                        >
+                          <Crosshair className={`h-4 w-4 ${isLocating ? "animate-pulse text-primary" : "text-gray-500"}`} />
+                        </Button>
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      </div>
+                      {showPickupSuggestions && (savedPlaces.length > 0 || recentLocations.length > 0) && (
+                        <Card className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto shadow-xl border" data-testid="pickup-suggestions">
+                          {savedPlaces.map((place) => (
+                            <button
+                              key={place.id}
+                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                              onClick={() => { setPickupAddress(place.address); setShowPickupSuggestions(false); }}
+                              data-testid={`pickup-saved-${place.id}`}
+                            >
+                              {place.icon === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : <Briefcase className="h-4 w-4 text-muted-foreground" />}
+                              <div>
+                                <p className="font-medium text-sm">{place.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                              </div>
+                            </button>
+                          ))}
+                          {recentLocations.slice(0, 3).map((loc) => (
+                            <button
+                              key={loc.id}
+                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                              onClick={() => { setPickupAddress(loc.address); setShowPickupSuggestions(false); }}
+                              data-testid={`pickup-recent-${loc.id}`}
+                            >
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <p className="text-sm truncate">{loc.address}</p>
+                            </button>
+                          ))}
+                        </Card>
+                      )}
+                    </div>
+
+                    {/* Destination Input */}
+                    <div className="relative">
+                      <Input
+                        placeholder="Where to?"
+                        value={destinationAddress}
+                        onChange={(e) => setDestinationAddress(e.target.value)}
+                        onFocus={() => setShowDestSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowDestSuggestions(false), 200)}
+                        className="h-12 pr-10 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500 font-medium"
+                        data-testid="input-destination"
+                      />
+                      <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      {showDestSuggestions && (savedPlaces.length > 0 || recentLocations.length > 0) && (
+                        <Card className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto shadow-xl border" data-testid="destination-suggestions">
+                          {savedPlaces.map((place) => (
+                            <button
+                              key={place.id}
+                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                              onClick={() => { setDestinationAddress(place.address); setShowDestSuggestions(false); }}
+                              data-testid={`dest-saved-${place.id}`}
+                            >
+                              {place.icon === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : <Briefcase className="h-4 w-4 text-muted-foreground" />}
+                              <div>
+                                <p className="font-medium text-sm">{place.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                              </div>
+                            </button>
+                          ))}
+                          {recentLocations.slice(0, 3).map((loc) => (
+                            <button
+                              key={loc.id}
+                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                              onClick={() => { setDestinationAddress(loc.address); setShowDestSuggestions(false); }}
+                              data-testid={`dest-recent-${loc.id}`}
+                            >
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <p className="text-sm truncate">{loc.address}</p>
+                            </button>
+                          ))}
+                        </Card>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <Input
-                  placeholder={isLocating ? "Detecting location..." : "Pickup location"}
-                  value={pickupAddress}
-                  onChange={(e) => setPickupAddress(e.target.value)}
-                  onFocus={() => setShowPickupSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowPickupSuggestions(false), 200)}
-                  className="pl-12 pr-12 h-14 text-base bg-muted/50 border-0 rounded-xl focus:ring-2 focus:ring-primary"
-                  data-testid="input-pickup"
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full hover:bg-primary/10"
-                  onClick={autoDetectLocation}
-                  disabled={isLocating}
-                  data-testid="button-detect-location"
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-gray-200 dark:bg-gray-700" />
+
+              {/* Quick Options & Payment */}
+              <div className="p-4 space-y-3">
+                <div className="flex gap-2">
+                  <Badge variant="secondary" className="px-3 py-1.5 rounded-full text-xs font-medium" data-testid="badge-pickup-now">
+                    <Clock className="h-3 w-3 mr-1.5" /> Now
+                  </Badge>
+                  <Badge variant="secondary" className="px-3 py-1.5 rounded-full text-xs font-medium" data-testid="badge-for-me">
+                    <User className="h-3 w-3 mr-1.5" /> For me
+                  </Badge>
+                </div>
+
+                {/* Payment Method Row */}
+                <button 
+                  className="flex items-center justify-between w-full p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl"
+                  onClick={() => showComingSoon("Payment method selection")}
+                  data-testid="payment-method"
                 >
-                  <Crosshair className={`h-5 w-5 ${isLocating ? "animate-pulse text-primary" : "text-muted-foreground"}`} />
+                  <div className="flex items-center gap-3">
+                    <CreditCard className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                    <span className="text-sm font-medium">•••• 4242</span>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-gray-400" />
+                </button>
+
+                <p className="text-[11px] text-center text-muted-foreground" data-testid="no-cash-notice">
+                  Cash payments are not available in the United States
+                </p>
+
+                {/* See Prices Button */}
+                <Button 
+                  className="w-full h-12 text-sm font-semibold rounded-lg" 
+                  onClick={handleSeePrices}
+                  data-testid="button-see-prices"
+                >
+                  See prices
                 </Button>
-                {showPickupSuggestions && (savedPlaces.length > 0 || recentLocations.length > 0) && (
-                  <Card className="absolute top-full left-0 right-0 mt-2 z-20 max-h-48 overflow-y-auto shadow-xl" data-testid="pickup-suggestions">
-                    {savedPlaces.map((place) => (
-                      <button
-                        key={place.id}
-                        className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                        onClick={() => { setPickupAddress(place.address); setShowPickupSuggestions(false); }}
-                        data-testid={`pickup-saved-${place.id}`}
-                      >
-                        {place.icon === "home" ? <Home className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />}
-                        <div>
-                          <p className="font-medium text-sm">{place.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{place.address}</p>
-                        </div>
-                      </button>
-                    ))}
-                    {recentLocations.slice(0, 3).map((loc) => (
-                      <button
-                        key={loc.id}
-                        className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                        onClick={() => { setPickupAddress(loc.address); setShowPickupSuggestions(false); }}
-                        data-testid={`pickup-recent-${loc.id}`}
-                      >
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm truncate">{loc.address}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </Card>
-                )}
               </div>
-
-              {/* Destination Input */}
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10">
-                  <div className="h-3 w-3 bg-primary" />
-                </div>
-                <Input
-                  placeholder="Where to?"
-                  value={destinationAddress}
-                  onChange={(e) => setDestinationAddress(e.target.value)}
-                  onFocus={() => setShowDestSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowDestSuggestions(false), 200)}
-                  className="pl-12 h-14 text-base bg-muted/50 border-0 rounded-xl focus:ring-2 focus:ring-primary"
-                  data-testid="input-destination"
-                />
-                {showDestSuggestions && (savedPlaces.length > 0 || recentLocations.length > 0) && (
-                  <Card className="absolute top-full left-0 right-0 mt-2 z-20 max-h-48 overflow-y-auto shadow-xl" data-testid="destination-suggestions">
-                    {savedPlaces.map((place) => (
-                      <button
-                        key={place.id}
-                        className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                        onClick={() => { setDestinationAddress(place.address); setShowDestSuggestions(false); }}
-                        data-testid={`dest-saved-${place.id}`}
-                      >
-                        {place.icon === "home" ? <Home className="h-4 w-4" /> : <Briefcase className="h-4 w-4" />}
-                        <div>
-                          <p className="font-medium text-sm">{place.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{place.address}</p>
-                        </div>
-                      </button>
-                    ))}
-                    {recentLocations.slice(0, 3).map((loc) => (
-                      <button
-                        key={loc.id}
-                        className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                        onClick={() => { setDestinationAddress(loc.address); setShowDestSuggestions(false); }}
-                        data-testid={`dest-recent-${loc.id}`}
-                      >
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm truncate">{loc.address}</p>
-                        </div>
-                      </button>
-                    ))}
-                  </Card>
-                )}
-              </div>
-
-              {/* Quick Options */}
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary" className="px-3 py-1.5 rounded-full" data-testid="badge-pickup-now">
-                  <Clock className="h-3 w-3 mr-1.5" /> Pickup now
-                </Badge>
-                <Badge variant="secondary" className="px-3 py-1.5 rounded-full" data-testid="badge-for-me">
-                  <User className="h-3 w-3 mr-1.5" /> For me
-                </Badge>
-              </div>
-
-              {/* Payment Method */}
-              <div 
-                className="flex items-center justify-between p-4 bg-muted/30 rounded-xl cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => showComingSoon("Payment method selection")}
-                data-testid="payment-method"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <CreditCard className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">Card ending ****4242</p>
-                    <p className="text-xs text-muted-foreground">Tap to change payment method</p>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground" />
-              </div>
-
-              {/* USA No Cash Notice */}
-              <p className="text-xs text-muted-foreground text-center px-4" data-testid="no-cash-notice">
-                Cash payments are not available in the United States
-              </p>
-
-              {/* See Prices Button - Uber Blue Style */}
-              <Button 
-                className="w-full h-14 text-base font-semibold rounded-xl shadow-lg" 
-                onClick={handleSeePrices}
-                data-testid="button-see-prices"
-              >
-                See prices
-              </Button>
             </CardContent>
           </Card>
         </section>
 
-        {/* SECTION 4: SERVICE TILES - Only Ride Active */}
+        {/* 8 SUGGESTION TILES - UBER STYLE */}
         <section data-testid="suggestions-section">
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
+          <div className="grid grid-cols-4 gap-3">
             {suggestionTiles.map((tile) => (
               <button
                 key={tile.id}
                 onClick={() => handleTileClick(tile)}
                 disabled={!tile.active}
                 aria-disabled={!tile.active}
-                className={`relative flex flex-col items-center p-4 rounded-2xl transition-all duration-200 ${
+                className={`relative flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-200 ${
                   tile.active 
-                    ? "hover:shadow-lg hover:scale-105 cursor-pointer bg-card" 
-                    : "opacity-60 cursor-not-allowed bg-muted/30"
+                    ? "hover:scale-105 hover:shadow-lg cursor-pointer active:scale-95" 
+                    : "cursor-not-allowed"
                 }`}
+                style={{ 
+                  boxShadow: tile.active ? '0 2px 8px rgba(0,0,0,0.08)' : 'none'
+                }}
                 data-testid={`tile-${tile.id}`}
               >
-                <div className={`h-14 w-14 rounded-2xl ${tile.color} flex items-center justify-center mb-3 ${
+                <div className={`h-12 w-12 rounded-full ${tile.color} flex items-center justify-center mb-2 ${
                   tile.active ? "shadow-md" : ""
                 }`}>
-                  <tile.icon className={`h-6 w-6 ${tile.iconColor}`} />
+                  <tile.icon className={`h-5 w-5 ${tile.iconColor}`} />
                 </div>
-                <span className="text-xs font-semibold text-center">{tile.label}</span>
+                <span className="text-[11px] font-semibold text-center leading-tight">{tile.label}</span>
                 {!tile.active && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-background/60 rounded-2xl">
-                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0.5 pointer-events-none">
+                  <div className="absolute inset-0 flex items-end justify-center pb-1 bg-background/70 dark:bg-background/80 rounded-xl">
+                    <span className="text-[8px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
                       Soon
-                    </Badge>
+                    </span>
                   </div>
                 )}
               </button>
@@ -425,13 +434,13 @@ export default function CustomerHome() {
           </div>
         </section>
 
-        {/* SECTION 5: RECENT ACTIVITY */}
+        {/* ACTIVITY PREVIEW - UBER STYLE */}
         <section data-testid="activity-section">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold">Recent Activity</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-bold">Recent</h2>
             <Link href="/customer/activity">
-              <Button variant="ghost" size="sm" className="text-primary font-medium" data-testid="link-see-all-activity">
-                See all <ArrowRight className="h-4 w-4 ml-1" />
+              <Button variant="ghost" size="sm" className="text-primary text-xs font-semibold h-7 px-2" data-testid="link-see-all-activity">
+                See all
               </Button>
             </Link>
           </div>
@@ -444,29 +453,37 @@ export default function CustomerHome() {
           ) : recentRides && recentRides.length > 0 ? (
             <div className="space-y-3">
               {recentRides.slice(0, 3).map((ride: any) => (
-                <Card key={ride.id} className="hover:shadow-md transition-shadow rounded-xl" data-testid={`activity-ride-${ride.id}`}>
+                <Card 
+                  key={ride.id} 
+                  className="overflow-hidden shadow-sm hover:shadow-md transition-shadow rounded-xl border-0 bg-gray-50 dark:bg-gray-900/50" 
+                  data-testid={`activity-ride-${ride.id}`}
+                >
                   <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Car className="h-6 w-6 text-primary" />
+                    <div className="flex items-center gap-4">
+                      {/* Large Uber-style Car Icon */}
+                      <div className="h-14 w-14 rounded-xl bg-gray-200 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
+                        <Car className="h-7 w-7 text-gray-700 dark:text-gray-300" />
                       </div>
+                      
+                      {/* Trip Details */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="font-semibold truncate">{ride.dropoffAddress || "Completed trip"}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {ride.createdAt ? new Date(ride.createdAt).toLocaleDateString("en-US", { 
-                                month: "short", day: "numeric", hour: "numeric", minute: "2-digit" 
-                              }) : "Recently"}
-                            </p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="font-bold text-lg">${ride.serviceFare?.toFixed(2) || "0.00"}</p>
-                            <Badge variant={ride.status === "completed" ? "default" : "secondary"} className="text-[10px]">
-                              {ride.status}
-                            </Badge>
-                          </div>
-                        </div>
+                        <p className="font-semibold text-sm truncate">{ride.dropoffAddress || "Completed trip"}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {ride.createdAt ? new Date(ride.createdAt).toLocaleDateString("en-US", { 
+                            month: "short", day: "numeric", hour: "numeric", minute: "2-digit" 
+                          }) : "Recently"}
+                        </p>
+                      </div>
+                      
+                      {/* Price & Action */}
+                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                        <p className="font-bold text-base">${ride.serviceFare?.toFixed(2) || "0.00"}</p>
+                        <Badge 
+                          variant="secondary" 
+                          className="text-[10px] px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                        >
+                          See details
+                        </Badge>
                       </div>
                     </div>
                   </CardContent>
@@ -474,163 +491,150 @@ export default function CustomerHome() {
               ))}
             </div>
           ) : (
-            <Card className="bg-muted/20 border-dashed rounded-xl" data-testid="no-activity">
-              <CardContent className="p-10 text-center">
-                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                  <Clock className="h-8 w-8 text-muted-foreground" />
+            <Card className="bg-gray-50 dark:bg-gray-900/50 border-0 rounded-xl" data-testid="no-activity">
+              <CardContent className="p-8 text-center">
+                <div className="h-14 w-14 rounded-full bg-gray-200 dark:bg-gray-800 flex items-center justify-center mx-auto mb-3">
+                  <Clock className="h-7 w-7 text-gray-500" />
                 </div>
-                <p className="font-semibold text-lg">No recent trips</p>
-                <p className="text-sm text-muted-foreground mt-1">Your ride history will appear here</p>
+                <p className="font-semibold text-sm">No recent trips</p>
+                <p className="text-xs text-muted-foreground mt-1">Your ride history will appear here</p>
               </CardContent>
             </Card>
           )}
         </section>
 
-        {/* SECTION 6: RESERVE PREVIEW - Coming Soon */}
+        {/* RESERVE PREVIEW - UBER TEAL STYLE */}
         <section id="reserve-section" data-testid="reserve-section">
-          <Card className="overflow-hidden bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/20 dark:to-sky-950/20 border-blue-100 dark:border-blue-900/30">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" />
-                  Reserve a Ride
-                </CardTitle>
-                <Badge variant="secondary" className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+          <Card 
+            className="overflow-hidden border-0 rounded-2xl"
+            style={{ backgroundColor: '#d7f0f0' }}
+          >
+            <div className="dark:bg-teal-950/40 p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-teal-700 dark:text-teal-400" />
+                  <h3 className="font-bold text-base text-teal-900 dark:text-teal-100">Reserve</h3>
+                </div>
+                <Badge className="bg-teal-200/80 dark:bg-teal-800/50 text-teal-800 dark:text-teal-200 text-[10px] border-0">
                   Coming Soon
                 </Badge>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Schedule your ride in advance. Perfect for airport trips and important meetings.
+              
+              <p className="text-xs text-teal-800/80 dark:text-teal-200/80 mb-4">
+                Schedule rides in advance for airport trips and important meetings.
               </p>
               
-              <div className="grid grid-cols-2 gap-3 opacity-50 pointer-events-none">
+              <div className="grid grid-cols-2 gap-3 opacity-60 pointer-events-none">
                 <div>
-                  <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Date</label>
-                  <Input
-                    type="date"
-                    disabled
-                    className="h-11 bg-white/50 dark:bg-white/5"
-                    data-testid="input-reserve-date"
-                  />
+                  <label className="text-[10px] font-semibold mb-1 block text-teal-900/60 dark:text-teal-100/60 uppercase tracking-wide">Date</label>
+                  <div className="h-11 bg-white/60 dark:bg-white/10 rounded-lg flex items-center px-3">
+                    <span className="text-sm text-teal-900/50 dark:text-teal-100/50">Select date</span>
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs font-medium mb-1.5 block text-muted-foreground">Time</label>
-                  <Input
-                    type="time"
-                    disabled
-                    className="h-11 bg-white/50 dark:bg-white/5"
-                    data-testid="input-reserve-time"
-                  />
+                  <label className="text-[10px] font-semibold mb-1 block text-teal-900/60 dark:text-teal-100/60 uppercase tracking-wide">Time</label>
+                  <div className="h-11 bg-white/60 dark:bg-white/10 rounded-lg flex items-center px-3">
+                    <span className="text-sm text-teal-900/50 dark:text-teal-100/50">Select time</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-white/50 dark:bg-white/5 rounded-xl p-4 space-y-2 text-sm" data-testid="reserve-info">
-                <div className="flex items-start gap-2">
-                  <Calendar className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                  <p className="text-muted-foreground">Reserve up to 90 days in advance</p>
+              <div className="mt-4 space-y-1.5">
+                <div className="flex items-center gap-2 text-teal-800 dark:text-teal-200">
+                  <Check className="h-3.5 w-3.5" />
+                  <span className="text-[11px]">Reserve up to 90 days ahead</span>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Clock className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                  <p className="text-muted-foreground">Extra wait time included</p>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Check className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                  <p className="text-muted-foreground">Free cancellation 60 min before</p>
+                <div className="flex items-center gap-2 text-teal-800 dark:text-teal-200">
+                  <Check className="h-3.5 w-3.5" />
+                  <span className="text-[11px]">Free cancellation 60 min before</span>
                 </div>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </section>
 
-        {/* SECTION 7: MORE FROM SAFEGO */}
+        {/* MORE FROM SAFEGO */}
         <section data-testid="more-section">
-          <h2 className="text-lg font-bold mb-4">More from SafeGo</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <h2 className="text-base font-bold mb-3">More from SafeGo</h2>
+          <div className="grid grid-cols-2 gap-3">
             <Card 
-              className="hover:shadow-md transition-shadow cursor-pointer rounded-xl" 
+              className="hover:shadow-md transition-shadow cursor-pointer rounded-xl border-0 bg-gray-50 dark:bg-gray-900/50" 
               onClick={() => showComingSoon("SafeGo Eats")}
               data-testid="card-safego-eats"
             >
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center flex-shrink-0">
-                  <UtensilsCrossed className="h-7 w-7 text-orange-600" />
+              <CardContent className="p-4 flex flex-col items-center text-center">
+                <div className="h-12 w-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mb-2">
+                  <UtensilsCrossed className="h-6 w-6 text-orange-600" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold">SafeGo Eats</h3>
-                  <p className="text-sm text-muted-foreground">Order food delivery</p>
-                  <Badge variant="secondary" className="mt-2 text-[10px]">Coming soon</Badge>
-                </div>
+                <h3 className="font-bold text-sm">Eats</h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Food delivery</p>
+                <Badge variant="secondary" className="mt-2 text-[9px]">Soon</Badge>
               </CardContent>
             </Card>
 
             <Card 
-              className="hover:shadow-md transition-shadow cursor-pointer rounded-xl" 
+              className="hover:shadow-md transition-shadow cursor-pointer rounded-xl border-0 bg-gray-50 dark:bg-gray-900/50" 
               onClick={() => showComingSoon("SafeGo Business")}
               data-testid="card-safego-business"
             >
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                  <Briefcase className="h-7 w-7 text-blue-600" />
+              <CardContent className="p-4 flex flex-col items-center text-center">
+                <div className="h-12 w-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-2">
+                  <Briefcase className="h-6 w-6 text-blue-600" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold">SafeGo Business</h3>
-                  <p className="text-sm text-muted-foreground">Corporate travel solutions</p>
-                  <Badge variant="secondary" className="mt-2 text-[10px]">Coming soon</Badge>
-                </div>
+                <h3 className="font-bold text-sm">Business</h3>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Corporate travel</p>
+                <Badge variant="secondary" className="mt-2 text-[9px]">Soon</Badge>
               </CardContent>
             </Card>
           </div>
         </section>
 
-        {/* SECTION 8: FOOTER - UPCOMING APPS */}
-        <section className="text-center py-8 border-t" data-testid="footer-apps">
-          <h3 className="font-bold mb-2">Get the SafeGo app</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Mobile apps coming soon. Web version active during development.
+        {/* FOOTER */}
+        <section className="text-center py-6 border-t" data-testid="footer-apps">
+          <h3 className="font-bold text-sm mb-1">Get the SafeGo app</h3>
+          <p className="text-[11px] text-muted-foreground mb-3">
+            Mobile apps coming soon
           </p>
-          <div className="flex justify-center gap-3">
-            <Button variant="outline" disabled className="opacity-50 rounded-xl" data-testid="button-app-store">
-              <Apple className="h-4 w-4 mr-2" />
+          <div className="flex justify-center gap-2">
+            <Button variant="outline" disabled size="sm" className="opacity-50 rounded-lg h-8 text-xs" data-testid="button-app-store">
+              <Apple className="h-3.5 w-3.5 mr-1.5" />
               App Store
             </Button>
-            <Button variant="outline" disabled className="opacity-50 rounded-xl" data-testid="button-google-play">
-              <Play className="h-4 w-4 mr-2" />
+            <Button variant="outline" disabled size="sm" className="opacity-50 rounded-lg h-8 text-xs" data-testid="button-google-play">
+              <Play className="h-3.5 w-3.5 mr-1.5" />
               Google Play
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">Coming soon</p>
         </section>
       </main>
 
-      {/* SECTION 9: BOTTOM TAB BAR */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-t z-50 safe-area-inset-bottom" data-testid="bottom-nav">
-        <div className="max-w-4xl mx-auto flex items-center justify-around h-16">
+      {/* UBER-STYLE BOTTOM TAB BAR */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-background border-t z-50" data-testid="bottom-nav">
+        <div className="max-w-lg mx-auto flex items-center justify-around h-14">
           <Link href="/customer">
-            <button className="flex flex-col items-center gap-1 px-6 py-2" data-testid="nav-home">
-              <Home className="h-5 w-5 text-primary" />
-              <span className="text-[10px] font-semibold text-primary">Home</span>
+            <button className="flex flex-col items-center justify-center gap-0.5 w-16 h-full" data-testid="nav-home">
+              <Home className="h-[22px] w-[22px] text-foreground" strokeWidth={2.5} />
+              <span className="text-[10px] font-semibold">Home</span>
             </button>
           </Link>
           <button 
-            className="flex flex-col items-center gap-1 px-6 py-2"
+            className="flex flex-col items-center justify-center gap-0.5 w-16 h-full"
             onClick={() => document.getElementById("activity-section")?.scrollIntoView({ behavior: "smooth" })}
             data-testid="nav-activity"
           >
-            <Clock className="h-5 w-5 text-muted-foreground" />
+            <Clock className="h-[22px] w-[22px] text-muted-foreground" strokeWidth={1.5} />
             <span className="text-[10px] font-medium text-muted-foreground">Activity</span>
           </button>
           <Link href="/customer/support">
-            <button className="flex flex-col items-center gap-1 px-6 py-2" data-testid="nav-support">
-              <HelpCircle className="h-5 w-5 text-muted-foreground" />
+            <button className="flex flex-col items-center justify-center gap-0.5 w-16 h-full" data-testid="nav-support">
+              <HelpCircle className="h-[22px] w-[22px] text-muted-foreground" strokeWidth={1.5} />
               <span className="text-[10px] font-medium text-muted-foreground">Support</span>
             </button>
           </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex flex-col items-center gap-1 px-6 py-2" data-testid="nav-profile">
-                <User className="h-5 w-5 text-muted-foreground" />
+              <button className="flex flex-col items-center justify-center gap-0.5 w-16 h-full" data-testid="nav-profile">
+                <User className="h-[22px] w-[22px] text-muted-foreground" strokeWidth={1.5} />
                 <span className="text-[10px] font-medium text-muted-foreground">Account</span>
               </button>
             </DropdownMenuTrigger>
