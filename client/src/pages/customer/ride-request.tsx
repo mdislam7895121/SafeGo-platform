@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Navigation, Crosshair, Loader2, Clock, Home, Briefcase, Star, ChevronRight, CreditCard, Wallet, AlertCircle } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, Crosshair, Loader2, Clock, Home, Briefcase, Star, ChevronRight, CreditCard, Wallet, AlertCircle, Car } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import {
   type SavedPlace,
   type RecentLocation
 } from "@/lib/locationService";
+import { formatDurationMinutes, getTrafficAwareDuration, getTrafficConditionLabel } from "@/lib/formatters";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -36,7 +37,9 @@ interface FareEstimate {
   totalFare: number;
   currency: string;
   etaMinutes: number;
+  etaWithTrafficMinutes: number;
   distanceKm: number;
+  trafficCondition: string;
 }
 
 function createPickupIcon() {
@@ -319,12 +322,18 @@ export default function RideRequest() {
     
     await new Promise(resolve => setTimeout(resolve, 500));
     
+    // Apply traffic-aware duration for pricing
+    const now = new Date();
+    const etaWithTrafficMinutes = getTrafficAwareDuration(routeInfo.etaMinutes, now);
+    const trafficCondition = getTrafficConditionLabel(now);
+    
     const baseFare = 2.50;
     const perKmRate = 1.25;
     const perMinRate = 0.30;
     
     const distanceFare = routeInfo.distanceKm * perKmRate;
-    const timeFare = routeInfo.etaMinutes * perMinRate;
+    // Use traffic-aware duration for time-based fare calculation
+    const timeFare = etaWithTrafficMinutes * perMinRate;
     const totalFare = baseFare + distanceFare + timeFare;
     
     setFareEstimate({
@@ -334,7 +343,9 @@ export default function RideRequest() {
       totalFare: Math.round(totalFare * 100) / 100,
       currency: "USD",
       etaMinutes: routeInfo.etaMinutes,
+      etaWithTrafficMinutes,
       distanceKm: routeInfo.distanceKm,
+      trafficCondition,
     });
     
     setIsCalculatingFare(false);
@@ -631,12 +642,18 @@ export default function RideRequest() {
                     </p>
                   </div>
                 </div>
-                <div className="text-right text-sm text-muted-foreground">
-                  <p data-testid="text-distance">{fareEstimate.distanceKm} km</p>
-                  <p data-testid="text-eta">{fareEstimate.etaMinutes} min</p>
+                <div className="text-right text-sm">
+                  <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceKm} km</p>
+                  <p className="font-medium" data-testid="text-eta">
+                    ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
+                  </p>
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <Badge variant="secondary" className="text-xs">
+                  <Car className="h-3 w-3 mr-1" />
+                  {fareEstimate.trafficCondition}
+                </Badge>
                 <Badge variant="secondary" className="text-xs">
                   <Wallet className="h-3 w-3 mr-1" />
                   Card/Wallet only

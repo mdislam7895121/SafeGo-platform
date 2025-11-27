@@ -36,6 +36,7 @@ import {
   type PlaceDetails
 } from "@/lib/locationService";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
+import { formatDurationMinutes, getTrafficAwareDuration, getTrafficConditionLabel } from "@/lib/formatters";
 
 const suggestionTiles = [
   { id: "ride", label: "Ride", icon: Car, color: "bg-black dark:bg-white", iconColor: "text-white dark:text-black", active: true },
@@ -803,7 +804,7 @@ export default function CustomerHome() {
                         <div className="flex items-center gap-1.5">
                           <Clock className="h-4 w-4 text-primary" />
                           <span className="text-sm font-semibold" data-testid="text-eta">
-                            ~{routeInfo.durationMinutes} min
+                            ~{formatDurationMinutes(getTrafficAwareDuration(routeInfo.durationMinutes))}
                           </span>
                         </div>
                       </>
