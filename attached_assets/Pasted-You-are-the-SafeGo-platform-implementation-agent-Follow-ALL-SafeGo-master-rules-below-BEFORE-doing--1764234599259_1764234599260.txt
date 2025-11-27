@@ -1,0 +1,309 @@
+You are the SafeGo platform implementation agent. Follow ALL SafeGo master rules below BEFORE doing anything. Do not skip, delete, or simplify any requirement. Your job is to FIX the customer ride-request screen so that current location detection and address suggestions work correctly, with zero breaking changes.
+
+====================================================
+A) SAFEGO MASTER RULES (ALWAYS ENFORCE)
+====================================================
+
+1. ROLES (4 separate roles, NEVER mix access)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   For EACH role, the platform must support:
+   - Separate signup / onboarding steps
+   - Country-specific KYC/verification
+   - Their own dashboard
+   - Their own permissions
+   - Their own status flows
+
+2. GLOBAL APP LOGIC
+   SafeGo is a global super-app with 3 core services:
+   1) Ride-hailing
+   2) Food delivery
+   3) Parcel delivery
+
+   Every implementation and fix you do must keep all three services working and consistent worldwide.
+
+3. COUNTRY-SPECIFIC KYC (BD vs US MUST be different)
+
+   BANGLADESH (BD) – mandatory fields:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID (number + front/back images)
+   - emergency_contact details
+   - verification_status
+   - is_verified (boolean)
+
+   UNITED STATES (US) – mandatory fields:
+   - date_of_birth
+   - home_address
+   - emergency_contact details
+   - government_id_type
+   - government_id_last4
+   - (drivers) driver_license_number + license_image + license_expiry
+   - (drivers) ssn_last4 (optional)
+   - verification_status
+   - is_verified (boolean)
+
+   KYC rules must be respected in all logic. Do NOT remove or rename any of these fields.
+
+4. ADMIN PANEL (ALWAYS PRESENT)
+   Admin must be able to:
+   - view and verify customers
+   - view and verify drivers
+   - view and verify restaurants
+   - approve/reject KYC submissions
+   - see rejection_reason for any rejection
+   - update pricing, fees, commissions
+   - block/unblock any user (all roles)
+   - manage payouts and settlements
+   - view driver negative balance
+   - view restaurant negative balance
+
+   Do NOT modify existing admin routes or permissions. Only add if needed.
+
+5. CORE COLLECTIONS (NEVER REMOVE)
+   The backend already has these collections:
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must contain:
+   - identity fields: customer_id, driver_id (or restaurant_id, etc.)
+   - pickup and dropoff addresses + geolocation (lat/lng)
+   - all fees and commissions (service_fee, driver_earnings, restaurant_earnings, safego_commission, taxes, etc.)
+   - payment details (payment_method, payment_status, transaction_id if online)
+   - timestamps (created_at, updated_at, status_timestamps)
+   - full status flow for that service
+   - rating + feedback fields from both sides where applicable
+
+   You must NOT rename these collections or their critical fields. Only extend with additive fields if absolutely required.
+
+6. COMMISSION & PAYOUT RULES (STRICT)
+   1) Rides – CASH payment:
+      - Driver receives full cash from customer.
+      - SafeGo commission becomes negative balance in driver_wallet_balance.
+      - Driver must settle negative balance weekly.
+   2) Food orders – CASH:
+      - Restaurant receives all cash directly from customer.
+      - SafeGo commission becomes negative balance in restaurant_wallet.
+   3) Any ONLINE payment:
+      - SafeGo keeps commission automatically; driver/restaurant wallets are updated net of commission.
+   4) Admin can settle balances and mark them as paid.
+
+   Your changes must not break any of this logic.
+
+7. SECURITY RULES
+   - Customers cannot see any driver documents (NID, license, SSN, etc.).
+   - Drivers cannot see customer NID or other sensitive KYC details.
+   - Restaurants cannot see or query other restaurants.
+   - Only Admin can:
+     - change pricing
+     - change commissions
+     - change verification_status / is_verified
+     - block/unblock any account
+   - Each user can only update their own profile.
+
+   For location features you implement, never expose precise coordinates to other users beyond what is needed to perform the ride/parcel/delivery.
+
+8. STATUS FLOWS (ALWAYS COMPLETE, DO NOT BREAK)
+
+   Ride statuses:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+   Food statuses:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+   Parcel statuses:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+   Your code must keep these flows intact. If you touch status logic, you must preserve these enums/states.
+
+9. ONBOARDING (ALL ROLES)
+   Each user type has multi-step onboarding:
+   - Step 1: Basic info
+   - Step 2: Address
+   - Step 3: ID/KYC upload (country-specific rules above)
+   - Step 4: Emergency contact
+   - verification_status = "pending" by default
+   - is_verified = false by default
+   - Access to rides/food/parcel is blocked until Admin approves.
+
+10. NOTIFICATIONS
+   System must send notifications for:
+   - new ride requests to nearby drivers
+   - order status updates to customer and driver
+   - parcel status updates
+   - KYC verification approval/rejection (with rejection_reason)
+   - important admin notifications (e.g., negative wallet balance, account blocked)
+
+   You must not remove or disable any notifications. Only add more if needed.
+
+11. NON-BREAKING CHANGE RULE
+   - Do NOT rename or delete existing DB fields.
+   - Do NOT remove or rename existing API routes or UI routes.
+   - All your changes must be backward-compatible and additive.
+   - If you need new functionality, ADD new fields/endpoints/components instead of changing old ones.
+
+   If there is any doubt, choose the safer ADDITIVE approach.
+
+====================================================
+B) SECURITY PHASE FOR THIS TASK
+====================================================
+
+For this task, apply SafeGo Security Roadmap Phase related to:
+- privacy-preserving location handling,
+- strict validation of external API responses (Google Maps / Places),
+- graceful failure when location permissions are denied.
+
+Never send raw Google API errors to the end user. Log securely, show friendly messages in UI.
+
+====================================================
+C) TASK: FIX CUSTOMER RIDE HOME SCREEN LOCATION + AUTOCOMPLETE
+====================================================
+
+CONTEXT:
+- This is the customer web app ride-hailing home screen (the one that shows “Good night, {username} – Where are you going?”).
+- Currently:
+  - The “Detecting location…” pickup field never resolves to a real address.
+  - When user types an address in the “Where to?” (dropoff) field, no suggestions (autocomplete) are shown.
+  - For United States, there is a note “Cash payments are not available in the United States” – THIS TEXT AND RULE MUST STAY.
+
+GOAL:
+Fix the frontend and any necessary backend glue so that:
+1) Current location is detected (where browser permission is granted) and converted to a human-readable pickup address.
+2) Pickup and Dropoff fields both show live address suggestions while the user types.
+3) Selected suggestion populates full address + lat/lng in the ride request object, stored in the existing rides collection.
+4) All of this works without breaking any existing SafeGo schemas, services, or country-specific rules.
+
+Do the implementation in a clean, production-quality way.
+
+====================================================
+D) DETAILED IMPLEMENTATION REQUIREMENTS
+====================================================
+
+1. Technology assumptions
+   - Web frontend is built with a modern JS framework (React/Next or similar). If there is an existing pattern/component for map/autocomplete, REUSE it.
+   - Backend already has some geo fields in the rides collection (for pickup and dropoff). Reuse those fields.
+
+2. Frontend: Current location detection
+   - Use the browser Geolocation API:
+
+     navigator.geolocation.getCurrentPosition(
+       successCallback,
+       errorCallback,
+       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+     )
+
+   - In successCallback:
+     - Get coordinates (lat, lng).
+     - Call a backend endpoint or Google Geocoding API to turn (lat, lng) into a formatted address.
+     - Update the pickup input with that formatted address.
+     - Store in local state:
+       - pickup_lat
+       - pickup_lng
+       - pickup_address
+
+   - In errorCallback:
+     - Do NOT crash. Show a small inline message like “Unable to detect your location. Please enter your pickup address manually.”
+     - Leave the input editable.
+     - Do NOT prompt repeatedly; one clear explanation is enough.
+
+   - Only trigger geolocation when:
+     - the page first loads, OR
+     - the user clicks a “Use current location” icon/button.
+   - Respect user privacy. If permission is denied, respect that decision and do not retry automatically.
+
+3. Frontend: Address autocomplete for pickup and dropoff
+   - Integrate Google Places Autocomplete (or the project’s existing autocomplete utility).
+
+   Requirements:
+   - Ensure the Maps JavaScript script is loaded with `libraries=places`.
+   - Use a single shared autocomplete component that can be used for both:
+     - pickup (current location override or typed)
+     - dropoff (“Where to?” field)
+
+   - For each keystroke after 2–3 characters:
+     - Query Places Autocomplete.
+     - Show suggestions in a dropdown under the input.
+     - On selecting a suggestion:
+       - Resolve full place details and extract:
+         - formatted_address
+         - latitude, longitude
+       - Update state:
+         - For pickup: pickup_address, pickup_lat, pickup_lng
+         - For dropoff: dropoff_address, dropoff_lat, dropoff_lng
+
+   - Handle rate-limit and error states with graceful UI messages (e.g., “Address suggestions temporarily unavailable. Please type full address.”).
+
+4. Backend integration (rides collection)
+   - When the customer taps “See prices” or the equivalent “Request ride / search rides” action:
+     - Build a ride request payload that includes at minimum:
+       - customer_id
+       - pickup_address
+       - pickup_lat
+       - pickup_lng
+       - dropoff_address
+       - dropoff_lat
+       - dropoff_lng
+       - country_code (e.g., "US" or "BD")
+       - payment_method (respecting rules below)
+       - created_at timestamp
+       - initial status = "requested"
+     - POST this payload to the existing ride creation endpoint.
+   - DO NOT rename any existing fields. If the schema already defines other required fields (like estimated_fare, currency, etc.), fill them using existing logic.
+
+5. Country-specific behavior (US vs BD)
+   - United States:
+     - “Cash payments are not available in the United States” message MUST stay visible.
+     - For US customers, when creating the ride, enforce:
+       - payment_method MUST be a non-cash method (e.g., "card", "wallet").
+       - Do NOT allow selecting “cash” in the UI.
+   - Bangladesh:
+     - Cash is allowed.
+     - Existing commission logic (driver gets full cash, SafeGo commission becomes negative driver_wallet_balance) MUST remain unchanged.
+
+   Your location/autocomplete fixes must not break any of these payment and commission rules.
+
+6. Security & privacy requirements
+   - Never expose another customer’s or driver’s coordinates in this screen.
+   - Only use the customer’s own coordinates for their ride request.
+   - Do not log full precise coordinates or full addresses in client-side console in production builds.
+   - Validate all external API responses on the backend if you introduce new backend endpoints (e.g., geocode proxy).
+
+7. Error handling and UX details
+   - If Google Maps / Places script fails to load:
+     - Allow manual entry of address.
+     - Show a subtle message: “Location suggestions unavailable. Please enter address manually.”
+   - If geolocation is blocked:
+     - Do not show infinite “Detecting location…”. Instead, replace with a clear message and keep the field editable.
+   - Keep the UI text “Good night, {username} – Where are you going?” and the overall layout unchanged.
+
+8. Tests and validation
+   - Implement at least basic tests (or manual test checklist) to confirm:
+     - Location detection works when permission is allowed.
+     - Location gracefully falls back to manual entry when permission is denied.
+     - Autocomplete dropdown appears after typing a few characters.
+     - Selecting a suggestion populates both address and coordinates.
+     - For US customers, “cash” payment option does not appear and card/wallet flow works.
+     - For BD customers, cash option still works and commission rules remain valid.
+
+====================================================
+E) NON-BREAKING GUARANTEE
+====================================================
+
+While implementing this task, you MUST:
+- Keep all existing database schemas, collection names, and key fields for rides, food_orders, deliveries unchanged.
+- Keep all existing API route URLs unchanged.
+- Keep all existing admin panel pages and features unchanged.
+- Only ADD:
+  - new components,
+  - new utility functions,
+  - or new optional fields, while continuing to support all existing data.
+
+If something appears risky or breaking, choose a safer, additive solution instead of modifying/removing existing behavior.
+
+Now implement all of the above and output the final updated frontend and any required backend glue code (JS/TS, components, hooks, and minimal configuration) in a way that can be copied directly into the SafeGo codebase.

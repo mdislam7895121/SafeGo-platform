@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,9 +6,9 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   Car, Package, UtensilsCrossed, User, Clock, HelpCircle, MapPin, 
   ChevronDown, ChevronRight, Calendar, ShoppingCart, Smartphone, Bus,
-  Briefcase, CreditCard, Navigation, Home, Settings,
+  Briefcase, CreditCard, Navigation, Home, Settings, Search, Loader2,
   LogOut, Star, ArrowRight, Apple, Play, Globe, Check, Crosshair,
-  BadgeCheck, Sun, Moon, Sunset, Key
+  BadgeCheck, Sun, Moon, Sunset, Key, AlertCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getSavedPlaces, getRecentLocations, reverseGeocode, type SavedPlace, type RecentLocation } from "@/lib/locationService";
+import { 
+  getSavedPlaces, 
+  getRecentLocations, 
+  reverseGeocode, 
+  searchLocations,
+  addRecentLocation,
+  type SavedPlace, 
+  type RecentLocation,
+  type SearchResult
+} from "@/lib/locationService";
 
 const suggestionTiles = [
   { id: "ride", label: "Ride", icon: Car, color: "bg-black dark:bg-white", iconColor: "text-white dark:text-black", active: true },
@@ -49,19 +58,34 @@ function getGreeting(): { text: string; icon: typeof Sun } {
   }
 }
 
+interface LocationData {
+  address: string;
+  lat: number;
+  lng: number;
+}
+
 export default function CustomerHome() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const heroRef = useRef<HTMLDivElement>(null);
+  const pickupAbortRef = useRef<AbortController | null>(null);
+  const destAbortRef = useRef<AbortController | null>(null);
   
   const [pickupAddress, setPickupAddress] = useState("");
+  const [pickupLocation, setPickupLocation] = useState<LocationData | null>(null);
   const [destinationAddress, setDestinationAddress] = useState("");
+  const [destinationLocation, setDestinationLocation] = useState<LocationData | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [recentLocations, setRecentLocations] = useState<RecentLocation[]>([]);
   const [showPickupSuggestions, setShowPickupSuggestions] = useState(false);
   const [showDestSuggestions, setShowDestSuggestions] = useState(false);
+  const [pickupSearchResults, setPickupSearchResults] = useState<SearchResult[]>([]);
+  const [destSearchResults, setDestSearchResults] = useState<SearchResult[]>([]);
+  const [isSearchingPickup, setIsSearchingPickup] = useState(false);
+  const [isSearchingDest, setIsSearchingDest] = useState(false);
 
   const { data: customerData, isLoading } = useQuery<{
     profile?: any;
@@ -85,28 +109,146 @@ export default function CustomerHome() {
     }
   }, []);
 
-  const autoDetectLocation = async () => {
-    if (typeof window === "undefined" || !navigator.geolocation) return;
+  useEffect(() => {
+    if (pickupAbortRef.current) pickupAbortRef.current.abort();
+    
+    if (pickupAddress.length >= 3 && !pickupAddress.startsWith("Current location")) {
+      setIsSearchingPickup(true);
+      pickupAbortRef.current = new AbortController();
+      
+      const timer = setTimeout(async () => {
+        try {
+          const results = await searchLocations(pickupAddress, pickupAbortRef.current?.signal);
+          setPickupSearchResults(results);
+        } catch {
+          setPickupSearchResults([]);
+        } finally {
+          setIsSearchingPickup(false);
+        }
+      }, 300);
+      
+      return () => {
+        clearTimeout(timer);
+        pickupAbortRef.current?.abort();
+      };
+    } else {
+      setPickupSearchResults([]);
+      setIsSearchingPickup(false);
+    }
+  }, [pickupAddress]);
+
+  useEffect(() => {
+    if (destAbortRef.current) destAbortRef.current.abort();
+    
+    if (destinationAddress.length >= 3) {
+      setIsSearchingDest(true);
+      destAbortRef.current = new AbortController();
+      
+      const timer = setTimeout(async () => {
+        try {
+          const results = await searchLocations(destinationAddress, destAbortRef.current?.signal);
+          setDestSearchResults(results);
+        } catch {
+          setDestSearchResults([]);
+        } finally {
+          setIsSearchingDest(false);
+        }
+      }, 300);
+      
+      return () => {
+        clearTimeout(timer);
+        destAbortRef.current?.abort();
+      };
+    } else {
+      setDestSearchResults([]);
+      setIsSearchingDest(false);
+    }
+  }, [destinationAddress]);
+
+  const autoDetectLocation = useCallback(async () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      setLocationError("Location services not available");
+      return;
+    }
     
     setIsLocating(true);
+    setLocationError(null);
+    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const address = await reverseGeocode(position.coords.latitude, position.coords.longitude);
-          const shortAddress = address.split(",")[0];
-          setPickupAddress(`Current location • ${shortAddress}`);
+          const { latitude, longitude } = position.coords;
+          const address = await reverseGeocode(latitude, longitude);
+          const shortAddress = address.split(",").slice(0, 2).join(",");
+          setPickupAddress(shortAddress);
+          setPickupLocation({ address, lat: latitude, lng: longitude });
+          setLocationError(null);
         } catch {
-          setPickupAddress("Current location");
+          setPickupAddress("");
+          setLocationError("Unable to get address. Please enter manually.");
         }
         setIsLocating(false);
       },
-      () => {
-        setPickupAddress("");
+      (error) => {
         setIsLocating(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError("Location access denied. Please enter your pickup address.");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError("Location unavailable. Please enter your pickup address.");
+            break;
+          case error.TIMEOUT:
+            setLocationError("Location request timed out. Please enter your pickup address.");
+            break;
+          default:
+            setLocationError("Unable to detect location. Please enter your pickup address.");
+        }
       },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
-  };
+  }, []);
+
+  const handleSelectPickupResult = useCallback((result: SearchResult) => {
+    setPickupAddress(result.name || result.address.split(",")[0]);
+    setPickupLocation({ address: result.address, lat: result.lat, lng: result.lng });
+    setShowPickupSuggestions(false);
+    setPickupSearchResults([]);
+  }, []);
+
+  const handleSelectDestResult = useCallback((result: SearchResult) => {
+    setDestinationAddress(result.name || result.address.split(",")[0]);
+    setDestinationLocation({ address: result.address, lat: result.lat, lng: result.lng });
+    setShowDestSuggestions(false);
+    setDestSearchResults([]);
+    addRecentLocation({ address: result.address, lat: result.lat, lng: result.lng });
+  }, []);
+
+  const handleSelectPickupPlace = useCallback((place: SavedPlace) => {
+    if (place.lat === 0 && place.lng === 0) return;
+    setPickupAddress(place.name);
+    setPickupLocation({ address: place.address, lat: place.lat, lng: place.lng });
+    setShowPickupSuggestions(false);
+  }, []);
+
+  const handleSelectDestPlace = useCallback((place: SavedPlace) => {
+    if (place.lat === 0 && place.lng === 0) return;
+    setDestinationAddress(place.name);
+    setDestinationLocation({ address: place.address, lat: place.lat, lng: place.lng });
+    setShowDestSuggestions(false);
+  }, []);
+
+  const handleSelectPickupRecent = useCallback((recent: RecentLocation) => {
+    setPickupAddress(recent.address.split(",")[0]);
+    setPickupLocation({ address: recent.address, lat: recent.lat, lng: recent.lng });
+    setShowPickupSuggestions(false);
+  }, []);
+
+  const handleSelectDestRecent = useCallback((recent: RecentLocation) => {
+    setDestinationAddress(recent.address.split(",")[0]);
+    setDestinationLocation({ address: recent.address, lat: recent.lat, lng: recent.lng });
+    setShowDestSuggestions(false);
+  }, []);
 
   const handleTileClick = (tile: typeof suggestionTiles[0]) => {
     if (!tile.active) {
@@ -128,6 +270,15 @@ export default function CustomerHome() {
       toast({ title: "Enter locations", description: "Please enter pickup and destination." });
       return;
     }
+    if (!pickupLocation || !destinationLocation) {
+      toast({ 
+        title: "Select from suggestions", 
+        description: "Please select a location from the suggestions to get accurate pricing." 
+      });
+      return;
+    }
+    sessionStorage.setItem("safego_ride_pickup", JSON.stringify(pickupLocation));
+    sessionStorage.setItem("safego_ride_destination", JSON.stringify(destinationLocation));
     setLocation("/customer/ride");
   };
 
@@ -257,13 +408,23 @@ export default function CustomerHome() {
                       <Input
                         placeholder={isLocating ? "Detecting location..." : "Pickup location"}
                         value={pickupAddress}
-                        onChange={(e) => setPickupAddress(e.target.value)}
-                        onFocus={() => setShowPickupSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowPickupSuggestions(false), 200)}
+                        onChange={(e) => {
+                          setPickupAddress(e.target.value);
+                          setPickupLocation(null);
+                          if (locationError) setLocationError(null);
+                        }}
+                        onFocus={() => {
+                          setShowPickupSuggestions(true);
+                          if (locationError) setLocationError(null);
+                        }}
+                        onBlur={() => setTimeout(() => setShowPickupSuggestions(false), 250)}
                         className="h-12 pr-20 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500"
                         data-testid="input-pickup"
                       />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {isSearchingPickup && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -276,33 +437,130 @@ export default function CustomerHome() {
                         </Button>
                         <ChevronRight className="h-4 w-4 text-gray-400" />
                       </div>
-                      {showPickupSuggestions && (savedPlaces.length > 0 || recentLocations.length > 0) && (
-                        <Card className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto shadow-xl border" data-testid="pickup-suggestions">
-                          {savedPlaces.map((place) => (
+                      
+                      {/* Location error message */}
+                      {locationError && !pickupAddress && (
+                        <div className="absolute top-full left-0 right-0 mt-1 flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg text-xs text-amber-700 dark:text-amber-300" data-testid="location-error">
+                          <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span>{locationError}</span>
+                        </div>
+                      )}
+                      
+                      {/* Pickup suggestions dropdown */}
+                      {showPickupSuggestions && !locationError && (
+                        <Card className="absolute top-full left-0 right-0 mt-1 z-30 max-h-64 overflow-y-auto shadow-xl border" data-testid="pickup-suggestions">
+                          {/* Current Location Option */}
+                          {pickupAddress.length < 3 && (
                             <button
-                              key={place.id}
-                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                              onClick={() => { setPickupAddress(place.address); setShowPickupSuggestions(false); }}
-                              data-testid={`pickup-saved-${place.id}`}
+                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors border-b"
+                              onClick={() => {
+                                autoDetectLocation();
+                                setShowPickupSuggestions(false);
+                              }}
+                              disabled={isLocating}
+                              data-testid="pickup-use-current-location"
                             >
-                              {place.icon === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : <Briefcase className="h-4 w-4 text-muted-foreground" />}
+                              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                                {isLocating ? (
+                                  <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+                                ) : (
+                                  <Navigation className="h-4 w-4 text-blue-600" />
+                                )}
+                              </div>
                               <div>
-                                <p className="font-medium text-sm">{place.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                                <p className="font-medium text-sm">Use current location</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {isLocating ? "Getting location..." : "GPS location"}
+                                </p>
                               </div>
                             </button>
-                          ))}
-                          {recentLocations.slice(0, 3).map((loc) => (
-                            <button
-                              key={loc.id}
-                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                              onClick={() => { setPickupAddress(loc.address); setShowPickupSuggestions(false); }}
-                              data-testid={`pickup-recent-${loc.id}`}
-                            >
-                              <Clock className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-sm truncate">{loc.address}</p>
-                            </button>
-                          ))}
+                          )}
+                          
+                          {/* Search Results */}
+                          {pickupSearchResults.length > 0 && (
+                            <div className="py-1">
+                              <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                Search Results
+                              </p>
+                              {pickupSearchResults.map((result) => (
+                                <button
+                                  key={result.placeId}
+                                  className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                                  onClick={() => handleSelectPickupResult(result)}
+                                  data-testid={`pickup-result-${result.placeId}`}
+                                >
+                                  <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <div className="min-w-0">
+                                    {result.name && (
+                                      <p className="font-medium text-sm truncate">{result.name}</p>
+                                    )}
+                                    <p className={`text-xs truncate ${result.name ? "text-muted-foreground" : "text-sm"}`}>
+                                      {result.address}
+                                    </p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Saved Places */}
+                          {pickupAddress.length < 3 && savedPlaces.filter(p => p.lat !== 0).length > 0 && (
+                            <div className="py-1 border-t">
+                              <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                Saved Places
+                              </p>
+                              {savedPlaces.filter(p => p.lat !== 0).map((place) => (
+                                <button
+                                  key={place.id}
+                                  className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                                  onClick={() => handleSelectPickupPlace(place)}
+                                  data-testid={`pickup-saved-${place.id}`}
+                                >
+                                  {place.icon === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : <Briefcase className="h-4 w-4 text-muted-foreground" />}
+                                  <div>
+                                    <p className="font-medium text-sm">{place.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Recent Locations */}
+                          {pickupAddress.length < 3 && recentLocations.length > 0 && (
+                            <div className="py-1 border-t">
+                              <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                Recent
+                              </p>
+                              {recentLocations.slice(0, 3).map((loc) => (
+                                <button
+                                  key={loc.id}
+                                  className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                                  onClick={() => handleSelectPickupRecent(loc)}
+                                  data-testid={`pickup-recent-${loc.id}`}
+                                >
+                                  <Clock className="h-4 w-4 text-muted-foreground" />
+                                  <p className="text-sm truncate">{loc.address}</p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* No results */}
+                          {pickupAddress.length >= 3 && !isSearchingPickup && pickupSearchResults.length === 0 && (
+                            <div className="py-6 text-center">
+                              <Search className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                              <p className="text-sm text-muted-foreground">No results found</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">Try a different search</p>
+                            </div>
+                          )}
+                          
+                          {/* Searching indicator */}
+                          {isSearchingPickup && (
+                            <div className="py-6 text-center">
+                              <Loader2 className="h-6 w-6 text-muted-foreground mx-auto animate-spin" />
+                            </div>
+                          )}
                         </Card>
                       )}
                     </div>
@@ -312,40 +570,110 @@ export default function CustomerHome() {
                       <Input
                         placeholder="Where to?"
                         value={destinationAddress}
-                        onChange={(e) => setDestinationAddress(e.target.value)}
+                        onChange={(e) => {
+                          setDestinationAddress(e.target.value);
+                          setDestinationLocation(null);
+                        }}
                         onFocus={() => setShowDestSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowDestSuggestions(false), 200)}
+                        onBlur={() => setTimeout(() => setShowDestSuggestions(false), 250)}
                         className="h-12 pr-10 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500 font-medium"
                         data-testid="input-destination"
                       />
-                      <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      {showDestSuggestions && (savedPlaces.length > 0 || recentLocations.length > 0) && (
-                        <Card className="absolute top-full left-0 right-0 mt-1 z-20 max-h-48 overflow-y-auto shadow-xl border" data-testid="destination-suggestions">
-                          {savedPlaces.map((place) => (
-                            <button
-                              key={place.id}
-                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                              onClick={() => { setDestinationAddress(place.address); setShowDestSuggestions(false); }}
-                              data-testid={`dest-saved-${place.id}`}
-                            >
-                              {place.icon === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : <Briefcase className="h-4 w-4 text-muted-foreground" />}
-                              <div>
-                                <p className="font-medium text-sm">{place.name}</p>
-                                <p className="text-xs text-muted-foreground truncate">{place.address}</p>
-                              </div>
-                            </button>
-                          ))}
-                          {recentLocations.slice(0, 3).map((loc) => (
-                            <button
-                              key={loc.id}
-                              className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
-                              onClick={() => { setDestinationAddress(loc.address); setShowDestSuggestions(false); }}
-                              data-testid={`dest-recent-${loc.id}`}
-                            >
-                              <Clock className="h-4 w-4 text-muted-foreground" />
-                              <p className="text-sm truncate">{loc.address}</p>
-                            </button>
-                          ))}
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        {isSearchingDest && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                      </div>
+                      
+                      {/* Destination suggestions dropdown */}
+                      {showDestSuggestions && (
+                        <Card className="absolute top-full left-0 right-0 mt-1 z-30 max-h-64 overflow-y-auto shadow-xl border" data-testid="destination-suggestions">
+                          {/* Search Results */}
+                          {destSearchResults.length > 0 && (
+                            <div className="py-1">
+                              <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                Search Results
+                              </p>
+                              {destSearchResults.map((result) => (
+                                <button
+                                  key={result.placeId}
+                                  className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                                  onClick={() => handleSelectDestResult(result)}
+                                  data-testid={`dest-result-${result.placeId}`}
+                                >
+                                  <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <div className="min-w-0">
+                                    {result.name && (
+                                      <p className="font-medium text-sm truncate">{result.name}</p>
+                                    )}
+                                    <p className={`text-xs truncate ${result.name ? "text-muted-foreground" : "text-sm"}`}>
+                                      {result.address}
+                                    </p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Saved Places */}
+                          {destinationAddress.length < 3 && savedPlaces.filter(p => p.lat !== 0).length > 0 && (
+                            <div className="py-1 border-t">
+                              <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                Saved Places
+                              </p>
+                              {savedPlaces.filter(p => p.lat !== 0).map((place) => (
+                                <button
+                                  key={place.id}
+                                  className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                                  onClick={() => handleSelectDestPlace(place)}
+                                  data-testid={`dest-saved-${place.id}`}
+                                >
+                                  {place.icon === "home" ? <Home className="h-4 w-4 text-muted-foreground" /> : <Briefcase className="h-4 w-4 text-muted-foreground" />}
+                                  <div>
+                                    <p className="font-medium text-sm">{place.name}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{place.address}</p>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* Recent Locations */}
+                          {destinationAddress.length < 3 && recentLocations.length > 0 && (
+                            <div className="py-1 border-t">
+                              <p className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                Recent
+                              </p>
+                              {recentLocations.slice(0, 3).map((loc) => (
+                                <button
+                                  key={loc.id}
+                                  className="w-full p-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                                  onClick={() => handleSelectDestRecent(loc)}
+                                  data-testid={`dest-recent-${loc.id}`}
+                                >
+                                  <Clock className="h-4 w-4 text-muted-foreground" />
+                                  <p className="text-sm truncate">{loc.address}</p>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {/* No results */}
+                          {destinationAddress.length >= 3 && !isSearchingDest && destSearchResults.length === 0 && (
+                            <div className="py-6 text-center">
+                              <Search className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+                              <p className="text-sm text-muted-foreground">No results found</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">Try a different search</p>
+                            </div>
+                          )}
+                          
+                          {/* Searching indicator */}
+                          {isSearchingDest && (
+                            <div className="py-6 text-center">
+                              <Loader2 className="h-6 w-6 text-muted-foreground mx-auto animate-spin" />
+                            </div>
+                          )}
                         </Card>
                       )}
                     </div>
