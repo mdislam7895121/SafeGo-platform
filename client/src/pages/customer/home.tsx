@@ -403,7 +403,7 @@ export default function CustomerHome() {
             {suggestionTiles.map((tile) => (
               <button
                 key={tile.id}
-                onClick={() => handleTileClick(tile)}
+                onClick={() => tile.active && handleTileClick(tile)}
                 disabled={!tile.active}
                 aria-disabled={!tile.active}
                 className={`relative flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-200 ${
@@ -417,14 +417,17 @@ export default function CustomerHome() {
                 data-testid={`tile-${tile.id}`}
               >
                 <div className={`h-12 w-12 rounded-full ${tile.color} flex items-center justify-center mb-2 ${
-                  tile.active ? "shadow-md" : ""
+                  tile.active ? "shadow-md" : "grayscale-[30%] opacity-70"
                 }`}>
-                  <tile.icon className={`h-5 w-5 ${tile.iconColor}`} />
+                  <tile.icon className={`h-5 w-5 ${tile.active ? tile.iconColor : "text-gray-400"}`} />
                 </div>
-                <span className="text-[11px] font-semibold text-center leading-tight">{tile.label}</span>
+                <span className={`text-[11px] font-semibold text-center leading-tight ${!tile.active ? "text-muted-foreground" : ""}`}>{tile.label}</span>
                 {!tile.active && (
-                  <div className="absolute inset-0 flex items-end justify-center pb-1 bg-background/70 dark:bg-background/80 rounded-xl">
-                    <span className="text-[8px] font-medium text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  <div 
+                    className="absolute inset-0 flex items-end justify-center pb-1.5 rounded-xl pointer-events-none"
+                    style={{ backgroundColor: 'rgba(255,255,255,0.25)' }}
+                  >
+                    <span className="text-[8px] font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 px-1.5 py-0.5 rounded shadow-sm">
                       Soon
                     </span>
                   </div>
@@ -451,14 +454,17 @@ export default function CustomerHome() {
               <Skeleton className="h-24 w-full rounded-xl" />
             </div>
           ) : recentRides && recentRides.length > 0 ? (
-            <div className="space-y-3">
-              {recentRides.slice(0, 3).map((ride: any) => (
-                <Card 
-                  key={ride.id} 
-                  className="overflow-hidden shadow-sm hover:shadow-md transition-shadow rounded-xl border-0 bg-gray-50 dark:bg-gray-900/50" 
+            <div className="rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900/50">
+              {recentRides.slice(0, 3).map((ride: any, index: number) => (
+                <div 
+                  key={ride.id}
+                  className={`hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors ${
+                    index < Math.min(recentRides.length, 3) - 1 ? "border-b" : ""
+                  }`}
+                  style={{ borderColor: '#e5e5e5' }}
                   data-testid={`activity-ride-${ride.id}`}
                 >
-                  <CardContent className="p-4">
+                  <div className="px-4 py-5">
                     <div className="flex items-center gap-4">
                       {/* Large Uber-style Car Icon */}
                       <div className="h-14 w-14 rounded-xl bg-gray-200 dark:bg-gray-800 flex items-center justify-center flex-shrink-0">
@@ -468,16 +474,16 @@ export default function CustomerHome() {
                       {/* Trip Details */}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-sm truncate">{ride.dropoffAddress || "Completed trip"}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {ride.createdAt ? new Date(ride.createdAt).toLocaleDateString("en-US", { 
                             month: "short", day: "numeric", hour: "numeric", minute: "2-digit" 
                           }) : "Recently"}
                         </p>
                       </div>
                       
-                      {/* Price & Action */}
-                      <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                        <p className="font-bold text-base">${ride.serviceFare?.toFixed(2) || "0.00"}</p>
+                      {/* Price & Action - Uber right-aligned */}
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <p className="font-bold text-base tabular-nums">${ride.serviceFare?.toFixed(2) || "0.00"}</p>
                         <Badge 
                           variant="secondary" 
                           className="text-[10px] px-2 py-0.5 bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
@@ -486,8 +492,8 @@ export default function CustomerHome() {
                         </Badge>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
