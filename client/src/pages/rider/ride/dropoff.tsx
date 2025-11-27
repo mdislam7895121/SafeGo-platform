@@ -1,42 +1,116 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   MapPin,
   ArrowLeft,
+  ArrowRight,
   Clock,
-  Search,
+  Ruler,
   Loader2,
-  ChevronRight,
+  Check,
 } from "lucide-react";
 import { useRideBooking } from "@/contexts/RideBookingContext";
-import { SafeGoMap } from "@/components/maps/SafeGoMap";
+import { MapContainer, TileLayer, useMap, Polyline, Marker } from "react-leaflet";
+import { DraggableMarker } from "@/components/maps/DraggableMarker";
+import { LocationSearchInput } from "@/components/rider/LocationSearchInput";
+import { reverseGeocode, addRecentLocation, calculateRouteInfo } from "@/lib/locationService";
+import "leaflet/dist/leaflet.css";
 
-interface SearchResult {
-  placeId: string;
-  address: string;
-  lat: number;
-  lng: number;
+function createPickupIcon() {
+  if (typeof window === "undefined") return null;
+  const L = require("leaflet");
+  return L.divIcon({
+    className: "safego-pickup-icon-static",
+    html: `<div style="
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 4px solid white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <span style="color: white; font-weight: bold; font-size: 14px;">A</span>
+    </div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
 }
 
-const mockSearchResults: SearchResult[] = [
-  { placeId: "1", address: "Bashundhara City Shopping Mall, Dhaka", lat: 23.7509, lng: 90.3935 },
-  { placeId: "2", address: "Dhaka Airport Terminal 1", lat: 23.8423, lng: 90.3976 },
-  { placeId: "3", address: "Gulshan 2 Circle, Dhaka", lat: 23.7934, lng: 90.4144 },
-  { placeId: "4", address: "Dhanmondi 27, Dhaka", lat: 23.7506, lng: 90.3746 },
-  { placeId: "5", address: "Mirpur 10, Dhaka", lat: 23.8069, lng: 90.3686 },
-];
+function MapBoundsHandler({ 
+  pickupLocation, 
+  dropoffLocation 
+}: { 
+  pickupLocation: { lat: number; lng: number } | null;
+  dropoffLocation: { lat: number; lng: number } | null;
+}) {
+  const map = useMap();
+  const hasFittedRef = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    if (pickupLocation && dropoffLocation && !hasFittedRef.current) {
+      const L = require("leaflet");
+      const bounds = L.latLngBounds(
+        [pickupLocation.lat, pickupLocation.lng],
+        [dropoffLocation.lat, dropoffLocation.lng]
+      );
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+      hasFittedRef.current = true;
+    } else if (pickupLocation && !dropoffLocation) {
+      map.setView([pickupLocation.lat, pickupLocation.lng], 15);
+    }
+  }, [map, pickupLocation, dropoffLocation]);
+
+  useEffect(() => {
+    if (dropoffLocation) {
+      hasFittedRef.current = false;
+    }
+  }, [dropoffLocation?.lat, dropoffLocation?.lng]);
+
+  return null;
+}
+
+function generateRoutePolyline(
+  pickup: { lat: number; lng: number },
+  dropoff: { lat: number; lng: number }
+): [number, number][] {
+  const points: [number, number][] = [];
+  const steps = 30;
+  
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const lat = pickup.lat + (dropoff.lat - pickup.lat) * t;
+    const lng = pickup.lng + (dropoff.lng - pickup.lng) * t;
+    const curve = Math.sin(t * Math.PI) * 0.001;
+    points.push([lat + curve * 0.5, lng + curve]);
+  }
+  
+  return points;
+}
 
 export default function RideDropoffPage() {
   const [, setLocation] = useLocation();
   const { state, setDropoff, setStep, canProceedToDropoff, canProceedToOptions } = useRideBooking();
   
-  const [searchQuery, setSearchQuery] = useState(state.dropoff?.address || "");
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [showResults, setShowResults] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(state.dropoff?.address?.split(",")[0] || "");
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({
+    lat: state.pickup?.lat || 23.8103,
+    lng: state.pickup?.lng || 90.4125,
+  });
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(
+    state.dropoff ? { lat: state.dropoff.lat, lng: state.dropoff.lng } : null
+  );
+  const [showMarkerAnimation, setShowMarkerAnimation] = useState(false);
+  const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; etaMinutes: number } | null>(null);
+
+  const pickupIcon = useMemo(() => createPickupIcon(), []);
 
   useEffect(() => {
     if (!canProceedToDropoff) {
@@ -47,36 +121,54 @@ export default function RideDropoffPage() {
   }, [setStep, canProceedToDropoff, setLocation]);
 
   useEffect(() => {
-    if (searchQuery.length >= 3) {
-      setIsSearching(true);
-      setShowResults(true);
-      const timer = setTimeout(() => {
-        const filtered = mockSearchResults.filter(r => 
-          r.address.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setSearchResults(filtered.length > 0 ? filtered : mockSearchResults.slice(0, 3));
-        setIsSearching(false);
-      }, 300);
-      return () => clearTimeout(timer);
+    if (state.pickup && state.dropoff) {
+      const info = calculateRouteInfo(
+        state.pickup.lat,
+        state.pickup.lng,
+        state.dropoff.lat,
+        state.dropoff.lng
+      );
+      setRouteInfo(info);
     } else {
-      setSearchResults([]);
-      setShowResults(false);
+      setRouteInfo(null);
     }
-  }, [searchQuery]);
+  }, [state.pickup, state.dropoff]);
 
-  const handleSelectResult = (result: SearchResult) => {
-    setDropoff({
-      address: result.address,
-      lat: result.lat,
-      lng: result.lng,
-      placeId: result.placeId,
-    });
-    setSearchQuery(result.address);
-    setShowResults(false);
-  };
+  const updateLocationFromCoords = useCallback(async (lat: number, lng: number, animate = true) => {
+    if (animate) setShowMarkerAnimation(true);
+    setMarkerPosition({ lat, lng });
+    setIsReverseGeocoding(true);
+    
+    try {
+      const address = await reverseGeocode(lat, lng);
+      const shortAddress = address.split(",")[0];
+      setSearchQuery(shortAddress);
+      setDropoff({ address, lat, lng });
+    } finally {
+      setIsReverseGeocoding(false);
+      if (animate) setTimeout(() => setShowMarkerAnimation(false), 400);
+    }
+  }, [setDropoff]);
+
+  const handleLocationSelect = useCallback((location: { address: string; lat: number; lng: number }) => {
+    setMapCenter({ lat: location.lat, lng: location.lng });
+    setMarkerPosition({ lat: location.lat, lng: location.lng });
+    setShowMarkerAnimation(true);
+    setDropoff(location);
+    setTimeout(() => setShowMarkerAnimation(false), 400);
+  }, [setDropoff]);
+
+  const handleMarkerDragEnd = useCallback(async (lat: number, lng: number) => {
+    await updateLocationFromCoords(lat, lng, false);
+  }, [updateLocationFromCoords]);
 
   const handleConfirmDropoff = () => {
-    if (canProceedToOptions) {
+    if (canProceedToOptions && state.dropoff) {
+      addRecentLocation({
+        address: state.dropoff.address,
+        lat: state.dropoff.lat,
+        lng: state.dropoff.lng,
+      });
       setLocation("/rider/ride/options");
     }
   };
@@ -85,99 +177,208 @@ export default function RideDropoffPage() {
     setLocation("/rider/ride/pickup");
   };
 
+  const routePolyline = state.pickup && state.dropoff
+    ? generateRoutePolyline(state.pickup, state.dropoff)
+    : [];
+
   return (
     <div className="flex flex-col h-full" data-testid="ride-dropoff-page">
-      <div className="p-4 border-b bg-background">
-        <div className="flex items-center gap-3 mb-4">
-          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-dropoff">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-semibold" data-testid="text-dropoff-title">Set Dropoff Location</h1>
-            <p className="text-sm text-muted-foreground">Search for your destination</p>
-          </div>
-        </div>
-
-        <Card className="mb-3 bg-muted/50">
-          <CardContent className="p-3">
-            <div className="flex items-start gap-3">
-              <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <span className="text-[10px] font-bold text-white">A</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">Pickup</p>
-                <p className="text-sm font-medium truncate" data-testid="text-pickup-summary">
-                  {state.pickup?.address || "Not set"}
-                </p>
-              </div>
+      <div className="sticky top-0 z-20 bg-background border-b shadow-sm">
+        <div className="p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleBack} 
+              data-testid="button-back-dropoff"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-lg font-semibold" data-testid="text-dropoff-title">
+                Where are you going?
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Search or select your destination
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-red-500" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Where are you going?"
-            className="pl-10"
-            data-testid="input-dropoff-search"
-          />
-          {isSearching && (
-            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
-          )}
-        </div>
-
-        {showResults && searchResults.length > 0 && (
-          <Card className="mt-2 max-h-60 overflow-y-auto">
-            <CardContent className="p-0 divide-y">
-              {searchResults.map((result) => (
-                <button
-                  key={result.placeId}
-                  className="w-full flex items-center gap-3 p-3 hover-elevate text-left"
-                  onClick={() => handleSelectResult(result)}
-                  data-testid={`search-result-${result.placeId}`}
-                >
-                  <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <p className="text-sm truncate flex-1">{result.address}</p>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                </button>
-              ))}
+          <Card className="mb-3 bg-muted/30 border-l-4 border-l-blue-500">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-white">A</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Pickup</p>
+                  <p className="text-sm font-medium truncate" data-testid="text-pickup-summary">
+                    {state.pickup?.address?.split(",")[0] || "Not set"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 text-muted-foreground">
+                  <div className="w-8 h-px bg-muted-foreground/30" />
+                  <ArrowRight className="h-4 w-4" />
+                  <div className="w-8 h-px bg-muted-foreground/30" />
+                </div>
+                <div className="h-8 w-8 rounded-full border-2 border-dashed border-red-400 flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-bold text-red-500">B</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
-        )}
+
+          <LocationSearchInput
+            value={searchQuery}
+            onChange={setSearchQuery}
+            onLocationSelect={handleLocationSelect}
+            placeholder="Where to?"
+            variant="dropoff"
+            showCurrentLocation={false}
+            autoFocus={true}
+          />
+        </div>
       </div>
 
       <div className="flex-1 relative min-h-[250px]">
-        <SafeGoMap
-          pickupLocation={state.pickup ? {
-            lat: state.pickup.lat,
-            lng: state.pickup.lng,
-            label: "Pickup",
-          } : null}
-          dropoffLocation={state.dropoff ? {
-            lat: state.dropoff.lat,
-            lng: state.dropoff.lng,
-            label: "Dropoff",
-          } : null}
-          showControls={true}
-          className="h-full w-full"
-        />
+        <MapContainer
+          center={[mapCenter.lat, mapCenter.lng]}
+          zoom={15}
+          style={{ height: "100%", width: "100%" }}
+          zoomControl={false}
+          attributionControl={false}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapBoundsHandler 
+            pickupLocation={state.pickup} 
+            dropoffLocation={markerPosition} 
+          />
+          
+          {state.pickup && pickupIcon && (
+            <Marker
+              position={[state.pickup.lat, state.pickup.lng]}
+              icon={pickupIcon}
+            />
+          )}
+          
+          {markerPosition && (
+            <DraggableMarker
+              position={markerPosition}
+              onDragEnd={handleMarkerDragEnd}
+              variant="dropoff"
+              isDraggable={true}
+              showAnimation={showMarkerAnimation}
+            />
+          )}
+          
+          {routePolyline.length > 1 && (
+            <>
+              <Polyline
+                positions={routePolyline}
+                pathOptions={{
+                  color: "#374151",
+                  weight: 8,
+                  opacity: 0.3,
+                  lineCap: "round",
+                  lineJoin: "round",
+                }}
+              />
+              <Polyline
+                positions={routePolyline}
+                pathOptions={{
+                  color: "#3B82F6",
+                  weight: 5,
+                  opacity: 0.9,
+                  lineCap: "round",
+                  lineJoin: "round",
+                  dashArray: "10, 10",
+                }}
+              />
+            </>
+          )}
+        </MapContainer>
+        
+        <div className="absolute top-4 left-4 z-[1000] bg-primary/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <div className="relative">
+              <MapPin className="h-5 w-5 text-primary-foreground" />
+              <div className="absolute -top-0.5 -right-0.5 h-2 w-2 bg-green-400 rounded-full animate-pulse" />
+            </div>
+            <span className="text-sm font-semibold text-primary-foreground">SafeGo Map</span>
+          </div>
+        </div>
+
+        {routeInfo && (
+          <div 
+            className="absolute top-4 right-4 z-[1000] bg-background/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border"
+            data-testid="route-info-overlay"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-muted-foreground" />
+                <span className="font-bold" data-testid="text-route-eta">{routeInfo.etaMinutes}</span>
+                <span className="text-xs text-muted-foreground">min</span>
+              </div>
+              <div className="h-4 w-px bg-border" />
+              <div className="flex items-center gap-1.5">
+                <Ruler className="h-4 w-4 text-muted-foreground" />
+                <span className="font-bold" data-testid="text-route-distance">{routeInfo.distanceKm}</span>
+                <span className="text-xs text-muted-foreground">km</span>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <div className="absolute bottom-4 left-4 right-4 z-[1000] flex gap-2">
+          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
+            <div className="h-3 w-3 rounded-full bg-blue-500" />
+            <span>Pickup</span>
+          </div>
+          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
+            <div className="h-3 w-3 rounded-full bg-red-500" />
+            <span>Dropoff</span>
+          </div>
+        </div>
       </div>
 
-      <div className="p-4 border-t bg-background space-y-3">
+      <div className="sticky bottom-0 z-20 p-4 border-t bg-background space-y-3 shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
         {state.dropoff && (
-          <Card className="bg-muted/50">
+          <Card className="bg-muted/50 border-l-4 border-l-red-500">
             <CardContent className="p-3">
               <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-white">B</span>
+                <div className="h-10 w-10 rounded-full bg-red-500 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-white">B</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Dropoff location</p>
-                  <p className="text-sm text-muted-foreground truncate" data-testid="text-selected-dropoff">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium">Dropoff location</p>
+                    {isReverseGeocoding && (
+                      <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                  <p 
+                    className="text-sm text-muted-foreground truncate" 
+                    data-testid="text-selected-dropoff"
+                  >
                     {state.dropoff.address}
                   </p>
+                  {routeInfo && (
+                    <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {routeInfo.etaMinutes} min
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Ruler className="h-3 w-3" />
+                        {routeInfo.distanceKm} km
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                    <Check className="h-4 w-4 text-green-600" />
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -185,13 +386,23 @@ export default function RideDropoffPage() {
         )}
 
         <Button
-          className="w-full"
+          className="w-full h-14 text-base font-semibold"
           size="lg"
-          disabled={!canProceedToOptions}
+          disabled={!canProceedToOptions || isReverseGeocoding}
           onClick={handleConfirmDropoff}
-          data-testid="button-see-ride-options"
+          data-testid="button-confirm-destination"
         >
-          See Ride Options
+          {isReverseGeocoding ? (
+            <>
+              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+              Getting Address...
+            </>
+          ) : (
+            <>
+              <ArrowRight className="h-5 w-5 mr-2" />
+              Confirm Destination
+            </>
+          )}
         </Button>
       </div>
     </div>
