@@ -1,12 +1,14 @@
-import { useEffect, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, useMapEvents } from "react-leaflet";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import * as turf from "@turf/turf";
 
 export interface MapLocation {
   lat: number;
   lng: number;
   label?: string;
+  heading?: number;
 }
 
 export type ActiveLeg = "to_pickup" | "to_dropoff" | "completed";
@@ -20,113 +22,193 @@ export interface SafeGoMapProps {
   activeLeg?: ActiveLeg;
   routeCoordinates?: [number, number][];
   onMapReady?: () => void;
+  onDistanceCalculated?: (distanceKm: number, etaMinutes: number) => void;
   className?: string;
   showControls?: boolean;
+  autoFollow?: boolean;
+  showEtaOverlay?: boolean;
 }
 
-const driverIcon = L.divIcon({
-  className: "safego-driver-marker",
+const createDriverIcon = (heading: number = 0) => L.divIcon({
+  className: "safego-driver-marker-animated",
   html: `<div style="
     background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 4px solid white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
     display: flex;
     align-items: center;
     justify-content: center;
+    transform: rotate(${heading}deg);
+    transition: transform 0.5s ease-out;
+    animation: pulse-driver 2s infinite;
   ">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
       <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
     </svg>
-  </div>`,
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-  popupAnchor: [0, -18],
+  </div>
+  <style>
+    @keyframes pulse-driver {
+      0%, 100% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
+      50% { box-shadow: 0 4px 20px rgba(16, 185, 129, 0.7); }
+    }
+  </style>`,
+  iconSize: [44, 44],
+  iconAnchor: [22, 22],
+  popupAnchor: [0, -22],
 });
 
 const pickupIcon = L.divIcon({
   className: "safego-pickup-marker",
   html: `<div style="
     background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 4px solid white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
   ">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
     </svg>
+    <div style="
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      color: #3B82F6;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    ">A</div>
   </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32],
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
 });
 
 const dropoffIcon = L.divIcon({
   className: "safego-dropoff-marker",
   html: `<div style="
     background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 4px solid white;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
     display: flex;
     align-items: center;
     justify-content: center;
+    position: relative;
   ">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
     </svg>
+    <div style="
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: bold;
+      color: #EF4444;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    ">B</div>
   </div>`,
-  iconSize: [32, 32],
-  iconAnchor: [16, 32],
-  popupAnchor: [0, -32],
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
 });
+
+function AutoFollowHandler({ 
+  driverLocation, 
+  autoFollow,
+  activeLeg,
+}: { 
+  driverLocation?: MapLocation | null;
+  autoFollow?: boolean;
+  activeLeg?: ActiveLeg;
+}) {
+  const map = useMap();
+  const prevLocation = useRef<MapLocation | null>(null);
+  
+  useEffect(() => {
+    if (!autoFollow || !driverLocation || activeLeg === "completed") return;
+    
+    const hasLocationChanged = !prevLocation.current || 
+      prevLocation.current.lat !== driverLocation.lat || 
+      prevLocation.current.lng !== driverLocation.lng;
+    
+    if (hasLocationChanged) {
+      map.panTo([driverLocation.lat, driverLocation.lng], {
+        animate: true,
+        duration: 0.5,
+      });
+      prevLocation.current = driverLocation;
+    }
+  }, [map, driverLocation, autoFollow, activeLeg]);
+  
+  return null;
+}
 
 function MapBoundsHandler({ 
   driverLocation, 
   pickupLocation, 
   dropoffLocation,
-  activeLeg 
+  activeLeg,
+  autoFollow,
 }: { 
   driverLocation?: MapLocation | null;
   pickupLocation?: MapLocation | null;
   dropoffLocation?: MapLocation | null;
   activeLeg?: ActiveLeg;
+  autoFollow?: boolean;
 }) {
   const map = useMap();
+  const hasInitialized = useRef(false);
   
   useEffect(() => {
+    if (hasInitialized.current && autoFollow) return;
+    
     const bounds: L.LatLngExpression[] = [];
     
     if (driverLocation) {
       bounds.push([driverLocation.lat, driverLocation.lng]);
     }
-    if (pickupLocation && activeLeg === "to_pickup") {
+    if (pickupLocation && (activeLeg === "to_pickup" || !activeLeg)) {
       bounds.push([pickupLocation.lat, pickupLocation.lng]);
     }
-    if (dropoffLocation && activeLeg === "to_dropoff") {
-      bounds.push([dropoffLocation.lat, dropoffLocation.lng]);
-    }
-    if (pickupLocation && dropoffLocation && !activeLeg) {
-      bounds.push([pickupLocation.lat, pickupLocation.lng]);
+    if (dropoffLocation && (activeLeg === "to_dropoff" || !activeLeg)) {
       bounds.push([dropoffLocation.lat, dropoffLocation.lng]);
     }
     
     if (bounds.length >= 2) {
       const latLngBounds = L.latLngBounds(bounds);
-      map.fitBounds(latLngBounds, { padding: [50, 50], maxZoom: 15 });
+      map.fitBounds(latLngBounds, { padding: [60, 60], maxZoom: 16 });
+      hasInitialized.current = true;
     } else if (bounds.length === 1) {
-      map.setView(bounds[0], 14);
+      map.setView(bounds[0], 15);
+      hasInitialized.current = true;
     }
-  }, [map, driverLocation, pickupLocation, dropoffLocation, activeLeg]);
+  }, [map, driverLocation, pickupLocation, dropoffLocation, activeLeg, autoFollow]);
   
   return null;
 }
@@ -143,37 +225,77 @@ function MapReadyHandler({ onMapReady }: { onMapReady?: () => void }) {
   return null;
 }
 
-function generateSampleRoute(
+function generateSmoothRoute(
   start: MapLocation,
   end: MapLocation
 ): [number, number][] {
   const points: [number, number][] = [];
-  const steps = 20;
+  const steps = 30;
   
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
+    const easeT = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
     const lat = start.lat + (end.lat - start.lat) * t;
     const lng = start.lng + (end.lng - start.lng) * t;
-    const jitter = (Math.sin(i * 0.8) * 0.001) * (1 - Math.abs(t - 0.5) * 2);
-    points.push([lat + jitter, lng + jitter]);
+    const curve = Math.sin(t * Math.PI) * 0.0008;
+    points.push([lat + curve, lng + curve * 0.5]);
   }
   
   return points;
 }
 
+function calculateDistanceAndEta(
+  from: MapLocation,
+  to: MapLocation
+): { distanceKm: number; etaMinutes: number } {
+  try {
+    const fromPoint = turf.point([from.lng, from.lat]);
+    const toPoint = turf.point([to.lng, to.lat]);
+    const distance = turf.distance(fromPoint, toPoint, { units: "kilometers" });
+    const avgSpeedKmh = 30;
+    const etaMinutes = Math.ceil((distance / avgSpeedKmh) * 60);
+    return { distanceKm: Math.round(distance * 10) / 10, etaMinutes: Math.max(1, etaMinutes) };
+  } catch {
+    return { distanceKm: 0, etaMinutes: 0 };
+  }
+}
+
 export function SafeGoMap({
   center = { lat: 40.7128, lng: -74.006 },
-  zoom = 13,
+  zoom = 14,
   driverLocation,
   pickupLocation,
   dropoffLocation,
   activeLeg = "to_pickup",
   routeCoordinates,
   onMapReady,
+  onDistanceCalculated,
   className = "",
   showControls = true,
+  autoFollow = true,
+  showEtaOverlay = true,
 }: SafeGoMapProps) {
   const [mapReady, setMapReady] = useState(false);
+  const driverIcon = useMemo(() => createDriverIcon(driverLocation?.heading || 0), [driverLocation?.heading]);
+  
+  const targetLocation = useMemo(() => {
+    if (activeLeg === "to_pickup") return pickupLocation;
+    if (activeLeg === "to_dropoff") return dropoffLocation;
+    return null;
+  }, [activeLeg, pickupLocation, dropoffLocation]);
+  
+  const { distanceKm, etaMinutes } = useMemo(() => {
+    if (driverLocation && targetLocation) {
+      return calculateDistanceAndEta(driverLocation, targetLocation);
+    }
+    return { distanceKm: 0, etaMinutes: 0 };
+  }, [driverLocation, targetLocation]);
+  
+  useEffect(() => {
+    if (onDistanceCalculated && distanceKm >= 0) {
+      onDistanceCalculated(distanceKm, etaMinutes);
+    }
+  }, [distanceKm, etaMinutes, onDistanceCalculated]);
   
   const getRouteColor = () => {
     if (activeLeg === "to_pickup") return "#3B82F6";
@@ -181,18 +303,19 @@ export function SafeGoMap({
     return "#6B7280";
   };
   
-  const computedRoute = routeCoordinates || (() => {
+  const computedRoute = useMemo(() => {
+    if (routeCoordinates && routeCoordinates.length > 0) return routeCoordinates;
     if (activeLeg === "to_pickup" && driverLocation && pickupLocation) {
-      return generateSampleRoute(driverLocation, pickupLocation);
+      return generateSmoothRoute(driverLocation, pickupLocation);
     }
     if (activeLeg === "to_dropoff" && driverLocation && dropoffLocation) {
-      return generateSampleRoute(driverLocation, dropoffLocation);
+      return generateSmoothRoute(driverLocation, dropoffLocation);
     }
     if (pickupLocation && dropoffLocation) {
-      return generateSampleRoute(pickupLocation, dropoffLocation);
+      return generateSmoothRoute(pickupLocation, dropoffLocation);
     }
     return [];
-  })();
+  }, [routeCoordinates, activeLeg, driverLocation, pickupLocation, dropoffLocation]);
   
   const mapCenter: [number, number] = driverLocation 
     ? [driverLocation.lat, driverLocation.lng]
@@ -200,11 +323,14 @@ export function SafeGoMap({
 
   return (
     <div className={`relative ${className}`} data-testid="safego-map-container">
-      <div className="absolute top-3 left-3 z-[1000] bg-primary/95 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg border border-primary">
-        <div className="flex items-center gap-2">
-          <svg className="h-5 w-5 text-primary-foreground" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-          </svg>
+      <div className="absolute top-3 left-3 z-[1000] bg-primary/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border border-primary">
+        <div className="flex items-center gap-2.5">
+          <div className="relative">
+            <svg className="h-6 w-6 text-primary-foreground" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+            <div className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-green-400 rounded-full animate-pulse" />
+          </div>
           <div className="flex flex-col">
             <span className="text-sm font-bold text-primary-foreground leading-tight">SafeGo Map</span>
             <span className="text-[10px] text-primary-foreground/80 leading-tight">Live Navigation</span>
@@ -212,9 +338,21 @@ export function SafeGoMap({
         </div>
       </div>
       
-      <div className="absolute bottom-3 right-3 z-[1000] bg-background/80 backdrop-blur-sm rounded px-2 py-1 shadow-sm border text-[10px] text-muted-foreground">
-        Powered by SafeGo
-      </div>
+      {showEtaOverlay && activeLeg !== "completed" && targetLocation && distanceKm > 0 && (
+        <div className="absolute top-3 right-3 z-[1000] bg-background/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border">
+          <div className="flex items-center gap-3">
+            <div className="text-center">
+              <p className="text-lg font-bold text-foreground">{etaMinutes}</p>
+              <p className="text-[10px] text-muted-foreground uppercase">min</p>
+            </div>
+            <div className="h-8 w-px bg-border" />
+            <div className="text-center">
+              <p className="text-lg font-bold text-foreground">{distanceKm}</p>
+              <p className="text-[10px] text-muted-foreground uppercase">km</p>
+            </div>
+          </div>
+        </div>
+      )}
       
       <MapContainer
         center={mapCenter}
@@ -233,6 +371,13 @@ export function SafeGoMap({
           pickupLocation={pickupLocation}
           dropoffLocation={dropoffLocation}
           activeLeg={activeLeg}
+          autoFollow={autoFollow}
+        />
+        
+        <AutoFollowHandler
+          driverLocation={driverLocation}
+          autoFollow={autoFollow}
+          activeLeg={activeLeg}
         />
         
         <MapReadyHandler onMapReady={() => {
@@ -241,30 +386,54 @@ export function SafeGoMap({
         }} />
         
         {computedRoute.length > 1 && (
-          <Polyline
-            positions={computedRoute}
-            pathOptions={{
-              color: getRouteColor(),
-              weight: 5,
-              opacity: 0.8,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
-          />
+          <>
+            <Polyline
+              positions={computedRoute}
+              pathOptions={{
+                color: "#374151",
+                weight: 8,
+                opacity: 0.3,
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+            />
+            <Polyline
+              positions={computedRoute}
+              pathOptions={{
+                color: getRouteColor(),
+                weight: 5,
+                opacity: 0.9,
+                lineCap: "round",
+                lineJoin: "round",
+              }}
+            />
+          </>
         )}
         
         {driverLocation && (
-          <Marker 
-            position={[driverLocation.lat, driverLocation.lng]} 
-            icon={driverIcon}
-          >
-            <Popup>
-              <div className="font-medium">Your Location</div>
-              {driverLocation.label && (
-                <div className="text-sm text-muted-foreground">{driverLocation.label}</div>
-              )}
-            </Popup>
-          </Marker>
+          <>
+            <Circle
+              center={[driverLocation.lat, driverLocation.lng]}
+              radius={50}
+              pathOptions={{
+                color: "#10B981",
+                fillColor: "#10B981",
+                fillOpacity: 0.15,
+                weight: 1,
+              }}
+            />
+            <Marker 
+              position={[driverLocation.lat, driverLocation.lng]} 
+              icon={driverIcon}
+            >
+              <Popup>
+                <div className="font-semibold text-base">Your Location</div>
+                {driverLocation.label && (
+                  <div className="text-sm text-gray-600 mt-1">{driverLocation.label}</div>
+                )}
+              </Popup>
+            </Marker>
+          </>
         )}
         
         {pickupLocation && (
@@ -273,9 +442,9 @@ export function SafeGoMap({
             icon={pickupIcon}
           >
             <Popup>
-              <div className="font-medium">Pickup Location</div>
+              <div className="font-semibold text-base">Pickup Location</div>
               {pickupLocation.label && (
-                <div className="text-sm text-muted-foreground">{pickupLocation.label}</div>
+                <div className="text-sm text-gray-600 mt-1">{pickupLocation.label}</div>
               )}
             </Popup>
           </Marker>
@@ -287,29 +456,37 @@ export function SafeGoMap({
             icon={dropoffIcon}
           >
             <Popup>
-              <div className="font-medium">Dropoff Location</div>
+              <div className="font-semibold text-base">Dropoff Location</div>
               {dropoffLocation.label && (
-                <div className="text-sm text-muted-foreground">{dropoffLocation.label}</div>
+                <div className="text-sm text-gray-600 mt-1">{dropoffLocation.label}</div>
               )}
             </Popup>
           </Marker>
         )}
       </MapContainer>
       
+      <div className="absolute bottom-3 right-3 z-[1000] bg-background/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-md border text-[10px] text-muted-foreground font-medium">
+        Powered by SafeGo
+      </div>
+      
       {activeLeg !== "completed" && (
-        <div className="absolute bottom-3 left-3 right-3 z-[1000] flex gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md border text-xs">
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <span>Driver</span>
+        <div className="absolute bottom-3 left-3 z-[1000] flex gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
+            <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+            <span>You</span>
           </div>
-          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md border text-xs">
-            <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-            <span>Pickup</span>
-          </div>
-          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md border text-xs">
-            <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
-            <span>Dropoff</span>
-          </div>
+          {activeLeg === "to_pickup" && (
+            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
+              <div className="h-3 w-3 rounded-full bg-blue-500" />
+              <span>Pickup</span>
+            </div>
+          )}
+          {(activeLeg === "to_dropoff" || activeLeg === "to_pickup") && (
+            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
+              <div className="h-3 w-3 rounded-full bg-red-500" />
+              <span>Dropoff</span>
+            </div>
+          )}
         </div>
       )}
     </div>
