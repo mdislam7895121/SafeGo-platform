@@ -105,7 +105,7 @@ export default function PaymentMethods() {
           makeDefault: cardData.makeDefault,
         }),
       });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer/payment-methods"] });
@@ -130,7 +130,7 @@ export default function PaymentMethods() {
       const response = await apiRequest(`/api/customer/payment-methods/${id}/default`, {
         method: "PUT",
       });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer/payment-methods"] });
@@ -153,7 +153,7 @@ export default function PaymentMethods() {
       const response = await apiRequest(`/api/customer/payment-methods/${id}`, {
         method: "DELETE",
       });
-      return response.json();
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customer/payment-methods"] });
