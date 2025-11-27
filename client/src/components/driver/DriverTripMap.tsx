@@ -124,19 +124,19 @@ export function DriverTripMap({
     triggerHapticFeedback("light");
   }, []);
 
-  const handleOpenFullscreen = useCallback(() => {
-    logNavigationEvent(NavigationProvider.SAFEGO, tripId);
+  const handleOpenFullscreen = useCallback(async () => {
+    await logNavigationEvent(NavigationProvider.SAFEGO, tripId);
     setLocation(`/driver/map?tripId=${tripId}`);
     triggerHapticFeedback("light");
   }, [tripId, setLocation, logNavigationEvent]);
 
   const handleProviderSelect = useCallback(
-    (provider: NavigationProvider) => {
+    async (provider: NavigationProvider) => {
       if (provider === NavigationProvider.SAFEGO) {
-        handleOpenFullscreen();
+        await handleOpenFullscreen();
         return;
       }
-      openInExternalMap(provider);
+      await openInExternalMap(provider);
     },
     [handleOpenFullscreen, openInExternalMap]
   );

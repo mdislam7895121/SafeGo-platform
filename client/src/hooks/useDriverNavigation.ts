@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   NavigationProvider,
   NavigationPreferences,
@@ -46,8 +47,8 @@ interface UseDriverNavigationReturn {
     key: K,
     value: NavigationPreferences[K]
   ) => void;
-  openInPrimaryMap: () => void;
-  openInExternalMap: (provider: NavigationProvider) => void;
+  openInPrimaryMap: () => Promise<void>;
+  openInExternalMap: (provider: NavigationProvider) => Promise<void>;
   toggleTrafficLayer: () => void;
   recenterOnDriver: () => void;
   logNavigationEvent: (provider: NavigationProvider, tripId?: string) => Promise<void>;
@@ -68,23 +69,54 @@ export function useDriverNavigation({
 }: UseDriverNavigationOptions = {}): UseDriverNavigationReturn {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [preferences, setPreferences] = useState<NavigationPreferences>(DEFAULT_NAVIGATION_PREFERENCES);
+  const [localPreferences, setLocalPreferences] = useState<NavigationPreferences>(
+    loadNavigationPreferences()
+  );
   const [recenterTrigger, setRecenterTrigger] = useState(0);
 
-  useEffect(() => {
-    const loaded = loadNavigationPreferences();
-    setPreferences(loaded);
-  }, []);
+  const { data: serverPreferences } = useQuery<{ preferredNavigationApp?: string }>({
+    queryKey: ["/api/driver/preferences"],
+  });
+
+  const updateNavigationMutation = useMutation({
+    mutationFn: async (preferredNavigationApp: string) => {
+      return apiRequest("/api/driver/preferences/navigation", {
+        method: "PATCH",
+        body: JSON.stringify({ preferredNavigationApp }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });
+    },
+    onError: (error: any) => {
+      console.warn("Failed to sync navigation preference to server:", error);
+    },
+  });
+
+  const preferences = useMemo((): NavigationPreferences => {
+    const serverNav = serverPreferences?.preferredNavigationApp;
+    const primaryProvider = serverNav
+      ? (serverNav as NavigationProvider)
+      : localPreferences.primaryProvider;
+    return {
+      ...localPreferences,
+      primaryProvider,
+    };
+  }, [serverPreferences, localPreferences]);
 
   const setPreference = useCallback(
     <K extends keyof NavigationPreferences>(key: K, value: NavigationPreferences[K]) => {
-      setPreferences((prev) => {
+      setLocalPreferences((prev) => {
         const updated = { ...prev, [key]: value };
         saveNavigationPreferences({ [key]: value });
         return updated;
       });
+      if (key === "primaryProvider") {
+        updateNavigationMutation.mutate(value as string);
+      }
     },
-    []
+    [updateNavigationMutation]
   );
 
   const isHeadingToPickup = useMemo(() => {
@@ -118,12 +150,12 @@ export function useDriverNavigation({
     [activeTrip?.id]
   );
 
-  const openInPrimaryMap = useCallback(() => {
+  const openInPrimaryMap = useCallback(async () => {
     const provider = preferences.primaryProvider;
 
     if (provider === NavigationProvider.SAFEGO) {
       if (activeTrip) {
-        logNavigationEvent(NavigationProvider.SAFEGO, activeTrip.id);
+        await logNavigationEvent(NavigationProvider.SAFEGO, activeTrip.id);
         setLocation(`/driver/map?tripId=${activeTrip.id}`);
       } else {
         setLocation("/driver/map");
@@ -153,7 +185,7 @@ export function useDriverNavigation({
     const url = buildTripNavigationUrl(provider, coordinates, isHeadingToPickup, activeTrip.id);
 
     if (url) {
-      logNavigationEvent(provider, activeTrip.id);
+      await logNavigationEvent(provider, activeTrip.id);
       window.open(url, "_blank");
       triggerHapticFeedback("light");
     } else {
@@ -166,9 +198,10 @@ export function useDriverNavigation({
   }, [preferences.primaryProvider, activeTrip, driverPosition, isHeadingToPickup, toast, setLocation, logNavigationEvent]);
 
   const openInExternalMap = useCallback(
-    (provider: NavigationProvider) => {
+    async (provider: NavigationProvider) => {
       if (!isExternalProvider(provider)) {
         if (activeTrip) {
+          await logNavigationEvent(NavigationProvider.SAFEGO, activeTrip.id);
           setLocation(`/driver/map?tripId=${activeTrip.id}`);
         } else {
           setLocation("/driver/map");
@@ -197,7 +230,7 @@ export function useDriverNavigation({
       const url = buildTripNavigationUrl(provider, coordinates, isHeadingToPickup, activeTrip.id);
 
       if (url) {
-        logNavigationEvent(provider, activeTrip.id);
+        await logNavigationEvent(provider, activeTrip.id);
         window.open(url, "_blank");
         triggerHapticFeedback("light");
       } else {

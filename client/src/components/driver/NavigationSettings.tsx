@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { MapPin, Navigation, ExternalLink, Layers, Route, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -6,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   NavigationProvider,
   NAVIGATION_PROVIDERS,
@@ -16,22 +18,53 @@ import {
 
 export function NavigationSettings() {
   const { toast } = useToast();
-  const [preferences, setPreferences] = useState<NavigationPreferences>({
+  const [localPreferences, setLocalPreferences] = useState<NavigationPreferences>({
     primaryProvider: NavigationProvider.SAFEGO,
     showTrafficByDefault: false,
     autoRouteRecalculation: true,
   });
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const loaded = loadNavigationPreferences();
-    setPreferences(loaded);
+    setLocalPreferences(loaded);
   }, []);
+
+  const { data: serverPreferences } = useQuery<{ preferredNavigationApp?: string }>({
+    queryKey: ["/api/driver/preferences"],
+  });
+
+  const updateNavigationMutation = useMutation({
+    mutationFn: async (preferredNavigationApp: string) => {
+      return apiRequest("/api/driver/preferences/navigation", {
+        method: "PATCH",
+        body: JSON.stringify({ preferredNavigationApp }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to save preference",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const preferences: NavigationPreferences = {
+    ...localPreferences,
+    primaryProvider: serverPreferences?.preferredNavigationApp
+      ? (serverPreferences.preferredNavigationApp as NavigationProvider)
+      : localPreferences.primaryProvider,
+  };
 
   const handleProviderChange = (value: string) => {
     const provider = value as NavigationProvider;
-    setPreferences((prev) => ({ ...prev, primaryProvider: provider }));
+    setLocalPreferences((prev) => ({ ...prev, primaryProvider: provider }));
     saveNavigationPreferences({ primaryProvider: provider });
+    updateNavigationMutation.mutate(provider);
     
     const providerInfo = NAVIGATION_PROVIDERS.find((p) => p.id === provider);
     toast({
@@ -41,20 +74,20 @@ export function NavigationSettings() {
   };
 
   const handleTrafficToggle = (checked: boolean) => {
-    setPreferences((prev) => ({ ...prev, showTrafficByDefault: checked }));
+    setLocalPreferences((prev) => ({ ...prev, showTrafficByDefault: checked }));
     saveNavigationPreferences({ showTrafficByDefault: checked });
     toast({
       title: checked ? "Traffic layer enabled" : "Traffic layer disabled",
-      description: "Your preference has been saved",
+      description: "Saved to this device",
     });
   };
 
   const handleAutoRecalculateToggle = (checked: boolean) => {
-    setPreferences((prev) => ({ ...prev, autoRouteRecalculation: checked }));
+    setLocalPreferences((prev) => ({ ...prev, autoRouteRecalculation: checked }));
     saveNavigationPreferences({ autoRouteRecalculation: checked });
     toast({
       title: checked ? "Auto-recalculation enabled" : "Auto-recalculation disabled",
-      description: "Your preference has been saved",
+      description: "Saved to this device",
     });
   };
 

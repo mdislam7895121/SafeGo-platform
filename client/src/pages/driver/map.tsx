@@ -194,7 +194,7 @@ export default function DriverMapPage() {
   }, [toast]);
 
   const handleProviderSelect = useCallback(
-    (provider: NavigationProvider) => {
+    async (provider: NavigationProvider) => {
       if (provider === NavigationProvider.SAFEGO) {
         setPreference("primaryProvider", provider);
         toast({ title: "Using SafeGo Map", description: "In-app navigation active" });
@@ -210,7 +210,7 @@ export default function DriverMapPage() {
         return;
       }
 
-      openInExternalMap(provider);
+      await openInExternalMap(provider);
     },
     [activeTrip, setPreference, openInExternalMap, toast]
   );
