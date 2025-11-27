@@ -339,15 +339,15 @@ export function SafeGoMap({
       </div>
       
       {showEtaOverlay && activeLeg !== "completed" && targetLocation && distanceKm > 0 && (
-        <div className="absolute top-3 right-3 z-[1000] bg-background/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border">
+        <div className="absolute top-3 right-3 z-[1000] bg-background/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border" data-testid="map-eta-overlay">
           <div className="flex items-center gap-3">
             <div className="text-center">
-              <p className="text-lg font-bold text-foreground">{etaMinutes}</p>
+              <p className="text-lg font-bold text-foreground" data-testid="map-eta-minutes">{etaMinutes}</p>
               <p className="text-[10px] text-muted-foreground uppercase">min</p>
             </div>
             <div className="h-8 w-px bg-border" />
             <div className="text-center">
-              <p className="text-lg font-bold text-foreground">{distanceKm}</p>
+              <p className="text-lg font-bold text-foreground" data-testid="map-distance-km">{distanceKm}</p>
               <p className="text-[10px] text-muted-foreground uppercase">km</p>
             </div>
           </div>
@@ -470,20 +470,20 @@ export function SafeGoMap({
       </div>
       
       {activeLeg !== "completed" && (
-        <div className="absolute bottom-3 left-3 z-[1000] flex gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
-            <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="absolute bottom-3 left-3 z-[1000] flex gap-2 flex-wrap" data-testid="map-legend">
+          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium" data-testid="legend-driver">
+            <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" data-testid="marker-driver-indicator" />
             <span>You</span>
           </div>
           {activeLeg === "to_pickup" && (
-            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
-              <div className="h-3 w-3 rounded-full bg-blue-500" />
+            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium" data-testid="legend-pickup">
+              <div className="h-3 w-3 rounded-full bg-blue-500" data-testid="marker-pickup-indicator" />
               <span>Pickup</span>
             </div>
           )}
           {(activeLeg === "to_dropoff" || activeLeg === "to_pickup") && (
-            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium">
-              <div className="h-3 w-3 rounded-full bg-red-500" />
+            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium" data-testid="legend-dropoff">
+              <div className="h-3 w-3 rounded-full bg-red-500" data-testid="marker-dropoff-indicator" />
               <span>Dropoff</span>
             </div>
           )}
