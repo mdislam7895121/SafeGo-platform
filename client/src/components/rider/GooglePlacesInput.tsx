@@ -155,8 +155,10 @@ export function GooglePlacesInput({
   }, [autoFocus, isReady]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log(`[GooglePlacesInput:${variant}] handleInputChange called, value: "${e.target.value}", isSelectingRef: ${isSelectingRef.current}`);
     // If we're in the middle of selecting from autocomplete, don't process
     if (isSelectingRef.current) {
+      console.log(`[GooglePlacesInput:${variant}] Skipping onChange due to selection in progress`);
       return;
     }
     const newValue = e.target.value;
