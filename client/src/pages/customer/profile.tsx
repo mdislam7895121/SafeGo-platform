@@ -133,14 +133,16 @@ export default function CustomerProfile() {
       <div className="p-6 space-y-6">
         {/* Quick Action Row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-payment-methods">
-            <CardContent className="p-4 text-center">
-              <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center mx-auto mb-2">
-                <CreditCard className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-              <p className="text-sm font-medium">Payment</p>
-            </CardContent>
-          </Card>
+          <Link href="/customer/payment-methods">
+            <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-payment-methods">
+              <CardContent className="p-4 text-center">
+                <div className="h-12 w-12 rounded-full bg-green-100 dark:bg-green-950 flex items-center justify-center mx-auto mb-2">
+                  <CreditCard className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <p className="text-sm font-medium">Payment</p>
+              </CardContent>
+            </Card>
+          </Link>
 
           <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-saved-places">
             <CardContent className="p-4 text-center">
@@ -162,14 +164,16 @@ export default function CustomerProfile() {
             </Card>
           </Link>
 
-          <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-edit-profile">
-            <CardContent className="p-4 text-center">
-              <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-950 flex items-center justify-center mx-auto mb-2">
-                <Edit className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-              </div>
-              <p className="text-sm font-medium">Edit</p>
-            </CardContent>
-          </Card>
+          <Link href="/customer/profile/settings">
+            <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-edit-profile">
+              <CardContent className="p-4 text-center">
+                <div className="h-12 w-12 rounded-full bg-orange-100 dark:bg-orange-950 flex items-center justify-center mx-auto mb-2">
+                  <Edit className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                </div>
+                <p className="text-sm font-medium">Edit</p>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Personal Information Section */}

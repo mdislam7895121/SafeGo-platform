@@ -398,16 +398,18 @@ export default function CustomerHome() {
                   </div>
                 </div>
               </div>
-              <DropdownMenuItem onClick={() => showComingSoon("Profile Settings")} data-testid="menu-profile-settings">
-                <Settings className="mr-2 h-4 w-4" />
-                Profile Settings
-                <Badge variant="secondary" className="ml-auto text-[10px]">Soon</Badge>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => showComingSoon("Payment Methods")} data-testid="menu-payment-methods">
-                <CreditCard className="mr-2 h-4 w-4" />
-                Payment Methods
-                <Badge variant="secondary" className="ml-auto text-[10px]">Soon</Badge>
-              </DropdownMenuItem>
+              <Link href="/customer/profile/settings">
+                <DropdownMenuItem data-testid="menu-profile-settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Profile Settings
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/customer/payment-methods">
+                <DropdownMenuItem data-testid="menu-payment-methods">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Payment Methods
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-red-600" data-testid="menu-sign-out">
                 <LogOut className="mr-2 h-4 w-4" />
@@ -1078,16 +1080,18 @@ export default function CustomerHome() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="top" className="w-56 mb-2">
-              <DropdownMenuItem onClick={() => showComingSoon("Profile Settings")}>
-                <Settings className="mr-2 h-4 w-4" />
-                Profile Settings
-                <Badge variant="secondary" className="ml-auto text-[10px]">Soon</Badge>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => showComingSoon("Payment Methods")}>
-                <CreditCard className="mr-2 h-4 w-4" />
-                Payment Methods
-                <Badge variant="secondary" className="ml-auto text-[10px]">Soon</Badge>
-              </DropdownMenuItem>
+              <Link href="/customer/profile/settings">
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  Profile Settings
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/customer/payment-methods">
+                <DropdownMenuItem>
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Payment Methods
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-red-600">
                 <LogOut className="mr-2 h-4 w-4" />
