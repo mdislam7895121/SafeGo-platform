@@ -69,17 +69,30 @@ export function GooglePlacesInput({
 
     autocompleteRef.current = autocomplete;
 
+    // Listen for clicks on the autocomplete dropdown BEFORE place_changed fires
+    // This sets the flag early so handleInputChange knows to skip processing
+    const handleDropdownClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      // Google's autocomplete dropdown has class "pac-container" and items have "pac-item"
+      if (target.closest('.pac-container')) {
+        console.log("[GooglePlacesInput] Dropdown clicked, setting selection flag");
+        isSelectingRef.current = true;
+      }
+    };
+
+    // Use capture phase to catch the event before Google processes it
+    document.addEventListener('mousedown', handleDropdownClick, true);
+
     listenerRef.current = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
       console.log("[GooglePlacesInput] place_changed fired:", place);
 
       if (!place.geometry?.location) {
         console.warn("[GooglePlacesInput] No geometry for selected place");
+        // Reset flag if selection failed
+        isSelectingRef.current = false;
         return;
       }
-
-      // Set flag to prevent onChange from clearing location during selection
-      isSelectingRef.current = true;
 
       const fullAddress = place.formatted_address || place.name || "";
       const lat = place.geometry.location.lat();
@@ -87,6 +100,11 @@ export function GooglePlacesInput({
       const placeId = place.place_id || "";
 
       console.log("[GooglePlacesInput] Calling onLocationSelect with:", { fullAddress, lat, lng, placeId });
+
+      // Explicitly update the input DOM value to ensure React state syncs
+      if (inputRef.current) {
+        inputRef.current.value = fullAddress;
+      }
 
       // Call onLocationSelect with full place data
       // The parent component is responsible for updating both the location AND the display address
@@ -103,19 +121,20 @@ export function GooglePlacesInput({
       // Reset flag after React has processed the state updates
       setTimeout(() => {
         isSelectingRef.current = false;
-      }, 150);
+      }, 200);
     });
 
     console.log("[GooglePlacesInput] Autocomplete initialized successfully");
 
     return () => {
+      document.removeEventListener('mousedown', handleDropdownClick, true);
       if (listenerRef.current && window.google?.maps?.event) {
         window.google.maps.event.removeListener(listenerRef.current);
         listenerRef.current = null;
       }
       autocompleteRef.current = null;
     };
-  }, [isReady, onLocationSelect, onChange]);
+  }, [isReady, onLocationSelect]);
 
   useEffect(() => {
     if (autoFocus && inputRef.current && isReady) {
