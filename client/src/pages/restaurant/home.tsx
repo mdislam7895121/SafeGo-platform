@@ -71,7 +71,7 @@ export default function RestaurantHome() {
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('today');
   const { toast } = useToast();
 
-  const { data: restaurantData, isLoading } = useQuery({
+  const { data: restaurantData, isLoading, isError: homeError } = useQuery({
     queryKey: ["/api/restaurant/home"],
     refetchInterval: 5000,
   });
@@ -82,7 +82,7 @@ export default function RestaurantHome() {
     refetchInterval: 10000, // Poll every 10 seconds for live updates
   });
 
-  const { data: walletData, isLoading: walletLoading } = useQuery<WalletData>({
+  const { data: walletData, isLoading: walletLoading, isError: walletError } = useQuery<WalletData>({
     queryKey: ["/api/restaurant/wallet"],
     refetchInterval: 30000, // Poll every 30 seconds
   });
@@ -164,6 +164,19 @@ export default function RestaurantHome() {
       <div className="space-y-6">
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-40 w-full" />
+      </div>
+    );
+  }
+
+  if (homeError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center" data-testid="error-dashboard-load">
+        <AlertTriangle className="h-16 w-16 text-orange-500 opacity-50 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Unable to load dashboard</h2>
+        <p className="text-muted-foreground mb-4">Please check your connection and try refreshing the page.</p>
+        <Button onClick={() => window.location.reload()} data-testid="button-retry-dashboard">
+          Retry
+        </Button>
       </div>
     );
   }
@@ -834,6 +847,7 @@ export default function RestaurantHome() {
               }}
               nextSettlementDate="Weekly on Monday"
               isLoading={walletLoading}
+              isError={walletError}
             />
 
             {/* Restaurant Information */}

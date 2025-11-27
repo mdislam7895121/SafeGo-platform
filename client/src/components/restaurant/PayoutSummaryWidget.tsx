@@ -22,6 +22,7 @@ interface PayoutSummaryWidgetProps {
   };
   nextSettlementDate?: string;
   isLoading?: boolean;
+  isError?: boolean;
 }
 
 export function PayoutSummaryWidget({
@@ -29,6 +30,7 @@ export function PayoutSummaryWidget({
   earnings,
   nextSettlementDate,
   isLoading = false,
+  isError = false,
 }: PayoutSummaryWidgetProps) {
   if (isLoading) {
     return (
@@ -41,6 +43,23 @@ export function PayoutSummaryWidget({
             <div className="h-12 bg-muted rounded" />
             <div className="h-12 bg-muted rounded" />
             <div className="h-12 bg-muted rounded" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card data-testid="widget-payout-summary-error">
+        <CardHeader>
+          <CardTitle className="text-sm font-medium">Wallet & Earnings</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-4 text-muted-foreground">
+            <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-orange-500 opacity-50" />
+            <p className="text-sm font-medium">Unable to load wallet data</p>
+            <p className="text-xs mt-1">Please try again later</p>
           </div>
         </CardContent>
       </Card>
