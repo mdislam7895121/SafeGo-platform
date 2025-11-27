@@ -124,6 +124,66 @@ router.patch("/profile", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// POST /api/restaurant/status
+// Update restaurant status (Open/Closed, Busy mode)
+// ====================================================
+const statusUpdateSchema = z.object({
+  isOpen: z.boolean().optional(),
+  isBusy: z.boolean().optional(),
+});
+
+router.post("/status", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const validationResult = statusUpdateSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { isOpen, isBusy } = validationResult.data;
+
+    // Get restaurant profile
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Update profile with status (using isActive for open/closed, isBusy for busy mode)
+    const updateData: any = {};
+    if (typeof isOpen === 'boolean') {
+      updateData.isActive = isOpen;
+    }
+    if (typeof isBusy === 'boolean') {
+      updateData.isBusy = isBusy;
+    }
+
+    let updatedProfile = restaurantProfile;
+    if (Object.keys(updateData).length > 0) {
+      updatedProfile = await prisma.restaurantProfile.update({
+        where: { userId },
+        data: updateData,
+      });
+    }
+
+    res.json({
+      message: "Restaurant status updated successfully",
+      isOpen: updatedProfile.isActive,
+      isBusy: updatedProfile.isBusy,
+    });
+  } catch (error) {
+    console.error("Status update error:", error);
+    res.status(500).json({ error: "Failed to update restaurant status" });
+  }
+});
+
+// ====================================================
 // STAFF MANAGEMENT API (R3)
 // ====================================================
 
@@ -460,6 +520,8 @@ router.get("/home", async (req: AuthRequest, res) => {
         isVerified: restaurantProfile.isVerified,
         rejectionReason: restaurantProfile.rejectionReason,
         ownerRole: restaurantProfile.ownerRole || "OWNER", // Phase 6: Include owner role for RBAC
+        isOpen: restaurantProfile.isActive,  // C-1: Restaurant open/closed status
+        isBusy: restaurantProfile.isBusy,    // C-1: Restaurant busy mode
       },
       wallet: restaurantProfile.restaurantWallet ? {
         balance: restaurantProfile.restaurantWallet.balance,

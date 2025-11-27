@@ -18,13 +18,19 @@ import {
   PackageCheck,
   Truck,
   CreditCard,
-  MapPin
+  MapPin,
+  Plus,
+  CalendarClock,
+  Tag,
+  Power,
+  PauseCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +42,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ordersKeys } from "@/lib/queryKeys";
@@ -48,6 +54,16 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertTriangle, BarChart3 } from "lucide-react";
 
 type TimePeriod = 'today' | 'week' | 'month';
+
+interface WalletData {
+  wallet: {
+    availableBalance: string;
+    negativeBalance: string;
+    currency: string;
+    balance?: string;
+    payoutMethods?: any[];
+  } | null;
+}
 
 export default function RestaurantHome() {
   const { user, logout } = useAuth();
@@ -66,9 +82,55 @@ export default function RestaurantHome() {
     refetchInterval: 10000, // Poll every 10 seconds for live updates
   });
 
-  const { data: walletData, isLoading: walletLoading } = useQuery({
+  const { data: walletData, isLoading: walletLoading } = useQuery<WalletData>({
     queryKey: ["/api/restaurant/wallet"],
     refetchInterval: 30000, // Poll every 30 seconds
+  });
+
+  // Restaurant status controls - derived from server state with local override during mutation
+  const serverIsOpen = (restaurantData as any)?.profile?.isOpen ?? true;
+  const serverIsBusy = (restaurantData as any)?.profile?.isBusy ?? false;
+  
+  // Local state for optimistic updates (null = use server state)
+  const [localIsOpen, setLocalIsOpen] = useState<boolean | null>(null);
+  const [localIsBusy, setLocalIsBusy] = useState<boolean | null>(null);
+
+  // Clear local overrides when server data updates (sync back to server truth)
+  useEffect(() => {
+    setLocalIsOpen(null);
+    setLocalIsBusy(null);
+  }, [serverIsOpen, serverIsBusy]);
+
+  // Effective values: use local override if set, otherwise use server state
+  const isOpen = localIsOpen ?? serverIsOpen;
+  const isBusy = localIsBusy ?? serverIsBusy;
+
+  // Mutation for updating restaurant status
+  const updateStatusMutation2 = useMutation({
+    mutationFn: async ({ isOpen, isBusy }: { isOpen?: boolean; isBusy?: boolean }) => {
+      return await apiRequest("/api/restaurant/status", {
+        method: "POST",
+        body: JSON.stringify({ isOpen, isBusy }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/restaurant/home"] });
+      toast({
+        title: "Status Updated",
+        description: "Restaurant status has been updated.",
+      });
+    },
+    onError: (error: any) => {
+      // Revert local overrides on error (server state will be re-fetched)
+      setLocalIsOpen(null);
+      setLocalIsBusy(null);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update status",
+        variant: "destructive",
+      });
+    },
   });
 
   // Mutation for updating order status
@@ -159,6 +221,26 @@ export default function RestaurantHome() {
   const liveOrders = orders.filter((order: any) => 
     !['delivered', 'cancelled', 'completed'].includes(order.status)
   );
+
+  // Today's order status breakdown
+  const todayOrdersByStatus = {
+    new: todayOrders.filter((o: any) => o.status === 'placed').length,
+    preparing: todayOrders.filter((o: any) => ['accepted', 'preparing'].includes(o.status)).length,
+    ready: todayOrders.filter((o: any) => o.status === 'ready_for_pickup').length,
+    delivered: todayOrders.filter((o: any) => ['delivered', 'completed', 'picked_up'].includes(o.status)).length,
+    cancelled: todayOrders.filter((o: any) => o.status === 'cancelled').length,
+  };
+
+  // Handle status toggle with optimistic updates
+  const handleOpenToggle = (checked: boolean) => {
+    setLocalIsOpen(checked);
+    updateStatusMutation2.mutate({ isOpen: checked });
+  };
+
+  const handleBusyToggle = (checked: boolean) => {
+    setLocalIsBusy(checked);
+    updateStatusMutation2.mutate({ isBusy: checked });
+  };
 
   // Mock rating (to be replaced with real data)
   const avgRating = 4.5;
@@ -272,6 +354,100 @@ export default function RestaurantHome() {
     <div className="space-y-6">
         {/* KYC Verification Banner */}
         <KYCBanner />
+
+        {/* Restaurant Status Controls */}
+        <Card className="mb-6" data-testid="card-restaurant-status">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Power className="h-4 w-4" />
+              Restaurant Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
+              <div className="flex items-center justify-between sm:justify-start gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="open-toggle"
+                    checked={isOpen}
+                    onCheckedChange={handleOpenToggle}
+                    disabled={updateStatusMutation2.isPending}
+                    data-testid="switch-open-close"
+                  />
+                  <Label htmlFor="open-toggle" className="font-medium cursor-pointer">
+                    {isOpen ? "Open" : "Closed"}
+                  </Label>
+                </div>
+                <Badge 
+                  variant={isOpen ? "default" : "secondary"} 
+                  className={isOpen ? "bg-green-500" : ""}
+                  data-testid="badge-open-status"
+                >
+                  {isOpen ? "Accepting Orders" : "Not Accepting"}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between sm:justify-start gap-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="busy-toggle"
+                    checked={isBusy}
+                    onCheckedChange={handleBusyToggle}
+                    disabled={updateStatusMutation2.isPending || !isOpen}
+                    data-testid="switch-busy-mode"
+                  />
+                  <Label htmlFor="busy-toggle" className={`font-medium cursor-pointer ${!isOpen ? 'text-muted-foreground' : ''}`}>
+                    Busy Mode
+                  </Label>
+                </div>
+                {isBusy && isOpen && (
+                  <Badge variant="destructive" className="flex items-center gap-1" data-testid="badge-busy-status">
+                    <PauseCircle className="h-3 w-3" />
+                    Paused
+                  </Badge>
+                )}
+              </div>
+            </div>
+            {isBusy && isOpen && (
+              <p className="text-xs text-muted-foreground mt-3">
+                New orders are temporarily paused. Existing orders can still be managed.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Today's Order Overview */}
+        <Card className="mb-6" data-testid="card-order-overview">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShoppingBag className="h-4 w-4" />
+              Today's Order Overview
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-5 gap-2 sm:gap-4">
+              <div className="text-center p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg" data-testid="status-new">
+                <p className="text-2xl font-bold text-blue-600">{todayOrdersByStatus.new}</p>
+                <p className="text-xs text-muted-foreground mt-1">New</p>
+              </div>
+              <div className="text-center p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg" data-testid="status-preparing">
+                <p className="text-2xl font-bold text-yellow-600">{todayOrdersByStatus.preparing}</p>
+                <p className="text-xs text-muted-foreground mt-1">Preparing</p>
+              </div>
+              <div className="text-center p-3 bg-purple-50 dark:bg-purple-950/20 rounded-lg" data-testid="status-ready">
+                <p className="text-2xl font-bold text-purple-600">{todayOrdersByStatus.ready}</p>
+                <p className="text-xs text-muted-foreground mt-1">Ready</p>
+              </div>
+              <div className="text-center p-3 bg-green-50 dark:bg-green-950/20 rounded-lg" data-testid="status-delivered">
+                <p className="text-2xl font-bold text-green-600">{todayOrdersByStatus.delivered}</p>
+                <p className="text-xs text-muted-foreground mt-1">Delivered</p>
+              </div>
+              <div className="text-center p-3 bg-red-50 dark:bg-red-950/20 rounded-lg" data-testid="status-cancelled">
+                <p className="text-2xl font-bold text-red-600">{todayOrdersByStatus.cancelled}</p>
+                <p className="text-xs text-muted-foreground mt-1">Cancelled</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Performance Overview Section - Responsive spacing: 32px mobile, 24px tablet, 20px desktop */}
         <section className="mt-6 max-md:mt-8 xl:mt-5 space-y-6">
@@ -766,28 +942,40 @@ export default function RestaurantHome() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <Link href="/restaurant/menu/new">
+                  <Button variant="default" size="sm" className="w-full justify-start gap-2" data-testid="button-add-item">
+                    <Plus className="h-4 w-4" />
+                    Add New Item
+                  </Button>
+                </Link>
                 <Link href="/restaurant/menu">
                   <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-manage-menu">
                     <MenuIcon className="h-4 w-4" />
                     Manage Menu
                   </Button>
                 </Link>
-                <Link href="/restaurant/orders">
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-order-history">
-                    <ShoppingBag className="h-4 w-4" />
-                    Order History
+                <Link href="/restaurant/orders/live">
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-ongoing-orders">
+                    <Clock className="h-4 w-4" />
+                    Ongoing Orders
                   </Button>
                 </Link>
-                <Link href="/restaurant/wallet">
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-wallet-payouts">
-                    <Wallet className="h-4 w-4" />
-                    Wallet & Payouts
+                <Link href="/restaurant/settings-hours">
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-schedule-hours">
+                    <CalendarClock className="h-4 w-4" />
+                    Schedule Hours
                   </Button>
                 </Link>
-                <Link href="/restaurant/support">
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-support">
-                    <MessageCircle className="h-4 w-4" />
-                    Support Chat
+                <Link href="/restaurant/payout-methods">
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-payout-methods">
+                    <CreditCard className="h-4 w-4" />
+                    Payout Methods
+                  </Button>
+                </Link>
+                <Link href="/restaurant/promotions/campaigns">
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-promotions">
+                    <Tag className="h-4 w-4" />
+                    Promotions & Discounts
                   </Button>
                 </Link>
               </CardContent>
