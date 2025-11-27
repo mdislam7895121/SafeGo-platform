@@ -19,6 +19,7 @@ import {
   type RecentLocation
 } from "@/lib/locationService";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 interface LocationData {
@@ -40,7 +41,6 @@ interface FareEstimate {
 
 function createPickupIcon() {
   if (typeof window === "undefined") return null;
-  const L = require("leaflet");
   return L.divIcon({
     className: "safego-pickup-icon",
     html: `<div style="
@@ -63,7 +63,6 @@ function createPickupIcon() {
 
 function createDropoffIcon() {
   if (typeof window === "undefined") return null;
-  const L = require("leaflet");
   return L.divIcon({
     className: "safego-dropoff-icon",
     html: `<div style="
@@ -97,7 +96,6 @@ function MapBoundsHandler({
     if (typeof window === "undefined") return;
     
     if (pickupLocation && dropoffLocation) {
-      const L = require("leaflet");
       const bounds = L.latLngBounds(
         [pickupLocation.lat, pickupLocation.lng],
         [dropoffLocation.lat, dropoffLocation.lng]
