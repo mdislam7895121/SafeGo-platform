@@ -13,9 +13,12 @@ import {
   Clock,
   X,
   ChevronRight,
+  AlertCircle,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   searchLocations,
+  getPlaceDetails,
   getSavedPlaces,
   getRecentLocations,
   type SearchResult,
@@ -48,8 +51,12 @@ export function LocationSearchInput({
   autoFocus = false,
   className = "",
 }: LocationSearchInputProps) {
+  const { toast } = useToast();
   const [isFocused, setIsFocused] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [recentLocations, setRecentLocations] = useState<RecentLocation[]>([]);
@@ -72,6 +79,8 @@ export function LocationSearchInput({
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    
+    setFetchError(null);
 
     if (value.length >= 3) {
       setIsSearching(true);
@@ -106,16 +115,45 @@ export function LocationSearchInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleSelectResult = useCallback((result: SearchResult) => {
-    onLocationSelect({
-      address: result.address,
-      lat: result.lat,
-      lng: result.lng,
-      placeId: result.placeId,
-    });
-    onChange(result.name || result.address.split(",")[0]);
-    setIsFocused(false);
-  }, [onLocationSelect, onChange]);
+  const handleSelectResult = useCallback(async (result: SearchResult) => {
+    setSelectedPlaceId(result.placeId);
+    setIsFetchingDetails(true);
+    setFetchError(null);
+    
+    try {
+      const details = await getPlaceDetails(result.placeId);
+      
+      if (details && details.lat && details.lng) {
+        onLocationSelect({
+          address: details.formattedAddress,
+          lat: details.lat,
+          lng: details.lng,
+          placeId: result.placeId,
+        });
+        onChange(details.formattedAddress.split(",")[0]);
+        setSearchResults([]);
+        setIsFocused(false);
+      } else {
+        setFetchError("Unable to get location details. Please try again.");
+        toast({
+          title: "Location Error",
+          description: "Could not get details for this location. Please try a different search.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching place details:", error);
+      setFetchError("Failed to load location. Please try again.");
+      toast({
+        title: "Connection Error",
+        description: "Could not connect to location service. Please check your connection and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsFetchingDetails(false);
+      setSelectedPlaceId(null);
+    }
+  }, [onLocationSelect, onChange, toast]);
 
   const handleSelectSavedPlace = useCallback((place: SavedPlace) => {
     if (place.lat === 0 && place.lng === 0) {
@@ -282,30 +320,50 @@ export function LocationSearchInput({
 
             {searchResults.length > 0 && (
               <div className="py-2">
-                <p className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Search Results
+                <p className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  <span>Search Results</span>
+                  <span className="text-xs font-normal opacity-60">powered by Google</span>
                 </p>
-                {searchResults.map((result) => (
-                  <button
-                    key={result.placeId}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover-elevate text-left"
-                    onClick={() => handleSelectResult(result)}
-                    data-testid={`search-result-${result.placeId}`}
-                  >
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                      <Search className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {result.name && (
-                        <p className="font-medium truncate">{result.name}</p>
+                {fetchError && (
+                  <div className="mx-4 mb-2 p-2 bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
+                    <span className="text-xs text-destructive">{fetchError}</span>
+                  </div>
+                )}
+                {searchResults.map((result) => {
+                  const isLoading = isFetchingDetails && selectedPlaceId === result.placeId;
+                  const isDisabled = isLoading;
+                  return (
+                    <button
+                      key={result.placeId}
+                      className={`w-full flex items-center gap-3 px-4 py-3 hover-elevate text-left transition-opacity ${isLoading ? "opacity-70 bg-muted/50" : ""}`}
+                      onClick={() => handleSelectResult(result)}
+                      disabled={isDisabled}
+                      data-testid={`search-result-${result.placeId}`}
+                    >
+                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        {isLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                        ) : (
+                          <MapPin className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {result.mainText && (
+                          <p className="font-medium truncate">{result.mainText}</p>
+                        )}
+                        <p className={`text-sm truncate ${result.mainText ? "text-muted-foreground" : ""}`}>
+                          {result.secondaryText || result.address}
+                        </p>
+                      </div>
+                      {isLoading ? (
+                        <span className="text-xs text-muted-foreground animate-pulse">Loading...</span>
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                       )}
-                      <p className={`text-sm truncate ${result.name ? "text-muted-foreground" : ""}`}>
-                        {result.address}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
