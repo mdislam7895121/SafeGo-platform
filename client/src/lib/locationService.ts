@@ -60,119 +60,102 @@ function getAuthToken(): string | null {
   return localStorage.getItem("safego_token");
 }
 
-// Reverse geocode using Google Geocoding API via backend proxy
+// Reverse geocode using client-side Google Maps SDK (preferred)
+// Falls back to coordinates if SDK is not available
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
-    const token = getAuthToken();
-    const headers: Record<string, string> = { 
-      "Content-Type": "application/json" 
-    };
+    // Try client-side reverse geocoding first (works with referrer-restricted API keys)
+    const { clientReverseGeocode } = await import("@/hooks/useGoogleMaps");
+    const result = await clientReverseGeocode(lat, lng);
     
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (result?.address) {
+      console.log("[LocationService] Client-side reverse geocode successful:", result.address);
+      return result.address;
     }
     
-    const response = await fetch("/api/maps/reverse-geocode", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ lat, lng }),
-      credentials: "include",
-    });
-    
-    if (!response.ok) {
-      throw new Error("Reverse geocode failed");
-    }
-    
-    const data = await response.json();
-    return data.formattedAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    // If client-side fails, return coordinates as fallback
+    console.warn("[LocationService] Client-side reverse geocode returned no result, using coordinates");
+    return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   } catch (error) {
-    console.error("Reverse geocode error:", error);
+    console.error("[LocationService] Reverse geocode error:", error);
     return `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
   }
 }
 
-// Get reverse geocode with full details
+// Get reverse geocode with full details using client-side SDK
 export async function reverseGeocodeDetails(lat: number, lng: number): Promise<PlaceDetails | null> {
   try {
-    const token = getAuthToken();
-    const headers: Record<string, string> = { 
-      "Content-Type": "application/json" 
-    };
+    const { clientReverseGeocode } = await import("@/hooks/useGoogleMaps");
+    const result = await clientReverseGeocode(lat, lng);
     
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (result) {
+      console.log("[LocationService] Client-side reverse geocode details successful");
+      return {
+        placeId: result.placeId,
+        formattedAddress: result.address,
+        lat,
+        lng,
+        addressComponents: result.addressComponents,
+      };
     }
     
-    const response = await fetch("/api/maps/reverse-geocode", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ lat, lng }),
-      credentials: "include",
-    });
-    
-    if (!response.ok) {
-      throw new Error("Reverse geocode failed");
-    }
-    
-    const data = await response.json();
-    return {
-      placeId: data.placeId || "",
-      formattedAddress: data.formattedAddress || `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-      lat,
-      lng,
-      addressComponents: data.addressComponents || {},
-    };
+    console.warn("[LocationService] Client-side reverse geocode details returned no result");
+    return null;
   } catch (error) {
-    console.error("Reverse geocode error:", error);
+    console.error("[LocationService] Reverse geocode details error:", error);
     return null;
   }
 }
 
 // Get route directions with distance, duration, and polyline
+// Uses client-side SDK (works with referrer-restricted API keys)
+// Falls back to Haversine calculation if SDK is unavailable
 export async function getRouteDirections(
   origin: { lat: number; lng: number },
   destination: { lat: number; lng: number }
 ): Promise<RouteInfo | null> {
   try {
-    const token = getAuthToken();
-    const headers: Record<string, string> = { 
-      "Content-Type": "application/json" 
-    };
+    // Try client-side directions first (works with referrer-restricted API keys)
+    const { clientGetDirections } = await import("@/hooks/useGoogleMaps");
+    const result = await clientGetDirections(origin, destination);
     
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+    if (result) {
+      console.log("[LocationService] Client-side directions successful");
+      return {
+        distanceMiles: result.distanceMiles,
+        durationMinutes: result.durationMinutes,
+        distanceText: result.distanceText,
+        durationText: result.durationText,
+        polyline: typeof result.polyline === "string" ? result.polyline : "",
+        startAddress: result.startAddress,
+        endAddress: result.endAddress,
+        rawDistanceMeters: result.rawDistanceMeters,
+        rawDurationSeconds: result.rawDurationSeconds,
+        providerSource: "google_maps_client",
+      };
     }
     
-    const response = await fetch("/api/maps/directions", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ origin, destination }),
-      credentials: "include",
-    });
+    // Fall back to Haversine calculation
+    console.warn("[LocationService] Client-side directions failed, using Haversine fallback");
+    const haversine = calculateHaversineDistance(
+      origin.lat, origin.lng, 
+      destination.lat, destination.lng
+    );
     
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.warn("No route found between locations");
-        return null;
-      }
-      throw new Error("Failed to get directions");
-    }
-    
-    const data = await response.json();
     return {
-      distanceMiles: data.distanceMiles,
-      durationMinutes: data.durationMinutes,
-      distanceText: data.distanceText,
-      durationText: data.durationText,
-      polyline: data.polyline,
-      startAddress: data.startAddress,
-      endAddress: data.endAddress,
-      rawDistanceMeters: data.rawDistanceMeters,
-      rawDurationSeconds: data.rawDurationSeconds,
-      providerSource: data.providerSource,
+      distanceMiles: haversine.distanceMiles,
+      durationMinutes: haversine.durationMinutes,
+      distanceText: `${haversine.distanceMiles} mi`,
+      durationText: `${haversine.durationMinutes} min`,
+      polyline: "",
+      startAddress: "",
+      endAddress: "",
+      rawDistanceMeters: Math.round(haversine.distanceMiles * 1609.344),
+      rawDurationSeconds: haversine.durationMinutes * 60,
+      providerSource: "haversine_fallback",
     };
   } catch (error) {
-    console.error("Directions error:", error);
+    console.error("[LocationService] Directions error:", error);
     return null;
   }
 }
