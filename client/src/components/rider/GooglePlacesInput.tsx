@@ -75,11 +75,14 @@ export function GooglePlacesInput({
 
     // Listen for clicks on the autocomplete dropdown BEFORE place_changed fires
     // This sets the flag early so handleInputChange knows to skip processing
+    // We need to only set the flag if the click is for THIS input's autocomplete dropdown
     const handleDropdownClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      const pacContainer = target.closest('.pac-container');
       // Google's autocomplete dropdown has class "pac-container" and items have "pac-item"
-      if (target.closest('.pac-container')) {
-        console.log("[GooglePlacesInput] Dropdown clicked, setting selection flag");
+      // Only set flag if THIS input is currently focused (meaning the dropdown belongs to this input)
+      if (pacContainer && document.activeElement === inputRef.current) {
+        console.log(`[GooglePlacesInput:${variant}] Dropdown clicked, setting selection flag`);
         isSelectingRef.current = true;
       }
     };
