@@ -76,7 +76,7 @@ export default function RestaurantHome() {
     refetchInterval: 5000,
   });
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+  const { data: ordersData, isLoading: ordersLoading, isError: ordersError } = useQuery({
     queryKey: ordersKeys.list({ limit: 10 }),
     queryFn: () => apiRequest("/api/restaurant/orders?limit=10"),
     refetchInterval: 10000, // Poll every 10 seconds for live updates
@@ -677,6 +677,12 @@ export default function RestaurantHome() {
                       <Skeleton key={i} className="h-32 w-full" />
                     ))}
                   </div>
+                ) : ordersError ? (
+                  <div className="text-center py-8 text-muted-foreground" data-testid="status-fetch-error">
+                    <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-orange-500 opacity-50" />
+                    <p className="font-medium">Unable to load orders</p>
+                    <p className="text-sm mt-1">Please check your connection and try again</p>
+                  </div>
                 ) : liveOrders.length > 0 ? (
                   <div className="space-y-3">
                     {liveOrders.map((order: any) => (
@@ -909,9 +915,10 @@ export default function RestaurantHome() {
                 
                 {/* Warning if no payout method */}
                 {!hasPayoutMethod && (
-                  <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <div className="p-3 bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800 rounded-lg flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-orange-600 dark:text-orange-400 shrink-0" />
                     <p className="text-xs text-orange-700 dark:text-orange-300 font-medium">
-                      ⚠ Add a payout method to receive earnings
+                      Add a payout method to receive earnings
                     </p>
                   </div>
                 )}
@@ -960,7 +967,7 @@ export default function RestaurantHome() {
                     Ongoing Orders
                   </Button>
                 </Link>
-                <Link href="/restaurant/settings-hours">
+                <Link href="/restaurant/settings/hours">
                   <Button variant="outline" size="sm" className="w-full justify-start gap-2" data-testid="button-schedule-hours">
                     <CalendarClock className="h-4 w-4" />
                     Schedule Hours
