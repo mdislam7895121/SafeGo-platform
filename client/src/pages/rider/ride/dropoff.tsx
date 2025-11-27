@@ -126,7 +126,11 @@ export default function RideDropoffPage() {
 
   useEffect(() => {
     if (state.pickup && state.dropoff) {
+      setLocalRouteInfo(null);
+      setGoogleRoutePolyline([]);
+      setRouteData(null);
       setIsCalculatingRoute(true);
+      
       getRouteDirections(
         { lat: state.pickup.lat, lng: state.pickup.lng },
         { lat: state.dropoff.lat, lng: state.dropoff.lng }
@@ -137,7 +141,11 @@ export default function RideDropoffPage() {
             durationMinutes: routeResult.durationMinutes,
           });
           if (routeResult.polyline) {
-            setGoogleRoutePolyline(decodePolyline(routeResult.polyline));
+            try {
+              setGoogleRoutePolyline(decodePolyline(routeResult.polyline));
+            } catch {
+              setGoogleRoutePolyline([]);
+            }
           } else {
             setGoogleRoutePolyline([]);
           }
@@ -150,15 +158,8 @@ export default function RideDropoffPage() {
             providerSource: routeResult.providerSource || "google_maps",
           };
           setRouteData(newRouteData);
-        } else {
-          setLocalRouteInfo(null);
-          setGoogleRoutePolyline([]);
-          setRouteData(null);
         }
       }).catch(() => {
-        setLocalRouteInfo(null);
-        setGoogleRoutePolyline([]);
-        setRouteData(null);
       }).finally(() => {
         setIsCalculatingRoute(false);
       });
