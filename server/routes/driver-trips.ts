@@ -595,4 +595,429 @@ function getStatusValuesForType(serviceType: string, status: TripStatus): string
   }
 }
 
+type ActiveTripStatus = "accepted" | "arriving" | "arrived" | "started" | "completed" | "cancelled";
+
+interface ActiveTrip {
+  id: string;
+  serviceType: ServiceType;
+  status: ActiveTripStatus;
+  tripCode: string;
+  pickupAddress: string;
+  pickupLat: number | null;
+  pickupLng: number | null;
+  dropoffAddress: string;
+  dropoffLat: number | null;
+  dropoffLng: number | null;
+  driverLat: number | null;
+  driverLng: number | null;
+  estimatedArrivalMinutes: number;
+  estimatedTripMinutes: number;
+  distanceKm: number;
+  fare: number;
+  customer: {
+    firstName: string;
+    phone: string | null;
+  };
+  restaurantName?: string;
+  createdAt: Date;
+}
+
+const activeStatusValues = ["accepted", "arriving", "arrived", "started", "in_progress", "picked_up"];
+
+const validStatusTransitions: Record<string, string[]> = {
+  accepted: ["arriving", "cancelled"],
+  arriving: ["arrived", "cancelled"],
+  arrived: ["started", "cancelled"],
+  started: ["completed", "cancelled"],
+  in_progress: ["completed", "cancelled"],
+  picked_up: ["completed", "cancelled"],
+};
+
+const statusUpdateSchema = z.object({
+  status: z.enum(["arriving", "arrived", "started", "completed", "cancelled"]),
+  driverLat: z.number().optional(),
+  driverLng: z.number().optional(),
+  reason: z.string().optional(),
+});
+
+router.get(
+  "/active",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: { 
+          id: true, 
+          isVerified: true, 
+          verificationStatus: true, 
+          isSuspended: true,
+          currentLat: true,
+          currentLng: true,
+        },
+      });
+      
+      if (!driverProfile) {
+        return res.status(403).json({ error: "Driver profile not found" });
+      }
+      
+      if (driverProfile.isSuspended) {
+        return res.status(403).json({ error: "Account is suspended" });
+      }
+      
+      const driverId = driverProfile.id;
+
+      const activeRide = await prisma.ride.findFirst({
+        where: { 
+          driverId, 
+          status: { in: activeStatusValues },
+          isDemo: false,
+        },
+        include: {
+          customer: {
+            select: { firstName: true, phone: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (activeRide) {
+        const activeTrip: ActiveTrip = {
+          id: activeRide.id,
+          serviceType: "RIDE",
+          status: activeRide.status as ActiveTripStatus,
+          tripCode: generateTripCode("RIDE", activeRide.id),
+          pickupAddress: activeRide.pickupAddress,
+          pickupLat: activeRide.pickupLat,
+          pickupLng: activeRide.pickupLng,
+          dropoffAddress: activeRide.dropoffAddress,
+          dropoffLat: activeRide.dropoffLat,
+          dropoffLng: activeRide.dropoffLng,
+          driverLat: driverProfile.currentLat,
+          driverLng: driverProfile.currentLng,
+          estimatedArrivalMinutes: 8,
+          estimatedTripMinutes: 15,
+          distanceKm: 5.2,
+          fare: serializeDecimal(activeRide.driverPayout),
+          customer: {
+            firstName: activeRide.customer.firstName || "Customer",
+            phone: activeRide.customer.phone,
+          },
+          createdAt: activeRide.createdAt,
+        };
+        
+        return res.json({ activeTrip, hasActiveTrip: true });
+      }
+
+      const activeFoodOrder = await prisma.foodOrder.findFirst({
+        where: { 
+          driverId, 
+          status: { in: ["accepted", "picked_up", "in_transit"] },
+          isDemo: false,
+        },
+        include: {
+          customer: {
+            select: { firstName: true, phone: true },
+          },
+          restaurant: {
+            select: { restaurantName: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (activeFoodOrder) {
+        const activeTrip: ActiveTrip = {
+          id: activeFoodOrder.id,
+          serviceType: "FOOD",
+          status: activeFoodOrder.status as ActiveTripStatus,
+          tripCode: activeFoodOrder.orderCode || generateTripCode("FOOD", activeFoodOrder.id),
+          pickupAddress: activeFoodOrder.pickupAddress || activeFoodOrder.restaurant.restaurantName,
+          pickupLat: activeFoodOrder.pickupLat,
+          pickupLng: activeFoodOrder.pickupLng,
+          dropoffAddress: activeFoodOrder.deliveryAddress,
+          dropoffLat: activeFoodOrder.deliveryLat,
+          dropoffLng: activeFoodOrder.deliveryLng,
+          driverLat: driverProfile.currentLat,
+          driverLng: driverProfile.currentLng,
+          estimatedArrivalMinutes: 5,
+          estimatedTripMinutes: 12,
+          distanceKm: 3.8,
+          fare: serializeDecimal(activeFoodOrder.driverPayout),
+          customer: {
+            firstName: activeFoodOrder.customer.firstName || "Customer",
+            phone: activeFoodOrder.customer.phone,
+          },
+          restaurantName: activeFoodOrder.restaurant.restaurantName,
+          createdAt: activeFoodOrder.createdAt,
+        };
+        
+        return res.json({ activeTrip, hasActiveTrip: true });
+      }
+
+      const activeDelivery = await prisma.delivery.findFirst({
+        where: { 
+          driverId, 
+          status: { in: ["accepted", "picked_up", "in_transit"] },
+          isDemo: false,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (activeDelivery) {
+        const activeTrip: ActiveTrip = {
+          id: activeDelivery.id,
+          serviceType: "PARCEL",
+          status: activeDelivery.status as ActiveTripStatus,
+          tripCode: generateTripCode("PARCEL", activeDelivery.id),
+          pickupAddress: activeDelivery.pickupAddress,
+          pickupLat: activeDelivery.pickupLat,
+          pickupLng: activeDelivery.pickupLng,
+          dropoffAddress: activeDelivery.dropoffAddress,
+          dropoffLat: activeDelivery.dropoffLat,
+          dropoffLng: activeDelivery.dropoffLng,
+          driverLat: driverProfile.currentLat,
+          driverLng: driverProfile.currentLng,
+          estimatedArrivalMinutes: 10,
+          estimatedTripMinutes: 20,
+          distanceKm: 7.5,
+          fare: serializeDecimal(activeDelivery.driverPayout),
+          customer: {
+            firstName: activeDelivery.recipientName || "Recipient",
+            phone: activeDelivery.recipientPhone,
+          },
+          createdAt: activeDelivery.createdAt,
+        };
+        
+        return res.json({ activeTrip, hasActiveTrip: true });
+      }
+
+      res.json({ activeTrip: null, hasActiveTrip: false });
+    } catch (error: any) {
+      console.error("Error fetching active trip:", error);
+      res.status(500).json({ error: "Failed to fetch active trip" });
+    }
+  }
+);
+
+router.post(
+  "/:tripId/status",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { tripId } = req.params;
+      const { serviceType } = req.query;
+      
+      const validatedData = statusUpdateSchema.parse(req.body);
+      const { status: newStatus, driverLat, driverLng, reason } = validatedData;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: { id: true, isSuspended: true },
+      });
+      
+      if (!driverProfile) {
+        return res.status(403).json({ error: "Driver profile not found" });
+      }
+      
+      if (driverProfile.isSuspended) {
+        return res.status(403).json({ error: "Account is suspended" });
+      }
+      
+      const driverId = driverProfile.id;
+
+      let currentStatus: string | null = null;
+      let entityType: string = "trip";
+      let updateResult: any = null;
+
+      if (!serviceType || serviceType === "RIDE") {
+        const ride = await prisma.ride.findFirst({
+          where: { id: tripId, driverId, isDemo: false },
+        });
+        
+        if (ride) {
+          currentStatus = ride.status;
+          entityType = "ride";
+          
+          const allowedTransitions = validStatusTransitions[currentStatus] || [];
+          if (!allowedTransitions.includes(newStatus)) {
+            return res.status(400).json({ 
+              error: `Invalid status transition from "${currentStatus}" to "${newStatus}"`,
+              allowedTransitions,
+            });
+          }
+          
+          updateResult = await prisma.ride.update({
+            where: { id: tripId },
+            data: {
+              status: newStatus,
+              ...(newStatus === "completed" && { completedAt: new Date() }),
+            },
+          });
+        }
+      }
+
+      if (!updateResult && (!serviceType || serviceType === "FOOD")) {
+        const foodOrder = await prisma.foodOrder.findFirst({
+          where: { id: tripId, driverId, isDemo: false },
+        });
+        
+        if (foodOrder) {
+          currentStatus = foodOrder.status;
+          entityType = "food_order";
+          
+          const foodStatusFlow: Record<string, string[]> = {
+            accepted: ["arriving", "cancelled"],
+            arriving: ["arrived", "cancelled"],
+            arrived: ["started", "cancelled"],
+            started: ["completed", "cancelled"],
+            picked_up: ["completed", "cancelled"],
+            in_transit: ["completed", "cancelled"],
+          };
+          const allowedTransitions = foodStatusFlow[currentStatus] || [];
+          if (!allowedTransitions.includes(newStatus)) {
+            return res.status(400).json({ 
+              error: `Invalid status transition from "${currentStatus}" to "${newStatus}"`,
+              allowedTransitions,
+            });
+          }
+          
+          const foodStatusMap: Record<string, string> = {
+            arriving: "picked_up",
+            arrived: "picked_up",
+            started: "in_transit",
+            completed: "delivered",
+          };
+          const mappedStatus = foodStatusMap[newStatus] || newStatus;
+          
+          updateResult = await prisma.foodOrder.update({
+            where: { id: tripId },
+            data: {
+              status: mappedStatus,
+              ...(mappedStatus === "picked_up" && { pickedUpAt: new Date() }),
+              ...(mappedStatus === "delivered" && { deliveredAt: new Date(), completedAt: new Date() }),
+            },
+          });
+        }
+      }
+
+      if (!updateResult && (!serviceType || serviceType === "PARCEL")) {
+        const delivery = await prisma.delivery.findFirst({
+          where: { id: tripId, driverId, isDemo: false },
+        });
+        
+        if (delivery) {
+          currentStatus = delivery.status;
+          entityType = "delivery";
+          
+          const parcelStatusFlow: Record<string, string[]> = {
+            accepted: ["arriving", "cancelled"],
+            arriving: ["arrived", "cancelled"],
+            arrived: ["started", "cancelled"],
+            started: ["completed", "cancelled"],
+            picked_up: ["completed", "cancelled"],
+            in_transit: ["completed", "cancelled"],
+          };
+          const allowedTransitions = parcelStatusFlow[currentStatus] || [];
+          if (!allowedTransitions.includes(newStatus)) {
+            return res.status(400).json({ 
+              error: `Invalid status transition from "${currentStatus}" to "${newStatus}"`,
+              allowedTransitions,
+            });
+          }
+          
+          const deliveryStatusMap: Record<string, string> = {
+            arriving: "picked_up",
+            arrived: "picked_up",
+            started: "in_transit",
+            completed: "delivered",
+          };
+          const mappedStatus = deliveryStatusMap[newStatus] || newStatus;
+          
+          updateResult = await prisma.delivery.update({
+            where: { id: tripId },
+            data: {
+              status: mappedStatus,
+              ...(mappedStatus === "delivered" && { deliveredAt: new Date() }),
+            },
+          });
+        }
+      }
+
+      if (!updateResult) {
+        return res.status(404).json({ error: "Trip not found or not assigned to you" });
+      }
+
+      if (driverLat !== undefined && driverLng !== undefined) {
+        await prisma.driverProfile.update({
+          where: { id: driverId },
+          data: { currentLat: driverLat, currentLng: driverLng },
+        });
+      }
+
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: "",
+        actorRole: "driver",
+        actionType: "UPDATE_TRIP_STATUS",
+        entityType,
+        entityId: tripId,
+        description: `Driver updated trip status from "${currentStatus}" to "${newStatus}"`,
+        metadata: {
+          previousStatus: currentStatus,
+          newStatus,
+          driverLat,
+          driverLng,
+          reason,
+          ip: req.ip,
+        },
+      });
+
+      res.json({ 
+        success: true, 
+        previousStatus: currentStatus,
+        newStatus,
+        message: `Trip status updated to ${newStatus}`,
+      });
+    } catch (error: any) {
+      console.error("Error updating trip status:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to update trip status" });
+    }
+  }
+);
+
+router.post(
+  "/:tripId/location",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { lat, lng } = req.body;
+      
+      if (typeof lat !== "number" || typeof lng !== "number") {
+        return res.status(400).json({ error: "Invalid coordinates" });
+      }
+      
+      await prisma.driverProfile.update({
+        where: { userId },
+        data: { currentLat: lat, currentLng: lng },
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error updating driver location:", error);
+      res.status(500).json({ error: "Failed to update location" });
+    }
+  }
+);
+
 export default router;

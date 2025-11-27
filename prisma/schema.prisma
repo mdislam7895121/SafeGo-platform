@@ -270,6 +270,10 @@ model DriverProfile {
   shareTripStatus       Boolean?           @default(true)  // Share trip status with emergency contacts
   emergencyShortcutEnabled Boolean?        @default(true)  // Emergency shortcut enabled
   regionPreference      String?            @default("auto") // auto, us, bd, etc.
+  // C-3: Real-time driver location for active trips
+  currentLat            Float?             // Current driver latitude
+  currentLng            Float?             // Current driver longitude
+  lastLocationUpdate    DateTime?          // When location was last updated
   deliveries            Delivery[]
   driverComplaints      DriverComplaint[]
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)

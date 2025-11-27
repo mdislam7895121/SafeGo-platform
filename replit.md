@@ -47,8 +47,16 @@ Core systems and features include:
     - **Payout Method Status**: PENDING_VERIFICATION (for Stripe Connect), ACTIVE, DISABLED
     - Driver and Restaurant roles have consistent Add Payout Method UX with country-restricted options and dynamic form fields
 -   **Driver Systems**: Comprehensive driver profile management (multi-vehicle, encrypted KYC, document upload), public profile card, earnings & payout dashboard, promotions & incentives system, document management, support & help center, in-app training & onboarding, getting started page, vehicle center, wallet center, trip history & earnings breakdown, performance & ratings center, incentives & milestones center, and Safety Center with incident reporting and emergency toolkit.
+    - **C-3 Driver Active Trip Screen**: Uber-style active trip experience with:
+      - SafeGo Map component (Leaflet-based) with driver/pickup/dropoff markers and route polyline
+      - Trip status flow: accepted → arriving → arrived → started → completed
+      - Status chip with ETA display and passenger card
+      - Multi-map navigation options: SafeGo Map Only, Google Maps, Apple Maps, Waze
+      - Driver navigation preference integration from Settings
+      - API endpoints: GET /api/driver/trips/active, POST /api/driver/trips/:id/status
+      - Audit logging for all status transitions
     - **Driver Sidebar Navigation**: Mobile-first organized menu with 5 sections:
-      - Core (Dashboard, Trip History, Wallet, Incentives, Trust Score, Performance)
+      - Core (Dashboard, Active Trip, Trip History, Wallet, Incentives, Trust Score, Performance)
       - Account (Account hub, Documents, Vehicle)
       - Rewards (SafeGo Points, Opportunity, Refer a Friend)
       - Support (Getting Started, Training Videos, Safety Center, Support, Help Center)

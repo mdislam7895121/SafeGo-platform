@@ -1,27 +1,27 @@
-import { useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Navigation, Check } from "lucide-react";
+import { ArrowLeft, Navigation, Check, MapPin, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 const navApps = [
-  { id: "google", name: "Google Maps" },
-  { id: "waze", name: "Waze" },
-  { id: "apple", name: "Apple Maps" },
-  { id: "builtin", name: "Built-in Navigation" },
+  { id: "safego", name: "SafeGo Map Only", description: "Use in-app SafeGo Map navigation", icon: MapPin, isDefault: true },
+  { id: "google", name: "Google Maps", description: "Open turn-by-turn directions in Google Maps", icon: ExternalLink },
+  { id: "waze", name: "Waze", description: "Open navigation in Waze app", icon: ExternalLink },
+  { id: "apple", name: "Apple Maps", description: "Open navigation in Apple Maps", icon: ExternalLink },
 ];
 
 export default function NavigationSettings() {
   const { toast } = useToast();
 
-  const { data: preferences } = useQuery({
+  const { data: preferences } = useQuery<{ preferredNavigationApp?: string }>({
     queryKey: ["/api/driver/preferences"],
   });
 
-  const currentApp = preferences?.preferredNavigationApp || "google";
+  const currentApp = preferences?.preferredNavigationApp || "safego";
 
   const updateNavigationMutation = useMutation({
     mutationFn: async (preferredNavigationApp: string) => {
@@ -67,29 +67,48 @@ export default function NavigationSettings() {
       <div className="p-6 max-w-2xl mx-auto">
         <Card>
           <CardHeader>
-            <CardTitle>Navigation App</CardTitle>
-            <CardDescription>Choose your preferred navigation app</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Navigation className="h-5 w-5" />
+              Navigation Preferences
+            </CardTitle>
+            <CardDescription>
+              Choose how you want to navigate during trips. SafeGo Map shows directions in-app, 
+              while external apps open turn-by-turn navigation.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {navApps.map((app) => (
-              <button
-                key={app.id}
-                onClick={() => handleSelectNav(app.id)}
-                disabled={updateNavigationMutation.isPending}
-                className={`flex items-center gap-4 w-full p-4 rounded-lg hover-elevate active-elevate-2 ${
-                  app.id === currentApp ? "bg-primary/10 border-2 border-primary" : "border-2 border-transparent"
-                }`}
-                data-testid={`button-nav-${app.id}`}
-              >
-                <Navigation className="h-6 w-6 text-muted-foreground" />
-                <p className="font-medium flex-1 text-left">{app.name}</p>
-                {app.id === currentApp && (
-                  <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                    <Check className="h-4 w-4 text-primary-foreground" />
+            {navApps.map((app) => {
+              const Icon = app.icon;
+              return (
+                <button
+                  key={app.id}
+                  onClick={() => handleSelectNav(app.id)}
+                  disabled={updateNavigationMutation.isPending}
+                  className={`flex items-start gap-4 w-full p-4 rounded-lg hover-elevate active-elevate-2 text-left ${
+                    app.id === currentApp ? "bg-primary/10 border-2 border-primary" : "border-2 border-transparent"
+                  }`}
+                  data-testid={`button-nav-${app.id}`}
+                >
+                  <div className={`p-2 rounded-full ${app.id === currentApp ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                    <Icon className="h-5 w-5" />
                   </div>
-                )}
-              </button>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{app.name}</p>
+                      {app.isDefault && (
+                        <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">{app.description}</p>
+                  </div>
+                  {app.id === currentApp && (
+                    <div className="h-6 w-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0 mt-1">
+                      <Check className="h-4 w-4 text-primary-foreground" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </CardContent>
         </Card>
       </div>

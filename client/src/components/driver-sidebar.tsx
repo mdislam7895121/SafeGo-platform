@@ -36,6 +36,7 @@ import {
   Shield,
   BadgeCheck,
   Gift,
+  Navigation,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -74,6 +75,12 @@ const menuSections: MenuSection[] = [
         title: "Dashboard",
         icon: LayoutDashboard,
         href: "/driver/dashboard",
+      },
+      {
+        title: "Active Trip",
+        icon: Navigation,
+        href: "/driver/trip/active",
+        isNew: true,
       },
       {
         title: "Trip History",
