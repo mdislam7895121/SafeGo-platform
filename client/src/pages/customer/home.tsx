@@ -35,6 +35,7 @@ import {
   type RouteInfo,
   type PlaceDetails
 } from "@/lib/locationService";
+import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 
 const suggestionTiles = [
   { id: "ride", label: "Ride", icon: Car, color: "bg-black dark:bg-white", iconColor: "text-white dark:text-black", active: true },
@@ -443,23 +444,36 @@ export default function CustomerHome() {
                   
                   {/* Input Fields */}
                   <div className="flex-1 space-y-2">
-                    {/* Pickup Input */}
+                    {/* Pickup Input with Google Places Autocomplete */}
                     <div className="relative">
-                      <Input
-                        placeholder={isLocating ? "Detecting location..." : "Pickup location"}
+                      <GooglePlacesInput
                         value={pickupAddress}
-                        onChange={(e) => {
-                          setPickupAddress(e.target.value);
+                        onChange={(value) => {
+                          setPickupAddress(value);
                           setPickupLocation(null);
                           if (locationError) setLocationError(null);
                         }}
+                        onLocationSelect={(location) => {
+                          handleSelectPickupResult({
+                            address: location.address,
+                            lat: location.lat,
+                            lng: location.lng,
+                            placeId: location.placeId,
+                            name: location.address.split(",")[0],
+                          });
+                        }}
+                        onCurrentLocation={autoDetectLocation}
+                        isLoadingCurrentLocation={isLocating}
                         onFocus={() => {
                           setShowPickupSuggestions(true);
                           if (locationError) setLocationError(null);
                         }}
                         onBlur={() => setTimeout(() => setShowPickupSuggestions(false), 250)}
-                        className="h-12 pr-20 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500"
-                        data-testid="input-pickup"
+                        placeholder={isLocating ? "Detecting location..." : "Pickup location"}
+                        variant="pickup"
+                        showCurrentLocation={false}
+                        hideIcon={true}
+                        inputClassName="pr-16 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500"
                       />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                         {isSearchingPickup && (
@@ -605,24 +619,32 @@ export default function CustomerHome() {
                       )}
                     </div>
 
-                    {/* Destination Input */}
+                    {/* Destination Input with Google Places Autocomplete */}
                     <div className="relative">
-                      <Input
-                        placeholder="Where to?"
+                      <GooglePlacesInput
                         value={destinationAddress}
-                        onChange={(e) => {
-                          setDestinationAddress(e.target.value);
+                        onChange={(value) => {
+                          setDestinationAddress(value);
                           setDestinationLocation(null);
+                        }}
+                        onLocationSelect={(location) => {
+                          handleSelectDestResult({
+                            address: location.address,
+                            lat: location.lat,
+                            lng: location.lng,
+                            placeId: location.placeId,
+                            name: location.address.split(",")[0],
+                          });
                         }}
                         onFocus={() => setShowDestSuggestions(true)}
                         onBlur={() => setTimeout(() => setShowDestSuggestions(false), 250)}
-                        className="h-12 pr-10 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500 font-medium"
-                        data-testid="input-destination"
+                        placeholder="Where to?"
+                        variant="dropoff"
+                        showCurrentLocation={false}
+                        hideIcon={true}
+                        inputClassName="pr-10 text-sm bg-gray-100 dark:bg-gray-800 border-0 rounded-lg placeholder:text-gray-500 font-medium"
                       />
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        {isSearchingDest && (
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        )}
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 z-20">
                         <ChevronRight className="h-4 w-4 text-gray-400" />
                       </div>
                       

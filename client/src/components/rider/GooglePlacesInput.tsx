@@ -20,6 +20,10 @@ interface GooglePlacesInputProps {
   showCurrentLocation?: boolean;
   autoFocus?: boolean;
   className?: string;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  inputClassName?: string;
+  hideIcon?: boolean;
 }
 
 export function GooglePlacesInput({
@@ -33,10 +37,22 @@ export function GooglePlacesInput({
   showCurrentLocation = true,
   autoFocus = false,
   className = "",
+  onFocus,
+  onBlur,
+  inputClassName = "",
+  hideIcon = false,
 }: GooglePlacesInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [showCurrentLocationButton, setShowCurrentLocationButton] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const { isReady, isLoading: isLoadingMaps, error } = useGoogleMaps();
+
+  // Sync value prop with input element (controlled behavior)
+  useEffect(() => {
+    if (inputRef.current && inputRef.current.value !== value) {
+      inputRef.current.value = value;
+    }
+  }, [value]);
 
   const handlePlaceSelect = useCallback(
     (place: { address: string; lat: number; lng: number; placeId: string }) => {
@@ -47,8 +63,15 @@ export function GooglePlacesInput({
         lng: place.lng,
         placeId: place.placeId,
       });
-      onChange(place.address.split(",")[0]);
+      // Update the displayed value to just the short address
+      const shortAddress = place.address.split(",")[0];
+      onChange(shortAddress);
+      // Also update the input directly since Google may have modified it
+      if (inputRef.current) {
+        inputRef.current.value = shortAddress;
+      }
       setShowCurrentLocationButton(false);
+      setIsFocused(false);
     },
     [onLocationSelect, onChange]
   );
@@ -73,14 +96,18 @@ export function GooglePlacesInput({
   };
 
   const handleInputFocus = () => {
+    setIsFocused(true);
     if (showCurrentLocation) {
       setShowCurrentLocationButton(true);
     }
+    onFocus?.();
   };
 
   const handleInputBlur = () => {
     setTimeout(() => {
+      setIsFocused(false);
       setShowCurrentLocationButton(false);
+      onBlur?.();
     }, 200);
   };
 
@@ -100,11 +127,13 @@ export function GooglePlacesInput({
   return (
     <div className={`relative ${className}`}>
       <div className="relative">
-        <MapPin
-          className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 z-10 ${
-            variant === "pickup" ? "text-blue-500" : "text-red-500"
-          }`}
-        />
+        {!hideIcon && (
+          <MapPin
+            className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 z-10 ${
+              variant === "pickup" ? "text-blue-500" : "text-red-500"
+            }`}
+          />
+        )}
         <Input
           ref={inputRef}
           defaultValue={value}
@@ -112,7 +141,7 @@ export function GooglePlacesInput({
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
           placeholder={isLoadingMaps ? "Loading Google Maps..." : placeholder}
-          className="pl-10 pr-10 h-12 text-base"
+          className={`${hideIcon ? "pr-10" : "pl-10 pr-10"} h-12 text-base ${inputClassName}`}
           disabled={!isReady}
           autoComplete="off"
           data-testid={`input-${variant}-location`}
@@ -134,7 +163,7 @@ export function GooglePlacesInput({
         )}
       </div>
 
-      {showCurrentLocation && showCurrentLocationButton && isReady && (
+      {showCurrentLocation && showCurrentLocationButton && isReady && isFocused && (
         <div className="absolute top-full left-0 right-0 mt-1 z-[9999] bg-background border rounded-lg shadow-lg overflow-hidden">
           <button
             type="button"
