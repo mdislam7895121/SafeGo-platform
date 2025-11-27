@@ -1,0 +1,161 @@
+###############################################
+# SAFEGO GLOBAL MASTER RULES (MUST FOLLOW)
+###############################################
+
+1. SYSTEM STRUCTURE RULES  
+- SafeGo-এর ৪টি রোল সবসময় সক্রিয় থাকবে: Customer, Driver, Restaurant, Admin.  
+- প্রতিটি রোলের স্ক্রিন, লজিক, স্ট্যাটাস ফ্লো স্বাধীনভাবে কাজ করবে।  
+- Web + Mobile future-ready architecture বজায় থাকবে।  
+- স্টোর (rides, deliveries, food_orders) সবসময় সঠিকভাবে আপডেট হবে।
+
+2. COUNTRY RULES  
+- USA mode: No cash payments. শুধু Card, Wallet, Apple Pay (Coming soon).  
+- GPS auto-detect সবসময় অন.  
+- Payment method manually choose করা যাবে না যদি backend incomplete থাকে → show “Coming soon”.
+
+3. SECURITY RULES  
+- Sensitive flow-তে input validation, data sanitization, server-side fare calculation.  
+- Fare user কখনও manually input দিতে পারবে না।  
+- Locations, prices, payments — সব backend থেকে আসবে।  
+- Unauthorized access → auto redirect.
+
+4. STATUS FLOW RULES  
+- Customer→Ride Request→Driver Accept→On-the-way→Arrived→Trip Started→Completed.  
+- Courier flow, Food flow — future steps হিসেবে placeholder থাকবে।  
+- সব UI elements-এ data-testid থাকতে হবে।
+
+5. DESIGN RULES  
+- পুরো Customer Web App Uber-এর মতো ultra-clean UI হবে।  
+- Mobile-first responsive layout.  
+- Everything swipeable, scroll-friendly.  
+- কোনো কিছু unfinished থাকলে → “Coming soon” toast দেখাবে।
+
+6. DEVELOPMENT RULES  
+- এক স্ক্রিন শেষ করে লগ করতে হবে।  
+- Broken link কখনও থাকবে না।  
+- Bottom Tabs show হবে, কিন্তু ফিচার incomplete হলে Coming soon.  
+- Speed optimized, no large scripts.  
+- UX সর্বোচ্চ লেভেলের হবে।
+
+###############################################
+# TASK-SPECIFIC PROMPT — BUILD CUSTOMER LANDING PAGE
+###############################################
+
+Task: SafeGo Customer Web Landing Page তৈরি করো (Uber mobile web-এর মতো), নিচের section-by-section নির্দেশনা ১০০% মেনে।
+
+---------------------------------------------
+SECTION 1 — TOP HEADER
+---------------------------------------------
+- Logo: SafeGo  
+- Region: United States  
+- Right side: Profile pill (avatar + email + verified badge)  
+- Dropdown:  
+  • Profile Settings (Coming soon)  
+  • Payment Methods (Coming soon)  
+  • Sign Out (active)
+
+---------------------------------------------
+SECTION 2 — HERO: REQUEST A RIDE
+---------------------------------------------
+Layout must match Uber design.
+
+- Title: “Request a ride”
+- Pickup box:  
+  • Auto-fill: Current location  
+  • Icon: circle  
+  • Tapping → recent places + live suggestions  
+  • No manual latitude/longitude field  
+- Destination box:  
+  • Icon: square  
+  • Suggestions auto-load immediately  
+- Options row:  
+  • Pickup now  
+  • For me  
+- Payment:  
+  • Payment Method: Card ending ****4242  
+  • Change → Coming soon  
+- Button: “See prices” (black)  
+  • Uses backend fare estimator  
+  • Never allow user to enter fare manually  
+  • USA mode → no cash message shown below
+
+---------------------------------------------
+SECTION 3 — SUGGESTIONS GRID
+---------------------------------------------
+8 tiles, Uber-style icons:
+1. Ride  
+2. Reserve  
+3. Courier  
+4. Food  
+5. Grocery  
+6. Rental Cars  
+7. Shuttle  
+8. Electronics  
+
+Rules:
+- Ride → Scroll to hero  
+- Courier → /customer/delivery  
+- Food/Grocery → Coming soon modal  
+
+---------------------------------------------
+SECTION 4 — ACCOUNT & ACTIVITY
+---------------------------------------------
+- Recent ride or recent delivery card with image  
+- Past rides list → icon, address, date, time, price, See details button  
+- If no history → friendly empty state
+
+---------------------------------------------
+SECTION 5 — PLAN FOR LATER (RESERVE)
+---------------------------------------------
+- Tabs: Reserve (active), Rent (Coming soon)  
+- Two inputs: Date, Time  
+- Button: Next → Coming soon toast  
+- Info box:  
+  • Pickup time up to 90 days in advance  
+  • Extra wait time  
+  • Cancel free 60 minutes before  
+
+---------------------------------------------
+SECTION 6 — MORE FROM SAFEGO
+---------------------------------------------
+Two cards:
+1. SafeGo Eats — Coming soon  
+2. SafeGo Business — Coming soon  
+
+---------------------------------------------
+SECTION 7 — FOOTER: UPCOMING APPS
+---------------------------------------------
+- Text: “Get the SafeGo app”  
+- Two disabled buttons: App Store, Google Play  
+- Label: Coming soon  
+- Explain: Web version active during development  
+
+---------------------------------------------
+SECTION 8 — BOTTOM TAB BAR
+---------------------------------------------
+Tabs:
+- Home → /customer  
+- Activity → scroll to activity  
+- Support → /customer/support (placeholder)  
+- Profile → open dropdown  
+If feature incomplete → show Coming soon toast.
+
+---------------------------------------------
+SECTION 9 — FUNCTIONAL RULES
+---------------------------------------------
+- No blank screen  
+- No white page  
+- If any component fails → fallback UI  
+- All interactive elements → data-testid  
+- Auto GPS → must initialize  
+- Errors → graceful fallback  
+
+---------------------------------------------
+SECTION 10 — DELIVERABLE
+---------------------------------------------
+- Build the full `/customer` landing page  
+- Ensure exact structure, no deviation  
+- Show screenshot after completion  
+- Log each step as completed  
+- Maintain SafeGo rules always  
+###############################################
