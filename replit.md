@@ -86,6 +86,19 @@ Core systems and features include:
       - Phone: E.164 format with country-specific patterns (US: +1XXX format, BD: +880XXX format) with normalization and storage in canonical format
       - Date of Birth: 18+ age requirement enforced on both frontend and backend
       - License Plate: Text-only input via dedicated endpoint without image upload requirement
+-   **R-2 Rider Ride-Booking Flow**: Complete Uber-style multi-step booking experience with:
+    - **RideBookingContext**: Centralized state management for multi-step booking flow with step validation guards
+    - **RiderRoutes Component**: Hoisted provider wrapper ensuring context persistence across all rider routes
+    - **6-Step Booking Flow**: /rider/ride/new → /rider/ride/pickup → /rider/ride/dropoff → /rider/ride/options → /rider/ride/confirm → /rider/trip/active
+    - **Pickup Page**: SafeGoMap integration with GPS location, saved places, and address search
+    - **Dropoff Page**: Map-based destination selection with search autocomplete and route preview
+    - **Options Page**: Vehicle tier selection with fare estimation (Economy, Comfort, Premium)
+    - **Confirm Page**: Payment method selector (Cash, Digital Wallet) with final trip creation
+    - **Active Trip Page**: Real-time trip tracking with driver info, status polling, and map visualization
+    - **Step Guards**: Automatic redirection if booking steps are skipped
+    - **Backend Enhancements**: GET /api/rides/:id returns comprehensive driver details (name, rating, vehicle info, current location)
+    - **Testing Coverage**: 62 data-testid attributes across all booking pages for E2E testing
+    - **API Contract**: Only supported fields sent in ride creation (pickupAddress, pickupLat/Lng, dropoffAddress, dropoffLat/Lng, serviceFare, paymentMethod)
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design
