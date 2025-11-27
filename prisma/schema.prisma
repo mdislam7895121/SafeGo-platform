@@ -797,9 +797,18 @@ model Ride {
   pickupAddress    String
   pickupLat        Float?
   pickupLng        Float?
+  pickupPlaceId    String?           // Google Place ID for pickup (additive)
   dropoffAddress   String
   dropoffLat       Float?
   dropoffLng       Float?
+  dropoffPlaceId   String?           // Google Place ID for dropoff (additive)
+  // Route metrics from Google Directions API (additive fields)
+  distanceMiles    Float?            // Calculated distance in miles
+  durationMinutes  Int?              // Estimated duration in minutes
+  routePolyline    String?           // Encoded polyline for route display
+  rawDistanceMeters Int?             // Raw distance from provider in meters
+  rawDurationSeconds Int?            // Raw duration from provider in seconds
+  routeProviderSource String?        // e.g., "google_maps"
   serviceFare      Decimal           @db.Decimal(10, 2)
   safegoCommission Decimal           @db.Decimal(10, 2)
   driverPayout     Decimal           @db.Decimal(10, 2)

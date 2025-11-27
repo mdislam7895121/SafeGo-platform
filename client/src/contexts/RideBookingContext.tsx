@@ -44,10 +44,20 @@ export interface FareEstimate {
   durationMinutes: number;
 }
 
+export interface RouteData {
+  distanceMiles: number;
+  durationMinutes: number;
+  rawDistanceMeters: number;
+  rawDurationSeconds: number;
+  routePolyline: string;
+  providerSource: string;
+}
+
 export interface RideBookingState {
   step: "idle" | "pickup" | "dropoff" | "options" | "confirm" | "requesting" | "active";
   pickup: LocationData | null;
   dropoff: LocationData | null;
+  routeData: RouteData | null;
   selectedOption: RideOption | null;
   paymentMethod: PaymentMethod | null;
   promoCode: string | null;
@@ -61,6 +71,7 @@ type RideBookingAction =
   | { type: "SET_STEP"; step: RideBookingState["step"] }
   | { type: "SET_PICKUP"; pickup: LocationData }
   | { type: "SET_DROPOFF"; dropoff: LocationData }
+  | { type: "SET_ROUTE_DATA"; routeData: RouteData }
   | { type: "SET_OPTION"; option: RideOption }
   | { type: "SET_PAYMENT"; payment: PaymentMethod }
   | { type: "SET_PROMO"; code: string; valid: boolean }
@@ -74,6 +85,7 @@ const initialState: RideBookingState = {
   step: "idle",
   pickup: null,
   dropoff: null,
+  routeData: null,
   selectedOption: null,
   paymentMethod: null,
   promoCode: null,
@@ -91,6 +103,8 @@ function rideBookingReducer(state: RideBookingState, action: RideBookingAction):
       return { ...state, pickup: action.pickup, error: null };
     case "SET_DROPOFF":
       return { ...state, dropoff: action.dropoff, error: null };
+    case "SET_ROUTE_DATA":
+      return { ...state, routeData: action.routeData, error: null };
     case "SET_OPTION":
       return { ...state, selectedOption: action.option, error: null };
     case "SET_PAYMENT":
@@ -117,6 +131,7 @@ interface RideBookingContextType {
   setStep: (step: RideBookingState["step"]) => void;
   setPickup: (pickup: LocationData) => void;
   setDropoff: (dropoff: LocationData) => void;
+  setRouteData: (routeData: RouteData) => void;
   setSelectedOption: (option: RideOption) => void;
   setPaymentMethod: (payment: PaymentMethod) => void;
   setPromoCode: (code: string, valid: boolean) => void;
@@ -157,6 +172,7 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
           step: state.step,
           pickup: state.pickup,
           dropoff: state.dropoff,
+          routeData: state.routeData,
           selectedOption: state.selectedOption,
           paymentMethod: state.paymentMethod,
           promoCode: state.promoCode,
@@ -182,6 +198,10 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
 
   const setDropoff = useCallback((dropoff: LocationData) => {
     dispatch({ type: "SET_DROPOFF", dropoff });
+  }, []);
+
+  const setRouteData = useCallback((routeData: RouteData) => {
+    dispatch({ type: "SET_ROUTE_DATA", routeData });
   }, []);
 
   const setSelectedOption = useCallback((option: RideOption) => {
@@ -224,6 +244,7 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
         setStep,
         setPickup,
         setDropoff,
+        setRouteData,
         setSelectedOption,
         setPaymentMethod,
         setPromoCode,

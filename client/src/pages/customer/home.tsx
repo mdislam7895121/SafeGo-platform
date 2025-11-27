@@ -26,12 +26,17 @@ import {
 import { 
   getSavedPlaces, 
   getRecentLocations, 
-  reverseGeocode, 
+  reverseGeocode,
+  reverseGeocodeDetails,
   searchLocations,
+  getPlaceDetails,
+  getRouteDirections,
   addRecentLocation,
   type SavedPlace, 
   type RecentLocation,
-  type SearchResult
+  type SearchResult,
+  type RouteInfo,
+  type PlaceDetails
 } from "@/lib/locationService";
 
 const suggestionTiles = [
@@ -62,6 +67,15 @@ interface LocationData {
   address: string;
   lat: number;
   lng: number;
+  placeId?: string;
+  addressComponents?: {
+    streetNumber?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+  };
 }
 
 export default function CustomerHome() {
@@ -86,6 +100,9 @@ export default function CustomerHome() {
   const [destSearchResults, setDestSearchResults] = useState<SearchResult[]>([]);
   const [isSearchingPickup, setIsSearchingPickup] = useState(false);
   const [isSearchingDest, setIsSearchingDest] = useState(false);
+  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
 
   const { data: customerData, isLoading } = useQuery<{
     profile?: any;
@@ -178,10 +195,23 @@ export default function CustomerHome() {
       async (position) => {
         try {
           const { latitude, longitude } = position.coords;
-          const address = await reverseGeocode(latitude, longitude);
-          const shortAddress = address.split(",").slice(0, 2).join(",");
-          setPickupAddress(shortAddress);
-          setPickupLocation({ address, lat: latitude, lng: longitude });
+          const details = await reverseGeocodeDetails(latitude, longitude);
+          if (details) {
+            const shortAddress = details.formattedAddress.split(",").slice(0, 2).join(",").trim();
+            setPickupAddress(shortAddress);
+            setPickupLocation({
+              address: details.formattedAddress,
+              lat: latitude,
+              lng: longitude,
+              placeId: details.placeId,
+              addressComponents: details.addressComponents,
+            });
+          } else {
+            const address = await reverseGeocode(latitude, longitude);
+            const shortAddress = address.split(",").slice(0, 2).join(",").trim();
+            setPickupAddress(shortAddress);
+            setPickupLocation({ address, lat: latitude, lng: longitude });
+          }
           setLocationError(null);
         } catch {
           setPickupAddress("");
@@ -209,20 +239,92 @@ export default function CustomerHome() {
     );
   }, []);
 
-  const handleSelectPickupResult = useCallback((result: SearchResult) => {
-    setPickupAddress(result.name || result.address.split(",")[0]);
-    setPickupLocation({ address: result.address, lat: result.lat, lng: result.lng });
+  // Calculate route when both pickup and destination are set
+  useEffect(() => {
+    const calculateRoute = async () => {
+      if (!pickupLocation || !destinationLocation) {
+        setRouteInfo(null);
+        return;
+      }
+      
+      if (pickupLocation.lat === 0 || destinationLocation.lat === 0) {
+        return;
+      }
+      
+      setIsCalculatingRoute(true);
+      try {
+        const route = await getRouteDirections(
+          { lat: pickupLocation.lat, lng: pickupLocation.lng },
+          { lat: destinationLocation.lat, lng: destinationLocation.lng }
+        );
+        setRouteInfo(route);
+      } catch (error) {
+        console.error("Failed to calculate route:", error);
+        setRouteInfo(null);
+      } finally {
+        setIsCalculatingRoute(false);
+      }
+    };
+    
+    calculateRoute();
+  }, [pickupLocation, destinationLocation]);
+
+  const handleSelectPickupResult = useCallback(async (result: SearchResult) => {
     setShowPickupSuggestions(false);
     setPickupSearchResults([]);
-  }, []);
+    setIsFetchingDetails(true);
+    
+    // Display name immediately
+    setPickupAddress(result.mainText || result.name || result.address.split(",")[0]);
+    
+    try {
+      // Fetch full place details including coordinates
+      const details = await getPlaceDetails(result.placeId);
+      if (details) {
+        setPickupLocation({
+          address: details.formattedAddress,
+          lat: details.lat,
+          lng: details.lng,
+          placeId: details.placeId,
+          addressComponents: details.addressComponents,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to get place details:", error);
+      toast({ title: "Error", description: "Failed to get location details. Please try again." });
+    } finally {
+      setIsFetchingDetails(false);
+    }
+  }, [toast]);
 
-  const handleSelectDestResult = useCallback((result: SearchResult) => {
-    setDestinationAddress(result.name || result.address.split(",")[0]);
-    setDestinationLocation({ address: result.address, lat: result.lat, lng: result.lng });
+  const handleSelectDestResult = useCallback(async (result: SearchResult) => {
     setShowDestSuggestions(false);
     setDestSearchResults([]);
-    addRecentLocation({ address: result.address, lat: result.lat, lng: result.lng });
-  }, []);
+    setIsFetchingDetails(true);
+    
+    // Display name immediately
+    setDestinationAddress(result.mainText || result.name || result.address.split(",")[0]);
+    
+    try {
+      // Fetch full place details including coordinates
+      const details = await getPlaceDetails(result.placeId);
+      if (details) {
+        setDestinationLocation({
+          address: details.formattedAddress,
+          lat: details.lat,
+          lng: details.lng,
+          placeId: details.placeId,
+          addressComponents: details.addressComponents,
+        });
+        addRecentLocation({ address: details.formattedAddress, lat: details.lat, lng: details.lng });
+      }
+    } catch (error) {
+      console.error("Failed to get place details:", error);
+      toast({ title: "Error", description: "Failed to get location details. Please try again." });
+    } finally {
+      setIsFetchingDetails(false);
+    }
+  }, [toast]);
 
   const handleSelectPickupPlace = useCallback((place: SavedPlace) => {
     if (place.lat === 0 && place.lng === 0) return;
@@ -277,8 +379,17 @@ export default function CustomerHome() {
       });
       return;
     }
+    if (isFetchingDetails || isCalculatingRoute) {
+      toast({ title: "Please wait", description: "Calculating route..." });
+      return;
+    }
+    
+    // Store location and route data for ride flow
     sessionStorage.setItem("safego_ride_pickup", JSON.stringify(pickupLocation));
     sessionStorage.setItem("safego_ride_destination", JSON.stringify(destinationLocation));
+    if (routeInfo) {
+      sessionStorage.setItem("safego_ride_route", JSON.stringify(routeInfo));
+    }
     setLocation("/customer/ride");
   };
 
@@ -712,13 +823,52 @@ export default function CustomerHome() {
                   Cash payments are not available in the United States
                 </p>
 
+                {/* Route Info Display */}
+                {(routeInfo || isCalculatingRoute) && (
+                  <div 
+                    className="flex items-center justify-center gap-4 py-2 px-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+                    data-testid="route-info"
+                  >
+                    {isCalculatingRoute ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span>Calculating route...</span>
+                      </div>
+                    ) : routeInfo ? (
+                      <>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold" data-testid="text-distance">
+                            {routeInfo.distanceMiles} mi
+                          </span>
+                        </div>
+                        <div className="h-4 w-px bg-gray-300 dark:bg-gray-600" />
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-semibold" data-testid="text-eta">
+                            ~{routeInfo.durationMinutes} min
+                          </span>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+                )}
+
                 {/* See Prices Button */}
                 <Button 
                   className="w-full h-12 text-sm font-semibold rounded-lg" 
                   onClick={handleSeePrices}
+                  disabled={isFetchingDetails || isCalculatingRoute}
                   data-testid="button-see-prices"
                 >
-                  See prices
+                  {isFetchingDetails || isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Calculating...
+                    </>
+                  ) : (
+                    "See prices"
+                  )}
                 </Button>
               </div>
             </CardContent>

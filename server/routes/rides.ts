@@ -27,9 +27,18 @@ router.post("/", async (req: AuthRequest, res) => {
       pickupAddress,
       pickupLat,
       pickupLng,
+      pickupPlaceId,
       dropoffAddress,
       dropoffLat,
       dropoffLng,
+      dropoffPlaceId,
+      // Route metrics from Google Directions
+      distanceMiles,
+      durationMinutes,
+      routePolyline,
+      rawDistanceMeters,
+      rawDurationSeconds,
+      routeProviderSource,
       serviceFare,
       paymentMethod,
     } = req.body;
@@ -107,7 +116,20 @@ router.post("/", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Invalid coordinates - must be valid numbers" });
     }
 
-    // Create ride with jurisdiction and validated coordinates
+    // Parse route metrics (optional fields from Google Directions)
+    const parseOptionalNumber = (value: any): number | null => {
+      if (value === undefined || value === null || value === '') return null;
+      const parsed = typeof value === 'number' ? value : parseFloat(value);
+      return isNaN(parsed) ? null : parsed;
+    };
+    
+    const parseOptionalInt = (value: any): number | null => {
+      if (value === undefined || value === null || value === '') return null;
+      const parsed = typeof value === 'number' ? Math.round(value) : parseInt(value);
+      return isNaN(parsed) ? null : parsed;
+    };
+
+    // Create ride with jurisdiction, validated coordinates, and route metadata
     const ride = await prisma.ride.create({
       data: {
         customerId: customerProfile.id,
@@ -116,9 +138,18 @@ router.post("/", async (req: AuthRequest, res) => {
         pickupAddress,
         pickupLat: validPickupLat,
         pickupLng: validPickupLng,
+        pickupPlaceId: pickupPlaceId || null,
         dropoffAddress,
         dropoffLat: validDropoffLat,
         dropoffLng: validDropoffLng,
+        dropoffPlaceId: dropoffPlaceId || null,
+        // Route metrics from Google Directions API
+        distanceMiles: parseOptionalNumber(distanceMiles),
+        durationMinutes: parseOptionalInt(durationMinutes),
+        routePolyline: routePolyline || null,
+        rawDistanceMeters: parseOptionalInt(rawDistanceMeters),
+        rawDurationSeconds: parseOptionalInt(rawDurationSeconds),
+        routeProviderSource: routeProviderSource || null,
         serviceFare: serviceFareDecimal,
         safegoCommission,
         driverPayout,
@@ -133,6 +164,8 @@ router.post("/", async (req: AuthRequest, res) => {
         id: ride.id,
         pickupAddress: ride.pickupAddress,
         dropoffAddress: ride.dropoffAddress,
+        distanceMiles: ride.distanceMiles,
+        durationMinutes: ride.durationMinutes,
         serviceFare: ride.serviceFare,
         paymentMethod: ride.paymentMethod,
         status: ride.status,

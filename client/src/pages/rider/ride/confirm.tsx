@@ -59,9 +59,17 @@ export default function RideConfirmPage() {
           pickupAddress: state.pickup.address,
           pickupLat: state.pickup.lat,
           pickupLng: state.pickup.lng,
+          pickupPlaceId: state.pickup.placeId || null,
           dropoffAddress: state.dropoff.address,
           dropoffLat: state.dropoff.lat,
           dropoffLng: state.dropoff.lng,
+          dropoffPlaceId: state.dropoff.placeId || null,
+          distanceMiles: state.routeData?.distanceMiles || null,
+          durationMinutes: state.routeData?.durationMinutes || null,
+          routePolyline: state.routeData?.routePolyline || null,
+          rawDistanceMeters: state.routeData?.rawDistanceMeters || null,
+          rawDurationSeconds: state.routeData?.rawDurationSeconds || null,
+          routeProviderSource: state.routeData?.providerSource || null,
           serviceFare: state.selectedOption.estimatedFare,
           paymentMethod: state.paymentMethod.type === "cash" ? "cash" : "online",
         }),
@@ -119,8 +127,8 @@ export default function RideConfirmPage() {
   }
 
   const PaymentIcon = getPaymentIcon(state.paymentMethod.type);
-  const distanceKm = 5.2;
-  const durationMins = 18;
+  const distanceMiles = state.routeData?.distanceMiles ?? 0;
+  const durationMins = state.routeData?.durationMinutes ?? 0;
 
   return (
     <div className="flex flex-col h-full" data-testid="ride-confirm-page">
@@ -195,13 +203,13 @@ export default function RideConfirmPage() {
 
             <div className="flex items-center justify-between pt-3 border-t">
               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" data-testid="text-distance">
                   <Route className="h-4 w-4" />
-                  {distanceKm} km
+                  {distanceMiles > 0 ? `${distanceMiles.toFixed(1)} mi` : "--"}
                 </span>
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" data-testid="text-duration">
                   <Clock className="h-4 w-4" />
-                  ~{durationMins} min
+                  {durationMins > 0 ? `~${durationMins} min` : "--"}
                 </span>
               </div>
             </div>

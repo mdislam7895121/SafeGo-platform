@@ -11,11 +11,11 @@ import {
   Loader2,
   Check,
 } from "lucide-react";
-import { useRideBooking } from "@/contexts/RideBookingContext";
+import { useRideBooking, type RouteData } from "@/contexts/RideBookingContext";
 import { MapContainer, TileLayer, useMap, Polyline, Marker } from "react-leaflet";
 import { DraggableMarker } from "@/components/maps/DraggableMarker";
 import { LocationSearchInput } from "@/components/rider/LocationSearchInput";
-import { reverseGeocode, addRecentLocation, calculateRouteInfo } from "@/lib/locationService";
+import { reverseGeocode, addRecentLocation, getRouteDirections, decodePolyline } from "@/lib/locationService";
 import "leaflet/dist/leaflet.css";
 
 function createPickupIcon() {
@@ -96,7 +96,7 @@ function generateRoutePolyline(
 
 export default function RideDropoffPage() {
   const [, setLocation] = useLocation();
-  const { state, setDropoff, setStep, canProceedToDropoff, canProceedToOptions } = useRideBooking();
+  const { state, setDropoff, setRouteData, setStep, canProceedToDropoff, canProceedToOptions } = useRideBooking();
   
   const [searchQuery, setSearchQuery] = useState(state.dropoff?.address?.split(",")[0] || "");
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({
@@ -108,7 +108,11 @@ export default function RideDropoffPage() {
   );
   const [showMarkerAnimation, setShowMarkerAnimation] = useState(false);
   const [isReverseGeocoding, setIsReverseGeocoding] = useState(false);
-  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; etaMinutes: number } | null>(null);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const [localRouteInfo, setLocalRouteInfo] = useState<{ distanceMiles: number; durationMinutes: number } | null>(
+    state.routeData ? { distanceMiles: state.routeData.distanceMiles, durationMinutes: state.routeData.durationMinutes } : null
+  );
+  const [googleRoutePolyline, setGoogleRoutePolyline] = useState<[number, number][]>([]);
 
   const pickupIcon = useMemo(() => createPickupIcon(), []);
 
@@ -122,17 +126,40 @@ export default function RideDropoffPage() {
 
   useEffect(() => {
     if (state.pickup && state.dropoff) {
-      const info = calculateRouteInfo(
-        state.pickup.lat,
-        state.pickup.lng,
-        state.dropoff.lat,
-        state.dropoff.lng
-      );
-      setRouteInfo(info);
+      setIsCalculatingRoute(true);
+      getRouteDirections(
+        { lat: state.pickup.lat, lng: state.pickup.lng },
+        { lat: state.dropoff.lat, lng: state.dropoff.lng }
+      ).then((routeResult) => {
+        if (routeResult) {
+          setLocalRouteInfo({
+            distanceMiles: routeResult.distanceMiles,
+            durationMinutes: routeResult.durationMinutes,
+          });
+          if (routeResult.polyline) {
+            setGoogleRoutePolyline(decodePolyline(routeResult.polyline));
+          }
+          const newRouteData: RouteData = {
+            distanceMiles: routeResult.distanceMiles,
+            durationMinutes: routeResult.durationMinutes,
+            rawDistanceMeters: routeResult.rawDistanceMeters || 0,
+            rawDurationSeconds: routeResult.rawDurationSeconds || 0,
+            routePolyline: routeResult.polyline || "",
+            providerSource: routeResult.providerSource || "google_maps",
+          };
+          setRouteData(newRouteData);
+        } else {
+          setLocalRouteInfo(null);
+          setGoogleRoutePolyline([]);
+        }
+      }).finally(() => {
+        setIsCalculatingRoute(false);
+      });
     } else {
-      setRouteInfo(null);
+      setLocalRouteInfo(null);
+      setGoogleRoutePolyline([]);
     }
-  }, [state.pickup, state.dropoff]);
+  }, [state.pickup, state.dropoff, setRouteData]);
 
   const updateLocationFromCoords = useCallback(async (lat: number, lng: number, animate = true) => {
     if (animate) setShowMarkerAnimation(true);
@@ -177,9 +204,10 @@ export default function RideDropoffPage() {
     setLocation("/rider/ride/pickup");
   };
 
-  const routePolyline = state.pickup && state.dropoff
+  const fallbackPolyline = state.pickup && state.dropoff
     ? generateRoutePolyline(state.pickup, state.dropoff)
     : [];
+  const routePolyline = googleRoutePolyline.length > 0 ? googleRoutePolyline : fallbackPolyline;
 
   return (
     <div className="flex flex-col h-full" data-testid="ride-dropoff-page">
@@ -308,7 +336,7 @@ export default function RideDropoffPage() {
           </div>
         </div>
 
-        {routeInfo && (
+        {localRouteInfo && (
           <div 
             className="absolute top-4 right-4 z-[1000] bg-background/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border"
             data-testid="route-info-overlay"
@@ -316,14 +344,14 @@ export default function RideDropoffPage() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1.5">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span className="font-bold" data-testid="text-route-eta">{routeInfo.etaMinutes}</span>
+                <span className="font-bold" data-testid="text-route-eta">{localRouteInfo.durationMinutes}</span>
                 <span className="text-xs text-muted-foreground">min</span>
               </div>
               <div className="h-4 w-px bg-border" />
               <div className="flex items-center gap-1.5">
                 <Ruler className="h-4 w-4 text-muted-foreground" />
-                <span className="font-bold" data-testid="text-route-distance">{routeInfo.distanceKm}</span>
-                <span className="text-xs text-muted-foreground">km</span>
+                <span className="font-bold" data-testid="text-route-distance">{localRouteInfo.distanceMiles.toFixed(1)}</span>
+                <span className="text-xs text-muted-foreground">mi</span>
               </div>
             </div>
           </div>
@@ -362,15 +390,15 @@ export default function RideDropoffPage() {
                   >
                     {state.dropoff.address}
                   </p>
-                  {routeInfo && (
+                  {localRouteInfo && (
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {routeInfo.etaMinutes} min
+                        {localRouteInfo.durationMinutes} min
                       </span>
                       <span className="flex items-center gap-1">
                         <Ruler className="h-3 w-3" />
-                        {routeInfo.distanceKm} km
+                        {localRouteInfo.distanceMiles.toFixed(1)} mi
                       </span>
                     </div>
                   )}
