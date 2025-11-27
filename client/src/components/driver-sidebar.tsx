@@ -77,10 +77,15 @@ const menuSections: MenuSection[] = [
         href: "/driver/dashboard",
       },
       {
+        title: "Go Online",
+        icon: Target,
+        href: "/driver/trip-requests",
+        isNew: true,
+      },
+      {
         title: "Active Trip",
         icon: Navigation,
         href: "/driver/trip/active",
-        isNew: true,
       },
       {
         title: "Trip History",

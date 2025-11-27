@@ -109,6 +109,7 @@ import DriverSafetyDetail from "@/pages/driver/safety-detail";
 import DriverSafetyEmergency from "@/pages/driver/safety-emergency";
 import DriverTrustScore from "@/pages/driver/trust-score";
 import DriverTripActive from "@/pages/driver/trip-active";
+import DriverTripRequests from "@/pages/driver/trip-requests";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -567,6 +568,11 @@ function Router() {
           <DriverLayout pageTitle="Active Trip">
             <DriverTripActive />
           </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/trip-requests">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverTripRequests />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/trips/:tripId">
