@@ -71,14 +71,29 @@ function isClient(): boolean {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
+// Get auth token from localStorage
+function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("safego_token");
+}
+
 // Search locations using Google Places Autocomplete via backend proxy
 export async function searchLocations(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
   if (!query || query.length < 2) return [];
   
   try {
+    const token = getAuthToken();
+    const headers: Record<string, string> = { 
+      "Content-Type": "application/json" 
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const response = await fetch("/api/maps/autocomplete", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ input: query }),
       credentials: "include",
       signal,
@@ -116,9 +131,18 @@ export async function searchLocations(query: string, signal?: AbortSignal): Prom
 // Get full place details including coordinates
 export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
   try {
+    const token = getAuthToken();
+    const headers: Record<string, string> = { 
+      "Content-Type": "application/json" 
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const response = await fetch("/api/maps/place-details", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ 
         placeId, 
         sessionToken: currentSessionToken 
@@ -150,9 +174,18 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
 // Reverse geocode using Google Geocoding API via backend proxy
 export async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
+    const token = getAuthToken();
+    const headers: Record<string, string> = { 
+      "Content-Type": "application/json" 
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const response = await fetch("/api/maps/reverse-geocode", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ lat, lng }),
       credentials: "include",
     });
@@ -172,9 +205,18 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string> 
 // Get reverse geocode with full details
 export async function reverseGeocodeDetails(lat: number, lng: number): Promise<PlaceDetails | null> {
   try {
+    const token = getAuthToken();
+    const headers: Record<string, string> = { 
+      "Content-Type": "application/json" 
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const response = await fetch("/api/maps/reverse-geocode", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ lat, lng }),
       credentials: "include",
     });
@@ -203,9 +245,18 @@ export async function getRouteDirections(
   destination: { lat: number; lng: number }
 ): Promise<RouteInfo | null> {
   try {
+    const token = getAuthToken();
+    const headers: Record<string, string> = { 
+      "Content-Type": "application/json" 
+    };
+    
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+    
     const response = await fetch("/api/maps/directions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ origin, destination }),
       credentials: "include",
     });

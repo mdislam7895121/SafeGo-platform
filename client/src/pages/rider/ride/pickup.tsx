@@ -14,7 +14,7 @@ import {
 import { useRideBooking, type LocationData } from "@/contexts/RideBookingContext";
 import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import { DraggableMarker } from "@/components/maps/DraggableMarker";
-import { LocationSearchInput } from "@/components/rider/LocationSearchInput";
+import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { reverseGeocode, addRecentLocation } from "@/lib/locationService";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import "leaflet/dist/leaflet.css";
@@ -210,7 +210,7 @@ export default function RidePickupPage() {
             </div>
           </div>
 
-          <LocationSearchInput
+          <GooglePlacesInput
             value={searchQuery}
             onChange={setSearchQuery}
             onLocationSelect={handleLocationSelect}

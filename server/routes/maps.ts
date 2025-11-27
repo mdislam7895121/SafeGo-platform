@@ -49,7 +49,23 @@ function checkRateLimit(userId: string): boolean {
   return true;
 }
 
-// All routes require authentication
+// ====================================================
+// GET /api/maps/config
+// Get Maps configuration for frontend JavaScript SDK
+// The API key has HTTP referrer restrictions for browser-only use
+// ====================================================
+router.get("/config", (req, res) => {
+  if (!GOOGLE_MAPS_API_KEY) {
+    return res.status(503).json({ error: "Maps service not configured" });
+  }
+  
+  res.json({
+    apiKey: GOOGLE_MAPS_API_KEY,
+    libraries: ["places"],
+  });
+});
+
+// All other routes require authentication
 router.use(authenticateToken);
 
 // ====================================================
