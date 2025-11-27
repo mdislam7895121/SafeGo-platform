@@ -1,0 +1,163 @@
+SafeGo – Rider Request Ride Screen (R3) Refactor – Uber-style address flow (US phase)
+
+You are working on the SafeGo multi-tenant platform (rider + driver + restaurant + admin + parcel). Follow these rules strictly:
+
+GLOBAL RULES (do not skip)
+1) Do NOT break or change any existing driver, restaurant, or admin features. Only update the rider "Request Ride" flow.
+2) Keep all security hardening already in place (auth, KYC gating, headers, audit logs, OTP/2FA, etc.).
+3) Preserve all existing API contracts and database schemas. If you must change anything, use backwards-compatible patterns and confirm with the “architect review” in your reasoning.
+4) Keep all existing data-testid attributes and extend them where needed for new UI elements.
+5) Respect country-specific behavior:
+   - USA: NO cash option in rider app for rides.
+   - Bangladesh: cash may exist later; do not delete enums or backend support, only hide in US UI.
+6) Do not add new external map libraries. Reuse the existing map / cartographer abstraction already configured in the project.
+
+TASK CONTEXT
+We are refactoring the Rider “Request Ride” screen to behave like Uber’s “Plan your ride” panel.
+
+Current route: /customer/ride  
+Current problem: The screen is a long form with:
+- Address, latitude, longitude fields for pickup and dropoff
+- “Fare Amount” input
+- “Payment Method” dropdown including cash
+This is not user-friendly or professional. We want a simple, map-driven address panel.
+
+HIGH-LEVEL GOAL
+Transform /customer/ride into an Uber-style, highly professional rider request screen that:
+- Only asks for Pickup and Dropoff locations
+- Auto-fills Pickup with the user’s current location
+- Shows smart suggestions under the fields
+- Does NOT ask rider to type fare
+- Does NOT show cash option for US riders
+- Is fully wired to the existing backend request/estimate flow
+
+DETAILED REQUIREMENTS
+
+1) Layout & UX structure
+- Keep the route /customer/ride and existing page component file (for example client/src/pages/rider/ride.tsx or similar – use the actual path in the repo).
+- Top app bar:
+  - Back arrow (navigates back to rider home R1/R3).
+  - Title: “Plan your ride”.
+- Main content:
+  - A floating card over the map, similar to Uber:
+    - Row 1: “Pickup” field
+    - Row 2: “Dropoff” field
+    - Underneath: suggestions list (recent / saved / frequent places).
+  - Background: current map component showing the city and updating when locations change.
+
+2) Pickup field behavior
+- Replace the existing pickup Address + latitude + longitude fields with ONE main input:
+  - Label: “Pickup location”
+  - Placeholder: “Current location”
+- On page load:
+  - Try browser geolocation (navigator.geolocation or the existing project helper).
+  - If permission granted:
+    - Set pickup to the rider’s current coordinates and a resolved human-readable address (using existing geocoding utilities if available).
+    - Show text like “Current location • [Street, City]”.
+  - If permission denied or fails:
+    - Leave input empty with placeholder “Set pickup location”.
+- Pickup field must be editable:
+  - When rider types, show location search suggestions (see section 4).
+- Remove any visible latitude/longitude inputs from the UI. Coordinates should be handled internally only.
+
+3) Dropoff (“Where to?”) field behavior
+- Replace the old dropoff Address + latitude + longitude with ONE main input:
+  - Label: “Dropoff location”
+  - Placeholder: “Where to?”
+- When focused:
+  - Immediately show suggestion list (recent/saved/popular locations).
+  - As the user types, filter / request address suggestions (using the existing search/geocoder or mock suggestions if backend not ready).
+- Once a suggestion is chosen, update:
+  - Dropoff input text with the chosen address.
+  - Map to show route from pickup to dropoff (reuse existing routing code if already implemented; otherwise, at minimum show two pins).
+
+4) Suggestions panel (under the fields)
+- Create a suggestion area similar to Uber:
+  - Section order:
+    1) “Home” (if rider has a saved home in profile; otherwise, hide or show “Add Home” placeholder).
+    2) “Work” (if available; otherwise similar placeholder).
+    3) “Recent places” (from recent trips).
+    4) “Saved places” (favourites).
+- If we don’t yet have real data sources:
+  - Use existing demo data / seed data that is already used elsewhere in the rider app.
+- Interaction:
+  - Tapping a suggestion while pickup is empty → Use as Dropoff and keep Pickup = current location.
+  - Tapping a suggestion while both fields are empty:
+    - If suggestion is “Home” or “Work” etc., treat as Dropoff (since Pickup will be current location).
+  - Tapping while Dropoff already set should update Dropoff with the new selection.
+
+5) Fare and payment behavior
+- Remove the “Fare Amount” input from the UI completely.
+  - Fare must be computed by backend using existing pricing logic after both locations are set.
+  - If needed, call the price estimate API once pickup and dropoff are valid and show the estimate in a small “Estimated fare” section below the card (read-only).
+- Payment Method:
+  - DO NOT show payment method selector on this screen for the US phase.
+  - The rider’s default payment method for the US should be used automatically (card / wallet / etc.).
+  - Keep backend PaymentMethod enums intact (including CASH) but:
+    - For US riders: ensure “cash” is never selectable.
+    - If there is a shared UI component, pass a prop like allowCash={country !== 'US'}.
+- If the project already has a separate “Confirm & pay” step, use that; otherwise:
+  - After clicking “Request Ride”, navigate to the existing confirmation/summary page where we can show:
+    - Driver ETA, estimated fare, and chosen payment method.
+
+6) Request Ride button and validation
+- Keep a single primary button at the bottom of the card:
+  - Label: “Request ride”.
+- Enable the button only when:
+  - pickup location is set (coords + address), AND
+  - dropoff location is set.
+- On click:
+  - Call existing backend endpoint to create a ride request or draft as already implemented.
+  - Include:
+    - pickup coordinates + address
+    - dropoff coordinates + address
+    - rider ID
+    - chosen service type (default “Ride” from tab context)
+    - platform type = “web”.
+- Handle errors gracefully:
+  - If backend fails, show a toast or inline error: “Couldn’t request a ride. Please try again.”
+- Add/extend data-testid attributes for:
+  - pickup input
+  - dropoff input
+  - each suggestion item
+  - request ride button
+  - error messages
+
+7) Map integration
+- Use existing map component (Cartographer / Map / MapCanvas – whatever the repo is already using).
+- Requirements:
+  - Show a pin for pickup once resolved.
+  - Show a pin for dropoff once set.
+  - Optionally draw route polyline if existing utilities are already present.
+- Do NOT add new third-party map SDKs.
+
+8) Country-specific behavior (US vs others)
+- Rider’s country must already be known from profile or KYC.
+- For this task:
+  - Implement the US behavior fully (no cash, estimate from backend, no fare input).
+  - For non-US:
+    - Keep current behavior as close as possible, but still remove the fare amount input.
+    - Leave room for a future “Payment method chooser” step; do NOT hard-remove any support in backend.
+
+9) Code quality, tests, and safety
+- Keep existing TypeScript types and extend them if needed with minimal changes.
+- Ensure no console errors or React warnings on /customer/ride.
+- Update or add tests (unit/component) if the project is already using a testing framework:
+  - Test that “Request ride” button stays disabled until both locations set.
+  - Test that US riders never see “Cash” in payment options (if any UI remains).
+- Keep the system consistent with prior security measures (rate limiting, audit logging etc.). If the ride request endpoint already writes audit logs, do not change that behavior.
+
+10) Final verification
+- After implementation:
+  - Restart the app and test /customer/ride end-to-end:
+    - With geolocation allowed.
+    - With geolocation denied.
+  - Confirm:
+    - Pickup auto-fills with current location when possible.
+    - Dropoff field shows and filters suggestions.
+    - No fare field is visible.
+    - No cash option is visible anywhere in this flow for US.
+    - Clicking “Request ride” creates or simulates a ride without errors.
+  - Take a screenshot of the final Rider “Plan your ride” screen and summarize the changes.
+
+When you are done, clearly state that the R3 Rider Request Ride screen has been refactored to the Uber-style flow and is ready for review.
