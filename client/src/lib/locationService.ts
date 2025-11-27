@@ -1,16 +1,3 @@
-import { apiRequest } from "./queryClient";
-
-export interface SearchResult {
-  placeId: string;
-  address: string;
-  name?: string;
-  mainText?: string;
-  secondaryText?: string;
-  lat: number;
-  lng: number;
-  type?: string;
-}
-
 export interface PlaceDetails {
   placeId: string;
   name?: string;
@@ -64,111 +51,13 @@ const SAVED_PLACES_KEY = "safego_saved_places";
 const RECENT_LOCATIONS_KEY = "safego_recent_locations";
 const MAX_RECENT_LOCATIONS = 10;
 
-// Session token for Google Places API billing optimization
-let currentSessionToken: string | null = null;
-
 function isClient(): boolean {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";
 }
 
-// Get auth token from localStorage
 function getAuthToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("safego_token");
-}
-
-// Search locations using Google Places Autocomplete via backend proxy
-export async function searchLocations(query: string, signal?: AbortSignal): Promise<SearchResult[]> {
-  if (!query || query.length < 2) return [];
-  
-  try {
-    const token = getAuthToken();
-    const headers: Record<string, string> = { 
-      "Content-Type": "application/json" 
-    };
-    
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-    
-    const response = await fetch("/api/maps/autocomplete", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ input: query }),
-      credentials: "include",
-      signal,
-    });
-    
-    if (!response.ok) {
-      if (response.status === 401) {
-        console.warn("Location search requires authentication");
-        return [];
-      }
-      throw new Error("Search failed");
-    }
-    
-    const data = await response.json();
-    currentSessionToken = data.sessionToken;
-    
-    // Return predictions without coordinates (need place-details for coords)
-    return (data.predictions || []).map((p: any) => ({
-      placeId: p.placeId,
-      address: p.description,
-      name: p.mainText,
-      mainText: p.mainText,
-      secondaryText: p.secondaryText,
-      lat: 0, // Will be fetched from place-details
-      lng: 0,
-      type: p.types?.[0],
-    }));
-  } catch (error: any) {
-    if (error.name === "AbortError") return [];
-    console.error("Location search error:", error);
-    return [];
-  }
-}
-
-// Get full place details including coordinates
-export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
-  try {
-    const token = getAuthToken();
-    const headers: Record<string, string> = { 
-      "Content-Type": "application/json" 
-    };
-    
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-    
-    const response = await fetch("/api/maps/place-details", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ 
-        placeId, 
-        sessionToken: currentSessionToken 
-      }),
-      credentials: "include",
-    });
-    
-    if (!response.ok) {
-      throw new Error("Failed to get place details");
-    }
-    
-    const data = await response.json();
-    currentSessionToken = null; // Clear after place selection
-    
-    return {
-      placeId: data.placeId,
-      name: data.name,
-      formattedAddress: data.formattedAddress,
-      lat: data.lat,
-      lng: data.lng,
-      addressComponents: data.addressComponents || {},
-    };
-  } catch (error) {
-    console.error("Place details error:", error);
-    return null;
-  }
 }
 
 // Reverse geocode using Google Geocoding API via backend proxy

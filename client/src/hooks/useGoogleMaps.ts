@@ -1,118 +1,91 @@
 /// <reference types="@types/google.maps" />
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 declare global {
   interface Window {
     google: typeof google;
-    initGoogleMapsCallback: () => void;
+    initGoogleMapsCallback?: () => void;
+    googleMapsLoaded?: boolean;
   }
 }
 
-interface GoogleMapsConfig {
-  apiKey: string;
-  libraries: string[];
-}
+let loadPromise: Promise<void> | null = null;
+let isLoaded = false;
 
-interface UseGoogleMapsResult {
-  isLoaded: boolean;
-  isLoading: boolean;
-  error: string | null;
-  google: typeof google | null;
-}
-
-let googleMapsPromise: Promise<void> | null = null;
-let isGoogleMapsLoaded = false;
-
-async function fetchMapsConfig(): Promise<GoogleMapsConfig | null> {
-  try {
-    const response = await fetch("/api/maps/config");
-    if (!response.ok) {
-      throw new Error("Failed to fetch maps config");
-    }
-    return response.json();
-  } catch (error) {
-    console.error("Error fetching maps config:", error);
-    return null;
+async function loadGoogleMapsSDK(): Promise<void> {
+  if (isLoaded && window.google?.maps?.places) {
+    return Promise.resolve();
   }
-}
 
-function loadGoogleMapsScript(apiKey: string, libraries: string[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (isGoogleMapsLoaded && window.google?.maps) {
-      resolve();
-      return;
-    }
+  if (loadPromise) {
+    return loadPromise;
+  }
 
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-    if (existingScript) {
-      if (window.google?.maps) {
-        isGoogleMapsLoaded = true;
-        resolve();
-      } else {
-        window.initGoogleMapsCallback = () => {
-          isGoogleMapsLoaded = true;
-          resolve();
-        };
+  loadPromise = new Promise(async (resolve, reject) => {
+    try {
+      const response = await fetch("/api/maps/config");
+      if (!response.ok) {
+        throw new Error("Failed to fetch maps config");
       }
-      return;
+      const config = await response.json();
+      const apiKey = config.apiKey;
+
+      if (!apiKey) {
+        throw new Error("No API key available");
+      }
+
+      const existingScript = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]');
+      if (existingScript) {
+        if (window.google?.maps?.places) {
+          isLoaded = true;
+          resolve();
+          return;
+        }
+        existingScript.remove();
+      }
+
+      window.initGoogleMapsCallback = () => {
+        isLoaded = true;
+        window.googleMapsLoaded = true;
+        console.log("[GoogleMaps] SDK loaded successfully with Places library");
+        resolve();
+      };
+
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGoogleMapsCallback`;
+      script.async = true;
+      script.defer = true;
+      script.onerror = (e) => {
+        console.error("[GoogleMaps] Failed to load SDK:", e);
+        reject(new Error("Failed to load Google Maps SDK"));
+      };
+
+      document.head.appendChild(script);
+      console.log("[GoogleMaps] Loading SDK with Places library...");
+    } catch (error) {
+      console.error("[GoogleMaps] Error loading SDK:", error);
+      reject(error);
     }
-
-    window.initGoogleMapsCallback = () => {
-      isGoogleMapsLoaded = true;
-      resolve();
-    };
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=${libraries.join(",")}&callback=initGoogleMapsCallback`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = () => {
-      reject(new Error("Failed to load Google Maps script"));
-    };
-
-    document.head.appendChild(script);
   });
+
+  return loadPromise;
 }
 
-export function useGoogleMaps(): UseGoogleMapsResult {
-  const [isLoaded, setIsLoaded] = useState(isGoogleMapsLoaded);
+export function useGoogleMaps() {
+  const [isReady, setIsReady] = useState(isLoaded && !!window.google?.maps?.places);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const initRef = useRef(false);
 
   useEffect(() => {
-    if (initRef.current) return;
-    initRef.current = true;
-
-    if (isGoogleMapsLoaded && window.google?.maps) {
-      setIsLoaded(true);
-      return;
-    }
-
-    if (googleMapsPromise) {
-      googleMapsPromise
-        .then(() => {
-          setIsLoaded(true);
-        })
-        .catch((err) => {
-          setError(err.message);
-        });
+    if (isLoaded && window.google?.maps?.places) {
+      setIsReady(true);
       return;
     }
 
     setIsLoading(true);
-
-    googleMapsPromise = (async () => {
-      const config = await fetchMapsConfig();
-      if (!config) {
-        throw new Error("Maps configuration not available");
-      }
-      await loadGoogleMapsScript(config.apiKey, config.libraries);
-    })();
-
-    googleMapsPromise
+    loadGoogleMapsSDK()
       .then(() => {
-        setIsLoaded(true);
+        setIsReady(true);
         setIsLoading(false);
       })
       .catch((err) => {
@@ -121,117 +94,86 @@ export function useGoogleMaps(): UseGoogleMapsResult {
       });
   }, []);
 
-  return {
-    isLoaded,
-    isLoading,
-    error,
-    google: isLoaded ? window.google : null,
-  };
+  return { isReady, isLoading, error };
 }
 
-interface UsePlacesAutocompleteOptions {
-  inputRef: React.RefObject<HTMLInputElement>;
-  onPlaceSelect: (place: {
-    address: string;
-    lat: number;
-    lng: number;
-    placeId: string;
-    addressComponents?: {
-      streetNumber?: string;
-      street?: string;
-      city?: string;
-      state?: string;
-      postalCode?: string;
-      country?: string;
-    };
-  }) => void;
-  options?: google.maps.places.AutocompleteOptions;
+interface PlaceResult {
+  address: string;
+  lat: number;
+  lng: number;
+  placeId: string;
 }
 
-export function usePlacesAutocomplete({
-  inputRef,
-  onPlaceSelect,
-  options = {},
-}: UsePlacesAutocompleteOptions) {
-  const { isLoaded, error } = useGoogleMaps();
+export function useGooglePlacesAutocomplete(
+  inputRef: React.RefObject<HTMLInputElement>,
+  onPlaceSelect: (place: PlaceResult) => void,
+  options?: {
+    types?: string[];
+    componentRestrictions?: { country: string | string[] };
+  }
+) {
+  const { isReady, error } = useGoogleMaps();
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const listenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const onPlaceSelectRef = useRef(onPlaceSelect);
 
-  useEffect(() => {
-    if (!isLoaded || !inputRef.current || autocompleteRef.current) return;
+  onPlaceSelectRef.current = onPlaceSelect;
 
-    const defaultOptions: google.maps.places.AutocompleteOptions = {
-      fields: ["formatted_address", "geometry", "place_id", "address_components"],
-      componentRestrictions: { country: "us" },
-      ...options,
-    };
+  const initAutocomplete = useCallback(() => {
+    if (!inputRef.current || !window.google?.maps?.places) {
+      return;
+    }
 
-    const autocomplete = new window.google.maps.places.Autocomplete(
-      inputRef.current,
-      defaultOptions
-    );
+    if (autocompleteRef.current) {
+      return;
+    }
+
+    console.log("[GooglePlaces] Initializing Autocomplete widget...");
+
+    const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+      fields: ["formatted_address", "geometry", "place_id", "name"],
+      types: options?.types || ["geocode", "establishment"],
+      componentRestrictions: options?.componentRestrictions || { country: "us" },
+    });
 
     autocompleteRef.current = autocomplete;
 
     listenerRef.current = autocomplete.addListener("place_changed", () => {
       const place = autocomplete.getPlace();
+      console.log("[GooglePlaces] Place selected:", place);
 
       if (!place.geometry?.location) {
-        console.warn("No geometry for selected place");
+        console.warn("[GooglePlaces] No geometry for selected place");
         return;
       }
 
-      const addressComponents: {
-        streetNumber?: string;
-        street?: string;
-        city?: string;
-        state?: string;
-        postalCode?: string;
-        country?: string;
-      } = {};
-
-      place.address_components?.forEach((component) => {
-        const types = component.types;
-        if (types.includes("street_number")) {
-          addressComponents.streetNumber = component.long_name;
-        }
-        if (types.includes("route")) {
-          addressComponents.street = component.long_name;
-        }
-        if (types.includes("locality")) {
-          addressComponents.city = component.long_name;
-        }
-        if (types.includes("administrative_area_level_1")) {
-          addressComponents.state = component.short_name;
-        }
-        if (types.includes("postal_code")) {
-          addressComponents.postalCode = component.long_name;
-        }
-        if (types.includes("country")) {
-          addressComponents.country = component.short_name;
-        }
-      });
-
-      onPlaceSelect({
-        address: place.formatted_address || "",
+      const result: PlaceResult = {
+        address: place.formatted_address || place.name || "",
         lat: place.geometry.location.lat(),
         lng: place.geometry.location.lng(),
         placeId: place.place_id || "",
-        addressComponents,
-      });
+      };
+
+      console.log("[GooglePlaces] Calling onPlaceSelect with:", result);
+      onPlaceSelectRef.current(result);
     });
 
+    console.log("[GooglePlaces] Autocomplete initialized successfully");
+  }, [inputRef, options?.types, options?.componentRestrictions]);
+
+  useEffect(() => {
+    if (isReady && inputRef.current) {
+      initAutocomplete();
+    }
+
     return () => {
-      if (listenerRef.current) {
+      if (listenerRef.current && window.google?.maps?.event) {
         window.google.maps.event.removeListener(listenerRef.current);
         listenerRef.current = null;
       }
+      autocompleteRef.current = null;
     };
-  }, [isLoaded, inputRef, onPlaceSelect, options]);
+  }, [isReady, initAutocomplete]);
 
-  return {
-    isLoaded,
-    error,
-    autocomplete: autocompleteRef.current,
-  };
+  return { isReady, error, autocomplete: autocompleteRef.current };
 }

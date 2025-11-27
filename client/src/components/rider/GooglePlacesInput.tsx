@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin, Loader2, X, Navigation } from "lucide-react";
-import { usePlacesAutocomplete, useGoogleMaps } from "@/hooks/useGoogleMaps";
+import { useGooglePlacesAutocomplete, useGoogleMaps } from "@/hooks/useGoogleMaps";
 
 interface GooglePlacesInputProps {
   value: string;
@@ -35,16 +35,12 @@ export function GooglePlacesInput({
   className = "",
 }: GooglePlacesInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [isFocused, setIsFocused] = useState(false);
-  const { isLoaded, isLoading: isLoadingMaps, error } = useGoogleMaps();
+  const [showCurrentLocationButton, setShowCurrentLocationButton] = useState(false);
+  const { isReady, isLoading: isLoadingMaps, error } = useGoogleMaps();
 
   const handlePlaceSelect = useCallback(
-    (place: {
-      address: string;
-      lat: number;
-      lng: number;
-      placeId: string;
-    }) => {
+    (place: { address: string; lat: number; lng: number; placeId: string }) => {
+      console.log("[GooglePlacesInput] Place selected:", place);
       onLocationSelect({
         address: place.address,
         lat: place.lat,
@@ -52,34 +48,40 @@ export function GooglePlacesInput({
         placeId: place.placeId,
       });
       onChange(place.address.split(",")[0]);
-      setIsFocused(false);
+      setShowCurrentLocationButton(false);
     },
     [onLocationSelect, onChange]
   );
 
-  usePlacesAutocomplete({
-    inputRef,
-    onPlaceSelect: handlePlaceSelect,
-    options: {
-      componentRestrictions: { country: "us" },
-      types: ["geocode", "establishment"],
-    },
+  useGooglePlacesAutocomplete(inputRef, handlePlaceSelect, {
+    types: ["geocode", "establishment"],
+    componentRestrictions: { country: "us" },
   });
 
   useEffect(() => {
-    if (autoFocus && inputRef.current && isLoaded) {
-      inputRef.current.focus();
+    if (autoFocus && inputRef.current && isReady) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
-  }, [autoFocus, isLoaded]);
-
-  useEffect(() => {
-    if (inputRef.current && isLoaded) {
-      inputRef.current.value = value;
-    }
-  }, [value, isLoaded]);
+  }, [autoFocus, isReady]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.value);
+    const newValue = e.target.value;
+    onChange(newValue);
+    setShowCurrentLocationButton(newValue.length === 0 && showCurrentLocation);
+  };
+
+  const handleInputFocus = () => {
+    if (showCurrentLocation) {
+      setShowCurrentLocationButton(true);
+    }
+  };
+
+  const handleInputBlur = () => {
+    setTimeout(() => {
+      setShowCurrentLocationButton(false);
+    }, 200);
   };
 
   const handleClear = () => {
@@ -92,14 +94,14 @@ export function GooglePlacesInput({
 
   const handleCurrentLocation = () => {
     onCurrentLocation?.();
-    setIsFocused(false);
+    setShowCurrentLocationButton(false);
   };
 
   return (
     <div className={`relative ${className}`}>
       <div className="relative">
         <MapPin
-          className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 ${
+          className={`absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 z-10 ${
             variant === "pickup" ? "text-blue-500" : "text-red-500"
           }`}
         />
@@ -107,11 +109,12 @@ export function GooglePlacesInput({
           ref={inputRef}
           defaultValue={value}
           onChange={handleInputChange}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-          placeholder={isLoadingMaps ? "Loading maps..." : placeholder}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          placeholder={isLoadingMaps ? "Loading Google Maps..." : placeholder}
           className="pl-10 pr-10 h-12 text-base"
-          disabled={!isLoaded || isLoadingMaps}
+          disabled={!isReady}
+          autoComplete="off"
           data-testid={`input-${variant}-location`}
         />
         {isLoadingMaps && (
@@ -123,6 +126,7 @@ export function GooglePlacesInput({
             size="icon"
             className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
             onClick={handleClear}
+            type="button"
             data-testid={`button-clear-${variant}-input`}
           >
             <X className="h-4 w-4" />
@@ -130,9 +134,10 @@ export function GooglePlacesInput({
         )}
       </div>
 
-      {showCurrentLocation && isFocused && isLoaded && (
+      {showCurrentLocation && showCurrentLocationButton && isReady && (
         <div className="absolute top-full left-0 right-0 mt-1 z-[9999] bg-background border rounded-lg shadow-lg overflow-hidden">
           <button
+            type="button"
             className="w-full flex items-center gap-3 p-4 hover-elevate text-left"
             onClick={handleCurrentLocation}
             disabled={isLoadingCurrentLocation}

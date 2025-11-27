@@ -28,13 +28,10 @@ import {
   getRecentLocations, 
   reverseGeocode,
   reverseGeocodeDetails,
-  searchLocations,
-  getPlaceDetails,
   getRouteDirections,
   addRecentLocation,
   type SavedPlace, 
   type RecentLocation,
-  type SearchResult,
   type RouteInfo,
   type PlaceDetails
 } from "@/lib/locationService";
@@ -76,6 +73,16 @@ interface LocationData {
     postalCode?: string;
     country?: string;
   };
+}
+
+interface SearchResult {
+  placeId: string;
+  address: string;
+  name?: string;
+  mainText?: string;
+  secondaryText?: string;
+  lat: number;
+  lng: number;
 }
 
 export default function CustomerHome() {
@@ -127,59 +134,13 @@ export default function CustomerHome() {
   }, []);
 
   useEffect(() => {
-    if (pickupAbortRef.current) pickupAbortRef.current.abort();
-    
-    if (pickupAddress.length >= 3 && !pickupAddress.startsWith("Current location")) {
-      setIsSearchingPickup(true);
-      pickupAbortRef.current = new AbortController();
-      
-      const timer = setTimeout(async () => {
-        try {
-          const results = await searchLocations(pickupAddress, pickupAbortRef.current?.signal);
-          setPickupSearchResults(results);
-        } catch {
-          setPickupSearchResults([]);
-        } finally {
-          setIsSearchingPickup(false);
-        }
-      }, 300);
-      
-      return () => {
-        clearTimeout(timer);
-        pickupAbortRef.current?.abort();
-      };
-    } else {
-      setPickupSearchResults([]);
-      setIsSearchingPickup(false);
-    }
+    setPickupSearchResults([]);
+    setIsSearchingPickup(false);
   }, [pickupAddress]);
 
   useEffect(() => {
-    if (destAbortRef.current) destAbortRef.current.abort();
-    
-    if (destinationAddress.length >= 3) {
-      setIsSearchingDest(true);
-      destAbortRef.current = new AbortController();
-      
-      const timer = setTimeout(async () => {
-        try {
-          const results = await searchLocations(destinationAddress, destAbortRef.current?.signal);
-          setDestSearchResults(results);
-        } catch {
-          setDestSearchResults([]);
-        } finally {
-          setIsSearchingDest(false);
-        }
-      }, 300);
-      
-      return () => {
-        clearTimeout(timer);
-        destAbortRef.current?.abort();
-      };
-    } else {
-      setDestSearchResults([]);
-      setIsSearchingDest(false);
-    }
+    setDestSearchResults([]);
+    setIsSearchingDest(false);
   }, [destinationAddress]);
 
   const autoDetectLocation = useCallback(async () => {
@@ -269,62 +230,30 @@ export default function CustomerHome() {
     calculateRoute();
   }, [pickupLocation, destinationLocation]);
 
-  const handleSelectPickupResult = useCallback(async (result: SearchResult) => {
+  const handleSelectPickupResult = useCallback((result: { address: string; lat: number; lng: number; placeId?: string; name?: string }) => {
     setShowPickupSuggestions(false);
     setPickupSearchResults([]);
-    setIsFetchingDetails(true);
-    
-    // Display name immediately
-    setPickupAddress(result.mainText || result.name || result.address.split(",")[0]);
-    
-    try {
-      // Fetch full place details including coordinates
-      const details = await getPlaceDetails(result.placeId);
-      if (details) {
-        setPickupLocation({
-          address: details.formattedAddress,
-          lat: details.lat,
-          lng: details.lng,
-          placeId: details.placeId,
-          addressComponents: details.addressComponents,
-        });
-      }
-    } catch (error) {
-      console.error("Failed to get place details:", error);
-      toast({ title: "Error", description: "Failed to get location details. Please try again." });
-    } finally {
-      setIsFetchingDetails(false);
-    }
-  }, [toast]);
+    setPickupAddress(result.name || result.address.split(",")[0]);
+    setPickupLocation({
+      address: result.address,
+      lat: result.lat,
+      lng: result.lng,
+      placeId: result.placeId,
+    });
+  }, []);
 
-  const handleSelectDestResult = useCallback(async (result: SearchResult) => {
+  const handleSelectDestResult = useCallback((result: { address: string; lat: number; lng: number; placeId?: string; name?: string }) => {
     setShowDestSuggestions(false);
     setDestSearchResults([]);
-    setIsFetchingDetails(true);
-    
-    // Display name immediately
-    setDestinationAddress(result.mainText || result.name || result.address.split(",")[0]);
-    
-    try {
-      // Fetch full place details including coordinates
-      const details = await getPlaceDetails(result.placeId);
-      if (details) {
-        setDestinationLocation({
-          address: details.formattedAddress,
-          lat: details.lat,
-          lng: details.lng,
-          placeId: details.placeId,
-          addressComponents: details.addressComponents,
-        });
-        addRecentLocation({ address: details.formattedAddress, lat: details.lat, lng: details.lng });
-      }
-    } catch (error) {
-      console.error("Failed to get place details:", error);
-      toast({ title: "Error", description: "Failed to get location details. Please try again." });
-    } finally {
-      setIsFetchingDetails(false);
-    }
-  }, [toast]);
+    setDestinationAddress(result.name || result.address.split(",")[0]);
+    setDestinationLocation({
+      address: result.address,
+      lat: result.lat,
+      lng: result.lng,
+      placeId: result.placeId,
+    });
+    addRecentLocation({ address: result.address, lat: result.lat, lng: result.lng });
+  }, []);
 
   const handleSelectPickupPlace = useCallback((place: SavedPlace) => {
     if (place.lat === 0 && place.lng === 0) return;

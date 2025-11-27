@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { LocationSearchInput } from "@/components/rider/LocationSearchInput";
+import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { 
   reverseGeocode, 
   getSavedPlaces, 
@@ -480,7 +480,7 @@ export default function RideRequest() {
                 </div>
                 
                 <div className="pl-10 space-y-2">
-                  <LocationSearchInput
+                  <GooglePlacesInput
                     value={pickupQuery}
                     onChange={setPickupQuery}
                     onLocationSelect={handlePickupSelect}
@@ -492,7 +492,7 @@ export default function RideRequest() {
                     className="w-full"
                   />
                   
-                  <LocationSearchInput
+                  <GooglePlacesInput
                     value={dropoffQuery}
                     onChange={setDropoffQuery}
                     onLocationSelect={handleDropoffSelect}
