@@ -88,6 +88,11 @@ const menuSections: MenuSection[] = [
         href: "/driver/trip/active",
       },
       {
+        title: "Map",
+        icon: MapPin,
+        href: "/driver/map",
+      },
+      {
         title: "Trip History",
         icon: History,
         href: "/driver/trips",
