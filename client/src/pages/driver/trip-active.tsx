@@ -41,11 +41,21 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { SafeGoMap, type ActiveLeg } from "@/components/maps/SafeGoMap";
 
-type TripStatusType = "accepted" | "arriving" | "arrived" | "started" | "completed" | "cancelled" | "in_progress" | "picked_up";
+type TripStatusType = "accepted" | "arriving" | "arrived" | "started" | "completed" | "cancelled" | "in_progress" | "picked_up" | "in_transit";
 
 interface ActiveTrip {
   id: string;
@@ -228,6 +238,13 @@ function SwipeToComplete({
   );
 }
 
+interface GpsSnapshot {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: number;
+}
+
 export default function DriverTripActive() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -235,6 +252,9 @@ export default function DriverTripActive() {
   const [waitTime, setWaitTime] = useState("0:00");
   const [liveDistance, setLiveDistance] = useState<number | null>(null);
   const [liveEta, setLiveEta] = useState<number | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingCompletion, setPendingCompletion] = useState<string | null>(null);
+  const [currentGpsPosition, setCurrentGpsPosition] = useState<GpsSnapshot | null>(null);
 
   const { data: activeTripData, isLoading, error, refetch } = useQuery<{ activeTrip: ActiveTrip | null; hasActiveTrip: boolean }>({
     queryKey: ["/api/driver/trips/active"],
@@ -249,6 +269,26 @@ export default function DriverTripActive() {
   const activeTrip = activeTripData?.activeTrip;
 
   useEffect(() => {
+    if (activeTrip && navigator.geolocation) {
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setCurrentGpsPosition({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            timestamp: pos.timestamp,
+          });
+        },
+        (err) => {
+          console.warn("GPS tracking error:", err.message);
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      );
+      return () => navigator.geolocation.clearWatch(watchId);
+    }
+  }, [activeTrip?.id]);
+
+  useEffect(() => {
     if (activeTrip?.status === "arrived" && activeTrip?.createdAt) {
       const interval = setInterval(() => {
         setWaitTime(formatWaitTime(activeTrip.createdAt));
@@ -258,11 +298,27 @@ export default function DriverTripActive() {
   }, [activeTrip?.status, activeTrip?.createdAt]);
 
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ tripId, status, serviceType }: { tripId: string; status: string; serviceType: string }) => {
+    mutationFn: async ({ tripId, status, serviceType, gpsSnapshot }: { 
+      tripId: string; 
+      status: string; 
+      serviceType: string;
+      gpsSnapshot?: GpsSnapshot | null;
+    }) => {
+      const payload: Record<string, unknown> = { status };
+      
+      if (status === "completed" && gpsSnapshot) {
+        payload.completionLocation = {
+          lat: gpsSnapshot.lat,
+          lng: gpsSnapshot.lng,
+          accuracy: gpsSnapshot.accuracy,
+          timestamp: gpsSnapshot.timestamp,
+        };
+      }
+      
       return apiRequest(`/api/driver/trips/${tripId}/status?serviceType=${serviceType}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(payload),
       });
     },
     onSuccess: (_, variables) => {
@@ -306,6 +362,13 @@ export default function DriverTripActive() {
 
   const handleStatusUpdate = useCallback((newStatus: string) => {
     if (!activeTrip) return;
+    
+    if (newStatus === "completed") {
+      setPendingCompletion(newStatus);
+      setShowConfirmDialog(true);
+      return;
+    }
+    
     updateStatusMutation.mutate({
       tripId: activeTrip.id,
       status: newStatus,
@@ -313,10 +376,42 @@ export default function DriverTripActive() {
     });
   }, [activeTrip, updateStatusMutation]);
 
+  const handleConfirmCompletion = useCallback(() => {
+    if (!activeTrip || !pendingCompletion) return;
+    
+    updateStatusMutation.mutate({
+      tripId: activeTrip.id,
+      status: pendingCompletion,
+      serviceType: activeTrip.serviceType,
+      gpsSnapshot: currentGpsPosition,
+    });
+    
+    setShowConfirmDialog(false);
+    setPendingCompletion(null);
+  }, [activeTrip, pendingCompletion, currentGpsPosition, updateStatusMutation]);
+
+  const handleCancelCompletion = useCallback(() => {
+    setShowConfirmDialog(false);
+    setPendingCompletion(null);
+  }, []);
+
+  const logNavigationEvent = useCallback(async (tripId: string, appName: string) => {
+    try {
+      await apiRequest("/api/driver/trips/log-navigation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tripId, navigationApp: appName }),
+      });
+    } catch (err) {
+      console.warn("Failed to log navigation event:", err);
+    }
+  }, []);
+
   const handleOpenNavigation = (appId: string) => {
     if (!activeTrip) return;
     
     if (appId === "safego" || preferredNavApp === "safego") {
+      logNavigationEvent(activeTrip.id, "safego");
       toast({ 
         title: "Using SafeGo Map", 
         description: "Follow the route shown on the map above." 
@@ -329,6 +424,7 @@ export default function DriverTripActive() {
     const targetLng = isHeadingToPickup ? activeTrip.pickupLng : activeTrip.dropoffLng;
     
     if (targetLat && targetLng) {
+      logNavigationEvent(activeTrip.id, appId);
       const url = buildNavigationUrl(appId, targetLat, targetLng);
       window.open(url, "_blank");
       triggerHapticFeedback("light");
@@ -780,6 +876,46 @@ export default function DriverTripActive() {
           </div>
         </motion.div>
       </AnimatePresence>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent data-testid="dialog-confirm-completion">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Trip Completion</AlertDialogTitle>
+            <AlertDialogDescription>
+              {activeTrip.serviceType === "RIDE" 
+                ? "Are you sure you want to complete this ride? The fare will be calculated and added to your earnings."
+                : activeTrip.serviceType === "FOOD"
+                ? "Confirm that the order has been delivered to the customer. The delivery fee will be added to your earnings."
+                : "Confirm that the parcel has been delivered. The delivery fee will be added to your earnings."
+              }
+              {!currentGpsPosition && (
+                <span className="block mt-2 text-yellow-600 dark:text-yellow-500">
+                  GPS location not available. Trip will be completed without location verification.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelCompletion} data-testid="button-cancel-completion">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmCompletion} 
+              disabled={updateStatusMutation.isPending}
+              data-testid="button-confirm-completion"
+            >
+              {updateStatusMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Completing...
+                </>
+              ) : (
+                "Complete Trip"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }

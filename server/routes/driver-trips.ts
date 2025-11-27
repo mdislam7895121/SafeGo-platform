@@ -633,11 +633,19 @@ const validStatusTransitions: Record<string, string[]> = {
   picked_up: ["completed", "cancelled"],
 };
 
+const completionLocationSchema = z.object({
+  lat: z.number(),
+  lng: z.number(),
+  accuracy: z.number().optional(),
+  timestamp: z.number().optional(),
+});
+
 const statusUpdateSchema = z.object({
   status: z.enum(["arriving", "arrived", "started", "completed", "cancelled"]),
   driverLat: z.number().optional(),
   driverLng: z.number().optional(),
   reason: z.string().optional(),
+  completionLocation: completionLocationSchema.optional(),
 });
 
 router.get(
@@ -814,7 +822,7 @@ router.post(
       const { serviceType } = req.query;
       
       const validatedData = statusUpdateSchema.parse(req.body);
-      const { status: newStatus, driverLat, driverLng, reason } = validatedData;
+      const { status: newStatus, driverLat, driverLng, reason, completionLocation } = validatedData;
       
       const driverProfile = await prisma.driverProfile.findUnique({
         where: { userId },
@@ -975,6 +983,14 @@ router.post(
           driverLng,
           reason,
           ip: req.ip,
+          ...(newStatus === "completed" && completionLocation && {
+            completionLocation: {
+              lat: completionLocation.lat,
+              lng: completionLocation.lng,
+              accuracy: completionLocation.accuracy,
+              verified: completionLocation.accuracy ? completionLocation.accuracy < 100 : false,
+            },
+          }),
         },
       });
 
@@ -1016,6 +1032,47 @@ router.post(
     } catch (error: any) {
       console.error("Error updating driver location:", error);
       res.status(500).json({ error: "Failed to update location" });
+    }
+  }
+);
+
+router.post(
+  "/log-navigation",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { tripId, navigationApp } = req.body;
+      
+      if (!tripId || !navigationApp) {
+        return res.status(400).json({ error: "Missing tripId or navigationApp" });
+      }
+      
+      const validApps = ["safego", "google", "apple", "waze"];
+      if (!validApps.includes(navigationApp)) {
+        return res.status(400).json({ error: "Invalid navigation app" });
+      }
+      
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: "",
+        actorRole: "driver",
+        actionType: "NAVIGATION_APP_OPENED",
+        entityType: "trip",
+        entityId: tripId,
+        description: `Driver opened ${navigationApp} navigation for trip`,
+        metadata: {
+          navigationApp,
+          timestamp: new Date().toISOString(),
+          ip: req.ip,
+        },
+      });
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error logging navigation event:", error);
+      res.status(500).json({ error: "Failed to log navigation event" });
     }
   }
 );
