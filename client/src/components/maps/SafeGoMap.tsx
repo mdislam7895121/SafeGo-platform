@@ -425,8 +425,8 @@ export function SafeGoMap({
         
         {showTraffic && (
           <TileLayer
-            url="https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=6170aad10dfd42a38d4d8c709a536f38"
-            opacity={0.4}
+            url="https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png"
+            opacity={0.3}
           />
         )}
         

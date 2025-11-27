@@ -178,6 +178,9 @@ export function useDriverTripMap(options: UseDriverTripMapOptions = {}): UseDriv
   const lastDistanceRef = useRef<number>(0);
   const lastEtaRef = useRef<number>(0);
   const recalculationCountRef = useRef<number>(0);
+  const lastOffRouteCheckRef = useRef<number>(0);
+  const lastTurnCheckRef = useRef<number>(0);
+  const isRecalculatingRef = useRef<boolean>(false);
   
   const updateDriverMarker = useCallback((position: MapLocation) => {
     setDriverLocation(position);
@@ -355,19 +358,106 @@ export function useDriverTripMap(options: UseDriverTripMapOptions = {}): UseDriv
   }, [driverLocation, activeLeg, pickupLocation, dropoffLocation, averageSpeedKmh, onDistanceUpdate]);
   
   useEffect(() => {
-    if (driverLocation && routeInfo) {
-      const info = checkOffRoute();
-      if (info.recalculationNeeded) {
-        recalculateRoute();
+    if (!driverLocation || !routeInfo?.coordinates || routeInfo.coordinates.length < 2) return;
+    if (isRecalculatingRef.current) return;
+    
+    const now = Date.now();
+    if (now - lastOffRouteCheckRef.current < 2000) return;
+    lastOffRouteCheckRef.current = now;
+    
+    const distanceFromRoute = calculateDistanceToLine(driverLocation, routeInfo.coordinates);
+    const isOff = distanceFromRoute > offRouteThresholdMeters;
+    const needsRecalc = distanceFromRoute > offRouteThresholdMeters * 2;
+    
+    setOffRouteInfo({
+      isOffRoute: isOff,
+      distanceFromRoute,
+      recalculationNeeded: needsRecalc,
+    });
+    
+    if (needsRecalc && !isRecalculatingRef.current) {
+      isRecalculatingRef.current = true;
+      
+      const target = activeLeg === "to_pickup" ? pickupLocation : dropoffLocation;
+      if (target) {
+        recalculationCountRef.current += 1;
+        console.log(`[SafeGo] Auto route recalculation (count: ${recalculationCountRef.current})`);
+        
+        const coordinates = generateSmoothRoute(driverLocation, target);
+        const distanceKm = calculateDistance(driverLocation, target);
+        const etaMinutes = calculateEta(distanceKm, averageSpeedKmh);
+        
+        setRouteInfo({
+          coordinates,
+          distanceKm: Math.round(distanceKm * 10) / 10,
+          etaMinutes: Math.max(1, etaMinutes),
+        });
+        
+        setOffRouteInfo({
+          isOffRoute: false,
+          distanceFromRoute: 0,
+          recalculationNeeded: false,
+        });
       }
+      
+      setTimeout(() => {
+        isRecalculatingRef.current = false;
+      }, 3000);
     }
-  }, [driverLocation, routeInfo, checkOffRoute, recalculateRoute]);
+  }, [driverLocation, routeInfo, offRouteThresholdMeters, activeLeg, pickupLocation, dropoffLocation, averageSpeedKmh]);
   
   useEffect(() => {
-    if (driverLocation && routeInfo) {
-      detectUpcomingTurn();
+    if (!driverLocation || !routeInfo?.coordinates || routeInfo.coordinates.length < 3) return;
+    
+    const now = Date.now();
+    if (now - lastTurnCheckRef.current < 1000) return;
+    lastTurnCheckRef.current = now;
+    
+    const { index: nearestIndex } = findNearestPointOnRoute(driverLocation, routeInfo.coordinates);
+    
+    let foundTurn = false;
+    for (let i = nearestIndex + 1; i < routeInfo.coordinates.length - 1 && !foundTurn; i++) {
+      const p1 = routeInfo.coordinates[i - 1];
+      const p2 = routeInfo.coordinates[i];
+      const p3 = routeInfo.coordinates[i + 1];
+      
+      const angle = calculateAngleBetweenPoints(p1, p2, p3);
+      
+      if (angle > 30) {
+        const distanceToTurn = calculateDistance(
+          driverLocation,
+          { lat: p2[0], lng: p2[1] }
+        ) * 1000;
+        
+        const isApproachingTurn = distanceToTurn < turnDetectionDistanceMeters;
+        const zoomBoost = isApproachingTurn ? Math.min(2, (turnDetectionDistanceMeters - distanceToTurn) / 50) : 0;
+        const newSuggestedZoom = Math.round((BASE_ZOOM + zoomBoost) * 10) / 10;
+        
+        if (Math.abs(newSuggestedZoom - suggestedZoom) > 0.2) {
+          setSuggestedZoom(newSuggestedZoom);
+        }
+        
+        setTurnInfo({
+          isApproachingTurn,
+          turnAngle: angle,
+          distanceToTurn,
+          suggestedZoom: newSuggestedZoom,
+        });
+        
+        foundTurn = true;
+      }
     }
-  }, [driverLocation, routeInfo, detectUpcomingTurn]);
+    
+    if (!foundTurn && suggestedZoom !== BASE_ZOOM) {
+      setSuggestedZoom(BASE_ZOOM);
+      setTurnInfo({
+        isApproachingTurn: false,
+        turnAngle: 0,
+        distanceToTurn: Infinity,
+        suggestedZoom: BASE_ZOOM,
+      });
+    }
+  }, [driverLocation, routeInfo, turnDetectionDistanceMeters, suggestedZoom]);
   
   useEffect(() => {
     const result = calculateDistanceToTarget();
