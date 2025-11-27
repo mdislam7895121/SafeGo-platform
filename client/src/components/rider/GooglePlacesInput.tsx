@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { MapPin, Loader2, X, Navigation } from "lucide-react";
-import { useGooglePlacesAutocomplete, useGoogleMaps } from "@/hooks/useGoogleMaps";
+import { useGoogleMaps } from "@/hooks/useGoogleMaps";
 
 interface GooglePlacesInputProps {
   value: string;
@@ -45,32 +45,77 @@ export function GooglePlacesInput({
   dropdownZIndex = 25,
 }: GooglePlacesInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const listenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const isSelectingRef = useRef(false);
   const [showCurrentLocationButton, setShowCurrentLocationButton] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const { isReady, isLoading: isLoadingMaps, error } = useGoogleMaps();
 
-  const handlePlaceSelect = useCallback(
-    (place: { address: string; lat: number; lng: number; placeId: string }) => {
-      console.log("[GooglePlacesInput] Place selected:", place);
+  // Initialize Google Places Autocomplete directly in this component
+  // to properly handle the controlled input + autocomplete interaction
+  useEffect(() => {
+    if (!isReady || !inputRef.current || autocompleteRef.current) {
+      return;
+    }
+
+    console.log("[GooglePlacesInput] Initializing Autocomplete widget...");
+
+    const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+      fields: ["formatted_address", "geometry", "place_id", "name"],
+      types: ["geocode", "establishment"],
+      componentRestrictions: { country: "us" },
+    });
+
+    autocompleteRef.current = autocomplete;
+
+    listenerRef.current = autocomplete.addListener("place_changed", () => {
+      const place = autocomplete.getPlace();
+      console.log("[GooglePlacesInput] place_changed fired:", place);
+
+      if (!place.geometry?.location) {
+        console.warn("[GooglePlacesInput] No geometry for selected place");
+        return;
+      }
+
+      // Set flag to prevent onChange from clearing location during selection
+      isSelectingRef.current = true;
+
+      const fullAddress = place.formatted_address || place.name || "";
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      const placeId = place.place_id || "";
+
+      console.log("[GooglePlacesInput] Calling onLocationSelect with:", { fullAddress, lat, lng, placeId });
+
+      // Call onLocationSelect with full place data
+      // The parent component is responsible for updating both the location AND the display address
       onLocationSelect({
-        address: place.address,
-        lat: place.lat,
-        lng: place.lng,
-        placeId: place.placeId,
+        address: fullAddress,
+        lat,
+        lng,
+        placeId,
       });
-      // Update the displayed value to just the short address
-      const shortAddress = place.address.split(",")[0];
-      onChange(shortAddress);
+
       setShowCurrentLocationButton(false);
       setIsFocused(false);
-    },
-    [onLocationSelect, onChange]
-  );
 
-  useGooglePlacesAutocomplete(inputRef, handlePlaceSelect, {
-    types: ["geocode", "establishment"],
-    componentRestrictions: { country: "us" },
-  });
+      // Reset flag after React has processed the state updates
+      setTimeout(() => {
+        isSelectingRef.current = false;
+      }, 150);
+    });
+
+    console.log("[GooglePlacesInput] Autocomplete initialized successfully");
+
+    return () => {
+      if (listenerRef.current && window.google?.maps?.event) {
+        window.google.maps.event.removeListener(listenerRef.current);
+        listenerRef.current = null;
+      }
+      autocompleteRef.current = null;
+    };
+  }, [isReady, onLocationSelect, onChange]);
 
   useEffect(() => {
     if (autoFocus && inputRef.current && isReady) {
@@ -81,6 +126,10 @@ export function GooglePlacesInput({
   }, [autoFocus, isReady]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // If we're in the middle of selecting from autocomplete, don't process
+    if (isSelectingRef.current) {
+      return;
+    }
     const newValue = e.target.value;
     onChange(newValue);
     setShowCurrentLocationButton(newValue.length === 0 && showCurrentLocation);

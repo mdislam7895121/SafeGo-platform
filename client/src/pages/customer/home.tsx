@@ -234,19 +234,22 @@ export default function CustomerHome() {
   const handleSelectPickupResult = useCallback((result: { address: string; lat: number; lng: number; placeId?: string; name?: string }) => {
     setShowPickupSuggestions(false);
     setPickupSearchResults([]);
-    setPickupAddress(result.name || result.address.split(",")[0]);
+    // Show the full formatted address in the input field
+    setPickupAddress(result.address);
     setPickupLocation({
       address: result.address,
       lat: result.lat,
       lng: result.lng,
       placeId: result.placeId,
     });
+    console.log("[CustomerHome] Pickup selected:", result.address, result.lat, result.lng);
   }, []);
 
   const handleSelectDestResult = useCallback((result: { address: string; lat: number; lng: number; placeId?: string; name?: string }) => {
     setShowDestSuggestions(false);
     setDestSearchResults([]);
-    setDestinationAddress(result.name || result.address.split(",")[0]);
+    // Show the full formatted address in the input field
+    setDestinationAddress(result.address);
     setDestinationLocation({
       address: result.address,
       lat: result.lat,
@@ -254,6 +257,7 @@ export default function CustomerHome() {
       placeId: result.placeId,
     });
     addRecentLocation({ address: result.address, lat: result.lat, lng: result.lng });
+    console.log("[CustomerHome] Destination selected:", result.address, result.lat, result.lng);
   }, []);
 
   const handleSelectPickupPlace = useCallback((place: SavedPlace) => {

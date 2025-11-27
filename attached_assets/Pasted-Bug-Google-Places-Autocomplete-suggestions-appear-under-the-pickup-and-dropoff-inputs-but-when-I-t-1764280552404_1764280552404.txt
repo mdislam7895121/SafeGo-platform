@@ -1,0 +1,44 @@
+Bug: Google Places Autocomplete suggestions appear under the pickup and dropoff inputs, but when I tap/click a suggestion, the text field does NOT update with the full address. It only keeps whatever I typed manually, and the selected place is not stored.
+
+Please audit and fix the location search implementation so that selecting a suggestion correctly fills the input and updates the selected location.
+
+What I am seeing:
+- Suggestions like “188 Sutter Avenue …” or “170-21 Jamaica Avenue …” show in the dropdown (powered by Google).
+- When I click/tap one of those suggestions, the input field still shows only my partial text (e.g., “188 sutter ave” or “170-21 j”), not the full formatted address.
+- The app then behaves as if no location was selected.
+
+What I need:
+1. When a user selects a suggestion (via mouse click or touch), the input field MUST update to the full suggestion description (e.g., “188 Sutter Avenue, Brooklyn, NY, USA”).
+2. The selected place must be stored in state with:
+   - full formatted address
+   - place_id
+   - coordinates (lat, lng), resolved via Google Places Details or the JS SDK.
+3. The dropdown should close after selection.
+4. Both pickup and destination fields (current location and “Where to?”) must use the same fixed behavior.
+
+Implementation details:
+- We are using the Google Maps JavaScript SDK with Places Autocomplete, loaded client-side using the key from `/api/maps/config`.
+- Please review and, if needed, update these files (names may differ, adjust accordingly):
+  - `client/src/components/rider/LocationSearchInput.tsx`
+  - `client/src/hooks/useGoogleMaps.ts`
+  - `client/src/lib/locationService.ts`
+  - Any component that renders the current location and destination search fields on the customer home/ride screen.
+- Make sure the component is a controlled React input:
+  - The input `value` reflects the currently selected address.
+  - There is a clear handler like `onPlaceSelect` or `handleSuggestionClick` that:
+    - receives the selected suggestion (from Google Autocomplete),
+    - updates React state with full address + place_id + lat/lng,
+    - calls back to the parent (e.g., `onChangeLocation` / `onLocationSelected`) so the rest of the ride booking flow knows which place was chosen.
+- Also support keyboard interactions:
+  - Pressing Enter on a highlighted suggestion should behave the same as clicking it.
+
+Acceptance tests:
+- Type “188 Sutter Ave” in the pickup field, click a suggestion:
+  - The input should change to the full formatted address from Google.
+  - No console errors.
+- Type “170-21 J” in the destination field, select one of the suggestions:
+  - The input shows the full selected address.
+  - The internal location object contains place_id and coordinates.
+- After both pickup and destination are selected, the app should be ready to compute distance/route without any “empty location” issues.
+
+Please implement the fixes, restart the app, and then report back exactly what changed (which files and what logic), and confirm with screenshots or logs that the selection now works.
