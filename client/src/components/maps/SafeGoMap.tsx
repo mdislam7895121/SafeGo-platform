@@ -16,6 +16,7 @@ export type ActiveLeg = "to_pickup" | "to_dropoff" | "completed";
 export interface SafeGoMapProps {
   center?: MapLocation;
   zoom?: number;
+  dynamicZoom?: number;
   driverLocation?: MapLocation | null;
   pickupLocation?: MapLocation | null;
   dropoffLocation?: MapLocation | null;
@@ -27,6 +28,9 @@ export interface SafeGoMapProps {
   showControls?: boolean;
   autoFollow?: boolean;
   showEtaOverlay?: boolean;
+  showTrafficToggle?: boolean;
+  isOffRoute?: boolean;
+  onRecalculateRoute?: () => void;
 }
 
 const createDriverIcon = (heading: number = 0) => L.divIcon({
@@ -225,6 +229,28 @@ function MapReadyHandler({ onMapReady }: { onMapReady?: () => void }) {
   return null;
 }
 
+function DynamicZoomHandler({ 
+  dynamicZoom,
+  driverLocation,
+}: { 
+  dynamicZoom?: number;
+  driverLocation?: MapLocation | null;
+}) {
+  const map = useMap();
+  const prevZoomRef = useRef<number | null>(null);
+  
+  useEffect(() => {
+    if (!dynamicZoom || !driverLocation) return;
+    
+    if (prevZoomRef.current !== dynamicZoom) {
+      map.setZoom(dynamicZoom, { animate: true });
+      prevZoomRef.current = dynamicZoom;
+    }
+  }, [map, dynamicZoom, driverLocation]);
+  
+  return null;
+}
+
 function generateSmoothRoute(
   start: MapLocation,
   end: MapLocation
@@ -263,6 +289,7 @@ function calculateDistanceAndEta(
 export function SafeGoMap({
   center = { lat: 40.7128, lng: -74.006 },
   zoom = 14,
+  dynamicZoom,
   driverLocation,
   pickupLocation,
   dropoffLocation,
@@ -274,8 +301,12 @@ export function SafeGoMap({
   showControls = true,
   autoFollow = true,
   showEtaOverlay = true,
+  showTrafficToggle = false,
+  isOffRoute = false,
+  onRecalculateRoute,
 }: SafeGoMapProps) {
   const [mapReady, setMapReady] = useState(false);
+  const [showTraffic, setShowTraffic] = useState(false);
   const driverIcon = useMemo(() => createDriverIcon(driverLocation?.heading || 0), [driverLocation?.heading]);
   
   const targetLocation = useMemo(() => {
@@ -385,6 +416,20 @@ export function SafeGoMap({
           onMapReady?.();
         }} />
         
+        {dynamicZoom && (
+          <DynamicZoomHandler 
+            dynamicZoom={dynamicZoom}
+            driverLocation={driverLocation}
+          />
+        )}
+        
+        {showTraffic && (
+          <TileLayer
+            url="https://{s}.tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=6170aad10dfd42a38d4d8c709a536f38"
+            opacity={0.4}
+          />
+        )}
+        
         {computedRoute.length > 1 && (
           <>
             <Polyline
@@ -468,6 +513,44 @@ export function SafeGoMap({
       <div className="absolute bottom-3 right-3 z-[1000] bg-background/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-md border text-[10px] text-muted-foreground font-medium">
         Powered by SafeGo
       </div>
+      
+      {showTrafficToggle && (
+        <button
+          onClick={() => setShowTraffic(!showTraffic)}
+          className={`absolute top-16 right-3 z-[1000] p-2.5 rounded-lg shadow-md border transition-all ${
+            showTraffic 
+              ? "bg-primary text-primary-foreground border-primary" 
+              : "bg-background/95 backdrop-blur-sm text-foreground hover-elevate"
+          }`}
+          data-testid="button-toggle-traffic"
+          title={showTraffic ? "Hide traffic" : "Show traffic"}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="4" y="3" width="16" height="18" rx="2" />
+            <circle cx="12" cy="8" r="2" />
+            <circle cx="12" cy="14" r="2" />
+            <circle cx="12" cy="20" r="1" />
+          </svg>
+        </button>
+      )}
+      
+      {isOffRoute && onRecalculateRoute && (
+        <div className="absolute top-16 left-3 right-16 z-[1000]" data-testid="off-route-warning">
+          <button
+            onClick={onRecalculateRoute}
+            className="w-full flex items-center justify-center gap-2 bg-amber-500 text-white font-medium py-2 px-4 rounded-lg shadow-lg animate-pulse"
+            data-testid="button-recalculate-route"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M8 16H3v5" />
+            </svg>
+            Off Route - Tap to Recalculate
+          </button>
+        </div>
+      )}
       
       {activeLeg !== "completed" && (
         <div className="absolute bottom-3 left-3 z-[1000] flex gap-2 flex-wrap" data-testid="map-legend">

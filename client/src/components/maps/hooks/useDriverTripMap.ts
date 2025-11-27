@@ -17,10 +17,27 @@ interface RouteInfo {
   etaMinutes: number;
 }
 
+interface OffRouteInfo {
+  isOffRoute: boolean;
+  distanceFromRoute: number;
+  recalculationNeeded: boolean;
+}
+
+interface TurnInfo {
+  isApproachingTurn: boolean;
+  turnAngle: number;
+  distanceToTurn: number;
+  suggestedZoom: number;
+}
+
 interface UseDriverTripMapOptions {
   onDistanceUpdate?: (distanceKm: number, etaMinutes: number) => void;
   onFocusChange?: (mode: FocusMode) => void;
+  onOffRoute?: (info: OffRouteInfo) => void;
+  onTurnApproaching?: (info: TurnInfo) => void;
   averageSpeedKmh?: number;
+  offRouteThresholdMeters?: number;
+  turnDetectionDistanceMeters?: number;
 }
 
 interface UseDriverTripMapReturn {
@@ -30,6 +47,9 @@ interface UseDriverTripMapReturn {
   routeInfo: RouteInfo | null;
   focusMode: FocusMode;
   activeLeg: ActiveLeg;
+  offRouteInfo: OffRouteInfo;
+  turnInfo: TurnInfo;
+  suggestedZoom: number;
   updateDriverMarker: (position: MapLocation) => void;
   setPickupLocation: (location: MapLocation) => void;
   setDropoffLocation: (location: MapLocation) => void;
@@ -38,9 +58,16 @@ interface UseDriverTripMapReturn {
   setActiveLeg: (leg: ActiveLeg) => void;
   fitToRouteBounds: () => { bounds: [[number, number], [number, number]] } | null;
   calculateDistanceToTarget: () => { distanceKm: number; etaMinutes: number } | null;
+  recalculateRoute: () => void;
+  checkOffRoute: () => OffRouteInfo;
+  detectUpcomingTurn: () => TurnInfo;
 }
 
 const DEFAULT_SPEED_KMH = 30;
+const DEFAULT_OFF_ROUTE_THRESHOLD_METERS = 50;
+const DEFAULT_TURN_DETECTION_DISTANCE_METERS = 100;
+const BASE_ZOOM = 16;
+const TURN_ZOOM = 18;
 
 function calculateDistance(from: MapLocation, to: MapLocation): number {
   try {
@@ -54,6 +81,53 @@ function calculateDistance(from: MapLocation, to: MapLocation): number {
 
 function calculateEta(distanceKm: number, speedKmh: number): number {
   return Math.ceil((distanceKm / speedKmh) * 60);
+}
+
+function calculateDistanceToLine(
+  point: MapLocation,
+  routeCoords: [number, number][]
+): number {
+  if (routeCoords.length < 2) return Infinity;
+  
+  try {
+    const pt = turf.point([point.lng, point.lat]);
+    const line = turf.lineString(routeCoords.map(([lat, lng]) => [lng, lat]));
+    const distance = turf.pointToLineDistance(pt, line, { units: "meters" });
+    return distance;
+  } catch {
+    return Infinity;
+  }
+}
+
+function calculateAngleBetweenPoints(
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number]
+): number {
+  const bearing1 = turf.bearing(turf.point([p1[1], p1[0]]), turf.point([p2[1], p2[0]]));
+  const bearing2 = turf.bearing(turf.point([p2[1], p2[0]]), turf.point([p3[1], p3[0]]));
+  let angle = Math.abs(bearing2 - bearing1);
+  if (angle > 180) angle = 360 - angle;
+  return angle;
+}
+
+function findNearestPointOnRoute(
+  position: MapLocation,
+  routeCoords: [number, number][]
+): { index: number; distance: number } {
+  let minDistance = Infinity;
+  let nearestIndex = 0;
+  
+  for (let i = 0; i < routeCoords.length; i++) {
+    const [lat, lng] = routeCoords[i];
+    const dist = calculateDistance(position, { lat, lng });
+    if (dist < minDistance) {
+      minDistance = dist;
+      nearestIndex = i;
+    }
+  }
+  
+  return { index: nearestIndex, distance: minDistance * 1000 };
 }
 
 function generateSmoothRoute(start: MapLocation, end: MapLocation): [number, number][] {
@@ -72,7 +146,15 @@ function generateSmoothRoute(start: MapLocation, end: MapLocation): [number, num
 }
 
 export function useDriverTripMap(options: UseDriverTripMapOptions = {}): UseDriverTripMapReturn {
-  const { onDistanceUpdate, onFocusChange, averageSpeedKmh = DEFAULT_SPEED_KMH } = options;
+  const { 
+    onDistanceUpdate, 
+    onFocusChange, 
+    onOffRoute,
+    onTurnApproaching,
+    averageSpeedKmh = DEFAULT_SPEED_KMH,
+    offRouteThresholdMeters = DEFAULT_OFF_ROUTE_THRESHOLD_METERS,
+    turnDetectionDistanceMeters = DEFAULT_TURN_DETECTION_DISTANCE_METERS,
+  } = options;
   
   const [driverLocation, setDriverLocation] = useState<MapLocation | null>(null);
   const [pickupLocation, setPickupLocation] = useState<MapLocation | null>(null);
@@ -80,9 +162,22 @@ export function useDriverTripMap(options: UseDriverTripMapOptions = {}): UseDriv
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
   const [focusMode, setFocusMode] = useState<FocusMode>("full-route");
   const [activeLeg, setActiveLeg] = useState<ActiveLeg>("to_pickup");
+  const [offRouteInfo, setOffRouteInfo] = useState<OffRouteInfo>({
+    isOffRoute: false,
+    distanceFromRoute: 0,
+    recalculationNeeded: false,
+  });
+  const [turnInfo, setTurnInfo] = useState<TurnInfo>({
+    isApproachingTurn: false,
+    turnAngle: 0,
+    distanceToTurn: Infinity,
+    suggestedZoom: BASE_ZOOM,
+  });
+  const [suggestedZoom, setSuggestedZoom] = useState(BASE_ZOOM);
   
   const lastDistanceRef = useRef<number>(0);
   const lastEtaRef = useRef<number>(0);
+  const recalculationCountRef = useRef<number>(0);
   
   const updateDriverMarker = useCallback((position: MapLocation) => {
     setDriverLocation(position);
@@ -152,6 +247,128 @@ export function useDriverTripMap(options: UseDriverTripMapOptions = {}): UseDriv
     };
   }, [driverLocation, pickupLocation, dropoffLocation, activeLeg, averageSpeedKmh]);
   
+  const checkOffRoute = useCallback((): OffRouteInfo => {
+    if (!driverLocation || !routeInfo?.coordinates || routeInfo.coordinates.length < 2) {
+      return { isOffRoute: false, distanceFromRoute: 0, recalculationNeeded: false };
+    }
+    
+    const distanceFromRoute = calculateDistanceToLine(driverLocation, routeInfo.coordinates);
+    const isOffRoute = distanceFromRoute > offRouteThresholdMeters;
+    const recalculationNeeded = distanceFromRoute > offRouteThresholdMeters * 2;
+    
+    const info: OffRouteInfo = {
+      isOffRoute,
+      distanceFromRoute,
+      recalculationNeeded,
+    };
+    
+    setOffRouteInfo(info);
+    
+    if (isOffRoute && onOffRoute) {
+      onOffRoute(info);
+    }
+    
+    return info;
+  }, [driverLocation, routeInfo, offRouteThresholdMeters, onOffRoute]);
+  
+  const detectUpcomingTurn = useCallback((): TurnInfo => {
+    if (!driverLocation || !routeInfo?.coordinates || routeInfo.coordinates.length < 3) {
+      return { isApproachingTurn: false, turnAngle: 0, distanceToTurn: Infinity, suggestedZoom: BASE_ZOOM };
+    }
+    
+    const { index: nearestIndex } = findNearestPointOnRoute(driverLocation, routeInfo.coordinates);
+    
+    for (let i = nearestIndex + 1; i < routeInfo.coordinates.length - 1; i++) {
+      const p1 = routeInfo.coordinates[i - 1];
+      const p2 = routeInfo.coordinates[i];
+      const p3 = routeInfo.coordinates[i + 1];
+      
+      const angle = calculateAngleBetweenPoints(p1, p2, p3);
+      
+      if (angle > 30) {
+        const distanceToTurn = calculateDistance(
+          driverLocation,
+          { lat: p2[0], lng: p2[1] }
+        ) * 1000;
+        
+        const isApproachingTurn = distanceToTurn < turnDetectionDistanceMeters;
+        const zoomBoost = isApproachingTurn ? Math.min(2, (turnDetectionDistanceMeters - distanceToTurn) / 50) : 0;
+        const newSuggestedZoom = BASE_ZOOM + zoomBoost;
+        
+        const info: TurnInfo = {
+          isApproachingTurn,
+          turnAngle: angle,
+          distanceToTurn,
+          suggestedZoom: newSuggestedZoom,
+        };
+        
+        setTurnInfo(info);
+        setSuggestedZoom(newSuggestedZoom);
+        
+        if (isApproachingTurn && onTurnApproaching) {
+          onTurnApproaching(info);
+        }
+        
+        return info;
+      }
+    }
+    
+    const noTurnInfo: TurnInfo = {
+      isApproachingTurn: false,
+      turnAngle: 0,
+      distanceToTurn: Infinity,
+      suggestedZoom: BASE_ZOOM,
+    };
+    setTurnInfo(noTurnInfo);
+    setSuggestedZoom(BASE_ZOOM);
+    return noTurnInfo;
+  }, [driverLocation, routeInfo, turnDetectionDistanceMeters, onTurnApproaching]);
+  
+  const recalculateRoute = useCallback(() => {
+    if (!driverLocation) return;
+    
+    const target = activeLeg === "to_pickup" ? pickupLocation : dropoffLocation;
+    if (!target) return;
+    
+    recalculationCountRef.current += 1;
+    console.log(`[SafeGo] Route recalculated (count: ${recalculationCountRef.current})`);
+    
+    const coordinates = generateSmoothRoute(driverLocation, target);
+    const distanceKm = calculateDistance(driverLocation, target);
+    const etaMinutes = calculateEta(distanceKm, averageSpeedKmh);
+    
+    setRouteInfo({
+      coordinates,
+      distanceKm: Math.round(distanceKm * 10) / 10,
+      etaMinutes: Math.max(1, etaMinutes),
+    });
+    
+    setOffRouteInfo({
+      isOffRoute: false,
+      distanceFromRoute: 0,
+      recalculationNeeded: false,
+    });
+    
+    if (onDistanceUpdate) {
+      onDistanceUpdate(distanceKm, etaMinutes);
+    }
+  }, [driverLocation, activeLeg, pickupLocation, dropoffLocation, averageSpeedKmh, onDistanceUpdate]);
+  
+  useEffect(() => {
+    if (driverLocation && routeInfo) {
+      const info = checkOffRoute();
+      if (info.recalculationNeeded) {
+        recalculateRoute();
+      }
+    }
+  }, [driverLocation, routeInfo, checkOffRoute, recalculateRoute]);
+  
+  useEffect(() => {
+    if (driverLocation && routeInfo) {
+      detectUpcomingTurn();
+    }
+  }, [driverLocation, routeInfo, detectUpcomingTurn]);
+  
   useEffect(() => {
     const result = calculateDistanceToTarget();
     if (result && onDistanceUpdate) {
@@ -174,6 +391,9 @@ export function useDriverTripMap(options: UseDriverTripMapOptions = {}): UseDriv
     routeInfo,
     focusMode,
     activeLeg,
+    offRouteInfo,
+    turnInfo,
+    suggestedZoom,
     updateDriverMarker,
     setPickupLocation,
     setDropoffLocation,
@@ -182,6 +402,9 @@ export function useDriverTripMap(options: UseDriverTripMapOptions = {}): UseDriv
     setActiveLeg,
     fitToRouteBounds,
     calculateDistanceToTarget,
+    recalculateRoute,
+    checkOffRoute,
+    detectUpcomingTurn,
   };
 }
 
