@@ -1,0 +1,147 @@
+SAFEGO GLOBAL RULES (ALWAYS APPLY)
+
+1) Core Roles
+   - Customer app: ride, food, parcel booking + payments + history.
+   - Driver app: online/offline, ride accept, navigation, payouts.
+   - Restaurant app (SafeGo Eats): orders, menus, status, payouts.
+   - Admin panel: full control over users, trips, payouts, KYC, disputes, config.
+
+2) Global Logic
+   - One super-app backend, multiple frontends (customer, driver, restaurant, admin).
+   - Core collections: rides, food_orders, deliveries, users, drivers, restaurants, payouts, cards, vehicles.
+   - Commission and payouts go through a clear pipeline: completed trips → commission → driver wallet → payout.
+
+3) Country / KYC (USA focus for now)
+   - Customer: basic profile + verified phone/email, card only (no cash in USA).
+   - Driver (NYC example): profile, phone, email, DOB, license state/number/expiry, SSN (masked), TLC where needed, address, emergency contact, background check, document upload.
+   - All KYC data must be stored securely and never exposed in logs.
+
+4) Security Phase (this task)
+   - Phase: Product UX improvement (maps & ETA).
+   - Requirements:
+     - Use existing `GOOGLE_MAPS_API_KEY` from server-side env only. Never hardcode or expose in client bundle.
+     - Respect existing CSP and API key restrictions (replit.dev /.app + localhost).
+     - No breaking changes to login, ride creation, payments, or profile flows.
+
+5) Non-breaking rule
+   - Do not remove or break existing Google Places Autocomplete, current location, or fare calculation pipeline.
+   - If any external API (Google) fails, the UI must degrade gracefully (e.g., fallback straight line and warning), not crash.
+
+----------------------------------------------------------------
+TASK: Replace straight-line route with real road route using Google Directions API
+----------------------------------------------------------------
+
+Goal:
+On the SafeGo customer “Plan your ride” screen, the route between pickup (A) and dropoff (B) is currently rendered as a simple straight dashed line. We already have:
+- Current location detection working.
+- Pickup / dropoff selection via Google Places Autocomplete.
+- Estimated fare + distance + ETA and a basic “traffic” badge.
+
+Now update the implementation so that:
+1) The map shows a real driving route following roads (not a straight line).
+2) ETA uses traffic-aware time from Google Directions.
+3) Everything else (fare card, Request ride button, etc.) continues to work as is.
+
+Use the existing `GOOGLE_MAPS_API_KEY` secret; assume it is already configured.
+
+Detailed instructions:
+
+1) Find current map routing logic
+   - Locate the customer ride planning page/component, e.g.:
+     - `client/src/pages/customer/ride-*.tsx`
+     - or `client/src/components/ride/RidePlanner*.tsx`
+   - Find where the map polyline between pickup and dropoff is drawn.
+     - Right now it likely uses a direct line between two coordinates (straight dashed route).
+   - Do NOT change the map provider (we are keeping the existing OSM/Leaflet-style map).
+
+2) Backend: Create/extend a directions endpoint using Google Directions API
+   - Look for existing map-related server routes, e.g.:
+     - `server/routes/maps.ts` or `server/routes/maps/index.ts`
+   - If there is already an `/api/maps/config` or similar, keep it; add a **new** endpoint:
+     - `GET /api/maps/route`
+   - The endpoint should accept query parameters:
+     - `origin` in `"lat,lng"` format
+     - `destination` in `"lat,lng"` format
+   - Inside the handler, call Google Directions API:
+     - Base URL: `https://maps.googleapis.com/maps/api/directions/json`
+     - Parameters:
+       - `origin` = origin from query
+       - `destination` = destination from query
+       - `mode=driving`
+       - `departure_time=now`           (for traffic-aware duration)
+       - `traffic_model=best_guess`
+       - `alternatives=false`           (for now we only need the primary route)
+       - `key=process.env.GOOGLE_MAPS_API_KEY`
+   - Handle errors:
+     - If Google responds with `status !== "OK"`, return:
+       ```json
+       { "success": false, "message": "GOOGLE_DIRECTIONS_ERROR", "status": "<status>" }
+       ```
+   - On success, transform the first route into a clean JSON:
+     ```ts
+     {
+       success: true,
+       route: {
+         polyline: data.routes[0].overview_polyline.points,
+         distanceMeters: data.routes[0].legs[0].distance.value,
+         durationSeconds: data.routes[0].legs[0].duration.value,
+         durationInTrafficSeconds: data.routes[0].legs[0].duration_in_traffic?.value ?? data.routes[0].legs[0].duration.value
+       }
+     }
+     ```
+   - Do not log the API key or the full Google response in production logs.
+
+3) Frontend: Call the new directions endpoint when both points are set
+   - On the ride planning screen, once:
+     - pickup location is chosen and has coordinates, and
+     - dropoff location is chosen and has coordinates,
+     call:
+       `GET /api/maps/route?origin=<lat,lng>&destination=<lat,lng>`
+   - Store the returned route in state, e.g.:
+     - `routePolyline`
+     - `routeDistanceMeters`
+     - `routeDurationSeconds`
+     - `routeDurationInTrafficSeconds`
+   - Continue to use the existing place selection UI and current location logic.
+
+4) Replace straight-line polyline with decoded road polyline
+   - Decode the `overview_polyline.points` string into an array of coordinates.
+     - If there is already a polyline decoder helper, reuse it.
+     - Otherwise, add a small polyline decode utility (TypeScript) and keep it in a shared map utils file.
+   - In the map component:
+     - Instead of drawing a direct straight dashed line between A and B,
+       draw the decoded polyline from the Directions API as the main route.
+     - Keep the existing marker style for A and B.
+     - Preserve current map zoom/fit behavior: fit bounds around the full polyline.
+
+5) Use traffic-aware duration for ETA and keep fare logic consistent
+   - Wherever the ETA is currently calculated for the Estimated fare card:
+     - Prefer `durationInTrafficSeconds` from the directions endpoint.
+     - Convert it to the current format: `~X h Y min`.
+   - If directions call fails, fall back to the old straight-line behavior and previous ETA logic so the UI still works.
+   - Do not change base fare logic or per-km logic, only update the “time” value to use the new duration.
+
+6) Keep the “Estimated traffic” badge aligned with real traffic
+   - Derive a simple traffic level from:
+     - ratio = durationInTrafficSeconds / durationSeconds
+   - Example:
+     - ratio < 1.1 → “Light traffic”
+     - 1.1 ≤ ratio < 1.3 → “Moderate traffic”
+     - ratio ≥ 1.3 → “Heavy traffic”
+   - Keep the existing single badge (e.g. “Estimated traffic”) but adjust its text based on this ratio if appropriate.
+   - Styling should remain consistent with current design.
+
+7) Safety and regression checks
+   - Do NOT break:
+     - Google Places autocomplete for both fields.
+     - Current location detection.
+     - Ride request submission flow.
+   - Test scenarios:
+     - Short local ride within Brooklyn.
+     - Longer ride from “188 Sutter Ave, Brooklyn, NY 11212, USA” to “Connecticut, USA”.
+   - In both cases, confirm:
+     - The map shows a curved road-following route (no more straight dashed line).
+     - Distance and ETA values match the new route.
+     - Fare and traffic badge render correctly.
+
+After implementing all of the above, reload `/customer/ride` and verify that the customer sees a real road route instead of a straight line, with ETA based on traffic-aware duration.
