@@ -44,7 +44,6 @@ import CustomerSupportTicketDetail from "@/pages/customer-app/support-ticket-det
 
 // Driver pages
 import { DriverLayout } from "@/layouts/DriverLayout";
-import DriverHome from "@/pages/driver/home";
 import DriverDashboard from "@/pages/driver/dashboard";
 import DriverProfile from "@/pages/driver/profile";
 import DriverPublicProfile from "@/pages/driver/profile-public";
@@ -408,13 +407,13 @@ function Router() {
       </Route>
 
       {/* Driver routes */}
-      {/* Legacy /driver route uses standalone DriverHome layout */}
+      {/* Main driver route redirects to dashboard with unified layout */}
       <Route path="/driver">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverHome />
+          <Redirect to="/driver/dashboard" />
         </ProtectedRoute>
       </Route>
-      {/* New driver routes wrapped with unified DriverLayout */}
+      {/* All driver routes wrapped with unified DriverLayout */}
       <Route path="/driver/dashboard">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Dashboard">
@@ -731,7 +730,9 @@ function Router() {
       </Route>
       <Route path="/driver/account/payout-methods">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <DriverAccountPayoutMethods />
+          <DriverLayout pageTitle="Payout Methods">
+            <DriverAccountPayoutMethods />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/driver/account/tax-info">
