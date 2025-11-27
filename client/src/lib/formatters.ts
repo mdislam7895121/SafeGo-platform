@@ -1,17 +1,20 @@
 /**
  * Format a duration in minutes to a human-readable string.
  * Examples:
+ * - 0.5 minutes -> "1 min" (rounds up sub-minute values)
  * - 45 minutes -> "45 min"
  * - 90 minutes -> "1 h 30 min"
  * - 120 minutes -> "2 h"
  * - 326 minutes -> "5 h 26 min"
+ * - 1500 minutes -> "25 h"
  */
 export function formatDurationMinutes(totalMinutes: number): string {
   if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
-    return '';
+    return '1 min'; // Minimum display value
   }
   
-  const minutes = Math.round(totalMinutes);
+  // Round up sub-minute values to at least 1 minute
+  const minutes = Math.max(1, Math.round(totalMinutes));
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
 

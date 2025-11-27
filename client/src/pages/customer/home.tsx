@@ -804,7 +804,11 @@ export default function CustomerHome() {
                         <div className="flex items-center gap-1.5">
                           <Clock className="h-4 w-4 text-primary" />
                           <span className="text-sm font-semibold" data-testid="text-eta">
-                            ~{formatDurationMinutes(getTrafficAwareDuration(routeInfo.durationMinutes))}
+                            ~{formatDurationMinutes(
+                              routeInfo.providerSource === "haversine_fallback"
+                                ? getTrafficAwareDuration(routeInfo.durationMinutes)
+                                : routeInfo.durationMinutes
+                            )}
                           </span>
                         </div>
                       </>
