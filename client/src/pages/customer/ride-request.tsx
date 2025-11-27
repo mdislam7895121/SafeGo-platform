@@ -183,6 +183,7 @@ export default function RideRequest() {
   
   const [mapCenter, setMapCenter] = useState({ lat: 40.7128, lng: -74.0060 });
   const [isClient, setIsClient] = useState(false);
+  const [hasCheckedStorage, setHasCheckedStorage] = useState(false);
   const [pickupIcon, setPickupIcon] = useState<any>(null);
   const [dropoffIcon, setDropoffIcon] = useState<any>(null);
 
@@ -194,6 +195,7 @@ export default function RideRequest() {
     return [];
   }, [pickup, dropoff]);
 
+  // Read pickup/destination from sessionStorage (passed from home page)
   useEffect(() => {
     if (typeof window === "undefined") return;
     setIsClient(true);
@@ -202,21 +204,51 @@ export default function RideRequest() {
     
     setPickupIcon(createPickupIcon());
     setDropoffIcon(createDropoffIcon());
+    
+    // Restore pickup and destination from sessionStorage if available
+    try {
+      const storedPickup = sessionStorage.getItem("safego_ride_pickup");
+      const storedDestination = sessionStorage.getItem("safego_ride_destination");
+      
+      if (storedPickup) {
+        const pickupData = JSON.parse(storedPickup);
+        console.log("[RideRequest] Restored pickup from sessionStorage:", pickupData);
+        setPickup(pickupData);
+        setPickupQuery(pickupData.address || pickupData.name || "");
+        setMapCenter({ lat: pickupData.lat, lng: pickupData.lng });
+      }
+      
+      if (storedDestination) {
+        const destData = JSON.parse(storedDestination);
+        console.log("[RideRequest] Restored destination from sessionStorage:", destData);
+        setDropoff(destData);
+        setDropoffQuery(destData.address || destData.name || "");
+        
+        // If we have both, center map on midpoint
+        if (storedPickup) {
+          const pickupData = JSON.parse(storedPickup);
+          setMapCenter({
+            lat: (pickupData.lat + destData.lat) / 2,
+            lng: (pickupData.lng + destData.lng) / 2,
+          });
+        }
+      }
+      
+      // Clear sessionStorage after reading to avoid stale data on refresh
+      // Only clear if we successfully restored both locations
+      if (storedPickup && storedDestination) {
+        // Don't clear immediately - the route info might still be needed
+        // sessionStorage.removeItem("safego_ride_pickup");
+        // sessionStorage.removeItem("safego_ride_destination");
+        // sessionStorage.removeItem("safego_ride_route");
+      }
+    } catch (e) {
+      console.warn("[RideRequest] Failed to restore locations from sessionStorage:", e);
+    }
+    
+    // Mark that we've checked storage so we can auto-detect location if needed
+    setHasCheckedStorage(true);
   }, []);
-
-  useEffect(() => {
-    if (isClient) {
-      handleGetCurrentLocation();
-    }
-  }, [isClient]);
-
-  useEffect(() => {
-    if (pickup && dropoff) {
-      calculateFareEstimate();
-    } else {
-      setFareEstimate(null);
-    }
-  }, [pickup, dropoff]);
 
   const handleGetCurrentLocation = useCallback(async () => {
     if (typeof window === "undefined" || !navigator.geolocation) {
@@ -262,6 +294,21 @@ export default function RideRequest() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   }, []);
+
+  // Only auto-detect current location if no pickup was provided from sessionStorage
+  useEffect(() => {
+    if (isClient && hasCheckedStorage && !pickup) {
+      handleGetCurrentLocation();
+    }
+  }, [isClient, hasCheckedStorage, pickup, handleGetCurrentLocation]);
+
+  useEffect(() => {
+    if (pickup && dropoff) {
+      calculateFareEstimate();
+    } else {
+      setFareEstimate(null);
+    }
+  }, [pickup, dropoff]);
 
   const calculateFareEstimate = useCallback(async () => {
     if (!pickup || !dropoff) return;
