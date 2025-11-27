@@ -290,7 +290,10 @@ export default function DriverTripRequestsPage() {
 
   if (statusLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div 
+        className="flex items-center justify-center min-h-screen bg-background"
+        data-testid="loading-driver-status"
+      >
         <div className="text-center space-y-4">
           <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
           <p className="text-muted-foreground">Loading driver status...</p>
@@ -301,7 +304,7 @@ export default function DriverTripRequestsPage() {
 
   if (!driverStatus?.isVerified) {
     return (
-      <div className="min-h-screen bg-background p-4">
+      <div className="min-h-screen bg-background p-4" data-testid="page-verification-required">
         <Card className="max-w-md mx-auto mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-amber-600">
@@ -314,7 +317,11 @@ export default function DriverTripRequestsPage() {
               Your account needs to be verified before you can receive trip requests.
               Please complete your profile and upload required documents.
             </p>
-            <Button onClick={() => navigate("/driver/documents")} className="w-full">
+            <Button 
+              onClick={() => navigate("/driver/documents")} 
+              className="w-full"
+              data-testid="button-complete-verification"
+            >
               Complete Verification
             </Button>
           </CardContent>
@@ -325,7 +332,7 @@ export default function DriverTripRequestsPage() {
 
   if (driverStatus?.isSuspended) {
     return (
-      <div className="min-h-screen bg-background p-4">
+      <div className="min-h-screen bg-background p-4" data-testid="page-account-suspended">
         <Card className="max-w-md mx-auto mt-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-red-600">
@@ -337,7 +344,11 @@ export default function DriverTripRequestsPage() {
             <p className="text-muted-foreground">
               Your driver account has been suspended. Please contact support for assistance.
             </p>
-            <Button onClick={() => navigate("/driver/support")} className="w-full">
+            <Button 
+              onClick={() => navigate("/driver/support")} 
+              className="w-full"
+              data-testid="button-contact-support"
+            >
               Contact Support
             </Button>
           </CardContent>
@@ -347,7 +358,7 @@ export default function DriverTripRequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col" data-testid="page-trip-requests">
       <header className="sticky top-0 z-40 bg-background border-b px-4 py-3">
         <div className="flex items-center justify-between max-w-lg mx-auto">
           <Button

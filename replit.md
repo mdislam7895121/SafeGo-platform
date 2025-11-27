@@ -55,6 +55,26 @@ Core systems and features include:
       - Driver navigation preference integration from Settings
       - API endpoints: GET /api/driver/trips/active, POST /api/driver/trips/:id/status
       - Audit logging for all status transitions
+      - Auto route recalculation when driver goes 50m+ off-route
+      - Dynamic map zoom on turns (30°+ angle detection)
+      - Optional traffic layer toggle with OSM France HOT tiles
+    - **C-4 Driver Trip Accept/Decline Flow**: Uber-style incoming request experience with:
+      - Full-screen modal popup with fade-in animation and countdown ring (15 seconds)
+      - Customer info display: name, rating, pickup/dropoff addresses
+      - Trip metrics: distance to pickup, ETA, estimated fare
+      - Surge/boost indicators when applicable
+      - Accept (green) and Decline (gray) action buttons
+      - Swipe-to-accept gesture with haptic and sound feedback
+      - Auto-decline on countdown expiration
+      - SafeGo Map preview with pickup/dropoff markers and route polyline
+      - Driver online/offline status management with toggle switch
+      - Real-time polling for pending requests (3s interval when online)
+      - Trip locking mechanism (prevents duplicate acceptance)
+      - Backend validation: verified driver, online status, no active trip
+      - Decline reason logging with optional notes
+      - Full audit trail: request_shown_at, action_taken, decision_time_ms
+      - API endpoints: GET /api/driver/trips/requests/pending, POST /api/driver/trips/requests/:id/accept, POST /api/driver/trips/requests/:id/decline, GET/POST /api/driver/trips/driver-status
+      - Comprehensive data-testid coverage for E2E testing
     - **Driver Sidebar Navigation**: Mobile-first organized menu with 5 sections:
       - Core (Dashboard, Active Trip, Trip History, Wallet, Incentives, Trust Score, Performance)
       - Account (Account hub, Documents, Vehicle)
