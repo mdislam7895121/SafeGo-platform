@@ -43,15 +43,7 @@ import CustomerSupportTickets from "@/pages/customer-app/support-tickets";
 import CustomerSupportTicketDetail from "@/pages/customer-app/support-ticket-detail";
 
 // Rider pages (new customer-facing web shell)
-import { RiderLayout } from "@/layouts/RiderLayout";
-import RiderHome from "@/pages/rider/home";
-import RiderTrips from "@/pages/rider/trips";
-import RiderOrders from "@/pages/rider/orders";
-import RiderParcels from "@/pages/rider/parcels";
-import RiderWallet from "@/pages/rider/wallet";
-import RiderSupport from "@/pages/rider/support";
-import RiderAccount from "@/pages/rider/account";
-import RiderSettings from "@/pages/rider/settings";
+import { RiderRoutes } from "@/components/rider/RiderRoutes";
 
 // Driver pages
 import { DriverLayout } from "@/layouts/DriverLayout";
@@ -420,157 +412,10 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      {/* Rider routes - new customer-facing web shell */}
-      <Route path="/rider">
+      {/* Rider routes - new customer-facing web shell with unified RideBookingProvider */}
+      <Route path="/rider/:rest*">
         <ProtectedRoute allowedRoles={["customer"]}>
-          <Redirect to="/rider/home" />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/home">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Home">
-            <RiderHome />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/trips/:id">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Trip Details">
-            <RiderTrips />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/trips">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Rides">
-            <RiderTrips />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/orders/:id">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Order Details">
-            <RiderOrders />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/orders">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Food Orders">
-            <RiderOrders />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/parcels/:id">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Parcel Details">
-            <RiderParcels />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/parcels">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Parcels">
-            <RiderParcels />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/wallet/methods">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Payment Methods">
-            <RiderWallet />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/wallet/history">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Transaction History">
-            <RiderWallet />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/wallet">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Wallet">
-            <RiderWallet />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/promotions">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Promotions">
-            <RiderWallet />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/history">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Trip History">
-            <RiderTrips />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/favorites">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Favorites">
-            <RiderHome />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/places">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Saved Places">
-            <RiderHome />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/support">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Support">
-            <RiderSupport />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/help">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Help Center">
-            <RiderSupport />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/account/profile">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Edit Profile">
-            <RiderAccount />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/account">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Account">
-            <RiderAccount />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/settings/notifications">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Notification Settings">
-            <RiderSettings />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/settings/privacy">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Privacy Settings">
-            <RiderSettings />
-          </RiderLayout>
-        </ProtectedRoute>
-      </Route>
-      <Route path="/rider/settings">
-        <ProtectedRoute allowedRoles={["customer"]}>
-          <RiderLayout pageTitle="Settings">
-            <RiderSettings />
-          </RiderLayout>
+          <RiderRoutes />
         </ProtectedRoute>
       </Route>
 

@@ -1,0 +1,315 @@
+You are working on the SafeGo project. Follow ALL SafeGo Master Rules strictly.
+
+==================== SAFEGO MASTER RULES (ALWAYS APPLY) ====================
+
+1) Global multi-sided platform
+- SafeGo has four roles: Rider/Customer, Driver, Restaurant, Admin.
+- Three core verticals share the same platform:
+  • Rides (people transport)
+  • Food delivery (SafeGo Eats)
+  • Parcel / package delivery
+- Code must keep these domains consistent but not break each other.
+
+2) Apps / surfaces
+- Web app for all roles (current focus).
+- Future native apps will reuse the same backend APIs and data models.
+- Navigation/headers must stay consistent per role:
+  • /driver/* for drivers
+  • /rider/* for riders
+  • /restaurant/* for restaurants
+  • /admin/* for admin
+
+3) Country & KYC rules (US + Bangladesh)
+- We already have KYC / identity and payout flows wired for drivers (US and BD).
+- DO NOT create new KYC schemas without checking existing models.
+- For riders in this task:
+  • Use existing auth and KYC gating – do not bypass checks.
+  • If some high-risk actions require verified account, check existing flags first.
+- Payout and wallet logic already exist – reuse read-only where needed, do not modify schemas unless absolutely required.
+
+4) Mandatory data structures / collections (already assumed to exist)
+- rides (or trips) collection for passenger trips.
+- food_orders for food delivery.
+- deliveries for parcel delivery.
+- payout_accounts, payouts, wallets / balances.
+- notifications / in-app events and audit logs.
+Never introduce new collections with overlapping purpose; extend existing ones carefully.
+
+5) Commission & payout logic
+- Platform commission and driver/restaurant earnings are already handled in the backend.
+- For Rider booking flows, only display fare estimates and existing payment methods.
+- Do not change commission math in this task. If you need pricing, call the existing pricing/estimate endpoint.
+
+6) Security roadmap (must respect existing phases)
+- Phase 1 is done: security headers (HSTS, CSP, CORS), sensitive route rate limiting, password verification for payout changes.
+- Phase 2 is done: OTP service, device/session security, tamper-proof audit logs, payout 2FA.
+- SIEM/anomaly detection/bug bounty etc. are future phases – DO NOT start them in this R-2 task.
+- Never weaken or bypass existing security checks. Reuse existing middleware and auth guards.
+- All new APIs must:
+  • validate input carefully,
+  • enforce authentication and role checks,
+  • log important actions into the existing audit log system.
+
+7) Status and workflow consistency
+- Driver-side active trip logic is already implemented (C-3/C-4/C-5):
+  • Allowed statuses: searching/matching, accepted, arriving, arrived, started, completed, cancelled.
+- DO NOT invent new status values for rides.
+- All rider-side views must simply reflect these same statuses and not add conflicts.
+- Data-testid attributes are already standardized; any new important element must include them.
+
+8) Non-breaking, incremental changes
+- Do not introduce destructive database migrations.
+- Prefer extending existing React components and hooks instead of rewriting.
+- Keep restaurant and driver dashboards working exactly as they are.
+- If you need new config, keep it small and backwards compatible.
+
+9) Testing and observability
+- All new critical UI elements must have data-testid attributes for automated tests.
+- Important backend actions (ride create, cancel, payment failure) must be logged in existing audit logging.
+
+10) Progress & scope control
+- We are now at Rider Phase R-2.
+- R-1 (Rider shell, navigation, base pages, data-testids) is complete.
+- Driver (D-series) and core navigation/header work are already complete; DO NOT re-implement them.
+- Focus ONLY on R-2 tasks described below. No new random features.
+
+==================== TASK: R-2 RIDER RIDE-BOOKING FLOW ====================
+
+Goal:
+Implement a full Uber-style ride booking experience for the Rider app, wired into the existing backend trip/driver logic. This must be production-quality and mobile-friendly.
+
+High-level requirements:
+- Rider can:
+  1) Choose pickup location.
+  2) Choose dropoff location.
+  3) See ride options and fare estimates.
+  4) Select payment method (reusing existing wallet/payment features).
+  5) Optionally enter a promo code (only if backend support already exists; otherwise keep it as a disabled/“coming soon” field).
+  6) Confirm the ride, trigger driver matching, and transition into the active trip screen.
+- Implementation must:
+  • Reuse existing trip/ride models and driver status transitions.
+  • NOT break food or parcel flows.
+  • Respect all security and logging rules.
+
+----------------------------------------------------------------------
+A. Routes and layout integration
+----------------------------------------------------------------------
+
+1) Ensure Rider routes are organized consistently:
+  - /rider/home
+  - /rider/ride/new          (entry to ride booking flow)
+  - /rider/ride/pickup       (if you use separate pages/steps)
+  - /rider/ride/dropoff
+  - /rider/ride/options      (ride type + fare estimates)
+  - /rider/ride/confirm
+  - /rider/trip/active       (reuse whatever exists from previous work)
+
+2) Integrate these into the existing Rider layout/navigation:
+  - Top bar and sidebar should already be present from R-1; do NOT change global rider navigation structure.
+  - Add “Where to?” / “Ride” entry point from Rider home that links to /rider/ride/new.
+  - Maintain consistent styling and typography with current Rider pages.
+
+3) Add appropriate data-testid attributes on key elements:
+  - Example: data-testid="rider-pickup-input", "rider-dropoff-input",
+    "rider-ride-option-card", "rider-confirm-button", etc.
+
+----------------------------------------------------------------------
+B. Pickup selection (step 1)
+----------------------------------------------------------------------
+
+1) UI behavior:
+  - Show a prominent search input labeled “Pickup location”.
+  - Default value: rider’s current GPS location if permissions are granted, otherwise empty.
+  - Under the input:
+    • "Current location" quick action.
+    • Saved places (Home, Work) if such data already exists.
+    • Recent pickup locations (use existing history API if available; otherwise leave as simple placeholders backed by mock list in frontend only, clearly separated so it’s easy to wire later).
+
+2) Map integration:
+  - Use the same map provider we already use in driver active trip (do NOT add a new map SDK).
+  - Show a draggable pickup pin.
+  - When user drags the pin, update the address text via reverse-geocoding using the existing map service helper; if none exists, create a small helper but keep it generic and reusable.
+  - Validate pickup against allowed service area:
+    • If outside service area, show a clear error and disable continue.
+
+3) Data + validation:
+  - Data structure to capture:
+    • pickupLatitude, pickupLongitude
+    • pickupAddress (string)
+  - Enforce required fields before allowing the user to continue.
+  - Store the interim booking state in a dedicated Rider booking context or hook (e.g., useRiderBookingStore) so it persists across steps and refreshes safely without leaking to global state.
+
+----------------------------------------------------------------------
+C. Dropoff selection (step 2)
+----------------------------------------------------------------------
+
+1) UI behavior:
+  - Very similar to pickup:
+    • Text input “Dropoff location”.
+    • Search-as-you-type suggestions via existing geocoding/autocomplete helper.
+    • Recent destinations list (if available).
+  - Allow user to tap on map to select dropoff, or pick from search results.
+
+2) Map behavior:
+  - Show pickup + dropoff pins.
+  - Draw a basic route polyline if route data can be fetched from the existing mapping helper.
+  - If route data is not yet integrated, keep it simple: just show both pins and the camera fitted to them.
+
+3) Data + validation:
+  - Add:
+    • dropoffLatitude, dropoffLongitude
+    • dropoffAddress
+  - Validate:
+    • Not the same as pickup.
+    • Inside service area.
+
+4) Continue button:
+  - “See ride options” button navigates to ride options step and triggers a backend fare estimate request as described below.
+
+----------------------------------------------------------------------
+D. Ride options + fare estimation (step 3)
+----------------------------------------------------------------------
+
+1) Fetch ride options:
+  - Call existing backend endpoint that returns available ride service types for the selected pickup/dropoff and possibly time.
+  - If such endpoint already exists for the driver or pricing system, reuse it.
+  - Expected response (do not change schema if it already exists):
+    • serviceTypeId/serviceCode
+    • displayName (e.g., SafeGoX, SafeGo XL, Comfort)
+    • baseFare, estimatedFare, currency
+    • ETA in minutes
+    • Capacity (number of riders)
+    • Flags like isMostPopular, isEco, etc., if present.
+
+2) UI:
+  - List of ride cards, each showing:
+    • Ride name + small description (e.g., “Affordable everyday rides”).
+    • Estimated fare range (or single price) and currency.
+    • ETA.
+    • Passenger capacity.
+  - Highlight “Most popular” / recommended service if backend denotes it.
+  - Make cards tappable; selected card is visually distinct.
+
+3) Fare estimation:
+  - Call backend with pickup+dropoff coordinates and service type.
+  - Handle errors gracefully:
+    • Show a non-blocking error toast and allow retry.
+    • If estimates are temporarily unavailable, show a message and prevent confirmation.
+
+4) Other options on this step:
+  - Payment method selector:
+    • Reuse existing wallet/payment methods for the rider (card, wallet balance, etc.).
+    • Do NOT add new payment types in schema.
+  - Promo code:
+    • ONLY if there is already an endpoint; in that case:
+      - Let user enter code, call validation, and show adjusted fare.
+    • If no promo system yet:
+      - Show a disabled field / “Coming soon” note, do not connect to backend.
+
+----------------------------------------------------------------------
+E. Confirmation screen (step 4)
+----------------------------------------------------------------------
+
+1) Before sending to backend:
+  - Ensure booking context has:
+    • pickup & dropoff coordinates and addresses.
+    • chosen serviceType.
+    • current estimated price.
+    • selected payment method ID (if any).
+    • optional promoCode (only if validated).
+    • navigationPreference (SafeGo internal map vs external app like Google Maps/Apple Maps; this was added in the driver side).
+
+2) Backend interaction:
+  - Use existing ride/trip creation endpoint (or create a small wrapper if one already exists) and DO NOT change its schema.
+  - Payload must be compatible with driver side:
+    • riderId (from auth context).
+    • pickup/dropoff coordinates & addresses.
+    • serviceType.
+    • initial status, aligned with the allowed statuses (e.g., searching/matching).
+    • pricing block with estimate and currency.
+    • paymentMethodId and any needed flags for pay-in-cash vs card, etc.
+
+3) Error handling:
+  - If trip creation fails:
+    • Show a clear error message.
+    • Log the failure using existing audit logging.
+    • Allow retry without creating duplicate trips (backend should either be idempotent or you should show a “Try again” that just re-calls the create endpoint).
+
+4) After success:
+  - Navigate to a “Driver is on the way” / matching screen that reuses the same URL as the active trip (e.g., /rider/trip/active) and just shows status searching/accepted/arriving etc.
+  - Use polling or WebSocket/subscription if an existing mechanism is in place; otherwise use simple periodic polling (e.g., 5–10 seconds) via existing trip status endpoint.
+
+----------------------------------------------------------------------
+F. Rider active trip experience (read-only mirror of driver)
+----------------------------------------------------------------------
+
+We already have driver active trip logic from C-3/C-4/C-5. For Rider:
+
+1) Status views:
+  - searching/matching: show driver-search animation, vehicle ETA estimate (if available).
+  - accepted/arriving: show driver info (photo, rating, car, plate), ETA, map with driver marker.
+  - arrived: show clear “Your driver has arrived” state.
+  - started: show route progress and remaining time/cost.
+  - completed: show short summary and link to rate the trip.
+
+2) Map:
+  - Reuse same map provider and route display as driver but in a read-only way.
+  - Do NOT duplicate map logic; share helpers where possible.
+
+3) Actions:
+  - Buttons for:
+    • Call driver.
+    • Message driver (if chat/messages already exist).
+    • Cancel ride (only if within allowed rules; call existing cancel endpoint and log the reason).
+  - All actions must be subject to existing security gates and cancellation rules.
+
+4) Audit / logging:
+  - Ensure that trip completion, cancellation, and important actions already log to the immutable audit log – if this is already handled at the backend controller/middleware level, do not duplicate.
+
+----------------------------------------------------------------------
+G. Security, performance, and UX details
+----------------------------------------------------------------------
+
+1) Security:
+  - All rider booking endpoints must:
+    • Check authenticated rider role.
+    • Enforce KYC or verification level if the existing config requires it.
+    • Rate-limit ride creation to prevent abuse (reusing existing rate limiter).
+  - Never expose internal IDs or sensitive driver data directly in the UI; use only fields that rider should see (name initial, car model, plate, rating, avatar).
+
+2) Performance:
+  - Avoid unnecessary map re-renders; memoize heavy components where helpful.
+  - Keep network calls minimal: share booking state across steps so you don’t recompute route/estimate if not necessary.
+
+3) UX:
+  - All screens must be usable on small mobile viewports.
+  - Use skeleton/loading states while fetching estimates and options.
+  - Provide clear error states for network issues (e.g., “Can’t connect. Check your internet and try again.”).
+
+----------------------------------------------------------------------
+H. Testing & verification
+----------------------------------------------------------------------
+
+1) Add/verify data-testid attributes for:
+  - pickup/dropoff inputs, ride option cards, confirm button, error messages, active trip status sections.
+
+2) Manual test plan (summarize in the Agent output):
+  - Scenario A: happy path
+    • Rider selects pickup current location and a dropoff.
+    • Sees ride options and estimates.
+    • Confirms ride and sees “searching for driver”.
+    • When backend status becomes accepted/arriving, screen updates correctly.
+  - Scenario B: invalid outside service area.
+  - Scenario C: server error on estimate.
+  - Scenario D: server error on trip creation.
+  - Scenario E: cancellation before driver arrives.
+
+3) At the end, provide a concise summary of:
+  - Files changed (frontend + backend).
+  - Any new hooks/context added.
+  - Any new endpoints or route handlers added.
+  - Known limitations or future polish ideas (mark them clearly as future).
+
+==================== END OF TASK ====================
+
+Now implement all of the above for R-2 in a single, coherent set of changes, keeping the rest of the system fully working.

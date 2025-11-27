@@ -53,7 +53,7 @@ const serviceCards = [
     subtitle: "Door-to-door rides anytime",
     description: "Get picked up and dropped off safely with professional drivers",
     icon: Car,
-    href: "/rider/trips?start=new",
+    href: "/rider/ride/new",
     color: "bg-blue-500",
     testId: "rider-home-ride-card",
   },
