@@ -47,7 +47,11 @@ export function GooglePlacesInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const listenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  const dropdownListenerRef = useRef<((e: MouseEvent) => void) | null>(null);
   const isSelectingRef = useRef(false);
+  // Store callbacks in refs to avoid re-initializing autocomplete when callbacks change
+  const onLocationSelectRef = useRef(onLocationSelect);
+  onLocationSelectRef.current = onLocationSelect;
   const [showCurrentLocationButton, setShowCurrentLocationButton] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const { isReady, isLoading: isLoadingMaps, error } = useGoogleMaps();
@@ -80,6 +84,9 @@ export function GooglePlacesInput({
       }
     };
 
+    // Store ref for cleanup
+    dropdownListenerRef.current = handleDropdownClick;
+
     // Use capture phase to catch the event before Google processes it
     document.addEventListener('mousedown', handleDropdownClick, true);
 
@@ -106,9 +113,9 @@ export function GooglePlacesInput({
         inputRef.current.value = fullAddress;
       }
 
-      // Call onLocationSelect with full place data
+      // Call onLocationSelect via ref to get the latest callback
       // The parent component is responsible for updating both the location AND the display address
-      onLocationSelect({
+      onLocationSelectRef.current({
         address: fullAddress,
         lat,
         lng,
@@ -127,14 +134,17 @@ export function GooglePlacesInput({
     console.log("[GooglePlacesInput] Autocomplete initialized successfully");
 
     return () => {
-      document.removeEventListener('mousedown', handleDropdownClick, true);
+      if (dropdownListenerRef.current) {
+        document.removeEventListener('mousedown', dropdownListenerRef.current, true);
+        dropdownListenerRef.current = null;
+      }
       if (listenerRef.current && window.google?.maps?.event) {
         window.google.maps.event.removeListener(listenerRef.current);
         listenerRef.current = null;
       }
       autocompleteRef.current = null;
     };
-  }, [isReady, onLocationSelect]);
+  }, [isReady]); // Only re-run when Maps SDK is ready, use refs for callbacks
 
   useEffect(() => {
     if (autoFocus && inputRef.current && isReady) {
