@@ -16,6 +16,11 @@ import {
   ArrowLeft,
   ExternalLink,
   Loader2,
+  MessageSquare,
+  CreditCard,
+  Banknote,
+  XCircle,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,6 +55,7 @@ interface ActiveTrip {
   estimatedTripMinutes: number;
   distanceKm: number;
   fare: number;
+  paymentMethod?: "card" | "cash" | "wallet";
   customer: {
     firstName: string;
     phone: string | null;
@@ -65,15 +71,15 @@ const navigationApps = [
   { id: "waze", name: "Waze", icon: ExternalLink },
 ];
 
-const statusConfig: Record<string, { label: string; color: string; bgColor: string }> = {
-  accepted: { label: "Trip Accepted", color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30" },
-  arriving: { label: "Heading to Pickup", color: "text-orange-600", bgColor: "bg-orange-100 dark:bg-orange-900/30" },
-  arrived: { label: "At Pickup", color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30" },
-  started: { label: "Trip in Progress", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30" },
-  in_progress: { label: "Trip in Progress", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30" },
-  picked_up: { label: "Picked Up", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30" },
-  completed: { label: "Completed", color: "text-emerald-600", bgColor: "bg-emerald-100 dark:bg-emerald-900/30" },
-  cancelled: { label: "Cancelled", color: "text-red-600", bgColor: "bg-red-100 dark:bg-red-900/30" },
+const statusConfig: Record<string, { label: string; sublabel: string; color: string; bgColor: string }> = {
+  accepted: { label: "Heading to pickup", sublabel: "Navigate to pickup location", color: "text-blue-600", bgColor: "bg-blue-100 dark:bg-blue-900/30" },
+  arriving: { label: "Heading to pickup", sublabel: "Almost there", color: "text-orange-600", bgColor: "bg-orange-100 dark:bg-orange-900/30" },
+  arrived: { label: "Waiting for rider", sublabel: "You've arrived at pickup", color: "text-purple-600", bgColor: "bg-purple-100 dark:bg-purple-900/30" },
+  started: { label: "On trip to destination", sublabel: "Drive safely", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30" },
+  in_progress: { label: "On trip to destination", sublabel: "Delivery in progress", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30" },
+  picked_up: { label: "Order picked up", sublabel: "Navigate to customer", color: "text-green-600", bgColor: "bg-green-100 dark:bg-green-900/30" },
+  completed: { label: "Trip completed", sublabel: "Earnings added to wallet", color: "text-emerald-600", bgColor: "bg-emerald-100 dark:bg-emerald-900/30" },
+  cancelled: { label: "Cancelled", sublabel: "Trip was cancelled", color: "text-red-600", bgColor: "bg-red-100 dark:bg-red-900/30" },
 };
 
 function getServiceIcon(serviceType: string) {
@@ -306,30 +312,38 @@ export default function DriverTripActive() {
   const nextAction = getNextAction();
   const activeLeg = getActiveLeg();
 
+  const paymentType = activeTrip.paymentMethod || "card";
+
   return (
     <div className="flex flex-col h-full" data-testid="active-trip-screen">
-      <div className={`px-4 py-3 ${statusInfo.bgColor}`}>
+      <div className={`px-4 py-4 ${statusInfo.bgColor}`}>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-full bg-background ${statusInfo.color}`}>
-              <ServiceIcon className="h-5 w-5" />
+            <div className={`p-2.5 rounded-full bg-background shadow-sm ${statusInfo.color}`}>
+              <ServiceIcon className="h-6 w-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className={`${statusInfo.bgColor} ${statusInfo.color} border-0`}>
-                  {statusInfo.label}
-                </Badge>
-                <span className="text-sm font-medium text-muted-foreground">{activeTrip.tripCode}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className={`text-lg font-bold ${statusInfo.color}`}>{statusInfo.label}</h2>
               </div>
-              <div className="flex items-center gap-1 text-sm mt-0.5">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                 <Clock className="h-3.5 w-3.5" />
-                <span>{getEtaDisplay()}</span>
+                <span className="font-medium">{getEtaDisplay()}</span>
+                <span className="text-muted-foreground/60">|</span>
+                <span>{activeTrip.tripCode}</span>
               </div>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-lg font-bold">${activeTrip.fare.toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">{activeTrip.distanceKm.toFixed(1)} km</p>
+            <div className="flex items-center gap-1.5 justify-end">
+              {paymentType === "cash" ? (
+                <Banknote className="h-4 w-4 text-green-600" />
+              ) : (
+                <CreditCard className="h-4 w-4 text-blue-600" />
+              )}
+              <p className="text-xl font-bold">${activeTrip.fare.toFixed(2)}</p>
+            </div>
+            <p className="text-xs text-muted-foreground">{activeTrip.distanceKm.toFixed(1)} km trip</p>
           </div>
         </div>
       </div>
@@ -393,33 +407,38 @@ export default function DriverTripActive() {
               </div>
             </div>
 
-            <div className="flex gap-2 mt-4">
+            <div className={`grid gap-2 mt-4 ${activeTrip.customer.phone ? 'grid-cols-4' : 'grid-cols-3'}`}>
               {activeTrip.customer.phone && (
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="flex-col h-auto py-3 gap-1"
                   asChild
                   data-testid="button-call-customer"
                 >
                   <a href={`tel:${activeTrip.customer.phone}`}>
-                    <Phone className="h-4 w-4 mr-2" />
-                    Call
+                    <Phone className="h-5 w-5" />
+                    <span className="text-xs font-medium">Call</span>
                   </a>
                 </Button>
               )}
-              <Link href="/driver/safety" className="flex-1">
-                <Button variant="outline" size="sm" className="w-full" data-testid="button-safety">
-                  <Shield className="h-4 w-4 mr-2" />
-                  Safety
+              <Link href={`/driver/support?tripId=${activeTrip.id}&context=active_trip`}>
+                <Button variant="outline" size="sm" className="w-full flex-col h-auto py-3 gap-1" data-testid="button-support">
+                  <MessageSquare className="h-5 w-5" />
+                  <span className="text-xs font-medium">Support</span>
+                </Button>
+              </Link>
+              <Link href={`/driver/safety?tripId=${activeTrip.id}`}>
+                <Button variant="outline" size="sm" className="w-full flex-col h-auto py-3 gap-1" data-testid="button-safety">
+                  <Shield className="h-5 w-5" />
+                  <span className="text-xs font-medium">Safety</span>
                 </Button>
               </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="flex-1" data-testid="button-navigation-menu">
-                    <Navigation className="h-4 w-4 mr-2" />
-                    Navigate
-                    <ChevronDown className="h-3 w-3 ml-1" />
+                  <Button variant="outline" size="sm" className="w-full flex-col h-auto py-3 gap-1" data-testid="button-navigation-menu">
+                    <Navigation className="h-5 w-5" />
+                    <span className="text-xs font-medium">Navigate</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
@@ -468,6 +487,31 @@ export default function DriverTripActive() {
             )}
           </Button>
         )}
+
+        <div className="flex items-center justify-center gap-4 pt-2">
+          <Link href={`/driver/safety?tripId=${activeTrip.id}&action=report`}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-muted-foreground hover:text-destructive"
+              data-testid="button-report-issue"
+            >
+              <AlertTriangle className="h-4 w-4 mr-1.5" />
+              Report Issue
+            </Button>
+          </Link>
+          <Link href={`/driver/support?tripId=${activeTrip.id}&action=cancel`}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-muted-foreground hover:text-destructive"
+              data-testid="button-cancel-trip"
+            >
+              <XCircle className="h-4 w-4 mr-1.5" />
+              Cancel Trip
+            </Button>
+          </Link>
+        </div>
       </div>
     </div>
   );
