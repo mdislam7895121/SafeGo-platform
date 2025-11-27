@@ -1,0 +1,64 @@
+###############################################
+# SAFEGO CUSTOMER LANDING PAGE – FINAL POLISH
+###############################################
+
+Follow all SafeGo Master Rules and the corrected system state.
+
+Improve ONLY the Customer Landing Page visuals and UX to match Uber-level quality WITHOUT enabling any new features. Do NOT activate Eats/Grocery/Reserve/Courier. They must remain “Coming soon”.
+
+Apply the following enhancements:
+
+1) HERO SECTION (top card)
+   - Add dynamic greeting based on time (“Good morning/afternoon/evening”)
+   - Show user profile with verified badge and country
+   - Clean spacing, premium padding, better typography
+   - Compact top navbar like Uber
+
+2) RIDE REQUEST BLOCK
+   - Refine the input boxes (Pickup + Destination)
+   - Auto-detect current location button on the right
+   - Slight border shadow like Uber
+   - “See prices” button styled like Uber (solid blue)
+   - Cash payment disabled text visible
+
+3) SERVICE TILES
+   - Keep Ride ACTIVE
+   - Apply “Coming soon” overlay on:
+        • Eats
+        • Grocery
+        • Courier
+        • Reserve
+        • Business
+   - Add hover glow and rounded corners
+   - Clean icon alignment
+
+4) ACTIVITY PREVIEW
+   - Show last 3 completed rides only
+   - “See all” button on the right
+   - If no rides, show placeholder card
+
+5) RESERVE PREVIEW CARD
+   - Light colored background (soft blue)
+   - Rounded container
+   - Date/time inputs disabled with Coming Soon label
+   - Do NOT activate this feature
+
+6) BOTTOM TABS
+   - Enable:
+        • Home
+        • Activity
+        • Support
+        • Profile
+   - Disable everything else with “Coming soon”
+   - Keep icons consistent with current design
+
+Important:
+- DO NOT activate any feature not in the “active” list.
+- DO NOT modify Driver/Restaurant/Admin roles.
+- Only polish visuals and UX for Customer Landing Page.
+
+###############################################
+# Final goal:
+Premium, clean, Uber-style landing page with only
+Ride fully active, and all other services Coming Soon.
+###############################################
