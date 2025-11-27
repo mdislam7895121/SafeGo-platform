@@ -111,3 +111,9 @@ The schema utilizes UUID primary keys, indexed foreign keys, and decimal types f
 -   **UI Components**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 -   **Environment Variables**: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV`, `ENCRYPTION_KEY`, `SESSION_SECRET`.
 -   **Optional Integrations**: Twilio (SMS OTP), AgentMail (Email OTP) - services degrade gracefully to console logging when not configured.
+-   **Google Maps Integration**: Client-side only due to API key HTTP referrer restrictions:
+    - `GOOGLE_MAPS_API_KEY` with HTTP referrer restrictions (browser-only)
+    - All Maps operations (Geocoding, Directions, Places Autocomplete) use JavaScript SDK loaded dynamically
+    - Server routes: Only `/api/maps/config` (exposes API key to frontend); no server-side geocoding/directions
+    - Required Google APIs: Maps JavaScript API, Places API, Directions API, Geocoding API
+    - Key Restrictions: HTTP referrers only (e.g., `*.replit.app/*`, `*.replit.dev/*`, `localhost:*/*`)

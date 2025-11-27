@@ -24,6 +24,7 @@ interface GooglePlacesInputProps {
   onBlur?: () => void;
   inputClassName?: string;
   hideIcon?: boolean;
+  dropdownZIndex?: number;
 }
 
 export function GooglePlacesInput({
@@ -41,18 +42,12 @@ export function GooglePlacesInput({
   onBlur,
   inputClassName = "",
   hideIcon = false,
+  dropdownZIndex = 25,
 }: GooglePlacesInputProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [showCurrentLocationButton, setShowCurrentLocationButton] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const { isReady, isLoading: isLoadingMaps, error } = useGoogleMaps();
-
-  // Sync value prop with input element (controlled behavior)
-  useEffect(() => {
-    if (inputRef.current && inputRef.current.value !== value) {
-      inputRef.current.value = value;
-    }
-  }, [value]);
 
   const handlePlaceSelect = useCallback(
     (place: { address: string; lat: number; lng: number; placeId: string }) => {
@@ -66,10 +61,6 @@ export function GooglePlacesInput({
       // Update the displayed value to just the short address
       const shortAddress = place.address.split(",")[0];
       onChange(shortAddress);
-      // Also update the input directly since Google may have modified it
-      if (inputRef.current) {
-        inputRef.current.value = shortAddress;
-      }
       setShowCurrentLocationButton(false);
       setIsFocused(false);
     },
@@ -104,19 +95,19 @@ export function GooglePlacesInput({
   };
 
   const handleInputBlur = () => {
+    // Call parent onBlur immediately so it can manage its own timing
+    onBlur?.();
+    // Delay internal state updates to allow click events on current location button
     setTimeout(() => {
       setIsFocused(false);
       setShowCurrentLocationButton(false);
-      onBlur?.();
     }, 200);
   };
 
   const handleClear = () => {
     onChange("");
-    if (inputRef.current) {
-      inputRef.current.value = "";
-      inputRef.current.focus();
-    }
+    // Focus back on input after clearing
+    inputRef.current?.focus();
   };
 
   const handleCurrentLocation = () => {
@@ -136,7 +127,7 @@ export function GooglePlacesInput({
         )}
         <Input
           ref={inputRef}
-          defaultValue={value}
+          value={value}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onBlur={handleInputBlur}
@@ -164,7 +155,7 @@ export function GooglePlacesInput({
       </div>
 
       {showCurrentLocation && showCurrentLocationButton && isReady && isFocused && (
-        <div className="absolute top-full left-0 right-0 mt-1 z-[9999] bg-background border rounded-lg shadow-lg overflow-hidden">
+        <div className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg overflow-hidden`} style={{ zIndex: dropdownZIndex }}>
           <button
             type="button"
             className="w-full flex items-center gap-3 p-4 hover-elevate text-left"
