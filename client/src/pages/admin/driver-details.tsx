@@ -133,6 +133,18 @@ interface DriverDetails {
     dmvInspectionVerificationStatus?: string;
     dmvInspectionRejectionReason?: string;
     dmvInspectionStatus?: string;
+    // Vehicle Category fields
+    vehicleCategory?: string;
+    vehicleCategoryStatus?: string;
+    suggestedCategory?: string;
+    suggestedCategoryReasons?: string[];
+    vehicleVerificationStatus?: string;
+    bodyType?: string;
+    luxury?: boolean;
+    seatCapacity?: number;
+    wheelchairAccessible?: boolean;
+    exteriorColor?: string;
+    interiorColor?: string;
   } | null;
   stats: {
     rating: string;
@@ -251,6 +263,11 @@ export default function AdminDriverDetails() {
   const [nid, setNid] = useState<string>("");
   const [showSSN, setShowSSN] = useState(false);
   const [maskedSSN, setMaskedSSN] = useState<string>("");
+  
+  // Vehicle category approval state
+  const [vehicleCategoryToAssign, setVehicleCategoryToAssign] = useState<string>("");
+  const [showVehicleRejectionDialog, setShowVehicleRejectionDialog] = useState(false);
+  const [vehicleRejectionReason, setVehicleRejectionReason] = useState("");
   
   // Edit profile dialog state (Bangladesh)
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -797,6 +814,59 @@ export default function AdminDriverDetails() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  // Vehicle category approval mutation
+  const vehicleCategoryApprovalMutation = useMutation({
+    mutationFn: async ({ approved, category, rejectionReason }: { approved: boolean; category?: string; rejectionReason?: string }) => {
+      const vehicleId = driver?.vehicle?.id;
+      if (!vehicleId) throw new Error("No vehicle found");
+
+      const response = await apiRequest("PATCH", `/api/admin/vehicles/${vehicleId}/category-approval`, {
+        approved,
+        vehicleCategory: category,
+        rejectionReason,
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to update vehicle category");
+      }
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      const message = variables.approved 
+        ? `Vehicle approved for category: ${variables.category}` 
+        : "Vehicle category update requested";
+      toast({ title: message });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/drivers"] });
+      setVehicleCategoryToAssign("");
+      setShowVehicleRejectionDialog(false);
+      setVehicleRejectionReason("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Vehicle category approval handler
+  const handleVehicleCategoryApproval = (approved: boolean) => {
+    if (approved && !vehicleCategoryToAssign) {
+      toast({ title: "Error", description: "Please select a category to assign", variant: "destructive" });
+      return;
+    }
+    vehicleCategoryApprovalMutation.mutate({
+      approved,
+      category: vehicleCategoryToAssign,
+    });
+  };
+
+  // Vehicle rejection handler with reason
+  const handleVehicleRejection = () => {
+    vehicleCategoryApprovalMutation.mutate({
+      approved: false,
+      rejectionReason: vehicleRejectionReason,
+    });
+  };
 
   // Handler to open vehicle edit dialog with existing data using staged hydration
   const handleOpenEditVehicleDialog = () => {
@@ -2000,6 +2070,162 @@ export default function AdminDriverDetails() {
                         )}
                       </div>
 
+                      {/* Vehicle Category Verification - NEW SECTION */}
+                      <div className="border-t pt-4">
+                        <p className="text-sm font-semibold text-foreground mb-3">Vehicle Category Verification</p>
+                        
+                        <div className="space-y-4">
+                          {/* Current Status */}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-xs text-muted-foreground">Verification Status:</p>
+                            <Badge
+                              variant={
+                                driver.vehicle.vehicleVerificationStatus === "APPROVED"
+                                  ? "default"
+                                  : driver.vehicle.vehicleVerificationStatus === "REJECTED"
+                                  ? "destructive"
+                                  : driver.vehicle.vehicleVerificationStatus === "REQUEST_CHANGES"
+                                  ? "outline"
+                                  : "secondary"
+                              }
+                              data-testid="badge-vehicle-verification-status"
+                            >
+                              {driver.vehicle.vehicleVerificationStatus || "PENDING_VERIFICATION"}
+                            </Badge>
+                          </div>
+
+                          {/* Current & Suggested Category */}
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Assigned Category</p>
+                              <p className="text-sm font-medium" data-testid="text-vehicle-category">
+                                {driver.vehicle.vehicleCategory ? (
+                                  <Badge variant="default">{driver.vehicle.vehicleCategory}</Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">Not assigned</span>
+                                )}
+                              </p>
+                            </div>
+                            {driver.vehicle.suggestedCategory && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">AI Suggested Category</p>
+                                <Badge variant="outline" data-testid="text-suggested-category">
+                                  {driver.vehicle.suggestedCategory}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* AI Suggestion Reasons */}
+                          {driver.vehicle.suggestedCategoryReasons && driver.vehicle.suggestedCategoryReasons.length > 0 && (
+                            <div className="p-3 bg-muted/50 border rounded-md">
+                              <p className="text-xs font-medium text-muted-foreground mb-2">AI Reasoning:</p>
+                              <ul className="text-xs space-y-1" data-testid="list-suggestion-reasons">
+                                {driver.vehicle.suggestedCategoryReasons.map((reason, idx) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <span className="text-primary">•</span>
+                                    <span>{reason}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Vehicle Properties for Verification */}
+                          <div className="grid gap-4 md:grid-cols-3">
+                            {driver.vehicle.bodyType && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Body Type</p>
+                                <p className="text-sm" data-testid="text-body-type">{driver.vehicle.bodyType}</p>
+                              </div>
+                            )}
+                            {driver.vehicle.seatCapacity && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Seat Capacity</p>
+                                <p className="text-sm" data-testid="text-seat-capacity">{driver.vehicle.seatCapacity}</p>
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-xs text-muted-foreground">Wheelchair Accessible</p>
+                              <p className="text-sm" data-testid="text-wheelchair-accessible">
+                                {driver.vehicle.wheelchairAccessible ? "Yes" : "No"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Luxury</p>
+                              <p className="text-sm" data-testid="text-luxury">
+                                {driver.vehicle.luxury ? "Yes" : "No"}
+                              </p>
+                            </div>
+                            {driver.vehicle.exteriorColor && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Exterior Color</p>
+                                <p className="text-sm" data-testid="text-exterior-color">{driver.vehicle.exteriorColor}</p>
+                              </div>
+                            )}
+                            {driver.vehicle.interiorColor && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Interior Color</p>
+                                <p className="text-sm" data-testid="text-interior-color">{driver.vehicle.interiorColor}</p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Admin Category Assignment Actions */}
+                          {driver.vehicle.vehicleVerificationStatus !== "APPROVED" && (
+                            <div className="flex flex-col gap-3 pt-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Label className="text-sm">Assign Category:</Label>
+                                <Select
+                                  value={vehicleCategoryToAssign}
+                                  onValueChange={setVehicleCategoryToAssign}
+                                >
+                                  <SelectTrigger className="w-48" data-testid="select-assign-category">
+                                    <SelectValue placeholder="Select category" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="SAFEGO_X">SafeGo X</SelectItem>
+                                    <SelectItem value="SAFEGO_COMFORT">SafeGo Comfort</SelectItem>
+                                    <SelectItem value="SAFEGO_COMFORT_XL">SafeGo Comfort XL</SelectItem>
+                                    <SelectItem value="SAFEGO_XL">SafeGo XL</SelectItem>
+                                    <SelectItem value="SAFEGO_BLACK">SafeGo Black</SelectItem>
+                                    <SelectItem value="SAFEGO_BLACK_SUV">SafeGo Black SUV</SelectItem>
+                                    <SelectItem value="SAFEGO_WAV">SafeGo WAV</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleVehicleCategoryApproval(true)}
+                                  disabled={!vehicleCategoryToAssign || vehicleCategoryApprovalMutation.isPending}
+                                  data-testid="button-approve-vehicle-category"
+                                >
+                                  {vehicleCategoryApprovalMutation.isPending ? "Processing..." : "Approve & Assign"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setShowVehicleRejectionDialog(true)}
+                                  disabled={vehicleCategoryApprovalMutation.isPending}
+                                  data-testid="button-reject-vehicle-category"
+                                >
+                                  Request Changes
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {driver.vehicle.vehicleVerificationStatus === "APPROVED" && driver.vehicle.vehicleCategory && (
+                            <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                              <p className="text-sm text-green-700 dark:text-green-400 font-medium" data-testid="text-approved-category">
+                                Vehicle approved for category: {driver.vehicle.vehicleCategory}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Registration Document */}
                       <div className="border-t pt-4">
                         <p className="text-sm font-semibold text-foreground mb-3">Registration Document</p>
@@ -2205,6 +2431,34 @@ export default function AdminDriverDetails() {
               data-testid="button-confirm-suspend"
             >
               Suspend
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Vehicle Rejection Dialog */}
+      <AlertDialog open={showVehicleRejectionDialog} onOpenChange={setShowVehicleRejectionDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Request Vehicle Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter a reason for requesting changes to the vehicle registration. The driver will need to update their vehicle information.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Textarea
+            placeholder="Reason for requesting changes..."
+            value={vehicleRejectionReason}
+            onChange={(e) => setVehicleRejectionReason(e.target.value)}
+            data-testid="textarea-vehicle-rejection-reason"
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-vehicle-rejection">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleVehicleRejection}
+              disabled={!vehicleRejectionReason || vehicleCategoryApprovalMutation.isPending}
+              data-testid="button-confirm-vehicle-rejection"
+            >
+              {vehicleCategoryApprovalMutation.isPending ? "Processing..." : "Request Changes"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

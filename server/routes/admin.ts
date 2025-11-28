@@ -2524,6 +2524,119 @@ router.get("/vehicles/:vehicleId/category-history", checkPermission(Permission.V
   }
 });
 
+// PATCH /api/admin/vehicles/:vehicleId/category-approval
+// Unified endpoint to approve/reject vehicle category with optional category assignment
+router.patch("/vehicles/:vehicleId/category-approval", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { approved, vehicleCategory, rejectionReason } = req.body;
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      include: {
+        driver: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    const oldCategory = vehicle.vehicleCategory;
+    const oldStatus = vehicle.vehicleVerificationStatus;
+
+    if (approved) {
+      // Validate category for approval
+      const validCategories = [
+        "SAFEGO_X", "SAFEGO_COMFORT", "SAFEGO_COMFORT_XL", "SAFEGO_XL", 
+        "SAFEGO_BLACK", "SAFEGO_BLACK_SUV", "SAFEGO_WAV",
+        // Legacy support
+        "X", "COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV", "WAV"
+      ];
+      if (!vehicleCategory || !validCategories.includes(vehicleCategory)) {
+        return res.status(400).json({ 
+          error: "Invalid category. Must be one of: SAFEGO_X, SAFEGO_COMFORT, SAFEGO_COMFORT_XL, SAFEGO_XL, SAFEGO_BLACK, SAFEGO_BLACK_SUV, SAFEGO_WAV" 
+        });
+      }
+
+      const updatedVehicle = await prisma.vehicle.update({
+        where: { id: vehicleId },
+        data: {
+          vehicleCategory: vehicleCategory,
+          vehicleCategoryStatus: "approved",
+          vehicleVerificationStatus: "APPROVED",
+          categoryApprovalNotes: `Admin approved: ${vehicleCategory}`,
+          categoryApprovedAt: new Date(),
+          categoryApprovedBy: req.user?.id,
+        },
+      });
+
+      await logAuditEvent({
+        adminId: req.adminUser?.id,
+        actionType: ActionType.UPDATE,
+        entityType: EntityType.VEHICLE,
+        entityId: vehicleId,
+        oldValue: JSON.stringify({ vehicleCategory: oldCategory, vehicleVerificationStatus: oldStatus }),
+        newValue: JSON.stringify({ vehicleCategory, vehicleVerificationStatus: "APPROVED" }),
+        ipAddress: getClientIp(req),
+      });
+
+      return res.json({
+        message: "Vehicle category approved successfully",
+        vehicle: {
+          id: updatedVehicle.id,
+          vehicleCategory: updatedVehicle.vehicleCategory,
+          vehicleCategoryStatus: updatedVehicle.vehicleCategoryStatus,
+          vehicleVerificationStatus: updatedVehicle.vehicleVerificationStatus,
+          categoryApprovedAt: updatedVehicle.categoryApprovedAt,
+        },
+      });
+    } else {
+      // Rejection/Request Changes
+      const updatedVehicle = await prisma.vehicle.update({
+        where: { id: vehicleId },
+        data: {
+          vehicleCategoryStatus: "rejected",
+          vehicleVerificationStatus: "REQUEST_CHANGES",
+          categoryRejectionReason: rejectionReason || "Changes requested",
+          categoryRejectedAt: new Date(),
+          categoryRejectedBy: req.user?.id,
+        },
+      });
+
+      await logAuditEvent({
+        adminId: req.adminUser?.id,
+        actionType: ActionType.UPDATE,
+        entityType: EntityType.VEHICLE,
+        entityId: vehicleId,
+        oldValue: JSON.stringify({ vehicleVerificationStatus: oldStatus }),
+        newValue: JSON.stringify({ vehicleVerificationStatus: "REQUEST_CHANGES", reason: rejectionReason }),
+        ipAddress: getClientIp(req),
+      });
+
+      return res.json({
+        message: "Vehicle category changes requested",
+        vehicle: {
+          id: updatedVehicle.id,
+          vehicleCategoryStatus: updatedVehicle.vehicleCategoryStatus,
+          vehicleVerificationStatus: updatedVehicle.vehicleVerificationStatus,
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Vehicle category approval error:", error);
+    res.status(500).json({ error: "Failed to update vehicle category" });
+  }
+});
+
 // PATCH /api/admin/vehicles/:vehicleId/category/override
 // Admin override to set a vehicle's category directly
 router.patch("/vehicles/:vehicleId/category/override", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
