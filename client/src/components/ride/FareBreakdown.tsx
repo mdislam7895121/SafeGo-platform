@@ -22,6 +22,10 @@ import {
   Navigation,
   Shield,
   AlertCircle,
+  Plane,
+  ArrowRightLeft,
+  FileText,
+  Flag,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -38,12 +42,27 @@ export interface FareBreakdownData {
   longDistanceFee?: number;
   crossCitySurcharge?: number;
   crossStateSurcharge?: number;
+  returnDeadheadFee?: number;
+  airportFee?: number;
+  airportCode?: string;
+  borderZoneFee?: number;
+  stateRegulatoryFee?: number;
+  stateRegulatoryFeeLabel?: string;
   surgeAmount?: number;
   surgeMultiplier?: number;
   minimumFareApplied?: boolean;
   maximumFareApplied?: boolean;
+  stateMinimumFareApplied?: boolean;
+  stateMinimumFare?: number;
   originalFare?: number;
   driverMinimumPayoutApplied?: boolean;
+  // Explicit flags
+  crossCityApplied?: boolean;
+  crossStateApplied?: boolean;
+  regulatoryFeeApplied?: boolean;
+  airportFeeApplied?: boolean;
+  borderZoneFeeApplied?: boolean;
+  returnDeadheadApplied?: boolean;
 }
 
 export interface FareBreakdownProps {
@@ -169,6 +188,38 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           currency={currency} 
         />
       )}
+      {(breakdown.returnDeadheadFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={ArrowRightLeft} 
+          label="Return deadhead fee" 
+          amount={breakdown.returnDeadheadFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.airportFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Plane} 
+          label={`Airport fee${breakdown.airportCode ? ` (${breakdown.airportCode})` : ''}`}
+          amount={breakdown.airportFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.borderZoneFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Flag} 
+          label="Border zone fee" 
+          amount={breakdown.borderZoneFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.stateRegulatoryFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={FileText} 
+          label={breakdown.stateRegulatoryFeeLabel || "State regulatory fee"}
+          amount={breakdown.stateRegulatoryFee ?? 0} 
+          currency={currency} 
+        />
+      )}
       <BreakdownLine 
         icon={Route} 
         label="Tolls" 
@@ -206,7 +257,12 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
       {breakdown.minimumFareApplied && (
         <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
           <Shield className="h-3 w-3" />
-          <span>Minimum fare applied</span>
+          <span>
+            {breakdown.stateMinimumFareApplied 
+              ? `State minimum fare applied (${formatCurrency(breakdown.stateMinimumFare || 0, currency)})`
+              : 'Minimum fare applied'
+            }
+          </span>
         </div>
       )}
       {breakdown.maximumFareApplied && (

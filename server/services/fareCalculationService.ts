@@ -191,6 +191,16 @@ export interface RouteFareBreakdown {
   longDistanceFee: number;
   crossCitySurcharge: number;
   crossStateSurcharge: number;
+  returnDeadheadFee: number;
+  
+  // Location-based fees
+  airportFee: number;
+  airportCode?: string;
+  borderZoneFee: number;
+  
+  // State regulatory fees
+  stateRegulatoryFee: number;
+  stateRegulatoryFeeBreakdown: FeeBreakdownItem[];
   
   // Fees
   tollsTotal: number;
@@ -213,6 +223,8 @@ export interface RouteFareBreakdown {
   minimumFareApplied: boolean;
   maximumFareApplied: boolean;
   originalCalculatedFare: number;
+  stateMinimumFare?: number;
+  stateMinimumFareApplied: boolean;
   
   // Driver payout
   driverPayout: number;
@@ -224,6 +236,14 @@ export interface RouteFareBreakdown {
   marginProtectionApplied: boolean;
   marginProtectionCapped: boolean;
   marginShortfall: number;
+  
+  // Explicit flags for fee application
+  crossCityApplied: boolean;
+  crossStateApplied: boolean;
+  regulatoryFeeApplied: boolean;
+  airportFeeApplied: boolean;
+  borderZoneFeeApplied: boolean;
+  returnDeadheadApplied: boolean;
   
   // Matched zones for logging
   matchedZoneIds: string[];
@@ -380,10 +400,156 @@ const DEFAULT_FARE_RULES = {
   LONG_DISTANCE_FEE_PER_MILE: 0.50, // Extra fee per mile after threshold
   CROSS_CITY_SURCHARGE: 5.00,       // Flat fee for cross-city trips
   CROSS_STATE_SURCHARGE: 10.00,     // Flat fee for cross-state trips
+  RETURN_DEADHEAD_PER_MILE: 0.25,   // Return deadhead fee per mile
+  BORDER_ZONE_FEE: 3.00,            // Border zone fee
   MAXIMUM_FARE: 500.00,             // Maximum fare cap
   DRIVER_MINIMUM_PAYOUT: 5.00,      // Minimum driver payout guarantee
   COMPANY_MIN_MARGIN_PERCENT: 15,   // Minimum company margin
 };
+
+// State-specific regulatory fees (US states)
+const STATE_REGULATORY_FEES: Record<string, { name: string; type: 'percent' | 'flat'; amount: number }[]> = {
+  'NY': [{ name: 'Black Car Fund Fee', type: 'percent', amount: 2.5 }],
+  'NJ': [{ name: 'Transportation Fee', type: 'flat', amount: 0.50 }],
+  'CT': [{ name: 'Ride-share Fee', type: 'flat', amount: 0.40 }],
+  'MA': [{ name: 'Transportation Network Surcharge', type: 'flat', amount: 0.20 }],
+  'IL': [{ name: 'Ground Transportation Tax', type: 'flat', amount: 0.65 }],
+  'CA': [{ name: 'Access for All Surcharge', type: 'flat', amount: 0.10 }],
+};
+
+// State-specific minimum fares (US states)
+const STATE_MINIMUM_FARES: Record<string, number> = {
+  'NY': 8.00,
+  'NJ': 7.00,
+  'CT': 6.00,
+  'MA': 6.50,
+  'IL': 5.50,
+  'CA': 7.00,
+};
+
+// Major US airports with their geo-coordinates and fees
+const AIRPORT_ZONES: {
+  code: string;
+  name: string;
+  lat: number;
+  lng: number;
+  radiusMiles: number;
+  pickupFee: number;
+  dropoffFee: number;
+  state: string;
+}[] = [
+  // New York Area
+  { code: 'JFK', name: 'John F. Kennedy International', lat: 40.6413, lng: -73.7781, radiusMiles: 2, pickupFee: 5.50, dropoffFee: 0, state: 'NY' },
+  { code: 'LGA', name: 'LaGuardia Airport', lat: 40.7769, lng: -73.8740, radiusMiles: 1.5, pickupFee: 3.00, dropoffFee: 0, state: 'NY' },
+  { code: 'EWR', name: 'Newark Liberty International', lat: 40.6895, lng: -74.1745, radiusMiles: 2, pickupFee: 4.50, dropoffFee: 0, state: 'NJ' },
+  // California
+  { code: 'LAX', name: 'Los Angeles International', lat: 33.9416, lng: -118.4085, radiusMiles: 2, pickupFee: 4.00, dropoffFee: 0, state: 'CA' },
+  { code: 'SFO', name: 'San Francisco International', lat: 37.6213, lng: -122.3790, radiusMiles: 2, pickupFee: 5.00, dropoffFee: 0, state: 'CA' },
+  { code: 'SAN', name: 'San Diego International', lat: 32.7338, lng: -117.1933, radiusMiles: 1.5, pickupFee: 3.50, dropoffFee: 0, state: 'CA' },
+  // Illinois
+  { code: 'ORD', name: "O'Hare International", lat: 41.9742, lng: -87.9073, radiusMiles: 2.5, pickupFee: 5.00, dropoffFee: 0, state: 'IL' },
+  { code: 'MDW', name: 'Chicago Midway', lat: 41.7868, lng: -87.7522, radiusMiles: 1.5, pickupFee: 3.00, dropoffFee: 0, state: 'IL' },
+  // Texas
+  { code: 'DFW', name: 'Dallas/Fort Worth International', lat: 32.8998, lng: -97.0403, radiusMiles: 3, pickupFee: 4.00, dropoffFee: 0, state: 'TX' },
+  { code: 'IAH', name: 'George Bush Intercontinental', lat: 29.9902, lng: -95.3368, radiusMiles: 2, pickupFee: 3.50, dropoffFee: 0, state: 'TX' },
+  // Florida
+  { code: 'MIA', name: 'Miami International', lat: 25.7959, lng: -80.2870, radiusMiles: 2, pickupFee: 3.50, dropoffFee: 0, state: 'FL' },
+  { code: 'MCO', name: 'Orlando International', lat: 28.4312, lng: -81.3081, radiusMiles: 2, pickupFee: 3.00, dropoffFee: 0, state: 'FL' },
+  // Massachusetts
+  { code: 'BOS', name: 'Boston Logan International', lat: 42.3656, lng: -71.0096, radiusMiles: 1.5, pickupFee: 4.25, dropoffFee: 0, state: 'MA' },
+  // Georgia
+  { code: 'ATL', name: 'Hartsfield-Jackson Atlanta', lat: 33.6407, lng: -84.4277, radiusMiles: 2.5, pickupFee: 4.00, dropoffFee: 0, state: 'GA' },
+  // Washington
+  { code: 'SEA', name: 'Seattle-Tacoma International', lat: 47.4502, lng: -122.3088, radiusMiles: 2, pickupFee: 3.50, dropoffFee: 0, state: 'WA' },
+  // DC Area
+  { code: 'DCA', name: 'Reagan National', lat: 38.8512, lng: -77.0402, radiusMiles: 1.5, pickupFee: 3.00, dropoffFee: 0, state: 'VA' },
+  { code: 'IAD', name: 'Washington Dulles', lat: 38.9531, lng: -77.4565, radiusMiles: 2, pickupFee: 4.00, dropoffFee: 0, state: 'VA' },
+];
+
+// Border zones (areas near state borders that have special pricing)
+const BORDER_ZONES: {
+  id: string;
+  name: string;
+  states: string[];
+  polygon: { lat: number; lng: number }[];
+}[] = [
+  {
+    id: 'ny-nj-border',
+    name: 'NY-NJ Border Zone',
+    states: ['NY', 'NJ'],
+    polygon: [
+      { lat: 40.85, lng: -74.10 },
+      { lat: 40.85, lng: -73.95 },
+      { lat: 40.70, lng: -73.95 },
+      { lat: 40.70, lng: -74.10 },
+    ],
+  },
+  {
+    id: 'ny-ct-border',
+    name: 'NY-CT Border Zone',
+    states: ['NY', 'CT'],
+    polygon: [
+      { lat: 41.15, lng: -73.75 },
+      { lat: 41.15, lng: -73.50 },
+      { lat: 40.95, lng: -73.50 },
+      { lat: 40.95, lng: -73.75 },
+    ],
+  },
+  {
+    id: 'dc-md-va-border',
+    name: 'DC-MD-VA Border Zone',
+    states: ['DC', 'MD', 'VA'],
+    polygon: [
+      { lat: 39.00, lng: -77.15 },
+      { lat: 39.00, lng: -76.90 },
+      { lat: 38.80, lng: -76.90 },
+      { lat: 38.80, lng: -77.15 },
+    ],
+  },
+];
+
+/**
+ * Detect if a point is within an airport zone
+ */
+function detectAirportZone(
+  point: { lat: number; lng: number }
+): typeof AIRPORT_ZONES[number] | null {
+  for (const airport of AIRPORT_ZONES) {
+    const distance = haversineDistanceMiles(point.lat, point.lng, airport.lat, airport.lng);
+    if (distance <= airport.radiusMiles) {
+      return airport;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detect if a point is within a border zone
+ */
+function detectBorderZone(
+  point: { lat: number; lng: number }
+): typeof BORDER_ZONES[number] | null {
+  for (const zone of BORDER_ZONES) {
+    if (isPointInPolygon(point, zone.polygon)) {
+      return zone;
+    }
+  }
+  return null;
+}
+
+/**
+ * Get state regulatory fees for a given state
+ */
+function getStateRegulatoryFees(stateCode: string): typeof STATE_REGULATORY_FEES[string] {
+  return STATE_REGULATORY_FEES[stateCode] || [];
+}
+
+/**
+ * Get state minimum fare for a given state
+ */
+function getStateMinimumFare(stateCode: string): number | null {
+  return STATE_MINIMUM_FARES[stateCode] || null;
+}
 
 // ============================================
 // Main Service Class
@@ -678,15 +844,117 @@ export class FareCalculationService {
       ? Number(fareConfig.crossStateSurcharge)
       : DEFAULT_FARE_RULES.CROSS_STATE_SURCHARGE;
     
+    // ============================================
+    // 7A. AIRPORT ZONE DETECTION
+    // Airport fee overrides cross-city surcharge
+    // ============================================
+    const pickupAirport = detectAirportZone(pickup);
+    const dropoffAirport = detectAirportZone(dropoff);
+    let airportFee = 0;
+    let airportCode: string | undefined;
+    let airportFeeApplied = false;
+    
+    if (pickupAirport) {
+      airportFee += pickupAirport.pickupFee;
+      airportCode = pickupAirport.code;
+      airportFeeApplied = true;
+    }
+    if (dropoffAirport) {
+      airportFee += dropoffAirport.dropoffFee;
+      if (!airportCode) airportCode = dropoffAirport.code;
+      airportFeeApplied = true;
+    }
+    airportFee = roundCurrency(airportFee);
+    
+    // ============================================
+    // 7B. BORDER ZONE DETECTION
+    // ============================================
+    const pickupBorderZone = detectBorderZone(pickup);
+    const dropoffBorderZone = detectBorderZone(dropoff);
+    let borderZoneFee = 0;
+    let borderZoneFeeApplied = false;
+    
+    // Apply border zone fee if either pickup or dropoff is in a border zone
+    if (pickupBorderZone || dropoffBorderZone) {
+      borderZoneFee = DEFAULT_FARE_RULES.BORDER_ZONE_FEE;
+      borderZoneFeeApplied = true;
+    }
+    
+    // ============================================
+    // 7C. CROSS-CITY AND CROSS-STATE SURCHARGES
+    // Airport fee overrides cross-city but NOT cross-state
+    // ============================================
     let crossCitySurcharge = 0;
     let crossStateSurcharge = 0;
+    let crossCityApplied = false;
+    let crossStateApplied = false;
     
     // Cross-state takes precedence over cross-city
     if (pickupStateCode && dropoffStateCode && pickupStateCode !== dropoffStateCode) {
       crossStateSurcharge = crossStateSurchargeAmount;
+      crossStateApplied = true;
     } else if (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) {
-      crossCitySurcharge = crossCitySurchargeAmount;
+      // Only apply cross-city if no airport fee (airport overrides cross-city)
+      if (!airportFeeApplied) {
+        crossCitySurcharge = crossCitySurchargeAmount;
+        crossCityApplied = true;
+      }
     }
+    
+    // ============================================
+    // 7D. RETURN DEADHEAD CHARGE (Uber-style)
+    // For cross-state rides or trips exceeding service area
+    // ============================================
+    let returnDeadheadFee = 0;
+    let returnDeadheadApplied = false;
+    
+    // Calculate excess return miles for cross-state trips
+    if (crossStateApplied) {
+      // Estimate return distance as the straight-line distance from dropoff to pickup
+      const returnDistance = haversineDistanceMiles(
+        dropoff.lat, dropoff.lng,
+        pickup.lat, pickup.lng
+      );
+      // Only charge for portion beyond typical service area (25 miles)
+      const excessReturnMiles = Math.max(0, returnDistance - 25);
+      if (excessReturnMiles > 0) {
+        returnDeadheadFee = roundCurrency(excessReturnMiles * DEFAULT_FARE_RULES.RETURN_DEADHEAD_PER_MILE);
+        returnDeadheadApplied = true;
+      }
+    }
+    
+    // ============================================
+    // 7E. STATE REGULATORY FEES
+    // Based on pickup state rules
+    // ============================================
+    const stateRegulatoryFees = pickupStateCode ? getStateRegulatoryFees(pickupStateCode) : [];
+    const stateRegulatoryFeeBreakdown: FeeBreakdownItem[] = [];
+    let stateRegulatoryFee = 0;
+    let regulatoryFeeApplied = false;
+    
+    for (const fee of stateRegulatoryFees) {
+      let amount = 0;
+      if (fee.type === 'percent') {
+        // Apply percent fee to the surge-adjusted fare
+        amount = roundCurrency(surgeAdjusted * fee.amount / 100);
+      } else {
+        amount = fee.amount;
+      }
+      
+      if (amount > 0) {
+        stateRegulatoryFeeBreakdown.push({
+          id: `state-${pickupStateCode}-${fee.name.replace(/\s+/g, '-').toLowerCase()}`,
+          name: fee.name,
+          amount,
+          type: fee.type,
+          description: `${pickupStateCode} state regulatory fee`,
+          isRegulatory: true,
+        });
+        stateRegulatoryFee += amount;
+        regulatoryFeeApplied = true;
+      }
+    }
+    stateRegulatoryFee = roundCurrency(stateRegulatoryFee);
     
     // ============================================
     // 8. DETECT TOLLS
@@ -765,6 +1033,10 @@ export class FareCalculationService {
       longDistanceFee +
       crossCitySurcharge +
       crossStateSurcharge +
+      returnDeadheadFee +
+      airportFee +
+      borderZoneFee +
+      stateRegulatoryFee +
       tollsTotal + 
       regulatoryFeesTotal + 
       additionalFeesTotal
@@ -805,8 +1077,17 @@ export class FareCalculationService {
     // ============================================
     // 15. FARE GUARDS (Minimum and Maximum)
     // Applied to gross fare
+    // State-specific minimums override global minimum
     // ============================================
-    const minimumFare = Number(fareConfig.minimumFare);
+    const globalMinimumFare = Number(fareConfig.minimumFare);
+    const stateMinimumFare = pickupStateCode ? getStateMinimumFare(pickupStateCode) : null;
+    
+    // Use state minimum if it exists and is higher than global minimum
+    const effectiveMinimumFare = stateMinimumFare && stateMinimumFare > globalMinimumFare
+      ? stateMinimumFare
+      : globalMinimumFare;
+    const stateMinimumFareApplied = stateMinimumFare !== null && stateMinimumFare > globalMinimumFare;
+    
     const maximumFare = fareConfig.maximumFare
       ? Number(fareConfig.maximumFare)
       : DEFAULT_FARE_RULES.MAXIMUM_FARE;
@@ -815,9 +1096,9 @@ export class FareCalculationService {
     let minimumFareApplied = false;
     let maximumFareApplied = false;
     
-    // Apply minimum fare first
-    if (fareAfterGuards < minimumFare) {
-      fareAfterGuards = minimumFare;
+    // Apply minimum fare first (state or global)
+    if (fareAfterGuards < effectiveMinimumFare) {
+      fareAfterGuards = effectiveMinimumFare;
       minimumFareApplied = true;
     }
     
@@ -849,9 +1130,11 @@ export class FareCalculationService {
     // All costs that are passed through (not retained by SafeGo):
     // - Driver payout (includes distance, time, and driver-paid tolls)
     // - Regulatory fees (goes to government, not SafeGo)
+    // - State regulatory fees (state-specific fees remitted to government)
     // Note: Additional fees (booking, safety, eco) and service fee are SafeGo revenue
+    const allRegulatoryFees = roundCurrency(regulatoryFeesTotal + stateRegulatoryFee);
     const calcPassThroughCosts = (payout: number) => 
-      roundCurrency(payout + regulatoryFeesTotal);
+      roundCurrency(payout + allRegulatoryFees);
     
     // Calculate commission: fare minus all pass-through costs
     const calcCommission = (fare: number, payout: number) => 
@@ -915,7 +1198,7 @@ export class FareCalculationService {
               // payout = fare - regFees - (targetMargin * fare)
               // payout = fare * (1 - targetMargin) - regFees
               const targetPayout = roundCurrency(
-                fareAfterGuards * (1 - companyMinMarginPercent / 100) - regulatoryFeesTotal
+                fareAfterGuards * (1 - companyMinMarginPercent / 100) - allRegulatoryFees
               );
               
               if (targetPayout >= driverMinimumPayout) {
@@ -975,6 +1258,16 @@ export class FareCalculationService {
       longDistanceFee,
       crossCitySurcharge,
       crossStateSurcharge,
+      returnDeadheadFee,
+      
+      // Location-based fees
+      airportFee,
+      airportCode,
+      borderZoneFee,
+      
+      // State regulatory fees
+      stateRegulatoryFee,
+      stateRegulatoryFeeBreakdown,
       
       tollsTotal,
       tollsBreakdown,
@@ -992,6 +1285,8 @@ export class FareCalculationService {
       minimumFareApplied,
       maximumFareApplied,
       originalCalculatedFare: grossFare,
+      stateMinimumFare: stateMinimumFare || undefined,
+      stateMinimumFareApplied,
       
       driverPayout,
       driverMinimumPayoutApplied,
@@ -1001,6 +1296,14 @@ export class FareCalculationService {
       marginProtectionApplied,
       marginProtectionCapped,
       marginShortfall,
+      
+      // Explicit flags for fee application
+      crossCityApplied,
+      crossStateApplied,
+      regulatoryFeeApplied,
+      airportFeeApplied,
+      borderZoneFeeApplied,
+      returnDeadheadApplied,
       
       matchedZoneIds,
     };
