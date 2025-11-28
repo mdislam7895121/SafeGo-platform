@@ -18,4 +18,8 @@ export default {
       tsconfig: 'tsconfig.json',
     }],
   },
+  moduleNameMapper: {
+    '^@shared/(.*)$': '<rootDir>/shared/$1',
+    '^@/(.*)$': '<rootDir>/client/src/$1',
+  },
 };

@@ -40,6 +40,7 @@ import secureAuditRoutes from "./routes/secure-audit"; // Security Hardening Pha
 import mapsRoutes from "./routes/maps"; // Google Maps proxy endpoints
 import faresRoutes from "./routes/fares"; // Multi-Route Fare Engine
 import promosRoutes from "./routes/promos"; // Promotion Engine
+import marketplaceBalancerRoutes from "./routes/marketplace-balancer"; // AI Marketplace Balancer
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { db } from "./db";
 
@@ -221,6 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/maps", mapsRoutes); // Google Maps proxy endpoints
   app.use("/api/fares", faresRoutes); // Multi-Route Fare Engine
   app.use("/api/promos", promosRoutes); // Promotion Engine
+  app.use("/api/admin/marketplace", marketplaceBalancerRoutes); // AI Marketplace Balancer
 
   const httpServer = createServer(app);
   
