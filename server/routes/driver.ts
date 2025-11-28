@@ -1449,6 +1449,100 @@ router.post("/vehicles/:id/request-category", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/driver/category-preferences
+// Get driver's category preferences for ride dispatch
+// ====================================================
+router.get("/category-preferences", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const result = await driverVehicleService.getDriverCategoryPreferences(driverProfile.id);
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json({
+      success: true,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Get category preferences error:", error);
+    res.status(500).json({ error: "Failed to get category preferences" });
+  }
+});
+
+// ====================================================
+// PUT /api/driver/category-preferences
+// Update driver's allowed categories for ride dispatch
+// ====================================================
+const categoryPreferencesSchema = z.object({
+  allowedCategories: z.array(z.string()).min(1, "At least one category must be enabled"),
+});
+
+router.put("/category-preferences", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = categoryPreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.errors,
+      });
+    }
+
+    const { allowedCategories } = validationResult.data;
+
+    // Validate all categories are valid VehicleCategoryIds
+    const invalidCategories = allowedCategories.filter(c => !isValidVehicleCategoryId(c));
+    if (invalidCategories.length > 0) {
+      return res.status(400).json({
+        error: `Invalid categories: ${invalidCategories.join(", ")}`,
+      });
+    }
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const result = await driverVehicleService.updateDriverCategoryPreferences(
+      driverProfile.id,
+      allowedCategories as VehicleCategoryId[]
+    );
+
+    if (!result.success) {
+      return res.status(400).json({
+        error: result.error,
+        validationErrors: (result as any).validationErrors,
+        validationWarnings: (result as any).validationWarnings,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Category preferences updated successfully",
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Update category preferences error:", error);
+    res.status(500).json({ error: "Failed to update category preferences" });
+  }
+});
+
+// ====================================================
 // GET /api/driver/dispatch-eligibility
 // Get the driver's current dispatch eligibility based on primary vehicle
 // ====================================================

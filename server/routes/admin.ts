@@ -14,6 +14,7 @@ import * as earningsService from "../services/earningsService";
 import * as fraudDetectionService from "../services/fraudDetectionService";
 import { scheduleAutomaticPayouts, runManualPayout } from "../services/payoutSchedulingService";
 import { reconcileWalletTransactions } from "../services/reconciliationService";
+import { driverVehicleService } from "../services/driverVehicleService";
 import { format } from "date-fns";
 import analyticsRouter, { getRBACFilter } from "./analytics";
 import performanceRouter from "./performance";
@@ -2704,6 +2705,42 @@ router.patch("/vehicles/:vehicleId/category/override", checkPermission(Permissio
   } catch (error) {
     console.error("Override vehicle category error:", error);
     res.status(500).json({ error: "Failed to override vehicle category" });
+  }
+});
+
+// PATCH /api/admin/vehicles/:vehicleId/reset-preferences
+// Admin reset driver's category preferences to default (all eligible categories)
+router.patch("/vehicles/:vehicleId/reset-preferences", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { vehicleId } = req.params;
+
+    const result = await driverVehicleService.adminResetCategoryPreferences(
+      vehicleId,
+      req.user?.userId || req.adminUser?.id || "admin"
+    );
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    await logAuditEvent({
+      adminId: req.adminUser?.id,
+      actionType: ActionType.UPDATE,
+      entityType: EntityType.VEHICLE,
+      entityId: vehicleId,
+      oldValue: "custom_preferences",
+      newValue: JSON.stringify({ allowedCategories: result.data?.allowedCategories }),
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({
+      success: true,
+      message: "Driver category preferences reset to default",
+      data: result.data,
+    });
+  } catch (error) {
+    console.error("Reset category preferences error:", error);
+    res.status(500).json({ error: "Failed to reset category preferences" });
   }
 });
 
