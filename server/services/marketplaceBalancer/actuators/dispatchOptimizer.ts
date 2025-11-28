@@ -249,7 +249,7 @@ export class DispatchOptimizer {
   // ========================================
 
   /**
-   * Filter drivers by vehicle category eligibility
+   * Filter drivers by vehicle category eligibility and driver preferences
    * Implements the dispatch matching rules:
    * - X → X only
    * - Comfort → Comfort + X
@@ -258,6 +258,10 @@ export class DispatchOptimizer {
    * - Black → Black + Comfort + X (NOT XL, WAV)
    * - Black SUV → Black SUV + Black + Comfort + X
    * - WAV → WAV only
+   * 
+   * Also checks driver preferences (allowedCategories):
+   * - If driver has allowedCategories set, only dispatch for categories they've enabled
+   * - If allowedCategories is not set, defaults to all eligible categories
    */
   filterByVehicleEligibility(
     drivers: DriverScoreInput[],
@@ -279,6 +283,7 @@ export class DispatchOptimizer {
         if (!driver.wheelchairAccessible || driver.vehicleCategory !== 'WAV') {
           return false;
         }
+        // WAV is locked and cannot be disabled by drivers, so we don't check preferences for WAV
         return true;
       }
 
@@ -288,12 +293,36 @@ export class DispatchOptimizer {
         requestedCategory
       );
 
-      return eligibility.isEligible;
+      if (!eligibility.isEligible) {
+        return false;
+      }
+
+      // Check driver preferences (allowedCategories)
+      // If driver has set preferences, only dispatch for categories they've enabled
+      if (driver.allowedCategories && driver.allowedCategories.length > 0) {
+        const normalizedRequestedCategory = requestedCategory.startsWith('SAFEGO_') 
+          ? requestedCategory 
+          : `SAFEGO_${requestedCategory}`;
+        
+        const isAllowed = driver.allowedCategories.some(allowed => {
+          const normalizedAllowed = allowed.startsWith('SAFEGO_') ? allowed : `SAFEGO_${allowed}`;
+          return normalizedAllowed === normalizedRequestedCategory;
+        });
+
+        if (!isAllowed) {
+          console.log(`[DispatchOptimizer] Driver ${driver.driverId} has disabled category ${requestedCategory} in preferences`);
+          return false;
+        }
+      }
+      // If allowedCategories is not set, driver accepts all eligible categories (default behavior)
+
+      return true;
     });
   }
 
   /**
    * Check if a specific driver is eligible for a category
+   * Also checks driver preferences (allowedCategories)
    */
   isDriverEligible(
     driver: DriverScoreInput,
@@ -313,7 +342,7 @@ export class DispatchOptimizer {
       };
     }
 
-    // Special WAV handling
+    // Special WAV handling - WAV is locked and cannot be disabled
     if (requestedCategory === 'WAV') {
       if (!driver.wheelchairAccessible) {
         return {
@@ -335,10 +364,33 @@ export class DispatchOptimizer {
       requestedCategory
     );
 
-    return {
-      eligible: eligibility.isEligible,
-      reason: eligibility.reason,
-    };
+    if (!eligibility.isEligible) {
+      return {
+        eligible: false,
+        reason: eligibility.reason,
+      };
+    }
+
+    // Check driver preferences (allowedCategories)
+    if (driver.allowedCategories && driver.allowedCategories.length > 0) {
+      const normalizedRequestedCategory = requestedCategory.startsWith('SAFEGO_') 
+        ? requestedCategory 
+        : `SAFEGO_${requestedCategory}`;
+      
+      const isAllowed = driver.allowedCategories.some(allowed => {
+        const normalizedAllowed = allowed.startsWith('SAFEGO_') ? allowed : `SAFEGO_${allowed}`;
+        return normalizedAllowed === normalizedRequestedCategory;
+      });
+
+      if (!isAllowed) {
+        return {
+          eligible: false,
+          reason: 'Driver has disabled this category in their preferences',
+        };
+      }
+    }
+
+    return { eligible: true };
   }
 
   /**

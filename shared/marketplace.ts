@@ -289,6 +289,7 @@ export interface DriverScoreInput {
   vehicleCategory?: string;
   wheelchairAccessible?: boolean;
   vehicleCategoryApproved?: boolean;
+  allowedCategories?: string[];
 }
 
 export interface DriverScoreResult {
