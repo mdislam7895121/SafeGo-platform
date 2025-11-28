@@ -88,6 +88,14 @@ export default function RideConfirmPage() {
         throw new Error("Missing booking details");
       }
 
+      const promo = state.promoValidation;
+      const fareEstimate = state.fareEstimate;
+      const originalFare = fareEstimate 
+        ? fareEstimate.totalFare + (fareEstimate.promoDiscount || 0)
+        : state.selectedOption.estimatedFare;
+      const promoDiscount = fareEstimate?.promoDiscount || (promo?.valid ? promo.discountAmount : 0);
+      const finalFare = fareEstimate?.totalFare || state.selectedOption.estimatedFare;
+
       const response = await apiRequest("/api/rides", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -106,7 +114,11 @@ export default function RideConfirmPage() {
           rawDistanceMeters: state.routeData?.rawDistanceMeters || null,
           rawDurationSeconds: state.routeData?.rawDurationSeconds || null,
           routeProviderSource: state.routeData?.providerSource || null,
-          serviceFare: state.selectedOption.estimatedFare,
+          serviceFare: finalFare,
+          originalFare: originalFare,
+          promoDiscount: promoDiscount,
+          promoCode: promo?.valid ? promo.code : null,
+          promoCodeId: promo?.valid ? promo.promoCodeId : null,
           paymentMethod: state.paymentMethod.type === "cash" ? "cash" : "online",
         }),
       });
@@ -324,16 +336,24 @@ export default function RideConfirmPage() {
           </CardContent>
         </Card>
 
-        {state.promoCode && (
+        {state.promoValidation?.valid && (
           <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
             <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                <div>
-                  <p className="font-medium text-green-700 dark:text-green-400">
-                    Promo code applied
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium text-green-700 dark:text-green-400">
+                      Promo code applied
+                    </p>
+                    <p className="text-xs text-green-600 dark:text-green-500">{state.promoValidation.code}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-green-700 dark:text-green-400" data-testid="text-promo-discount">
+                    -৳{state.promoValidation.discountAmount.toFixed(2)}
                   </p>
-                  <p className="text-xs text-green-600 dark:text-green-500">{state.promoCode}</p>
+                  <p className="text-xs text-green-600 dark:text-green-500">Saved</p>
                 </div>
               </div>
             </CardContent>

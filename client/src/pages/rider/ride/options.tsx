@@ -308,6 +308,7 @@ export default function RideOptionsPage() {
     setRouteAlternatives,
     setSelectedRoute,
     getSelectedRoute,
+    setFareEstimate,
     canProceedToOptions,
   } = useRideBooking();
   
@@ -367,13 +368,17 @@ export default function RideOptionsPage() {
     const selectedRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
     const fare = selectedRouteId ? getFare(selectedRideType, selectedRouteId) : null;
     
+    const promo = state.promoValidation;
+    const promoDiscountAmount = promo?.valid ? promo.discountAmount : 0;
+    const adjustedFare = fare ? fare.totalFare - promoDiscountAmount : 0;
+    
     const option: RideOption = {
       id: selectedRideType,
       code: selectedRideType,
       name: config.name,
       description: config.description,
       baseFare: fare?.baseFare || 0,
-      estimatedFare: fare?.totalFare || 0,
+      estimatedFare: adjustedFare,
       currency: currency,
       etaMinutes: config.etaMinutes,
       capacity: config.capacity,
@@ -382,7 +387,7 @@ export default function RideOptionsPage() {
       isEco: config.isEco,
     };
     setSelectedOption(option);
-  }, [selectedRideType, state.selectedRouteId, fareRoutes, getFare, currency, setSelectedOption]);
+  }, [selectedRideType, state.selectedRouteId, state.promoValidation, fareRoutes, getFare, currency, setSelectedOption]);
 
   const locationKey = useMemo(() => {
     if (!state.pickup || !state.dropoff) return null;
@@ -436,6 +441,24 @@ export default function RideOptionsPage() {
       return;
     }
     
+    const promo = state.promoValidation;
+    const promoDiscountAmount = promo?.valid ? Math.min(promo.discountAmount, fare.totalFare) : 0;
+    const adjustedTotalFare = Math.max(0, fare.totalFare - promoDiscountAmount);
+    
+    const selectedRoute = getSelectedRoute();
+    const estimate = {
+      baseFare: fare.baseFare,
+      distanceFare: fare.distanceFare,
+      timeFare: fare.timeFare,
+      surgeFare: fare.surgeAmount,
+      promoDiscount: promoDiscountAmount,
+      totalFare: adjustedTotalFare,
+      currency: currency,
+      distanceKm: (selectedRoute?.distanceMiles || 0) * 1.60934,
+      durationMinutes: selectedRoute?.durationMinutes || 0,
+    };
+    setFareEstimate(estimate);
+    
     setLocation("/rider/ride/confirm");
   };
 
@@ -466,10 +489,12 @@ export default function RideOptionsPage() {
   const selectedFare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
   
   const promoValidation = state.promoValidation;
-  const promoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
-  const anchorFare = selectedFare ? selectedFare.totalFare + promoDiscount : 0;
+  const promoDiscount = promoValidation?.valid && selectedFare 
+    ? Math.min(promoValidation.discountAmount, selectedFare.totalFare) 
+    : 0;
+  const anchorFare = selectedFare ? selectedFare.totalFare : 0;
   const savedAmount = promoDiscount;
-  const finalFare = selectedFare ? selectedFare.totalFare - promoDiscount : 0;
+  const finalFare = selectedFare ? Math.max(0, selectedFare.totalFare - promoDiscount) : 0;
   const config = RIDE_TYPE_CONFIG[selectedRideType];
 
   const promoType: PromoType = promoDiscount > 0 ? "PROMO_APPLIED" : "NONE";
@@ -825,6 +850,38 @@ export default function RideOptionsPage() {
                       rideTypeCode={selectedRideType}
                       countryCode="US"
                       isWalletPayment={selectedPayment?.type === "wallet"}
+                      onPromoApplied={(validation) => {
+                        if (selectedFare && selectedRoute) {
+                          const discountAmount = Math.min(validation.discountAmount, selectedFare.totalFare);
+                          const adjustedTotal = Math.max(0, selectedFare.totalFare - discountAmount);
+                          setFareEstimate({
+                            baseFare: selectedFare.baseFare,
+                            distanceFare: selectedFare.distanceFare,
+                            timeFare: selectedFare.timeFare,
+                            surgeFare: selectedFare.surgeAmount,
+                            promoDiscount: discountAmount,
+                            totalFare: adjustedTotal,
+                            currency: currency,
+                            distanceKm: selectedRoute.distanceMiles * 1.60934,
+                            durationMinutes: selectedRoute.durationMinutes,
+                          });
+                        }
+                      }}
+                      onPromoCleared={() => {
+                        if (selectedFare && selectedRoute) {
+                          setFareEstimate({
+                            baseFare: selectedFare.baseFare,
+                            distanceFare: selectedFare.distanceFare,
+                            timeFare: selectedFare.timeFare,
+                            surgeFare: selectedFare.surgeAmount,
+                            promoDiscount: 0,
+                            totalFare: selectedFare.totalFare,
+                            currency: currency,
+                            distanceKm: selectedRoute.distanceMiles * 1.60934,
+                            durationMinutes: selectedRoute.durationMinutes,
+                          });
+                        }
+                      }}
                     />
                   </div>
                 </CardContent>

@@ -8,7 +8,7 @@ export interface PromoFareCardProps {
   rideType: string;
   etaMinutes: number;
   finalFare: number;
-  anchorFare: number;
+  anchorFare?: number;
   savedAmount: number;
   promoType: PromoType;
   currency?: string;
@@ -59,7 +59,7 @@ export function PromoFareCard({
   className = "",
 }: PromoFareCardProps) {
   const promoBadge = PROMO_BADGE_CONFIG[promoType];
-  const hasDiscount = anchorFare > finalFare && savedAmount > 0;
+  const hasDiscount = anchorFare !== undefined && anchorFare > finalFare && savedAmount > 0;
   const PromoIcon = promoBadge?.icon || Tag;
 
   return (
@@ -97,7 +97,7 @@ export function PromoFareCard({
           {/* Right: Price Section */}
           <div className="flex flex-col items-start sm:items-end">
             {/* Anchor Price (strikethrough) */}
-            {hasDiscount && (
+            {hasDiscount && anchorFare !== undefined && (
               <span 
                 className="text-sm text-muted-foreground line-through"
                 data-testid="promo-anchor-fare"
