@@ -2,13 +2,14 @@
  * Promotion Engine API Routes
  * 
  * Provides endpoints for calculating promos, checking eligibility,
- * and applying promos to fares.
+ * applying promos to fares, and validating user-entered promo codes.
  */
 
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { PromotionEngine } from "../services/promotionEngine";
-import { optionalAuth, AuthRequest } from "../middleware/auth";
+import { PromoCodeService } from "../services/promoCodeService";
+import { optionalAuth, authenticateToken, AuthRequest } from "../middleware/auth";
 
 const router = Router();
 
@@ -188,6 +189,260 @@ router.get("/loss-protection-config", async (_req: Request, res: Response) => {
     success: true,
     config: PromotionEngine.LOSS_PROTECTION,
   });
+});
+
+const PromoCodeValidationSchema = z.object({
+  code: z.string().min(1).max(50),
+  originalFare: z.number().positive(),
+  rideTypeCode: z.string(),
+  countryCode: z.string().optional().default("US"),
+  cityCode: z.string().optional(),
+  isWalletPayment: z.boolean().optional().default(false),
+});
+
+router.post("/code/validate", optionalAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const validation = PromoCodeValidationSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        valid: false,
+        message: "Invalid request body",
+        errors: validation.error.errors,
+      });
+      return;
+    }
+
+    const data = validation.data;
+    const userId = req.user?.userId;
+
+    const result = await PromoCodeService.validatePromoCode({
+      code: data.code,
+      userId,
+      originalFare: data.originalFare,
+      rideTypeCode: data.rideTypeCode,
+      countryCode: data.countryCode,
+      cityCode: data.cityCode,
+      isWalletPayment: data.isWalletPayment,
+    });
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error("[Promos] Code validation error:", error);
+    res.status(500).json({
+      success: false,
+      valid: false,
+      message: "Failed to validate promo code",
+    });
+  }
+});
+
+router.post("/code/apply", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const validation = PromoCodeValidationSchema.extend({
+      rideId: z.string().optional(),
+    }).safeParse(req.body);
+    
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        valid: false,
+        message: "Invalid request body",
+        errors: validation.error.errors,
+      });
+      return;
+    }
+
+    const data = validation.data;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        valid: false,
+        message: "Authentication required",
+      });
+      return;
+    }
+
+    const result = await PromoCodeService.applyPromoCode(
+      {
+        code: data.code,
+        userId,
+        originalFare: data.originalFare,
+        rideTypeCode: data.rideTypeCode,
+        countryCode: data.countryCode,
+        cityCode: data.cityCode,
+        isWalletPayment: data.isWalletPayment,
+      },
+      data.rideId
+    );
+
+    res.json({
+      success: true,
+      ...result,
+    });
+  } catch (error) {
+    console.error("[Promos] Code apply error:", error);
+    res.status(500).json({
+      success: false,
+      valid: false,
+      message: "Failed to apply promo code",
+    });
+  }
+});
+
+router.get("/codes/active", optionalAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const countryCode = (req.query.countryCode as string) || "US";
+    const cityCode = req.query.cityCode as string | undefined;
+
+    const codes = await PromoCodeService.getActivePromoCodes(countryCode, cityCode);
+
+    res.json({
+      success: true,
+      promoCodes: codes,
+    });
+  } catch (error) {
+    console.error("[Promos] Get active codes error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get active promo codes",
+    });
+  }
+});
+
+const CreatePromoCodeSchema = z.object({
+  code: z.string().min(3).max(30),
+  discountType: z.enum(["PERCENTAGE", "FIXED_AMOUNT", "CAPPED_PERCENTAGE"]),
+  discountValue: z.number().positive().max(100),
+  maxDiscountAmount: z.number().positive().optional(),
+  minFareAmount: z.number().positive().optional(),
+  countryCode: z.string().optional(),
+  cityCode: z.string().optional(),
+  rideTypes: z.array(z.string()).optional(),
+  maxTotalUses: z.number().int().positive().optional(),
+  maxUsesPerUser: z.number().int().positive().optional().default(1),
+  validFrom: z.string().datetime().optional(),
+  validTo: z.string().datetime().optional(),
+  firstRideOnly: z.boolean().optional().default(false),
+  newUsersOnly: z.boolean().optional().default(false),
+  walletPaymentOnly: z.boolean().optional().default(false),
+  description: z.string().optional(),
+  internalNotes: z.string().optional(),
+});
+
+router.post("/admin/codes", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const validation = CreatePromoCodeSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid request body",
+        errors: validation.error.errors,
+      });
+      return;
+    }
+
+    const data = validation.data;
+    const adminUserId = req.user?.userId;
+
+    const promoCode = await PromoCodeService.createPromoCode({
+      ...data,
+      discountType: data.discountType as any,
+      validFrom: data.validFrom ? new Date(data.validFrom) : undefined,
+      validTo: data.validTo ? new Date(data.validTo) : undefined,
+      createdBy: adminUserId,
+    });
+
+    res.status(201).json({
+      success: true,
+      promoCode,
+    });
+  } catch (error: any) {
+    console.error("[Promos] Create code error:", error);
+    if (error.message === "Promo code already exists") {
+      res.status(409).json({
+        success: false,
+        message: error.message,
+      });
+      return;
+    }
+    res.status(500).json({
+      success: false,
+      message: "Failed to create promo code",
+    });
+  }
+});
+
+router.patch("/admin/codes/:id", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const updateSchema = z.object({
+      isActive: z.boolean().optional(),
+      maxTotalUses: z.number().int().positive().optional(),
+      maxUsesPerUser: z.number().int().positive().optional(),
+      validTo: z.string().datetime().optional(),
+      description: z.string().optional(),
+      internalNotes: z.string().optional(),
+    });
+
+    const validation = updateSchema.safeParse(req.body);
+    if (!validation.success) {
+      res.status(400).json({
+        success: false,
+        message: "Invalid request body",
+        errors: validation.error.errors,
+      });
+      return;
+    }
+
+    const data = validation.data;
+    const promoCode = await PromoCodeService.updatePromoCode(id, {
+      ...data,
+      validTo: data.validTo ? new Date(data.validTo) : undefined,
+    });
+
+    res.json({
+      success: true,
+      promoCode,
+    });
+  } catch (error) {
+    console.error("[Promos] Update code error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update promo code",
+    });
+  }
+});
+
+router.get("/admin/codes/:id/stats", authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const stats = await PromoCodeService.getPromoCodeStats(id);
+
+    if (!stats) {
+      res.status(404).json({
+        success: false,
+        message: "Promo code not found",
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      ...stats,
+    });
+  } catch (error) {
+    console.error("[Promos] Get code stats error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get promo code stats",
+    });
+  }
 });
 
 export default router;

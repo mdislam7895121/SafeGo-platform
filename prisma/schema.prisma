@@ -3724,3 +3724,81 @@ model PromoLog {
   @@index([wasBlocked])
   @@map("promo_logs")
 }
+
+// User-entered promo codes for rides
+model RidePromoCode {
+  id                    String        @id @default(uuid())
+  code                  String        @unique // e.g., "WELCOME10", "SUMMER2024"
+  
+  // Discount configuration
+  discountType          RidePromoDiscountType @default(PERCENTAGE)
+  discountValue         Decimal       @db.Decimal(10, 2) // Percentage or fixed amount
+  maxDiscountAmount     Decimal?      @db.Decimal(10, 2) // Cap for percentage discounts
+  minFareAmount         Decimal?      @db.Decimal(10, 2) // Minimum fare required
+  
+  // Targeting
+  countryCode           String?       // null = all countries
+  cityCode              String?       // null = all cities
+  rideTypes             String[]      @default([]) // Empty = all ride types
+  
+  // Usage limits
+  maxTotalUses          Int?          // null = unlimited
+  maxUsesPerUser        Int?          @default(1)
+  currentUsageCount     Int           @default(0)
+  
+  // Validity period
+  validFrom             DateTime      @default(now())
+  validTo               DateTime?     // null = no expiry
+  
+  // Conditions
+  firstRideOnly         Boolean       @default(false)
+  newUsersOnly          Boolean       @default(false) // Registered within last 7 days
+  walletPaymentOnly     Boolean       @default(false)
+  
+  // Status
+  isActive              Boolean       @default(true)
+  
+  // Metadata
+  description           String?       @db.Text
+  internalNotes         String?       @db.Text
+  createdBy             String?       // Admin user ID
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  
+  // Usage tracking relation
+  usages                RidePromoCodeUsage[]
+  
+  @@index([code])
+  @@index([isActive])
+  @@index([validFrom, validTo])
+  @@index([countryCode])
+  @@map("ride_promo_codes")
+}
+
+enum RidePromoDiscountType {
+  PERCENTAGE        // Percentage off fare
+  FIXED_AMOUNT      // Fixed dollar amount off
+  CAPPED_PERCENTAGE // Percentage with max cap
+}
+
+// Track promo code usage per user
+model RidePromoCodeUsage {
+  id                    String        @id @default(uuid())
+  promoCodeId           String
+  userId                String
+  rideId                String?       // Set when ride is completed
+  
+  discountApplied       Decimal       @db.Decimal(10, 2)
+  originalFare          Decimal?      @db.Decimal(10, 2)
+  finalFare             Decimal?      @db.Decimal(10, 2)
+  
+  appliedAt             DateTime      @default(now())
+  
+  promoCode             RidePromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+  
+  @@unique([promoCodeId, userId, rideId])
+  @@index([userId])
+  @@index([promoCodeId])
+  @@index([appliedAt])
+  @@map("ride_promo_code_usages")
+}

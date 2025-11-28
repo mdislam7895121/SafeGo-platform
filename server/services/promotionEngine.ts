@@ -15,9 +15,8 @@
  * 8. DRIVER_ARRIVAL - Late arrival credit
  */
 
-import { PrismaClient, PromoType } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { PromoType } from "@prisma/client";
+import { prisma } from "../db";
 
 // ============================================
 // Type Definitions
