@@ -14,7 +14,6 @@ import {
   getSavedPlaces, 
   getRecentLocations,
   addRecentLocation,
-  calculateRouteInfo,
   type SavedPlace,
   type RecentLocation
 } from "@/lib/locationService";
@@ -135,21 +134,6 @@ function MapBoundsHandler({
   return null;
 }
 
-function generateFallbackPolyline(pickup: LocationData, dropoff: LocationData): [number, number][] {
-  const points: [number, number][] = [];
-  const steps = 20;
-  
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const lat = pickup.lat + (dropoff.lat - pickup.lat) * t;
-    const lng = pickup.lng + (dropoff.lng - pickup.lng) * t;
-    const offset = Math.sin(t * Math.PI) * 0.002;
-    points.push([lat + offset, lng]);
-  }
-  
-  return points;
-}
-
 function SuggestionItem({
   icon: Icon,
   iconBg,
@@ -226,15 +210,6 @@ export default function RideRequest() {
       points: decodePolyline(route.polyline),
     }));
   }, [routes]);
-
-  const fallbackPolyline = useMemo(() => {
-    if (typeof window === "undefined") return [];
-    // Only show fallback when fetch completed but no routes available
-    if (pickup && dropoff && routeFetchCompleted && routes.length === 0) {
-      return generateFallbackPolyline(pickup, dropoff);
-    }
-    return [];
-  }, [pickup, dropoff, routeFetchCompleted, routes.length]);
 
   // Read pickup/destination from sessionStorage (passed from home page)
   useEffect(() => {
@@ -343,11 +318,20 @@ export default function RideRequest() {
     }
   }, [isClient, hasCheckedStorage, pickup, handleGetCurrentLocation]);
 
-  // Fetch routes when both locations are set
+  // Fetch routes using Google Maps DirectionsService (client-side)
   const fetchRoutes = useCallback(async () => {
     if (!pickup || !dropoff) {
       setRoutes([]);
       setRouteFetchCompleted(false);
+      return;
+    }
+    
+    // Check if Google Maps SDK is loaded
+    if (typeof google === "undefined" || !google.maps) {
+      console.error("[RideRequest] Google Maps SDK not loaded");
+      setRoutes([]);
+      setRouteError("Maps not available. Please refresh the page.");
+      setRouteFetchCompleted(true);
       return;
     }
     
@@ -356,27 +340,71 @@ export default function RideRequest() {
     setRouteFetchCompleted(false);
     
     try {
-      const origin = `${pickup.lat},${pickup.lng}`;
-      const destination = `${dropoff.lat},${dropoff.lng}`;
+      const directionsService = new google.maps.DirectionsService();
       
-      const response = await apiRequest(`/api/maps/route?origin=${origin}&destination=${destination}`);
+      const request: google.maps.DirectionsRequest = {
+        origin: { lat: pickup.lat, lng: pickup.lng },
+        destination: { lat: dropoff.lat, lng: dropoff.lng },
+        travelMode: google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: true,
+        drivingOptions: {
+          departureTime: new Date(),
+          trafficModel: google.maps.TrafficModel.BEST_GUESS,
+        },
+      };
       
-      if (response?.success && response.routes?.length > 0) {
-        setRoutes(response.routes);
-        setActiveRouteId(0); // Default to first route (fastest)
-        setRouteFetchCompleted(true);
-      } else {
-        console.warn("[RideRequest] No routes returned, using fallback");
-        setRoutes([]);
-        setRouteError("Could not find driving routes. Showing estimated path.");
-        setRouteFetchCompleted(true);
-      }
+      directionsService.route(request, (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result && result.routes.length > 0) {
+          console.log("[RideRequest] Google Directions success:", result.routes.length, "routes");
+          
+          const parsedRoutes: RouteData[] = result.routes.map((route, index) => {
+            const leg = route.legs[0];
+            const distanceMeters = leg.distance?.value ?? 0;
+            const durationSeconds = leg.duration?.value ?? 0;
+            const durationInTrafficSeconds = leg.duration_in_traffic?.value ?? durationSeconds;
+            
+            const overviewPolyline = route.overview_polyline;
+            const polylineStr = typeof overviewPolyline === "string" 
+              ? overviewPolyline 
+              : (overviewPolyline as any)?.points ?? "";
+            
+            return {
+              id: index,
+              summary: route.summary || `Route ${index + 1}`,
+              polyline: polylineStr,
+              distanceMeters,
+              distanceMiles: Math.round((distanceMeters / 1609.34) * 10) / 10,
+              distanceText: leg.distance?.text ?? "",
+              durationSeconds,
+              durationInTrafficSeconds,
+              durationText: leg.duration?.text ?? "",
+              durationInTrafficText: leg.duration_in_traffic?.text ?? leg.duration?.text ?? "",
+              startAddress: leg.start_address ?? "",
+              endAddress: leg.end_address ?? "",
+            };
+          });
+          
+          // Sort by traffic-aware duration (fastest first)
+          parsedRoutes.sort((a, b) => a.durationInTrafficSeconds - b.durationInTrafficSeconds);
+          parsedRoutes.forEach((r, i) => r.id = i);
+          
+          setRoutes(parsedRoutes);
+          setActiveRouteId(0);
+          setRouteFetchCompleted(true);
+          setIsLoadingRoutes(false);
+        } else {
+          console.error("[RideRequest] Google Directions failed:", status);
+          setRoutes([]);
+          setRouteError(`Could not find driving routes (${status}). Please try different locations.`);
+          setRouteFetchCompleted(true);
+          setIsLoadingRoutes(false);
+        }
+      });
     } catch (error) {
       console.error("[RideRequest] Route fetch error:", error);
       setRoutes([]);
-      setRouteError("Could not load routes. Showing estimated path.");
+      setRouteError("Could not load routes. Please try again.");
       setRouteFetchCompleted(true);
-    } finally {
       setIsLoadingRoutes(false);
     }
   }, [pickup, dropoff]);
@@ -414,37 +442,6 @@ export default function RideRequest() {
     setIsCalculatingFare(false);
   }, []);
 
-  const calculateFareEstimateFallback = useCallback(() => {
-    if (!pickup || !dropoff) return;
-    
-    setIsCalculatingFare(true);
-    
-    const routeInfo = calculateRouteInfo(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
-    
-    const baseFare = 2.50;
-    const perKmRate = 1.25;
-    const perMinRate = 0.30;
-    
-    const distanceFare = routeInfo.distanceKm * perKmRate;
-    const timeFare = routeInfo.etaMinutes * perMinRate;
-    const totalFare = baseFare + distanceFare + timeFare;
-    
-    setFareEstimate({
-      baseFare,
-      distanceFare: Math.round(distanceFare * 100) / 100,
-      timeFare: Math.round(timeFare * 100) / 100,
-      totalFare: Math.round(totalFare * 100) / 100,
-      currency: "USD",
-      etaMinutes: routeInfo.etaMinutes,
-      etaWithTrafficMinutes: routeInfo.etaMinutes,
-      distanceKm: routeInfo.distanceKm,
-      trafficLevel: "moderate",
-      trafficLabel: "Estimated traffic",
-    });
-    
-    setIsCalculatingFare(false);
-  }, [pickup, dropoff]);
-
   useEffect(() => {
     if (pickup && dropoff) {
       fetchRoutes();
@@ -454,15 +451,12 @@ export default function RideRequest() {
     }
   }, [pickup, dropoff, fetchRoutes]);
 
-  // Calculate fare when active route changes
+  // Calculate fare when active route changes (no fallback - Google Directions only)
   useEffect(() => {
     if (activeRoute) {
       calculateFareFromRoute(activeRoute);
-    } else if (pickup && dropoff && routeFetchCompleted && routes.length === 0) {
-      // Fallback to Haversine calculation when routes fetch failed
-      calculateFareEstimateFallback();
     }
-  }, [activeRoute, pickup, dropoff, routeFetchCompleted, routes.length, calculateFareFromRoute, calculateFareEstimateFallback]);
+  }, [activeRoute, calculateFareFromRoute]);
 
   const handlePickupSelect = useCallback((location: { address: string; lat: number; lng: number }) => {
     setPickup(location);
@@ -627,19 +621,6 @@ export default function RideRequest() {
                 }}
               />
             ))}
-            
-            {/* Fallback dashed line when no routes available */}
-            {fallbackPolyline.length > 0 && (
-              <Polyline
-                positions={fallbackPolyline}
-                pathOptions={{
-                  color: "#3B82F6",
-                  weight: 4,
-                  opacity: 0.8,
-                  dashArray: "10, 10",
-                }}
-              />
-            )}
           </MapContainer>
         )}
 
