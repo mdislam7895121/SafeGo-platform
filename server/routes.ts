@@ -38,6 +38,7 @@ import reviewRoutes from "./routes/reviews"; // R5: Reviews & Ratings
 import earningsRoutes from "./routes/earnings"; // R6: Earnings & Commission Center
 import secureAuditRoutes from "./routes/secure-audit"; // Security Hardening Phase 2
 import mapsRoutes from "./routes/maps"; // Google Maps proxy endpoints
+import faresRoutes from "./routes/fares"; // Multi-Route Fare Engine
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { db } from "./db";
 
@@ -217,6 +218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/restaurant/earnings", earningsRoutes); // R6: Earnings & Commission Center
   app.use("/api/internal", secureAuditRoutes); // Security Hardening Phase 2 - internal admin endpoints
   app.use("/api/maps", mapsRoutes); // Google Maps proxy endpoints
+  app.use("/api/fares", faresRoutes); // Multi-Route Fare Engine
 
   const httpServer = createServer(app);
   

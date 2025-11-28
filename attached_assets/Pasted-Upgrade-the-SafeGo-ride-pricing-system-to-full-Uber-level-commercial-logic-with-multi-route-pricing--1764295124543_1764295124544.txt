@@ -1,0 +1,202 @@
+Upgrade the SafeGo ride-pricing system to full Uber-level commercial logic with multi-route pricing. Follow all SafeGo Master Rules, Security Rules, and existing architecture.
+
+===========================================
+PHASE: SafeGo Multi-Route Fare Engine (USA)
+===========================================
+
+Goal:
+Each route alternative (fastest, shortest, avoid highways, avoid tolls) must produce its own fully independent fare breakdown including regulatory fees, taxes, tolls, surcharges, and SafeGo pricing config.
+
+For every route returned by Google Directions API:
+- Use that route’s own distance (miles), duration (minutes), roads used, and toll segments.
+- Compute separate fare for each route.
+- Display fares side-by-side in UI.
+- Customers must clearly see:
+      Fastest (XX minutes) — $___
+      Shortest (XX minutes) — $___
+      Avoid Tolls (XX minutes) — $___
+      Avoid Highways — $___
+- Default selectedRouteId = fastest.
+
+===========================================
+1. Core Fare Formula (Per Route)
+===========================================
+For each route:
+trip_cost = base_fare + 
+            (distance_mi * per_mile_rate) + 
+            (duration_min * per_min_rate)
+
+traffic_adjusted = trip_cost * traffic_factor  
+surge_adjusted   = traffic_adjusted * surge_factor  
+
+subtotal = surge_adjusted
+
+===========================================
+2. Regulatory Rules (USA)
+===========================================
+
+A) Black Car Fund (NY BCF)
+- Applies if pickup OR dropoff is inside NYC polygon.
+- Rate: 2.5% of fare before service fee.
+- Store separately in regulatory ledger.
+
+B) City Boundary Fee
+- Charge when crossing any defined city polygon boundary.
+- leaving_city_fee = $2
+- entering_city_fee = $2
+- Show as “City Boundary Surcharge”.
+
+C) Local Government Ride Tax
+- Percent-based.
+- NYC: 1%
+- Others configurable.
+- applied_tax = subtotal * local_tax_rate
+
+===========================================
+3. Airport + Zone Fees
+===========================================
+If pickup or dropoff falls inside:
+- JFK Airport zone → $5.00
+- LaGuardia → $5.00
+- Newark → $5.00
+- Manhattan Congestion Zone → $2.75
+
+All must be auto-detected by polygon.
+
+===========================================
+4. Toll Detection (Per Route)
+===========================================
+- From Google Directions, detect toll segments.
+- Sum all tolls for that route from tollRates_US config.
+- Add breakdown line “Tolls”.
+- 100% toll goes to driver.
+
+===========================================
+5. Safety & Environmental Surcharges
+===========================================
+Admin configurable:
+- clean_air_fee
+- insurance_surcharge
+- eco_fee
+
+===========================================
+6. Cancellation Rules
+===========================================
+- If driver assigned:
+      0–2 mins free
+      >2 mins = $5–$10
+- Must log reason + metadata.
+
+===========================================
+7. Waiting Fee
+===========================================
+- First 2 mins free.
+- waiting_fee = extra_minutes * waiting_rate
+- Added as “Driver Waiting Time Fee”.
+
+===========================================
+8. Minimum Fare by Ride Type
+===========================================
+If calculated fare < minimum_fare[type]:
+    fare = minimum_fare[type]
+
+===========================================
+9. Ride Types (Uber-style)
+===========================================
+Support:
+- Saver
+- Standard
+- Comfort
+- XL
+- Premium
+
+Each type must override:
+- base_fare
+- per_mile
+- per_minute
+- minimum_fare
+- surge rules
+
+===========================================
+10. Driver Payout Engine
+===========================================
+For the selected route:
+driver_earnings =
+    (distance_mi * per_mile_driver_rate) +
+    (duration_min * per_min_driver_rate) +
+    tolls +
+    incentives –
+    SafeGo commission
+
+Exclude:
+- Black Car Fund
+- City/State taxes
+
+===========================================
+11. Customer Fare Breakdown (Per Route)
+===========================================
+UI must show:
+
+1. Base Fare  
+2. Distance Fare  
+3. Time Fare  
+4. Traffic adjustment  
+5. Surge  
+6. Car type upgrade  
+7. Tolls  
+8. Airport / Zone fees  
+9. City Boundary fee  
+10. Black Car Fund (2.5%)  
+11. Local Government Tax  
+12. Safety / Eco fees  
+13. SafeGo service fee  
+14. Promo discount  
+------------------------------------
+TOTAL FARE
+
+===========================================
+12. Multi-Route Fare Display
+===========================================
+For each alternative route:
+- Show ETA
+- Show distance (miles)
+- Show fare (USD)
+- Highlight cheapest
+- Highlight fastest
+- Allow user to switch
+
+===========================================
+13. Admin Panel (Required)
+===========================================
+Add editing for:
+- per-mile, per-minute, base fare
+- surge config
+- regulatory tax rates
+- airport fees
+- city-boundary fees
+- BCF on/off per region
+- waiting fee rules
+- cancellation fee rules
+- toll rates
+- minimum fare per vehicle type
+
+Must support versioned config with audit logs.
+
+===========================================
+14. Logging & Security
+===========================================
+Log:
+- routeId chosen
+- all route alternatives + fares
+- applied surge
+- toll segments
+- regulatory fees
+- location polygons matched
+- tax rules
+- server-side authoritative fare calculation
+
+===========================================
+END OF TASK
+===========================================
+
+Implement everything above without breaking existing features.

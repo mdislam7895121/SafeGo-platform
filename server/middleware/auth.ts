@@ -123,3 +123,28 @@ export function checkPermission(permission: Permission) {
     }
   };
 }
+
+/**
+ * Optional authentication - allows requests to proceed even without a valid token
+ * If a valid token is provided, req.user will be populated
+ * If no token or invalid token, req.user will be undefined and request proceeds
+ */
+export function optionalAuth(req: AuthRequest, res: Response, next: NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    // No token provided, proceed without user
+    next();
+    return;
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    req.user = payload;
+  } catch {
+    // Invalid token, proceed without user (don't fail)
+  }
+  
+  next();
+}

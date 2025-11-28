@@ -3226,3 +3226,310 @@ model DriverRewardLedger {
   @@index([isPaid])
   @@map("driver_reward_ledger")
 }
+
+// ========================================
+// MULTI-ROUTE FARE ENGINE (USA)
+// ========================================
+
+enum RideTypeCode {
+  SAVER
+  STANDARD
+  COMFORT
+  XL
+  PREMIUM
+}
+
+// Ride type configuration with base pricing
+model RideType {
+  id                  String        @id @default(uuid())
+  code                RideTypeCode  @unique
+  name                String        // Display name (e.g., "SafeGo X", "SafeGo Comfort")
+  description         String?
+  iconType            String        @default("economy") // economy, comfort, xl, premium
+  capacity            Int           @default(4)
+  isActive            Boolean       @default(true)
+  sortOrder           Int           @default(0)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  fareConfigs         RideFareConfig[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("ride_types")
+}
+
+// Per-country/city fare configuration for each ride type
+model RideFareConfig {
+  id                      String        @id @default(uuid())
+  rideTypeId              String
+  countryCode             String        @default("US")
+  cityCode                String?       // null = country-wide default
+  
+  // Base fare components (USD)
+  baseFare                Decimal       @db.Decimal(10, 2) @default(2.50)
+  perMileRate             Decimal       @db.Decimal(10, 4) @default(1.50)
+  perMinuteRate           Decimal       @db.Decimal(10, 4) @default(0.30)
+  minimumFare             Decimal       @db.Decimal(10, 2) @default(5.00)
+  
+  // Driver rates (for payout calculation)
+  driverPerMileRate       Decimal       @db.Decimal(10, 4) @default(1.20)
+  driverPerMinuteRate     Decimal       @db.Decimal(10, 4) @default(0.20)
+  
+  // Service fee configuration
+  serviceFeePercent       Decimal       @db.Decimal(5, 2) @default(15.00) // SafeGo service fee %
+  serviceFeeMinimum       Decimal       @db.Decimal(10, 2) @default(1.50)
+  serviceFeeMaximum       Decimal       @db.Decimal(10, 2) @default(10.00)
+  
+  // Surge configuration
+  maxSurgeMultiplier      Decimal       @db.Decimal(4, 2) @default(3.00)
+  surgeEnabled            Boolean       @default(true)
+  
+  // Traffic adjustment (multiplier applied based on traffic severity)
+  trafficMultiplierLight  Decimal       @db.Decimal(4, 2) @default(1.00)
+  trafficMultiplierModerate Decimal     @db.Decimal(4, 2) @default(1.10)
+  trafficMultiplierHeavy  Decimal       @db.Decimal(4, 2) @default(1.25)
+  
+  isActive                Boolean       @default(true)
+  version                 Int           @default(1)
+  effectiveFrom           DateTime      @default(now())
+  effectiveTo             DateTime?     // null = currently active
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+  updatedByAdminId        String?
+
+  rideType                RideType      @relation(fields: [rideTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([rideTypeId, countryCode, cityCode, version])
+  @@index([countryCode])
+  @@index([cityCode])
+  @@index([isActive])
+  @@index([effectiveFrom])
+  @@map("ride_fare_configs")
+}
+
+enum RegulatoryZoneType {
+  AIRPORT
+  CONGESTION
+  CITY_BOUNDARY
+  BLACK_CAR_FUND
+  SPECIAL_TAX
+}
+
+// Polygon-based regulatory zones (airports, congestion zones, city boundaries)
+model RegulatoryZone {
+  id                  String              @id @default(uuid())
+  name                String              // e.g., "JFK Airport", "Manhattan Congestion Zone"
+  zoneType            RegulatoryZoneType
+  countryCode         String              @default("US")
+  stateCode           String?             // e.g., "NY"
+  cityCode            String?
+  
+  // Polygon definition (JSON array of {lat, lng} points)
+  polygonCoordinates  Json                // [{lat: number, lng: number}, ...]
+  
+  // Simple bounding box for quick pre-filtering
+  boundingBoxMinLat   Float?
+  boundingBoxMaxLat   Float?
+  boundingBoxMinLng   Float?
+  boundingBoxMaxLng   Float?
+  
+  isActive            Boolean             @default(true)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  feeConfigs          RegulatoryFeeConfig[]
+
+  @@index([zoneType])
+  @@index([countryCode])
+  @@index([stateCode])
+  @@index([isActive])
+  @@map("regulatory_zones")
+}
+
+enum RegulatoryFeeType {
+  BLACK_CAR_FUND          // NY BCF - 2.5% of fare
+  CITY_BOUNDARY_LEAVING   // Leaving city fee
+  CITY_BOUNDARY_ENTERING  // Entering city fee
+  LOCAL_TAX               // Local government ride tax
+  AIRPORT_FEE             // Airport pickup/dropoff fee
+  CONGESTION_FEE          // Congestion zone surcharge
+}
+
+// Fee configurations for regulatory zones
+model RegulatoryFeeConfig {
+  id                  String              @id @default(uuid())
+  zoneId              String
+  feeType             RegulatoryFeeType
+  
+  // Fee can be flat or percentage-based
+  flatFeeAmount       Decimal?            @db.Decimal(10, 2)
+  percentFeeRate      Decimal?            @db.Decimal(5, 2) // e.g., 2.5 for BCF
+  
+  // When fee applies
+  appliesToPickup     Boolean             @default(true)
+  appliesToDropoff    Boolean             @default(true)
+  
+  // Description for customer display
+  displayName         String              // e.g., "Airport Surcharge", "Black Car Fund"
+  description         String?
+  
+  isActive            Boolean             @default(true)
+  version             Int                 @default(1)
+  effectiveFrom       DateTime            @default(now())
+  effectiveTo         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  updatedByAdminId    String?
+
+  zone                RegulatoryZone      @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@index([zoneId])
+  @@index([feeType])
+  @@index([isActive])
+  @@map("regulatory_fee_configs")
+}
+
+// Toll segment configurations for known toll roads/bridges
+model TollConfig {
+  id                  String        @id @default(uuid())
+  name                String        // e.g., "George Washington Bridge", "Holland Tunnel"
+  countryCode         String        @default("US")
+  stateCode           String?
+  
+  // Toll segment identification - can match by road name or coordinates
+  segmentIdentifier   String        // Road name or segment ID from mapping provider
+  alternateIdentifiers String[]     @default([]) // Alternative names/IDs
+  
+  // Coordinates for segment (start/end points for matching)
+  startLat            Float?
+  startLng            Float?
+  endLat              Float?
+  endLng              Float?
+  
+  // Toll rates by vehicle type
+  tollRateSaver       Decimal       @db.Decimal(10, 2) @default(0)
+  tollRateStandard    Decimal       @db.Decimal(10, 2) @default(0)
+  tollRateComfort     Decimal       @db.Decimal(10, 2) @default(0)
+  tollRateXL          Decimal       @db.Decimal(10, 2) @default(0)
+  tollRatePremium     Decimal       @db.Decimal(10, 2) @default(0)
+  
+  // Driver keeps 100% of tolls
+  tollPaidToDriver    Boolean       @default(true)
+  
+  isActive            Boolean       @default(true)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  @@index([countryCode])
+  @@index([stateCode])
+  @@index([isActive])
+  @@map("toll_configs")
+}
+
+enum FeeRuleType {
+  CANCELLATION_FEE
+  WAITING_FEE
+  BOOKING_FEE
+  SAFETY_FEE
+  CLEAN_AIR_FEE
+  INSURANCE_SURCHARGE
+  ECO_FEE
+}
+
+// General configurable fees (cancellation, waiting, safety, eco)
+model FeeRule {
+  id                  String        @id @default(uuid())
+  feeType             FeeRuleType
+  countryCode         String        @default("US")
+  cityCode            String?
+  
+  // Fee amount (flat or per-unit)
+  flatAmount          Decimal?      @db.Decimal(10, 2)
+  perUnitAmount       Decimal?      @db.Decimal(10, 4) // e.g., per minute for waiting
+  unitType            String?       // "minute", "mile", "percent"
+  
+  // Thresholds
+  freeUnits           Int?          @default(0) // e.g., 2 free minutes for waiting
+  minimumFee          Decimal?      @db.Decimal(10, 2)
+  maximumFee          Decimal?      @db.Decimal(10, 2)
+  
+  // Conditions
+  requiresDriverAssigned Boolean    @default(false) // For cancellation fees
+  minimumMinutesAfterAccept Int?    // e.g., no cancel fee within 2 mins
+  
+  displayName         String
+  description         String?
+  
+  isActive            Boolean       @default(true)
+  version             Int           @default(1)
+  effectiveFrom       DateTime      @default(now())
+  effectiveTo         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  updatedByAdminId    String?
+
+  @@unique([feeType, countryCode, cityCode, version])
+  @@index([feeType])
+  @@index([countryCode])
+  @@index([isActive])
+  @@map("fee_rules")
+}
+
+// Audit log for fare calculations (security and compliance)
+model FareCalculationLog {
+  id                      String        @id @default(uuid())
+  rideId                  String?       // Reference to ride if booked
+  customerId              String?
+  
+  // Route information
+  pickupLat               Float
+  pickupLng               Float
+  dropoffLat              Float
+  dropoffLng              Float
+  routeId                 String?       // Geometry-based route identifier
+  distanceMiles           Float
+  durationMinutes         Int
+  trafficDurationMinutes  Int?
+  
+  // Selected options
+  rideTypeCode            String
+  selectedRouteType       String?       // fastest, shortest, avoid_highways, avoid_tolls
+  
+  // Calculated fare breakdown (stored as JSON for flexibility)
+  fareBreakdown           Json          // Full breakdown with all components
+  
+  // Summary amounts for quick queries
+  baseFare                Decimal       @db.Decimal(10, 2)
+  distanceFare            Decimal       @db.Decimal(10, 2)
+  timeFare                Decimal       @db.Decimal(10, 2)
+  trafficAdjustment       Decimal       @db.Decimal(10, 2) @default(0)
+  surgeAmount             Decimal       @db.Decimal(10, 2) @default(0)
+  surgeMultiplier         Decimal       @db.Decimal(4, 2) @default(1.00)
+  tollsTotal              Decimal       @db.Decimal(10, 2) @default(0)
+  regulatoryFeesTotal     Decimal       @db.Decimal(10, 2) @default(0)
+  serviceFee              Decimal       @db.Decimal(10, 2)
+  discountAmount          Decimal       @db.Decimal(10, 2) @default(0)
+  totalFare               Decimal       @db.Decimal(10, 2)
+  
+  // Driver payout calculation
+  driverPayout            Decimal       @db.Decimal(10, 2)
+  safegoCommission        Decimal       @db.Decimal(10, 2)
+  
+  // Matched zones and fees
+  matchedZones            String[]      @default([]) // Zone IDs that matched
+  appliedFees             Json?         // Detailed fee application log
+  
+  // All route alternatives that were calculated
+  routeAlternatives       Json?         // All routes with their fares
+  
+  calculatedAt            DateTime      @default(now())
+  ipAddress               String?
+  userAgent               String?
+  
+  @@index([rideId])
+  @@index([customerId])
+  @@index([calculatedAt])
+  @@index([rideTypeCode])
+  @@map("fare_calculation_logs")
+}

@@ -6,12 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   Car,
   Users,
   Clock,
   Sparkles,
-  Leaf,
   Crown,
   Check,
   Tag,
@@ -24,64 +29,231 @@ import {
   AlertTriangle,
   Loader2,
   Navigation,
+  Info,
+  DollarSign,
+  MapPin,
+  Timer,
+  CircleDollarSign,
+  FileText,
+  Building2,
+  TrendingUp,
 } from "lucide-react";
 import { useRideBooking, type RideOption, type PaymentMethod, type RouteAlternative } from "@/contexts/RideBookingContext";
 import { SafeGoMap } from "@/components/maps/SafeGoMap";
 import { clientGetRouteAlternatives } from "@/hooks/useGoogleMaps";
 import { decodePolyline } from "@/lib/locationService";
+import { useFareCalculation } from "@/hooks/useFareCalculation";
+import type { RideTypeCode, RouteFareBreakdown, RouteInfoRequest } from "@/lib/fareTypes";
 
-const mockRideOptions: RideOption[] = [
-  {
-    id: "safego-x",
-    code: "SAFEGO_X",
+// Define ride types with their visual properties (fares calculated dynamically)
+const RIDE_TYPE_CONFIG: Record<RideTypeCode, {
+  name: string;
+  description: string;
+  iconType: RideOption["iconType"];
+  capacity: number;
+  etaMinutes: number;
+  isPopular?: boolean;
+  isEco?: boolean;
+}> = {
+  SAVER: {
+    name: "SafeGo Saver",
+    description: "Budget-friendly option",
+    iconType: "economy",
+    capacity: 4,
+    etaMinutes: 10,
+  },
+  STANDARD: {
     name: "SafeGo X",
     description: "Affordable everyday rides",
-    baseFare: 50,
-    estimatedFare: 180,
-    currency: "BDT",
-    etaMinutes: 5,
-    capacity: 4,
     iconType: "economy",
+    capacity: 4,
+    etaMinutes: 5,
     isPopular: true,
   },
-  {
-    id: "safego-comfort",
-    code: "SAFEGO_COMFORT",
+  COMFORT: {
     name: "SafeGo Comfort",
     description: "Newer cars with extra legroom",
-    baseFare: 80,
-    estimatedFare: 280,
-    currency: "BDT",
-    etaMinutes: 8,
-    capacity: 4,
     iconType: "comfort",
+    capacity: 4,
+    etaMinutes: 7,
   },
-  {
-    id: "safego-xl",
-    code: "SAFEGO_XL",
+  XL: {
     name: "SafeGo XL",
     description: "SUVs for groups up to 6",
-    baseFare: 100,
-    estimatedFare: 350,
-    currency: "BDT",
-    etaMinutes: 10,
-    capacity: 6,
     iconType: "xl",
+    capacity: 6,
+    etaMinutes: 10,
   },
-  {
-    id: "safego-green",
-    code: "SAFEGO_GREEN",
-    name: "SafeGo Green",
-    description: "Electric and hybrid vehicles",
-    baseFare: 60,
-    estimatedFare: 200,
-    currency: "BDT",
-    etaMinutes: 12,
+  PREMIUM: {
+    name: "SafeGo Premium",
+    description: "High-end vehicles",
+    iconType: "premium",
     capacity: 4,
-    iconType: "economy",
-    isEco: true,
+    etaMinutes: 12,
   },
-];
+};
+
+const RIDE_TYPE_ORDER: RideTypeCode[] = ["SAVER", "STANDARD", "COMFORT", "XL", "PREMIUM"];
+
+function formatCurrency(amount: number, currency: string = "USD"): string {
+  if (currency === "USD") {
+    return `$${amount.toFixed(2)}`;
+  }
+  return `${amount.toFixed(2)} ${currency}`;
+}
+
+function FareBreakdownDialog({
+  isOpen,
+  onClose,
+  fareBreakdown,
+  rideTypeName,
+  currency,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  fareBreakdown: RouteFareBreakdown | null;
+  rideTypeName: string;
+  currency: string;
+}) {
+  if (!fareBreakdown) return null;
+
+  const hasRegulatoryFees = fareBreakdown.regulatoryFeesTotal > 0;
+  const hasTolls = fareBreakdown.tollsTotal > 0;
+  const hasAdditionalFees = fareBreakdown.additionalFeesTotal > 0;
+  const hasTrafficAdjustment = fareBreakdown.trafficAdjustment > 0;
+  const hasSurge = fareBreakdown.surgeAmount > 0;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Fare Breakdown - {rideTypeName}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4 mt-4">
+          <div className="space-y-2">
+            <h4 className="text-sm font-semibold text-muted-foreground">Base Fare</h4>
+            <div className="flex justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                Base fare
+              </span>
+              <span>{formatCurrency(fareBreakdown.baseFare, currency)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                Distance ({fareBreakdown.distanceMiles.toFixed(1)} mi)
+              </span>
+              <span>{formatCurrency(fareBreakdown.distanceFare, currency)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Timer className="h-4 w-4 text-muted-foreground" />
+                Time ({fareBreakdown.durationMinutes} min)
+              </span>
+              <span>{formatCurrency(fareBreakdown.timeFare, currency)}</span>
+            </div>
+          </div>
+
+          {hasTrafficAdjustment && (
+            <div className="border-t pt-2">
+              <div className="flex justify-between text-sm text-amber-600 dark:text-amber-400">
+                <span className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  Traffic adjustment
+                </span>
+                <span>+{formatCurrency(fareBreakdown.trafficAdjustment, currency)}</span>
+              </div>
+            </div>
+          )}
+
+          {hasSurge && (
+            <div className="border-t pt-2">
+              <div className="flex justify-between text-sm text-orange-600 dark:text-orange-400">
+                <span className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Surge pricing ({fareBreakdown.surgeMultiplier}x)
+                </span>
+                <span>+{formatCurrency(fareBreakdown.surgeAmount, currency)}</span>
+              </div>
+            </div>
+          )}
+
+          {hasTolls && (
+            <div className="border-t pt-2 space-y-1">
+              <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <CircleDollarSign className="h-4 w-4" />
+                Tolls
+              </h4>
+              {fareBreakdown.tollsBreakdown.map((toll) => (
+                <div key={toll.id} className="flex justify-between text-sm pl-6">
+                  <span>{toll.name}</span>
+                  <span>{formatCurrency(toll.amount, currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {hasRegulatoryFees && (
+            <div className="border-t pt-2 space-y-1">
+              <h4 className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Regulatory Fees
+              </h4>
+              {fareBreakdown.regulatoryFeesBreakdown.map((fee) => (
+                <div key={fee.id} className="flex justify-between text-sm pl-6">
+                  <span title={fee.description}>{fee.name}</span>
+                  <span>{formatCurrency(fee.amount, currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {hasAdditionalFees && (
+            <div className="border-t pt-2 space-y-1">
+              <h4 className="text-sm font-semibold text-muted-foreground">Additional Fees</h4>
+              {fareBreakdown.additionalFeesBreakdown.map((fee) => (
+                <div key={fee.id} className="flex justify-between text-sm pl-6">
+                  <span title={fee.description}>{fee.name}</span>
+                  <span>{formatCurrency(fee.amount, currency)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {fareBreakdown.serviceFee > 0 && (
+            <div className="border-t pt-2">
+              <div className="flex justify-between text-sm">
+                <span>Service fee</span>
+                <span>{formatCurrency(fareBreakdown.serviceFee, currency)}</span>
+              </div>
+            </div>
+          )}
+
+          {fareBreakdown.discountAmount > 0 && (
+            <div className="border-t pt-2">
+              <div className="flex justify-between text-sm text-green-600 dark:text-green-400">
+                <span>Discount applied</span>
+                <span>-{formatCurrency(fareBreakdown.discountAmount, currency)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="border-t pt-3 mt-3">
+            <div className="flex justify-between text-lg font-bold">
+              <span>Total</span>
+              <span>{formatCurrency(fareBreakdown.totalFare, currency)}</span>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 const mockPaymentMethods: PaymentMethod[] = [
   { id: "cash", type: "cash", label: "Cash", isDefault: true },
@@ -142,7 +314,9 @@ export default function RideOptionsPage() {
     canProceedToOptions,
   } = useRideBooking();
   
-  const [selectedId, setSelectedId] = useState(state.selectedOption?.id || mockRideOptions[0].id);
+  const [selectedRideType, setSelectedRideType] = useState<RideTypeCode>(
+    (state.selectedOption?.code as RideTypeCode) || "STANDARD"
+  );
   const [selectedPaymentId, setSelectedPaymentId] = useState(
     state.paymentMethod?.id || mockPaymentMethods.find(p => p.isDefault)?.id || mockPaymentMethods[0].id
   );
@@ -150,6 +324,41 @@ export default function RideOptionsPage() {
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [showRouteSelector, setShowRouteSelector] = useState(false);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
+  const [showFareBreakdown, setShowFareBreakdown] = useState(false);
+  const [fareBreakdownRideType, setFareBreakdownRideType] = useState<RideTypeCode | null>(null);
+
+  // Convert route alternatives to fare calculation format
+  const fareRoutes: RouteInfoRequest[] = useMemo(() => {
+    return state.routeAlternatives.map((route) => ({
+      routeId: route.id,
+      distanceMiles: route.distanceMiles,
+      durationMinutes: route.durationMinutes,
+      trafficDurationMinutes: route.trafficDurationSeconds 
+        ? Math.ceil(route.trafficDurationSeconds / 60)
+        : undefined,
+      polyline: route.polyline,
+      summary: route.summary,
+      avoidsHighways: route.avoidsHighways,
+      avoidsTolls: route.avoidsTolls,
+    }));
+  }, [state.routeAlternatives]);
+
+  // Use fare calculation hook
+  const { 
+    fareMatrix, 
+    isLoading: isLoadingFares, 
+    getFare, 
+    currency 
+  } = useFareCalculation({
+    pickupLat: state.pickup?.lat ?? null,
+    pickupLng: state.pickup?.lng ?? null,
+    dropoffLat: state.dropoff?.lat ?? null,
+    dropoffLng: state.dropoff?.lng ?? null,
+    routes: fareRoutes,
+    countryCode: "US",
+    surgeMultiplier: 1,
+    enabled: fareRoutes.length > 0,
+  });
 
   useEffect(() => {
     if (!canProceedToOptions) {
@@ -157,11 +366,32 @@ export default function RideOptionsPage() {
       return;
     }
     setStep("options");
-    const defaultOption = mockRideOptions.find(o => o.id === selectedId) || mockRideOptions[0];
-    setSelectedOption(defaultOption);
     const defaultPayment = mockPaymentMethods.find(p => p.id === selectedPaymentId) || mockPaymentMethods[0];
     setPaymentMethod(defaultPayment);
-  }, [setStep, setSelectedOption, setPaymentMethod, selectedId, selectedPaymentId, canProceedToOptions, setLocation]);
+  }, [setStep, setPaymentMethod, selectedPaymentId, canProceedToOptions, setLocation]);
+
+  // Update selected option when ride type changes
+  useEffect(() => {
+    const config = RIDE_TYPE_CONFIG[selectedRideType];
+    const selectedRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
+    const fare = selectedRouteId ? getFare(selectedRideType, selectedRouteId) : null;
+    
+    const option: RideOption = {
+      id: selectedRideType,
+      code: selectedRideType,
+      name: config.name,
+      description: config.description,
+      baseFare: fare?.baseFare || 0,
+      estimatedFare: fare?.totalFare || 0,
+      currency: currency,
+      etaMinutes: config.etaMinutes,
+      capacity: config.capacity,
+      iconType: config.iconType,
+      isPopular: config.isPopular,
+      isEco: config.isEco,
+    };
+    setSelectedOption(option);
+  }, [selectedRideType, state.selectedRouteId, fareRoutes, getFare, currency, setSelectedOption]);
 
   // Create a location key to track when locations change
   // Use higher precision (7 decimals ~= 1cm) to catch meaningful location changes
@@ -197,9 +427,8 @@ export default function RideOptionsPage() {
     }
   }, [locationKey, lastFetchedLocationKey, state.pickup, state.dropoff, setRouteAlternatives]);
 
-  const handleSelectOption = (option: RideOption) => {
-    setSelectedId(option.id);
-    setSelectedOption(option);
+  const handleSelectRideType = (rideType: RideTypeCode) => {
+    setSelectedRideType(rideType);
   };
 
   const handleSelectPayment = (payment: PaymentMethod) => {
@@ -220,6 +449,13 @@ export default function RideOptionsPage() {
   };
 
   const handleConfirm = () => {
+    const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
+    const fare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
+    
+    if (!fare || isLoadingFares) {
+      return;
+    }
+    
     setLocation("/rider/ride/confirm");
   };
 
@@ -227,10 +463,19 @@ export default function RideOptionsPage() {
     setLocation("/rider/ride/dropoff");
   };
 
-  const selectedOption = mockRideOptions.find(o => o.id === selectedId);
+  const handleShowFareBreakdown = (rideType: RideTypeCode) => {
+    setFareBreakdownRideType(rideType);
+    setShowFareBreakdown(true);
+  };
+
   const selectedPayment = mockPaymentMethods.find(p => p.id === selectedPaymentId);
   const selectedRoute = getSelectedRoute();
   const PaymentIcon = selectedPayment ? getPaymentIcon(selectedPayment.type) : Banknote;
+  
+  // Get fare for fare breakdown dialog
+  const fareBreakdownFare = fareBreakdownRideType && state.selectedRouteId
+    ? getFare(fareBreakdownRideType, state.selectedRouteId)
+    : null;
 
   const routePolyline = useMemo(() => {
     if (selectedRoute?.polyline) {
@@ -419,19 +664,24 @@ export default function RideOptionsPage() {
         )}
 
         <div className="space-y-2">
-          {mockRideOptions.map((option) => {
-            const Icon = getRideIcon(option.iconType);
-            const isSelected = option.id === selectedId;
+          {RIDE_TYPE_ORDER.map((rideTypeCode) => {
+            const config = RIDE_TYPE_CONFIG[rideTypeCode];
+            const Icon = getRideIcon(config.iconType);
+            const isSelected = rideTypeCode === selectedRideType;
+            const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
+            const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
+            const isLoadingThisFare = isLoadingFares && !fare;
+            
             return (
               <Card
-                key={option.id}
+                key={rideTypeCode}
                 className={`cursor-pointer transition-all ${
                   isSelected 
                     ? "ring-2 ring-primary border-primary" 
                     : "hover-elevate"
                 }`}
-                onClick={() => handleSelectOption(option)}
-                data-testid={`ride-option-${option.id}`}
+                onClick={() => handleSelectRideType(rideTypeCode)}
+                data-testid={`ride-option-${rideTypeCode}`}
               >
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
@@ -442,33 +692,65 @@ export default function RideOptionsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold">{option.name}</h3>
-                        {option.isPopular && (
+                        <h3 className="font-semibold">{config.name}</h3>
+                        {config.isPopular && (
                           <Badge variant="secondary" className="text-[10px]">Popular</Badge>
                         )}
-                        {option.isEco && (
+                        {config.isEco && (
                           <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            <Leaf className="h-3 w-3 mr-0.5" />
                             Eco
                           </Badge>
                         )}
+                        {fare && (fare.tollsTotal > 0 || fare.regulatoryFeesTotal > 0) && (
+                          <Badge variant="outline" className="text-[10px]">
+                            + fees
+                          </Badge>
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                      <p className="text-sm text-muted-foreground">{config.description}</p>
                       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {option.etaMinutes} min
+                          {config.etaMinutes} min
                         </span>
                         <span className="flex items-center gap-1">
                           <Users className="h-3 w-3" />
-                          {option.capacity}
+                          {config.capacity}
                         </span>
+                        {fare && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-5 px-1.5 text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleShowFareBreakdown(rideTypeCode);
+                            }}
+                            data-testid={`button-fare-breakdown-${rideTypeCode}`}
+                          >
+                            <Info className="h-3 w-3 mr-1" />
+                            Details
+                          </Button>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold" data-testid={`fare-${option.id}`}>
-                        ৳{option.estimatedFare}
-                      </p>
+                    <div className="text-right min-w-[80px]">
+                      {isLoadingThisFare ? (
+                        <Skeleton className="h-6 w-16 ml-auto" />
+                      ) : fare ? (
+                        <>
+                          <p className="text-lg font-bold" data-testid={`fare-${rideTypeCode}`}>
+                            {formatCurrency(fare.totalFare, currency)}
+                          </p>
+                          {fare.surgeMultiplier > 1 && (
+                            <Badge variant="destructive" className="text-[9px]">
+                              {fare.surgeMultiplier}x surge
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">--</p>
+                      )}
                       {isSelected && (
                         <Check className="h-5 w-5 text-primary ml-auto mt-1" />
                       )}
@@ -551,15 +833,41 @@ export default function RideOptionsPage() {
       </div>
 
       <div className="p-4 border-t bg-background">
-        <Button
-          className="w-full"
-          size="lg"
-          onClick={handleConfirm}
-          data-testid="button-confirm-ride-option"
-        >
-          Confirm {selectedOption?.name} - ৳{selectedOption?.estimatedFare}
-        </Button>
+        {(() => {
+          const config = RIDE_TYPE_CONFIG[selectedRideType];
+          const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
+          const fare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
+          
+          return (
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={handleConfirm}
+              disabled={!fare || isLoadingFares}
+              data-testid="button-confirm-ride-option"
+            >
+              {isLoadingFares ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Calculating fare...
+                </>
+              ) : fare ? (
+                <>Confirm {config.name} - {formatCurrency(fare.totalFare, currency)}</>
+              ) : (
+                <>Select a route to see fare</>
+              )}
+            </Button>
+          );
+        })()}
       </div>
+
+      <FareBreakdownDialog
+        isOpen={showFareBreakdown}
+        onClose={() => setShowFareBreakdown(false)}
+        fareBreakdown={fareBreakdownFare}
+        rideTypeName={fareBreakdownRideType ? RIDE_TYPE_CONFIG[fareBreakdownRideType].name : ""}
+        currency={currency}
+      />
     </div>
   );
 }
