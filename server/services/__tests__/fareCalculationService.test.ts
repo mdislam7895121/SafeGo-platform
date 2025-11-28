@@ -1399,4 +1399,370 @@ describe('Dynamic Commission System (Model A)', () => {
       expect(Math.abs(calculatedTotal - result.totalFare)).toBeLessThanOrEqual(0.05);
     });
   });
+
+  describe('Surge Timing Transparency', () => {
+    it('should return manual surge reason when surge timing not enabled', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {}, {
+        surgeMultiplier: 1.5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBe(1.5);
+      expect(result.surgeReason).toBe('manual');
+      expect(result.surgeReasons).toContain('manual');
+      expect(result.surgeCapped).toBe(false);
+    });
+
+    it('should return none surge reason when no surge applied', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {}, {
+        surgeMultiplier: 1.0,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBe(1.0);
+      expect(result.surgeReason).toBe('none');
+      expect(result.surgeReasons).toContain('none');
+    });
+
+    it('should flag surgeCapped when exceeding maxSurgeMultiplier', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {}, {
+        surgeMultiplier: 5.0, // Exceeds default max of 3.0
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBe(3.0); // Capped at max
+      expect(result.surgeCapped).toBe(true);
+      expect(result.flags.surgeCapped).toBe(true);
+    });
+
+    it('should propagate surge timing data through FareFlags', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {}, {
+        surgeMultiplier: 1.8,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.flags.surgeApplied).toBe(true);
+      expect(result.flags.surgeCapped).toBe(false);
+      expect(result.surgeAmount).toBeGreaterThan(0);
+    });
+  });
+
+  describe('Surge Timing Engine Integration', () => {
+    // WeatherCondition type alias
+    type WeatherType = 'clear' | 'rain' | 'heavy_rain' | 'snow' | 'storm' | 'fog' | 'low_visibility';
+    
+    // Helper to create context with surge timing enabled
+    function createSurgeTimingContext(
+      route: any,
+      pickup: any,
+      dropoff: any,
+      surgeTimingInput: {
+        useSurgeTiming: true;
+        requestedAt: Date;
+        weather?: { type: WeatherType; temperatureFahrenheit?: number };
+        nearbyEvents?: any[];
+        airportSurgeZones?: any[];
+      }
+    ) {
+      return {
+        fareConfig: DEFAULT_FARE_CONFIG,
+        rideTypeCode: 'STANDARD' as const,
+        route,
+        pickup,
+        dropoff,
+        surgeMultiplier: 1.0, // Will be overridden by surge timing engine
+        timeContext: {
+          hour: surgeTimingInput.requestedAt.getHours(),
+          dayOfWeek: surgeTimingInput.requestedAt.getDay(),
+        },
+        airports: AIRPORTS,
+        borderZones: [],
+        tolls: [],
+        stateRegulatoryFees: NY_REGULATORY_FEES,
+        additionalFees: [],
+        surgeTimingInput,
+      };
+    }
+
+    // Helper to create date at specific day/time
+    function createTestDate(dayOfWeek: number, hour: number): Date {
+      const date = new Date('2025-06-01T00:00:00');
+      const currentDay = date.getDay();
+      const daysToAdd = (dayOfWeek - currentDay + 7) % 7;
+      date.setDate(date.getDate() + daysToAdd);
+      date.setHours(hour, 0, 0, 0);
+      return date;
+    }
+
+    it('should apply weekday morning peak surge (Monday 8 AM)', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(1, 8), // Monday 8 AM
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReason).toBe('weekday_morning_peak');
+      expect(result.surgeTimingWindow).toBe('weekday_morning');
+      expect(result.flags.surgeApplied).toBe(true);
+    });
+
+    it('should apply weekday evening peak surge (Tuesday 5 PM)', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(2, 17), // Tuesday 5 PM
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReason).toBe('weekday_evening_peak');
+      expect(result.surgeTimingWindow).toBe('weekday_evening');
+    });
+
+    it('should apply Friday night surge (Friday 9 PM)', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(5, 21), // Friday 9 PM
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReason).toBe('weekend_friday_night');
+      expect(result.surgeTimingWindow).toBe('friday_night');
+    });
+
+    it('should apply Saturday night surge (Saturday 10 PM)', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(6, 22), // Saturday 10 PM
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReason).toBe('weekend_saturday_night');
+      expect(result.surgeTimingWindow).toBe('saturday_night');
+    });
+
+    it('should apply Sunday evening surge (Sunday 6 PM)', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(0, 18), // Sunday 6 PM
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReason).toBe('weekend_sunday_evening');
+      expect(result.surgeTimingWindow).toBe('sunday_evening');
+    });
+
+    it('should not apply surge during off-peak hours (Wednesday 2 PM)', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(3, 14), // Wednesday 2 PM
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBe(1.0);
+      expect(result.surgeReason).toBe('none');
+      expect(result.surgeTimingWindow).toBe('off_peak');
+    });
+
+    it('should apply weather surge for rain', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(3, 14), // Wednesday 2 PM (off-peak)
+        weather: { type: 'rain' },
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReasons).toContain('weather_rain');
+    });
+
+    it('should apply weather surge for snow', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(3, 14),
+        weather: { type: 'snow' },
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReasons).toContain('weather_snow');
+    });
+
+    it('should apply weather surge for storm', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(3, 14),
+        weather: { type: 'storm' },
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReasons).toContain('weather_storm');
+    });
+
+    it('should apply weather surge for extreme cold', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(3, 14),
+        weather: { type: 'clear', temperatureFahrenheit: 20 },
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReasons).toContain('weather_extreme_cold');
+    });
+
+    it('should apply airport surge at JFK', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, JFK_AIRPORT_COORDS, NYC_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(3, 14), // Off-peak
+        airportSurgeZones: [
+          {
+            code: 'JFK',
+            name: 'John F. Kennedy International Airport',
+            location: { lat: 40.6413, lng: -73.7781 },
+            radiusMiles: 3,
+            baseSurgeMultiplier: 1.25,
+            alwaysActive: true,
+          },
+        ],
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReasons).toContain('airport_jfk');
+      expect(result.surgeTimingWindow).toBe('airport_zone');
+    });
+
+    it('should correctly set all transparency fields for off-peak airport-only surge', () => {
+      const route = createRoute(10, 25);
+      const context = createSurgeTimingContext(route, JFK_AIRPORT_COORDS, NYC_COORDS, {
+        useSurgeTiming: true,
+        requestedAt: createTestDate(3, 14), // Wednesday 2 PM (off-peak)
+        airportSurgeZones: [
+          {
+            code: 'JFK',
+            name: 'John F. Kennedy International Airport',
+            location: { lat: 40.6413, lng: -73.7781 },
+            radiusMiles: 3,
+            baseSurgeMultiplier: 1.25,
+            alwaysActive: true,
+          },
+        ],
+      });
+      const result = calculateFare(context);
+      
+      // Verify all transparency fields are correctly set for airport-only surge
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReason).toBe('airport_jfk');
+      expect(result.surgeTimingWindow).toBe('airport_zone');
+      expect(result.surgeReasons).toEqual(['airport_jfk']);
+      expect(result.surgeCapped).toBe(false);
+      expect(result.flags.surgeApplied).toBe(true);
+      expect(result.surgeAmount).toBeGreaterThan(0);
+    });
+
+    it('should apply driver shortage surge', () => {
+      const route = createRoute(10, 25);
+      const context = {
+        ...createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+          useSurgeTiming: true,
+          requestedAt: createTestDate(3, 14), // Off-peak
+        }),
+        demandContext: {
+          activeRides: 200,
+          availableDrivers: 50, // Severe shortage
+          etaDensity: 10,
+        },
+      };
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReasons).toContain('driver_shortage');
+    });
+
+    it('should combine multiple surge reasons', () => {
+      const route = createRoute(10, 25);
+      const context = {
+        ...createSurgeTimingContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+          useSurgeTiming: true,
+          requestedAt: createTestDate(5, 21), // Friday 9 PM
+          weather: { type: 'rain' },
+        }),
+        demandContext: {
+          activeRides: 150,
+          availableDrivers: 50,
+          etaDensity: 10,
+        },
+      };
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeGreaterThan(1.0);
+      expect(result.surgeReason).toBe('combined');
+      expect(result.surgeReasons.length).toBeGreaterThan(1);
+    });
+
+    it('should cap surge at 1.90x (SafeGo limit)', () => {
+      const route = createRoute(10, 25);
+      const context = {
+        ...createSurgeTimingContext(route, JFK_AIRPORT_COORDS, NYC_COORDS, {
+          useSurgeTiming: true,
+          requestedAt: createTestDate(6, 22), // Saturday night
+          weather: { type: 'storm' },
+        }),
+        demandContext: {
+          activeRides: 300,
+          availableDrivers: 30, // Extreme shortage
+          etaDensity: 20,
+        },
+      };
+      const result = calculateFare(context);
+      
+      // Multiple factors would push surge above 1.90, but it should be capped
+      expect(result.surgeMultiplier).toBeLessThanOrEqual(1.90);
+      expect(result.surgeCapped).toBe(true);
+    });
+
+    it('should respect fareConfig maxSurgeMultiplier if lower than engine cap', () => {
+      const route = createRoute(10, 25);
+      const context = {
+        ...createSurgeTimingContext(route, JFK_AIRPORT_COORDS, NYC_COORDS, {
+          useSurgeTiming: true,
+          requestedAt: createTestDate(6, 22),
+          weather: { type: 'storm' },
+        }),
+        fareConfig: {
+          ...DEFAULT_FARE_CONFIG,
+          maxSurgeMultiplier: 1.5, // Lower than engine's 1.90 cap
+        },
+        demandContext: {
+          activeRides: 200,
+          availableDrivers: 30,
+          etaDensity: 15,
+        },
+      };
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBeLessThanOrEqual(1.5);
+      expect(result.surgeCapped).toBe(true);
+    });
+  });
 });

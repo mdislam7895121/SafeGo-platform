@@ -1,0 +1,130 @@
+Implement SafeGo’s full Pricing Intelligence System by combining:
+
+(A) Dynamic Commission Engine  
+(B) Uber-style Surge Timing System (but always cheaper than Uber)
+
+========================================================
+A. Dynamic Commission System (Model A)
+========================================================
+
+1. Dynamic Commission Bands (based on real-time demand):
+   - Low demand: 10% – 12%
+   - Normal demand: 13% – 15%
+   - High demand: 15% – 18%
+   - Hard cap: 18% (never exceed)
+
+2. Demand Detection Module:
+   Inputs:
+   - activeRequests
+   - activeDrivers
+   - surgeMultiplier
+   - ETA density
+   Output:
+   - demandLevel = "low" | "normal" | "high"
+
+3. Commission Logic:
+   - commissionRate depends on demandLevel
+   - Apply after all fees, surcharges, and promos but before final guards
+   - Must never violate:
+       • minimum driver payout = $5
+       • margin protection (min 15%)
+       • maximum fare cap
+
+4. Margin Correction Steps (in order):
+   1) Try increasing fare within maxFareLimit
+   2) If needed, reduce driver payout (but never < $5)
+   3) If still impossible, set marginProtectionCapped = true
+
+5. Breakdown Additions:
+   - dynamicCommissionApplied
+   - commissionRate
+   - demandLevel
+   - commissionCapped
+
+6. Tests:
+   - low/normal/high demand
+   - promo + commission
+   - surge + commission
+   - driver minimum payout conflict
+   - max fare conflict
+
+========================================================
+B. Surge Timing System (Match Uber timing but keep SafeGo cheaper)
+========================================================
+
+SafeGo surge MUST activate in the same timing windows as Uber so rider sees:
+“Uber price high → SafeGo cheaper.”
+
+But SafeGo surge multiplier must always remain LOWER than Uber.
+
+Surge ranges:
+- minimumSurge: 1.05x
+- normalSurgeRange: 1.15x – 1.35x
+- peakSurgeRange: 1.40x – 1.90x
+- surgeCap: 1.90x
+
+Ensure surgeMultiplier never exceeds surgeCap.
+
+Surge Activation Windows (same as Uber):
+1. Weekday Peak Hours:
+   - Morning: 7:00 AM – 10:00 AM
+   - Evening: 4:00 PM – 8:00 PM
+
+2. Weekend Surge:
+   - Friday: 6 PM – 11:59 PM
+   - Saturday: 5 PM – 2 AM
+   - Sunday: 5 PM – 9 PM
+
+3. Weather Surge:
+   - heavy rain, snow, storm, low visibility, temperature < 30°F
+
+4. Event Surge:
+   - Starts 1 hour before event
+   - Ends 1.5 hours after event
+   - For stadiums, concerts, festivals, major gatherings
+
+5. Airport Surge:
+   - Always active surge zones:
+     - JFK
+     - LGA
+     - EWR
+
+6. Driver Shortage Surge:
+   If activeRequests > activeDrivers:
+      auto-increase surge (within SafeGo cap)
+
+Surge Placement in Fare Pipeline:
+- AFTER traffic adjustment
+- BEFORE time-based surcharges
+- BEFORE long-distance fees
+
+Breakdown Needs:
+- surgeMultiplier
+- surgeReason
+- surgeTimingWindow
+- surgeCapped
+
+========================================================
+C. Integration Rules
+========================================================
+
+1. Dynamic Commission must adjust independently but may not override surge rules.
+2. Surge must never break:
+   - minimum driver payout
+   - margin protection
+   - maximum fare guard
+3. Promo discounts apply AFTER surge.
+4. Toll prices never discounted by promo or surge.
+5. All flags must be correctly reflected in FareBreakdown.
+
+========================================================
+D. Deliverables
+========================================================
+
+- Updated fare engine code
+- Surge timing engine
+- Demand detection module
+- Dynamic commission calculator
+- Updated breakdown UI fields
+- Full test coverage (40+ test cases)
+- No existing logic or fee priority should break

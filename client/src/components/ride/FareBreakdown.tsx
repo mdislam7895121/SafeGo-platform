@@ -61,6 +61,10 @@ export interface FareBreakdownData {
   stateRegulatoryFeeLabel?: string;
   surgeAmount?: number;
   surgeMultiplier?: number;
+  surgeReason?: string;
+  surgeReasons?: string[];
+  surgeTimingWindow?: string;
+  surgeCapped?: boolean;
   minimumFareApplied?: boolean;
   maximumFareApplied?: boolean;
   stateMinimumFareApplied?: boolean;
@@ -84,6 +88,7 @@ export interface FareBreakdownData {
   flags?: {
     trafficApplied?: boolean;
     surgeApplied?: boolean;
+    surgeCapped?: boolean;
     nightApplied?: boolean;
     peakApplied?: boolean;
     longDistanceApplied?: boolean;
@@ -125,6 +130,46 @@ function formatCurrency(amount: number, currency: string = "USD"): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
+}
+
+function getSurgeReasonLabel(reason: string): string {
+  const labels: Record<string, string> = {
+    weekday_morning_peak: 'Morning rush',
+    weekday_evening_peak: 'Evening rush',
+    weekend_friday_night: 'Friday night',
+    weekend_saturday_night: 'Saturday night',
+    weekend_sunday_evening: 'Sunday evening',
+    weather_rain: 'Rainy weather',
+    weather_snow: 'Snow conditions',
+    weather_storm: 'Storm',
+    weather_low_visibility: 'Low visibility',
+    weather_extreme_cold: 'Extreme cold',
+    event_pre: 'Event nearby',
+    event_post: 'Event ended',
+    airport_jfk: 'JFK zone',
+    airport_lga: 'LGA zone',
+    airport_ewr: 'Newark zone',
+    driver_shortage: 'Fewer drivers',
+    combined: 'Multiple factors',
+    manual: 'High demand',
+    none: '',
+  };
+  return labels[reason] || reason;
+}
+
+function getSurgeTimingWindowLabel(window: string): string {
+  const labels: Record<string, string> = {
+    weekday_morning: '7-10 AM',
+    weekday_evening: '4-8 PM',
+    friday_night: 'Fri 6 PM+',
+    saturday_night: 'Sat 5 PM+',
+    sunday_evening: 'Sun 5-9 PM',
+    event_window: 'Event',
+    airport_zone: 'Airport',
+    off_peak: '',
+    combined: 'Multiple',
+  };
+  return labels[window] || '';
 }
 
 interface BreakdownLineProps {
@@ -187,12 +232,44 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         currency={currency} 
       />
       {(breakdown.surgeAmount ?? 0) > 0 && (
-        <BreakdownLine 
-          icon={TrendingUp} 
-          label={`High demand (${breakdown.surgeMultiplier?.toFixed(1) || '1.0'}x)`}
-          amount={breakdown.surgeAmount ?? 0} 
-          currency={currency} 
-        />
+        <div className="flex items-center justify-between py-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              Surge pricing ({breakdown.surgeMultiplier?.toFixed(2) || '1.00'}x)
+            </span>
+            {breakdown.surgeReason && breakdown.surgeReason !== 'none' && breakdown.surgeReason !== 'manual' && (
+              <Badge 
+                variant="secondary" 
+                className="text-xs"
+                data-testid="badge-surge-reason"
+              >
+                {getSurgeReasonLabel(breakdown.surgeReason)}
+              </Badge>
+            )}
+            {breakdown.surgeTimingWindow && getSurgeTimingWindowLabel(breakdown.surgeTimingWindow) && (
+              <Badge 
+                variant="outline" 
+                className="text-xs"
+                data-testid="badge-surge-timing-window"
+              >
+                {getSurgeTimingWindowLabel(breakdown.surgeTimingWindow)}
+              </Badge>
+            )}
+            {(breakdown.surgeCapped || breakdown.flags?.surgeCapped) && (
+              <Badge 
+                variant="destructive" 
+                className="text-xs"
+                data-testid="badge-surge-capped"
+              >
+                Capped
+              </Badge>
+            )}
+          </div>
+          <span className="text-sm" data-testid="text-surge-amount">
+            {formatCurrency(breakdown.surgeAmount ?? 0, currency)}
+          </span>
+        </div>
       )}
       {(breakdown.nightSurcharge ?? 0) > 0 && (
         <BreakdownLine 

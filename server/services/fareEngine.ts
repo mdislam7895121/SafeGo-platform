@@ -37,6 +37,18 @@ import {
   DEFAULT_COMMISSION_BANDS,
 } from './demandEngine';
 
+import {
+  SurgeTimingContext,
+  SurgeTimingResult,
+  SurgeReason,
+  SurgeTimingWindow,
+  calculateSurgeTiming,
+  DEFAULT_SURGE_CONFIG,
+  WeatherCondition,
+  EventInfo,
+  AirportSurgeZone,
+} from './surgeTimingEngine';
+
 export type RideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
 
 export interface FareConfig {
@@ -73,6 +85,7 @@ export interface FareConfig {
 }
 
 export { DemandLevel, DemandInput, DemandResult, CommissionBands, DEFAULT_COMMISSION_BANDS };
+export { WeatherCondition, EventInfo, AirportSurgeZone, SurgeTimingContext, SurgeTimingResult, SurgeReason, SurgeTimingWindow, DEFAULT_SURGE_CONFIG };
 
 export const DEFAULT_COMMISSION_CONFIG = {
   customerServiceFee: 1.99,
@@ -139,6 +152,14 @@ export interface DemandContext {
   etaDensity?: number;
 }
 
+export interface SurgeTimingInput {
+  weather?: WeatherCondition;
+  nearbyEvents?: EventInfo[];
+  airportSurgeZones?: AirportSurgeZone[];
+  useSurgeTiming?: boolean;
+  requestedAt?: Date; // Explicit timestamp for deterministic testing
+}
+
 export interface FareEngineContext {
   fareConfig: FareConfig;
   rideTypeCode: RideTypeCode;
@@ -153,6 +174,7 @@ export interface FareEngineContext {
   stateRegulatoryFees: StateRegulatoryFee[];
   additionalFees: { id: string; name: string; amount: number }[];
   demandContext?: DemandContext;
+  surgeTimingInput?: SurgeTimingInput;
 }
 
 export interface FeeBreakdownItem {
@@ -168,6 +190,7 @@ export interface FeeBreakdownItem {
 export interface FareFlags {
   trafficApplied: boolean;
   surgeApplied: boolean;
+  surgeCapped: boolean;
   nightApplied: boolean;
   peakApplied: boolean;
   longDistanceApplied: boolean;
@@ -268,6 +291,12 @@ export interface FareEngineResult {
   dynamicCommissionApplied: boolean;
   commissionCapped: boolean;
   commissionFloored: boolean;
+  
+  // Surge timing transparency fields
+  surgeReason: string;
+  surgeReasons: string[];
+  surgeTimingWindow: string;
+  surgeCapped: boolean;
   
   marginProtectionApplied: boolean;
   marginProtectionCapped: boolean;
@@ -434,9 +463,46 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   const fareAfterTraffic = roundCurrency(fareAfterShortTrip * trafficMultiplier);
 
   // ============================================
-  // STEP 4: SURGE MULTIPLIER
+  // STEP 4: SURGE MULTIPLIER (with Surge Timing Engine)
   // ============================================
-  const effectiveSurge = Math.min(surgeMultiplier, fareConfig.maxSurgeMultiplier);
+  const { surgeTimingInput } = context;
+  let surgeTimingResult: SurgeTimingResult | null = null;
+  let effectiveSurge = surgeMultiplier;
+  let surgeReason: string = 'none';
+  let surgeReasons: string[] = ['none'];
+  let surgeTimingWindow: string = 'off_peak';
+  let surgeCappedByEngine = false;
+  
+  // Use surge timing engine if input is provided and enabled
+  if (surgeTimingInput?.useSurgeTiming) {
+    const surgeTimingContext: SurgeTimingContext = {
+      currentTime: surgeTimingInput.requestedAt ?? new Date(),
+      pickupLocation: { lat: pickup.lat, lng: pickup.lng },
+      activeRequests: demandContext?.activeRides ?? 100,
+      availableDrivers: demandContext?.availableDrivers ?? 100,
+      weather: surgeTimingInput.weather,
+      nearbyEvents: surgeTimingInput.nearbyEvents,
+      airportZones: surgeTimingInput.airportSurgeZones,
+    };
+    
+    surgeTimingResult = calculateSurgeTiming(surgeTimingContext);
+    
+    // Use surge timing engine result, respecting the fare config max
+    effectiveSurge = Math.min(surgeTimingResult.surgeMultiplier, fareConfig.maxSurgeMultiplier);
+    surgeReason = surgeTimingResult.surgeReason;
+    surgeReasons = surgeTimingResult.surgeReasons;
+    surgeTimingWindow = surgeTimingResult.surgeTimingWindow;
+    surgeCappedByEngine = surgeTimingResult.surgeCapped || effectiveSurge < surgeTimingResult.surgeMultiplier;
+  } else {
+    // Use manual surge multiplier (legacy behavior)
+    effectiveSurge = Math.min(surgeMultiplier, fareConfig.maxSurgeMultiplier);
+    if (effectiveSurge > 1) {
+      surgeReason = 'manual';
+      surgeReasons = ['manual'];
+    }
+    surgeCappedByEngine = surgeMultiplier > fareConfig.maxSurgeMultiplier;
+  }
+  
   const surgeAmount = roundCurrency(fareAfterTraffic * (effectiveSurge - 1));
   const fareAfterSurge = roundCurrency(fareAfterTraffic * effectiveSurge);
 
@@ -831,9 +897,12 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   const absoluteMinimumFare = effectiveMinimumFare;
   const effectiveDiscountPct = 0;
 
+  const surgeCapped = surgeCappedByEngine;
+  
   const flags: FareFlags = {
     trafficApplied,
     surgeApplied: effectiveSurge > 1,
+    surgeCapped,
     nightApplied: nightSurcharge > 0,
     peakApplied: peakHourSurcharge > 0,
     longDistanceApplied: longDistanceFee > 0,
@@ -927,6 +996,12 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     dynamicCommissionApplied,
     commissionCapped,
     commissionFloored,
+    
+    // Surge timing transparency
+    surgeReason,
+    surgeReasons,
+    surgeTimingWindow,
+    surgeCapped,
     
     marginProtectionApplied,
     marginProtectionCapped,
