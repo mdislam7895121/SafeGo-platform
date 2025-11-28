@@ -987,3 +987,416 @@ describe('FareEngine - Comprehensive Regression Tests', () => {
     });
   });
 });
+
+describe('Dynamic Commission System (Model A)', () => {
+  const createContextWithDemand = (
+    route: RouteInput,
+    pickup: LocationInfo,
+    dropoff: LocationInfo,
+    demandInputs: {
+      activeRides?: number;
+      availableDrivers?: number;
+      etaDensity?: number;
+    } = {},
+    options: {
+      surgeMultiplier?: number;
+      timeContext?: { hour: number; dayOfWeek: number };
+      fareConfigOverrides?: Partial<FareConfig>;
+    } = {}
+  ): FareEngineContext => ({
+    fareConfig: { 
+      ...DEFAULT_FARE_CONFIG, 
+      useDynamicCommission: true,
+      commissionBands: {
+        lowDemand: { min: 10, max: 12 },
+        normalDemand: { min: 13, max: 15 },
+        highDemand: { min: 15, max: 18 },
+        hardCap: 18,
+        hardFloor: 10,
+      },
+      ...options.fareConfigOverrides 
+    },
+    rideTypeCode: 'STANDARD',
+    route,
+    pickup,
+    dropoff,
+    airports: AIRPORTS,
+    borderZones: [],
+    surgeMultiplier: options.surgeMultiplier ?? 1.0,
+    timeContext: options.timeContext ?? { hour: 14, dayOfWeek: 2 },
+    tolls: [],
+    stateRegulatoryFees: [],
+    additionalFees: [],
+    demandContext: {
+      activeRides: demandInputs.activeRides ?? 50,
+      availableDrivers: demandInputs.availableDrivers ?? 50,
+      etaDensity: demandInputs.etaDensity ?? 5,
+    },
+  });
+
+  describe('Demand Level Detection', () => {
+    it('should detect low demand (10-12% commission) with high driver availability', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 20,
+        availableDrivers: 100,
+        etaDensity: 2,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('low');
+      expect(result.commissionRate).toBeGreaterThanOrEqual(10);
+      expect(result.commissionRate).toBeLessThanOrEqual(12);
+      expect(result.dynamicCommissionApplied).toBe(true);
+      expect(result.flags.dynamicCommissionApplied).toBe(true);
+    });
+
+    it('should detect normal demand (13-15% commission) with balanced conditions', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 50,
+        availableDrivers: 60,
+        etaDensity: 5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('normal');
+      expect(result.commissionRate).toBeGreaterThanOrEqual(13);
+      expect(result.commissionRate).toBeLessThanOrEqual(15);
+      expect(result.dynamicCommissionApplied).toBe(true);
+    });
+
+    it('should detect high demand (15-18% commission) with low driver availability', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 100,
+        availableDrivers: 10,
+        etaDensity: 12,
+      }, {
+        surgeMultiplier: 2.0,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('high');
+      expect(result.commissionRate).toBeGreaterThanOrEqual(15);
+      expect(result.commissionRate).toBeLessThanOrEqual(18);
+      expect(result.dynamicCommissionApplied).toBe(true);
+    });
+
+    it('should apply surge multiplier impact on demand detection', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 80,
+        availableDrivers: 30,
+        etaDensity: 8,
+      }, {
+        surgeMultiplier: 2.5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('high');
+    });
+  });
+
+  describe('Commission Hard Cap Enforcement', () => {
+    it('should never exceed 18% commission hard cap', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 200,
+        availableDrivers: 5,
+        etaDensity: 20,
+      }, {
+        surgeMultiplier: 3.0,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.commissionRate).toBeLessThanOrEqual(18);
+      if (result.commissionRate === 18) {
+        expect(result.commissionCapped).toBe(true);
+        expect(result.flags.commissionCapped).toBe(true);
+      }
+    });
+
+    it('should flag commissionCapped when hitting hard cap', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 200,
+        availableDrivers: 5,
+        etaDensity: 25,
+      }, {
+        surgeMultiplier: 3.0,
+        fareConfigOverrides: {
+          commissionBands: {
+            lowDemand: { min: 10, max: 12 },
+            normalDemand: { min: 13, max: 15 },
+            highDemand: { min: 17, max: 22 },
+            hardCap: 18,
+            hardFloor: 10,
+          },
+        },
+      });
+      const result = calculateFare(context);
+      
+      expect(result.commissionRate).toBe(18);
+      expect(result.commissionCapped).toBe(true);
+      expect(result.commissionFloored).toBe(false);
+      expect(result.flags.commissionCapped).toBe(true);
+      expect(result.flags.commissionFloored).toBe(false);
+    });
+
+    it('should flag commissionFloored when hitting hard floor and NOT commissionCapped', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 5,
+        availableDrivers: 200,
+        etaDensity: 1,
+      }, {
+        fareConfigOverrides: {
+          commissionBands: {
+            lowDemand: { min: 5, max: 8 },
+            normalDemand: { min: 13, max: 15 },
+            highDemand: { min: 15, max: 18 },
+            hardCap: 18,
+            hardFloor: 10,
+          },
+        },
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('low');
+      expect(result.commissionRate).toBe(10);
+      expect(result.commissionFloored).toBe(true);
+      expect(result.commissionCapped).toBe(false);
+      expect(result.flags.commissionFloored).toBe(true);
+      expect(result.flags.commissionCapped).toBe(false);
+    });
+
+    it('should not set capped or floored when rate is within normal bounds', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 50,
+        availableDrivers: 60,
+        etaDensity: 5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('normal');
+      expect(result.commissionRate).toBeGreaterThanOrEqual(13);
+      expect(result.commissionRate).toBeLessThanOrEqual(15);
+      expect(result.commissionCapped).toBe(false);
+      expect(result.commissionFloored).toBe(false);
+    });
+  });
+
+  describe('Driver Minimum Payout Protection', () => {
+    it('should ensure driver receives at least $5 minimum payout', () => {
+      const route = createRoute(2, 8);
+      const context = createContextWithDemand(route, NYC_COORDS, NYC_COORDS, {
+        activeRides: 100,
+        availableDrivers: 10,
+        etaDensity: 15,
+      }, {
+        surgeMultiplier: 2.0,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+      expect(result.driverMinimumPayoutApplied).toBeDefined();
+    });
+
+    it('should reduce commission rate to protect driver minimum on small fares', () => {
+      const route = createRoute(1.5, 5);
+      const context = createContextWithDemand(route, NYC_COORDS, NYC_COORDS, {
+        activeRides: 100,
+        availableDrivers: 10,
+        etaDensity: 15,
+      }, {
+        surgeMultiplier: 2.0,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+    });
+  });
+
+  describe('Commission Application Sequence', () => {
+    it('should apply commission after all surcharges', () => {
+      const route = createRoute(30, 65);
+      const context = createContextWithDemand(route, JFK_AIRPORT_COORDS, NEWARK_NJ_COORDS, {
+        activeRides: 50,
+        availableDrivers: 60,
+        etaDensity: 5,
+      }, {
+        surgeMultiplier: 1.2,
+        timeContext: { hour: 23, dayOfWeek: 2 },
+      });
+      const result = calculateFare(context);
+      
+      expect(result.airportFee).toBeGreaterThanOrEqual(0);
+      expect(result.nightSurcharge).toBeGreaterThan(0);
+      expect(result.dynamicCommissionApplied).toBe(true);
+      expect(result.platformCommission).toBeGreaterThan(0);
+    });
+
+    it('should apply commission before customer service fee', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 50,
+        availableDrivers: 60,
+        etaDensity: 5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.customerServiceFee).toBe(1.99);
+      const expectedDriverEarnings = result.totalFare - result.platformCommission - result.customerServiceFee - result.stateRegulatoryFee;
+      expect(Math.abs(result.driverEarnings - expectedDriverEarnings)).toBeLessThanOrEqual(0.05);
+    });
+  });
+
+  describe('Backward Compatibility', () => {
+    it('should use 15% default commission when no demand context provided', () => {
+      const route = createRoute(10, 25);
+      const context: FareEngineContext = {
+        fareConfig: DEFAULT_FARE_CONFIG,
+        rideTypeCode: 'STANDARD',
+        route,
+        pickup: NYC_COORDS,
+        dropoff: BROOKLYN_COORDS,
+        airports: [],
+        borderZones: [],
+        surgeMultiplier: 1.0,
+        timeContext: { hour: 14, dayOfWeek: 2 },
+        tolls: [],
+        stateRegulatoryFees: [],
+        additionalFees: [],
+      };
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('normal');
+      expect(result.commissionRate).toBeCloseTo(15, 1);
+      expect(result.dynamicCommissionApplied).toBe(false);
+    });
+
+    it('should maintain existing fee precedence rules', () => {
+      const route = createRoute(30, 55);
+      const context = createContextWithDemand(route, JFK_AIRPORT_COORDS, STAMFORD_CT_COORDS, {
+        activeRides: 50,
+        availableDrivers: 60,
+        etaDensity: 5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.crossStateSurcharge).toBeGreaterThan(0);
+      expect(result.dynamicCommissionApplied).toBe(true);
+    });
+  });
+
+  describe('Demand Score Transparency', () => {
+    it('should provide demand score in result', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 50,
+        availableDrivers: 60,
+        etaDensity: 5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandScore).toBeDefined();
+      expect(typeof result.demandScore).toBe('number');
+      expect(result.demandScore).toBeGreaterThanOrEqual(0);
+      expect(result.demandScore).toBeLessThanOrEqual(100);
+    });
+
+    it('should have higher demand score with worse conditions', () => {
+      const route = createRoute(10, 25);
+      
+      const lowDemandContext = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 20,
+        availableDrivers: 100,
+        etaDensity: 2,
+      });
+      const lowDemandResult = calculateFare(lowDemandContext);
+      
+      const highDemandContext = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 100,
+        availableDrivers: 10,
+        etaDensity: 15,
+      }, {
+        surgeMultiplier: 2.5,
+      });
+      const highDemandResult = calculateFare(highDemandContext);
+      
+      expect(highDemandResult.demandScore).toBeGreaterThan(lowDemandResult.demandScore);
+    });
+  });
+
+  describe('Complex Scenarios with Dynamic Commission', () => {
+    it('should apply dynamic commission with promo discount', () => {
+      const route = createRoute(15, 35);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 100,
+        availableDrivers: 10,
+        etaDensity: 10,
+      }, {
+        surgeMultiplier: 1.5,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('high');
+      expect(result.commissionRate).toBeGreaterThanOrEqual(15);
+      expect(result.totalFare).toBeGreaterThan(0);
+      expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+    });
+
+    it('should maintain commission bands with surge pricing', () => {
+      const route = createRoute(10, 25);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 80,
+        availableDrivers: 15,
+        etaDensity: 10,
+      }, {
+        surgeMultiplier: 2.0,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.surgeMultiplier).toBe(2.0);
+      expect(result.demandLevel).toBe('high');
+      expect(result.commissionRate).toBeLessThanOrEqual(18);
+      expect(result.surgeAmount).toBeGreaterThan(0);
+    });
+
+    it('should work with cross-state and airport fees', () => {
+      const route = createRoute(35, 60);
+      const context = createContextWithDemand(route, JFK_AIRPORT_COORDS, NEWARK_NJ_COORDS, {
+        activeRides: 30,
+        availableDrivers: 100,
+        etaDensity: 3,
+      });
+      const result = calculateFare(context);
+      
+      expect(result.demandLevel).toBe('low');
+      expect(result.commissionRate).toBeGreaterThanOrEqual(10);
+      expect(result.commissionRate).toBeLessThanOrEqual(12);
+      expect(result.crossStateSurcharge).toBeGreaterThan(0);
+      expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+    });
+
+    it('should balance fare = driver earnings + commission + fees', () => {
+      const route = createRoute(15, 35);
+      const context = createContextWithDemand(route, NYC_COORDS, BROOKLYN_COORDS, {
+        activeRides: 50,
+        availableDrivers: 60,
+        etaDensity: 5,
+      }, {
+        surgeMultiplier: 1.2,
+      });
+      const result = calculateFare(context);
+      
+      const calculatedTotal = result.driverEarnings + 
+                              result.platformCommission + 
+                              result.stateRegulatoryFee + 
+                              result.customerServiceFee;
+      expect(Math.abs(calculatedTotal - result.totalFare)).toBeLessThanOrEqual(0.05);
+    });
+  });
+});

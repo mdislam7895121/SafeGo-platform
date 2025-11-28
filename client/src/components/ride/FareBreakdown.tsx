@@ -79,6 +79,7 @@ export interface FareBreakdownData {
   commissionRate?: number;
   dynamicCommissionApplied?: boolean;
   commissionCapped?: boolean;
+  commissionFloored?: boolean;
   // Consolidated flags object
   flags?: {
     trafficApplied?: boolean;
@@ -99,6 +100,7 @@ export interface FareBreakdownData {
     marginProtectionCapped?: boolean;
     dynamicCommissionApplied?: boolean;
     commissionCapped?: boolean;
+    commissionFloored?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -356,7 +358,12 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
                 )}
                 {(breakdown.commissionCapped || breakdown.flags?.commissionCapped) && (
                   <Badge variant="outline" className="text-xs" data-testid="badge-commission-capped">
-                    Capped
+                    Max capped
+                  </Badge>
+                )}
+                {(breakdown.commissionFloored || breakdown.flags?.commissionFloored) && (
+                  <Badge variant="secondary" className="text-xs" data-testid="badge-commission-floored">
+                    Min floored
                   </Badge>
                 )}
               </div>

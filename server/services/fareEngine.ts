@@ -186,6 +186,7 @@ export interface FareFlags {
   marginProtectionApplied: boolean;
   dynamicCommissionApplied: boolean;
   commissionCapped: boolean;
+  commissionFloored: boolean;
 }
 
 export interface FeeSuppressionEntry {
@@ -266,6 +267,7 @@ export interface FareEngineResult {
   commissionRate: number;
   dynamicCommissionApplied: boolean;
   commissionCapped: boolean;
+  commissionFloored: boolean;
   
   marginProtectionApplied: boolean;
   marginProtectionCapped: boolean;
@@ -672,8 +674,10 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   const driverEarningsPercent = fareConfig.driverEarningsPercent ?? DEFAULT_COMMISSION_CONFIG.driverEarningsPercent;
   const staticCommissionPercent = fareConfig.platformCommissionPercent ?? DEFAULT_COMMISSION_CONFIG.platformCommissionPercent;
   const driverMinimumEarnings = fareConfig.driverMinimumPayout ?? DEFAULT_COMMISSION_CONFIG.driverMinimumEarnings;
-  const useDynamicCommission = fareConfig.useDynamicCommission ?? true;
   const commissionBands = fareConfig.commissionBands ?? DEFAULT_COMMISSION_BANDS;
+  
+  const hasDemandContext = demandContext !== undefined && demandContext !== null;
+  const useDynamicCommission = (fareConfig.useDynamicCommission ?? true) && hasDemandContext;
   
   const demandInput: DemandInput = {
     activeRides: demandContext?.activeRides ?? 50,
@@ -685,25 +689,20 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   };
   
   const demandResult = detectDemand(demandInput);
-  const demandLevel: DemandLevel = demandResult.demandLevel;
-  const demandScore = demandResult.demandScore;
+  const demandLevel: DemandLevel = useDynamicCommission ? demandResult.demandLevel : 'normal';
+  const demandScore = useDynamicCommission ? demandResult.demandScore : 50;
   
   let dynamicCommissionApplied = false;
   let commissionCapped = false;
+  let commissionFloored = false;
   let effectiveCommissionRate: number;
   
   if (useDynamicCommission) {
-    effectiveCommissionRate = calculateDynamicCommissionRate(demandResult, commissionBands);
+    const commissionResult = calculateDynamicCommissionRate(demandResult, commissionBands);
+    effectiveCommissionRate = commissionResult.rate;
     dynamicCommissionApplied = true;
-    
-    if (effectiveCommissionRate < commissionBands.hardFloor) {
-      effectiveCommissionRate = commissionBands.hardFloor;
-      commissionCapped = true;
-    }
-    if (effectiveCommissionRate > commissionBands.hardCap) {
-      effectiveCommissionRate = commissionBands.hardCap;
-      commissionCapped = true;
-    }
+    commissionCapped = commissionResult.wasCapped;
+    commissionFloored = commissionResult.wasBelowFloor;
   } else {
     effectiveCommissionRate = staticCommissionPercent;
   }
@@ -853,6 +852,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     marginProtectionApplied,
     dynamicCommissionApplied,
     commissionCapped,
+    commissionFloored,
   };
 
   const feeSuppressionLog: FeeSuppressionLog = {
@@ -926,6 +926,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     commissionRate,
     dynamicCommissionApplied,
     commissionCapped,
+    commissionFloored,
     
     marginProtectionApplied,
     marginProtectionCapped,

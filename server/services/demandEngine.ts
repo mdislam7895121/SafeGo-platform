@@ -179,10 +179,17 @@ export const DEFAULT_COMMISSION_BANDS: CommissionBands = {
   hardFloor: 10,
 };
 
+export interface CommissionRateResult {
+  rate: number;
+  uncappedRate: number;
+  wasCapped: boolean;
+  wasBelowFloor: boolean;
+}
+
 export function calculateDynamicCommissionRate(
   demandResult: DemandResult,
   bands: CommissionBands = DEFAULT_COMMISSION_BANDS
-): number {
+): CommissionRateResult {
   const { demandLevel, demandScore } = demandResult;
 
   let band: { min: number; max: number };
@@ -216,12 +223,27 @@ export function calculateDynamicCommissionRate(
   const positionInBand = bandRange > 0 ? scoreInBand / bandRange : 0.5;
   
   const commissionRange = band.max - band.min;
-  let rate = band.min + (positionInBand * commissionRange);
+  const uncappedRate = Math.round((band.min + (positionInBand * commissionRange)) * 100) / 100;
+  
+  let rate = uncappedRate;
+  let wasBelowFloor = false;
+  let wasCapped = false;
 
-  rate = Math.max(bands.hardFloor, rate);
-  rate = Math.min(bands.hardCap, rate);
+  if (rate < bands.hardFloor) {
+    rate = bands.hardFloor;
+    wasBelowFloor = true;
+  }
+  if (rate > bands.hardCap) {
+    rate = bands.hardCap;
+    wasCapped = true;
+  }
 
-  return Math.round(rate * 100) / 100;
+  return {
+    rate: Math.round(rate * 100) / 100,
+    uncappedRate,
+    wasCapped,
+    wasBelowFloor,
+  };
 }
 
 export function getDemandLevelFromContext(
