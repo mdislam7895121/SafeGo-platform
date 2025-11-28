@@ -59,6 +59,20 @@ export interface FareBreakdownData {
   borderZoneFee?: number;
   stateRegulatoryFee?: number;
   stateRegulatoryFeeLabel?: string;
+  
+  // NYC TLC Regulatory Fees
+  tlcCongestionFee?: number;
+  tlcCongestionFeeApplied?: boolean;
+  tlcAirportFee?: number;
+  tlcAirportName?: string;
+  tlcAirportCode?: string;
+  tlcAirportFeeApplied?: boolean;
+  tlcAVFFee?: number;
+  tlcAVFFeeApplied?: boolean;
+  tlcBCFFee?: number;
+  tlcBCFFeeRate?: number;
+  tlcBCFFeeApplied?: boolean;
+  
   surgeAmount?: number;
   surgeMultiplier?: number;
   surgeReason?: string;
@@ -106,6 +120,11 @@ export interface FareBreakdownData {
     dynamicCommissionApplied?: boolean;
     commissionCapped?: boolean;
     commissionFloored?: boolean;
+    // NYC TLC regulatory flags
+    tlcCongestionFeeApplied?: boolean;
+    tlcAirportFeeApplied?: boolean;
+    tlcAVFFeeApplied?: boolean;
+    tlcBCFFeeApplied?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -351,6 +370,41 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           currency={currency} 
         />
       )}
+      
+      {/* NYC TLC Regulatory Fees Section */}
+      {(breakdown.tlcCongestionFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Building2} 
+          label="NYC Congestion Surcharge"
+          amount={breakdown.tlcCongestionFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.tlcAirportFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Plane} 
+          label={`NYC TLC Airport Fee${breakdown.tlcAirportCode ? ` (${breakdown.tlcAirportCode})` : ''}`}
+          amount={breakdown.tlcAirportFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.tlcAVFFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Shield} 
+          label="NYC Accessible Vehicle Fund"
+          amount={breakdown.tlcAVFFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.tlcBCFFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={FileText} 
+          label={`NYC Black Car Fund (${((breakdown.tlcBCFFeeRate ?? 0.0275) * 100).toFixed(2)}%)`}
+          amount={breakdown.tlcBCFFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      
       <BreakdownLine 
         icon={Route} 
         label="Tolls" 
