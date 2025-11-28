@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -26,6 +31,7 @@ import {
   Zap,
   Ruler,
   AlertTriangle,
+  AlertCircle,
   Loader2,
   Navigation,
   DollarSign,
@@ -36,6 +42,7 @@ import {
   Building2,
   TrendingUp,
   ChevronDown,
+  Accessibility,
 } from "lucide-react";
 import { useRideBooking, type RideOption, type PaymentMethod, type RouteAlternative } from "@/contexts/RideBookingContext";
 import { SafeGoMap } from "@/components/maps/SafeGoMap";
@@ -54,6 +61,7 @@ import { PromoFareCard, type PromoType } from "@/components/ride/PromoFareCard";
 import { FareBreakdown, type FareBreakdownData } from "@/components/ride/FareBreakdown";
 import { RouteOptionsBar, type RouteOption as RouteOptionType } from "@/components/ride/RouteOptionCard";
 import { PromoCodeInput } from "@/components/ride/PromoCodeInput";
+import { useCategoryAvailability, type CategoryAvailabilityStatus } from "@/hooks/useCategoryAvailability";
 
 const VEHICLE_CATEGORY_ORDER_ACTIVE: VehicleCategoryId[] = VEHICLE_CATEGORY_ORDER.filter(
   (id) => VEHICLE_CATEGORIES[id]?.isActive
@@ -319,6 +327,29 @@ export default function RideOptionsPage() {
     enabled: fareRoutes.length > 0,
   });
 
+  const {
+    getAvailability,
+    isUnavailable: isCategoryUnavailable,
+    isLimited: isCategoryLimited,
+    isLoading: isLoadingAvailability,
+  } = useCategoryAvailability({
+    pickupLat: state.pickup?.lat ?? null,
+    pickupLng: state.pickup?.lng ?? null,
+    enabled: !!state.pickup,
+    refreshIntervalMs: 30000,
+  });
+
+  useEffect(() => {
+    if (!isLoadingAvailability && isCategoryUnavailable(selectedVehicleCategory)) {
+      const firstAvailableCategory = VEHICLE_CATEGORY_ORDER_ACTIVE.find(
+        (id) => !isCategoryUnavailable(id)
+      );
+      if (firstAvailableCategory) {
+        setSelectedVehicleCategory(firstAvailableCategory);
+      }
+    }
+  }, [selectedVehicleCategory, isCategoryUnavailable, isLoadingAvailability]);
+
   useEffect(() => {
     if (!canProceedToOptions) {
       setLocation("/rider/ride/dropoff");
@@ -385,6 +416,9 @@ export default function RideOptionsPage() {
   }, [locationKey, lastFetchedLocationKey, state.pickup, state.dropoff, setRouteAlternatives]);
 
   const handleSelectVehicleCategory = (categoryId: VehicleCategoryId) => {
+    if (isCategoryUnavailable(categoryId)) {
+      return;
+    }
     setSelectedVehicleCategory(categoryId);
   };
 
@@ -620,30 +654,58 @@ export default function RideOptionsPage() {
                     const fare = currentRouteId ? getFare(categoryId, currentRouteId) : null;
                     const pillPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
                     const pillFinalFare = fare ? fare.totalFare - pillPromoDiscount : 0;
+                    const catUnavailable = isCategoryUnavailable(categoryId);
+                    const catLimited = isCategoryLimited(categoryId);
+                    const catAvailability = getAvailability(categoryId);
                     
                     return (
-                      <Button
-                        key={categoryId}
-                        variant={isSelected ? "default" : "outline"}
-                        className={`flex-shrink-0 snap-start h-auto py-2 px-3 ${
-                          isSelected ? "" : "hover-elevate"
-                        }`}
-                        onClick={() => handleSelectVehicleCategory(categoryId)}
-                        data-testid={`ride-pill-${categoryId}`}
-                      >
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="relative">
-                            <Icon className="h-5 w-5" />
-                            {isSelected && promoValidation?.valid && (
-                              <div className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
-                            )}
-                          </div>
-                          <span className="text-[10px] sm:text-xs font-medium">{catConfig.displayName.replace("SafeGo ", "")}</span>
-                          <span className={`text-[10px] font-bold ${pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
-                            {fare ? formatCurrency(pillFinalFare, currency) : "--"}
-                          </span>
-                        </div>
-                      </Button>
+                      <Tooltip key={categoryId}>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={isSelected ? "default" : "outline"}
+                            className={`flex-shrink-0 snap-start h-auto py-2 px-3 ${
+                              catUnavailable 
+                                ? "opacity-50 cursor-not-allowed" 
+                                : isSelected 
+                                  ? "" 
+                                  : "hover-elevate"
+                            }`}
+                            onClick={() => !catUnavailable && handleSelectVehicleCategory(categoryId)}
+                            disabled={catUnavailable}
+                            data-testid={`ride-pill-${categoryId}`}
+                          >
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="relative">
+                                <Icon className="h-5 w-5" />
+                                {catUnavailable && (
+                                  <div className="absolute -top-1 -right-1">
+                                    <AlertCircle className="h-3 w-3 text-muted-foreground" />
+                                  </div>
+                                )}
+                                {catLimited && !catUnavailable && (
+                                  <div className="absolute -top-1 -right-1 h-2 w-2 bg-amber-500 rounded-full" />
+                                )}
+                                {isSelected && promoValidation?.valid && !catUnavailable && !catLimited && (
+                                  <div className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
+                                )}
+                              </div>
+                              <span className="text-[10px] sm:text-xs font-medium">{catConfig.displayName.replace("SafeGo ", "")}</span>
+                              {catUnavailable ? (
+                                <span className="text-[8px] text-muted-foreground">N/A</span>
+                              ) : (
+                                <span className={`text-[10px] font-bold ${pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                                  {fare ? formatCurrency(pillFinalFare, currency) : "--"}
+                                </span>
+                              )}
+                            </div>
+                          </Button>
+                        </TooltipTrigger>
+                        {(catUnavailable || catLimited) && (
+                          <TooltipContent side="bottom" className="text-xs">
+                            {catAvailability?.reason || (catUnavailable ? "Currently unavailable" : "Limited availability")}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                     );
                   })}
                 </div>
@@ -658,32 +720,48 @@ export default function RideOptionsPage() {
                     const catPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
                     const catFinalFare = fare ? fare.totalFare - catPromoDiscount : 0;
                     const catAnchorFare = fare && catPromoDiscount > 0 ? fare.totalFare : 0;
+                    const catUnavailable = isCategoryUnavailable(categoryId);
+                    const catLimited = isCategoryLimited(categoryId);
+                    const catAvailability = getAvailability(categoryId);
                     
                     return (
                       <Card
                         key={categoryId}
-                        className={`cursor-pointer transition-all ${
-                          isSelected 
-                            ? "ring-2 ring-primary border-primary" 
-                            : "hover-elevate"
+                        className={`transition-all ${
+                          catUnavailable 
+                            ? "opacity-50 cursor-not-allowed"
+                            : isSelected 
+                              ? "ring-2 ring-primary border-primary cursor-pointer" 
+                              : "hover-elevate cursor-pointer"
                         }`}
-                        onClick={() => handleSelectVehicleCategory(categoryId)}
+                        onClick={() => !catUnavailable && handleSelectVehicleCategory(categoryId)}
                         data-testid={`ride-option-${categoryId}`}
                       >
                         <CardContent className="p-3">
                           <div className="flex items-center gap-3">
                             <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${
-                              isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                              catUnavailable 
+                                ? "bg-muted/50 text-muted-foreground"
+                                : isSelected 
+                                  ? "bg-primary text-primary-foreground" 
+                                  : "bg-muted"
                             }`}>
                               <Icon className="h-5 w-5" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-semibold text-sm">{catConfig.displayName}</h3>
-                                {catConfig.isPopular && (
+                                <h3 className={`font-semibold text-sm ${catUnavailable ? "text-muted-foreground" : ""}`}>
+                                  {catConfig.displayName}
+                                </h3>
+                                {catConfig.isPopular && !catUnavailable && (
                                   <Badge variant="secondary" className="text-[9px]">Popular</Badge>
                                 )}
-                                {isSelected && promoValidation?.valid && (
+                                {catLimited && !catUnavailable && (
+                                  <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-600 dark:text-amber-400">
+                                    Limited
+                                  </Badge>
+                                )}
+                                {isSelected && promoValidation?.valid && !catUnavailable && (
                                   <Badge 
                                     variant="outline" 
                                     className="text-[9px] bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
@@ -694,6 +772,12 @@ export default function RideOptionsPage() {
                                   </Badge>
                                 )}
                               </div>
+                              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                                {catUnavailable 
+                                  ? catAvailability?.reason || "Currently unavailable"
+                                  : catConfig.shortDescription
+                                }
+                              </p>
                               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
@@ -706,7 +790,9 @@ export default function RideOptionsPage() {
                               </div>
                             </div>
                             <div className="text-right">
-                              {fare ? (
+                              {catUnavailable ? (
+                                <span className="text-muted-foreground text-sm">--</span>
+                              ) : fare ? (
                                 <>
                                   {catPromoDiscount > 0 && (
                                     <span className="text-[10px] text-muted-foreground line-through block">
@@ -721,7 +807,7 @@ export default function RideOptionsPage() {
                                 <Skeleton className="h-5 w-14" />
                               )}
                             </div>
-                            {isSelected && (
+                            {isSelected && !catUnavailable && (
                               <Check className="h-4 w-4 text-primary flex-shrink-0" />
                             )}
                           </div>
