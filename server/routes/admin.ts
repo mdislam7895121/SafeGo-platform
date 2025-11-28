@@ -2242,6 +2242,359 @@ router.patch("/drivers/:id/vehicle", checkPermission(Permission.MANAGE_DRIVERS),
 });
 
 // ====================================================
+// VEHICLE CATEGORY MANAGEMENT (Admin Approval System)
+// ====================================================
+
+// GET /api/admin/vehicles/pending-categories
+// List all vehicles with pending category approval
+router.get("/vehicles/pending-categories", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { page = "1", limit = "20", categoryType } = req.query;
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: any = {
+      vehicleCategoryStatus: "pending",
+      vehicleCategory: { not: null },
+    };
+
+    if (categoryType) {
+      where.vehicleCategory = categoryType as string;
+    }
+
+    const [vehicles, total] = await Promise.all([
+      prisma.vehicle.findMany({
+        where,
+        include: {
+          driver: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              kycStatus: true,
+              tlcLicenseNumber: true,
+              tlcLicenseExpiry: true,
+              dmvLicenseNumber: true,
+              dmvLicenseExpiry: true,
+            },
+          },
+        },
+        skip,
+        take: limitNum,
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.vehicle.count({ where }),
+    ]);
+
+    const formattedVehicles = vehicles.map((v) => ({
+      vehicleId: v.id,
+      driverId: v.driverId,
+      driverName: `${v.driver.firstName || ""} ${v.driver.lastName || ""}`.trim() || "Unknown",
+      driverEmail: v.driver.email,
+      driverPhone: v.driver.phone,
+      driverKycStatus: v.driver.kycStatus,
+      vehicleCategory: v.vehicleCategory,
+      vehicleCategoryStatus: v.vehicleCategoryStatus,
+      vehicleType: v.vehicleType,
+      make: v.make,
+      model: v.vehicleModel,
+      year: v.vehicleYear,
+      color: v.color,
+      licensePlate: v.licensePlate,
+      wheelchairAccessible: v.wheelchairAccessible,
+      tlcLicenseNumber: v.tlcLicenseNumber,
+      tlcLicenseExpiry: v.tlcLicenseExpiry,
+      registrationExpiry: v.registrationExpiry,
+      insuranceExpiry: v.insuranceExpiry,
+      driverTlcLicenseNumber: v.driver.tlcLicenseNumber,
+      driverTlcLicenseExpiry: v.driver.tlcLicenseExpiry,
+      driverDmvLicenseNumber: v.driver.dmvLicenseNumber,
+      driverDmvLicenseExpiry: v.driver.dmvLicenseExpiry,
+      updatedAt: v.updatedAt,
+    }));
+
+    res.json({
+      vehicles: formattedVehicles,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    console.error("Get pending vehicle categories error:", error);
+    res.status(500).json({ error: "Failed to fetch pending vehicle categories" });
+  }
+});
+
+// PATCH /api/admin/vehicles/:vehicleId/category/approve
+// Approve a vehicle's category assignment
+router.patch("/vehicles/:vehicleId/category/approve", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { notes } = req.body;
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      include: {
+        driver: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    if (!vehicle.vehicleCategory) {
+      return res.status(400).json({ error: "Vehicle has no category to approve" });
+    }
+
+    if (vehicle.vehicleCategoryStatus === "approved") {
+      return res.status(400).json({ error: "Vehicle category is already approved" });
+    }
+
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        vehicleCategoryStatus: "approved",
+        categoryApprovalNotes: notes || null,
+        categoryApprovedAt: new Date(),
+        categoryApprovedBy: req.user?.id,
+      },
+    });
+
+    await logAuditEvent({
+      adminId: req.adminUser?.id,
+      actionType: ActionType.UPDATE,
+      entityType: EntityType.VEHICLE,
+      entityId: vehicleId,
+      oldValue: JSON.stringify({ vehicleCategoryStatus: vehicle.vehicleCategoryStatus }),
+      newValue: JSON.stringify({ vehicleCategoryStatus: "approved", notes }),
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({
+      message: "Vehicle category approved successfully",
+      vehicle: {
+        id: updatedVehicle.id,
+        vehicleCategory: updatedVehicle.vehicleCategory,
+        vehicleCategoryStatus: updatedVehicle.vehicleCategoryStatus,
+        categoryApprovedAt: updatedVehicle.categoryApprovedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Approve vehicle category error:", error);
+    res.status(500).json({ error: "Failed to approve vehicle category" });
+  }
+});
+
+// PATCH /api/admin/vehicles/:vehicleId/category/reject
+// Reject a vehicle's category assignment
+router.patch("/vehicles/:vehicleId/category/reject", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || typeof reason !== "string") {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      include: {
+        driver: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            userId: true,
+          },
+        },
+      },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    if (!vehicle.vehicleCategory) {
+      return res.status(400).json({ error: "Vehicle has no category to reject" });
+    }
+
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        vehicleCategoryStatus: "rejected",
+        categoryApprovalNotes: reason,
+        categoryRejectedAt: new Date(),
+        categoryRejectedBy: req.user?.id,
+      },
+    });
+
+    await logAuditEvent({
+      adminId: req.adminUser?.id,
+      actionType: ActionType.UPDATE,
+      entityType: EntityType.VEHICLE,
+      entityId: vehicleId,
+      oldValue: JSON.stringify({ vehicleCategoryStatus: vehicle.vehicleCategoryStatus }),
+      newValue: JSON.stringify({ vehicleCategoryStatus: "rejected", reason }),
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({
+      message: "Vehicle category rejected",
+      vehicle: {
+        id: updatedVehicle.id,
+        vehicleCategory: updatedVehicle.vehicleCategory,
+        vehicleCategoryStatus: updatedVehicle.vehicleCategoryStatus,
+        categoryApprovalNotes: updatedVehicle.categoryApprovalNotes,
+      },
+    });
+  } catch (error) {
+    console.error("Reject vehicle category error:", error);
+    res.status(500).json({ error: "Failed to reject vehicle category" });
+  }
+});
+
+// GET /api/admin/vehicles/:vehicleId/category-history
+// Get category approval history for a vehicle
+router.get("/vehicles/:vehicleId/category-history", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
+  try {
+    const { vehicleId } = req.params;
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      select: {
+        id: true,
+        vehicleCategory: true,
+        vehicleCategoryStatus: true,
+        categoryApprovalNotes: true,
+        categoryApprovedAt: true,
+        categoryApprovedBy: true,
+        categoryRejectedAt: true,
+        categoryRejectedBy: true,
+        wheelchairAccessible: true,
+        createdAt: true,
+        updatedAt: true,
+        driver: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    res.json({
+      vehicleId: vehicle.id,
+      currentCategory: vehicle.vehicleCategory,
+      currentStatus: vehicle.vehicleCategoryStatus,
+      approvalNotes: vehicle.categoryApprovalNotes,
+      approvedAt: vehicle.categoryApprovedAt,
+      approvedBy: vehicle.categoryApprovedBy,
+      rejectedAt: vehicle.categoryRejectedAt,
+      rejectedBy: vehicle.categoryRejectedBy,
+      wheelchairAccessible: vehicle.wheelchairAccessible,
+      driver: vehicle.driver,
+      createdAt: vehicle.createdAt,
+      updatedAt: vehicle.updatedAt,
+    });
+  } catch (error) {
+    console.error("Get vehicle category history error:", error);
+    res.status(500).json({ error: "Failed to fetch vehicle category history" });
+  }
+});
+
+// PATCH /api/admin/vehicles/:vehicleId/category/override
+// Admin override to set a vehicle's category directly
+router.patch("/vehicles/:vehicleId/category/override", checkPermission(Permission.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { vehicleId } = req.params;
+    const { category, notes } = req.body;
+
+    const validCategories = ["X", "COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV", "WAV"];
+    if (!category || !validCategories.includes(category)) {
+      return res.status(400).json({ 
+        error: "Invalid category. Must be one of: " + validCategories.join(", ") 
+      });
+    }
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      include: {
+        driver: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    const oldCategory = vehicle.vehicleCategory;
+    const oldStatus = vehicle.vehicleCategoryStatus;
+
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: {
+        vehicleCategory: category,
+        vehicleCategoryStatus: "approved",
+        categoryApprovalNotes: notes || `Admin override: ${oldCategory || 'none'} -> ${category}`,
+        categoryApprovedAt: new Date(),
+        categoryApprovedBy: req.user?.id,
+      },
+    });
+
+    await logAuditEvent({
+      adminId: req.adminUser?.id,
+      actionType: ActionType.UPDATE,
+      entityType: EntityType.VEHICLE,
+      entityId: vehicleId,
+      oldValue: JSON.stringify({ vehicleCategory: oldCategory, vehicleCategoryStatus: oldStatus }),
+      newValue: JSON.stringify({ vehicleCategory: category, vehicleCategoryStatus: "approved", notes }),
+      ipAddress: getClientIp(req),
+    });
+
+    res.json({
+      message: "Vehicle category overridden successfully",
+      vehicle: {
+        id: updatedVehicle.id,
+        vehicleCategory: updatedVehicle.vehicleCategory,
+        vehicleCategoryStatus: updatedVehicle.vehicleCategoryStatus,
+        previousCategory: oldCategory,
+      },
+    });
+  } catch (error) {
+    console.error("Override vehicle category error:", error);
+    res.status(500).json({ error: "Failed to override vehicle category" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/drivers/:id/ssn
 // Decrypt and return masked SSN (admin only)
 // ====================================================
