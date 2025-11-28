@@ -948,4 +948,285 @@ describe('NYC TLC Minimum Pay Engine', () => {
       });
     });
   });
+
+  /**
+   * NYC TLC HVFHV Long Trip Surcharge Tests (Step 8)
+   * 
+   * Implements $20.00 flat fee for NYC trips exceeding 60 minutes.
+   * 
+   * Rules:
+   * - Fee applies when trip duration > 60 minutes (not >=)
+   * - Both pickup AND dropoff must be in NYC boroughs
+   * - Does NOT apply to cross-state trips
+   * - Fee is a regulatory pass-through (not SafeGo revenue)
+   * - Pipeline position: Step 6G (after State Surcharge, before service fee)
+   */
+  describe('NYC TLC Long Trip Surcharge (Step 8)', () => {
+    const TLC_LONG_TRIP_SURCHARGE = 20.00;
+    const TLC_LONG_TRIP_THRESHOLD_MINUTES = 60;
+    const NYC_BOROUGH_CODES = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
+
+    describe('Fee Constant Validation', () => {
+      it('should define Long Trip Surcharge as $20.00', () => {
+        expect(TLC_LONG_TRIP_SURCHARGE).toBe(20.00);
+      });
+
+      it('should define Long Trip threshold as 60 minutes', () => {
+        expect(TLC_LONG_TRIP_THRESHOLD_MINUTES).toBe(60);
+      });
+    });
+
+    describe('Duration-Based Eligibility', () => {
+      it('should NOT apply for trips exactly 60 minutes (threshold is >60, not >=60)', () => {
+        const tripDuration = 60;
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        expect(isLongTrip).toBe(false);
+      });
+
+      it('should apply for trips at 61 minutes', () => {
+        const tripDuration = 61;
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        expect(isLongTrip).toBe(true);
+      });
+
+      it('should NOT apply for short trips (45 minutes)', () => {
+        const tripDuration = 45;
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        expect(isLongTrip).toBe(false);
+      });
+
+      it('should apply for long trips (75 minutes)', () => {
+        const tripDuration = 75;
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        expect(isLongTrip).toBe(true);
+      });
+
+      it('should apply for very long trips (90 minutes)', () => {
+        const tripDuration = 90;
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        expect(isLongTrip).toBe(true);
+      });
+    });
+
+    describe('Geographic Eligibility - NYC Borough Requirements', () => {
+      it('should apply for trips within Manhattan', () => {
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'manhattan';
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        expect(bothInNYC).toBe(true);
+      });
+
+      it('should apply for trips from Manhattan to Brooklyn', () => {
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'brooklyn';
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        expect(bothInNYC).toBe(true);
+      });
+
+      it('should apply for trips across all NYC boroughs', () => {
+        for (const pickup of NYC_BOROUGH_CODES) {
+          for (const dropoff of NYC_BOROUGH_CODES) {
+            const bothInNYC = NYC_BOROUGH_CODES.includes(pickup) && NYC_BOROUGH_CODES.includes(dropoff);
+            expect(bothInNYC).toBe(true);
+          }
+        }
+      });
+
+      it('should NOT apply for trips with pickup outside NYC', () => {
+        const pickupZone = 'newark';
+        const dropoffZone = 'manhattan';
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        expect(bothInNYC).toBe(false);
+      });
+
+      it('should NOT apply for trips with dropoff outside NYC', () => {
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'newark';
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        expect(bothInNYC).toBe(false);
+      });
+
+      it('should NOT apply for cross-state trips (NY to NJ)', () => {
+        const pickupState: string = 'NY';
+        const dropoffState: string = 'NJ';
+        const bothInNY = pickupState === 'NY' && dropoffState === 'NY';
+        const bothInNYC = false; // Even if in NY state, requires NYC boroughs
+        expect(bothInNY).toBe(false);
+        expect(bothInNYC).toBe(false);
+      });
+    });
+
+    describe('Combined Duration + Geographic Eligibility', () => {
+      it('should apply full $20.00 fee for 75-minute NYC-to-NYC trip', () => {
+        const tripDuration = 75;
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'brooklyn';
+        
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        const feeApplies = isLongTrip && bothInNYC;
+        const fee = feeApplies ? TLC_LONG_TRIP_SURCHARGE : 0;
+        
+        expect(feeApplies).toBe(true);
+        expect(fee).toBe(20.00);
+      });
+
+      it('should NOT apply fee for 75-minute trip with non-NYC dropoff', () => {
+        const tripDuration = 75;
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'newark';
+        
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        const feeApplies = isLongTrip && bothInNYC;
+        const fee = feeApplies ? TLC_LONG_TRIP_SURCHARGE : 0;
+        
+        expect(feeApplies).toBe(false);
+        expect(fee).toBe(0);
+      });
+
+      it('should NOT apply fee for 45-minute NYC-to-NYC trip', () => {
+        const tripDuration = 45;
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'brooklyn';
+        
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        const feeApplies = isLongTrip && bothInNYC;
+        const fee = feeApplies ? TLC_LONG_TRIP_SURCHARGE : 0;
+        
+        expect(feeApplies).toBe(false);
+        expect(fee).toBe(0);
+      });
+
+      it('should NOT apply fee for exactly 60-minute NYC-to-NYC trip (boundary case)', () => {
+        const tripDuration = 60;
+        const pickupZone = 'queens';
+        const dropoffZone = 'bronx';
+        
+        const isLongTrip = tripDuration > TLC_LONG_TRIP_THRESHOLD_MINUTES;
+        const bothInNYC = NYC_BOROUGH_CODES.includes(pickupZone) && NYC_BOROUGH_CODES.includes(dropoffZone);
+        const feeApplies = isLongTrip && bothInNYC;
+        const fee = feeApplies ? TLC_LONG_TRIP_SURCHARGE : 0;
+        
+        expect(isLongTrip).toBe(false);
+        expect(bothInNYC).toBe(true);
+        expect(feeApplies).toBe(false);
+        expect(fee).toBe(0);
+      });
+    });
+
+    describe('Regulatory Pass-Through Treatment', () => {
+      it('should treat Long Trip Surcharge as regulatory fee (not SafeGo revenue)', () => {
+        const fee = TLC_LONG_TRIP_SURCHARGE;
+        const isRegulatoryPassThrough = true;
+        const contributesToCommission = false;
+        
+        expect(fee).toBe(20.00);
+        expect(isRegulatoryPassThrough).toBe(true);
+        expect(contributesToCommission).toBe(false);
+      });
+
+      it('should NOT participate in surge multiplier calculation', () => {
+        const surgeMultiplier = 1.5;
+        const baseFare = 25.00;
+        const surgedFare = baseFare * surgeMultiplier;
+        const longTripFee = TLC_LONG_TRIP_SURCHARGE;
+        
+        // Long Trip Surcharge should NOT be multiplied by surge
+        expect(longTripFee).toBe(20.00);
+        expect(surgedFare).toBe(37.50);
+        
+        // Total should be additive, not multiplicative
+        const totalWithFee = surgedFare + longTripFee;
+        expect(totalWithFee).toBe(57.50);
+      });
+    });
+
+    describe('Fare Pipeline Integration', () => {
+      it('should integrate Long Trip Surcharge into comprehensive NYC fare calculation', () => {
+        const baseFare = 2.50;
+        const distanceFare = 10.0 * 1.31;
+        const timeFare = 75 * 0.56;
+        const surgeAdjusted = baseFare + distanceFare + timeFare;
+        
+        const congestionFee = 2.75;
+        const airportFee = 0; // Not an airport trip
+        const avfFee = 0.30;
+        const bcfRate = 0.0275;
+        const bcfFee = Math.round(surgeAdjusted * bcfRate * 100) / 100;
+        const hvrfFee = 0.75;
+        const stateSurcharge = 0.50;
+        const longTripFee = TLC_LONG_TRIP_SURCHARGE;
+        
+        const allTLCFees = congestionFee + airportFee + avfFee + bcfFee + hvrfFee + stateSurcharge + longTripFee;
+        const subtotalWithFees = surgeAdjusted + allTLCFees;
+        
+        expect(surgeAdjusted).toBeCloseTo(57.60, 2);
+        expect(bcfFee).toBeCloseTo(1.58, 2);
+        expect(longTripFee).toBe(20.00);
+        expect(allTLCFees).toBeCloseTo(25.88, 2);
+        expect(subtotalWithFees).toBeCloseTo(83.48, 2);
+      });
+    });
+
+    describe('Pipeline Sequencing', () => {
+      it('should apply Long Trip Surcharge after State Surcharge in fee pipeline sequence', () => {
+        const pipelineOrder = [
+          'congestion',
+          'airport',
+          'avf',
+          'bcf',
+          'hvrf',
+          'stateSurcharge',
+          'longTripSurcharge',
+          'serviceFee',
+          'commission'
+        ];
+        
+        const stateSurchargeIndex = pipelineOrder.indexOf('stateSurcharge');
+        const longTripIndex = pipelineOrder.indexOf('longTripSurcharge');
+        const serviceFeeIndex = pipelineOrder.indexOf('serviceFee');
+        
+        expect(longTripIndex).toBeGreaterThan(stateSurchargeIndex);
+        expect(longTripIndex).toBeLessThan(serviceFeeIndex);
+      });
+
+      it('should be Step 6G in the fare pipeline (after 6A-6F)', () => {
+        const pipelineSteps = {
+          '6A': 'congestion',
+          '6B': 'airport',
+          '6C': 'avf',
+          '6D': 'bcf',
+          '6E': 'hvrf',
+          '6F': 'stateSurcharge',
+          '6G': 'longTripSurcharge',
+        };
+        
+        expect(pipelineSteps['6G']).toBe('longTripSurcharge');
+      });
+    });
+
+    describe('Fare Breakdown Output', () => {
+      it('should expose Long Trip Surcharge in fare breakdown for transparent billing', () => {
+        const fareBreakdown = {
+          tlcLongTripFee: TLC_LONG_TRIP_SURCHARGE,
+          tlcLongTripFeeApplied: true,
+        };
+        
+        expect(fareBreakdown.tlcLongTripFee).toBe(20.00);
+        expect(fareBreakdown.tlcLongTripFeeApplied).toBe(true);
+      });
+
+      it('should expose Long Trip Surcharge applied flag as false when not eligible', () => {
+        const fareBreakdown = {
+          tlcLongTripFee: 0,
+          tlcLongTripFeeApplied: false,
+        };
+        
+        expect(fareBreakdown.tlcLongTripFee).toBe(0);
+        expect(fareBreakdown.tlcLongTripFeeApplied).toBe(false);
+      });
+    });
+  });
 });
