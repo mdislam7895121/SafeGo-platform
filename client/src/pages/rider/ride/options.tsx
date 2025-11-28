@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +18,17 @@ import {
   CreditCard,
   Wallet,
   Banknote,
+  Route,
+  Zap,
+  Ruler,
+  AlertTriangle,
+  Loader2,
+  Navigation,
 } from "lucide-react";
-import { useRideBooking, type RideOption, type PaymentMethod } from "@/contexts/RideBookingContext";
+import { useRideBooking, type RideOption, type PaymentMethod, type RouteAlternative } from "@/contexts/RideBookingContext";
 import { SafeGoMap } from "@/components/maps/SafeGoMap";
+import { clientGetRouteAlternatives } from "@/hooks/useGoogleMaps";
+import { decodePolyline } from "@/lib/locationService";
 
 const mockRideOptions: RideOption[] = [
   {
@@ -106,6 +113,21 @@ function getPaymentIcon(type: PaymentMethod["type"]) {
   }
 }
 
+function getRouteIcon(route: RouteAlternative) {
+  if (route.isFastest) return Zap;
+  if (route.avoidsHighways) return Navigation;
+  if (route.avoidsTolls) return Route;
+  return Route;
+}
+
+function getRouteBadgeText(route: RouteAlternative): string | null {
+  if (route.isFastest) return "Fastest";
+  if (route.isShortest) return "Shortest";
+  if (route.avoidsHighways) return "Local Roads";
+  if (route.avoidsTolls) return "No Tolls";
+  return null;
+}
+
 export default function RideOptionsPage() {
   const [, setLocation] = useLocation();
   const { 
@@ -114,8 +136,10 @@ export default function RideOptionsPage() {
     setPaymentMethod, 
     setPromoCode,
     setStep,
+    setRouteAlternatives,
+    setSelectedRoute,
+    getSelectedRoute,
     canProceedToOptions,
-    canProceedToConfirm,
   } = useRideBooking();
   
   const [selectedId, setSelectedId] = useState(state.selectedOption?.id || mockRideOptions[0].id);
@@ -124,6 +148,8 @@ export default function RideOptionsPage() {
   );
   const [promoInput, setPromoInput] = useState(state.promoCode || "");
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
+  const [showRouteSelector, setShowRouteSelector] = useState(false);
+  const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
 
   useEffect(() => {
     if (!canProceedToOptions) {
@@ -137,6 +163,40 @@ export default function RideOptionsPage() {
     setPaymentMethod(defaultPayment);
   }, [setStep, setSelectedOption, setPaymentMethod, selectedId, selectedPaymentId, canProceedToOptions, setLocation]);
 
+  // Create a location key to track when locations change
+  // Use higher precision (7 decimals ~= 1cm) to catch meaningful location changes
+  const locationKey = useMemo(() => {
+    if (!state.pickup || !state.dropoff) return null;
+    return `${state.pickup.lat.toFixed(7)},${state.pickup.lng.toFixed(7)}-${state.dropoff.lat.toFixed(7)},${state.dropoff.lng.toFixed(7)}`;
+  }, [state.pickup, state.dropoff]);
+
+  // Track the last fetched location key to avoid unnecessary refetches
+  const [lastFetchedLocationKey, setLastFetchedLocationKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Only fetch routes if we have locations and they've changed since last fetch
+    if (state.pickup && state.dropoff && locationKey && locationKey !== lastFetchedLocationKey) {
+      setIsLoadingRoutes(true);
+      setLastFetchedLocationKey(locationKey);
+      
+      clientGetRouteAlternatives(
+        { lat: state.pickup.lat, lng: state.pickup.lng },
+        { lat: state.dropoff.lat, lng: state.dropoff.lng }
+      )
+        .then((routes) => {
+          if (routes.length > 0) {
+            setRouteAlternatives(routes);
+          }
+        })
+        .catch((err) => {
+          console.error("[RouteOptions] Failed to fetch routes:", err);
+        })
+        .finally(() => {
+          setIsLoadingRoutes(false);
+        });
+    }
+  }, [locationKey, lastFetchedLocationKey, state.pickup, state.dropoff, setRouteAlternatives]);
+
   const handleSelectOption = (option: RideOption) => {
     setSelectedId(option.id);
     setSelectedOption(option);
@@ -146,6 +206,11 @@ export default function RideOptionsPage() {
     setSelectedPaymentId(payment.id);
     setPaymentMethod(payment);
     setShowPaymentSelector(false);
+  };
+
+  const handleSelectRoute = (route: RouteAlternative) => {
+    setSelectedRoute(route.id);
+    setShowRouteSelector(false);
   };
 
   const handleApplyPromo = () => {
@@ -164,7 +229,19 @@ export default function RideOptionsPage() {
 
   const selectedOption = mockRideOptions.find(o => o.id === selectedId);
   const selectedPayment = mockPaymentMethods.find(p => p.id === selectedPaymentId);
+  const selectedRoute = getSelectedRoute();
   const PaymentIcon = selectedPayment ? getPaymentIcon(selectedPayment.type) : Banknote;
+
+  const routePolyline = useMemo(() => {
+    if (selectedRoute?.polyline) {
+      try {
+        return decodePolyline(selectedRoute.polyline);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }, [selectedRoute?.polyline]);
 
   return (
     <div className="flex flex-col h-full" data-testid="ride-options-page">
@@ -194,13 +271,153 @@ export default function RideOptionsPage() {
             lng: state.dropoff.lng,
             label: "Dropoff",
           } : null}
+          routeCoordinates={routePolyline}
           activeLeg="to_dropoff"
           showControls={false}
           className="h-full w-full"
         />
+        {selectedRoute && (
+          <div 
+            className="absolute top-2 right-2 z-[1000] bg-background/95 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-lg border"
+            data-testid="route-info-badge"
+          >
+            <div className="flex items-center gap-2 text-xs">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <span className="font-medium">{selectedRoute.durationMinutes} min</span>
+              <span className="text-muted-foreground">•</span>
+              <Ruler className="h-3 w-3 text-muted-foreground" />
+              <span className="font-medium">{selectedRoute.distanceMiles} mi</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {state.routeAlternatives.length > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-medium flex items-center gap-2">
+                  <Route className="h-4 w-4" />
+                  Route Options
+                </p>
+                {isLoadingRoutes && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+              
+              {showRouteSelector ? (
+                <div className="space-y-2">
+                  {state.routeAlternatives.map((route) => {
+                    const RouteIcon = getRouteIcon(route);
+                    const badgeText = getRouteBadgeText(route);
+                    const isSelected = route.id === state.selectedRouteId;
+                    
+                    return (
+                      <div
+                        key={route.id}
+                        className={`p-3 rounded-lg border cursor-pointer transition-all ${
+                          isSelected 
+                            ? "ring-2 ring-primary border-primary bg-primary/5" 
+                            : "hover:bg-muted/50"
+                        }`}
+                        onClick={() => handleSelectRoute(route)}
+                        data-testid={`route-option-${route.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                            isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                          }`}>
+                            <RouteIcon className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{route.name}</span>
+                              {badgeText && (
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {badgeText}
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {route.summary || route.description}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-sm">{route.durationMinutes} min</p>
+                            <p className="text-xs text-muted-foreground">{route.distanceMiles} mi</p>
+                          </div>
+                          {isSelected && (
+                            <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                          )}
+                        </div>
+                        {route.trafficDurationText && route.trafficDurationSeconds && 
+                         route.trafficDurationSeconds > route.rawDurationSeconds && (
+                          <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>Traffic delay: {route.trafficDurationText}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-2"
+                    onClick={() => setShowRouteSelector(false)}
+                    data-testid="button-collapse-routes"
+                  >
+                    Collapse
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="w-full justify-between"
+                  onClick={() => setShowRouteSelector(true)}
+                  data-testid="button-expand-routes"
+                >
+                  <span className="flex items-center gap-2">
+                    {selectedRoute ? (
+                      <>
+                        {(() => {
+                          const RouteIcon = getRouteIcon(selectedRoute);
+                          return <RouteIcon className="h-4 w-4" />;
+                        })()}
+                        <span>{selectedRoute.name}</span>
+                        <span className="text-muted-foreground">
+                          • {selectedRoute.durationMinutes} min • {selectedRoute.distanceMiles} mi
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <Route className="h-4 w-4" />
+                        <span>Select route</span>
+                      </>
+                    )}
+                  </span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {state.routeAlternatives.length} options
+                  </Badge>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {isLoadingRoutes && state.routeAlternatives.length === 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-32 mb-2" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="space-y-2">
           {mockRideOptions.map((option) => {
             const Icon = getRideIcon(option.iconType);

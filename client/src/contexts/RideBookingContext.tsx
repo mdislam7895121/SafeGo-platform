@@ -53,11 +53,34 @@ export interface RouteData {
   providerSource: string;
 }
 
+export interface RouteAlternative {
+  id: string;
+  name: string;
+  description: string;
+  distanceMiles: number;
+  durationMinutes: number;
+  distanceText: string;
+  durationText: string;
+  polyline: string;
+  rawDistanceMeters: number;
+  rawDurationSeconds: number;
+  trafficDurationSeconds?: number;
+  trafficDurationText?: string;
+  summary: string;
+  warnings: string[];
+  isFastest?: boolean;
+  isShortest?: boolean;
+  avoidsTolls?: boolean;
+  avoidsHighways?: boolean;
+}
+
 export interface RideBookingState {
   step: "idle" | "pickup" | "dropoff" | "options" | "confirm" | "requesting" | "active";
   pickup: LocationData | null;
   dropoff: LocationData | null;
   routeData: RouteData | null;
+  routeAlternatives: RouteAlternative[];
+  selectedRouteId: string | null;
   selectedOption: RideOption | null;
   paymentMethod: PaymentMethod | null;
   promoCode: string | null;
@@ -72,6 +95,8 @@ type RideBookingAction =
   | { type: "SET_PICKUP"; pickup: LocationData }
   | { type: "SET_DROPOFF"; dropoff: LocationData }
   | { type: "SET_ROUTE_DATA"; routeData: RouteData | null }
+  | { type: "SET_ROUTE_ALTERNATIVES"; alternatives: RouteAlternative[] }
+  | { type: "SET_SELECTED_ROUTE"; routeId: string }
   | { type: "SET_OPTION"; option: RideOption }
   | { type: "SET_PAYMENT"; payment: PaymentMethod }
   | { type: "SET_PROMO"; code: string; valid: boolean }
@@ -86,6 +111,8 @@ const initialState: RideBookingState = {
   pickup: null,
   dropoff: null,
   routeData: null,
+  routeAlternatives: [],
+  selectedRouteId: null,
   selectedOption: null,
   paymentMethod: null,
   promoCode: null,
@@ -105,6 +132,49 @@ function rideBookingReducer(state: RideBookingState, action: RideBookingAction):
       return { ...state, dropoff: action.dropoff, error: null };
     case "SET_ROUTE_DATA":
       return { ...state, routeData: action.routeData, error: null };
+    case "SET_ROUTE_ALTERNATIVES": {
+      // Preserve selected route if it still exists in new alternatives
+      // Use fuzzy matching as fallback if exact ID not found
+      const existingSelection = state.selectedRouteId;
+      const previousRoute = state.routeAlternatives.find(r => r.id === existingSelection);
+      
+      // First try: exact ID match
+      let matchedRoute = action.alternatives.find(r => r.id === existingSelection);
+      
+      // Second try: fuzzy match if previous route exists but ID changed
+      if (!matchedRoute && previousRoute && action.alternatives.length > 0) {
+        // Match by similar characteristics: same avoidance flags, similar duration (within 10%), similar distance
+        matchedRoute = action.alternatives.find(r => {
+          const sameAvoidFlags = 
+            (r.avoidsHighways || false) === (previousRoute.avoidsHighways || false) &&
+            (r.avoidsTolls || false) === (previousRoute.avoidsTolls || false);
+          
+          if (!sameAvoidFlags) return false;
+          
+          // Duration within 10%
+          const durationDiff = Math.abs(r.rawDurationSeconds - previousRoute.rawDurationSeconds);
+          const durationSimilar = durationDiff / Math.max(r.rawDurationSeconds, previousRoute.rawDurationSeconds) <= 0.1;
+          
+          // Distance within 10%  
+          const distanceDiff = Math.abs(r.rawDistanceMeters - previousRoute.rawDistanceMeters);
+          const distanceSimilar = distanceDiff / Math.max(r.rawDistanceMeters, previousRoute.rawDistanceMeters) <= 0.1;
+          
+          return durationSimilar && distanceSimilar;
+        });
+      }
+      
+      const newSelectedId = matchedRoute?.id 
+        || (action.alternatives.length > 0 ? action.alternatives[0].id : null);
+      
+      return { 
+        ...state, 
+        routeAlternatives: action.alternatives,
+        selectedRouteId: newSelectedId,
+        error: null 
+      };
+    }
+    case "SET_SELECTED_ROUTE":
+      return { ...state, selectedRouteId: action.routeId, error: null };
     case "SET_OPTION":
       return { ...state, selectedOption: action.option, error: null };
     case "SET_PAYMENT":
@@ -132,6 +202,8 @@ interface RideBookingContextType {
   setPickup: (pickup: LocationData) => void;
   setDropoff: (dropoff: LocationData) => void;
   setRouteData: (routeData: RouteData | null) => void;
+  setRouteAlternatives: (alternatives: RouteAlternative[]) => void;
+  setSelectedRoute: (routeId: string) => void;
   setSelectedOption: (option: RideOption) => void;
   setPaymentMethod: (payment: PaymentMethod) => void;
   setPromoCode: (code: string, valid: boolean) => void;
@@ -142,6 +214,7 @@ interface RideBookingContextType {
   canProceedToDropoff: boolean;
   canProceedToOptions: boolean;
   canProceedToConfirm: boolean;
+  getSelectedRoute: () => RouteAlternative | null;
 }
 
 const RideBookingContext = createContext<RideBookingContextType | undefined>(undefined);
@@ -173,6 +246,8 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
           pickup: state.pickup,
           dropoff: state.dropoff,
           routeData: state.routeData,
+          routeAlternatives: state.routeAlternatives,
+          selectedRouteId: state.selectedRouteId,
           selectedOption: state.selectedOption,
           paymentMethod: state.paymentMethod,
           promoCode: state.promoCode,
@@ -203,6 +278,19 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
   const setRouteData = useCallback((routeData: RouteData | null) => {
     dispatch({ type: "SET_ROUTE_DATA", routeData });
   }, []);
+
+  const setRouteAlternatives = useCallback((alternatives: RouteAlternative[]) => {
+    dispatch({ type: "SET_ROUTE_ALTERNATIVES", alternatives });
+  }, []);
+
+  const setSelectedRoute = useCallback((routeId: string) => {
+    dispatch({ type: "SET_SELECTED_ROUTE", routeId });
+  }, []);
+
+  const getSelectedRoute = useCallback((): RouteAlternative | null => {
+    if (!state.selectedRouteId || state.routeAlternatives.length === 0) return null;
+    return state.routeAlternatives.find(r => r.id === state.selectedRouteId) || null;
+  }, [state.selectedRouteId, state.routeAlternatives]);
 
   const setSelectedOption = useCallback((option: RideOption) => {
     dispatch({ type: "SET_OPTION", option });
@@ -245,6 +333,8 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
         setPickup,
         setDropoff,
         setRouteData,
+        setRouteAlternatives,
+        setSelectedRoute,
         setSelectedOption,
         setPaymentMethod,
         setPromoCode,
@@ -255,6 +345,7 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
         canProceedToDropoff,
         canProceedToOptions,
         canProceedToConfirm,
+        getSelectedRoute,
       }}
     >
       {children}
