@@ -649,24 +649,24 @@ describe('NYC TLC Minimum Pay Engine', () => {
     });
 
     it('should apply HVRF fee to NYC-to-NYC trips', () => {
-      const pickupState = 'NY';
-      const dropoffState = 'NY';
+      const pickupState: string = 'NY';
+      const dropoffState: string = 'NY';
       const bothStatesAreNY = pickupState === 'NY' && dropoffState === 'NY';
       
       expect(bothStatesAreNY).toBe(true);
     });
 
     it('should NOT apply HVRF fee to cross-state trips (NY to NJ)', () => {
-      const pickupState = 'NY';
-      const dropoffState = 'NJ';
+      const pickupState: string = 'NY';
+      const dropoffState: string = 'NJ';
       const bothStatesAreNY = pickupState === 'NY' && dropoffState === 'NY';
       
       expect(bothStatesAreNY).toBe(false);
     });
 
     it('should NOT apply HVRF fee to out-of-state trips', () => {
-      const pickupState = 'CA';
-      const dropoffState = 'CA';
+      const pickupState: string = 'CA';
+      const dropoffState: string = 'CA';
       const bothStatesAreNY = pickupState === 'NY' && dropoffState === 'NY';
       
       expect(bothStatesAreNY).toBe(false);
