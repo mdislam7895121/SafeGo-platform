@@ -1270,22 +1270,44 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     .filter(t => t.paidToDriver)
     .reduce((sum, t) => sum + t.amount, 0);
   
+  // For cross-state trips, calculate driver earnings from the cross-state fare
+  // For regular trips, use the legacy distance+time based calculation
   const driverDistanceEarnings = roundCurrency(route.distanceMiles * fareConfig.driverPerMileRate);
   const driverTimeEarnings = roundCurrency(route.durationMinutes * fareConfig.driverPerMinuteRate);
-  const legacyDriverPayout = roundCurrency(driverDistanceEarnings + driverTimeEarnings + driverTolls);
-  const driverMinimumPayoutApplied = legacyDriverPayout < fareConfig.driverMinimumPayout;
+  const legacyDriverPayoutBase = roundCurrency(driverDistanceEarnings + driverTimeEarnings + driverTolls);
+  
+  // Cross-state driver payout is based on driver earnings percentage of the cross-state total
+  const crossStateDriverPayout = usingCrossStateFare && crossStateFareResult
+    ? roundCurrency(crossStateFareResult.totalFare * driverEarningsPercent / 100)
+    : 0;
+  
+  const effectiveDriverPayoutBase = usingCrossStateFare ? crossStateDriverPayout : legacyDriverPayoutBase;
+  // For cross-state trips, minimum payout is never enforced, so this is always false
+  const driverMinimumPayoutApplied = usingCrossStateFare 
+    ? false
+    : (legacyDriverPayoutBase < fareConfig.driverMinimumPayout);
   
   let driverEarningsCalculated = roundCurrency(fareAfterGuards * driverEarningsPercent / 100);
-  let driverEarnings = Math.max(driverEarningsCalculated, driverMinimumEarnings);
-  const driverEarningsMinimumApplied = driverEarningsCalculated < driverMinimumEarnings;
+  // For cross-state trips, use calculated earnings directly without minimum enforcement
+  // Cross-state fare already includes all components and should not have legacy minimums applied
+  let driverEarnings = usingCrossStateFare 
+    ? driverEarningsCalculated 
+    : Math.max(driverEarningsCalculated, driverMinimumEarnings);
+  const driverEarningsMinimumApplied = usingCrossStateFare 
+    ? false 
+    : (driverEarningsCalculated < driverMinimumEarnings);
   
-  let driverPayout = Math.max(legacyDriverPayout, fareConfig.driverMinimumPayout);
+  // For cross-state trips, use the cross-state driver payout directly without minimum enforcement
+  let driverPayout = usingCrossStateFare 
+    ? effectiveDriverPayoutBase 
+    : Math.max(effectiveDriverPayoutBase, fareConfig.driverMinimumPayout);
 
   // ============================================
   // STEP 18: DRIVER MINIMUM PAYOUT ENFORCEMENT
   // Ensure driver always receives at least $5.00
+  // (Skip for cross-state trips - they use their own calculated amounts)
   // ============================================
-  if (driverEarnings < driverMinimumEarnings) {
+  if (!usingCrossStateFare && driverEarnings < driverMinimumEarnings) {
     driverEarnings = driverMinimumEarnings;
   }
 
@@ -1296,10 +1318,12 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   // 2. If still < target, reduce driver earnings (never below $5)
   // 3. If still < target, accept reduced margin and set marginProtectionCapped: true
   // ============================================
-  const allRegulatoryFees = roundCurrency(stateRegulatoryFee);
+  // For cross-state trips, regulatory fees and customer service fee are zero (cross-state fare is all-inclusive)
+  const allRegulatoryFees = usingCrossStateFare ? 0 : roundCurrency(stateRegulatoryFee);
+  const effectiveCustomerServiceFee = usingCrossStateFare ? 0 : customerServiceFee;
   
   const calcPlatformCommission = (fare: number, driverPay: number) => 
-    roundCurrency(fare - driverPay - allRegulatoryFees - customerServiceFee);
+    roundCurrency(fare - driverPay - allRegulatoryFees - effectiveCustomerServiceFee);
   
   const calcCommissionPercent = (fare: number, commission: number) => 
     fare > 0 ? roundCurrency((commission / fare) * 100) : 0;
@@ -1307,7 +1331,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   const calcMinFareForMargin = (driverPay: number) => {
     const marginDecimal = platformCommissionPercent / 100;
     if (marginDecimal >= 1) return Infinity;
-    const passThroughCosts = driverPay + allRegulatoryFees + customerServiceFee;
+    const passThroughCosts = driverPay + allRegulatoryFees + effectiveCustomerServiceFee;
     return roundCurrency(passThroughCosts / (1 - marginDecimal));
   };
   
@@ -1357,7 +1381,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
         if (afterFareMargin < platformCommissionPercent) {
           if (driverEarnings > driverMinimumEarnings) {
             const targetDriverEarnings = roundCurrency(
-              fareAfterGuards * (1 - platformCommissionPercent / 100) - allRegulatoryFees - customerServiceFee
+              fareAfterGuards * (1 - platformCommissionPercent / 100) - allRegulatoryFees - effectiveCustomerServiceFee
             );
             
             if (targetDriverEarnings >= driverMinimumEarnings) {
@@ -1482,15 +1506,15 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     surgeAmount: usingCrossStateFare ? (crossStateFareResult?.surgeAmount ?? 0) : surgeAmount,
     surgeMultiplier: usingCrossStateFare ? (crossStateFareResult?.surgeMultiplier ?? 1) : effectiveSurge,
     
-    nightSurcharge,
-    peakHourSurcharge,
+    nightSurcharge: usingCrossStateFare ? 0 : nightSurcharge,
+    peakHourSurcharge: usingCrossStateFare ? 0 : peakHourSurcharge,
     
-    shortTripAdjustment,
-    longDistanceFee,
-    crossCitySurcharge,
-    crossStateSurcharge,
-    returnDeadheadFee,
-    excessReturnMiles,
+    shortTripAdjustment: usingCrossStateFare ? 0 : shortTripAdjustment,
+    longDistanceFee: usingCrossStateFare ? 0 : longDistanceFee,
+    crossCitySurcharge: usingCrossStateFare ? 0 : crossCitySurcharge,
+    crossStateSurcharge: usingCrossStateFare ? (crossStateFareResult?.crossStateSurcharge ?? 0) : crossStateSurcharge,
+    returnDeadheadFee: usingCrossStateFare ? 0 : returnDeadheadFee,
+    excessReturnMiles: usingCrossStateFare ? 0 : excessReturnMiles,
     
     // Cross-State Fare Engine fields (populated from calculateCrossStateFare result)
     crossStateFareApplied: usingCrossStateFare,
@@ -1510,23 +1534,23 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     crossStateFareMaximumApplied: usingCrossStateFare ? crossStateFareResult?.maximumFareApplied : undefined,
     crossStateFareOriginal: usingCrossStateFare ? crossStateFareResult?.originalCalculatedFare : undefined,
     
-    tlcCrossBoroughFee,
-    tlcCrossBoroughApplied,
-    tlcPickupBorough,
-    tlcDropoffBorough,
+    tlcCrossBoroughFee: usingCrossStateFare ? 0 : tlcCrossBoroughFee,
+    tlcCrossBoroughApplied: usingCrossStateFare ? false : tlcCrossBoroughApplied,
+    tlcPickupBorough: usingCrossStateFare ? undefined : tlcPickupBorough,
+    tlcDropoffBorough: usingCrossStateFare ? undefined : tlcDropoffBorough,
     
-    airportFee,
-    airportCode,
-    borderZoneFee,
+    airportFee: usingCrossStateFare ? 0 : airportFee,
+    airportCode: usingCrossStateFare ? undefined : airportCode,
+    borderZoneFee: usingCrossStateFare ? 0 : borderZoneFee,
     
-    stateRegulatoryFee,
-    stateRegulatoryFeeBreakdown,
+    stateRegulatoryFee: usingCrossStateFare ? 0 : stateRegulatoryFee,
+    stateRegulatoryFeeBreakdown: usingCrossStateFare ? [] : stateRegulatoryFeeBreakdown,
     
-    tollsTotal,
-    tollsBreakdown,
-    additionalFeesTotal,
-    additionalFeesBreakdown,
-    serviceFee,
+    tollsTotal: usingCrossStateFare ? (crossStateFareResult?.tollsTotal ?? 0) : tollsTotal,
+    tollsBreakdown: usingCrossStateFare ? tolls : tollsBreakdown,
+    additionalFeesTotal: usingCrossStateFare ? 0 : additionalFeesTotal,
+    additionalFeesBreakdown: usingCrossStateFare ? [] : additionalFeesBreakdown,
+    serviceFee: usingCrossStateFare ? 0 : serviceFee,
     
     discountAmount,
     effectiveDiscountPct,
@@ -1545,7 +1569,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     safegoCommission,
     companyMarginPercent,
     
-    customerServiceFee,
+    customerServiceFee: usingCrossStateFare ? 0 : customerServiceFee,
     platformCommission,
     driverEarnings,
     driverEarningsMinimumApplied,
@@ -1558,33 +1582,33 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     commissionFloored,
     
     // Surge timing transparency
-    surgeReason,
-    surgeReasons,
-    surgeTimingWindow,
-    surgeCapped,
+    surgeReason: usingCrossStateFare ? (crossStateFareResult?.surgeApplied ? 'cross_state_surge' : undefined) : surgeReason,
+    surgeReasons: usingCrossStateFare ? [] : surgeReasons,
+    surgeTimingWindow: usingCrossStateFare ? undefined : surgeTimingWindow,
+    surgeCapped: usingCrossStateFare ? false : surgeCapped,
     
-    marginProtectionApplied,
-    marginProtectionCapped,
-    marginShortfall,
+    marginProtectionApplied: usingCrossStateFare ? false : marginProtectionApplied,
+    marginProtectionCapped: usingCrossStateFare ? false : marginProtectionCapped,
+    marginShortfall: usingCrossStateFare ? 0 : marginShortfall,
     
-    tlcMinimumPayApplied: tlcEnforcement.tlcMinimumApplied,
-    tlcAdjustment: tlcEnforcement.tlcAdjustment,
-    tlcTimeBasedMinimum: tlcEnforcement.tlcDetails.timeBasedMinimum,
-    tlcHourlyEquivalent: tlcEnforcement.tlcDetails.hourlyEquivalentMinimum,
-    tlcFinalMinimum: tlcEnforcement.tlcDetails.tlcMinimumPay,
-    tlcDetails: tlcEnforcement.tlcDetails,
+    tlcMinimumPayApplied: usingCrossStateFare ? false : tlcEnforcement.tlcMinimumApplied,
+    tlcAdjustment: usingCrossStateFare ? 0 : tlcEnforcement.tlcAdjustment,
+    tlcTimeBasedMinimum: usingCrossStateFare ? 0 : tlcEnforcement.tlcDetails.timeBasedMinimum,
+    tlcHourlyEquivalent: usingCrossStateFare ? 0 : tlcEnforcement.tlcDetails.hourlyEquivalentMinimum,
+    tlcFinalMinimum: usingCrossStateFare ? 0 : tlcEnforcement.tlcDetails.tlcMinimumPay,
+    tlcDetails: usingCrossStateFare ? { timeBasedMinimum: 0, hourlyEquivalentMinimum: 0, tlcMinimumPay: 0 } : tlcEnforcement.tlcDetails,
     
-    tlcBaseFare,
-    tlcTimeFare,
-    tlcDistanceFare,
-    tlcCalculatedFare,
-    tlcMinimumTripFare,
-    tlcMaximumTripFare,
-    tlcBaseFareApplied,
-    tlcTimeRateApplied,
-    tlcDistanceRateApplied,
-    tlcMinimumFareApplied,
-    tlcMaximumFareApplied,
+    tlcBaseFare: usingCrossStateFare ? 0 : tlcBaseFare,
+    tlcTimeFare: usingCrossStateFare ? 0 : tlcTimeFare,
+    tlcDistanceFare: usingCrossStateFare ? 0 : tlcDistanceFare,
+    tlcCalculatedFare: usingCrossStateFare ? 0 : tlcCalculatedFare,
+    tlcMinimumTripFare: usingCrossStateFare ? 0 : tlcMinimumTripFare,
+    tlcMaximumTripFare: usingCrossStateFare ? 0 : tlcMaximumTripFare,
+    tlcBaseFareApplied: usingCrossStateFare ? false : tlcBaseFareApplied,
+    tlcTimeRateApplied: usingCrossStateFare ? false : tlcTimeRateApplied,
+    tlcDistanceRateApplied: usingCrossStateFare ? false : tlcDistanceRateApplied,
+    tlcMinimumFareApplied: usingCrossStateFare ? false : tlcMinimumFareApplied,
+    tlcMaximumFareApplied: usingCrossStateFare ? false : tlcMaximumFareApplied,
     
     flags,
     feeSuppressionLog,
