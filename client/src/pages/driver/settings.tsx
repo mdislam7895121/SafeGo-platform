@@ -490,6 +490,20 @@ export default function DriverSettings() {
                 </Link>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardContent className="p-4">
+                <Link href="/driver/ride-preferences">
+                  <div className="flex items-center justify-between hover-elevate p-2 -m-2 rounded-lg cursor-pointer" data-testid="link-ride-preferences">
+                    <div>
+                      <h3 className="font-medium">Ride Categories</h3>
+                      <p className="text-sm text-muted-foreground">Choose which ride types you want to accept</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </Link>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="earnings" className="space-y-4 mt-0">

@@ -104,6 +104,7 @@ import DriverOnboarding from "@/pages/driver/onboarding";
 import DriverGettingStarted from "@/pages/driver/getting-started";
 import DriverTutorials from "@/pages/driver/tutorials";
 import DriverSettings from "@/pages/driver/settings";
+import DriverRidePreferences from "@/pages/driver/ride-preferences";
 import DriverIncentives from "@/pages/driver/incentives";
 import DriverIncentivesAchievements from "@/pages/driver/incentives-achievements";
 import DriverIncentivesRewards from "@/pages/driver/incentives-rewards";
@@ -457,6 +458,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Settings">
             <DriverSettings />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/ride-preferences">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Ride Preferences">
+            <DriverRidePreferences />
           </DriverLayout>
         </ProtectedRoute>
       </Route>
