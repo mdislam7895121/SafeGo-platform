@@ -1394,21 +1394,19 @@ export class FareCalculationService {
     let tlcAVFFee = 0;
     let tlcAVFFeeApplied = false;
     
-    // Determine state and borough codes for AVF eligibility
-    // Using the matched zones and pickup/dropoff location info
-    const pickupStateCode = matchedPickupZones.find(z => z.zoneType === 'state')?.zoneId?.toUpperCase();
-    const dropoffStateCode = matchedDropoffZones.find(z => z.zoneType === 'state')?.zoneId?.toUpperCase();
-    const pickupBoroughCode = matchedPickupZones.find(z => z.zoneType === 'borough')?.zoneId;
-    const dropoffBoroughCode = matchedDropoffZones.find(z => z.zoneType === 'borough')?.zoneId;
+    // Determine borough codes for AVF eligibility from matched zones
+    const avfPickupBoroughCode = matchedPickupZones.find(z => z.zoneType === 'borough')?.zoneId;
+    const avfDropoffBoroughCode = matchedDropoffZones.find(z => z.zoneType === 'borough')?.zoneId;
     
     // AVF applies to NYC trips (state code NY with valid borough)
     // Also check if congestion fee was applied (indicates Manhattan trip)
     // or if TLC airport fee was applied (indicates NYC metro trip)
+    // Use existing pickupStateCode/dropoffStateCode from function parameters
     const avfEligible = isEligibleForTLCAVFFee(
       pickupStateCode,
       dropoffStateCode,
-      pickupBoroughCode,
-      dropoffBoroughCode,
+      avfPickupBoroughCode,
+      avfDropoffBoroughCode,
       false // isParatransit - would be passed from request in production
     ) || congestionFeeApplied || tlcAirportFeeApplied;
     
@@ -1910,6 +1908,7 @@ export class FareCalculationService {
       crossStateApplied,
       congestionFeeApplied,
       tlcAirportFeeApplied,
+      tlcAVFFeeApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -1964,6 +1963,7 @@ export class FareCalculationService {
       tlcAirportFee,
       tlcAirportName,
       tlcAirportCode,
+      tlcAVFFee,
       airportFee,
       airportCode,
       borderZoneFee,
@@ -2010,6 +2010,7 @@ export class FareCalculationService {
       regulatoryFeeApplied,
       congestionFeeApplied,
       tlcAirportFeeApplied,
+      tlcAVFFeeApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
