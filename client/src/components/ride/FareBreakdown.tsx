@@ -78,6 +78,8 @@ export interface FareBreakdownData {
   tlcStateSurchargeApplied?: boolean;
   tlcLongTripFee?: number;
   tlcLongTripFeeApplied?: boolean;
+  tlcOutOfTownFee?: number;
+  tlcOutOfTownApplied?: boolean;
   
   surgeAmount?: number;
   surgeMultiplier?: number;
@@ -134,6 +136,7 @@ export interface FareBreakdownData {
     tlcHVRFFeeApplied?: boolean;
     tlcStateSurchargeApplied?: boolean;
     tlcLongTripFeeApplied?: boolean;
+    tlcOutOfTownApplied?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -434,6 +437,14 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           icon={Clock} 
           label="NYC Long Trip Surcharge"
           amount={breakdown.tlcLongTripFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.tlcOutOfTownFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Navigation} 
+          label="Out-of-Town Return Fee"
+          amount={breakdown.tlcOutOfTownFee ?? 0} 
           currency={currency} 
         />
       )}
