@@ -27,6 +27,12 @@ import {
   TripCategory,
   AirportCode,
 } from "./tlcReportGenerator";
+import {
+  detectNYCBorough,
+  detectCrossCity,
+  TLC_CROSS_CITY_FEE,
+  NYCBoroughCode,
+} from "./nycBoroughDetection";
 
 // ============================================
 // Audit Types and Interfaces
@@ -109,6 +115,7 @@ export interface FareConsistencyResult {
     stateSurcharge: number;
     longTripSurcharge: number;
     outOfTownReturnFee: number;
+    crossCityFee: number;
     discountAmount: number;
     calculatedTotal: number;
   };
@@ -140,6 +147,8 @@ export interface LocationAccuracyResult {
   congestionZoneValid: boolean;
   airportZoneValid: boolean;
   outOfTownValid: boolean;
+  crossCityValid: boolean;
+  isCrossCity: boolean;
   computedPickupBorough: BoroughCode;
   computedDropoffBorough: BoroughCode;
   errors: string[];
@@ -235,6 +244,7 @@ const TLC_FEES = {
   LONG_TRIP_THRESHOLD_MILES: 20,
   LONG_TRIP_SURCHARGE: 2.50,
   OUT_OF_TOWN_RETURN_FEE: 17.50,
+  CROSS_CITY_FEE: TLC_CROSS_CITY_FEE.CROSS_BOROUGH_FEE,  // $2.50 cross-borough fee
 };
 
 // Tolerance thresholds for audit checks
@@ -331,6 +341,9 @@ function calculateDurationMinutes(pickupTime: Date, dropoffTime: Date): number {
 export function auditFareConsistency(trip: TripRecordReport): FareConsistencyResult {
   const errors: string[] = [];
   
+  // Get cross-city fee from trip record
+  const tripCrossCityFee = (trip as any).crossCityFee ?? (trip as any).tlcCrossCityFee ?? 0;
+  
   const componentBreakdown = {
     fareSubtotal: trip.fareSubtotal,
     tolls: trip.tolls,
@@ -342,6 +355,7 @@ export function auditFareConsistency(trip: TripRecordReport): FareConsistencyRes
     stateSurcharge: trip.stateSurcharge,
     longTripSurcharge: trip.longTripSurcharge,
     outOfTownReturnFee: trip.outOfTownReturnFee,
+    crossCityFee: tripCrossCityFee,
     discountAmount: trip.discountAmount,
     calculatedTotal: 0,
   };
@@ -356,7 +370,8 @@ export function auditFareConsistency(trip: TripRecordReport): FareConsistencyRes
     trip.hvrfFee +
     trip.stateSurcharge +
     trip.longTripSurcharge +
-    trip.outOfTownReturnFee -
+    trip.outOfTownReturnFee +
+    tripCrossCityFee -
     trip.discountAmount
   );
   
@@ -550,13 +565,59 @@ export function auditLocationAccuracy(trip: TripRecordReport): LocationAccuracyR
     errors.push(`Long trip surcharge applied but trip is only ${trip.tripDistanceMiles.toFixed(1)}mi (≤20mi)`);
   }
   
+  // Cross-city (cross-borough) fee validation using polygon-based detection
+  // NOTE: Cross-city fee can be legitimately suppressed by:
+  // 1. Airport fee (if configured to override cross-borough)
+  // 2. Cross-state/out-of-town trips (handled in detectCrossCity)
+  const crossCityResult = detectCrossCity(
+    trip.pickupLocation.lat, trip.pickupLocation.lng,
+    trip.dropoffLocation.lat, trip.dropoffLocation.lng
+  );
+  
+  const isCrossCity = crossCityResult.isCrossCity;
+  let crossCityValid = true;
+  
+  // Get cross-city fee from trip record (may be in different field names)
+  const tripCrossCityFee = (trip as any).crossCityFee ?? (trip as any).tlcCrossCityFee ?? 0;
+  
+  // Check for suppression scenarios where cross-city fee should NOT apply
+  const isAirportTrip = trip.tripCategory === "AIRPORT_PICKUP" || trip.tripCategory === "AIRPORT_DROPOFF";
+  const isCrossStateTrip = trip.tripCategory === "NYC_TO_OOS" || trip.tripCategory === "OOS_TO_NYC";
+  const hasOutOfTownFee = trip.outOfTownReturnFee > 0;
+  
+  // Cross-city fee is suppressed if:
+  // - It's a cross-state trip (out-of-town return fee applies instead)
+  // - Airport fee was applied (airport may override cross-borough)
+  // - Trip has out-of-town return fee (supersedes cross-borough)
+  const crossCitySuppressed = isCrossStateTrip || hasOutOfTownFee || (isAirportTrip && trip.airportFee > 0);
+  
+  if (crossCityResult.feeApplicable && !crossCitySuppressed) {
+    // Cross-city trip with no suppression - should have the fee
+    if (tripCrossCityFee === 0) {
+      crossCityValid = false;
+      errors.push(`Missing cross-city fee for ${crossCityResult.pickupBorough} to ${crossCityResult.dropoffBorough} trip - expected $${TLC_FEES.CROSS_CITY_FEE}`);
+    } else if (Math.abs(tripCrossCityFee - TLC_FEES.CROSS_CITY_FEE) > AUDIT_TOLERANCES.ROUNDING_TOLERANCE) {
+      crossCityValid = false;
+      errors.push(`Cross-city fee mismatch: expected $${TLC_FEES.CROSS_CITY_FEE}, got $${tripCrossCityFee}`);
+    }
+  } else if (tripCrossCityFee > 0 && !isCrossCity) {
+    // Fee applied but trip is not cross-borough
+    crossCityValid = false;
+    errors.push(`Cross-city fee applied but trip is within ${crossCityResult.pickupBorough} (not cross-borough)`);
+  } else if (tripCrossCityFee === 0 && crossCityResult.feeApplicable && crossCitySuppressed) {
+    // Cross-city was eligible but correctly suppressed - this is valid
+    // No error, fee was rightfully not applied due to suppression
+  }
+  
   return {
-    isValid: pickupBoroughValid && dropoffBoroughValid && congestionZoneValid && airportZoneValid && outOfTownValid && longTripValid,
+    isValid: pickupBoroughValid && dropoffBoroughValid && congestionZoneValid && airportZoneValid && outOfTownValid && longTripValid && crossCityValid,
     pickupBoroughValid,
     dropoffBoroughValid,
     congestionZoneValid,
     airportZoneValid,
     outOfTownValid,
+    crossCityValid,
+    isCrossCity,
     computedPickupBorough,
     computedDropoffBorough,
     errors,

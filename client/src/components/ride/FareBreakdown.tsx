@@ -81,6 +81,12 @@ export interface FareBreakdownData {
   tlcOutOfTownFee?: number;
   tlcOutOfTownApplied?: boolean;
   
+  // NYC TLC Cross-City (Cross-Borough) Fee
+  tlcCrossCityFee?: number;
+  tlcCrossCityFeeApplied?: boolean;
+  tlcPickupBorough?: string;
+  tlcDropoffBorough?: string;
+  
   // NYC TLC Toll Facilities (bridges, tunnels with EZ-Pass rates)
   tlcTollsBreakdown?: Array<{
     id: string;
@@ -149,6 +155,7 @@ export interface FareBreakdownData {
     tlcStateSurchargeApplied?: boolean;
     tlcLongTripFeeApplied?: boolean;
     tlcOutOfTownApplied?: boolean;
+    tlcCrossCityFeeApplied?: boolean;
     tollsApplied?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
@@ -460,6 +467,25 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           amount={breakdown.tlcOutOfTownFee ?? 0} 
           currency={currency} 
         />
+      )}
+      {(breakdown.tlcCrossCityFee ?? 0) > 0 && (
+        <div 
+          className="flex items-center justify-between py-2"
+          data-testid="row-tlc-cross-city-fee"
+        >
+          <div className="flex items-center gap-2 flex-wrap">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">NYC Cross-City Fee</span>
+            {breakdown.tlcPickupBorough && breakdown.tlcDropoffBorough && (
+              <Badge variant="outline" className="text-xs" data-testid="badge-cross-city-boroughs">
+                {breakdown.tlcPickupBorough.replace('_', ' ')} to {breakdown.tlcDropoffBorough.replace('_', ' ')}
+              </Badge>
+            )}
+          </div>
+          <span className="text-sm" data-testid="text-cross-city-fee-amount">
+            {formatCurrency(breakdown.tlcCrossCityFee ?? 0, currency)}
+          </span>
+        </div>
       )}
       
       {/* NYC TLC Tolls - Individual bridge/tunnel line items */}

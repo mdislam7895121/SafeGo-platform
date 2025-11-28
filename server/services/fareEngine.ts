@@ -55,6 +55,12 @@ import {
   NYC_TLC_CONFIG,
 } from './tlcMinimumPayEngine';
 
+import {
+  detectCrossCity,
+  TLC_CROSS_CITY_FEE,
+  NYCBoroughCode,
+} from './nycBoroughDetection';
+
 export type RideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
 
 export interface FareConfig {
@@ -235,6 +241,7 @@ export interface FareFlags {
   tlcDistanceRateApplied: boolean;
   tlcMinimumFareApplied: boolean;
   tlcMaximumFareApplied: boolean;
+  tlcCrossBoroughApplied: boolean;
 }
 
 export interface FeeSuppressionEntry {
@@ -274,6 +281,11 @@ export interface FareEngineResult {
   crossStateSurcharge: number;
   returnDeadheadFee: number;
   excessReturnMiles: number;
+  
+  tlcCrossBoroughFee: number;
+  tlcCrossBoroughApplied: boolean;
+  tlcPickupBorough?: NYCBoroughCode;
+  tlcDropoffBorough?: NYCBoroughCode;
   
   airportFee: number;
   airportCode?: string;
@@ -731,6 +743,49 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   }
 
   // ============================================
+  // STEP 11.5: NYC TLC CROSS-BOROUGH FEE
+  // Applies when trip crosses NYC borough boundaries
+  // Suppression: cross-state > airport (if configured) > cross-borough
+  // ============================================
+  let tlcCrossBoroughFee = 0;
+  let tlcCrossBoroughApplied = false;
+  let tlcPickupBorough: NYCBoroughCode | undefined;
+  let tlcDropoffBorough: NYCBoroughCode | undefined;
+  
+  // Only check for NYC cross-borough if not already a cross-state trip
+  if (!crossStateApplied) {
+    const crossCityResult = detectCrossCity(
+      pickup.lat, pickup.lng,
+      dropoff.lat, dropoff.lng
+    );
+    
+    tlcPickupBorough = crossCityResult.pickupBorough;
+    tlcDropoffBorough = crossCityResult.dropoffBorough;
+    
+    if (crossCityResult.feeApplicable) {
+      // Check if airport fee should suppress cross-borough fee
+      const airportSuppressesCrossBorough = airportFeeApplied && fareConfig.airportOverridesCrossCity;
+      
+      if (airportSuppressesCrossBorough) {
+        addSuppression('tlcCrossBoroughFee', 'airportFee', 
+          `Airport fee overrides NYC cross-borough fee (${tlcPickupBorough} to ${tlcDropoffBorough})`, 
+          TLC_CROSS_CITY_FEE.CROSS_BOROUGH_FEE);
+      } else {
+        tlcCrossBoroughFee = TLC_CROSS_CITY_FEE.CROSS_BOROUGH_FEE;
+        tlcCrossBoroughApplied = true;
+      }
+    }
+  } else if (detectCrossCity(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng).feeApplicable) {
+    // Log suppression for cross-state trips that would have had cross-borough fee
+    const crossCityResult = detectCrossCity(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+    tlcPickupBorough = crossCityResult.pickupBorough;
+    tlcDropoffBorough = crossCityResult.dropoffBorough;
+    addSuppression('tlcCrossBoroughFee', 'crossStateSurcharge', 
+      `Cross-state trip supersedes NYC cross-borough fee (${tlcPickupBorough} to ${tlcDropoffBorough})`, 
+      TLC_CROSS_CITY_FEE.CROSS_BOROUGH_FEE);
+  }
+
+  // ============================================
   // STEP 12: STATE REGULATORY FEES
   // ============================================
   const stateRegulatoryFeeBreakdown: FeeBreakdownItem[] = [];
@@ -794,6 +849,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     crossCitySurcharge +
     crossStateSurcharge +
     returnDeadheadFee +
+    tlcCrossBoroughFee +  // NYC TLC cross-borough fee (after out-of-town, before service fee)
     airportFee +
     borderZoneFee +
     stateRegulatoryFee +
@@ -1048,6 +1104,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     tlcDistanceRateApplied,
     tlcMinimumFareApplied,
     tlcMaximumFareApplied,
+    tlcCrossBoroughApplied,
   };
 
   const feeSuppressionLog: FeeSuppressionLog = {
@@ -1080,6 +1137,11 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     crossStateSurcharge,
     returnDeadheadFee,
     excessReturnMiles,
+    
+    tlcCrossBoroughFee,
+    tlcCrossBoroughApplied,
+    tlcPickupBorough,
+    tlcDropoffBorough,
     
     airportFee,
     airportCode,
