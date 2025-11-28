@@ -88,6 +88,12 @@ export interface FareConfig {
   driverEarningsPercent: number;
   useDynamicCommission?: boolean;
   commissionBands?: CommissionBands;
+  useTLCBaseFare?: boolean;
+  tlcBaseFare?: number;
+  tlcPerMinuteRate?: number;
+  tlcPerMileRate?: number;
+  tlcMinimumTripFare?: number;
+  tlcMaximumFare?: number;
 }
 
 export { DemandLevel, DemandInput, DemandResult, CommissionBands, DEFAULT_COMMISSION_BANDS };
@@ -98,6 +104,14 @@ export const DEFAULT_COMMISSION_CONFIG = {
   platformCommissionPercent: 15,
   driverEarningsPercent: 85,
   driverMinimumEarnings: 5.00,
+};
+
+export const TLC_BASE_FARE_CONFIG = {
+  baseFare: 2.50,
+  perMinuteRate: 0.56,
+  perMileRate: 1.31,
+  minimumTripFare: 8.00,
+  maximumFare: 500.00,
 };
 
 export interface RouteInput {
@@ -216,6 +230,11 @@ export interface FareFlags {
   dynamicCommissionApplied: boolean;
   commissionCapped: boolean;
   commissionFloored: boolean;
+  tlcBaseFareApplied: boolean;
+  tlcTimeRateApplied: boolean;
+  tlcDistanceRateApplied: boolean;
+  tlcMinimumFareApplied: boolean;
+  tlcMaximumFareApplied: boolean;
 }
 
 export interface FeeSuppressionEntry {
@@ -317,6 +336,18 @@ export interface FareEngineResult {
   tlcHourlyGuaranteeApplied?: boolean;
   tlcWeeklyAdjustment?: number;
   tlcDetails?: TLCPerRideResult;
+  
+  tlcBaseFare: number;
+  tlcTimeFare: number;
+  tlcDistanceFare: number;
+  tlcCalculatedFare: number;
+  tlcMinimumTripFare: number;
+  tlcMaximumTripFare: number;
+  tlcBaseFareApplied: boolean;
+  tlcTimeRateApplied: boolean;
+  tlcDistanceRateApplied: boolean;
+  tlcMinimumFareApplied: boolean;
+  tlcMaximumFareApplied: boolean;
   
   flags: FareFlags;
   feeSuppressionLog: FeeSuppressionLog;
@@ -438,10 +469,69 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
 
   // ============================================
   // STEP 1: BASE FARE CALCULATION
+  // Including NYC TLC Time-Distance Base Fare Formula
   // ============================================
-  const baseFare = fareConfig.baseFare;
-  const distanceFare = roundCurrency(route.distanceMiles * fareConfig.perMileRate);
-  const timeFare = roundCurrency(route.durationMinutes * fareConfig.perMinuteRate);
+  const useTLCBaseFare = fareConfig.useTLCBaseFare ?? false;
+  
+  let baseFare: number;
+  let distanceFare: number;
+  let timeFare: number;
+  let tlcBaseFare = 0;
+  let tlcTimeFare = 0;
+  let tlcDistanceFare = 0;
+  let tlcCalculatedFare = 0;
+  let tlcMinimumTripFare = TLC_BASE_FARE_CONFIG.minimumTripFare;
+  let tlcMaximumTripFare = TLC_BASE_FARE_CONFIG.maximumFare;
+  let tlcBaseFareApplied = false;
+  let tlcTimeRateApplied = false;
+  let tlcDistanceRateApplied = false;
+  let tlcMinimumFareApplied = false;
+  let tlcMaximumFareApplied = false;
+  
+  if (useTLCBaseFare) {
+    const effectiveTLCBaseFare = fareConfig.tlcBaseFare ?? TLC_BASE_FARE_CONFIG.baseFare;
+    const effectiveTLCPerMinute = fareConfig.tlcPerMinuteRate ?? TLC_BASE_FARE_CONFIG.perMinuteRate;
+    const effectiveTLCPerMile = fareConfig.tlcPerMileRate ?? TLC_BASE_FARE_CONFIG.perMileRate;
+    tlcMinimumTripFare = fareConfig.tlcMinimumTripFare ?? TLC_BASE_FARE_CONFIG.minimumTripFare;
+    tlcMaximumTripFare = fareConfig.tlcMaximumFare ?? TLC_BASE_FARE_CONFIG.maximumFare;
+    
+    tlcBaseFare = roundCurrency(effectiveTLCBaseFare);
+    tlcTimeFare = roundCurrency(route.durationMinutes * effectiveTLCPerMinute);
+    tlcDistanceFare = roundCurrency(route.distanceMiles * effectiveTLCPerMile);
+    tlcCalculatedFare = roundCurrency(tlcBaseFare + tlcTimeFare + tlcDistanceFare);
+    
+    tlcBaseFareApplied = tlcBaseFare > 0;
+    tlcTimeRateApplied = tlcTimeFare > 0;
+    tlcDistanceRateApplied = tlcDistanceFare > 0;
+    
+    if (tlcCalculatedFare < tlcMinimumTripFare) {
+      tlcMinimumFareApplied = true;
+    }
+    
+    if (tlcCalculatedFare > tlcMaximumTripFare) {
+      tlcMaximumFareApplied = true;
+    }
+    
+    const enforcedTLCFare = Math.max(
+      Math.min(tlcCalculatedFare, tlcMaximumTripFare),
+      tlcMinimumTripFare
+    );
+    
+    baseFare = tlcBaseFare;
+    distanceFare = tlcDistanceFare;
+    timeFare = tlcTimeFare;
+    
+    if (enforcedTLCFare !== tlcCalculatedFare) {
+      const tlcFareDelta = roundCurrency(enforcedTLCFare - tlcCalculatedFare);
+      baseFare = roundCurrency(baseFare + tlcFareDelta);
+    }
+    tlcCalculatedFare = enforcedTLCFare;
+  } else {
+    baseFare = fareConfig.baseFare;
+    distanceFare = roundCurrency(route.distanceMiles * fareConfig.perMileRate);
+    timeFare = roundCurrency(route.durationMinutes * fareConfig.perMinuteRate);
+  }
+  
   const rawFare = roundCurrency(baseFare + distanceFare + timeFare);
 
   // ============================================
@@ -953,6 +1043,11 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     dynamicCommissionApplied,
     commissionCapped,
     commissionFloored,
+    tlcBaseFareApplied,
+    tlcTimeRateApplied,
+    tlcDistanceRateApplied,
+    tlcMinimumFareApplied,
+    tlcMaximumFareApplied,
   };
 
   const feeSuppressionLog: FeeSuppressionLog = {
@@ -1044,6 +1139,18 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     tlcHourlyEquivalent: tlcEnforcement.tlcDetails.hourlyEquivalentMinimum,
     tlcFinalMinimum: tlcEnforcement.tlcDetails.tlcMinimumPay,
     tlcDetails: tlcEnforcement.tlcDetails,
+    
+    tlcBaseFare,
+    tlcTimeFare,
+    tlcDistanceFare,
+    tlcCalculatedFare,
+    tlcMinimumTripFare,
+    tlcMaximumTripFare,
+    tlcBaseFareApplied,
+    tlcTimeRateApplied,
+    tlcDistanceRateApplied,
+    tlcMinimumFareApplied,
+    tlcMaximumFareApplied,
     
     flags,
     feeSuppressionLog,

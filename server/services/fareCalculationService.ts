@@ -292,6 +292,24 @@ export interface RouteFareBreakdown {
   // Fee suppression log for audit
   feeSuppressionLog: FeeSuppressionLog;
   
+  // TLC Base Fare tracking (NYC TLC Time-Distance Formula)
+  tlcBaseFare: number;
+  tlcTimeFare: number;
+  tlcDistanceFare: number;
+  tlcRawTotal: number;
+  tlcEnforcedTotal: number;
+  tlcCalculatedFare: number;
+  tlcMinimumTripFare: number;
+  tlcMaximumTripFare: number;
+  tlcBaseFareApplied: boolean;
+  tlcTimeRateApplied: boolean;
+  tlcDistanceRateApplied: boolean;
+  tlcMinimumFareApplied: boolean;
+  tlcMaximumFareApplied: boolean;
+  
+  // Pipeline subtotal (enforced TLC or raw base+distance+time)
+  baseSubtotalForPipeline: number;
+  
   // Display helpers
   isCheapest?: boolean;
   isFastest?: boolean;
@@ -837,11 +855,75 @@ export class FareCalculationService {
     // ============================================
     
     // ============================================
-    // 1. BASE FARE COMPONENTS
+    // 1. BASE FARE COMPONENTS (with NYC TLC Time-Distance Formula)
     // ============================================
-    const baseFare = Number(fareConfig.baseFare);
-    const distanceFare = roundCurrency(route.distanceMiles * Number(fareConfig.perMileRate));
-    const timeFare = roundCurrency(route.durationMinutes * Number(fareConfig.perMinuteRate));
+    const TLC_BASE_FARE = 2.50;
+    const TLC_PER_MINUTE = 0.56;
+    const TLC_PER_MILE = 1.31;
+    const TLC_MIN_FARE = 8.00;
+    const TLC_MAX_FARE = 500.00;
+    
+    const NYC_BOROUGHS = ['NYC', 'MANHATTAN', 'BROOKLYN', 'QUEENS', 'BRONX', 'STATEN_ISLAND', 
+                          'manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island',
+                          'MN', 'BK', 'QN', 'BX', 'SI'];
+    const isNYCCity = (code?: string) => code && NYC_BOROUGHS.includes(code.toUpperCase());
+    const isNYState = (code?: string) => code && code.toUpperCase() === 'NY';
+    
+    const useTLCBaseFare = isNYState(pickupStateCode) || isNYState(dropoffStateCode) || 
+                           isNYCCity(cityCode) || isNYCCity(pickupCityCode) || isNYCCity(dropoffCityCode);
+    
+    let baseFare: number;
+    let distanceFare: number;
+    let timeFare: number;
+    let tlcBaseFare = 0;
+    let tlcTimeFare = 0;
+    let tlcDistanceFare = 0;
+    let tlcCalculatedFare = 0;
+    let tlcMinimumTripFare = TLC_MIN_FARE;
+    let tlcMaximumTripFare = TLC_MAX_FARE;
+    let tlcBaseFareApplied = false;
+    let tlcTimeRateApplied = false;
+    let tlcDistanceRateApplied = false;
+    let tlcMinimumFareApplied = false;
+    let tlcMaximumFareApplied = false;
+    
+    let tlcRawTotal = 0;
+    let tlcEnforcedTotal = 0;
+    
+    if (useTLCBaseFare) {
+      tlcBaseFare = TLC_BASE_FARE;
+      tlcTimeFare = roundCurrency(route.durationMinutes * TLC_PER_MINUTE);
+      tlcDistanceFare = roundCurrency(route.distanceMiles * TLC_PER_MILE);
+      tlcRawTotal = roundCurrency(tlcBaseFare + tlcTimeFare + tlcDistanceFare);
+      
+      tlcBaseFareApplied = true;
+      tlcTimeRateApplied = tlcTimeFare > 0;
+      tlcDistanceRateApplied = tlcDistanceFare > 0;
+      
+      if (tlcRawTotal < TLC_MIN_FARE) {
+        tlcMinimumFareApplied = true;
+        tlcEnforcedTotal = TLC_MIN_FARE;
+      } else if (tlcRawTotal > TLC_MAX_FARE) {
+        tlcMaximumFareApplied = true;
+        tlcEnforcedTotal = TLC_MAX_FARE;
+      } else {
+        tlcEnforcedTotal = tlcRawTotal;
+      }
+      
+      tlcCalculatedFare = tlcEnforcedTotal;
+      
+      baseFare = tlcBaseFare;
+      distanceFare = tlcDistanceFare;
+      timeFare = tlcTimeFare;
+    } else {
+      baseFare = Number(fareConfig.baseFare);
+      distanceFare = roundCurrency(route.distanceMiles * Number(fareConfig.perMileRate));
+      timeFare = roundCurrency(route.durationMinutes * Number(fareConfig.perMinuteRate));
+    }
+    
+    const baseSubtotalForPipeline = useTLCBaseFare 
+      ? tlcEnforcedTotal 
+      : (baseFare + distanceFare + timeFare);
     
     // ============================================
     // 2. SHORT-TRIP ADJUSTMENT (if configured)
@@ -851,9 +933,8 @@ export class FareCalculationService {
     let shortTripAdjustment = 0;
     let shortTripAdjustmentApplied = false;
     
-    const rawBaseFare = baseFare + distanceFare + timeFare;
-    if (route.distanceMiles < shortTripThreshold && rawBaseFare < shortTripMinimumFare) {
-      shortTripAdjustment = roundCurrency(shortTripMinimumFare - rawBaseFare);
+    if (route.distanceMiles < shortTripThreshold && baseSubtotalForPipeline < shortTripMinimumFare) {
+      shortTripAdjustment = roundCurrency(shortTripMinimumFare - baseSubtotalForPipeline);
       shortTripAdjustmentApplied = true;
     }
     
@@ -870,7 +951,8 @@ export class FareCalculationService {
     }
     
     // Include short-trip adjustment in trip cost (step 2 in pipeline)
-    const tripCost = baseFare + distanceFare + timeFare + shortTripAdjustment;
+    // Uses baseSubtotalForPipeline which contains tlcEnforcedTotal for TLC trips
+    const tripCost = baseSubtotalForPipeline + shortTripAdjustment;
     const trafficAdjusted = roundCurrency(tripCost * trafficMultiplier);
     const trafficAdjustment = roundCurrency(trafficAdjusted - tripCost);
     
@@ -1227,10 +1309,23 @@ export class FareCalculationService {
       minimumFareApplied = true;
     }
     
-    // Apply maximum fare cap
+    // Apply maximum fare cap (regular config cap)
     if (fareAfterGuards > maximumFare) {
       fareAfterGuards = maximumFare;
       maximumFareApplied = true;
+    }
+    
+    // Apply TLC fare guards for NYC trips (regulatory compliance)
+    // This ensures the rider total respects TLC bounds after surge/traffic
+    if (useTLCBaseFare) {
+      if (fareAfterGuards < tlcMinimumTripFare) {
+        fareAfterGuards = tlcMinimumTripFare;
+        tlcMinimumFareApplied = true;
+      }
+      if (fareAfterGuards > tlcMaximumTripFare) {
+        fareAfterGuards = tlcMaximumTripFare;
+        tlcMaximumFareApplied = true;
+      }
     }
     
     // ============================================
@@ -1357,6 +1452,23 @@ export class FareCalculationService {
     // 18. FINAL FARE CALCULATION
     // After all guards and protections
     // ============================================
+    
+    // Final TLC enforcement - absolute cap after ALL adjustments including margin protection
+    // This is the regulatory compliance checkpoint for NYC trips
+    if (useTLCBaseFare) {
+      if (fareAfterGuards < tlcMinimumTripFare) {
+        fareAfterGuards = tlcMinimumTripFare;
+        tlcMinimumFareApplied = true;
+      }
+      if (fareAfterGuards > tlcMaximumTripFare) {
+        fareAfterGuards = tlcMaximumTripFare;
+        tlcMaximumFareApplied = true;
+        // Recalculate commission after cap
+        safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+        safegoCommission = Math.max(0, safegoCommission);
+      }
+    }
+    
     const finalFare = fareAfterGuards;
     
     // Calculate ACTUAL margin percentage from final values
@@ -1474,6 +1586,24 @@ export class FareCalculationService {
       
       // Fee suppression log for audit
       feeSuppressionLog,
+      
+      // TLC Base Fare tracking (NYC TLC Time-Distance Formula)
+      tlcBaseFare,
+      tlcTimeFare,
+      tlcDistanceFare,
+      tlcRawTotal,
+      tlcEnforcedTotal,
+      tlcCalculatedFare,
+      tlcMinimumTripFare,
+      tlcMaximumTripFare,
+      tlcBaseFareApplied,
+      tlcTimeRateApplied,
+      tlcDistanceRateApplied,
+      tlcMinimumFareApplied,
+      tlcMaximumFareApplied,
+      
+      // Pipeline subtotal (enforced TLC or raw base+distance+time)
+      baseSubtotalForPipeline,
     };
   }
   
