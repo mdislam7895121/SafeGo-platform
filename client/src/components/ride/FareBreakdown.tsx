@@ -81,6 +81,18 @@ export interface FareBreakdownData {
   tlcOutOfTownFee?: number;
   tlcOutOfTownApplied?: boolean;
   
+  // NYC TLC Toll Facilities (bridges, tunnels with EZ-Pass rates)
+  tlcTollsBreakdown?: Array<{
+    id: string;
+    name: string;
+    shortName: string;
+    amount: number;
+    isPeak: boolean;
+    operator: string;
+    direction?: string;
+  }>;
+  tollsApplied?: boolean;
+  
   surgeAmount?: number;
   surgeMultiplier?: number;
   surgeReason?: string;
@@ -137,6 +149,7 @@ export interface FareBreakdownData {
     tlcStateSurchargeApplied?: boolean;
     tlcLongTripFeeApplied?: boolean;
     tlcOutOfTownApplied?: boolean;
+    tollsApplied?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -449,12 +462,41 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         />
       )}
       
-      <BreakdownLine 
-        icon={Route} 
-        label="Tolls" 
-        amount={breakdown.tolls} 
-        currency={currency} 
-      />
+      {/* NYC TLC Tolls - Individual bridge/tunnel line items */}
+      {breakdown.tlcTollsBreakdown && breakdown.tlcTollsBreakdown.length > 0 ? (
+        <>
+          {breakdown.tlcTollsBreakdown.map((toll, index) => (
+            <div 
+              key={`toll-${toll.id}-${index}`}
+              className="flex items-center justify-between py-2"
+              data-testid={`row-toll-${toll.id}`}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <Route className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">{toll.shortName}</span>
+                <Badge variant="outline" className="text-xs" data-testid={`badge-toll-rate-${toll.id}`}>
+                  {toll.isPeak ? 'Peak' : 'Off-Peak'}
+                </Badge>
+                {toll.direction && (
+                  <Badge variant="secondary" className="text-xs" data-testid={`badge-toll-direction-${toll.id}`}>
+                    {toll.direction === 'eastbound' ? 'EB' : toll.direction === 'westbound' ? 'WB' : toll.direction}
+                  </Badge>
+                )}
+              </div>
+              <span className="text-sm" data-testid={`text-toll-amount-${toll.id}`}>
+                {formatCurrency(toll.amount, currency)}
+              </span>
+            </div>
+          ))}
+        </>
+      ) : (
+        <BreakdownLine 
+          icon={Route} 
+          label="Tolls" 
+          amount={breakdown.tolls} 
+          currency={currency} 
+        />
+      )}
       <BreakdownLine 
         icon={Building2} 
         label="City & airport fees" 
