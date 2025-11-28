@@ -120,6 +120,234 @@ export const TLC_BASE_FARE_CONFIG = {
   maximumFare: 500.00,
 };
 
+// ============================================
+// CROSS-STATE FARE CONFIGURATION (Uber-style)
+// ============================================
+
+/**
+ * Cross-State Fare Configuration
+ * 
+ * When pickup and dropoff are in different states, this dedicated
+ * pricing model is applied instead of regular fare calculation.
+ * 
+ * Formula:
+ * fare = (baseFare + distanceCost + timeCost + crossStateSurcharge + tolls) * surgeMultiplier
+ */
+export interface CrossStateFareConfig {
+  baseFare: number;           // Fixed base fare for cross-state trips
+  perMileRate: number;        // Rate per mile traveled
+  perMinuteRate: number;      // Rate per minute duration
+  crossStateSurcharge: number; // Flat surcharge for crossing state lines
+  defaultSurgeMultiplier: number; // Default surge (admin can override)
+  minimumFare: number;        // Minimum fare for cross-state trips
+  maximumFare: number;        // Maximum fare for cross-state trips
+}
+
+export const CROSS_STATE_FARE_CONFIG: CrossStateFareConfig = {
+  baseFare: 3.00,
+  perMileRate: 2.00,
+  perMinuteRate: 0.60,
+  crossStateSurcharge: 2.00,
+  defaultSurgeMultiplier: 1.0,
+  minimumFare: 15.00,  // Higher minimum for cross-state
+  maximumFare: 1000.00, // Higher max for cross-state
+};
+
+/**
+ * Cross-State Fare Calculation Result
+ */
+export interface CrossStateFareResult {
+  isCrossState: boolean;
+  pickupState: string;
+  dropoffState: string;
+  
+  // Fare components (pre-surge)
+  baseFare: number;
+  distanceCost: number;
+  timeCost: number;
+  crossStateSurcharge: number;
+  tollsTotal: number;
+  
+  // Pre-surge subtotal
+  preSurgeSubtotal: number;
+  
+  // Surge application
+  surgeMultiplier: number;
+  surgeAmount: number;
+  surgeApplied: boolean;
+  
+  // Final fare
+  totalFare: number;
+  minimumFareApplied: boolean;
+  maximumFareApplied: boolean;
+  originalCalculatedFare: number;
+  
+  // Breakdown for UI
+  fareBreakdown: {
+    baseFare: number;
+    distanceCost: number;
+    timeCost: number;
+    crossStateSurcharge: number;
+    tollsTotal: number;
+    surgeAmount: number;
+    totalFare: number;
+  };
+}
+
+/**
+ * Detect if a trip crosses state boundaries
+ */
+export function isCrossStateTrip(
+  pickupState: string | undefined,
+  dropoffState: string | undefined
+): boolean {
+  if (!pickupState || !dropoffState) {
+    return false;
+  }
+  return pickupState.toUpperCase() !== dropoffState.toUpperCase();
+}
+
+/**
+ * Calculate Cross-State Fare using Uber-style pricing model
+ * 
+ * This function is called when pickup_state != dropoff_state.
+ * It uses a completely different pricing formula than in-state trips.
+ * 
+ * @param distanceMiles Trip distance in miles
+ * @param durationMinutes Trip duration in minutes
+ * @param pickupState Pickup state code (e.g., "NJ", "NY", "PA")
+ * @param dropoffState Dropoff state code
+ * @param tollsTotal Total tolls for the trip
+ * @param surgeMultiplier Admin-configured surge multiplier (default 1.0)
+ * @param config Optional custom config (uses default if not provided)
+ */
+export function calculateCrossStateFare(
+  distanceMiles: number,
+  durationMinutes: number,
+  pickupState: string,
+  dropoffState: string,
+  tollsTotal: number = 0,
+  surgeMultiplier: number = CROSS_STATE_FARE_CONFIG.defaultSurgeMultiplier,
+  config: CrossStateFareConfig = CROSS_STATE_FARE_CONFIG
+): CrossStateFareResult {
+  // Validate cross-state
+  const isCrossState = isCrossStateTrip(pickupState, dropoffState);
+  
+  if (!isCrossState) {
+    // Return zero result if not actually cross-state
+    console.log(`[CrossStateFare] NOT triggered - same state: ${pickupState}`);
+    return {
+      isCrossState: false,
+      pickupState: pickupState || '',
+      dropoffState: dropoffState || '',
+      baseFare: 0,
+      distanceCost: 0,
+      timeCost: 0,
+      crossStateSurcharge: 0,
+      tollsTotal: 0,
+      preSurgeSubtotal: 0,
+      surgeMultiplier: 1.0,
+      surgeAmount: 0,
+      surgeApplied: false,
+      totalFare: 0,
+      minimumFareApplied: false,
+      maximumFareApplied: false,
+      originalCalculatedFare: 0,
+      fareBreakdown: {
+        baseFare: 0,
+        distanceCost: 0,
+        timeCost: 0,
+        crossStateSurcharge: 0,
+        tollsTotal: 0,
+        surgeAmount: 0,
+        totalFare: 0,
+      },
+    };
+  }
+
+  console.log(`[CrossStateFare] TRIGGERED - ${pickupState} → ${dropoffState}`);
+  console.log(`[CrossStateFare] Distance: ${distanceMiles.toFixed(2)} mi, Duration: ${durationMinutes.toFixed(1)} min`);
+  console.log(`[CrossStateFare] Tolls: $${tollsTotal.toFixed(2)}, Surge: ${surgeMultiplier}x`);
+
+  // Calculate fare components
+  const baseFare = roundCurrency(config.baseFare);
+  const distanceCost = roundCurrency(distanceMiles * config.perMileRate);
+  const timeCost = roundCurrency(durationMinutes * config.perMinuteRate);
+  const crossStateSurcharge = roundCurrency(config.crossStateSurcharge);
+  const tolls = roundCurrency(tollsTotal);
+
+  // Pre-surge subtotal
+  const preSurgeSubtotal = roundCurrency(
+    baseFare + distanceCost + timeCost + crossStateSurcharge + tolls
+  );
+
+  console.log(`[CrossStateFare] Pre-surge breakdown:`);
+  console.log(`  Base fare: $${baseFare.toFixed(2)}`);
+  console.log(`  Distance ($${config.perMileRate}/mi × ${distanceMiles.toFixed(2)}mi): $${distanceCost.toFixed(2)}`);
+  console.log(`  Time ($${config.perMinuteRate}/min × ${durationMinutes.toFixed(1)}min): $${timeCost.toFixed(2)}`);
+  console.log(`  Cross-state surcharge: $${crossStateSurcharge.toFixed(2)}`);
+  console.log(`  Tolls: $${tolls.toFixed(2)}`);
+  console.log(`  Pre-surge subtotal: $${preSurgeSubtotal.toFixed(2)}`);
+
+  // Apply surge multiplier
+  const effectiveSurge = Math.max(1.0, surgeMultiplier);
+  const surgeApplied = effectiveSurge > 1.0;
+  const fareAfterSurge = roundCurrency(preSurgeSubtotal * effectiveSurge);
+  const surgeAmount = surgeApplied ? roundCurrency(fareAfterSurge - preSurgeSubtotal) : 0;
+
+  if (surgeApplied) {
+    console.log(`[CrossStateFare] Surge applied: ${effectiveSurge}x = +$${surgeAmount.toFixed(2)}`);
+  }
+
+  // Apply minimum/maximum fare guards
+  let finalFare = fareAfterSurge;
+  let minimumFareApplied = false;
+  let maximumFareApplied = false;
+  const originalCalculatedFare = fareAfterSurge;
+
+  if (finalFare < config.minimumFare) {
+    finalFare = config.minimumFare;
+    minimumFareApplied = true;
+    console.log(`[CrossStateFare] Minimum fare applied: $${config.minimumFare.toFixed(2)}`);
+  }
+
+  if (finalFare > config.maximumFare) {
+    finalFare = config.maximumFare;
+    maximumFareApplied = true;
+    console.log(`[CrossStateFare] Maximum fare applied: $${config.maximumFare.toFixed(2)}`);
+  }
+
+  console.log(`[CrossStateFare] Final fare: $${finalFare.toFixed(2)}`);
+
+  return {
+    isCrossState: true,
+    pickupState: pickupState.toUpperCase(),
+    dropoffState: dropoffState.toUpperCase(),
+    baseFare,
+    distanceCost,
+    timeCost,
+    crossStateSurcharge,
+    tollsTotal: tolls,
+    preSurgeSubtotal,
+    surgeMultiplier: effectiveSurge,
+    surgeAmount,
+    surgeApplied,
+    totalFare: finalFare,
+    minimumFareApplied,
+    maximumFareApplied,
+    originalCalculatedFare,
+    fareBreakdown: {
+      baseFare,
+      distanceCost,
+      timeCost,
+      crossStateSurcharge,
+      tollsTotal: tolls,
+      surgeAmount,
+      totalFare: finalFare,
+    },
+  };
+}
+
 export interface RouteInput {
   routeId: string;
   distanceMiles: number;
@@ -281,6 +509,24 @@ export interface FareEngineResult {
   crossStateSurcharge: number;
   returnDeadheadFee: number;
   excessReturnMiles: number;
+  
+  // Cross-State Fare Engine (Uber-style)
+  crossStateFareApplied: boolean;
+  crossStatePickupState?: string;
+  crossStateDropoffState?: string;
+  crossStateFareBaseFare?: number;
+  crossStateFareDistanceCost?: number;
+  crossStateFareTimeCost?: number;
+  crossStateFareSurcharge?: number;
+  crossStateFareTolls?: number;
+  crossStateFarePreSurgeSubtotal?: number;
+  crossStateFareSurgeMultiplier?: number;
+  crossStateFareSurgeAmount?: number;
+  crossStateFareSurgeApplied?: boolean;
+  crossStateFareTotal?: number;
+  crossStateFareMinimumApplied?: boolean;
+  crossStateFareMaximumApplied?: boolean;
+  crossStateFareOriginal?: number;
   
   tlcCrossBoroughFee: number;
   tlcCrossBoroughApplied: boolean;
@@ -684,10 +930,16 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   let borderZoneFeeApplied = false;
   
   const isCrossCityTrip = pickup.cityCode && dropoff.cityCode && pickup.cityCode !== dropoff.cityCode;
-  const isCrossStateTrip = pickup.stateCode && dropoff.stateCode && pickup.stateCode !== dropoff.stateCode;
+  const isCrossStateTripDetected = pickup.stateCode && dropoff.stateCode && pickup.stateCode !== dropoff.stateCode;
   
-  // Step 8: Apply cross-state fee (highest priority)
-  if (isCrossStateTrip) {
+  // Step 8: Apply cross-state fare (highest priority - Uber-style pricing)
+  if (isCrossStateTripDetected) {
+    console.log(`[FareEngine] CROSS-STATE TRIP DETECTED: ${pickup.stateCode} → ${dropoff.stateCode}`);
+    console.log(`[FareEngine] Cross-State Fare Engine ACTIVATED`);
+    console.log(`[FareEngine] Using Uber-style pricing: base=$${CROSS_STATE_FARE_CONFIG.baseFare}, perMile=$${CROSS_STATE_FARE_CONFIG.perMileRate}, perMin=$${CROSS_STATE_FARE_CONFIG.perMinuteRate}`);
+    console.log(`[FareEngine] Cross-state surcharge: $${CROSS_STATE_FARE_CONFIG.crossStateSurcharge}`);
+    console.log(`[FareEngine] Trip details: ${route.distanceMiles.toFixed(2)} mi, ${route.durationMinutes.toFixed(1)} min`);
+    
     crossStateSurcharge = fareConfig.crossStateSurcharge;
     crossStateApplied = true;
     
@@ -695,6 +947,8 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
       addSuppression('crossCitySurcharge', 'crossStateSurcharge', 
         'Cross-state trip supersedes cross-city surcharge', fareConfig.crossCitySurcharge);
     }
+  } else if (pickup.stateCode && dropoff.stateCode) {
+    console.log(`[FareEngine] In-state trip: ${pickup.stateCode} → ${dropoff.stateCode} (same state - using standard fare)`);
   }
   // Step 9: Apply cross-city fee (if not suppressed)
   else if (isCrossCityTrip) {
@@ -839,36 +1093,96 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   const additionalFeesTotal = roundCurrency(additionalFees.reduce((sum, f) => sum + f.amount, 0));
 
   // ============================================
-  // STEP 15: SUBTOTAL & SERVICE FEE
+  // STEP 14.5: CROSS-STATE FARE ENGINE
+  // If pickup and dropoff are in different states,
+  // calculate cross-state fare FIRST and use it to
+  // completely override the normal fare pipeline.
+  // This must happen BEFORE subtotal/guards calculation.
   // ============================================
-  const subtotalBeforeDiscount = roundCurrency(
-    fareAfterSurge + 
-    nightSurcharge + 
-    peakHourSurcharge + 
-    longDistanceFee +
-    crossCitySurcharge +
-    crossStateSurcharge +
-    returnDeadheadFee +
-    tlcCrossBoroughFee +  // NYC TLC cross-borough fee (after out-of-town, before service fee)
-    airportFee +
-    borderZoneFee +
-    stateRegulatoryFee +
-    tollsTotal + 
-    additionalFeesTotal
-  );
+  let crossStateFareResult: CrossStateFareResult | null = null;
+  let usingCrossStateFare = false;
   
-  const discountAmount = 0;
-  const subtotal = roundCurrency(subtotalBeforeDiscount - discountAmount);
+  if (crossStateApplied && pickup.stateCode && dropoff.stateCode) {
+    crossStateFareResult = calculateCrossStateFare(
+      route.distanceMiles,
+      route.durationMinutes,
+      pickup.stateCode,
+      dropoff.stateCode,
+      tollsTotal,
+      effectiveSurge,
+      CROSS_STATE_FARE_CONFIG
+    );
+    
+    if (crossStateFareResult.isCrossState) {
+      usingCrossStateFare = true;
+      console.log(`[FareEngine] ========================================`);
+      console.log(`[FareEngine] CROSS-STATE FARE ENGINE ACTIVATED`);
+      console.log(`[FareEngine] Trip: ${pickup.stateCode} → ${dropoff.stateCode}`);
+      console.log(`[FareEngine] Using dedicated Uber-style pricing`);
+      console.log(`[FareEngine] ========================================`);
+    }
+  }
+
+  // ============================================
+  // STEP 15: SUBTOTAL & SERVICE FEE
+  // For cross-state trips, the subtotal is calculated
+  // from the cross-state fare, not the normal pipeline.
+  // ============================================
+  let subtotalBeforeDiscount: number;
+  let discountAmount = 0;
+  let subtotal: number;
+  let serviceFee: number;
+  let grossFare: number;
   
-  let serviceFee = roundCurrency(subtotal * fareConfig.serviceFeePercent / 100);
-  serviceFee = Math.max(serviceFee, fareConfig.serviceFeeMinimum);
-  serviceFee = Math.min(serviceFee, fareConfig.serviceFeeMaximum);
+  if (usingCrossStateFare && crossStateFareResult) {
+    // Cross-state fare includes all components (base, distance, time, surcharge, tolls, surge)
+    // We use the pre-surge subtotal as the base, then apply surge
+    subtotalBeforeDiscount = crossStateFareResult.preSurgeSubtotal;
+    subtotal = roundCurrency(subtotalBeforeDiscount - discountAmount);
+    
+    // Service fee for cross-state trips
+    serviceFee = roundCurrency(subtotal * fareConfig.serviceFeePercent / 100);
+    serviceFee = Math.max(serviceFee, fareConfig.serviceFeeMinimum);
+    serviceFee = Math.min(serviceFee, fareConfig.serviceFeeMaximum);
+    
+    // For cross-state, the gross fare is the cross-state total (which already includes surge)
+    grossFare = crossStateFareResult.totalFare;
+    
+    console.log(`[FareEngine] Cross-state subtotal: $${subtotal.toFixed(2)}`);
+    console.log(`[FareEngine] Cross-state service fee: $${serviceFee.toFixed(2)}`);
+    console.log(`[FareEngine] Cross-state gross fare (final): $${grossFare.toFixed(2)}`);
+  } else {
+    // Normal fare calculation
+    subtotalBeforeDiscount = roundCurrency(
+      fareAfterSurge + 
+      nightSurcharge + 
+      peakHourSurcharge + 
+      longDistanceFee +
+      crossCitySurcharge +
+      crossStateSurcharge +
+      returnDeadheadFee +
+      tlcCrossBoroughFee +  // NYC TLC cross-borough fee (after out-of-town, before service fee)
+      airportFee +
+      borderZoneFee +
+      stateRegulatoryFee +
+      tollsTotal + 
+      additionalFeesTotal
+    );
+    
+    subtotal = roundCurrency(subtotalBeforeDiscount - discountAmount);
+    
+    serviceFee = roundCurrency(subtotal * fareConfig.serviceFeePercent / 100);
+    serviceFee = Math.max(serviceFee, fareConfig.serviceFeeMinimum);
+    serviceFee = Math.min(serviceFee, fareConfig.serviceFeeMaximum);
+    
+    grossFare = roundCurrency(subtotal + serviceFee);
+  }
 
   // ============================================
   // STEP 16: GROSS FARE & GUARDS
+  // For cross-state trips, guards are already applied
+  // in the calculateCrossStateFare function.
   // ============================================
-  const grossFare = roundCurrency(subtotal + serviceFee);
-  
   const globalMinimumFare = fareConfig.minimumFare;
   const stateMinimumFare: number | undefined = undefined; // Would come from state config
   const effectiveMinimumFare = stateMinimumFare && stateMinimumFare > globalMinimumFare
@@ -876,18 +1190,32 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     : globalMinimumFare;
   const stateMinimumFareApplied = stateMinimumFare !== undefined && stateMinimumFare > globalMinimumFare;
   
-  let fareAfterGuards = grossFare;
+  let fareAfterGuards: number;
   let minimumFareApplied = false;
   let maximumFareApplied = false;
   
-  if (fareAfterGuards < effectiveMinimumFare) {
-    fareAfterGuards = effectiveMinimumFare;
-    minimumFareApplied = true;
-  }
-  
-  if (fareAfterGuards > fareConfig.maximumFare) {
-    fareAfterGuards = fareConfig.maximumFare;
-    maximumFareApplied = true;
+  if (usingCrossStateFare && crossStateFareResult) {
+    // Cross-state fare already has guards applied
+    fareAfterGuards = crossStateFareResult.totalFare;
+    minimumFareApplied = crossStateFareResult.minimumFareApplied;
+    maximumFareApplied = crossStateFareResult.maximumFareApplied;
+    
+    console.log(`[FareEngine] Cross-state fare after guards: $${fareAfterGuards.toFixed(2)}`);
+    if (minimumFareApplied) console.log(`[FareEngine] Cross-state minimum fare applied: $${CROSS_STATE_FARE_CONFIG.minimumFare}`);
+    if (maximumFareApplied) console.log(`[FareEngine] Cross-state maximum fare applied: $${CROSS_STATE_FARE_CONFIG.maximumFare}`);
+  } else {
+    // Normal guards
+    fareAfterGuards = grossFare;
+    
+    if (fareAfterGuards < effectiveMinimumFare) {
+      fareAfterGuards = effectiveMinimumFare;
+      minimumFareApplied = true;
+    }
+    
+    if (fareAfterGuards > fareConfig.maximumFare) {
+      fareAfterGuards = fareConfig.maximumFare;
+      maximumFareApplied = true;
+    }
   }
 
   // ============================================
@@ -990,7 +1318,9 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   
   const targetMarginAmount = roundCurrency(fareAfterGuards * platformCommissionPercent / 100);
   
-  if (platformCommission < targetMarginAmount) {
+  // Skip margin protection fare adjustments for cross-state trips
+  // Cross-state fare is already finalized with its own guards
+  if (platformCommission < targetMarginAmount && !usingCrossStateFare) {
     marginProtectionApplied = true;
     
     if (platformCommission < 0 && driverEarnings > driverMinimumEarnings) {
@@ -1053,8 +1383,21 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   }
   
   platformCommission = Math.max(0, platformCommission);
-  const safegoCommission = platformCommission;
+  let safegoCommission = platformCommission;
+  
+  // Final fare is already set correctly from cross-state or normal pipeline
   const finalFare = fareAfterGuards;
+  
+  // Log cross-state summary if applicable
+  if (usingCrossStateFare && crossStateFareResult) {
+    console.log(`[FareEngine] ----------------------------------------`);
+    console.log(`[FareEngine] CROSS-STATE FARE SUMMARY`);
+    console.log(`[FareEngine] Final fare: $${finalFare.toFixed(2)}`);
+    console.log(`[FareEngine] Driver earnings: $${driverEarnings.toFixed(2)}`);
+    console.log(`[FareEngine] Platform commission: $${platformCommission.toFixed(2)}`);
+    console.log(`[FareEngine] ----------------------------------------`);
+  }
+  
   const companyMarginPercent = calcCommissionPercent(finalFare, platformCommission);
   const absoluteMinimumFare = effectiveMinimumFare;
   const effectiveDiscountPct = 0;
@@ -1076,35 +1419,46 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     driverEarnings = tlcEnforcement.finalDriverPayout;
   }
   
+  // For cross-state trips, use cross-state flags for minimum/maximum applied
+  const finalMinimumFareApplied = usingCrossStateFare 
+    ? (crossStateFareResult?.minimumFareApplied ?? false) 
+    : minimumFareApplied;
+  const finalMaximumFareApplied = usingCrossStateFare 
+    ? (crossStateFareResult?.maximumFareApplied ?? false) 
+    : maximumFareApplied;
+  const finalSurgeApplied = usingCrossStateFare 
+    ? (crossStateFareResult?.surgeApplied ?? false) 
+    : effectiveSurge > 1;
+  
   const flags: FareFlags = {
-    trafficApplied,
-    surgeApplied: effectiveSurge > 1,
-    surgeCapped,
-    nightApplied: nightSurcharge > 0,
-    peakApplied: peakHourSurcharge > 0,
-    longDistanceApplied: longDistanceFee > 0,
-    crossCityApplied,
+    trafficApplied: usingCrossStateFare ? false : trafficApplied,
+    surgeApplied: finalSurgeApplied,
+    surgeCapped: usingCrossStateFare ? false : surgeCapped,
+    nightApplied: usingCrossStateFare ? false : nightSurcharge > 0,
+    peakApplied: usingCrossStateFare ? false : peakHourSurcharge > 0,
+    longDistanceApplied: usingCrossStateFare ? false : longDistanceFee > 0,
+    crossCityApplied: usingCrossStateFare ? false : crossCityApplied,
     crossStateApplied,
-    airportFeeApplied,
-    borderZoneApplied: borderZoneFeeApplied,
-    regulatoryFeeApplied,
-    returnDeadheadApplied,
+    airportFeeApplied: usingCrossStateFare ? false : airportFeeApplied,
+    borderZoneApplied: usingCrossStateFare ? false : borderZoneFeeApplied,
+    regulatoryFeeApplied: usingCrossStateFare ? false : regulatoryFeeApplied,
+    returnDeadheadApplied: usingCrossStateFare ? false : returnDeadheadApplied,
     promoApplied: false,
-    stateMinimumFareApplied,
-    shortTripAdjustmentApplied,
-    maximumFareApplied,
-    minimumFareApplied,
+    stateMinimumFareApplied: usingCrossStateFare ? false : stateMinimumFareApplied,
+    shortTripAdjustmentApplied: usingCrossStateFare ? false : shortTripAdjustmentApplied,
+    maximumFareApplied: finalMaximumFareApplied,
+    minimumFareApplied: finalMinimumFareApplied,
     driverMinimumPayoutApplied,
-    marginProtectionApplied,
+    marginProtectionApplied: usingCrossStateFare ? false : marginProtectionApplied,
     dynamicCommissionApplied,
     commissionCapped,
     commissionFloored,
-    tlcBaseFareApplied,
-    tlcTimeRateApplied,
-    tlcDistanceRateApplied,
-    tlcMinimumFareApplied,
-    tlcMaximumFareApplied,
-    tlcCrossBoroughApplied,
+    tlcBaseFareApplied: usingCrossStateFare ? false : tlcBaseFareApplied,
+    tlcTimeRateApplied: usingCrossStateFare ? false : tlcTimeRateApplied,
+    tlcDistanceRateApplied: usingCrossStateFare ? false : tlcDistanceRateApplied,
+    tlcMinimumFareApplied: usingCrossStateFare ? false : tlcMinimumFareApplied,
+    tlcMaximumFareApplied: usingCrossStateFare ? false : tlcMaximumFareApplied,
+    tlcCrossBoroughApplied: usingCrossStateFare ? false : tlcCrossBoroughApplied,
   };
 
   const feeSuppressionLog: FeeSuppressionLog = {
@@ -1119,14 +1473,14 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     durationMinutes: route.durationMinutes,
     trafficDurationMinutes: route.trafficDurationMinutes,
     
-    baseFare,
-    distanceFare,
-    timeFare,
+    baseFare: usingCrossStateFare ? (crossStateFareResult?.baseFare ?? baseFare) : baseFare,
+    distanceFare: usingCrossStateFare ? (crossStateFareResult?.distanceCost ?? distanceFare) : distanceFare,
+    timeFare: usingCrossStateFare ? (crossStateFareResult?.timeCost ?? timeFare) : timeFare,
     
-    trafficAdjustment,
-    trafficMultiplier,
-    surgeAmount,
-    surgeMultiplier: effectiveSurge,
+    trafficAdjustment: usingCrossStateFare ? 0 : trafficAdjustment,
+    trafficMultiplier: usingCrossStateFare ? 1 : trafficMultiplier,
+    surgeAmount: usingCrossStateFare ? (crossStateFareResult?.surgeAmount ?? 0) : surgeAmount,
+    surgeMultiplier: usingCrossStateFare ? (crossStateFareResult?.surgeMultiplier ?? 1) : effectiveSurge,
     
     nightSurcharge,
     peakHourSurcharge,
@@ -1137,6 +1491,24 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     crossStateSurcharge,
     returnDeadheadFee,
     excessReturnMiles,
+    
+    // Cross-State Fare Engine fields (populated from calculateCrossStateFare result)
+    crossStateFareApplied: usingCrossStateFare,
+    crossStatePickupState: usingCrossStateFare ? crossStateFareResult?.pickupState : pickup.stateCode,
+    crossStateDropoffState: usingCrossStateFare ? crossStateFareResult?.dropoffState : dropoff.stateCode,
+    crossStateFareBaseFare: usingCrossStateFare ? crossStateFareResult?.baseFare : undefined,
+    crossStateFareDistanceCost: usingCrossStateFare ? crossStateFareResult?.distanceCost : undefined,
+    crossStateFareTimeCost: usingCrossStateFare ? crossStateFareResult?.timeCost : undefined,
+    crossStateFareSurcharge: usingCrossStateFare ? crossStateFareResult?.crossStateSurcharge : undefined,
+    crossStateFareTolls: usingCrossStateFare ? crossStateFareResult?.tollsTotal : undefined,
+    crossStateFarePreSurgeSubtotal: usingCrossStateFare ? crossStateFareResult?.preSurgeSubtotal : undefined,
+    crossStateFareSurgeMultiplier: usingCrossStateFare ? crossStateFareResult?.surgeMultiplier : undefined,
+    crossStateFareSurgeAmount: usingCrossStateFare ? crossStateFareResult?.surgeAmount : undefined,
+    crossStateFareSurgeApplied: usingCrossStateFare ? (crossStateFareResult?.surgeApplied ?? false) : false,
+    crossStateFareTotal: usingCrossStateFare ? crossStateFareResult?.totalFare : undefined,
+    crossStateFareMinimumApplied: usingCrossStateFare ? crossStateFareResult?.minimumFareApplied : undefined,
+    crossStateFareMaximumApplied: usingCrossStateFare ? crossStateFareResult?.maximumFareApplied : undefined,
+    crossStateFareOriginal: usingCrossStateFare ? crossStateFareResult?.originalCalculatedFare : undefined,
     
     tlcCrossBoroughFee,
     tlcCrossBoroughApplied,
@@ -1162,9 +1534,9 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     subtotal,
     totalFare: finalFare,
     
-    minimumFareApplied,
-    maximumFareApplied,
-    originalCalculatedFare: grossFare,
+    minimumFareApplied: finalMinimumFareApplied,
+    maximumFareApplied: finalMaximumFareApplied,
+    originalCalculatedFare: usingCrossStateFare ? (crossStateFareResult?.originalCalculatedFare ?? grossFare) : grossFare,
     stateMinimumFare,
     absoluteMinimumFare,
     

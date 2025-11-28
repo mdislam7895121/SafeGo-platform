@@ -500,13 +500,33 @@ export default function RideOptionsPage() {
   const promoType: PromoType = promoDiscount > 0 ? "PROMO_APPLIED" : "NONE";
 
   const fareBreakdownData: FareBreakdownData | null = selectedFare ? {
-    tripFare: selectedFare.baseFare + selectedFare.distanceFare + selectedFare.timeFare,
-    trafficAdjustment: selectedFare.trafficAdjustment,
-    tolls: selectedFare.tollsTotal,
-    cityFees: selectedFare.regulatoryFeesTotal,
-    serviceFee: selectedFare.serviceFee,
+    tripFare: selectedFare.crossStateFareApplied 
+      ? (selectedFare.crossStateFareBaseFare || 0) + (selectedFare.crossStateFareDistanceCost || 0) + (selectedFare.crossStateFareTimeCost || 0)
+      : selectedFare.baseFare + selectedFare.distanceFare + selectedFare.timeFare,
+    trafficAdjustment: selectedFare.crossStateFareApplied ? 0 : selectedFare.trafficAdjustment,
+    tolls: selectedFare.crossStateFareApplied ? (selectedFare.crossStateFareTolls || 0) : selectedFare.tollsTotal,
+    cityFees: selectedFare.crossStateFareApplied ? 0 : selectedFare.regulatoryFeesTotal,
+    serviceFee: selectedFare.crossStateFareApplied ? 0 : selectedFare.serviceFee,
     promoDiscount: promoDiscount,
     totalFare: finalFare,
+    
+    // Cross-State Fare Engine fields
+    crossStateFareApplied: selectedFare.crossStateFareApplied,
+    crossStatePickupState: selectedFare.crossStatePickupState,
+    crossStateDropoffState: selectedFare.crossStateDropoffState,
+    crossStateFareBaseFare: selectedFare.crossStateFareBaseFare,
+    crossStateFareDistanceCost: selectedFare.crossStateFareDistanceCost,
+    crossStateFareTimeCost: selectedFare.crossStateFareTimeCost,
+    crossStateFareSurcharge: selectedFare.crossStateFareSurcharge,
+    crossStateFareTolls: selectedFare.crossStateFareTolls,
+    crossStateFarePreSurgeSubtotal: selectedFare.crossStateFarePreSurgeSubtotal,
+    crossStateFareSurgeMultiplier: selectedFare.crossStateFareSurgeMultiplier,
+    crossStateFareSurgeAmount: selectedFare.crossStateFareSurgeAmount,
+    crossStateFareSurgeApplied: selectedFare.crossStateFareSurgeApplied,
+    crossStateFareTotal: selectedFare.crossStateFareTotal,
+    crossStateFareMinimumApplied: selectedFare.crossStateFareMinimumApplied,
+    crossStateFareMaximumApplied: selectedFare.crossStateFareMaximumApplied,
+    crossStateFareOriginal: selectedFare.crossStateFareOriginal,
   } : null;
 
   const routeOptions: RouteOptionType[] = useMemo(() => {

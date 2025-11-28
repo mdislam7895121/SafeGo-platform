@@ -60,6 +60,24 @@ export interface FareBreakdownData {
   stateRegulatoryFee?: number;
   stateRegulatoryFeeLabel?: string;
   
+  // Cross-State Fare Engine (Uber-style pricing)
+  crossStateFareApplied?: boolean;
+  crossStatePickupState?: string;
+  crossStateDropoffState?: string;
+  crossStateFareBaseFare?: number;
+  crossStateFareDistanceCost?: number;
+  crossStateFareTimeCost?: number;
+  crossStateFareSurcharge?: number;
+  crossStateFareTolls?: number;
+  crossStateFarePreSurgeSubtotal?: number;
+  crossStateFareSurgeMultiplier?: number;
+  crossStateFareSurgeAmount?: number;
+  crossStateFareSurgeApplied?: boolean;
+  crossStateFareTotal?: number;
+  crossStateFareMinimumApplied?: boolean;
+  crossStateFareMaximumApplied?: boolean;
+  crossStateFareOriginal?: number;
+  
   // NYC TLC Regulatory Fees
   tlcCongestionFee?: number;
   tlcCongestionFeeApplied?: boolean;
@@ -362,7 +380,96 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           currency={currency} 
         />
       )}
-      {(breakdown.crossStateSurcharge ?? 0) > 0 && (
+      {/* Cross-State Fare Engine Section (Uber-style pricing) */}
+      {breakdown.crossStateFareApplied && (
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/30 dark:to-amber-950/30 rounded-lg p-3 my-2 border border-orange-200 dark:border-orange-800" data-testid="section-cross-state-fare">
+          <div className="flex items-center gap-2 mb-3">
+            <ArrowRightLeft className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <span className="font-semibold text-sm text-orange-800 dark:text-orange-200">Cross-State Trip Pricing</span>
+            {breakdown.crossStatePickupState && breakdown.crossStateDropoffState && (
+              <Badge variant="outline" className="text-xs bg-orange-100 dark:bg-orange-900/50 border-orange-300 dark:border-orange-700" data-testid="badge-cross-state-route">
+                {breakdown.crossStatePickupState} to {breakdown.crossStateDropoffState}
+              </Badge>
+            )}
+          </div>
+          
+          <div className="space-y-1.5 text-sm">
+            {/* Base Fare */}
+            <div className="flex justify-between items-center" data-testid="row-cross-state-base-fare">
+              <span className="text-muted-foreground">Base fare</span>
+              <span className="font-medium">{formatCurrency(breakdown.crossStateFareBaseFare ?? 0, currency)}</span>
+            </div>
+            
+            {/* Distance Cost */}
+            <div className="flex justify-between items-center" data-testid="row-cross-state-distance">
+              <span className="text-muted-foreground">Distance cost</span>
+              <span className="font-medium">{formatCurrency(breakdown.crossStateFareDistanceCost ?? 0, currency)}</span>
+            </div>
+            
+            {/* Time Cost */}
+            <div className="flex justify-between items-center" data-testid="row-cross-state-time">
+              <span className="text-muted-foreground">Time cost</span>
+              <span className="font-medium">{formatCurrency(breakdown.crossStateFareTimeCost ?? 0, currency)}</span>
+            </div>
+            
+            {/* Cross-State Surcharge */}
+            <div className="flex justify-between items-center" data-testid="row-cross-state-surcharge">
+              <span className="text-muted-foreground">Cross-state surcharge</span>
+              <span className="font-medium">{formatCurrency(breakdown.crossStateFareSurcharge ?? 0, currency)}</span>
+            </div>
+            
+            {/* Tolls (if applicable) */}
+            {(breakdown.crossStateFareTolls ?? 0) > 0 && (
+              <div className="flex justify-between items-center" data-testid="row-cross-state-tolls">
+                <span className="text-muted-foreground">Tolls</span>
+                <span className="font-medium">{formatCurrency(breakdown.crossStateFareTolls ?? 0, currency)}</span>
+              </div>
+            )}
+            
+            {/* Pre-Surge Subtotal */}
+            <div className="flex justify-between items-center pt-1 border-t border-orange-200 dark:border-orange-700" data-testid="row-cross-state-subtotal">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-medium">{formatCurrency(breakdown.crossStateFarePreSurgeSubtotal ?? 0, currency)}</span>
+            </div>
+            
+            {/* Surge Multiplier (if applied) */}
+            {breakdown.crossStateFareSurgeApplied && (breakdown.crossStateFareSurgeMultiplier ?? 1) > 1 && (
+              <div className="flex justify-between items-center text-orange-700 dark:text-orange-300" data-testid="row-cross-state-surge">
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  <span>Surge ({breakdown.crossStateFareSurgeMultiplier?.toFixed(2)}x)</span>
+                </div>
+                <span className="font-medium">+{formatCurrency(breakdown.crossStateFareSurgeAmount ?? 0, currency)}</span>
+              </div>
+            )}
+            
+            {/* Total */}
+            <div className="flex justify-between items-center pt-2 border-t border-orange-300 dark:border-orange-600 font-semibold" data-testid="row-cross-state-total">
+              <span>Cross-state total</span>
+              <span className="text-orange-700 dark:text-orange-300">{formatCurrency(breakdown.crossStateFareTotal ?? breakdown.totalFare, currency)}</span>
+            </div>
+            
+            {/* Minimum/Maximum Applied Badges */}
+            {(breakdown.crossStateFareMinimumApplied || breakdown.crossStateFareMaximumApplied) && (
+              <div className="flex justify-end gap-2 mt-1">
+                {breakdown.crossStateFareMinimumApplied && (
+                  <Badge variant="secondary" className="text-xs" data-testid="badge-cross-state-minimum">
+                    Minimum applied
+                  </Badge>
+                )}
+                {breakdown.crossStateFareMaximumApplied && (
+                  <Badge variant="secondary" className="text-xs" data-testid="badge-cross-state-maximum">
+                    Maximum applied
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Legacy cross-state surcharge (only shown when cross-state fare engine is not active) */}
+      {!breakdown.crossStateFareApplied && (breakdown.crossStateSurcharge ?? 0) > 0 && (
         <BreakdownLine 
           icon={MapPin} 
           label="Cross-state surcharge" 
