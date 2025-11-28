@@ -174,6 +174,7 @@ export interface FareFlags {
   longDistanceApplied: boolean;
   crossCityApplied: boolean;
   crossStateApplied: boolean;
+  congestionFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -230,6 +231,7 @@ export interface RouteFareBreakdown {
   excessReturnMiles: number;
   
   // Location-based fees
+  congestionFee: number;
   airportFee: number;
   airportCode?: string;
   borderZoneFee: number;
@@ -281,6 +283,7 @@ export interface RouteFareBreakdown {
   crossCityApplied: boolean;
   crossStateApplied: boolean;
   regulatoryFeeApplied: boolean;
+  congestionFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
@@ -601,6 +604,111 @@ function detectBorderZone(
     }
   }
   return null;
+}
+
+/**
+ * NYC TLC Congestion Pricing Zone Configuration
+ * Manhattan below 96th Street (both East and West sides)
+ * Effective for HVFHV (High-Volume For-Hire Vehicle) trips
+ */
+/**
+ * Manhattan Congestion Zone Polygon
+ * Precise boundaries for TLC congestion pricing zone (Manhattan below 96th Street)
+ * Northern boundary: 96th Street (latitude 40.7849 - the actual street alignment)
+ * Western boundary: Hudson River waterfront
+ * Eastern boundary: East River / FDR Drive
+ * Southern tip: Battery Park
+ * 
+ * Polygon points trace Manhattan's actual shoreline to exclude Brooklyn, 
+ * Jersey City, and other areas across the rivers.
+ * 
+ * Reference: NYC TLC defines congestion zone as Manhattan south of and including
+ * 96th Street on both East and West sides.
+ */
+const MANHATTAN_CONGESTION_ZONE = {
+  fee: 2.75,
+  name: 'Manhattan Congestion Zone',
+  description: 'TLC Congestion Fee - Manhattan below 96th Street',
+  polygon: [
+    // Northern boundary - 96th Street (lat 40.7849 is actual 96th Street)
+    // Start at 96th Street & Riverside Drive (West Side)
+    { lat: 40.7849, lng: -73.9750 },
+    // 96th Street at Central Park West
+    { lat: 40.7849, lng: -73.9651 },
+    // 96th Street at 5th Avenue (Central Park)
+    { lat: 40.7849, lng: -73.9592 },
+    // 96th Street East Side at FDR Drive
+    { lat: 40.7849, lng: -73.9430 },
+    
+    // Eastern boundary - East River / FDR Drive (south along waterfront)
+    // Upper East Side (90th to 80th)
+    { lat: 40.7770, lng: -73.9430 },
+    // Yorkville / East 70s
+    { lat: 40.7680, lng: -73.9530 },
+    // Upper East Side to Midtown East
+    { lat: 40.7550, lng: -73.9600 },
+    // UN area (42nd to 34th)
+    { lat: 40.7470, lng: -73.9680 },
+    // Murray Hill / Kips Bay
+    { lat: 40.7380, lng: -73.9720 },
+    // Stuyvesant / Gramercy
+    { lat: 40.7280, lng: -73.9740 },
+    // East Village
+    { lat: 40.7200, lng: -73.9750 },
+    // Lower East Side
+    { lat: 40.7120, lng: -73.9780 },
+    // Two Bridges / Seaport
+    { lat: 40.7070, lng: -73.9960 },
+    
+    // Southern tip - Battery Park
+    { lat: 40.7008, lng: -74.0180 },
+    
+    // Western boundary - Hudson River waterfront (north along waterfront)
+    // Battery Park City
+    { lat: 40.7120, lng: -74.0170 },
+    // Tribeca
+    { lat: 40.7200, lng: -74.0140 },
+    // West Village / Meatpacking
+    { lat: 40.7350, lng: -74.0100 },
+    // Chelsea Piers
+    { lat: 40.7480, lng: -74.0050 },
+    // Hell's Kitchen / Hudson Yards
+    { lat: 40.7600, lng: -74.0010 },
+    // Upper West Side (72nd St)
+    { lat: 40.7750, lng: -73.9880 },
+    // 96th Street & Riverside Drive (closing the polygon)
+    { lat: 40.7849, lng: -73.9750 },
+  ],
+};
+
+/**
+ * Detect if a point is within the Manhattan Congestion Zone (below 96th Street)
+ * Uses precise polygon-based geo-detection for accurate zone boundary matching
+ * 
+ * Bounding box derived from polygon extremes:
+ * - minLat: 40.7008 (Battery Park - southern tip)
+ * - maxLat: 40.7849 (96th Street - northern boundary)
+ * - minLng: -74.0180 (Battery Park / Hudson waterfront)
+ * - maxLng: -73.9430 (FDR Drive at 96th Street)
+ */
+function isInManhattanCongestionZone(
+  point: { lat: number; lng: number }
+): boolean {
+  // Quick bounding box pre-check for performance (derived from polygon)
+  const lat = point.lat;
+  const lng = point.lng;
+  const minLat = 40.7008;  // Battery Park
+  const maxLat = 40.7849;  // 96th Street (exact cutoff)
+  const minLng = -74.0180; // Battery Park / Hudson waterfront
+  const maxLng = -73.9430; // FDR Drive at 96th Street
+  
+  // If outside bounding box, definitely not in zone
+  if (lat < minLat || lat > maxLat || lng < minLng || lng > maxLng) {
+    return false;
+  }
+  
+  // Use precise polygon check for points within bounding box
+  return isPointInPolygon(point, MANHATTAN_CONGESTION_ZONE.polygon);
 }
 
 /**
@@ -1005,6 +1113,22 @@ export class FareCalculationService {
     }
     
     // ============================================
+    // 6A. NYC TLC CONGESTION PRICING
+    // $2.75 flat fee for trips in Manhattan below 96th Street
+    // Applied AFTER TLC base fare, BEFORE airport fees
+    // ============================================
+    let congestionFee = 0;
+    let congestionFeeApplied = false;
+    
+    const pickupInCongestionZone = isInManhattanCongestionZone(pickup);
+    const dropoffInCongestionZone = isInManhattanCongestionZone(dropoff);
+    
+    if (pickupInCongestionZone || dropoffInCongestionZone) {
+      congestionFee = MANHATTAN_CONGESTION_ZONE.fee;
+      congestionFeeApplied = true;
+    }
+    
+    // ============================================
     // 7. CROSS-CITY AND CROSS-STATE SURCHARGES
     // ============================================
     const crossCitySurchargeAmount = fareConfig.crossCitySurcharge
@@ -1238,6 +1362,7 @@ export class FareCalculationService {
       nightSurcharge + 
       peakHourSurcharge + 
       longDistanceFee +
+      congestionFee +
       crossCitySurcharge +
       crossStateSurcharge +
       returnDeadheadFee +
@@ -1483,6 +1608,7 @@ export class FareCalculationService {
       longDistanceApplied: longDistanceFee > 0,
       crossCityApplied,
       crossStateApplied,
+      congestionFeeApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -1533,6 +1659,7 @@ export class FareCalculationService {
       excessReturnMiles,
       
       // Location-based fees
+      congestionFee,
       airportFee,
       airportCode,
       borderZoneFee,
@@ -1577,6 +1704,7 @@ export class FareCalculationService {
       crossCityApplied,
       crossStateApplied,
       regulatoryFeeApplied,
+      congestionFeeApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
