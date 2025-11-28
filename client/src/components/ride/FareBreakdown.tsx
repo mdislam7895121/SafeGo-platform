@@ -60,6 +60,15 @@ export interface FareBreakdownData {
   stateRegulatoryFee?: number;
   stateRegulatoryFeeLabel?: string;
   
+  vehicleCategoryId?: string;
+  vehicleCategoryDisplayName?: string;
+  vehicleCategoryMultiplierApplied?: boolean;
+  vehicleCategoryMinimumApplied?: boolean;
+  preMultiplierBaseFare?: number;
+  preMultiplierDistanceFare?: number;
+  preMultiplierTimeFare?: number;
+  vehicleCategoryMinimumFare?: number;
+  
   // Cross-State Fare Engine (Uber-style pricing)
   crossStateFareApplied?: boolean;
   crossStatePickupState?: string;

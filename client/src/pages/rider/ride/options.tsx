@@ -42,61 +42,22 @@ import { SafeGoMap } from "@/components/maps/SafeGoMap";
 import { clientGetRouteAlternatives } from "@/hooks/useGoogleMaps";
 import { decodePolyline } from "@/lib/locationService";
 import { useFareCalculation } from "@/hooks/useFareCalculation";
-import type { RideTypeCode, RouteFareBreakdown, RouteInfoRequest } from "@/lib/fareTypes";
+import type { RouteFareBreakdown, RouteInfoRequest } from "@/lib/fareTypes";
+import { 
+  type VehicleCategoryId, 
+  VEHICLE_CATEGORIES, 
+  VEHICLE_CATEGORY_ORDER,
+  type VehicleCategoryConfig
+} from "@shared/vehicleCategories";
 
 import { PromoFareCard, type PromoType } from "@/components/ride/PromoFareCard";
 import { FareBreakdown, type FareBreakdownData } from "@/components/ride/FareBreakdown";
 import { RouteOptionsBar, type RouteOption as RouteOptionType } from "@/components/ride/RouteOptionCard";
 import { PromoCodeInput } from "@/components/ride/PromoCodeInput";
 
-const RIDE_TYPE_CONFIG: Record<RideTypeCode, {
-  name: string;
-  description: string;
-  iconType: RideOption["iconType"];
-  capacity: number;
-  etaMinutes: number;
-  isPopular?: boolean;
-  isEco?: boolean;
-}> = {
-  SAVER: {
-    name: "SafeGo Saver",
-    description: "Budget-friendly option",
-    iconType: "economy",
-    capacity: 4,
-    etaMinutes: 10,
-  },
-  STANDARD: {
-    name: "SafeGo X",
-    description: "Affordable everyday rides",
-    iconType: "economy",
-    capacity: 4,
-    etaMinutes: 5,
-    isPopular: true,
-  },
-  COMFORT: {
-    name: "SafeGo Comfort",
-    description: "Newer cars with extra legroom",
-    iconType: "comfort",
-    capacity: 4,
-    etaMinutes: 7,
-  },
-  XL: {
-    name: "SafeGo XL",
-    description: "SUVs for groups up to 6",
-    iconType: "xl",
-    capacity: 6,
-    etaMinutes: 10,
-  },
-  PREMIUM: {
-    name: "SafeGo Premium",
-    description: "High-end vehicles",
-    iconType: "premium",
-    capacity: 4,
-    etaMinutes: 12,
-  },
-};
-
-const RIDE_TYPE_ORDER: RideTypeCode[] = ["SAVER", "STANDARD", "COMFORT", "XL", "PREMIUM"];
+const VEHICLE_CATEGORY_ORDER_ACTIVE: VehicleCategoryId[] = VEHICLE_CATEGORY_ORDER.filter(
+  (id) => VEHICLE_CATEGORIES[id].isActive
+);
 
 function formatCurrency(amount: number, currency: string = "USD"): string {
   return new Intl.NumberFormat("en-US", {
@@ -266,7 +227,7 @@ const mockPaymentMethods: PaymentMethod[] = [
   { id: "card-1234", type: "card", label: "Visa", lastFour: "1234", isDefault: false },
 ];
 
-function getRideIcon(iconType: RideOption["iconType"]) {
+function getVehicleCategoryIcon(iconType: VehicleCategoryConfig["iconType"]) {
   switch (iconType) {
     case "comfort":
       return Sparkles;
@@ -274,6 +235,11 @@ function getRideIcon(iconType: RideOption["iconType"]) {
       return Users;
     case "premium":
       return Crown;
+    case "suv":
+      return Users;
+    case "accessible":
+      return Car;
+    case "economy":
     default:
       return Car;
   }
@@ -312,8 +278,8 @@ export default function RideOptionsPage() {
     canProceedToOptions,
   } = useRideBooking();
   
-  const [selectedRideType, setSelectedRideType] = useState<RideTypeCode>(
-    (state.selectedOption?.code as RideTypeCode) || "STANDARD"
+  const [selectedVehicleCategory, setSelectedVehicleCategory] = useState<VehicleCategoryId>(
+    (state.selectedOption?.code as VehicleCategoryId) || "X"
   );
   const [selectedPaymentId, setSelectedPaymentId] = useState(
     state.paymentMethod?.id || mockPaymentMethods.find(p => p.isDefault)?.id || mockPaymentMethods[0].id
@@ -321,7 +287,7 @@ export default function RideOptionsPage() {
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [showFareBreakdown, setShowFareBreakdown] = useState(false);
-  const [fareBreakdownRideType, setFareBreakdownRideType] = useState<RideTypeCode | null>(null);
+  const [fareBreakdownCategory, setFareBreakdownCategory] = useState<VehicleCategoryId | null>(null);
 
   const fareRoutes: RouteInfoRequest[] = useMemo(() => {
     return state.routeAlternatives.map((route) => ({
@@ -364,30 +330,29 @@ export default function RideOptionsPage() {
   }, [setStep, setPaymentMethod, selectedPaymentId, canProceedToOptions, setLocation]);
 
   useEffect(() => {
-    const config = RIDE_TYPE_CONFIG[selectedRideType];
+    const config = VEHICLE_CATEGORIES[selectedVehicleCategory];
     const selectedRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
-    const fare = selectedRouteId ? getFare(selectedRideType, selectedRouteId) : null;
+    const fare = selectedRouteId ? getFare(selectedVehicleCategory, selectedRouteId) : null;
     
     const promo = state.promoValidation;
     const promoDiscountAmount = promo?.valid ? promo.discountAmount : 0;
     const adjustedFare = fare ? fare.totalFare - promoDiscountAmount : 0;
     
     const option: RideOption = {
-      id: selectedRideType,
-      code: selectedRideType,
-      name: config.name,
+      id: selectedVehicleCategory,
+      code: selectedVehicleCategory,
+      name: config.displayName,
       description: config.description,
       baseFare: fare?.baseFare || 0,
       estimatedFare: adjustedFare,
       currency: currency,
-      etaMinutes: config.etaMinutes,
-      capacity: config.capacity,
+      etaMinutes: config.etaMinutesOffset + 5,
+      capacity: config.seatCount,
       iconType: config.iconType,
       isPopular: config.isPopular,
-      isEco: config.isEco,
     };
     setSelectedOption(option);
-  }, [selectedRideType, state.selectedRouteId, state.promoValidation, fareRoutes, getFare, currency, setSelectedOption]);
+  }, [selectedVehicleCategory, state.selectedRouteId, state.promoValidation, fareRoutes, getFare, currency, setSelectedOption]);
 
   const locationKey = useMemo(() => {
     if (!state.pickup || !state.dropoff) return null;
@@ -419,8 +384,8 @@ export default function RideOptionsPage() {
     }
   }, [locationKey, lastFetchedLocationKey, state.pickup, state.dropoff, setRouteAlternatives]);
 
-  const handleSelectRideType = (rideType: RideTypeCode) => {
-    setSelectedRideType(rideType);
+  const handleSelectVehicleCategory = (categoryId: VehicleCategoryId) => {
+    setSelectedVehicleCategory(categoryId);
   };
 
   const handleSelectPayment = (payment: PaymentMethod) => {
@@ -435,7 +400,7 @@ export default function RideOptionsPage() {
 
   const handleConfirm = () => {
     const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
-    const fare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
+    const fare = currentRouteId ? getFare(selectedVehicleCategory, currentRouteId) : null;
     
     if (!fare || isLoadingFares) {
       return;
@@ -470,8 +435,8 @@ export default function RideOptionsPage() {
   const selectedRoute = getSelectedRoute();
   const PaymentIcon = selectedPayment ? getPaymentIcon(selectedPayment.type) : Banknote;
   
-  const fareBreakdownFare = fareBreakdownRideType && state.selectedRouteId
-    ? getFare(fareBreakdownRideType, state.selectedRouteId)
+  const fareBreakdownFare = fareBreakdownCategory && state.selectedRouteId
+    ? getFare(fareBreakdownCategory, state.selectedRouteId)
     : null;
 
   const routePolyline = useMemo(() => {
@@ -486,7 +451,7 @@ export default function RideOptionsPage() {
   }, [selectedRoute?.polyline]);
 
   const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
-  const selectedFare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
+  const selectedFare = currentRouteId ? getFare(selectedVehicleCategory, currentRouteId) : null;
   
   const promoValidation = state.promoValidation;
   const promoDiscount = promoValidation?.valid && selectedFare 
@@ -495,7 +460,7 @@ export default function RideOptionsPage() {
   const anchorFare = selectedFare ? selectedFare.totalFare : 0;
   const savedAmount = promoDiscount;
   const finalFare = selectedFare ? Math.max(0, selectedFare.totalFare - promoDiscount) : 0;
-  const config = RIDE_TYPE_CONFIG[selectedRideType];
+  const categoryConfig = VEHICLE_CATEGORIES[selectedVehicleCategory];
 
   const promoType: PromoType = promoDiscount > 0 ? "PROMO_APPLIED" : "NONE";
 
@@ -531,7 +496,7 @@ export default function RideOptionsPage() {
 
   const routeOptions: RouteOptionType[] = useMemo(() => {
     return state.routeAlternatives.map((route) => {
-      const routeFare = getFare(selectedRideType, route.id);
+      const routeFare = getFare(selectedVehicleCategory, route.id);
       return {
         id: route.id,
         label: getRouteLabel(route),
@@ -542,7 +507,7 @@ export default function RideOptionsPage() {
         isSelected: route.id === state.selectedRouteId,
       };
     });
-  }, [state.routeAlternatives, state.selectedRouteId, selectedRideType, getFare]);
+  }, [state.routeAlternatives, state.selectedRouteId, selectedVehicleCategory, getFare]);
 
   return (
     <div className="flex flex-col h-full" data-testid="ride-options-page">
@@ -648,23 +613,23 @@ export default function RideOptionsPage() {
                 
                 {/* Mobile: Horizontal Scroll Pills */}
                 <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide lg:hidden -mx-3 sm:-mx-4 px-3 sm:px-4">
-                  {RIDE_TYPE_ORDER.map((rideTypeCode) => {
-                    const rideConfig = RIDE_TYPE_CONFIG[rideTypeCode];
-                    const Icon = getRideIcon(rideConfig.iconType);
-                    const isSelected = rideTypeCode === selectedRideType;
-                    const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
+                  {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId) => {
+                    const catConfig = VEHICLE_CATEGORIES[categoryId];
+                    const Icon = getVehicleCategoryIcon(catConfig.iconType);
+                    const isSelected = categoryId === selectedVehicleCategory;
+                    const fare = currentRouteId ? getFare(categoryId, currentRouteId) : null;
                     const pillPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
                     const pillFinalFare = fare ? fare.totalFare - pillPromoDiscount : 0;
                     
                     return (
                       <Button
-                        key={rideTypeCode}
+                        key={categoryId}
                         variant={isSelected ? "default" : "outline"}
                         className={`flex-shrink-0 snap-start h-auto py-2 px-3 ${
                           isSelected ? "" : "hover-elevate"
                         }`}
-                        onClick={() => handleSelectRideType(rideTypeCode)}
-                        data-testid={`ride-pill-${rideTypeCode}`}
+                        onClick={() => handleSelectVehicleCategory(categoryId)}
+                        data-testid={`ride-pill-${categoryId}`}
                       >
                         <div className="flex flex-col items-center gap-1">
                           <div className="relative">
@@ -673,7 +638,7 @@ export default function RideOptionsPage() {
                               <div className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
                             )}
                           </div>
-                          <span className="text-[10px] sm:text-xs font-medium">{rideConfig.name.replace("SafeGo ", "")}</span>
+                          <span className="text-[10px] sm:text-xs font-medium">{catConfig.displayName.replace("SafeGo ", "")}</span>
                           <span className={`text-[10px] font-bold ${pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
                             {fare ? formatCurrency(pillFinalFare, currency) : "--"}
                           </span>
@@ -685,25 +650,25 @@ export default function RideOptionsPage() {
 
                 {/* Desktop: Vertical List */}
                 <div className="hidden lg:block space-y-2">
-                  {RIDE_TYPE_ORDER.map((rideTypeCode) => {
-                    const rideConfig = RIDE_TYPE_CONFIG[rideTypeCode];
-                    const Icon = getRideIcon(rideConfig.iconType);
-                    const isSelected = rideTypeCode === selectedRideType;
-                    const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
-                    const ridePromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
-                    const rideFinalFare = fare ? fare.totalFare - ridePromoDiscount : 0;
-                    const rideAnchorFare = fare && ridePromoDiscount > 0 ? fare.totalFare : 0;
+                  {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId) => {
+                    const catConfig = VEHICLE_CATEGORIES[categoryId];
+                    const Icon = getVehicleCategoryIcon(catConfig.iconType);
+                    const isSelected = categoryId === selectedVehicleCategory;
+                    const fare = currentRouteId ? getFare(categoryId, currentRouteId) : null;
+                    const catPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
+                    const catFinalFare = fare ? fare.totalFare - catPromoDiscount : 0;
+                    const catAnchorFare = fare && catPromoDiscount > 0 ? fare.totalFare : 0;
                     
                     return (
                       <Card
-                        key={rideTypeCode}
+                        key={categoryId}
                         className={`cursor-pointer transition-all ${
                           isSelected 
                             ? "ring-2 ring-primary border-primary" 
                             : "hover-elevate"
                         }`}
-                        onClick={() => handleSelectRideType(rideTypeCode)}
-                        data-testid={`ride-option-${rideTypeCode}`}
+                        onClick={() => handleSelectVehicleCategory(categoryId)}
+                        data-testid={`ride-option-${categoryId}`}
                       >
                         <CardContent className="p-3">
                           <div className="flex items-center gap-3">
@@ -714,15 +679,15 @@ export default function RideOptionsPage() {
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-semibold text-sm">{rideConfig.name}</h3>
-                                {rideConfig.isPopular && (
+                                <h3 className="font-semibold text-sm">{catConfig.displayName}</h3>
+                                {catConfig.isPopular && (
                                   <Badge variant="secondary" className="text-[9px]">Popular</Badge>
                                 )}
                                 {isSelected && promoValidation?.valid && (
                                   <Badge 
                                     variant="outline" 
                                     className="text-[9px] bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
-                                    data-testid={`promo-badge-${rideTypeCode}`}
+                                    data-testid={`promo-badge-${categoryId}`}
                                   >
                                     <Tag className="h-2.5 w-2.5 mr-1" />
                                     {promoValidation.code}
@@ -732,24 +697,24 @@ export default function RideOptionsPage() {
                               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  {rideConfig.etaMinutes} min
+                                  {catConfig.etaMinutesOffset + 5} min
                                 </span>
                                 <span className="flex items-center gap-1">
                                   <Users className="h-3 w-3" />
-                                  {rideConfig.capacity}
+                                  {catConfig.seatCount}
                                 </span>
                               </div>
                             </div>
                             <div className="text-right">
                               {fare ? (
                                 <>
-                                  {ridePromoDiscount > 0 && (
+                                  {catPromoDiscount > 0 && (
                                     <span className="text-[10px] text-muted-foreground line-through block">
-                                      {formatCurrency(rideAnchorFare, currency)}
+                                      {formatCurrency(catAnchorFare, currency)}
                                     </span>
                                   )}
-                                  <p className={`font-bold ${ridePromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
-                                    {formatCurrency(rideFinalFare, currency)}
+                                  <p className={`font-bold ${catPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                                    {formatCurrency(catFinalFare, currency)}
                                   </p>
                                 </>
                               ) : (
@@ -770,8 +735,8 @@ export default function RideOptionsPage() {
               {/* Promo Fare Card - Using shared component */}
               {selectedFare && (
                 <PromoFareCard
-                  rideType={config.name}
-                  etaMinutes={config.etaMinutes}
+                  rideType={categoryConfig.displayName}
+                  etaMinutes={categoryConfig.etaMinutesOffset + 5}
                   finalFare={finalFare}
                   anchorFare={promoDiscount > 0 ? anchorFare : undefined}
                   savedAmount={savedAmount}
@@ -867,7 +832,7 @@ export default function RideOptionsPage() {
                     <p className="text-xs sm:text-sm font-medium mb-2">Promo Code</p>
                     <PromoCodeInput
                       originalFare={selectedFare?.totalFare || 0}
-                      rideTypeCode={selectedRideType}
+                      rideTypeCode={selectedVehicleCategory}
                       countryCode="US"
                       isWalletPayment={selectedPayment?.type === "wallet"}
                       onPromoApplied={(validation) => {

@@ -38,11 +38,30 @@ export interface RouteFareBreakdown {
   timeFare: number;
   
   vehicleCategoryId?: VehicleCategoryId;
+  vehicleCategoryDisplayName?: string;
   vehicleCategoryMultiplierApplied?: boolean;
   vehicleCategoryMinimumApplied?: boolean;
   preMultiplierBaseFare?: number;
   preMultiplierDistanceFare?: number;
   preMultiplierTimeFare?: number;
+  vehicleCategoryMinimumFare?: number;
+  
+  crossStateFareApplied?: boolean;
+  crossStatePickupState?: string;
+  crossStateDropoffState?: string;
+  crossStateFareBaseFare?: number;
+  crossStateFareDistanceCost?: number;
+  crossStateFareTimeCost?: number;
+  crossStateFareSurcharge?: number;
+  crossStateFareTolls?: number;
+  crossStateFarePreSurgeSubtotal?: number;
+  crossStateFareSurgeMultiplier?: number;
+  crossStateFareSurgeAmount?: number;
+  crossStateFareSurgeApplied?: boolean;
+  crossStateFareTotal?: number;
+  crossStateFareMinimumApplied?: boolean;
+  crossStateFareMaximumApplied?: boolean;
+  crossStateFareOriginal?: number;
   
   trafficAdjustment: number;
   surgeAmount: number;
