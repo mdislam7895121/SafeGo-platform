@@ -180,6 +180,7 @@ export interface FareFlags {
   tlcBCFFeeApplied: boolean;
   tlcHVRFFeeApplied: boolean;
   tlcStateSurchargeApplied: boolean;
+  tlcLongTripFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -245,6 +246,7 @@ export interface RouteFareBreakdown {
   tlcBCFFeeRate: number;
   tlcHVRFFee: number;
   tlcStateSurcharge: number;
+  tlcLongTripFee: number;
   airportFee: number;
   airportCode?: string;
   borderZoneFee: number;
@@ -302,6 +304,7 @@ export interface RouteFareBreakdown {
   tlcBCFFeeApplied: boolean;
   tlcHVRFFeeApplied: boolean;
   tlcStateSurchargeApplied: boolean;
+  tlcLongTripFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
@@ -879,6 +882,17 @@ const TLC_HVRF_FEE = 0.75;
 // Excluded for: cross-state trips, trips outside NYC, zero subtotal
 // ============================================
 const TLC_STATE_SURCHARGE = 0.50;
+
+// ============================================
+// NYC TLC Long Trip Surcharge (LTS)
+// $20.00 flat fee for trips exceeding 60 minutes
+// Applies to NYC-to-NYC trips only (both pickup AND dropoff in NYC)
+// Duration threshold: > 60 minutes (not >=)
+// Excluded for: cross-state trips, trips with pickup/dropoff outside NYC
+// Non-commissionable, excluded from driver earnings
+// ============================================
+const TLC_LONG_TRIP_FEE = 20.00;
+const TLC_LONG_TRIP_DURATION_THRESHOLD = 60; // minutes
 
 // NYC Borough codes for AVF eligibility detection
 const NYC_BOROUGH_CODES = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
@@ -1595,6 +1609,33 @@ export class FareCalculationService {
     }
     
     // ============================================
+    // STEP 6G. NYC TLC LONG TRIP SURCHARGE (LTS)
+    // $20.00 flat fee for trips exceeding 60 minutes
+    // Applies to NYC-to-NYC trips only (both pickup AND dropoff in NYC boroughs)
+    // Duration threshold: > 60 minutes (not >=)
+    // FLAT regulatory fee - does NOT participate in surge multiplier
+    // Non-commissionable, excluded from driver earnings
+    // Excluded for: cross-state trips, trips with pickup/dropoff outside NYC
+    // ============================================
+    let tlcLongTripFee = 0;
+    let tlcLongTripFeeApplied = false;
+    
+    // Long Trip Surcharge eligibility:
+    // 1. Trip duration exceeds 60 minutes (> 60, not >=)
+    // 2. BOTH pickup AND dropoff are in NYC boroughs
+    // 3. NOT a cross-state trip
+    const tripDurationMinutes = route.durationMinutes;
+    const exceedsLongTripThreshold = tripDurationMinutes > TLC_LONG_TRIP_DURATION_THRESHOLD;
+    
+    // Reuse bothInNYCBoroughs from State Surcharge eligibility check
+    const longTripSurchargeEligible = exceedsLongTripThreshold && bothInNYCBoroughs;
+    
+    if (longTripSurchargeEligible) {
+      tlcLongTripFee = TLC_LONG_TRIP_FEE;
+      tlcLongTripFeeApplied = true;
+    }
+    
+    // ============================================
     // 7. CROSS-CITY AND CROSS-STATE SURCHARGES
     // ============================================
     const crossCitySurchargeAmount = fareConfig.crossCitySurcharge
@@ -1838,6 +1879,7 @@ export class FareCalculationService {
       tlcBCFFee +
       tlcHVRFFee +
       tlcStateSurcharge +
+      tlcLongTripFee +
       crossCitySurcharge +
       crossStateSurcharge +
       returnDeadheadFee +
@@ -1961,7 +2003,7 @@ export class FareCalculationService {
     // Note: TLC fees are included in pre-surge base but surged portion is SafeGo revenue;
     //       only original amounts are pass-through
     const allRegulatoryFees = roundCurrency(
-      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee + tlcStateSurcharge
+      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee + tlcStateSurcharge + tlcLongTripFee
     );
     const calcPassThroughCosts = (payout: number) => 
       roundCurrency(payout + allRegulatoryFees);
@@ -2099,6 +2141,7 @@ export class FareCalculationService {
       tlcBCFFeeApplied,
       tlcHVRFFeeApplied,
       tlcStateSurchargeApplied,
+      tlcLongTripFeeApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -2158,6 +2201,7 @@ export class FareCalculationService {
       tlcBCFFeeRate,
       tlcHVRFFee,
       tlcStateSurcharge,
+      tlcLongTripFee,
       airportFee,
       airportCode,
       borderZoneFee,
@@ -2208,6 +2252,7 @@ export class FareCalculationService {
       tlcBCFFeeApplied,
       tlcHVRFFeeApplied,
       tlcStateSurchargeApplied,
+      tlcLongTripFeeApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
