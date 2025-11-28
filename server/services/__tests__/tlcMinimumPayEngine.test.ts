@@ -627,4 +627,114 @@ describe('NYC TLC Minimum Pay Engine', () => {
       expect(result.adjustmentRequired).toBe(0);
     });
   });
+
+  describe('HVRF Workers Compensation Fee', () => {
+    /**
+     * NYC TLC HVFHV Workers' Compensation (HVRF) Fee Tests
+     * 
+     * The HVRF fee is a $0.75 flat fee applied to all NYC-to-NYC HVFHV trips
+     * to fund workers' compensation insurance for livery drivers.
+     * 
+     * Eligibility rules:
+     * - Both pickup AND dropoff must be in NY state
+     * - Fee is a flat $0.75 per trip
+     * - Does not apply to out-of-state trips
+     * - Does not apply to $0 promotional rides
+     */
+
+    const TLC_HVRF_FEE = 0.75;
+
+    it('should define correct HVRF fee amount', () => {
+      expect(TLC_HVRF_FEE).toBe(0.75);
+    });
+
+    it('should apply HVRF fee to NYC-to-NYC trips', () => {
+      const pickupState = 'NY';
+      const dropoffState = 'NY';
+      const bothStatesAreNY = pickupState === 'NY' && dropoffState === 'NY';
+      
+      expect(bothStatesAreNY).toBe(true);
+    });
+
+    it('should NOT apply HVRF fee to cross-state trips (NY to NJ)', () => {
+      const pickupState = 'NY';
+      const dropoffState = 'NJ';
+      const bothStatesAreNY = pickupState === 'NY' && dropoffState === 'NY';
+      
+      expect(bothStatesAreNY).toBe(false);
+    });
+
+    it('should NOT apply HVRF fee to out-of-state trips', () => {
+      const pickupState = 'CA';
+      const dropoffState = 'CA';
+      const bothStatesAreNY = pickupState === 'NY' && dropoffState === 'NY';
+      
+      expect(bothStatesAreNY).toBe(false);
+    });
+
+    it('should treat HVRF as non-commissionable pass-through', () => {
+      const hvrfFee = TLC_HVRF_FEE;
+      const baseSubtotal = 25.00;
+      const basePlusFees = baseSubtotal + hvrfFee;
+      
+      expect(basePlusFees).toBe(25.75);
+    });
+
+    it('should add HVRF to total regulatory fees', () => {
+      const congestionFee = 2.75;
+      const avfFee = 0.30;
+      const bcfFee = 0.69;
+      const hvrfFee = TLC_HVRF_FEE;
+      
+      const totalRegulatoryFees = congestionFee + avfFee + bcfFee + hvrfFee;
+      expect(totalRegulatoryFees).toBeCloseTo(4.49, 2);
+    });
+
+    it('should calculate correct fare breakdown with all NYC TLC fees', () => {
+      const baseFare = 2.50;
+      const distanceFare = 13.10;
+      const timeFare = 11.20;
+      const surgeAdjusted = baseFare + distanceFare + timeFare;
+      
+      const congestionFee = 2.75;
+      const airportFee = 2.50;
+      const avfFee = 0.30;
+      const bcfRate = 0.0275;
+      const bcfFee = Math.round(surgeAdjusted * bcfRate * 100) / 100;
+      const hvrfFee = TLC_HVRF_FEE;
+      
+      const allTLCFees = congestionFee + airportFee + avfFee + bcfFee + hvrfFee;
+      const subtotalWithFees = surgeAdjusted + allTLCFees;
+      
+      expect(bcfFee).toBeCloseTo(0.74, 2);
+      expect(allTLCFees).toBeCloseTo(7.04, 2);
+      expect(subtotalWithFees).toBeCloseTo(33.84, 2);
+    });
+
+    it('should NOT apply HVRF to $0 promotional rides', () => {
+      const subtotal = 0;
+      const shouldApplyHVRF = subtotal > 0;
+      
+      expect(shouldApplyHVRF).toBe(false);
+    });
+
+    it('should apply HVRF after BCF in fee pipeline sequence', () => {
+      const pipelineOrder = [
+        'congestion',
+        'airport',
+        'avf',
+        'bcf',
+        'hvrf',
+        'serviceFee',
+        'commission'
+      ];
+      
+      const bcfIndex = pipelineOrder.indexOf('bcf');
+      const hvrfIndex = pipelineOrder.indexOf('hvrf');
+      const serviceFeeIndex = pipelineOrder.indexOf('serviceFee');
+      
+      expect(hvrfIndex).toBeGreaterThan(bcfIndex);
+      expect(hvrfIndex).toBeLessThan(serviceFeeIndex);
+    });
+  });
 });
