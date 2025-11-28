@@ -622,11 +622,12 @@ interface ActiveTrip {
   createdAt: Date;
 }
 
-const activeStatusValues = ["accepted", "arriving", "arrived", "started", "in_progress", "picked_up"];
+const activeStatusValues = ["accepted", "arriving", "driver_arriving", "arrived", "started", "in_progress", "picked_up"];
 
 const validStatusTransitions: Record<string, string[]> = {
   accepted: ["arriving", "cancelled"],
   arriving: ["arrived", "cancelled"],
+  driver_arriving: ["arrived", "cancelled"],
   arrived: ["started", "cancelled"],
   started: ["completed", "cancelled"],
   in_progress: ["completed", "cancelled"],
@@ -860,13 +861,35 @@ router.post(
             });
           }
           
+          // Build update data with proper timestamps
+          const updateData: any = {
+            status: newStatus,
+            ...(newStatus === "arriving" && { status: "driver_arriving" }),
+            ...(newStatus === "arrived" && { arrivedAt: new Date() }),
+            ...(newStatus === "started" && { tripStartedAt: new Date(), status: "in_progress" }),
+            ...(newStatus === "completed" && { completedAt: new Date() }),
+          };
+          
           updateResult = await prisma.ride.update({
             where: { id: tripId },
-            data: {
-              status: newStatus,
-              ...(newStatus === "completed" && { completedAt: new Date() }),
-            },
+            data: updateData,
           });
+          
+          // Create status event record for audit trail
+          try {
+            await prisma.rideStatusEvent.create({
+              data: {
+                rideId: tripId,
+                status: newStatus,
+                changedBy: "driver",
+                changedByActorId: driverId,
+                latitude: driverLat ? new Prisma.Decimal(driverLat) : null,
+                longitude: driverLng ? new Prisma.Decimal(driverLng) : null,
+              },
+            });
+          } catch (eventError) {
+            console.error("Failed to create status event:", eventError);
+          }
         }
       }
 

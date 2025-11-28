@@ -16,6 +16,7 @@ import RideDropoff from "@/pages/rider/ride/dropoff";
 import RideOptions from "@/pages/rider/ride/options";
 import RideConfirm from "@/pages/rider/ride/confirm";
 import RiderTripActive from "@/pages/rider/trip/active";
+import RiderTripReceipt from "@/pages/rider/trip/receipt";
 
 export function RiderRoutes() {
   return (
@@ -166,6 +167,11 @@ export function RiderRoutes() {
         <Route path="/rider/trip/active">
           <RiderLayout pageTitle="Active Trip">
             <RiderTripActive />
+          </RiderLayout>
+        </Route>
+        <Route path="/rider/trip/:id/receipt">
+          <RiderLayout pageTitle="Trip Receipt">
+            <RiderTripReceipt />
           </RiderLayout>
         </Route>
       </Switch>

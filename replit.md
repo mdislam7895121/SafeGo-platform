@@ -99,6 +99,20 @@ Core systems and features include:
     - **Backend Enhancements**: GET /api/rides/:id returns comprehensive driver details (name, rating, vehicle info, current location)
     - **Testing Coverage**: 62 data-testid attributes across all booking pages for E2E testing
     - **API Contract**: Only supported fields sent in ride creation (pickupAddress, pickupLat/Lng, dropoffAddress, dropoffLat/Lng, serviceFare, paymentMethod)
+-   **Phase A Ride System Features**: Comprehensive ride lifecycle management with:
+    - **Customer Controls**: Cancel ride with reason selection and fee warning, in-app chat with driver, change destination mid-trip
+    - **Rating System**: Post-trip 5-star rating modal with optional comment, driver rating average calculation
+    - **Receipt System**: Detailed fare breakdown page with share/download options, auto-generated on completion
+    - **Driver Status Workflow**: Full status transitions (accepted → driver_arriving → arrived → in_progress → completed) with timestamps
+    - **Audit Trail**: RideStatusEvent creation for all status transitions with location data
+    - **API Endpoints**:
+      - POST /api/rides/:id/cancel - Cancel with reason, fee calculation
+      - POST /api/rides/:id/chat - Send in-app messages
+      - GET /api/rides/:id/chat - Retrieve chat history
+      - POST /api/rides/:id/rate - Submit customer rating
+      - GET /api/rides/:id/receipt - Get fare breakdown
+      - PATCH /api/rides/:id/destination - Change dropoff location
+    - **Database Models**: RideStatusEvent, RideLiveLocation, RideRouteOption, RideStop, RideCancellation, RideChatMessage, RideReceipt
 -   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
 
 ### Database Schema Design

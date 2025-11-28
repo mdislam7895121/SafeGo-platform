@@ -1,21 +1,119 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
-import { Car, DollarSign, TrendingUp, Settings, User, Wallet, MessageCircle } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
+import { Car, DollarSign, TrendingUp, Settings, User, Wallet, MessageCircle, Power, MapPin, Navigation, Radio } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useState, useEffect, useCallback } from "react";
 
 export default function DriverHome() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [locationWatchId, setLocationWatchId] = useState<number | null>(null);
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
     refetchInterval: 5000,
   });
+
+  const { data: activeRideData } = useQuery({
+    queryKey: ["/api/driver/active-ride"],
+    refetchInterval: 3000,
+  });
+
+  const { data: pendingRequestsData, refetch: refetchPendingRequests } = useQuery({
+    queryKey: ["/api/driver/pending-requests"],
+    refetchInterval: 3000,
+    enabled: !!(driverData as any)?.vehicle?.isOnline && !(activeRideData as any)?.activeRide,
+  });
+
+  // Toggle online/offline status mutation
+  const toggleStatusMutation = useMutation({
+    mutationFn: async (isOnline: boolean) => {
+      return apiRequest("/api/driver/status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isOnline }),
+      });
+    },
+    onSuccess: (_, isOnline) => {
+      toast({
+        title: isOnline ? "You are now online" : "You are now offline",
+        description: isOnline ? "You can now receive ride requests" : "You will not receive new ride requests",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/home"] });
+      setIsUpdatingStatus(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update status",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+      setIsUpdatingStatus(false);
+    },
+  });
+
+  // Send location update to server
+  const sendLocationUpdate = useCallback(async (position: GeolocationPosition) => {
+    try {
+      await apiRequest("/api/driver/location", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+          heading: position.coords.heading,
+          speed: position.coords.speed,
+          accuracy: position.coords.accuracy,
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to update location:", error);
+    }
+  }, []);
+
+  // Start/stop location broadcasting based on online status
+  useEffect(() => {
+    const vehicle = (driverData as any)?.vehicle;
+    const isOnline = vehicle?.isOnline;
+
+    if (isOnline && !locationWatchId) {
+      // Start broadcasting location
+      if (navigator.geolocation) {
+        const watchId = navigator.geolocation.watchPosition(
+          sendLocationUpdate,
+          (error) => console.error("Location error:", error),
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+        );
+        setLocationWatchId(watchId);
+      }
+    } else if (!isOnline && locationWatchId) {
+      // Stop broadcasting location
+      navigator.geolocation.clearWatch(locationWatchId);
+      setLocationWatchId(null);
+    }
+
+    return () => {
+      if (locationWatchId) {
+        navigator.geolocation.clearWatch(locationWatchId);
+      }
+    };
+  }, [(driverData as any)?.vehicle?.isOnline, locationWatchId, sendLocationUpdate]);
+
+  const handleToggleStatus = () => {
+    const vehicle = (driverData as any)?.vehicle;
+    const newStatus = !vehicle?.isOnline;
+    setIsUpdatingStatus(true);
+    toggleStatusMutation.mutate(newStatus);
+  };
 
   if (isLoading) {
     return (
@@ -53,6 +151,125 @@ export default function DriverHome() {
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Online/Offline Toggle - Prominent Card */}
+        {profile?.isVerified && vehicle && (
+          <Card className={`border-2 ${vehicle.isOnline ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-gray-300 dark:border-gray-700"}`}>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`h-12 w-12 rounded-full flex items-center justify-center ${vehicle.isOnline ? "bg-green-500" : "bg-gray-400"}`}>
+                    <Power className={`h-6 w-6 text-white ${vehicle.isOnline ? "animate-pulse" : ""}`} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-lg" data-testid="text-online-status">
+                      {vehicle.isOnline ? "Online" : "Offline"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {vehicle.isOnline ? (
+                        <span className="flex items-center gap-1">
+                          <Radio className="h-3 w-3 text-green-500 animate-pulse" />
+                          Broadcasting location
+                        </span>
+                      ) : "Tap to go online and receive rides"}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={vehicle.isOnline}
+                  onCheckedChange={handleToggleStatus}
+                  disabled={isUpdatingStatus}
+                  className="scale-125"
+                  data-testid="switch-online-status"
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Active Ride Card */}
+        {(activeRideData as any)?.activeRide && (
+          <Card className="border-2 border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Navigation className="h-5 w-5 text-blue-500" />
+                  <span className="font-semibold">Active Ride</span>
+                </div>
+                <Badge className="bg-blue-500">{(activeRideData as any).activeRide.status.replace(/_/g, " ")}</Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-green-500 mt-0.5" />
+                  <span>{(activeRideData as any).activeRide.pickupAddress}</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-red-500 mt-0.5" />
+                  <span>{(activeRideData as any).activeRide.dropoffAddress}</span>
+                </div>
+                <div className="flex justify-between mt-3">
+                  <span className="text-muted-foreground">Payout</span>
+                  <span className="font-bold text-green-600">${(activeRideData as any).activeRide.driverPayout.toFixed(2)}</span>
+                </div>
+              </div>
+              <Link href="/driver/trip/active">
+                <Button className="w-full mt-3" data-testid="button-view-active-ride">
+                  <Navigation className="h-4 w-4 mr-2" />
+                  View Active Ride
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Pending Ride Requests */}
+        {vehicle?.isOnline && !(activeRideData as any)?.activeRide && (pendingRequestsData as any)?.requests?.length > 0 && (
+          <Card className="border-2 border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Car className="h-5 w-5 text-amber-500" />
+                Ride Requests
+                <Badge variant="secondary" className="ml-auto">{(pendingRequestsData as any).requests.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(pendingRequestsData as any).requests.slice(0, 2).map((request: any) => (
+                <div key={request.id} className="bg-background rounded-lg p-3 border">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-sm">{request.customer.fullName}</span>
+                    <Badge className="bg-green-500">${request.driverPayout.toFixed(2)}</Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <div className="flex items-start gap-1">
+                      <MapPin className="h-3 w-3 text-green-500 mt-0.5" />
+                      <span className="line-clamp-1">{request.pickupAddress}</span>
+                    </div>
+                    <div className="flex items-start gap-1">
+                      <MapPin className="h-3 w-3 text-red-500 mt-0.5" />
+                      <span className="line-clamp-1">{request.dropoffAddress}</span>
+                    </div>
+                  </div>
+                  <Link href={`/driver/ride-request/${request.id}`}>
+                    <Button size="sm" className="w-full mt-2" data-testid={`button-view-request-${request.id}`}>
+                      View Request
+                    </Button>
+                  </Link>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Waiting for Requests */}
+        {vehicle?.isOnline && !(activeRideData as any)?.activeRide && (!(pendingRequestsData as any)?.requests?.length) && (
+          <Card className="border-dashed border-2">
+            <CardContent className="p-6 text-center">
+              <Radio className="h-10 w-10 mx-auto text-green-500 animate-pulse mb-3" />
+              <p className="font-medium">Waiting for ride requests...</p>
+              <p className="text-sm text-muted-foreground mt-1">Stay in a busy area to get more requests</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Verification Status */}
         {!profile?.isVerified && (
           <Card className="border-orange-500">

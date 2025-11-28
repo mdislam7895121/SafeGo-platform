@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
+import { z } from "zod";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 import { promotionBonusService } from "../services/promotionBonusService";
@@ -247,9 +248,11 @@ router.get("/:id", async (req: AuthRequest, res) => {
           photoUrl: ride.driver.photoUrl || undefined,
           currentLat: ride.driver.currentLat ? Number(ride.driver.currentLat) : undefined,
           currentLng: ride.driver.currentLng ? Number(ride.driver.currentLng) : undefined,
+          lastLocationUpdate: ride.driver.lastLocationUpdate || undefined,
           vehicleMake: ride.driver.vehicle?.make || undefined,
           vehicleModel: ride.driver.vehicle?.model || undefined,
           vehicleColor: ride.driver.vehicle?.color || undefined,
+          vehicleYear: ride.driver.vehicle?.year || undefined,
           licensePlate: ride.driver.vehicle?.licensePlate || undefined,
         } : null,
         pickupAddress: ride.pickupAddress,
@@ -258,16 +261,26 @@ router.get("/:id", async (req: AuthRequest, res) => {
         dropoffAddress: ride.dropoffAddress,
         dropoffLat: ride.dropoffLat,
         dropoffLng: ride.dropoffLng,
+        routePolyline: ride.routePolyline,
+        distanceMiles: ride.distanceMiles,
+        durationMinutes: ride.durationMinutes,
+        trafficEtaSeconds: ride.trafficEtaSeconds,
         serviceFare: ride.serviceFare,
         safegoCommission: ride.safegoCommission,
         driverPayout: ride.driverPayout,
+        tollAmount: ride.tollAmount,
+        surgeMultiplier: ride.surgeMultiplier,
         paymentMethod: ride.paymentMethod,
         status: ride.status,
+        currentLeg: ride.currentLeg,
         customerRating: ride.customerRating,
         customerFeedback: ride.customerFeedback,
         driverRating: ride.driverRating,
         driverFeedback: ride.driverFeedback,
         createdAt: ride.createdAt,
+        acceptedAt: ride.acceptedAt,
+        arrivedAt: ride.arrivedAt,
+        tripStartedAt: ride.tripStartedAt,
         completedAt: ride.completedAt,
       },
     });
@@ -553,6 +566,645 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Complete ride error:", error);
     res.status(500).json({ error: "Failed to complete ride" });
+  }
+});
+
+// ====================================================
+// Phase A: POST /api/rides/:id/chat
+// Send a chat message to the ride
+// ====================================================
+router.post("/:id/chat", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { message } = req.body;
+
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { id: true, userId: true } },
+        driver: { select: { id: true, userId: true } },
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Verify sender is participant
+    let senderType: "customer" | "driver";
+    if (role === "customer" && ride.customer.userId === userId) {
+      senderType = "customer";
+    } else if (role === "driver" && ride.driver?.userId === userId) {
+      senderType = "driver";
+    } else {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Only allow chat during active ride
+    if (!["accepted", "driver_arriving", "arrived", "in_progress"].includes(ride.status)) {
+      return res.status(400).json({ error: "Chat is only available during active rides" });
+    }
+
+    const chatMessage = await prisma.rideChatMessage.create({
+      data: {
+        rideId: id,
+        senderType,
+        message: message.trim(),
+      },
+    });
+
+    res.status(201).json({
+      message: "Message sent",
+      chatMessage: {
+        id: chatMessage.id,
+        senderType: chatMessage.senderType,
+        message: chatMessage.message,
+        createdAt: chatMessage.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("Send chat message error:", error);
+    res.status(500).json({ error: "Failed to send message" });
+  }
+});
+
+// ====================================================
+// Phase A: GET /api/rides/:id/chat
+// Get chat messages for a ride
+// ====================================================
+router.get("/:id/chat", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        customer: { select: { id: true, userId: true, fullName: true } },
+        driver: { select: { id: true, userId: true, firstName: true } },
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Verify requester is participant
+    if (role === "customer" && ride.customer.userId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    } else if (role === "driver" && ride.driver?.userId !== userId) {
+      return res.status(403).json({ error: "Access denied" });
+    } else if (role !== "customer" && role !== "driver" && role !== "admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const messages = await prisma.rideChatMessage.findMany({
+      where: { rideId: id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    res.json({
+      messages: messages.map((m) => ({
+        id: m.id,
+        senderType: m.senderType,
+        message: m.message,
+        createdAt: m.createdAt,
+        senderName: m.senderType === "customer" ? ride.customer.fullName : ride.driver?.firstName,
+      })),
+    });
+  } catch (error) {
+    console.error("Get chat messages error:", error);
+    res.status(500).json({ error: "Failed to fetch messages" });
+  }
+});
+
+// ====================================================
+// Phase A: POST /api/rides/:id/cancel
+// Cancel an active ride
+// ====================================================
+const cancelRideSchema = z.object({
+  reason: z.enum(["changed_mind", "driver_too_far", "wrong_pickup", "price_too_high", "found_alternative", "other"]),
+  notes: z.string().optional(),
+});
+
+router.post("/:id/cancel", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    const validatedData = cancelRideSchema.parse(req.body);
+
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        customer: { include: { user: true } },
+        driver: { include: { user: true } },
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Determine canceller type
+    let cancelledBy: "customer" | "driver";
+    if (role === "customer" && ride.customer.userId === userId) {
+      cancelledBy = "customer";
+    } else if (role === "driver" && ride.driver?.userId === userId) {
+      cancelledBy = "driver";
+    } else {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Check if ride can be cancelled
+    const cancellableStatuses = ["requested", "searching_driver", "accepted", "driver_arriving", "arrived"];
+    if (!cancellableStatuses.includes(ride.status)) {
+      return res.status(400).json({ error: "Ride cannot be cancelled in current status" });
+    }
+
+    // Calculate cancellation fee (only if ride was accepted and cancelling after driver is en route)
+    let cancellationFee = 0;
+    const feeWaivedReason: string | null = null;
+    if (cancelledBy === "customer" && ["accepted", "driver_arriving", "arrived"].includes(ride.status)) {
+      cancellationFee = 5.00; // $5 cancellation fee
+    }
+
+    // Create cancellation record
+    await prisma.rideCancellation.create({
+      data: {
+        rideId: id,
+        cancelledBy,
+        reason: validatedData.reason,
+        notes: validatedData.notes,
+        cancellationFee,
+        feeWaivedReason,
+      },
+    });
+
+    // Update ride status
+    const updatedRide = await prisma.ride.update({
+      where: { id },
+      data: {
+        status: cancelledBy === "customer" ? "cancelled_by_customer" : "cancelled_by_driver",
+      },
+    });
+
+    // Create notification for the other party
+    const notifyUserId = cancelledBy === "customer" ? ride.driver?.userId : ride.customer.userId;
+    if (notifyUserId) {
+      await prisma.notification.create({
+        data: {
+          userId: notifyUserId,
+          type: "ride_update",
+          title: cancelledBy === "customer" ? "Ride Cancelled" : "Ride Cancelled by Driver",
+          body: cancelledBy === "customer" 
+            ? "The customer has cancelled the ride." 
+            : "Your driver has cancelled the ride. We're finding you a new driver.",
+        },
+      });
+    }
+
+    res.json({
+      message: "Ride cancelled successfully",
+      ride: {
+        id: updatedRide.id,
+        status: updatedRide.status,
+      },
+      cancellationFee,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid cancellation data", details: error.errors });
+    }
+    console.error("Cancel ride error:", error);
+    res.status(500).json({ error: "Failed to cancel ride" });
+  }
+});
+
+// ====================================================
+// GET /api/rides/:id/chat
+// Get chat messages for a ride
+// ====================================================
+router.get("/:id/chat", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: "Invalid ride ID format" });
+    }
+
+    // Get ride with customer and driver
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        driver: true,
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Verify access (customer or assigned driver)
+    const isCustomer = role === "customer" && ride.customer.userId === userId;
+    const isDriver = role === "driver" && ride.driver?.userId === userId;
+    if (!isCustomer && !isDriver) {
+      return res.status(403).json({ error: "Not authorized to view this ride's messages" });
+    }
+
+    // Get chat messages
+    const messages = await prisma.rideChatMessage.findMany({
+      where: { rideId: id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    res.json({
+      messages: messages.map((msg) => ({
+        id: msg.id,
+        senderType: msg.senderType,
+        message: msg.message,
+        createdAt: msg.createdAt.toISOString(),
+        senderName: msg.senderType === "customer" ? ride.customer.fullName : ride.driver?.fullName,
+      })),
+    });
+  } catch (error) {
+    console.error("Get chat messages error:", error);
+    res.status(500).json({ error: "Failed to get chat messages" });
+  }
+});
+
+// ====================================================
+// POST /api/rides/:id/rate
+// Submit a rating for a completed ride
+// ====================================================
+const rateRideSchema = z.object({
+  rating: z.number().min(1).max(5),
+  comment: z.string().optional(),
+  raterType: z.enum(["customer", "driver"]),
+});
+
+router.post("/:id/rate", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    
+    const validatedData = rateRideSchema.parse(req.body);
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: "Invalid ride ID format" });
+    }
+
+    // Get ride with customer and driver
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        driver: true,
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Verify ride is completed
+    if (ride.status !== "completed") {
+      return res.status(400).json({ error: "Can only rate completed rides" });
+    }
+
+    // Verify access and rater type
+    const isCustomer = role === "customer" && ride.customer.userId === userId;
+    const isDriver = role === "driver" && ride.driver?.userId === userId;
+
+    if (!isCustomer && !isDriver) {
+      return res.status(403).json({ error: "Not authorized to rate this ride" });
+    }
+
+    // Verify rater type matches user role
+    if ((isCustomer && validatedData.raterType !== "customer") || 
+        (isDriver && validatedData.raterType !== "driver")) {
+      return res.status(400).json({ error: "Rater type does not match your role" });
+    }
+
+    // Update ride with rating
+    if (isCustomer) {
+      // Customer rating the driver
+      if (ride.customerRating) {
+        return res.status(400).json({ error: "You have already rated this ride" });
+      }
+      
+      await prisma.ride.update({
+        where: { id },
+        data: {
+          customerRating: validatedData.rating,
+          customerComment: validatedData.comment,
+        },
+      });
+
+      // Update driver's average rating
+      if (ride.driverId) {
+        const driverRatings = await prisma.ride.findMany({
+          where: { 
+            driverId: ride.driverId, 
+            customerRating: { not: null },
+          },
+          select: { customerRating: true },
+        });
+        
+        const avgRating = driverRatings.reduce((sum, r) => sum + (r.customerRating || 0), 0) / driverRatings.length;
+        
+        await prisma.driverProfile.update({
+          where: { id: ride.driverId },
+          data: { rating: avgRating },
+        });
+      }
+    } else if (isDriver) {
+      // Driver rating the customer
+      if (ride.driverRating) {
+        return res.status(400).json({ error: "You have already rated this ride" });
+      }
+      
+      await prisma.ride.update({
+        where: { id },
+        data: {
+          driverRating: validatedData.rating,
+          driverComment: validatedData.comment,
+        },
+      });
+    }
+
+    res.json({
+      message: "Rating submitted successfully",
+      rating: validatedData.rating,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid rating data", details: error.errors });
+    }
+    console.error("Rate ride error:", error);
+    res.status(500).json({ error: "Failed to submit rating" });
+  }
+});
+
+// ====================================================
+// GET /api/rides/:id/receipt
+// Get receipt for a completed ride
+// ====================================================
+router.get("/:id/receipt", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: "Invalid ride ID format" });
+    }
+
+    // Get ride with all details
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        driver: true,
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Verify access
+    const isCustomer = role === "customer" && ride.customer.userId === userId;
+    const isDriver = role === "driver" && ride.driver?.userId === userId;
+    if (!isCustomer && !isDriver) {
+      return res.status(403).json({ error: "Not authorized to view this receipt" });
+    }
+
+    // Verify ride is completed
+    if (ride.status !== "completed") {
+      return res.status(400).json({ error: "Receipt only available for completed rides" });
+    }
+
+    // Check if receipt exists, create if not
+    let receipt = await prisma.rideReceipt.findUnique({
+      where: { rideId: id },
+    });
+
+    if (!receipt) {
+      // Create receipt
+      const baseFare = Number(ride.serviceFare) || 0;
+      const surge = Number(ride.surgeMultiplier) || 1;
+      const tip = Number(ride.tipAmount) || 0;
+      const discount = Number(ride.discountAmount) || 0;
+      const subtotal = baseFare;
+      const total = (subtotal * surge) + tip - discount;
+
+      receipt = await prisma.rideReceipt.create({
+        data: {
+          rideId: id,
+          baseFare: new Prisma.Decimal(baseFare),
+          distanceFare: new Prisma.Decimal(0),
+          timeFare: new Prisma.Decimal(0),
+          surgeFee: new Prisma.Decimal((subtotal * surge) - subtotal),
+          tipAmount: new Prisma.Decimal(tip),
+          discount: new Prisma.Decimal(discount),
+          total: new Prisma.Decimal(total),
+          currency: "USD",
+          paymentMethod: ride.paymentMethod || "card",
+          paymentStatus: "completed",
+        },
+      });
+    }
+
+    res.json({
+      receipt: {
+        id: receipt.id,
+        rideId: receipt.rideId,
+        baseFare: Number(receipt.baseFare),
+        distanceFare: Number(receipt.distanceFare),
+        timeFare: Number(receipt.timeFare),
+        surgeFee: Number(receipt.surgeFee),
+        tipAmount: Number(receipt.tipAmount),
+        discount: Number(receipt.discount),
+        total: Number(receipt.total),
+        currency: receipt.currency,
+        paymentMethod: receipt.paymentMethod,
+        paymentStatus: receipt.paymentStatus,
+        createdAt: receipt.createdAt.toISOString(),
+      },
+      ride: {
+        id: ride.id,
+        pickupAddress: ride.pickupAddress,
+        dropoffAddress: ride.dropoffAddress,
+        createdAt: ride.createdAt.toISOString(),
+        completedAt: ride.completedAt?.toISOString(),
+        distanceMiles: ride.distanceMiles,
+        durationMinutes: ride.durationMinutes,
+        driver: ride.driver ? {
+          name: ride.driver.fullName,
+          rating: ride.driver.rating,
+          vehicle: ride.driver.vehicleMake && ride.driver.vehicleModel 
+            ? `${ride.driver.vehicleMake} ${ride.driver.vehicleModel}`
+            : null,
+          licensePlate: ride.driver.licensePlate,
+        } : null,
+      },
+    });
+  } catch (error) {
+    console.error("Get receipt error:", error);
+    res.status(500).json({ error: "Failed to get receipt" });
+  }
+});
+
+// ====================================================
+// PATCH /api/rides/:id/destination
+// Change dropoff destination mid-trip
+// ====================================================
+const changeDestinationSchema = z.object({
+  dropoffAddress: z.string().min(1),
+  dropoffLat: z.number(),
+  dropoffLng: z.number(),
+  dropoffPlaceId: z.string().optional(),
+  newFare: z.number().optional(),
+  newDistanceMiles: z.number().optional(),
+  newDurationMinutes: z.number().optional(),
+});
+
+router.patch("/:id/destination", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can change destination" });
+    }
+
+    const validatedData = changeDestinationSchema.parse(req.body);
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: "Invalid ride ID format" });
+    }
+
+    // Get ride
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: { customer: true },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Verify ownership
+    if (ride.customer.userId !== userId) {
+      return res.status(403).json({ error: "Not authorized to modify this ride" });
+    }
+
+    // Verify ride is in progress
+    const allowedStatuses = ["accepted", "driver_arriving", "arrived", "in_progress"];
+    if (!allowedStatuses.includes(ride.status)) {
+      return res.status(400).json({ error: "Cannot change destination in current ride status" });
+    }
+
+    // Store original destination for audit
+    const originalDropoff = {
+      address: ride.dropoffAddress,
+      lat: ride.dropoffLat,
+      lng: ride.dropoffLng,
+    };
+
+    // Update ride with new destination
+    const updatedRide = await prisma.ride.update({
+      where: { id },
+      data: {
+        dropoffAddress: validatedData.dropoffAddress,
+        dropoffLat: validatedData.dropoffLat,
+        dropoffLng: validatedData.dropoffLng,
+        dropoffPlaceId: validatedData.dropoffPlaceId,
+        ...(validatedData.newFare && { serviceFare: new Prisma.Decimal(validatedData.newFare) }),
+        ...(validatedData.newDistanceMiles && { distanceMiles: validatedData.newDistanceMiles }),
+        ...(validatedData.newDurationMinutes && { durationMinutes: validatedData.newDurationMinutes }),
+      },
+    });
+
+    // Create status event for audit
+    try {
+      await prisma.rideStatusEvent.create({
+        data: {
+          rideId: id,
+          status: "destination_changed",
+          changedBy: "customer",
+          changedByActorId: ride.customerId,
+          metadata: JSON.stringify({
+            originalDropoff,
+            newDropoff: {
+              address: validatedData.dropoffAddress,
+              lat: validatedData.dropoffLat,
+              lng: validatedData.dropoffLng,
+            },
+          }),
+        },
+      });
+    } catch (eventError) {
+      console.error("Failed to create destination change event:", eventError);
+    }
+
+    // Notify driver of destination change
+    if (ride.driverId) {
+      const driver = await prisma.driverProfile.findUnique({
+        where: { id: ride.driverId },
+        select: { userId: true },
+      });
+      
+      if (driver) {
+        await prisma.notification.create({
+          data: {
+            userId: driver.userId,
+            type: "ride_update",
+            title: "Destination Changed",
+            body: `Customer changed destination to: ${validatedData.dropoffAddress}`,
+          },
+        });
+      }
+    }
+
+    res.json({
+      message: "Destination updated successfully",
+      ride: {
+        id: updatedRide.id,
+        dropoffAddress: updatedRide.dropoffAddress,
+        dropoffLat: updatedRide.dropoffLat,
+        dropoffLng: updatedRide.dropoffLng,
+        serviceFare: Number(updatedRide.serviceFare),
+      },
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid destination data", details: error.errors });
+    }
+    console.error("Change destination error:", error);
+    res.status(500).json({ error: "Failed to change destination" });
   }
 });
 

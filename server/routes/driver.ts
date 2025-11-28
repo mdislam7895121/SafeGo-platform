@@ -1347,6 +1347,14 @@ router.patch("/status", async (req: AuthRequest, res) => {
       data: { isOnline },
     });
 
+    // Update driver's lastActive timestamp when going online
+    if (isOnline) {
+      await prisma.driverProfile.update({
+        where: { id: driverProfile.id },
+        data: { lastActive: new Date() },
+      });
+    }
+
     res.json({
       message: `Driver is now ${isOnline ? "online" : "offline"}`,
       vehicle: {
@@ -1357,6 +1365,257 @@ router.patch("/status", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Update status error:", error);
     res.status(500).json({ error: "Failed to update status" });
+  }
+});
+
+// ====================================================
+// Phase A: POST /api/driver/location
+// Update driver's live GPS location
+// ====================================================
+const locationUpdateSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  heading: z.number().optional(),
+  speed: z.number().optional(),
+  accuracy: z.number().optional(),
+});
+
+router.post("/location", authenticateToken, requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const validatedData = locationUpdateSchema.parse(req.body);
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        vehicles: {
+          where: { isActive: true, isPrimary: true, isOnline: true },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Only update location if driver is online
+    if (driverProfile.vehicles.length === 0) {
+      return res.status(403).json({ error: "Driver must be online to broadcast location" });
+    }
+
+    // Update driver's current location in profile
+    await prisma.driverProfile.update({
+      where: { id: driverProfile.id },
+      data: {
+        currentLat: validatedData.lat,
+        currentLng: validatedData.lng,
+        lastLocationUpdate: new Date(),
+        lastActive: new Date(),
+      },
+    });
+
+    // If driver has an active ride, also store in RideLiveLocation for tracking history
+    const activeRide = await prisma.ride.findFirst({
+      where: {
+        driverId: driverProfile.id,
+        status: {
+          in: ["accepted", "driver_arriving", "arrived", "in_progress"],
+        },
+      },
+    });
+
+    if (activeRide) {
+      await prisma.rideLiveLocation.create({
+        data: {
+          rideId: activeRide.id,
+          driverId: driverProfile.id,
+          lat: validatedData.lat,
+          lng: validatedData.lng,
+          heading: validatedData.heading,
+          speed: validatedData.speed,
+          accuracy: validatedData.accuracy,
+        },
+      });
+    }
+
+    res.json({
+      message: "Location updated",
+      location: {
+        lat: validatedData.lat,
+        lng: validatedData.lng,
+        updatedAt: new Date().toISOString(),
+      },
+      activeRideId: activeRide?.id || null,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid location data", details: error.errors });
+    }
+    console.error("Location update error:", error);
+    res.status(500).json({ error: "Failed to update location" });
+  }
+});
+
+// ====================================================
+// Phase A: GET /api/driver/active-ride
+// Get driver's currently active ride
+// ====================================================
+router.get("/active-ride", authenticateToken, requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const activeRide = await prisma.ride.findFirst({
+      where: {
+        driverId: driverProfile.id,
+        status: {
+          in: ["accepted", "driver_arriving", "arrived", "in_progress"],
+        },
+      },
+      include: {
+        customer: {
+          include: {
+            user: {
+              select: { email: true },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!activeRide) {
+      return res.json({ activeRide: null });
+    }
+
+    res.json({
+      activeRide: {
+        id: activeRide.id,
+        status: activeRide.status,
+        currentLeg: activeRide.currentLeg || "to_pickup",
+        pickupAddress: activeRide.pickupAddress,
+        pickupLat: activeRide.pickupLat,
+        pickupLng: activeRide.pickupLng,
+        dropoffAddress: activeRide.dropoffAddress,
+        dropoffLat: activeRide.dropoffLat,
+        dropoffLng: activeRide.dropoffLng,
+        routePolyline: activeRide.routePolyline,
+        distanceMiles: activeRide.distanceMiles,
+        durationMinutes: activeRide.durationMinutes,
+        trafficEtaSeconds: activeRide.trafficEtaSeconds,
+        serviceFare: serializeDecimal(activeRide.serviceFare),
+        driverPayout: serializeDecimal(activeRide.driverPayout),
+        paymentMethod: activeRide.paymentMethod,
+        createdAt: activeRide.createdAt,
+        acceptedAt: activeRide.acceptedAt,
+        arrivedAt: activeRide.arrivedAt,
+        tripStartedAt: activeRide.tripStartedAt,
+        customer: {
+          fullName: activeRide.customer.fullName || "Customer",
+          phoneNumber: activeRide.customer.phoneNumber,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Get active ride error:", error);
+    res.status(500).json({ error: "Failed to get active ride" });
+  }
+});
+
+// ====================================================
+// Phase A: GET /api/driver/pending-requests
+// Get pending ride requests for online drivers
+// ====================================================
+router.get("/pending-requests", authenticateToken, requireRole(["driver"]), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        vehicles: {
+          where: { isActive: true, isPrimary: true, isOnline: true },
+        },
+        user: {
+          select: { countryCode: true },
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (!driverProfile.isVerified) {
+      return res.status(403).json({ error: "Driver must be verified to receive ride requests" });
+    }
+
+    if (driverProfile.vehicles.length === 0) {
+      return res.json({ requests: [], message: "Driver is offline" });
+    }
+
+    // Check if driver already has an active ride
+    const existingActiveRide = await prisma.ride.findFirst({
+      where: {
+        driverId: driverProfile.id,
+        status: { in: ["accepted", "driver_arriving", "arrived", "in_progress"] },
+      },
+    });
+
+    if (existingActiveRide) {
+      return res.json({ requests: [], message: "Driver already has an active ride" });
+    }
+
+    // Get pending ride requests in the same country
+    const pendingRides = await prisma.ride.findMany({
+      where: {
+        status: { in: ["requested", "searching_driver"] },
+        driverId: null,
+        countryCode: driverProfile.user.countryCode,
+        isDemo: false,
+      },
+      include: {
+        customer: {
+          select: {
+            fullName: true,
+            phoneNumber: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+      take: 5,
+    });
+
+    res.json({
+      requests: pendingRides.map((ride) => ({
+        id: ride.id,
+        pickupAddress: ride.pickupAddress,
+        pickupLat: ride.pickupLat,
+        pickupLng: ride.pickupLng,
+        dropoffAddress: ride.dropoffAddress,
+        dropoffLat: ride.dropoffLat,
+        dropoffLng: ride.dropoffLng,
+        distanceMiles: ride.distanceMiles,
+        durationMinutes: ride.durationMinutes,
+        serviceFare: serializeDecimal(ride.serviceFare),
+        driverPayout: serializeDecimal(ride.driverPayout),
+        paymentMethod: ride.paymentMethod,
+        createdAt: ride.createdAt,
+        customer: {
+          fullName: ride.customer.fullName || "Customer",
+        },
+      })),
+    });
+  } catch (error) {
+    console.error("Get pending requests error:", error);
+    res.status(500).json({ error: "Failed to get pending requests" });
   }
 });
 

@@ -297,6 +297,7 @@ model DriverProfile {
   achievements          DriverAchievement[]       // D19: Driver achievements
   rewardLedger          DriverRewardLedger[]      // D19: Driver reward ledger
   safetyIncidents       DriverSafetyIncident[]    // D20: Driver safety incidents
+  rideLiveLocations     RideLiveLocation[]        // Phase A: Driver live locations during rides
 
   @@map("driver_profiles")
 }
@@ -824,17 +825,147 @@ model Ride {
   // Phase 12: Support ticket tracking (additive only)
   supportTicketCount Int?            @default(0)
   lastSupportStatus  String?         // Latest support ticket status
+  
+  // Phase A: Enhanced ride lifecycle fields
+  currentLeg         String?         // to_pickup, to_dropoff, completed
+  trafficEtaSeconds  Int?            // Live ETA with traffic
+  surgeMultiplier    Decimal?        @db.Decimal(4, 2) // Surge pricing multiplier
+  tollAmount         Decimal?        @db.Decimal(10, 2) // Toll charges
+  discountAmount     Decimal?        @db.Decimal(10, 2) // Applied discount
+  cancelledAt        DateTime?       // When ride was cancelled
+  whoCancelled       String?         // customer, driver, system
+  cancellationReason String?         // Reason for cancellation
+  cancellationFee    Decimal?        @db.Decimal(10, 2) // Cancel fee charged
+  selectedRouteType  String?         // fastest, shortest, highway
+  acceptedAt         DateTime?       // When driver accepted
+  arrivedAt          DateTime?       // When driver arrived at pickup
+  tripStartedAt      DateTime?       // When trip started (customer in car)
+  
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   completedAt      DateTime?
   driverComplaints DriverComplaint[]
   customer         CustomerProfile   @relation(fields: [customerId], references: [id])
   driver           DriverProfile?    @relation(fields: [driverId], references: [id])
+  
+  // Phase A: Ride lifecycle relations
+  statusEvents     RideStatusEvent[]
+  liveLocations    RideLiveLocation[]
+  chatMessages     RideChatMessage[]
+  receipt          RideReceipt?
+  stops            RideStop[]
 
   @@index([countryCode])
   @@index([cityCode])
   @@index([isDemo])
+  @@index([status])
   @@map("rides")
+}
+
+// Phase A: Track ride status transitions for audit trail
+model RideStatusEvent {
+  id          String   @id @default(uuid())
+  rideId      String
+  fromStatus  String?
+  toStatus    String
+  changedBy   String   // user_id who made the change
+  changedByRole String // customer, driver, admin, system
+  reason      String?
+  metadata    Json?    // Additional event data
+  createdAt   DateTime @default(now())
+  
+  ride        Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  
+  @@index([rideId])
+  @@index([createdAt])
+  @@map("ride_status_events")
+}
+
+// Phase A: Store driver live GPS locations during active ride
+model RideLiveLocation {
+  id          String   @id @default(uuid())
+  rideId      String
+  driverId    String
+  lat         Float
+  lng         Float
+  heading     Float?   // Direction in degrees
+  speed       Float?   // Speed in km/h
+  accuracy    Float?   // GPS accuracy in meters
+  createdAt   DateTime @default(now())
+  
+  ride        Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  driver      DriverProfile @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  @@index([rideId])
+  @@index([driverId])
+  @@index([createdAt])
+  @@map("ride_live_locations")
+}
+
+// Phase A: Store in-app chat messages between customer and driver
+model RideChatMessage {
+  id          String   @id @default(uuid())
+  rideId      String
+  senderId    String   // user_id of sender
+  senderRole  String   // customer or driver
+  message     String
+  messageType String   @default("text") // text, quick_message, location
+  isRead      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  ride        Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  
+  @@index([rideId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("ride_chat_messages")
+}
+
+// Phase A: Detailed fare receipt for completed rides
+model RideReceipt {
+  id              String   @id @default(uuid())
+  rideId          String   @unique
+  baseFare        Decimal  @db.Decimal(10, 2)
+  distanceFare    Decimal  @db.Decimal(10, 2)
+  timeFare        Decimal  @db.Decimal(10, 2)
+  surgeFare       Decimal? @db.Decimal(10, 2) // Surge pricing extra charge
+  tollsFare       Decimal? @db.Decimal(10, 2)
+  tipAmount       Decimal? @db.Decimal(10, 2)
+  discountAmount  Decimal? @db.Decimal(10, 2)
+  subtotal        Decimal  @db.Decimal(10, 2)
+  taxAmount       Decimal? @db.Decimal(10, 2)
+  totalFare       Decimal  @db.Decimal(10, 2)
+  currency        String   @default("USD")
+  distanceMiles   Float?
+  durationMinutes Int?
+  fareBreakdown   Json?    // Detailed breakdown as JSON
+  createdAt       DateTime @default(now())
+  
+  ride            Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  
+  @@index([rideId])
+  @@map("ride_receipts")
+}
+
+// Phase A: Support for adding stops during ride
+model RideStop {
+  id          String   @id @default(uuid())
+  rideId      String
+  address     String
+  lat         Float?
+  lng         Float?
+  placeId     String?
+  stopOrder   Int      // Order of stop (1, 2, 3...)
+  status      String   @default("pending") // pending, arrived, completed, skipped
+  arrivedAt   DateTime?
+  departedAt  DateTime?
+  createdAt   DateTime @default(now())
+  
+  ride        Ride     @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  
+  @@index([rideId])
+  @@index([stopOrder])
+  @@map("ride_stops")
 }
 
 model User {
