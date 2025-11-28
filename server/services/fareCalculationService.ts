@@ -166,6 +166,16 @@ export interface FeeBreakdownItem {
   paidToDriver?: boolean;
 }
 
+export interface TollBreakdownItem {
+  id: string;
+  name: string;
+  shortName: string;
+  amount: number;
+  isPeak: boolean;
+  operator: 'MTA' | 'PANYNJ' | 'TBTA';
+  direction?: 'inbound' | 'outbound' | 'both';
+}
+
 export interface FareFlags {
   trafficApplied: boolean;
   surgeApplied: boolean;
@@ -182,6 +192,7 @@ export interface FareFlags {
   tlcStateSurchargeApplied: boolean;
   tlcLongTripFeeApplied: boolean;
   tlcOutOfTownApplied: boolean;
+  tollsApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -260,6 +271,7 @@ export interface RouteFareBreakdown {
   // Fees
   tollsTotal: number;
   tollsBreakdown: FeeBreakdownItem[];
+  tlcTollsBreakdown: TollBreakdownItem[];
   regulatoryFeesTotal: number;
   regulatoryFeesBreakdown: FeeBreakdownItem[];
   additionalFeesTotal: number;
@@ -308,6 +320,7 @@ export interface RouteFareBreakdown {
   tlcStateSurchargeApplied: boolean;
   tlcLongTripFeeApplied: boolean;
   tlcOutOfTownApplied: boolean;
+  tollsApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
@@ -2065,10 +2078,47 @@ export class FareCalculationService {
     stateRegulatoryFee = roundCurrency(stateRegulatoryFee);
     
     // ============================================
-    // 8. DETECT TOLLS
+    // 8. DETECT TOLLS (Step 6I - After Out-of-Town, Before Service Fee)
     // ============================================
-    const tollsBreakdown = await this.detectTolls(route.tollSegments || [], rideType.code);
-    const tollsTotal = roundCurrency(tollsBreakdown.reduce((sum, t) => sum + t.amount, 0));
+    // First, detect NYC TLC toll facilities
+    const tlcTolls = detectNYCTLCTolls(route.tollSegments || [], isPeakHour);
+    const tlcTollsBreakdown: TollBreakdownItem[] = tlcTolls.map(t => ({
+      id: t.facility.id,
+      name: t.facility.name,
+      shortName: t.facility.shortName,
+      amount: t.amount,
+      isPeak: t.isPeak,
+      operator: t.facility.operator,
+      direction: t.facility.direction,
+    }));
+    
+    // Calculate TLC tolls total
+    const tlcTollsTotal = roundCurrency(tlcTolls.reduce((sum, t) => sum + t.amount, 0));
+    
+    // Also get any other tolls from the general detection system
+    const otherTollsBreakdown = await this.detectTolls(route.tollSegments || [], rideType.code);
+    
+    // Filter out NYC TLC tolls that were already detected to avoid double-counting
+    const tlcFacilityIds = new Set(tlcTolls.map(t => t.facility.id));
+    const filteredOtherTolls = otherTollsBreakdown.filter(t => !tlcFacilityIds.has(t.id));
+    const otherTollsTotal = roundCurrency(filteredOtherTolls.reduce((sum, t) => sum + t.amount, 0));
+    
+    // Combined tolls breakdown (for legacy compatibility)
+    const tollsBreakdown: FeeBreakdownItem[] = [
+      ...tlcTollsBreakdown.map(t => ({
+        id: t.id,
+        name: t.name,
+        amount: t.amount,
+        type: "flat" as const,
+        description: `${t.shortName} (${t.operator}) - ${t.isPeak ? 'Peak' : 'Off-Peak'} EZ-Pass rate`,
+        paidToDriver: true,
+      })),
+      ...filteredOtherTolls,
+    ];
+    
+    // Total tolls = TLC + Other
+    const tollsTotal = roundCurrency(tlcTollsTotal + otherTollsTotal);
+    const tollsApplied = tollsTotal > 0;
     
     // ============================================
     // 9. PROCESS REGULATORY ZONE FEES (NYC RTA, BCF, Airport)
@@ -2414,6 +2464,7 @@ export class FareCalculationService {
       tlcStateSurchargeApplied,
       tlcLongTripFeeApplied,
       tlcOutOfTownApplied,
+      tollsApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -2485,6 +2536,7 @@ export class FareCalculationService {
       
       tollsTotal,
       tollsBreakdown,
+      tlcTollsBreakdown,
       regulatoryFeesTotal,
       regulatoryFeesBreakdown,
       additionalFeesTotal,
@@ -2527,6 +2579,7 @@ export class FareCalculationService {
       tlcStateSurchargeApplied,
       tlcLongTripFeeApplied,
       tlcOutOfTownApplied,
+      tollsApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
