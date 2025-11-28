@@ -50,6 +50,16 @@ interface RideFareConfig {
   trafficMultiplierHeavy: any;
   isActive: boolean;
   version: number;
+  // Extended fare config (with defaults if not in DB)
+  nightSurchargePercent?: any;
+  peakHourSurchargePercent?: any;
+  longDistanceThresholdMiles?: any;
+  longDistanceFeePerMile?: any;
+  crossCitySurcharge?: any;
+  crossStateSurcharge?: any;
+  maximumFare?: any;
+  driverMinimumPayout?: any;
+  companyMinMarginPercent?: any;
 }
 
 interface RegulatoryZone {
@@ -173,6 +183,15 @@ export interface RouteFareBreakdown {
   surgeAmount: number;
   surgeMultiplier: number;
   
+  // Time-based surcharges
+  nightSurcharge: number;
+  peakHourSurcharge: number;
+  
+  // Distance-based fees
+  longDistanceFee: number;
+  crossCitySurcharge: number;
+  crossStateSurcharge: number;
+  
   // Fees
   tollsTotal: number;
   tollsBreakdown: FeeBreakdownItem[];
@@ -190,9 +209,21 @@ export interface RouteFareBreakdown {
   subtotal: number;
   totalFare: number;
   
+  // Fare protection
+  minimumFareApplied: boolean;
+  maximumFareApplied: boolean;
+  originalCalculatedFare: number;
+  
   // Driver payout
   driverPayout: number;
+  driverMinimumPayoutApplied: boolean;
   safegoCommission: number;
+  companyMarginPercent: number;
+  
+  // Margin protection
+  marginProtectionApplied: boolean;
+  marginProtectionCapped: boolean;
+  marginShortfall: number;
   
   // Matched zones for logging
   matchedZoneIds: string[];
@@ -295,6 +326,64 @@ function getTrafficLevel(
 function roundCurrency(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
+
+/**
+ * Check if current time is during night hours (8PM - 6AM)
+ */
+function isNightTime(date: Date = new Date()): boolean {
+  const hour = date.getHours();
+  return hour >= 20 || hour < 6;
+}
+
+/**
+ * Check if current time is during peak hours (7-9AM or 4-7PM weekdays)
+ */
+function isPeakHour(date: Date = new Date()): boolean {
+  const hour = date.getHours();
+  const dayOfWeek = date.getDay();
+  
+  // Weekend - no peak hours
+  if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+  
+  // Morning peak: 7-9AM
+  if (hour >= 7 && hour < 9) return true;
+  
+  // Evening peak: 4-7PM
+  if (hour >= 16 && hour < 19) return true;
+  
+  return false;
+}
+
+/**
+ * Calculate Haversine distance between two points in miles
+ */
+function haversineDistanceMiles(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Default fare rule values (used when not configured in DB)
+const DEFAULT_FARE_RULES = {
+  NIGHT_SURCHARGE_PERCENT: 10,      // 10% night surcharge (8PM-6AM)
+  PEAK_HOUR_SURCHARGE_PERCENT: 15,  // 15% peak hour surcharge
+  LONG_DISTANCE_THRESHOLD_MILES: 25, // Long distance threshold
+  LONG_DISTANCE_FEE_PER_MILE: 0.50, // Extra fee per mile after threshold
+  CROSS_CITY_SURCHARGE: 5.00,       // Flat fee for cross-city trips
+  CROSS_STATE_SURCHARGE: 10.00,     // Flat fee for cross-state trips
+  MAXIMUM_FARE: 500.00,             // Maximum fare cap
+  DRIVER_MINIMUM_PAYOUT: 5.00,      // Minimum driver payout guarantee
+  COMPANY_MIN_MARGIN_PERCENT: 15,   // Minimum company margin
+};
 
 // ============================================
 // Main Service Class
@@ -494,6 +583,7 @@ export class FareCalculationService {
   
   /**
    * Calculate fare for a single route
+   * Implements complete US ride-share pricing with all fee components
    */
   private async calculateRouteFare(
     route: RouteInfo,
@@ -503,14 +593,24 @@ export class FareCalculationService {
     dropoff: { lat: number; lng: number },
     surgeMultiplier: number,
     countryCode: string,
-    cityCode?: string
+    cityCode?: string,
+    pickupCityCode?: string,
+    dropoffCityCode?: string,
+    pickupStateCode?: string,
+    dropoffStateCode?: string
   ): Promise<RouteFareBreakdown> {
-    // 1. Calculate base fare components
+    const now = new Date();
+    
+    // ============================================
+    // 1. BASE FARE COMPONENTS
+    // ============================================
     const baseFare = Number(fareConfig.baseFare);
     const distanceFare = roundCurrency(route.distanceMiles * Number(fareConfig.perMileRate));
     const timeFare = roundCurrency(route.durationMinutes * Number(fareConfig.perMinuteRate));
     
-    // 2. Calculate traffic adjustment
+    // ============================================
+    // 2. TRAFFIC ADJUSTMENT
+    // ============================================
     const trafficLevel = getTrafficLevel(route.durationMinutes, route.trafficDurationMinutes);
     let trafficMultiplier = 1;
     switch (trafficLevel) {
@@ -523,20 +623,83 @@ export class FareCalculationService {
     const trafficAdjusted = roundCurrency(tripCost * trafficMultiplier);
     const trafficAdjustment = roundCurrency(trafficAdjusted - tripCost);
     
-    // 3. Apply surge multiplier (capped at max)
+    // ============================================
+    // 3. SURGE MULTIPLIER (Dynamic High-Demand)
+    // ============================================
     const effectiveSurge = Math.min(surgeMultiplier, Number(fareConfig.maxSurgeMultiplier));
     const surgeAdjusted = roundCurrency(trafficAdjusted * effectiveSurge);
     const surgeAmount = roundCurrency(surgeAdjusted - trafficAdjusted);
     
-    // 4. Detect tolls
+    // ============================================
+    // 4. NIGHT SURCHARGE (8PM - 6AM)
+    // ============================================
+    const nightSurchargePercent = fareConfig.nightSurchargePercent 
+      ? Number(fareConfig.nightSurchargePercent) 
+      : DEFAULT_FARE_RULES.NIGHT_SURCHARGE_PERCENT;
+    let nightSurcharge = 0;
+    if (isNightTime(now)) {
+      nightSurcharge = roundCurrency(surgeAdjusted * nightSurchargePercent / 100);
+    }
+    
+    // ============================================
+    // 5. PEAK HOUR SURCHARGE (7-9AM, 4-7PM weekdays)
+    // ============================================
+    const peakHourSurchargePercent = fareConfig.peakHourSurchargePercent
+      ? Number(fareConfig.peakHourSurchargePercent)
+      : DEFAULT_FARE_RULES.PEAK_HOUR_SURCHARGE_PERCENT;
+    let peakHourSurcharge = 0;
+    if (isPeakHour(now) && !isNightTime(now)) {
+      // Don't apply both night and peak surcharge
+      peakHourSurcharge = roundCurrency(surgeAdjusted * peakHourSurchargePercent / 100);
+    }
+    
+    // ============================================
+    // 6. LONG-DISTANCE FEE (trips > threshold miles)
+    // ============================================
+    const longDistanceThreshold = fareConfig.longDistanceThresholdMiles
+      ? Number(fareConfig.longDistanceThresholdMiles)
+      : DEFAULT_FARE_RULES.LONG_DISTANCE_THRESHOLD_MILES;
+    const longDistanceFeePerMile = fareConfig.longDistanceFeePerMile
+      ? Number(fareConfig.longDistanceFeePerMile)
+      : DEFAULT_FARE_RULES.LONG_DISTANCE_FEE_PER_MILE;
+    let longDistanceFee = 0;
+    if (route.distanceMiles > longDistanceThreshold) {
+      const extraMiles = route.distanceMiles - longDistanceThreshold;
+      longDistanceFee = roundCurrency(extraMiles * longDistanceFeePerMile);
+    }
+    
+    // ============================================
+    // 7. CROSS-CITY AND CROSS-STATE SURCHARGES
+    // ============================================
+    const crossCitySurchargeAmount = fareConfig.crossCitySurcharge
+      ? Number(fareConfig.crossCitySurcharge)
+      : DEFAULT_FARE_RULES.CROSS_CITY_SURCHARGE;
+    const crossStateSurchargeAmount = fareConfig.crossStateSurcharge
+      ? Number(fareConfig.crossStateSurcharge)
+      : DEFAULT_FARE_RULES.CROSS_STATE_SURCHARGE;
+    
+    let crossCitySurcharge = 0;
+    let crossStateSurcharge = 0;
+    
+    // Cross-state takes precedence over cross-city
+    if (pickupStateCode && dropoffStateCode && pickupStateCode !== dropoffStateCode) {
+      crossStateSurcharge = crossStateSurchargeAmount;
+    } else if (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) {
+      crossCitySurcharge = crossCitySurchargeAmount;
+    }
+    
+    // ============================================
+    // 8. DETECT TOLLS
+    // ============================================
     const tollsBreakdown = await this.detectTolls(route.tollSegments || [], rideType.code);
     const tollsTotal = roundCurrency(tollsBreakdown.reduce((sum, t) => sum + t.amount, 0));
     
-    // 5. Detect regulatory zones and calculate fees
+    // ============================================
+    // 9. DETECT REGULATORY ZONES (NYC RTA, BCF, Airport)
+    // ============================================
     const pickupZones = await this.detectZones(pickup, true);
     const dropoffZones = await this.detectZones(dropoff, false);
     
-    // Combine unique zones
     const allZoneIds = new Set<string>();
     const matchedZoneIds: string[] = [];
     const regulatoryFeesBreakdown: FeeBreakdownItem[] = [];
@@ -552,7 +715,6 @@ export class FareCalculationService {
           if (fee.flatFeeAmount) {
             amount = Number(fee.flatFeeAmount);
           } else if (fee.percentFeeRate) {
-            // Percent fee applied to subtotal before regulatory fees
             amount = roundCurrency(surgeAdjusted * Number(fee.percentFeeRate) / 100);
           }
           
@@ -577,7 +739,9 @@ export class FareCalculationService {
       regulatoryFeesBreakdown.reduce((sum, f) => sum + f.amount, 0)
     );
     
-    // 6. Get additional fees
+    // ============================================
+    // 10. ADDITIONAL FEES (Booking, Safety, Eco)
+    // ============================================
     const additionalFeeRules = await this.getAdditionalFees(countryCode, cityCode);
     const additionalFeesBreakdown: FeeBreakdownItem[] = additionalFeeRules.map(rule => ({
       id: rule.id,
@@ -590,32 +754,205 @@ export class FareCalculationService {
       additionalFeesBreakdown.reduce((sum, f) => sum + f.amount, 0)
     );
     
-    // 7. Calculate subtotal (before service fee)
-    const subtotal = roundCurrency(
-      surgeAdjusted + tollsTotal + regulatoryFeesTotal + additionalFeesTotal
+    // ============================================
+    // 11. SUBTOTAL (Before service fee and discounts)
+    // Promo discounts apply AFTER fees, BEFORE service fee
+    // ============================================
+    const subtotalBeforeDiscount = roundCurrency(
+      surgeAdjusted + 
+      nightSurcharge + 
+      peakHourSurcharge + 
+      longDistanceFee +
+      crossCitySurcharge +
+      crossStateSurcharge +
+      tollsTotal + 
+      regulatoryFeesTotal + 
+      additionalFeesTotal
     );
     
-    // 8. Calculate service fee
+    // Discount placeholder (promo codes applied at API layer)
+    const discountAmount = 0;
+    const subtotal = roundCurrency(subtotalBeforeDiscount - discountAmount);
+    
+    // ============================================
+    // 12. SERVICE FEE (After discounts)
+    // ============================================
     let serviceFee = roundCurrency(subtotal * Number(fareConfig.serviceFeePercent) / 100);
     serviceFee = Math.max(serviceFee, Number(fareConfig.serviceFeeMinimum));
     serviceFee = Math.min(serviceFee, Number(fareConfig.serviceFeeMaximum));
     
-    // 9. Calculate total fare
-    const totalFare = roundCurrency(subtotal + serviceFee);
+    // ============================================
+    // 13. GROSS FARE CALCULATION (Before Guards)
+    // This is the calculated fare before min/max enforcement
+    // ============================================
+    const grossFare = roundCurrency(subtotal + serviceFee);
     
-    // 10. Apply minimum fare
-    const minimumFare = Number(fareConfig.minimumFare);
-    const finalFare = Math.max(totalFare, minimumFare);
-    
-    // 11. Calculate driver payout (excludes regulatory fees, taxes, and SafeGo commission)
+    // ============================================
+    // 14. DRIVER BASE PAYOUT CALCULATION
+    // Calculate from gross fare to establish baseline
+    // ============================================
     const driverDistanceEarnings = roundCurrency(route.distanceMiles * Number(fareConfig.driverPerMileRate));
     const driverTimeEarnings = roundCurrency(route.durationMinutes * Number(fareConfig.driverPerMinuteRate));
     const driverTolls = tollsBreakdown
       .filter(t => t.paidToDriver)
       .reduce((sum, t) => sum + t.amount, 0);
     
-    const driverPayout = roundCurrency(driverDistanceEarnings + driverTimeEarnings + driverTolls);
-    const safegoCommission = roundCurrency(finalFare - driverPayout - regulatoryFeesTotal);
+    const driverBasePayoutCalculated = roundCurrency(driverDistanceEarnings + driverTimeEarnings + driverTolls);
+    const driverMinimumPayout = fareConfig.driverMinimumPayout
+      ? Number(fareConfig.driverMinimumPayout)
+      : DEFAULT_FARE_RULES.DRIVER_MINIMUM_PAYOUT;
+    
+    // ============================================
+    // 15. FARE GUARDS (Minimum and Maximum)
+    // Applied to gross fare
+    // ============================================
+    const minimumFare = Number(fareConfig.minimumFare);
+    const maximumFare = fareConfig.maximumFare
+      ? Number(fareConfig.maximumFare)
+      : DEFAULT_FARE_RULES.MAXIMUM_FARE;
+    
+    let fareAfterGuards = grossFare;
+    let minimumFareApplied = false;
+    let maximumFareApplied = false;
+    
+    // Apply minimum fare first
+    if (fareAfterGuards < minimumFare) {
+      fareAfterGuards = minimumFare;
+      minimumFareApplied = true;
+    }
+    
+    // Apply maximum fare cap
+    if (fareAfterGuards > maximumFare) {
+      fareAfterGuards = maximumFare;
+      maximumFareApplied = true;
+    }
+    
+    // ============================================
+    // 16. DRIVER PAYOUT WITH MINIMUM PROTECTION
+    // Ensure driver gets at least minimum payout
+    // ============================================
+    let driverPayout = Math.max(driverBasePayoutCalculated, driverMinimumPayout);
+    const driverMinimumPayoutApplied = driverBasePayoutCalculated < driverMinimumPayout;
+    
+    // ============================================
+    // 17. COMPANY MARGIN PROTECTION
+    // Runs AFTER fare guards, ensures minimum margin
+    // while respecting driver minimum and fare caps
+    // Commission = TotalFare - AllPassThroughCosts
+    // PassThroughCosts = DriverPayout + RegulatoryFees (driver payout already includes driver tolls)
+    // Margin% = Commission / TotalFare * 100
+    // ============================================
+    const companyMinMarginPercent = fareConfig.companyMinMarginPercent
+      ? Number(fareConfig.companyMinMarginPercent)
+      : DEFAULT_FARE_RULES.COMPANY_MIN_MARGIN_PERCENT;
+    
+    // All costs that are passed through (not retained by SafeGo):
+    // - Driver payout (includes distance, time, and driver-paid tolls)
+    // - Regulatory fees (goes to government, not SafeGo)
+    // Note: Additional fees (booking, safety, eco) and service fee are SafeGo revenue
+    const calcPassThroughCosts = (payout: number) => 
+      roundCurrency(payout + regulatoryFeesTotal);
+    
+    // Calculate commission: fare minus all pass-through costs
+    const calcCommission = (fare: number, payout: number) => 
+      roundCurrency(fare - calcPassThroughCosts(payout));
+    
+    // Calculate margin percentage from commission and fare
+    const calcMarginPercent = (fare: number, commission: number) => 
+      fare > 0 ? roundCurrency((commission / fare) * 100) : 0;
+    
+    // Calculate the minimum fare needed to achieve target margin with given costs
+    // Algebra: margin% = (fare - passThroughCosts) / fare * 100
+    //          margin% * fare = fare - passThroughCosts
+    //          fare - margin% * fare = passThroughCosts
+    //          fare * (1 - margin%) = passThroughCosts
+    //          fare = passThroughCosts / (1 - margin%)
+    const calcMinFareForMargin = (payout: number) => {
+      const marginDecimal = companyMinMarginPercent / 100;
+      if (marginDecimal >= 1) return Infinity; // Can't achieve 100%+ margin
+      const passThroughCosts = calcPassThroughCosts(payout);
+      return roundCurrency(passThroughCosts / (1 - marginDecimal));
+    };
+    
+    let safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+    let marginProtectionApplied = false;
+    let marginProtectionCapped = false;
+    let marginShortfall = 0;
+    
+    // Check if we need margin protection
+    const targetMarginAmount = roundCurrency(fareAfterGuards * companyMinMarginPercent / 100);
+    
+    if (safegoCommission < targetMarginAmount) {
+      marginProtectionApplied = true;
+      
+      // Step 1: If commission is negative, reduce driver payout to minimum first
+      if (safegoCommission < 0 && driverPayout > driverMinimumPayout) {
+        driverPayout = driverMinimumPayout;
+        safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+      }
+      
+      // Step 2: Try to increase fare to meet margin requirement
+      if (calcMarginPercent(fareAfterGuards, safegoCommission) < companyMinMarginPercent) {
+        const neededFare = calcMinFareForMargin(driverPayout);
+        
+        if (neededFare <= maximumFare) {
+          // Can increase fare to meet margin
+          fareAfterGuards = Math.max(fareAfterGuards, neededFare);
+          safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+        } else {
+          // Hit maximum cap - can only increase fare up to cap
+          if (!maximumFareApplied) {
+            fareAfterGuards = maximumFare;
+            maximumFareApplied = true;
+            safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+          }
+          
+          // Step 3: Try reducing driver payout to increase margin (but not below minimum)
+          if (calcMarginPercent(fareAfterGuards, safegoCommission) < companyMinMarginPercent) {
+            if (driverPayout > driverMinimumPayout) {
+              // Calculate payout that yields target margin at capped fare
+              // targetMargin = (fare - payout - regFees) / fare
+              // payout = fare - regFees - (targetMargin * fare)
+              // payout = fare * (1 - targetMargin) - regFees
+              const targetPayout = roundCurrency(
+                fareAfterGuards * (1 - companyMinMarginPercent / 100) - regulatoryFeesTotal
+              );
+              
+              if (targetPayout >= driverMinimumPayout) {
+                driverPayout = targetPayout;
+                safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+              } else {
+                // Can't meet margin - reduce to minimum and accept lower margin
+                driverPayout = driverMinimumPayout;
+                safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+                marginProtectionCapped = true;
+              }
+            } else {
+              marginProtectionCapped = true;
+            }
+          }
+        }
+      }
+      
+      // Final check if margin target was met
+      const finalMarginPercent = calcMarginPercent(fareAfterGuards, safegoCommission);
+      if (finalMarginPercent < companyMinMarginPercent) {
+        marginProtectionCapped = true;
+        marginShortfall = roundCurrency(companyMinMarginPercent - finalMarginPercent);
+      }
+    }
+    
+    // Final safety: Ensure commission is never negative
+    safegoCommission = Math.max(0, safegoCommission);
+    
+    // ============================================
+    // 18. FINAL FARE CALCULATION
+    // After all guards and protections
+    // ============================================
+    const finalFare = fareAfterGuards;
+    
+    // Calculate ACTUAL margin percentage from final values
+    const companyMarginPercent = calcMarginPercent(finalFare, safegoCommission);
     
     return {
       routeId: route.routeId,
@@ -632,6 +969,13 @@ export class FareCalculationService {
       surgeAmount,
       surgeMultiplier: effectiveSurge,
       
+      nightSurcharge,
+      peakHourSurcharge,
+      
+      longDistanceFee,
+      crossCitySurcharge,
+      crossStateSurcharge,
+      
       tollsTotal,
       tollsBreakdown,
       regulatoryFeesTotal,
@@ -640,13 +984,23 @@ export class FareCalculationService {
       additionalFeesBreakdown,
       serviceFee,
       
-      discountAmount: 0, // TODO: Implement promo codes
+      discountAmount,
       
       subtotal,
       totalFare: finalFare,
       
+      minimumFareApplied,
+      maximumFareApplied,
+      originalCalculatedFare: grossFare,
+      
       driverPayout,
+      driverMinimumPayoutApplied,
       safegoCommission,
+      companyMarginPercent,
+      
+      marginProtectionApplied,
+      marginProtectionCapped,
+      marginShortfall,
       
       matchedZoneIds,
     };
@@ -842,6 +1196,183 @@ export class FareCalculationService {
     });
     
     return log.id;
+  }
+  
+  // ============================================
+  // REFUND AND CANCELLATION FEE RULES
+  // ============================================
+  
+  /**
+   * Calculate refund amount based on ride status and timing
+   * Implements standard US ride-share refund policies
+   */
+  calculateRefund(
+    originalFare: number,
+    rideStatus: string,
+    minutesSinceBooking: number,
+    minutesSinceDriverAccept: number,
+    distanceTraveled: number,
+    totalDistance: number,
+    cancellationReason?: string
+  ): {
+    refundAmount: number;
+    refundPercent: number;
+    cancellationFee: number;
+    reason: string;
+  } {
+    // Free cancellation window: 2 minutes after booking, before driver accepts
+    const FREE_CANCEL_WINDOW_MINUTES = 2;
+    // Grace period after driver accepts
+    const DRIVER_ACCEPT_GRACE_MINUTES = 5;
+    // No-show threshold (driver waited)
+    const NO_SHOW_THRESHOLD_MINUTES = 5;
+    // Cancellation fee rates
+    const CANCELLATION_FEE_BASE = 5.00;
+    const CANCELLATION_FEE_AFTER_WAIT = 7.50;
+    
+    let refundAmount = 0;
+    let cancellationFee = 0;
+    let reason = "";
+    
+    // Full refund scenarios
+    if (rideStatus === "SEARCHING" && minutesSinceBooking <= FREE_CANCEL_WINDOW_MINUTES) {
+      refundAmount = originalFare;
+      reason = "Free cancellation within 2-minute window";
+    }
+    else if (rideStatus === "SEARCHING") {
+      // After 2 minutes but no driver found yet
+      refundAmount = originalFare;
+      reason = "Full refund - no driver assigned";
+    }
+    else if (rideStatus === "DRIVER_ASSIGNED" && minutesSinceDriverAccept <= DRIVER_ACCEPT_GRACE_MINUTES) {
+      // Within grace period after driver accepts
+      refundAmount = originalFare;
+      reason = "Free cancellation within 5-minute grace period";
+    }
+    else if (cancellationReason === "DRIVER_CANCELLED" || cancellationReason === "DRIVER_NO_SHOW") {
+      // Driver cancelled or didn't show
+      refundAmount = originalFare;
+      reason = "Full refund - driver cancelled or no-show";
+    }
+    // Partial refund scenarios
+    else if (rideStatus === "DRIVER_ASSIGNED") {
+      // After grace period, before pickup
+      cancellationFee = CANCELLATION_FEE_BASE;
+      refundAmount = Math.max(0, originalFare - cancellationFee);
+      reason = `Cancellation fee of $${CANCELLATION_FEE_BASE.toFixed(2)} applied`;
+    }
+    else if (rideStatus === "DRIVER_ARRIVED" || rideStatus === "WAITING") {
+      // Driver arrived and waiting
+      cancellationFee = CANCELLATION_FEE_AFTER_WAIT;
+      refundAmount = Math.max(0, originalFare - cancellationFee);
+      reason = `Driver wait time cancellation fee of $${CANCELLATION_FEE_AFTER_WAIT.toFixed(2)} applied`;
+    }
+    else if (rideStatus === "IN_PROGRESS") {
+      // Partial trip completed
+      if (distanceTraveled > 0 && totalDistance > 0) {
+        const completedPercent = Math.min(100, (distanceTraveled / totalDistance) * 100);
+        const completedFare = roundCurrency(originalFare * (completedPercent / 100));
+        refundAmount = roundCurrency(originalFare - completedFare);
+        reason = `Partial refund - ${completedPercent.toFixed(0)}% of trip completed`;
+      } else {
+        refundAmount = 0;
+        reason = "No refund - trip in progress";
+      }
+    }
+    else if (rideStatus === "COMPLETED") {
+      // Trip completed - no automatic refund
+      refundAmount = 0;
+      reason = "Trip completed - contact support for refund requests";
+    }
+    // No-show by rider
+    else if (rideStatus === "RIDER_NO_SHOW") {
+      cancellationFee = CANCELLATION_FEE_AFTER_WAIT;
+      refundAmount = Math.max(0, originalFare - cancellationFee);
+      reason = `No-show fee of $${CANCELLATION_FEE_AFTER_WAIT.toFixed(2)} applied`;
+    }
+    else {
+      // Default: no refund
+      refundAmount = 0;
+      reason = "Refund not applicable";
+    }
+    
+    const refundPercent = originalFare > 0 
+      ? roundCurrency((refundAmount / originalFare) * 100) 
+      : 0;
+    
+    return {
+      refundAmount: roundCurrency(refundAmount),
+      refundPercent,
+      cancellationFee: roundCurrency(cancellationFee),
+      reason,
+    };
+  }
+  
+  /**
+   * Calculate no-show fee for rider who didn't show up
+   */
+  calculateNoShowFee(
+    waitTimeMinutes: number,
+    fareConfig: RideFareConfig,
+    countryCode: string
+  ): {
+    noShowFee: number;
+    waitTimeFee: number;
+    totalFee: number;
+    driverCompensation: number;
+  } {
+    const BASE_NO_SHOW_FEE = 5.00;
+    const WAIT_FEE_PER_MINUTE = 0.50;
+    const WAIT_FREE_MINUTES = 2;
+    const MAX_WAIT_FEE = 10.00;
+    
+    // Calculate wait time fee (after free period)
+    let waitTimeFee = 0;
+    if (waitTimeMinutes > WAIT_FREE_MINUTES) {
+      const chargeableMinutes = waitTimeMinutes - WAIT_FREE_MINUTES;
+      waitTimeFee = roundCurrency(chargeableMinutes * WAIT_FEE_PER_MINUTE);
+      waitTimeFee = Math.min(waitTimeFee, MAX_WAIT_FEE);
+    }
+    
+    const noShowFee = BASE_NO_SHOW_FEE;
+    const totalFee = roundCurrency(noShowFee + waitTimeFee);
+    
+    // Driver gets 80% of the no-show fee as compensation
+    const driverCompensation = roundCurrency(totalFee * 0.80);
+    
+    return {
+      noShowFee: roundCurrency(noShowFee),
+      waitTimeFee: roundCurrency(waitTimeFee),
+      totalFee,
+      driverCompensation,
+    };
+  }
+  
+  /**
+   * Get waiting time fee for rider delays
+   */
+  calculateWaitingTimeFee(
+    waitTimeMinutes: number,
+    countryCode: string,
+    cityCode?: string
+  ): {
+    fee: number;
+    freeMinutes: number;
+    chargeableMinutes: number;
+    ratePerMinute: number;
+  } {
+    const WAIT_FREE_MINUTES = 2;
+    const WAIT_FEE_PER_MINUTE = 0.50;
+    
+    const chargeableMinutes = Math.max(0, waitTimeMinutes - WAIT_FREE_MINUTES);
+    const fee = roundCurrency(chargeableMinutes * WAIT_FEE_PER_MINUTE);
+    
+    return {
+      fee,
+      freeMinutes: WAIT_FREE_MINUTES,
+      chargeableMinutes,
+      ratePerMinute: WAIT_FEE_PER_MINUTE,
+    };
   }
 }
 

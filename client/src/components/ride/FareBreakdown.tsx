@@ -16,7 +16,14 @@ import {
   Percent,
   Receipt,
   Tag,
+  Moon,
+  TrendingUp,
+  MapPin,
+  Navigation,
+  Shield,
+  AlertCircle,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export interface FareBreakdownData {
   tripFare: number;
@@ -26,6 +33,17 @@ export interface FareBreakdownData {
   serviceFee: number;
   promoDiscount: number;
   totalFare: number;
+  nightSurcharge?: number;
+  peakHourSurcharge?: number;
+  longDistanceFee?: number;
+  crossCitySurcharge?: number;
+  crossStateSurcharge?: number;
+  surgeAmount?: number;
+  surgeMultiplier?: number;
+  minimumFareApplied?: boolean;
+  maximumFareApplied?: boolean;
+  originalFare?: number;
+  driverMinimumPayoutApplied?: boolean;
 }
 
 export interface FareBreakdownProps {
@@ -103,6 +121,54 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         amount={breakdown.trafficAdjustment} 
         currency={currency} 
       />
+      {(breakdown.surgeAmount ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={TrendingUp} 
+          label={`High demand (${breakdown.surgeMultiplier?.toFixed(1) || '1.0'}x)`}
+          amount={breakdown.surgeAmount ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.nightSurcharge ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Moon} 
+          label="Night surcharge (8PM-6AM)" 
+          amount={breakdown.nightSurcharge ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.peakHourSurcharge ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Clock} 
+          label="Peak hour (rush hour)" 
+          amount={breakdown.peakHourSurcharge ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.longDistanceFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Navigation} 
+          label="Long distance fee" 
+          amount={breakdown.longDistanceFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.crossCitySurcharge ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={MapPin} 
+          label="Cross-city surcharge" 
+          amount={breakdown.crossCitySurcharge ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.crossStateSurcharge ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={MapPin} 
+          label="Cross-state surcharge" 
+          amount={breakdown.crossStateSurcharge ?? 0} 
+          currency={currency} 
+        />
+      )}
       <BreakdownLine 
         icon={Route} 
         label="Tolls" 
@@ -137,6 +203,18 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         currency={currency} 
         isTotal={true}
       />
+      {breakdown.minimumFareApplied && (
+        <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
+          <Shield className="h-3 w-3" />
+          <span>Minimum fare applied</span>
+        </div>
+      )}
+      {breakdown.maximumFareApplied && (
+        <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
+          <AlertCircle className="h-3 w-3" />
+          <span>Fare capped at maximum</span>
+        </div>
+      )}
     </div>
   );
 }
