@@ -145,6 +145,10 @@ interface DriverDetails {
     wheelchairAccessible?: boolean;
     exteriorColor?: string;
     interiorColor?: string;
+    // Category Preferences fields
+    allowedCategories?: string[];
+    eligibleCategories?: string[];
+    preferencesLastUpdated?: string;
   } | null;
   stats: {
     rating: string;
@@ -867,6 +871,28 @@ export default function AdminDriverDetails() {
       rejectionReason: vehicleRejectionReason,
     });
   };
+
+  // Reset category preferences mutation
+  const resetCategoryPreferencesMutation = useMutation({
+    mutationFn: async () => {
+      const vehicleId = driver?.vehicle?.id;
+      if (!vehicleId) throw new Error("No vehicle found");
+
+      const response = await apiRequest("PATCH", `/api/admin/vehicles/${vehicleId}/reset-preferences`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to reset category preferences");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Category preferences reset to default (all eligible categories enabled)" });
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}`] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   // Handler to open vehicle edit dialog with existing data using staged hydration
   const handleOpenEditVehicleDialog = () => {
@@ -2225,6 +2251,79 @@ export default function AdminDriverDetails() {
                           )}
                         </div>
                       </div>
+
+                      {/* Driver Category Preferences - Shows which categories driver has enabled/disabled */}
+                      {driver.vehicle.vehicleVerificationStatus === "APPROVED" && driver.vehicle.vehicleCategory && (
+                        <div className="border-t pt-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-sm font-semibold text-foreground">Driver Category Preferences</p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => resetCategoryPreferencesMutation.mutate()}
+                              disabled={resetCategoryPreferencesMutation.isPending}
+                              data-testid="button-reset-preferences"
+                            >
+                              {resetCategoryPreferencesMutation.isPending ? "Resetting..." : "Reset to Default"}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-3">
+                            Categories the driver has enabled or disabled for ride dispatch. Drivers can choose to disable some ride types they're eligible for.
+                          </p>
+                          
+                          {driver.vehicle.eligibleCategories && driver.vehicle.eligibleCategories.length > 0 ? (
+                            <div className="space-y-2">
+                              <div className="grid gap-2 md:grid-cols-2">
+                                {driver.vehicle.eligibleCategories.map((category) => {
+                                  const isAllowed = driver.vehicle?.allowedCategories?.includes(category);
+                                  return (
+                                    <div 
+                                      key={category}
+                                      className={`flex items-center justify-between p-2 rounded-md border ${
+                                        isAllowed 
+                                          ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" 
+                                          : "bg-muted border-muted-foreground/20"
+                                      }`}
+                                      data-testid={`category-pref-${category}`}
+                                    >
+                                      <span className="text-sm font-medium">
+                                        {category.replace("SAFEGO_", "")}
+                                      </span>
+                                      <Badge 
+                                        variant={isAllowed ? "default" : "secondary"}
+                                        data-testid={`badge-pref-${category}`}
+                                      >
+                                        {isAllowed ? "Enabled" : "Disabled"}
+                                      </Badge>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              
+                              {driver.vehicle.preferencesLastUpdated && (
+                                <p className="text-xs text-muted-foreground mt-2" data-testid="text-pref-updated">
+                                  Last updated: {format(new Date(driver.vehicle.preferencesLastUpdated), "PPp")}
+                                </p>
+                              )}
+                              
+                              {driver.vehicle.allowedCategories && 
+                               driver.vehicle.eligibleCategories && 
+                               driver.vehicle.allowedCategories.length < driver.vehicle.eligibleCategories.length && (
+                                <div className="p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md mt-2">
+                                  <p className="text-xs text-amber-700 dark:text-amber-400" data-testid="text-pref-warning">
+                                    Driver has disabled {driver.vehicle.eligibleCategories.length - driver.vehicle.allowedCategories.length} category(ies). 
+                                    They will not receive requests for disabled categories.
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground" data-testid="text-no-preferences">
+                              Category preferences not yet set. They will be initialized when the vehicle is approved.
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                       {/* Registration Document */}
                       <div className="border-t pt-4">
