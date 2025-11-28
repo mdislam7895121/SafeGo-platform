@@ -74,6 +74,20 @@ export interface RouteAlternative {
   avoidsHighways?: boolean;
 }
 
+export interface PromoValidation {
+  code: string;
+  valid: boolean;
+  discountAmount: number;
+  discountPercent: number;
+  finalFare: number;
+  displayMessage: string;
+  errorCode?: string;
+  errorMessage?: string;
+  promoCodeId?: string;
+  discountType?: "PERCENTAGE" | "FIXED_AMOUNT" | "CAPPED_PERCENTAGE";
+  isCapped?: boolean;
+}
+
 export interface RideBookingState {
   step: "idle" | "pickup" | "dropoff" | "options" | "confirm" | "requesting" | "active";
   pickup: LocationData | null;
@@ -85,6 +99,7 @@ export interface RideBookingState {
   paymentMethod: PaymentMethod | null;
   promoCode: string | null;
   promoValid: boolean;
+  promoValidation: PromoValidation | null;
   fareEstimate: FareEstimate | null;
   activeRideId: string | null;
   error: string | null;
@@ -100,6 +115,8 @@ type RideBookingAction =
   | { type: "SET_OPTION"; option: RideOption }
   | { type: "SET_PAYMENT"; payment: PaymentMethod }
   | { type: "SET_PROMO"; code: string; valid: boolean }
+  | { type: "SET_PROMO_VALIDATION"; validation: PromoValidation | null }
+  | { type: "CLEAR_PROMO" }
   | { type: "SET_FARE_ESTIMATE"; estimate: FareEstimate }
   | { type: "SET_ACTIVE_RIDE"; rideId: string }
   | { type: "SET_ERROR"; error: string | null }
@@ -117,6 +134,7 @@ const initialState: RideBookingState = {
   paymentMethod: null,
   promoCode: null,
   promoValid: false,
+  promoValidation: null,
   fareEstimate: null,
   activeRideId: null,
   error: null,
@@ -181,6 +199,22 @@ function rideBookingReducer(state: RideBookingState, action: RideBookingAction):
       return { ...state, paymentMethod: action.payment, error: null };
     case "SET_PROMO":
       return { ...state, promoCode: action.code, promoValid: action.valid, error: null };
+    case "SET_PROMO_VALIDATION":
+      return { 
+        ...state, 
+        promoValidation: action.validation,
+        promoCode: action.validation?.code || null,
+        promoValid: action.validation?.valid || false,
+        error: null 
+      };
+    case "CLEAR_PROMO":
+      return { 
+        ...state, 
+        promoCode: null, 
+        promoValid: false, 
+        promoValidation: null,
+        error: null 
+      };
     case "SET_FARE_ESTIMATE":
       return { ...state, fareEstimate: action.estimate, error: null };
     case "SET_ACTIVE_RIDE":
@@ -207,6 +241,8 @@ interface RideBookingContextType {
   setSelectedOption: (option: RideOption) => void;
   setPaymentMethod: (payment: PaymentMethod) => void;
   setPromoCode: (code: string, valid: boolean) => void;
+  setPromoValidation: (validation: PromoValidation | null) => void;
+  clearPromo: () => void;
   setFareEstimate: (estimate: FareEstimate) => void;
   setActiveRide: (rideId: string) => void;
   setError: (error: string | null) => void;
@@ -252,6 +288,7 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
           paymentMethod: state.paymentMethod,
           promoCode: state.promoCode,
           promoValid: state.promoValid,
+          promoValidation: state.promoValidation,
           fareEstimate: state.fareEstimate,
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
@@ -304,6 +341,14 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_PROMO", code, valid });
   }, []);
 
+  const setPromoValidation = useCallback((validation: PromoValidation | null) => {
+    dispatch({ type: "SET_PROMO_VALIDATION", validation });
+  }, []);
+
+  const clearPromo = useCallback(() => {
+    dispatch({ type: "CLEAR_PROMO" });
+  }, []);
+
   const setFareEstimate = useCallback((estimate: FareEstimate) => {
     dispatch({ type: "SET_FARE_ESTIMATE", estimate });
   }, []);
@@ -338,6 +383,8 @@ export function RideBookingProvider({ children }: { children: ReactNode }) {
         setSelectedOption,
         setPaymentMethod,
         setPromoCode,
+        setPromoValidation,
+        clearPromo,
         setFareEstimate,
         setActiveRide,
         setError,
