@@ -176,6 +176,7 @@ export interface FareFlags {
   crossStateApplied: boolean;
   congestionFeeApplied: boolean;
   tlcAirportFeeApplied: boolean;
+  tlcAVFFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -236,6 +237,7 @@ export interface RouteFareBreakdown {
   tlcAirportFee: number;
   tlcAirportName?: string;
   tlcAirportCode?: string;
+  tlcAVFFee: number;
   airportFee: number;
   airportCode?: string;
   borderZoneFee: number;
@@ -289,6 +291,7 @@ export interface RouteFareBreakdown {
   regulatoryFeeApplied: boolean;
   congestionFeeApplied: boolean;
   tlcAirportFeeApplied: boolean;
+  tlcAVFFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
