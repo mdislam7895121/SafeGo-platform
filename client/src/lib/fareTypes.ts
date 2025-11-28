@@ -3,7 +3,18 @@
  * Mirrors server/services/fareCalculationService.ts types
  */
 
-export type RideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
+export type LegacyRideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
+
+export type VehicleCategoryId = 
+  | "X" 
+  | "COMFORT" 
+  | "COMFORT_XL" 
+  | "XL" 
+  | "BLACK" 
+  | "BLACK_SUV" 
+  | "WAV";
+
+export type RideTypeCode = LegacyRideTypeCode | VehicleCategoryId;
 
 export interface FeeBreakdownItem {
   id: string;
@@ -25,6 +36,13 @@ export interface RouteFareBreakdown {
   baseFare: number;
   distanceFare: number;
   timeFare: number;
+  
+  vehicleCategoryId?: VehicleCategoryId;
+  vehicleCategoryMultiplierApplied?: boolean;
+  vehicleCategoryMinimumApplied?: boolean;
+  preMultiplierBaseFare?: number;
+  preMultiplierDistanceFare?: number;
+  preMultiplierTimeFare?: number;
   
   trafficAdjustment: number;
   surgeAmount: number;
@@ -100,10 +118,15 @@ export interface CalculateAllFaresRequest {
   surgeMultiplier?: number;
 }
 
-export const RIDE_TYPE_DISPLAY_INFO: Record<RideTypeCode, { iconType: string; etaMinutes: number }> = {
+export const RIDE_TYPE_DISPLAY_INFO: Record<string, { iconType: string; etaMinutes: number }> = {
   SAVER: { iconType: "economy", etaMinutes: 8 },
   STANDARD: { iconType: "economy", etaMinutes: 5 },
   COMFORT: { iconType: "comfort", etaMinutes: 7 },
   XL: { iconType: "xl", etaMinutes: 10 },
   PREMIUM: { iconType: "premium", etaMinutes: 12 },
+  X: { iconType: "economy", etaMinutes: 5 },
+  COMFORT_XL: { iconType: "xl", etaMinutes: 9 },
+  BLACK: { iconType: "premium", etaMinutes: 12 },
+  BLACK_SUV: { iconType: "suv", etaMinutes: 15 },
+  WAV: { iconType: "accessible", etaMinutes: 13 },
 };

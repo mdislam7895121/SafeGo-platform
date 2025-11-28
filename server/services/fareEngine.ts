@@ -61,7 +61,18 @@ import {
   NYCBoroughCode,
 } from './nycBoroughDetection';
 
-export type RideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
+import {
+  VehicleCategoryId,
+  VehicleCategoryConfig,
+  VEHICLE_CATEGORIES,
+  applyVehicleMultipliers,
+  getVehicleCategory,
+  isValidVehicleCategoryId,
+} from '@shared/vehicleCategories';
+
+export type LegacyRideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
+export type RideTypeCode = LegacyRideTypeCode | VehicleCategoryId;
+export { VehicleCategoryId, VehicleCategoryConfig, VEHICLE_CATEGORIES };
 
 export interface FareConfig {
   baseFare: number;
@@ -417,6 +428,7 @@ export interface SurgeTimingInput {
 export interface FareEngineContext {
   fareConfig: FareConfig;
   rideTypeCode: RideTypeCode;
+  vehicleCategoryId?: VehicleCategoryId;
   route: RouteInput;
   pickup: LocationInfo;
   dropoff: LocationInfo;
@@ -494,6 +506,15 @@ export interface FareEngineResult {
   baseFare: number;
   distanceFare: number;
   timeFare: number;
+  
+  vehicleCategoryId?: VehicleCategoryId;
+  vehicleCategoryDisplayName?: string;
+  vehicleCategoryMultiplierApplied: boolean;
+  vehicleCategoryMinimumApplied: boolean;
+  preMultiplierBaseFare: number;
+  preMultiplierDistanceFare: number;
+  preMultiplierTimeFare: number;
+  vehicleCategoryMinimumFare: number;
   
   trafficAdjustment: number;
   trafficMultiplier: number;
@@ -793,20 +814,66 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   const rawFare = roundCurrency(baseFare + distanceFare + timeFare);
 
   // ============================================
+  // STEP 1.5: VEHICLE CATEGORY MULTIPLIERS
+  // Apply per-category fare adjustments AFTER TLC base calculation
+  // but BEFORE surcharges and regulatory fees
+  // ============================================
+  const { vehicleCategoryId } = context;
+  let preMultiplierBaseFare = baseFare;
+  let preMultiplierDistanceFare = distanceFare;
+  let preMultiplierTimeFare = timeFare;
+  let vehicleCategoryMultiplierApplied = false;
+  let vehicleCategoryMinimumApplied = false;
+  let vehicleCategoryMinimumFare = 0;
+  let vehicleCategoryDisplayName: string | undefined;
+  
+  if (vehicleCategoryId && isValidVehicleCategoryId(vehicleCategoryId)) {
+    const category = getVehicleCategory(vehicleCategoryId);
+    vehicleCategoryDisplayName = category.displayName;
+    vehicleCategoryMinimumFare = category.minimumFare;
+    
+    const multiplierResult = applyVehicleMultipliers(
+      baseFare,
+      distanceFare,
+      timeFare,
+      vehicleCategoryId
+    );
+    
+    baseFare = multiplierResult.adjustedBaseFare;
+    distanceFare = multiplierResult.adjustedDistanceFare;
+    timeFare = multiplierResult.adjustedTimeFare;
+    vehicleCategoryMultiplierApplied = multiplierResult.multiplierApplied;
+    
+    const adjustedSubtotal = baseFare + distanceFare + timeFare;
+    if (adjustedSubtotal < category.minimumFare) {
+      const minimumDelta = roundCurrency(category.minimumFare - adjustedSubtotal);
+      baseFare = roundCurrency(baseFare + minimumDelta);
+      vehicleCategoryMinimumApplied = true;
+    }
+    
+    console.log(`[FareEngine] Vehicle category ${vehicleCategoryId} applied:`);
+    console.log(`  Pre-multiplier: base=$${preMultiplierBaseFare}, dist=$${preMultiplierDistanceFare}, time=$${preMultiplierTimeFare}`);
+    console.log(`  Post-multiplier: base=$${baseFare}, dist=$${distanceFare}, time=$${timeFare}`);
+    console.log(`  Multiplier applied: ${vehicleCategoryMultiplierApplied}, Minimum applied: ${vehicleCategoryMinimumApplied}`);
+  }
+  
+  const rawFareAfterCategory = roundCurrency(baseFare + distanceFare + timeFare);
+
+  // ============================================
   // STEP 2: SHORT-TRIP ADJUSTMENT
   // ============================================
   let shortTripAdjustment = 0;
   let shortTripAdjustmentApplied = false;
   
   if (route.distanceMiles < fareConfig.shortTripThresholdMiles) {
-    const shortTripDiff = fareConfig.shortTripMinimumFare - rawFare;
+    const shortTripDiff = fareConfig.shortTripMinimumFare - rawFareAfterCategory;
     if (shortTripDiff > 0) {
       shortTripAdjustment = roundCurrency(shortTripDiff);
       shortTripAdjustmentApplied = true;
     }
   }
   
-  const fareAfterShortTrip = roundCurrency(rawFare + shortTripAdjustment);
+  const fareAfterShortTrip = roundCurrency(rawFareAfterCategory + shortTripAdjustment);
 
   // ============================================
   // STEP 3: TRAFFIC MULTIPLIER
@@ -1500,6 +1567,15 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     baseFare: usingCrossStateFare ? (crossStateFareResult?.baseFare ?? baseFare) : baseFare,
     distanceFare: usingCrossStateFare ? (crossStateFareResult?.distanceCost ?? distanceFare) : distanceFare,
     timeFare: usingCrossStateFare ? (crossStateFareResult?.timeCost ?? timeFare) : timeFare,
+    
+    vehicleCategoryId,
+    vehicleCategoryDisplayName,
+    vehicleCategoryMultiplierApplied,
+    vehicleCategoryMinimumApplied,
+    preMultiplierBaseFare,
+    preMultiplierDistanceFare,
+    preMultiplierTimeFare,
+    vehicleCategoryMinimumFare,
     
     trafficAdjustment: usingCrossStateFare ? 0 : trafficAdjustment,
     trafficMultiplier: usingCrossStateFare ? 1 : trafficMultiplier,
