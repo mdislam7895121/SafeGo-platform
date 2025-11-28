@@ -56,7 +56,7 @@ import { RouteOptionsBar, type RouteOption as RouteOptionType } from "@/componen
 import { PromoCodeInput } from "@/components/ride/PromoCodeInput";
 
 const VEHICLE_CATEGORY_ORDER_ACTIVE: VehicleCategoryId[] = VEHICLE_CATEGORY_ORDER.filter(
-  (id) => VEHICLE_CATEGORIES[id].isActive
+  (id) => VEHICLE_CATEGORIES[id]?.isActive
 );
 
 function formatCurrency(amount: number, currency: string = "USD"): string {
