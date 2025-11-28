@@ -166,6 +166,23 @@ export interface FeeBreakdownItem {
   paidToDriver?: boolean;
 }
 
+export interface FareFlags {
+  trafficApplied: boolean;
+  surgeApplied: boolean;
+  nightApplied: boolean;
+  peakApplied: boolean;
+  longDistanceApplied: boolean;
+  crossCityApplied: boolean;
+  crossStateApplied: boolean;
+  airportFeeApplied: boolean;
+  borderZoneApplied: boolean;
+  regulatoryFeeApplied: boolean;
+  returnDeadheadApplied: boolean;
+  promoApplied: boolean;
+  stateMinimumFareApplied: boolean;
+  shortTripAdjustmentApplied: boolean;
+}
+
 export interface RouteFareBreakdown {
   routeId: string;
   routeSummary?: string;
@@ -180,18 +197,21 @@ export interface RouteFareBreakdown {
   
   // Adjustments
   trafficAdjustment: number;
+  trafficMultiplier: number;
   surgeAmount: number;
   surgeMultiplier: number;
   
-  // Time-based surcharges
+  // Time-based surcharges (mutually exclusive)
   nightSurcharge: number;
   peakHourSurcharge: number;
   
   // Distance-based fees
+  shortTripAdjustment: number;
   longDistanceFee: number;
   crossCitySurcharge: number;
   crossStateSurcharge: number;
   returnDeadheadFee: number;
+  excessReturnMiles: number;
   
   // Location-based fees
   airportFee: number;
@@ -214,6 +234,7 @@ export interface RouteFareBreakdown {
   // Discounts
   discountAmount: number;
   promoCode?: string;
+  effectiveDiscountPct: number;
   
   // Totals
   subtotal: number;
@@ -224,7 +245,7 @@ export interface RouteFareBreakdown {
   maximumFareApplied: boolean;
   originalCalculatedFare: number;
   stateMinimumFare?: number;
-  stateMinimumFareApplied: boolean;
+  absoluteMinimumFare: number;
   
   // Driver payout
   driverPayout: number;
@@ -237,13 +258,17 @@ export interface RouteFareBreakdown {
   marginProtectionCapped: boolean;
   marginShortfall: number;
   
-  // Explicit flags for fee application
+  // Consolidated flags object (as per spec)
+  flags: FareFlags;
+  
+  // Legacy individual flags (for backward compatibility)
   crossCityApplied: boolean;
   crossStateApplied: boolean;
   regulatoryFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
+  stateMinimumFareApplied: boolean;
   
   // Matched zones for logging
   matchedZoneIds: string[];
@@ -396,6 +421,8 @@ function haversineDistanceMiles(
 const DEFAULT_FARE_RULES = {
   NIGHT_SURCHARGE_PERCENT: 10,      // 10% night surcharge (8PM-6AM)
   PEAK_HOUR_SURCHARGE_PERCENT: 15,  // 15% peak hour surcharge
+  SHORT_TRIP_THRESHOLD_MILES: 2.0,  // Short trip threshold
+  SHORT_TRIP_MINIMUM_FARE: 8.00,    // Minimum fare for short trips
   LONG_DISTANCE_THRESHOLD_MILES: 25, // Long distance threshold
   LONG_DISTANCE_FEE_PER_MILE: 0.50, // Extra fee per mile after threshold
   CROSS_CITY_SURCHARGE: 5.00,       // Flat fee for cross-city trips
@@ -405,6 +432,8 @@ const DEFAULT_FARE_RULES = {
   MAXIMUM_FARE: 500.00,             // Maximum fare cap
   DRIVER_MINIMUM_PAYOUT: 5.00,      // Minimum driver payout guarantee
   COMPANY_MIN_MARGIN_PERCENT: 15,   // Minimum company margin
+  AIRPORT_OVERRIDES_CROSS_CITY: true, // Airport fee overrides cross-city surcharge
+  RETURN_DEADHEAD_THRESHOLD_MILES: 25, // Miles before deadhead fee kicks in
 };
 
 // State-specific regulatory fees (US states)
@@ -775,7 +804,22 @@ export class FareCalculationService {
     const timeFare = roundCurrency(route.durationMinutes * Number(fareConfig.perMinuteRate));
     
     // ============================================
-    // 2. TRAFFIC ADJUSTMENT
+    // 2. SHORT-TRIP ADJUSTMENT (if configured)
+    // ============================================
+    const shortTripThreshold = DEFAULT_FARE_RULES.SHORT_TRIP_THRESHOLD_MILES;
+    const shortTripMinimumFare = DEFAULT_FARE_RULES.SHORT_TRIP_MINIMUM_FARE;
+    let shortTripAdjustment = 0;
+    let shortTripAdjustmentApplied = false;
+    
+    const rawBaseFare = baseFare + distanceFare + timeFare;
+    if (route.distanceMiles < shortTripThreshold && rawBaseFare < shortTripMinimumFare) {
+      shortTripAdjustment = roundCurrency(shortTripMinimumFare - rawBaseFare);
+      shortTripAdjustmentApplied = true;
+    }
+    
+    // ============================================
+    // 3. TRAFFIC ADJUSTMENT
+    // Applied AFTER short-trip adjustment per spec
     // ============================================
     const trafficLevel = getTrafficLevel(route.durationMinutes, route.trafficDurationMinutes);
     let trafficMultiplier = 1;
@@ -785,9 +829,13 @@ export class FareCalculationService {
       case "heavy": trafficMultiplier = Number(fareConfig.trafficMultiplierHeavy); break;
     }
     
-    const tripCost = baseFare + distanceFare + timeFare;
+    // Include short-trip adjustment in trip cost (step 2 in pipeline)
+    const tripCost = baseFare + distanceFare + timeFare + shortTripAdjustment;
     const trafficAdjusted = roundCurrency(tripCost * trafficMultiplier);
     const trafficAdjustment = roundCurrency(trafficAdjusted - tripCost);
+    
+    // Track if traffic adjustment was applied (multiplier != 1 OR adjustment > 0)
+    const trafficApplied = trafficMultiplier !== 1 || trafficAdjustment > 0;
     
     // ============================================
     // 3. SURGE MULTIPLIER (Dynamic High-Demand)
@@ -882,20 +930,29 @@ export class FareCalculationService {
     
     // ============================================
     // 7C. CROSS-CITY AND CROSS-STATE SURCHARGES
-    // Airport fee overrides cross-city but NOT cross-state
+    // Priority rules per spec:
+    // - Cross-state takes precedence over cross-city
+    // - Airport can override cross-city IF config.AIRPORT_OVERRIDES_CROSS_CITY is true
+    // - Airport does NOT override cross-state
     // ============================================
     let crossCitySurcharge = 0;
     let crossStateSurcharge = 0;
     let crossCityApplied = false;
     let crossStateApplied = false;
     
+    // Check configurable airport override behavior
+    const airportOverridesCrossCity = DEFAULT_FARE_RULES.AIRPORT_OVERRIDES_CROSS_CITY;
+    
     // Cross-state takes precedence over cross-city
     if (pickupStateCode && dropoffStateCode && pickupStateCode !== dropoffStateCode) {
       crossStateSurcharge = crossStateSurchargeAmount;
       crossStateApplied = true;
     } else if (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) {
-      // Only apply cross-city if no airport fee (airport overrides cross-city)
-      if (!airportFeeApplied) {
+      // Apply cross-city surcharge UNLESS:
+      // 1. Cross-state is already applied (handled above)
+      // 2. Airport fee is applied AND airportOverridesCrossCity is true
+      const shouldSkipCrossCity = airportFeeApplied && airportOverridesCrossCity;
+      if (!shouldSkipCrossCity) {
         crossCitySurcharge = crossCitySurchargeAmount;
         crossCityApplied = true;
       }
@@ -907,6 +964,7 @@ export class FareCalculationService {
     // ============================================
     let returnDeadheadFee = 0;
     let returnDeadheadApplied = false;
+    let excessReturnMiles = 0;
     
     // Calculate excess return miles for cross-state trips
     if (crossStateApplied) {
@@ -915,8 +973,9 @@ export class FareCalculationService {
         dropoff.lat, dropoff.lng,
         pickup.lat, pickup.lng
       );
-      // Only charge for portion beyond typical service area (25 miles)
-      const excessReturnMiles = Math.max(0, returnDistance - 25);
+      // Only charge for portion beyond typical service area threshold
+      const deadheadThreshold = DEFAULT_FARE_RULES.RETURN_DEADHEAD_THRESHOLD_MILES;
+      excessReturnMiles = Math.max(0, returnDistance - deadheadThreshold);
       if (excessReturnMiles > 0) {
         returnDeadheadFee = roundCurrency(excessReturnMiles * DEFAULT_FARE_RULES.RETURN_DEADHEAD_PER_MILE);
         returnDeadheadApplied = true;
@@ -1237,6 +1296,34 @@ export class FareCalculationService {
     // Calculate ACTUAL margin percentage from final values
     const companyMarginPercent = calcMarginPercent(finalFare, safegoCommission);
     
+    // Build the consolidated flags object
+    const flags: FareFlags = {
+      trafficApplied,
+      surgeApplied: effectiveSurge > 1,
+      nightApplied: nightSurcharge > 0,
+      peakApplied: peakHourSurcharge > 0,
+      longDistanceApplied: longDistanceFee > 0,
+      crossCityApplied,
+      crossStateApplied,
+      airportFeeApplied,
+      borderZoneApplied: borderZoneFeeApplied,
+      regulatoryFeeApplied,
+      returnDeadheadApplied,
+      promoApplied: false, // Will be set by promo engine
+      stateMinimumFareApplied,
+      shortTripAdjustmentApplied,
+    };
+    
+    // Calculate effective discount percentage
+    const effectiveDiscountPct = discountAmount > 0 && subtotal > 0
+      ? roundCurrency((discountAmount / subtotal) * 100)
+      : 0;
+    
+    // Calculate absolute minimum fare (max of global and state minimums)
+    const absoluteMinimumFare = stateMinimumFare && stateMinimumFare > globalMinimumFare
+      ? stateMinimumFare
+      : globalMinimumFare;
+
     return {
       routeId: route.routeId,
       routeSummary: route.summary,
@@ -1249,16 +1336,19 @@ export class FareCalculationService {
       timeFare,
       
       trafficAdjustment,
+      trafficMultiplier,
       surgeAmount,
       surgeMultiplier: effectiveSurge,
       
       nightSurcharge,
       peakHourSurcharge,
       
+      shortTripAdjustment,
       longDistanceFee,
       crossCitySurcharge,
       crossStateSurcharge,
       returnDeadheadFee,
+      excessReturnMiles,
       
       // Location-based fees
       airportFee,
@@ -1278,6 +1368,7 @@ export class FareCalculationService {
       serviceFee,
       
       discountAmount,
+      effectiveDiscountPct,
       
       subtotal,
       totalFare: finalFare,
@@ -1286,7 +1377,7 @@ export class FareCalculationService {
       maximumFareApplied,
       originalCalculatedFare: grossFare,
       stateMinimumFare: stateMinimumFare || undefined,
-      stateMinimumFareApplied,
+      absoluteMinimumFare,
       
       driverPayout,
       driverMinimumPayoutApplied,
@@ -1297,13 +1388,17 @@ export class FareCalculationService {
       marginProtectionCapped,
       marginShortfall,
       
-      // Explicit flags for fee application
+      // Consolidated flags object (as per spec)
+      flags,
+      
+      // Legacy individual flags (for backward compatibility)
       crossCityApplied,
       crossStateApplied,
       regulatoryFeeApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
+      stateMinimumFareApplied,
       
       matchedZoneIds,
     };

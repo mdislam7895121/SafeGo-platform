@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 export interface FareBreakdownData {
   tripFare: number;
   trafficAdjustment: number;
+  trafficMultiplier?: number;
   tolls: number;
   cityFees: number;
   serviceFee: number;
@@ -39,10 +40,12 @@ export interface FareBreakdownData {
   totalFare: number;
   nightSurcharge?: number;
   peakHourSurcharge?: number;
+  shortTripAdjustment?: number;
   longDistanceFee?: number;
   crossCitySurcharge?: number;
   crossStateSurcharge?: number;
   returnDeadheadFee?: number;
+  excessReturnMiles?: number;
   airportFee?: number;
   airportCode?: string;
   borderZoneFee?: number;
@@ -54,9 +57,28 @@ export interface FareBreakdownData {
   maximumFareApplied?: boolean;
   stateMinimumFareApplied?: boolean;
   stateMinimumFare?: number;
+  absoluteMinimumFare?: number;
   originalFare?: number;
   driverMinimumPayoutApplied?: boolean;
-  // Explicit flags
+  effectiveDiscountPct?: number;
+  // Consolidated flags object
+  flags?: {
+    trafficApplied?: boolean;
+    surgeApplied?: boolean;
+    nightApplied?: boolean;
+    peakApplied?: boolean;
+    longDistanceApplied?: boolean;
+    crossCityApplied?: boolean;
+    crossStateApplied?: boolean;
+    airportFeeApplied?: boolean;
+    borderZoneApplied?: boolean;
+    regulatoryFeeApplied?: boolean;
+    returnDeadheadApplied?: boolean;
+    promoApplied?: boolean;
+    stateMinimumFareApplied?: boolean;
+    shortTripAdjustmentApplied?: boolean;
+  };
+  // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
   crossStateApplied?: boolean;
   regulatoryFeeApplied?: boolean;
@@ -161,6 +183,14 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           icon={Clock} 
           label="Peak hour (rush hour)" 
           amount={breakdown.peakHourSurcharge ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.shortTripAdjustment ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Navigation} 
+          label="Short trip adjustment" 
+          amount={breakdown.shortTripAdjustment ?? 0} 
           currency={currency} 
         />
       )}

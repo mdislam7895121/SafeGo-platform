@@ -1,0 +1,343 @@
+You are updating the SafeGo US fare engine.
+
+Goal:
+- Implement a complete, deterministic pricing pipeline.
+- No fee is accidentally skipped or double-applied.
+- Cross-city, cross-state, airport, regulatory, promo, and protection rules all work together.
+- Final fares stay competitive but protect drivers and company margin.
+
+========================
+A. GLOBAL CALCULATION PIPELINE (ORDER MATTERS)
+========================
+
+For a single ride, the fare engine MUST follow this exact order:
+
+1) Base Fare
+   - baseFare = pickupFee + (distanceMiles * perMileRate) + (durationMinutes * perMinuteRate)
+   - Use city/state specific base configs.
+
+2) Distance & Time Adjustments
+   - Apply minimum distance/short-trip adjustments if configured.
+   - Example: enforce short-trip minimum if total distance < shortTripThreshold.
+
+3) Traffic / ETA Adjustment
+   - Adjust for traffic if ETA is significantly above normal.
+   - trafficAdjustedFare = baseFare * trafficMultiplier
+   - Keep a flag: trafficApplied: true/false
+
+4) Surge Multiplier
+   - surgeAdjustedFare = trafficAdjustedFare * surgeMultiplier
+   - surgeMultiplier >= 1.0
+   - Keep surgeMultiplier and surgeReason in breakdown.
+
+5) Time-Based Surcharges (Night / Peak Hour)
+   - Decide mutually exclusive:
+     - If within Night Window -> apply night surcharge.
+     - Else if within Peak Window -> apply peak surcharge.
+     - Else -> none.
+   - nightSurcharge = surgeAdjustedFare * nightPct
+   - peakSurcharge = surgeAdjustedFare * peakPct
+   - Add only ONE of them.
+   - timeAdjustedFare = surgeAdjustedFare + (nightSurcharge OR peakSurcharge)
+
+6) Long-Distance Fee
+   - Trigger: distanceMiles > longDistanceThreshold (e.g., 25 mi)
+   - longDistanceFee = (distanceMiles - threshold) * longDistanceRate
+   - Add to fare.
+   - Keep: longDistanceApplied flag.
+
+7) Tolls
+   - Sum all tolls on selected route.
+   - tollsTotal included as pass-through item.
+   - Add to fare and show separately in breakdown.
+
+8) Geographic / Regulatory Surcharges (City/State/Airport/Border)
+   Apply in this order and with these priorities:
+
+   8.1) Airport Surcharge (highest local priority)
+       - Detect airport pickup/dropoff by airport zone or airportCode.
+       - airportFee = airportConfig[airportCode].flatFee
+       - airportFee overrides cross-city surcharge if both would apply.
+
+   8.2) Cross-State Surcharge
+       - If pickupState != dropoffState:
+         - crossStateFee = 10.00 (flat, configurable)
+         - DO NOT apply cross-city surcharge in this case.
+       - Keep flag: crossStateApplied: true
+
+   8.3) Cross-City Surcharge (same state)
+       - If pickupCity != dropoffCity AND pickupState == dropoffState AND NOT crossStateApplied:
+         - crossCityFee = 5.00 (flat, configurable)
+       - Keep flag: crossCityApplied: true/false
+
+   8.4) Border-Zone Fee
+       - If either end in defined borderZone:
+         - zoneFee = borderZoneConfig.flatFee (e.g., 3.00)
+       - Keep flag: borderZoneApplied.
+
+   8.5) State Regulatory Fees (per pickupState)
+       - Example defaults (configurable):
+         - NY: blackCarFundPct = 2.5% of current fare (excluding tolls)
+         - NJ: transportationFeeFlat = 0.50
+         - CT: rideshareFeeFlat = 0.40
+       - Add regulatoryFees to breakdown.
+       - Keep: regulatoryFeeApplied with stateCode.
+
+   After step 8, we have:
+   geoRegulatoryAdjustedFare = timeAdjustedFare + longDistanceFee + tolls + airportFee + crossStateFee + crossCityFee + zoneFee + regulatoryFees
+
+9) Return Deadhead Charge (Cross-State / Out-of-Area)
+   - Trigger conditions:
+     - Cross-state ride OR
+     - Dropoff outside driverHomeRegion or outside serviceArea polygons.
+   - returnDeadheadFee = excessReturnMiles * deadheadRate (e.g., $0.25/mile)
+   - Add to fare.
+   - Keep: returnDeadheadApplied: true/false and excessReturnMiles.
+
+10) Service / Platform Fee
+    - serviceFee = geoRegulatoryAdjustedFare * serviceFeePct OR flatServiceFee.
+    - This is the rider-facing "service fee" (not driver earnings).
+    - Add to fare and breakdown.
+
+11) Promotions / Discounts (Promo Engine)
+    Apply AFTER all base + surcharges + service fee, BEFORE guards.
+
+    - Input: list of active promos (percentage, flat, capped).
+    - Calculate discount according to promo rules:
+      - Ensure minimum fare allowed by promo config.
+      - Respect usage limits & eligibility.
+    - discountAmount must never push fare below configured absolute minimum.
+    - finalBeforeGuards = max(geoRegulatoryAdjustedFare + serviceFee - discountAmount, absoluteMinimumFare)
+    - Keep:
+        promoApplied: true/false
+        promoCode
+        discountAmount
+        effectiveDiscountPct
+
+12) Maximum Fare Guard
+    - If finalBeforeGuards > maximumFare (e.g., $500):
+        finalBeforeGuards = maximumFare
+        maximumFareApplied: true
+    - Else: maximumFareApplied: false
+
+13) Driver Earnings & Protection
+    - Calculate driverPayoutCandidates based on driverSharePct or per-mile/per-minute rates.
+    - driverCalculatedPayout = function(finalBeforeGuards, config)
+    - If driverCalculatedPayout < driverMinimumPayout (e.g., $5):
+        driverPayout = driverMinimumPayout
+        driverMinimumPayoutApplied: true
+    - Else:
+        driverPayout = driverCalculatedPayout
+        driverMinimumPayoutApplied: false
+
+14) Company Commission & Margin Protection
+    - companyCommission = finalBeforeGuards - driverPayout - tollsPassThrough - regulatoryPassThroughPortion
+    - companyCommissionPct = companyCommission / finalBeforeGuards
+
+    - If companyCommissionPct < minCompanyMarginPct (e.g., 15%):
+        - Try, in order:
+            1) Adjust fare upward (up to maximumFare) to reach minCompanyMarginPct.
+            2) If still not possible, slightly reduce driverPayout but NEVER below driverMinimumPayout.
+            3) If still not possible, accept lower margin and set marginProtectionCapped: true.
+    - Keep:
+        companyMarginPct
+        marginProtectionCapped: true/false
+
+15) Final Rider Fare
+    - finalFare = roundToTwoDecimals(finalBeforeGuards)  (after possible margin adjustments)
+    - Ensure finalFare >= absoluteMinimumFare and <= maximumFare.
+
+16) Output Detailed Breakdown Object
+    - Must include at minimum:
+
+      {
+        baseFare,
+        distanceMiles,
+        durationMinutes,
+        trafficMultiplier,
+        surgeMultiplier,
+        nightSurcharge,
+        peakSurcharge,
+        longDistanceFee,
+        tolls,
+        airportFee,
+        crossCityFee,
+        crossStateFee,
+        borderZoneFee,
+        regulatoryFees,
+        returnDeadheadFee,
+        serviceFee,
+        promoCode,
+        discountAmount,
+        maximumFareApplied,
+        driverPayout,
+        driverMinimumPayoutApplied,
+        companyCommission,
+        companyMarginPct,
+        marginProtectionCapped,
+        flags: {
+          trafficApplied,
+          surgeApplied,
+          nightApplied,
+          peakApplied,
+          longDistanceApplied,
+          crossCityApplied,
+          crossStateApplied,
+          borderZoneApplied,
+          regulatoryFeeApplied,
+          returnDeadheadApplied,
+          promoApplied,
+          stateMinimumFareApplied
+        }
+      }
+
+========================
+B. PRIORITY / CONFLICT RULES
+========================
+
+1) Night vs Peak:
+   - Only one can apply:
+     - If in Night window -> apply night.
+     - Else if in Peak window -> apply peak.
+     - Else -> none.
+
+2) Cross-City vs Cross-State:
+   - If crossStateApplied == true:
+       crossCityFee MUST be 0 and crossCityApplied = false.
+
+3) Airport vs Cross-City:
+   - Airport surcharge always applies when in an airport zone.
+   - Cross-City still allowed, except when your product spec says airport overrides it.
+   - For now:
+       - If airport + cross-city: apply both.
+       - If you want stricter rule: set config.airportOverridesCrossCity = true.
+
+4) Airport vs Cross-State:
+   - Both can apply (airport fee + cross-state fee).
+   - Regulation differences handled by config per airport/state if needed.
+
+5) State Minimum Fare vs Global Absolute Minimum:
+   - pickupState defines stateMinimumFare.
+   - absoluteMinimumFare = max(globalMinimumFare, stateMinimumFare).
+   - All discounts and adjustments must maintain fare >= absoluteMinimumFare.
+
+6) Maximum Fare Guard:
+   - Applied after promo, before driver/company protection logic.
+
+7) Driver Minimum Payout vs Margin Protection:
+   - Driver minimum payout is hard floor.
+   - Margin protection cannot push driverPayout below driverMinimumPayout.
+
+8) Promo Application:
+   - Promos must never discount tolls below actual tolls.
+   - Promo discount is applied on (fareWithoutTolls + serviceFee), then tolls are added back.
+   - This ensures tolls are pass-through.
+
+========================
+C. TEST SCENARIOS (FOR AUTOMATED CHECKS)
+========================
+
+Create automated tests for these scenarios to verify the pricing logic:
+
+1) Normal Short Trip (Same City, No Surge)
+   - 3 mi, 10 min, no traffic, no night/peak, no tolls.
+   - Expect: base + small service fee, no surcharges, no promos.
+   - Margin >= 15%, driver payout >= $5.
+
+2) Night Trip (Within City)
+   - Same route as #1 but at 11:00 PM.
+   - Expect: night surcharge applied, no peak surcharge.
+
+3) Peak Hour Trip (Within City)
+   - Same route as #1 but at 8:30 AM on a weekday.
+   - Expect: peak surcharge applied, no night surcharge.
+
+4) Long-Distance Same-State Trip
+   - 35 mi, 50 min, within same state but different cities.
+   - Expect:
+     - longDistanceFee > 0
+     - crossCityFee applied
+     - no crossStateFee
+     - no airportFee
+
+5) Cross-State Trip (No Airport)
+   - Pickup NY, dropoff NJ, 20 mi.
+   - Expect:
+     - crossStateFee = 10
+     - crossCityFee = 0
+     - returnDeadheadFee > 0 if excessReturnMiles > 0
+     - state regulatory fees based on pickupState (NY).
+
+6) Airport Pickup (Same State)
+   - Pickup at JFK airport (NY), dropoff Brooklyn.
+   - Expect:
+     - airportFee applied
+     - regulatory NY fee applied
+     - crossCityFee depends on city codes
+     - no crossStateFee.
+
+7) Airport Dropoff Cross-State
+   - Pickup Manhattan (NY), dropoff Newark Airport (NJ).
+   - Expect:
+     - airportFee(EWR)
+     - crossStateFee = 10
+     - correct regulatory fees based on pickupState NY
+     - returnDeadheadFee may apply depending on config.
+
+8) Border-Zone Trip (Non-Airport)
+   - Pickup near state border in NY, dropoff just inside NJ border zone.
+   - Expect:
+     - borderZoneFee applied if configured
+     - crossStateFee = 10
+     - no crossCityFee.
+
+9) High Surge with Maximum Fare Guard
+   - Very long trip + high surge that would push fare above $500.
+   - Expect:
+     - raw calculation > 500
+     - finalFare capped at 500
+     - maximumFareApplied: true.
+
+10) Very Short Trip – Driver Minimum Payout
+    - 0.5 mi, 3 min.
+    - Expect:
+      - driverCalculatedPayout < 5
+      - driverPayout = 5
+      - driverMinimumPayoutApplied: true
+      - marginProtection still keeps commission >= 15% if possible.
+
+11) Promo Percentage Discount
+    - Normal trip, apply 20% promo.
+    - Expect:
+      - discountAmount = 20% of eligible fare (excluding tolls)
+      - final fare >= absoluteMinimumFare
+      - promoApplied: true.
+
+12) Promo Fixed Discount with Minimum Fare
+    - Trip with $15 fare, $10 flat promo, minimum fare = $8.
+    - Expect:
+      - discountAmount reduced so finalFare is NOT below $8.
+      - proper breakdown of base vs discount.
+
+13) Cross-State + Promo + Margin Check
+    - Cross-state trip with promo that would push company margin below 15%.
+    - Expect:
+      - marginProtection logic tries to raise fare (up to max fare) or adjusts within rules.
+      - If still below 15%, marginProtectionCapped: true.
+
+For each scenario, assert:
+- finalFare correctness
+- driverPayout and companyCommission values
+- all relevant flags (crossCityApplied, crossStateApplied, airportFeeApplied, etc.)
+
+========================
+D. IMPLEMENTATION NOTES
+========================
+
+- Keep all thresholds and percentages configurable per city/state/airport from a central config file.
+- Ensure the pipeline is pure and deterministic: given the same inputs, it always returns the same breakdown.
+- Log the full breakdown object for audit/debugging.
+- Add unit tests that cover all scenarios in section C.
+- Return both:
+  - summary: { finalFare, driverPayout, companyCommission }
+  - breakdown: detailed structure from step 16.
