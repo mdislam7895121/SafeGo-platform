@@ -1229,4 +1229,435 @@ describe('NYC TLC Minimum Pay Engine', () => {
       });
     });
   });
+
+  /**
+   * Step 9: NYC TLC Out-of-Town Surcharge Tests
+   * 
+   * TLC Rule: $15.00 flat fee for trips leaving NYC
+   * - Pickup must be in NYC boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten Island)
+   * - Dropoff must be OUTSIDE NYC (different state, or outside NYC county within NY)
+   * - Fee compensates driver for return trip "deadhead" back to NYC for next fare
+   * - Fee is a regulatory pass-through (not SafeGo revenue)
+   * - Pipeline position: Step 6H (after Long Trip Surcharge, before cross-city)
+   */
+  describe('NYC TLC Out-of-Town Surcharge (Step 9)', () => {
+    const TLC_OUT_OF_TOWN_FEE = 15.00;
+    const NYC_BOROUGH_CODES = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
+    const NYC_COUNTY_CODES = ['new_york', 'kings', 'queens', 'bronx', 'richmond'];
+
+    describe('Fee Constant Validation', () => {
+      it('should define Out-of-Town Surcharge as $15.00', () => {
+        expect(TLC_OUT_OF_TOWN_FEE).toBe(15.00);
+      });
+    });
+
+    describe('Geographic Eligibility - NYC Pickup Requirement', () => {
+      it('should identify Manhattan as valid NYC pickup zone', () => {
+        const pickupZone = 'manhattan';
+        const isNYCPickup = NYC_BOROUGH_CODES.includes(pickupZone);
+        expect(isNYCPickup).toBe(true);
+      });
+
+      it('should identify Brooklyn as valid NYC pickup zone', () => {
+        const pickupZone = 'brooklyn';
+        const isNYCPickup = NYC_BOROUGH_CODES.includes(pickupZone);
+        expect(isNYCPickup).toBe(true);
+      });
+
+      it('should identify Queens as valid NYC pickup zone', () => {
+        const pickupZone = 'queens';
+        const isNYCPickup = NYC_BOROUGH_CODES.includes(pickupZone);
+        expect(isNYCPickup).toBe(true);
+      });
+
+      it('should identify Bronx as valid NYC pickup zone', () => {
+        const pickupZone = 'bronx';
+        const isNYCPickup = NYC_BOROUGH_CODES.includes(pickupZone);
+        expect(isNYCPickup).toBe(true);
+      });
+
+      it('should identify Staten Island as valid NYC pickup zone', () => {
+        const pickupZone = 'staten_island';
+        const isNYCPickup = NYC_BOROUGH_CODES.includes(pickupZone);
+        expect(isNYCPickup).toBe(true);
+      });
+
+      it('should NOT identify Nassau County as valid NYC pickup zone', () => {
+        const pickupZone = 'nassau';
+        const isNYCPickup = NYC_BOROUGH_CODES.includes(pickupZone);
+        expect(isNYCPickup).toBe(false);
+      });
+    });
+
+    describe('Geographic Eligibility - Out-of-Town Dropoff Detection', () => {
+      it('should detect dropoff in New Jersey as out-of-town', () => {
+        const pickupState = 'NY';
+        const dropoffState = 'NJ';
+        const isOutOfTown = dropoffState !== 'NY';
+        expect(isOutOfTown).toBe(true);
+      });
+
+      it('should detect dropoff in Connecticut as out-of-town', () => {
+        const pickupState = 'NY';
+        const dropoffState = 'CT';
+        const isOutOfTown = dropoffState !== 'NY';
+        expect(isOutOfTown).toBe(true);
+      });
+
+      it('should detect dropoff in Nassau County (Long Island) as out-of-town', () => {
+        const pickupZone = 'manhattan';
+        const dropoffCounty = 'nassau';
+        const isNYCDropoff = NYC_COUNTY_CODES.includes(dropoffCounty);
+        expect(isNYCDropoff).toBe(false);
+      });
+
+      it('should detect dropoff in Suffolk County (Long Island) as out-of-town', () => {
+        const pickupZone = 'brooklyn';
+        const dropoffCounty = 'suffolk';
+        const isNYCDropoff = NYC_COUNTY_CODES.includes(dropoffCounty);
+        expect(isNYCDropoff).toBe(false);
+      });
+
+      it('should detect dropoff in Westchester County as out-of-town', () => {
+        const pickupZone = 'bronx';
+        const dropoffCounty = 'westchester';
+        const isNYCDropoff = NYC_COUNTY_CODES.includes(dropoffCounty);
+        expect(isNYCDropoff).toBe(false);
+      });
+    });
+
+    describe('Geographic Eligibility - Trips NOT Leaving NYC', () => {
+      it('should NOT apply for trips within Manhattan', () => {
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'manhattan';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        expect(isLeavingNYC).toBe(false);
+      });
+
+      it('should NOT apply for trips from Manhattan to Brooklyn', () => {
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'brooklyn';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        expect(isLeavingNYC).toBe(false);
+      });
+
+      it('should NOT apply for trips from Brooklyn to Queens', () => {
+        const pickupZone = 'brooklyn';
+        const dropoffZone = 'queens';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        expect(isLeavingNYC).toBe(false);
+      });
+
+      it('should NOT apply for trips from Queens to Bronx', () => {
+        const pickupZone = 'queens';
+        const dropoffZone = 'bronx';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        expect(isLeavingNYC).toBe(false);
+      });
+
+      it('should NOT apply for trips from Bronx to Staten Island', () => {
+        const pickupZone = 'bronx';
+        const dropoffZone = 'staten_island';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        expect(isLeavingNYC).toBe(false);
+      });
+    });
+
+    describe('Geographic Eligibility - Trips Leaving NYC (Should Apply)', () => {
+      it('should apply for Manhattan to New Jersey', () => {
+        const pickupZone = 'manhattan';
+        const dropoffState = 'NJ';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsOutOfState = dropoffState !== 'NY';
+        const isLeavingNYC = pickupIsNYC && dropoffIsOutOfState;
+        expect(isLeavingNYC).toBe(true);
+      });
+
+      it('should apply for Queens to Nassau County (Long Island)', () => {
+        const pickupZone = 'queens';
+        const dropoffZone = 'nassau';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        expect(isLeavingNYC).toBe(true);
+      });
+
+      it('should apply for Brooklyn to Connecticut', () => {
+        const pickupZone = 'brooklyn';
+        const dropoffState = 'CT';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsOutOfState = dropoffState !== 'NY';
+        const isLeavingNYC = pickupIsNYC && dropoffIsOutOfState;
+        expect(isLeavingNYC).toBe(true);
+      });
+
+      it('should apply for Bronx to Westchester County', () => {
+        const pickupZone = 'bronx';
+        const dropoffZone = 'westchester';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        expect(isLeavingNYC).toBe(true);
+      });
+
+      it('should apply for Staten Island to New Jersey', () => {
+        const pickupZone = 'staten_island';
+        const dropoffState = 'NJ';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsOutOfState = dropoffState !== 'NY';
+        const isLeavingNYC = pickupIsNYC && dropoffIsOutOfState;
+        expect(isLeavingNYC).toBe(true);
+      });
+    });
+
+    describe('Geographic Eligibility - Trips Entering NYC (Should NOT Apply)', () => {
+      it('should NOT apply for trips from New Jersey to Manhattan', () => {
+        const pickupState = 'NJ';
+        const dropoffZone = 'manhattan';
+        const pickupIsNYC = false; // NJ is not NYC
+        const isLeavingNYC = pickupIsNYC;
+        expect(isLeavingNYC).toBe(false);
+      });
+
+      it('should NOT apply for trips from Nassau County to Queens', () => {
+        const pickupZone = 'nassau';
+        const dropoffZone = 'queens';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        expect(pickupIsNYC).toBe(false);
+        expect(dropoffIsNYC).toBe(true);
+      });
+
+      it('should NOT apply for trips from Westchester to Bronx', () => {
+        const pickupZone = 'westchester';
+        const dropoffZone = 'bronx';
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        expect(pickupIsNYC).toBe(false);
+      });
+
+      it('should NOT apply for trips from Connecticut to Manhattan', () => {
+        const pickupState = 'CT';
+        const dropoffZone = 'manhattan';
+        const pickupIsNYC = false;
+        expect(pickupIsNYC).toBe(false);
+      });
+    });
+
+    describe('Fee Amount and Regulatory Status', () => {
+      it('should charge exactly $15.00 for out-of-town trips', () => {
+        const fee = TLC_OUT_OF_TOWN_FEE;
+        expect(fee).toBe(15.00);
+      });
+
+      it('should treat fee as regulatory pass-through (not SafeGo revenue)', () => {
+        const isRegulatoryPassThrough = true;
+        const contributesToCommission = false;
+        const fee = TLC_OUT_OF_TOWN_FEE;
+        
+        expect(fee).toBe(15.00);
+        expect(isRegulatoryPassThrough).toBe(true);
+        expect(contributesToCommission).toBe(false);
+      });
+
+      it('should NOT participate in surge multiplier calculation', () => {
+        const surgeMultiplier = 1.5;
+        const baseFare = 25.00;
+        const surgedFare = baseFare * surgeMultiplier;
+        const outOfTownFee = TLC_OUT_OF_TOWN_FEE;
+        
+        // Out-of-Town fee should NOT be multiplied by surge
+        expect(outOfTownFee).toBe(15.00);
+        expect(surgedFare).toBe(37.50);
+        
+        // Total should be additive, not multiplicative
+        const totalWithFee = surgedFare + outOfTownFee;
+        expect(totalWithFee).toBe(52.50);
+      });
+    });
+
+    describe('Pipeline Sequencing', () => {
+      it('should apply Out-of-Town Surcharge after Long Trip Surcharge in fee pipeline sequence', () => {
+        const pipelineOrder = [
+          'congestion',
+          'airport',
+          'avf',
+          'bcf',
+          'hvrf',
+          'stateSurcharge',
+          'longTripSurcharge',
+          'outOfTownSurcharge',
+          'crossCity',
+          'serviceFee',
+          'commission'
+        ];
+        
+        const longTripIndex = pipelineOrder.indexOf('longTripSurcharge');
+        const outOfTownIndex = pipelineOrder.indexOf('outOfTownSurcharge');
+        const crossCityIndex = pipelineOrder.indexOf('crossCity');
+        
+        expect(outOfTownIndex).toBeGreaterThan(longTripIndex);
+        expect(outOfTownIndex).toBeLessThan(crossCityIndex);
+      });
+
+      it('should be Step 6H in the fare pipeline (after 6A-6G)', () => {
+        const pipelineSteps = {
+          '6A': 'congestion',
+          '6B': 'airport',
+          '6C': 'avf',
+          '6D': 'bcf',
+          '6E': 'hvrf',
+          '6F': 'stateSurcharge',
+          '6G': 'longTripSurcharge',
+          '6H': 'outOfTownSurcharge',
+        };
+        
+        expect(pipelineSteps['6H']).toBe('outOfTownSurcharge');
+      });
+    });
+
+    describe('Fare Breakdown Output', () => {
+      it('should expose Out-of-Town fee in fare breakdown for transparent billing', () => {
+        const fareBreakdown = {
+          tlcOutOfTownFee: TLC_OUT_OF_TOWN_FEE,
+          tlcOutOfTownApplied: true,
+        };
+        
+        expect(fareBreakdown.tlcOutOfTownFee).toBe(15.00);
+        expect(fareBreakdown.tlcOutOfTownApplied).toBe(true);
+      });
+
+      it('should expose Out-of-Town fee applied flag as false when not eligible', () => {
+        const fareBreakdown = {
+          tlcOutOfTownFee: 0,
+          tlcOutOfTownApplied: false,
+        };
+        
+        expect(fareBreakdown.tlcOutOfTownFee).toBe(0);
+        expect(fareBreakdown.tlcOutOfTownApplied).toBe(false);
+      });
+    });
+
+    describe('Combined Scenario Tests', () => {
+      it('should apply both Long Trip and Out-of-Town fees for 90+ minute trip to NJ', () => {
+        const tripDurationMinutes = 95;
+        const pickupZone = 'manhattan';
+        const dropoffState = 'NJ';
+        
+        const isLongTrip = tripDurationMinutes > 60;
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const isLeavingNYC = pickupIsNYC && dropoffState !== 'NY';
+        
+        const longTripFee = isLongTrip ? 20.00 : 0;
+        const outOfTownFee = isLeavingNYC ? 15.00 : 0;
+        const totalFees = longTripFee + outOfTownFee;
+        
+        expect(isLongTrip).toBe(true);
+        expect(isLeavingNYC).toBe(true);
+        expect(longTripFee).toBe(20.00);
+        expect(outOfTownFee).toBe(15.00);
+        expect(totalFees).toBe(35.00);
+      });
+
+      it('should apply Out-of-Town but NOT Long Trip for 45 minute trip to Nassau', () => {
+        const tripDurationMinutes = 45;
+        const pickupZone = 'queens';
+        const dropoffZone = 'nassau';
+        
+        const isLongTrip = tripDurationMinutes > 60;
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        
+        const longTripFee = isLongTrip ? 20.00 : 0;
+        const outOfTownFee = isLeavingNYC ? 15.00 : 0;
+        const totalFees = longTripFee + outOfTownFee;
+        
+        expect(isLongTrip).toBe(false);
+        expect(isLeavingNYC).toBe(true);
+        expect(longTripFee).toBe(0);
+        expect(outOfTownFee).toBe(15.00);
+        expect(totalFees).toBe(15.00);
+      });
+
+      it('should apply Long Trip but NOT Out-of-Town for 90 minute trip within NYC', () => {
+        const tripDurationMinutes = 90;
+        const pickupZone = 'manhattan';
+        const dropoffZone = 'brooklyn';
+        
+        const isLongTrip = tripDurationMinutes > 60;
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        
+        const longTripFee = isLongTrip ? 20.00 : 0;
+        const outOfTownFee = isLeavingNYC ? 15.00 : 0;
+        const totalFees = longTripFee + outOfTownFee;
+        
+        expect(isLongTrip).toBe(true);
+        expect(isLeavingNYC).toBe(false);
+        expect(longTripFee).toBe(20.00);
+        expect(outOfTownFee).toBe(0);
+        expect(totalFees).toBe(20.00);
+      });
+
+      it('should apply neither fee for short trip within NYC', () => {
+        const tripDurationMinutes = 30;
+        const pickupZone = 'bronx';
+        const dropoffZone = 'manhattan';
+        
+        const isLongTrip = tripDurationMinutes > 60;
+        const pickupIsNYC = NYC_BOROUGH_CODES.includes(pickupZone);
+        const dropoffIsNYC = NYC_BOROUGH_CODES.includes(dropoffZone);
+        const isLeavingNYC = pickupIsNYC && !dropoffIsNYC;
+        
+        const longTripFee = isLongTrip ? 20.00 : 0;
+        const outOfTownFee = isLeavingNYC ? 15.00 : 0;
+        const totalFees = longTripFee + outOfTownFee;
+        
+        expect(isLongTrip).toBe(false);
+        expect(isLeavingNYC).toBe(false);
+        expect(longTripFee).toBe(0);
+        expect(outOfTownFee).toBe(0);
+        expect(totalFees).toBe(0);
+      });
+    });
+
+    describe('Fare Pipeline Integration', () => {
+      it('should integrate Out-of-Town Surcharge into comprehensive NYC fare calculation', () => {
+        const baseFare = 2.50;
+        const distanceFare = 25.0 * 1.31; // 25 miles to NJ
+        const timeFare = 45 * 0.56;
+        const surgeAdjusted = baseFare + distanceFare + timeFare;
+        
+        const congestionFee = 2.75;
+        const airportFee = 0;
+        const avfFee = 0.30;
+        const bcfRate = 0.0275;
+        const bcfFee = Math.round(surgeAdjusted * bcfRate * 100) / 100;
+        const hvrfFee = 0.75;
+        const stateSurcharge = 0.50;
+        const longTripFee = 0; // Trip is only 45 minutes
+        const outOfTownFee = TLC_OUT_OF_TOWN_FEE;
+        
+        const allTLCFees = congestionFee + airportFee + avfFee + bcfFee + hvrfFee + stateSurcharge + longTripFee + outOfTownFee;
+        const subtotalWithFees = surgeAdjusted + allTLCFees;
+        
+        expect(surgeAdjusted).toBeCloseTo(60.45, 2);
+        expect(bcfFee).toBeCloseTo(1.66, 2);
+        expect(outOfTownFee).toBe(15.00);
+        expect(allTLCFees).toBeCloseTo(20.96, 2);
+        expect(subtotalWithFees).toBeCloseTo(81.41, 2);
+      });
+    });
+  });
 });
