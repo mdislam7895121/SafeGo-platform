@@ -1574,20 +1574,20 @@ export class FareCalculationService {
     let tlcStateSurchargeApplied = false;
     
     // State Surcharge eligibility: NYC-to-NYC trips only
-    // Uses same eligibility as HVRF (both states NY, subtotal > 0, not airport-to-airport outside NYC)
-    // Also requires at least one endpoint to be in NYC borough
+    // BOTH pickup AND dropoff must be in NYC boroughs (not just NY state)
+    // More restrictive than HVRF which only requires NY state
     const stateSurchargeSubtotalCheck = surgeAdjusted + nightSurcharge + peakHourSurcharge + 
       longDistanceFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee;
     
     // State Surcharge applies if:
-    // 1. Both pickup and dropoff are in NY state (not cross-state)
-    // 2. At least one endpoint is in an NYC borough (trip touches NYC)
-    // 3. The subtotal is greater than zero (not a fully discounted ride)
+    // 1. BOTH pickup AND dropoff are in NYC boroughs (not just NY state)
+    // 2. The subtotal is greater than zero (not a fully discounted ride)
+    // 3. Does NOT apply to: cross-state trips, trips leaving NYC, trips entering NYC from outside
     const pickupInNYCBorough = matchedPickupZones.some(z => NYC_BOROUGH_CODES.includes(z.zoneId.toLowerCase()));
     const dropoffInNYCBorough = matchedDropoffZones.some(z => NYC_BOROUGH_CODES.includes(z.zoneId.toLowerCase()));
-    const tripTouchesNYC = pickupInNYCBorough || dropoffInNYCBorough;
+    const bothInNYCBoroughs = pickupInNYCBorough && dropoffInNYCBorough;
     
-    const stateSurchargeEligible = bothStatesAreNY && tripTouchesNYC && stateSurchargeSubtotalCheck > 0;
+    const stateSurchargeEligible = bothInNYCBoroughs && stateSurchargeSubtotalCheck > 0;
     
     if (stateSurchargeEligible) {
       tlcStateSurcharge = TLC_STATE_SURCHARGE;

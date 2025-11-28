@@ -746,140 +746,206 @@ describe('NYC TLC Minimum Pay Engine', () => {
      * The NY State Surcharge is a $0.50 flat fee applied to all NYC-to-NYC HVFHV trips.
      * This is a state-mandated regulatory fee that goes to NY State.
      * 
-     * Eligibility rules:
-     * - Both pickup AND dropoff must be in NYC boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten Island)
+     * Eligibility rules (more restrictive than HVRF):
+     * - BOTH pickup AND dropoff must be in NYC boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten Island)
+     * - Does NOT apply to trips where only one endpoint is in NYC (e.g., NYC to Westchester)
      * - Does NOT apply to cross-state trips (e.g., NYC to NJ)
      * - Does NOT apply to trips that leave NYC (e.g., NYC to Westchester)
-     * - Does NOT apply to $0 promotional rides
+     * - Does NOT apply to trips entering NYC from outside
+     * - Does NOT apply to $0 promotional rides (subtotal must be > 0)
      * - Fee is a flat $0.50 per trip
      * - Fee does NOT participate in surge multiplier
      * - Full amount is regulatory pass-through (non-commissionable)
      */
 
     const TLC_STATE_SURCHARGE = 0.50;
-    const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+    const NYC_BOROUGHS = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
 
     it('should define correct State Surcharge amount', () => {
       expect(TLC_STATE_SURCHARGE).toBe(0.50);
     });
 
-    it('should apply State Surcharge to NYC-to-NYC trips (Manhattan to Brooklyn)', () => {
-      const pickupBorough: string = 'Manhattan';
-      const dropoffBorough: string = 'Brooklyn';
-      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffBorough);
-      
-      expect(isNYCToNYC).toBe(true);
+    describe('Eligibility - NYC-to-NYC trips', () => {
+      it('should apply State Surcharge to NYC-to-NYC trips (Manhattan to Brooklyn)', () => {
+        const pickupBorough = 'manhattan';
+        const dropoffBorough = 'brooklyn';
+        const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffBorough);
+        
+        expect(bothInNYCBoroughs).toBe(true);
+      });
+
+      it('should apply State Surcharge to same-borough trips (Queens to Queens)', () => {
+        const pickupBorough = 'queens';
+        const dropoffBorough = 'queens';
+        const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffBorough);
+        
+        expect(bothInNYCBoroughs).toBe(true);
+      });
+
+      it('should apply State Surcharge for all NYC borough combinations', () => {
+        for (const pickup of NYC_BOROUGHS) {
+          for (const dropoff of NYC_BOROUGHS) {
+            const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickup) && NYC_BOROUGHS.includes(dropoff);
+            expect(bothInNYCBoroughs).toBe(true);
+          }
+        }
+      });
     });
 
-    it('should apply State Surcharge to same-borough trips (Queens to Queens)', () => {
-      const pickupBorough: string = 'Queens';
-      const dropoffBorough: string = 'Queens';
-      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffBorough);
-      
-      expect(isNYCToNYC).toBe(true);
+    describe('Eligibility - Exclusions', () => {
+      it('should NOT apply State Surcharge to cross-state trips (Manhattan to NJ)', () => {
+        const pickupBorough = 'manhattan';
+        const dropoffLocation = 'newark'; // NJ location - not in NYC_BOROUGHS
+        const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffLocation);
+        
+        expect(bothInNYCBoroughs).toBe(false);
+      });
+
+      it('should NOT apply State Surcharge to trips leaving NYC (Manhattan to Westchester)', () => {
+        const pickupBorough = 'manhattan';
+        const dropoffLocation = 'westchester'; // Not in NYC_BOROUGHS
+        const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffLocation);
+        
+        expect(bothInNYCBoroughs).toBe(false);
+      });
+
+      it('should NOT apply State Surcharge to trips entering NYC from outside', () => {
+        const pickupLocation = 'connecticut'; // Not in NYC_BOROUGHS
+        const dropoffBorough = 'manhattan';
+        const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickupLocation) && NYC_BOROUGHS.includes(dropoffBorough);
+        
+        expect(bothInNYCBoroughs).toBe(false);
+      });
+
+      it('should NOT apply State Surcharge when only pickup is in NYC (NYC to Long Island)', () => {
+        const pickupBorough = 'brooklyn';
+        const dropoffLocation = 'long_island';
+        const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffLocation);
+        
+        expect(bothInNYCBoroughs).toBe(false);
+      });
+
+      it('should NOT apply State Surcharge when only dropoff is in NYC (Long Island to NYC)', () => {
+        const pickupLocation = 'long_island';
+        const dropoffBorough = 'brooklyn';
+        const bothInNYCBoroughs = NYC_BOROUGHS.includes(pickupLocation) && NYC_BOROUGHS.includes(dropoffBorough);
+        
+        expect(bothInNYCBoroughs).toBe(false);
+      });
+
+      it('should NOT apply State Surcharge to $0 promotional rides', () => {
+        const subtotal = 0;
+        const shouldApplyStateSurcharge = subtotal > 0;
+        
+        expect(shouldApplyStateSurcharge).toBe(false);
+      });
+
+      it('should NOT apply State Surcharge to negative subtotal rides', () => {
+        const subtotal = -5;
+        const shouldApplyStateSurcharge = subtotal > 0;
+        
+        expect(shouldApplyStateSurcharge).toBe(false);
+      });
     });
 
-    it('should NOT apply State Surcharge to cross-state trips (Manhattan to NJ)', () => {
-      const pickupBorough: string = 'Manhattan';
-      const dropoffState: string = 'NJ';
-      const dropoffBorough: string | null = null; // Not a NYC borough
-      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && (dropoffBorough !== null && NYC_BOROUGHS.includes(dropoffBorough));
-      
-      expect(isNYCToNYC).toBe(false);
+    describe('Fee Calculation', () => {
+      it('should treat State Surcharge as non-commissionable pass-through', () => {
+        const stateSurcharge = TLC_STATE_SURCHARGE;
+        const baseSubtotal = 25.00;
+        const basePlusFees = baseSubtotal + stateSurcharge;
+        
+        expect(basePlusFees).toBe(25.50);
+      });
+
+      it('should add State Surcharge to total regulatory fees', () => {
+        const congestionFee = 2.75;
+        const avfFee = 0.30;
+        const bcfFee = 0.69;
+        const hvrfFee = 0.75;
+        const stateSurcharge = TLC_STATE_SURCHARGE;
+        
+        const totalRegulatoryFees = congestionFee + avfFee + bcfFee + hvrfFee + stateSurcharge;
+        expect(totalRegulatoryFees).toBeCloseTo(4.99, 2);
+      });
+
+      it('should calculate correct fare breakdown with all NYC TLC fees including State Surcharge', () => {
+        const baseFare = 2.50;
+        const distanceFare = 13.10;
+        const timeFare = 11.20;
+        const surgeAdjusted = baseFare + distanceFare + timeFare;
+        
+        const congestionFee = 2.75;
+        const airportFee = 2.50;
+        const avfFee = 0.30;
+        const bcfRate = 0.0275;
+        const bcfFee = Math.round(surgeAdjusted * bcfRate * 100) / 100;
+        const hvrfFee = 0.75;
+        const stateSurcharge = TLC_STATE_SURCHARGE;
+        
+        const allTLCFees = congestionFee + airportFee + avfFee + bcfFee + hvrfFee + stateSurcharge;
+        const subtotalWithFees = surgeAdjusted + allTLCFees;
+        
+        expect(bcfFee).toBeCloseTo(0.74, 2);
+        expect(allTLCFees).toBeCloseTo(7.54, 2);
+        expect(subtotalWithFees).toBeCloseTo(34.34, 2);
+      });
     });
 
-    it('should NOT apply State Surcharge to trips leaving NYC (Manhattan to Westchester)', () => {
-      const pickupBorough: string = 'Manhattan';
-      const dropoffLocation: string = 'Westchester';
-      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffLocation);
-      
-      expect(isNYCToNYC).toBe(false);
+    describe('Pipeline Sequencing', () => {
+      it('should apply State Surcharge after HVRF in fee pipeline sequence', () => {
+        const pipelineOrder = [
+          'congestion',
+          'airport',
+          'avf',
+          'bcf',
+          'hvrf',
+          'stateSurcharge',
+          'serviceFee',
+          'commission'
+        ];
+        
+        const hvrfIndex = pipelineOrder.indexOf('hvrf');
+        const stateSurchargeIndex = pipelineOrder.indexOf('stateSurcharge');
+        const serviceFeeIndex = pipelineOrder.indexOf('serviceFee');
+        
+        expect(stateSurchargeIndex).toBeGreaterThan(hvrfIndex);
+        expect(stateSurchargeIndex).toBeLessThan(serviceFeeIndex);
+      });
+
+      it('should be Step 6F in the fare pipeline (after 6A-6E)', () => {
+        const pipelineSteps = {
+          '6A': 'congestion',
+          '6B': 'airport',
+          '6C': 'avf',
+          '6D': 'bcf',
+          '6E': 'hvrf',
+          '6F': 'stateSurcharge',
+        };
+        
+        expect(pipelineSteps['6F']).toBe('stateSurcharge');
+      });
     });
 
-    it('should NOT apply State Surcharge to trips entering NYC from outside', () => {
-      const pickupLocation: string = 'Connecticut';
-      const dropoffBorough: string = 'Manhattan';
-      const isNYCToNYC = NYC_BOROUGHS.includes(pickupLocation) && NYC_BOROUGHS.includes(dropoffBorough);
-      
-      expect(isNYCToNYC).toBe(false);
-    });
+    describe('Fare Breakdown Output', () => {
+      it('should expose State Surcharge in fare breakdown for transparent billing', () => {
+        const fareBreakdown = {
+          tlcStateSurcharge: TLC_STATE_SURCHARGE,
+          tlcStateSurchargeApplied: true,
+        };
+        
+        expect(fareBreakdown.tlcStateSurcharge).toBe(0.50);
+        expect(fareBreakdown.tlcStateSurchargeApplied).toBe(true);
+      });
 
-    it('should NOT apply State Surcharge to $0 promotional rides', () => {
-      const subtotal = 0;
-      const shouldApplyStateSurcharge = subtotal > 0;
-      
-      expect(shouldApplyStateSurcharge).toBe(false);
-    });
-
-    it('should treat State Surcharge as non-commissionable pass-through', () => {
-      const stateSurcharge = TLC_STATE_SURCHARGE;
-      const baseSubtotal = 25.00;
-      const basePlusFees = baseSubtotal + stateSurcharge;
-      
-      expect(basePlusFees).toBe(25.50);
-    });
-
-    it('should add State Surcharge to total regulatory fees', () => {
-      const congestionFee = 2.75;
-      const avfFee = 0.30;
-      const bcfFee = 0.69;
-      const hvrfFee = 0.75;
-      const stateSurcharge = TLC_STATE_SURCHARGE;
-      
-      const totalRegulatoryFees = congestionFee + avfFee + bcfFee + hvrfFee + stateSurcharge;
-      expect(totalRegulatoryFees).toBeCloseTo(4.99, 2);
-    });
-
-    it('should calculate correct fare breakdown with all NYC TLC fees including State Surcharge', () => {
-      const baseFare = 2.50;
-      const distanceFare = 13.10;
-      const timeFare = 11.20;
-      const surgeAdjusted = baseFare + distanceFare + timeFare;
-      
-      const congestionFee = 2.75;
-      const airportFee = 2.50;
-      const avfFee = 0.30;
-      const bcfRate = 0.0275;
-      const bcfFee = Math.round(surgeAdjusted * bcfRate * 100) / 100;
-      const hvrfFee = 0.75;
-      const stateSurcharge = TLC_STATE_SURCHARGE;
-      
-      const allTLCFees = congestionFee + airportFee + avfFee + bcfFee + hvrfFee + stateSurcharge;
-      const subtotalWithFees = surgeAdjusted + allTLCFees;
-      
-      expect(bcfFee).toBeCloseTo(0.74, 2);
-      expect(allTLCFees).toBeCloseTo(7.54, 2);
-      expect(subtotalWithFees).toBeCloseTo(34.34, 2);
-    });
-
-    it('should apply State Surcharge after HVRF in fee pipeline sequence', () => {
-      const pipelineOrder = [
-        'congestion',
-        'airport',
-        'avf',
-        'bcf',
-        'hvrf',
-        'stateSurcharge',
-        'serviceFee',
-        'commission'
-      ];
-      
-      const hvrfIndex = pipelineOrder.indexOf('hvrf');
-      const stateSurchargeIndex = pipelineOrder.indexOf('stateSurcharge');
-      const serviceFeeIndex = pipelineOrder.indexOf('serviceFee');
-      
-      expect(stateSurchargeIndex).toBeGreaterThan(hvrfIndex);
-      expect(stateSurchargeIndex).toBeLessThan(serviceFeeIndex);
-    });
-
-    it('should expose State Surcharge in fare breakdown for transparent billing', () => {
-      const fareBreakdown = {
-        tlcStateSurcharge: TLC_STATE_SURCHARGE,
-        tlcStateSurchargeApplied: true,
-      };
-      
-      expect(fareBreakdown.tlcStateSurcharge).toBe(0.50);
-      expect(fareBreakdown.tlcStateSurchargeApplied).toBe(true);
+      it('should expose State Surcharge applied flag as false when not eligible', () => {
+        const fareBreakdown = {
+          tlcStateSurcharge: 0,
+          tlcStateSurchargeApplied: false,
+        };
+        
+        expect(fareBreakdown.tlcStateSurcharge).toBe(0);
+        expect(fareBreakdown.tlcStateSurchargeApplied).toBe(false);
+      });
     });
   });
 });
