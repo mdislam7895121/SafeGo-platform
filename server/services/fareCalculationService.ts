@@ -181,6 +181,7 @@ export interface FareFlags {
   tlcHVRFFeeApplied: boolean;
   tlcStateSurchargeApplied: boolean;
   tlcLongTripFeeApplied: boolean;
+  tlcOutOfTownApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -247,6 +248,7 @@ export interface RouteFareBreakdown {
   tlcHVRFFee: number;
   tlcStateSurcharge: number;
   tlcLongTripFee: number;
+  tlcOutOfTownFee: number;
   airportFee: number;
   airportCode?: string;
   borderZoneFee: number;
@@ -305,6 +307,7 @@ export interface RouteFareBreakdown {
   tlcHVRFFeeApplied: boolean;
   tlcStateSurchargeApplied: boolean;
   tlcLongTripFeeApplied: boolean;
+  tlcOutOfTownApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
@@ -894,9 +897,35 @@ const TLC_STATE_SURCHARGE = 0.50;
 const TLC_LONG_TRIP_FEE = 20.00;
 const TLC_LONG_TRIP_DURATION_THRESHOLD = 60; // minutes
 
+// ============================================
+// NYC TLC Out-of-Town Return Deadhead Fee (Step 6H)
+// ============================================
+// Fee: $15.00 flat
+// Applies when: pickup inside NYC, dropoff outside NYC
+// Dropoff destinations that trigger fee:
+//   - New Jersey (any county)
+//   - Long Island (Nassau, Suffolk counties)
+//   - Westchester County
+//   - Any other non-NYC county
+// Does NOT apply to: NYC → NYC trips, or simultaneously with cross-state surcharge
+// Non-commissionable, excluded from driver earnings
+// ============================================
+const TLC_OUT_OF_TOWN_FEE = 15.00;
+
 // NYC Borough codes for AVF eligibility detection
 const NYC_BOROUGH_CODES = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
 const NYC_STATE_CODE = 'NY';
+
+// Out-of-Town detection: NYC counties (5 boroughs)
+// New York County = Manhattan, Kings County = Brooklyn, 
+// Bronx County = Bronx, Queens County = Queens, Richmond County = Staten Island
+const NYC_COUNTY_CODES = ['new_york', 'kings', 'bronx', 'queens', 'richmond', 'manhattan', 'brooklyn', 'staten_island'];
+
+// Out-of-Town NY counties that trigger return deadhead fee
+const OUT_OF_TOWN_NY_COUNTIES = ['nassau', 'suffolk', 'westchester'];
+
+// New Jersey state code for out-of-town detection
+const NJ_STATE_CODE = 'NJ';
 
 /**
  * Check if a trip is eligible for TLC AVF fee
@@ -1636,6 +1665,54 @@ export class FareCalculationService {
     }
     
     // ============================================
+    // STEP 6H. NYC TLC OUT-OF-TOWN RETURN DEADHEAD FEE
+    // $15.00 flat fee when trip leaves NYC
+    // Applies when: pickup inside NYC, dropoff outside NYC
+    // Dropoff destinations that trigger fee:
+    //   - New Jersey (any county)
+    //   - Long Island (Nassau, Suffolk counties)
+    //   - Westchester County
+    //   - Any other non-NYC county
+    // Does NOT apply to: NYC → NYC trips
+    // Does NOT apply simultaneously with cross-state surcharge (mutual exclusion)
+    // FLAT regulatory fee - does NOT participate in surge multiplier
+    // Non-commissionable, excluded from driver earnings
+    // ============================================
+    let tlcOutOfTownFee = 0;
+    let tlcOutOfTownApplied = false;
+    
+    // Out-of-Town eligibility:
+    // 1. Pickup is inside NYC (any of the 5 boroughs)
+    // 2. Dropoff is outside NYC (NJ, Nassau, Suffolk, Westchester, or any non-NYC county)
+    // 3. NOT a NYC → NYC trip (already covered by bothInNYCBoroughs check)
+    
+    // Get dropoff state and county for out-of-town detection
+    const dropoffIsNJ = dropoffStateCode?.toUpperCase() === NJ_STATE_CODE;
+    const dropoffCountyLower = dropoffCityCode?.toLowerCase() || '';
+    const dropoffIsOutOfTownNY = OUT_OF_TOWN_NY_COUNTIES.includes(dropoffCountyLower);
+    
+    // Pickup must be in NYC borough, dropoff must be outside NYC
+    const pickupIsNYC = pickupInNYCBorough;
+    const dropoffIsOutsideNYC = !dropoffInNYCBorough;
+    
+    // Out-of-Town fee applies when:
+    // - Pickup is in NYC AND dropoff is outside NYC
+    // - Dropoff is in NJ, Nassau, Suffolk, Westchester, or any other non-NYC location
+    const outOfTownEligible = pickupIsNYC && dropoffIsOutsideNYC && (dropoffIsNJ || dropoffIsOutOfTownNY || dropoffStateCode?.toUpperCase() === NYC_STATE_CODE);
+    
+    // Additional check: if dropoff is in NY state but not in NYC boroughs, apply fee
+    // This covers: Nassau, Suffolk, Westchester, and any other NY county outside NYC
+    const dropoffInNYButNotNYC = dropoffStateCode?.toUpperCase() === NYC_STATE_CODE && !dropoffInNYCBorough;
+    
+    // Final eligibility: pickup in NYC, dropoff outside NYC (either NJ or NY outside NYC)
+    const outOfTownFeeApplicable = pickupIsNYC && (dropoffIsNJ || dropoffInNYButNotNYC);
+    
+    if (outOfTownFeeApplicable) {
+      tlcOutOfTownFee = TLC_OUT_OF_TOWN_FEE;
+      tlcOutOfTownApplied = true;
+    }
+    
+    // ============================================
     // 7. CROSS-CITY AND CROSS-STATE SURCHARGES
     // ============================================
     const crossCitySurchargeAmount = fareConfig.crossCitySurcharge
@@ -1880,6 +1957,7 @@ export class FareCalculationService {
       tlcHVRFFee +
       tlcStateSurcharge +
       tlcLongTripFee +
+      tlcOutOfTownFee +
       crossCitySurcharge +
       crossStateSurcharge +
       returnDeadheadFee +
@@ -2003,7 +2081,7 @@ export class FareCalculationService {
     // Note: TLC fees are included in pre-surge base but surged portion is SafeGo revenue;
     //       only original amounts are pass-through
     const allRegulatoryFees = roundCurrency(
-      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee + tlcStateSurcharge + tlcLongTripFee
+      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee + tlcStateSurcharge + tlcLongTripFee + tlcOutOfTownFee
     );
     const calcPassThroughCosts = (payout: number) => 
       roundCurrency(payout + allRegulatoryFees);
@@ -2142,6 +2220,7 @@ export class FareCalculationService {
       tlcHVRFFeeApplied,
       tlcStateSurchargeApplied,
       tlcLongTripFeeApplied,
+      tlcOutOfTownApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -2202,6 +2281,7 @@ export class FareCalculationService {
       tlcHVRFFee,
       tlcStateSurcharge,
       tlcLongTripFee,
+      tlcOutOfTownFee,
       airportFee,
       airportCode,
       borderZoneFee,
@@ -2253,6 +2333,7 @@ export class FareCalculationService {
       tlcHVRFFeeApplied,
       tlcStateSurchargeApplied,
       tlcLongTripFeeApplied,
+      tlcOutOfTownApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,

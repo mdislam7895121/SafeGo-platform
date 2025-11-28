@@ -1,0 +1,66 @@
+Step 9 — Implement NYC TLC Out-of-Town Surcharge Rules (Return Deadhead + State Logic)
+
+Proceed with Step 9 of the NYC TLC regulatory system. Add the mandatory Out-of-Town rules with the following specifications:
+
+1. Return Deadhead Logic:
+   - Whenever a trip leaves NYC (pickup inside NYC, dropoff outside NYC),
+     apply the TLC Return Deadhead Fee.
+   - Fee amount: $15.00 flat.
+   - Applies for dropoff in:
+       • New Jersey
+       • Long Island (Nassau, Suffolk)
+       • Westchester County
+       • Any other non-NYC county
+   - Does NOT apply to NYC → NYC trips.
+   - Does NOT apply to cross-state surcharge simultaneously.
+   - This fee is non-commissionable.
+
+2. State & County Boundary Detection:
+   - Use geo-boundary polygon matching.
+   - Identify:
+       • NYC counties (NY, Kings, Bronx, Queens, Richmond)
+       • Out-of-town NY counties (Nassau, Suffolk, Westchester)
+       • New Jersey boundary
+   - Return Deadhead applies when:
+       pickupCounty ∈ NYC AND dropoffCounty ∉ NYC.
+
+3. Fare Pipeline Position:
+   Insert AFTER:
+       • NYC TLC Base Fare Enforcement
+       • Congestion Fee
+       • Airport Fees
+       • AVF ($0.30)
+       • HVRF ($0.75)
+       • BCF (2.75%)
+       • Long Trip Surcharge (if any)
+   BEFORE:
+       • SafeGo Service Fee
+       • Platform Commission
+       • Driver Earnings Calculation
+
+4. API Response Fields:
+   - tlcOutOfTownFee
+   - tlcOutOfTownApplied (boolean)
+
+5. UI Requirements:
+   - Add FareBreakdown line item:
+       "Out-of-Town Return Fee — $15.00"
+   - Show only when applied.
+   - Use the same icon style as other TLC fees.
+
+6. Test Coverage:
+   - NYC → New Jersey → $15 fee
+   - NYC → Nassau → $15 fee
+   - NYC → Suffolk → $15 fee
+   - NYC → Westchester → $15 fee
+   - NYC → NYC → $0
+   - Brooklyn → Bronx → $0
+   - Promo active → still applies
+   - Long trip + Out-of-town → both apply correctly
+   - Verify exclusion from commission and driver earnings
+
+7. Documentation (replit.md):
+   - Add Out-of-Town Surcharge section with full rule explanation,
+     maps, examples, and pipeline sequence.
+
+Complete Step 9 and confirm before moving to Step 10 (NYC Tolls Integration).
