@@ -176,6 +176,90 @@ router.post("/calculate-all", optionalAuth, async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// POST /api/fares/calculate-categories
+// Calculate fares for ALL 7 SAFEGO vehicle categories across all route alternatives
+// Returns a comprehensive fare matrix keyed by SAFEGO_ category IDs
+// ====================================================
+router.post("/calculate-categories", optionalAuth, async (req: AuthRequest, res) => {
+  try {
+    const validation = allFaresRequestSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Invalid request body",
+        details: validation.error.errors 
+      });
+    }
+
+    const data = validation.data;
+    
+    const results = await fareCalculationService.calculateAllCategoryFares(
+      data.pickupLat,
+      data.pickupLng,
+      data.dropoffLat,
+      data.dropoffLng,
+      data.routes as RouteInfo[],
+      data.surgeMultiplier,
+      data.countryCode,
+      data.cityCode
+    );
+
+    // Convert Map to object for JSON serialization
+    const fareMatrix: Record<string, FareCalculationResult> = {};
+    results.categoryFares.forEach((value, key) => {
+      fareMatrix[key] = value;
+    });
+
+    return res.json({
+      success: results.success,
+      fareMatrix,
+      rideTypeCount: results.rideTypeCount,
+      routeCount: results.routeCount,
+      currency: results.currency,
+      calculatedAt: results.calculatedAt.toISOString(),
+    });
+  } catch (error) {
+    console.error("[FareRoutes] Error calculating category fares:", error);
+    return res.status(500).json({ 
+      error: "Failed to calculate category fares",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// ====================================================
+// GET /api/fares/vehicle-categories
+// Get available vehicle categories with configuration info
+// ====================================================
+router.get("/vehicle-categories", async (_req, res) => {
+  try {
+    const { getActiveVehicleCategories } = await import("@shared/vehicleCategories");
+    const categories = getActiveVehicleCategories();
+    
+    return res.json({
+      success: true,
+      categories: categories.map(cat => ({
+        id: cat.id,
+        displayName: cat.displayName,
+        description: cat.description,
+        shortDescription: cat.shortDescription,
+        seatCount: cat.seatCount,
+        iconType: cat.iconType,
+        etaMinutesOffset: cat.etaMinutesOffset,
+        sortOrder: cat.sortOrder,
+        isPopular: cat.isPopular,
+        minimumFare: cat.minimumFare,
+      })),
+    });
+  } catch (error) {
+    console.error("[FareRoutes] Error fetching vehicle categories:", error);
+    return res.status(500).json({ 
+      error: "Failed to fetch vehicle categories",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+// ====================================================
 // GET /api/fares/ride-types
 // Get available ride types with basic info
 // ====================================================

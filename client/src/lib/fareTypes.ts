@@ -3,17 +3,14 @@
  * Mirrors server/services/fareCalculationService.ts types
  */
 
+import { type VehicleCategoryId as SafeGoVehicleCategoryId } from "@shared/vehicleCategories";
+
 export type LegacyRideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
 
-export type VehicleCategoryId = 
-  | "X" 
-  | "COMFORT" 
-  | "COMFORT_XL" 
-  | "XL" 
-  | "BLACK" 
-  | "BLACK_SUV" 
-  | "WAV";
+// Re-export the SAFEGO_ prefixed category IDs from shared module
+export type VehicleCategoryId = SafeGoVehicleCategoryId;
 
+// Combined type for backwards compatibility
 export type RideTypeCode = LegacyRideTypeCode | VehicleCategoryId;
 
 export interface FeeBreakdownItem {
@@ -138,14 +135,18 @@ export interface CalculateAllFaresRequest {
 }
 
 export const RIDE_TYPE_DISPLAY_INFO: Record<string, { iconType: string; etaMinutes: number }> = {
+  // Legacy ride types
   SAVER: { iconType: "economy", etaMinutes: 8 },
   STANDARD: { iconType: "economy", etaMinutes: 5 },
   COMFORT: { iconType: "comfort", etaMinutes: 7 },
   XL: { iconType: "xl", etaMinutes: 10 },
   PREMIUM: { iconType: "premium", etaMinutes: 12 },
-  X: { iconType: "economy", etaMinutes: 5 },
-  COMFORT_XL: { iconType: "xl", etaMinutes: 9 },
-  BLACK: { iconType: "premium", etaMinutes: 12 },
-  BLACK_SUV: { iconType: "suv", etaMinutes: 15 },
-  WAV: { iconType: "accessible", etaMinutes: 13 },
+  // SAFEGO_ prefixed vehicle categories
+  SAFEGO_X: { iconType: "economy", etaMinutes: 5 },
+  SAFEGO_COMFORT: { iconType: "comfort", etaMinutes: 7 },
+  SAFEGO_COMFORT_XL: { iconType: "xl", etaMinutes: 9 },
+  SAFEGO_XL: { iconType: "xl", etaMinutes: 10 },
+  SAFEGO_BLACK: { iconType: "premium", etaMinutes: 12 },
+  SAFEGO_BLACK_SUV: { iconType: "suv", etaMinutes: 15 },
+  SAFEGO_WAV: { iconType: "accessible", etaMinutes: 13 },
 };

@@ -1,0 +1,328 @@
+You are an expert full-stack engineer working on the SafeGo multi-service platform (Ride, Eats, Courier/Parcel, Business travel). Follow ALL SafeGo master rules below before doing anything.
+
+────────────────────────
+SAFEGO GLOBAL MASTER RULES
+────────────────────────
+
+1) Core Roles (always keep all 4 in mind)
+   1. Rider / Customer
+   2. Driver
+   3. Restaurant / Merchant
+   4. Admin / Operations
+
+2) Global App Modes / Services
+   - Ride-hailing (primary for now)
+   - Food delivery (SafeGo Eats) – not yet live, but UI stubs exist
+   - Parcel / Courier delivery – "Coming soon" states only
+   - Business / Corporate travel – "Coming soon" states only
+
+   Never break or remove existing “Coming soon” placeholders or navigation. Only improve what is in scope.
+
+3) Country / KYC & Compliance
+   - We must support at minimum:
+     - USA (NYC focus, with NYC TLC rules)
+     - Bangladesh (BD) later
+   - KYC logic:
+     - Riders: phone + email + minimal profile
+     - Drivers: strong identity requirements (license, SSN/TIN where applicable, address, background check, bank info)
+     - Restaurants/Merchants: business verification, bank info, address
+   - For this task, DO NOT change KYC or onboarding flows. Only respect existing auth and permissions.
+
+4) Admin Panel (mandatory concepts to preserve)
+   - Central place to:
+     - View, approve, and manage drivers
+     - View and manage riders and merchants
+     - Configure pricing, fees, commissions, surge rules
+     - View logs / audit trails for critical changes (pricing, payouts, driver category approvals)
+   - Do not remove any existing admin capabilities. When adding new features, make them visible in admin in a clean, minimal way and keep auditability.
+
+5) Core Ride Data Structures / Collections (must not break)
+   - rides (or trips)
+   - fare_breakdowns / fare flags
+   - driver_profiles
+   - vehicle_profiles
+   - driver_category_eligibility (which vehicle categories a driver can serve)
+   - driver_category_preferences (which categories the driver currently wants to accept)
+   - payouts / earnings
+   - commissions / platform_fees
+   - regulatory_fees (TLC and state fees)
+   - loyalty / incentives (if referenced)
+   Keep schema changes backward-compatible and additive.
+
+6) Commissions / Fees / Payout Logic (already implemented – do NOT break)
+   - Global platform commission: 15%
+   - Driver share: 85% of commissionable amount
+   - Fixed service fee (e.g. $1.99) charged to rider
+   - Regulatory TLC fees (congestion, airport, AVF, BCF, HVRF, state surcharge, long-trip, out-of-town, tolls, etc.) are NON-COMMISSIONABLE pass-through to government.
+   - Commission must be calculated on the appropriate “commissionable base” (fare excluding non-commissionable items).
+   - Margin protection, surge pricing, marketplace balancer, and cross-state fare logic are already implemented – do NOT rewrite them. Only consume them.
+
+7) NYC TLC & USA Pricing Rules (DO NOT BREAK)
+   - TLC driver minimum pay enforcement already in place.
+   - TLC regulatory fees implemented and tested:
+     - Congestion
+     - Airport access
+     - AVF (Accessible Vehicle Fund)
+     - BCF (Black Car Fund)
+     - HVRF (Workers’ Compensation)
+     - State surcharge (NY state)
+     - Long trip surcharge (60+ minutes)
+     - Out-of-town / return trip surcharge (NJ, CT, Nassau, Suffolk, Westchester)
+     - Tolls with direction-specific rules (e.g., Verrazzano bridge logic)
+   - TLC fee audit & reconciliation engine implemented and must stay accurate (tests already exist).
+   - Cross-state fare engine implemented (NJ↔NY, etc.) with dedicated pricing that overrides normal fare for those trips.
+   - DO NOT alter numeric TLC fee constants or order of regulatory fee pipeline steps.
+
+8) AI Marketplace Balancer (already implemented)
+   - Optimizes:
+     - Surge pricing
+     - Commissions
+     - Incentives
+     - Dispatch balancing
+   - We selected the “business-friendly” configuration with:
+     - Transparent surge (lower than Uber)
+     - Driver-friendly incentives
+     - Sustainable but not exploitative platform margin
+   - You may READ its outputs (e.g., surge factor, suggested margin) but must not rewrite its core algorithm. Only integrate or display relevant values.
+
+9) Vehicle Categories (already implemented in backend)
+   - SafeGo X (base)
+   - SafeGo Comfort
+   - SafeGo Comfort XL
+   - SafeGo XL
+   - SafeGo Black
+   - SafeGo Black SUV
+   - SafeGo WAV (Accessible)
+   - There is a multi-category vehicle system with:
+     - Vehicle profile records
+     - AI auto-suggest categories using SAFEGO_* prefix
+     - Admin review & category approval (APPROVED / REQUEST_CHANGES, with audit log)
+     - Dispatch mapping: which categories each driver can serve
+     - Driver category preferences (driver can opt-in/out from allowed categories, except WAV which is locked for accessibility reasons)
+   - Category prefix naming convention: SAFEGO_X, SAFEGO_COMFORT, etc. DO NOT change this convention.
+
+10) Driver Category Preferences (already implemented)
+   - Drivers can configure which categories they want to receive:
+     - Example: a high-end Cadillac may be eligible for SAFEGO_X, SAFEGO_COMFORT, SAFEGO_BLACK, SAFEGO_BLACK_SUV.
+       The driver may choose to only accept BLACK, BLACK_SUV, etc.
+   - Dispatch must always respect:
+     - Vehicle eligibility
+     - Admin approval state
+     - Driver preferences
+     - Accessibility rules (WAV always special)
+   - Do NOT break the existing dispatch logic. When you add rider category selection, it must feed into this system cleanly.
+
+11) Security & Access Control
+   - All fare calculations, TLC enforcement, and reports must require authentication and appropriate roles.
+   - Do NOT expose internal admin endpoints to public/rider unauthenticated clients.
+   - Keep separation of concerns:
+     - Rider app uses public APIs that internally call secure fare engines.
+     - Admin app uses protected endpoints with role checks and audit logs.
+
+12) Implementation Discipline
+   - Do not do breaking changes.
+   - Prefer additive, backward-compatible changes.
+   - Keep strong test coverage (unit + integration when applicable).
+   - Respect existing file/module structure.
+   - Update documentation (replit.md or equivalent) with each significant feature.
+   - Keep code readable and consistent with the rest of the project.
+
+────────────────────────
+TASK: C2 – Rider Vehicle Category Pricing UI (Customer App)
+────────────────────────
+
+Goal:
+Create a professional, Uber-style vehicle category pricing experience in the rider (customer) web app, using the 7 SafeGo categories already implemented in the backend and dispatch system.
+
+This is **Customer Step C2** in our sequence:
+- C1 (DONE): Basic ride flow with pickup/destination, route preview, distance/time estimate, payment method, and TLC-compliant fare estimate.
+- C2 (THIS TASK): Show per-category pricing options (SafeGo X, Comfort, Comfort XL, XL, Black, Black SUV, WAV) and allow the rider to select one.
+- Later steps (not in this task): loyalty, promos, advanced filters, etc.
+
+You MUST:
+- Reuse existing fare engine, TLC rules, AI Marketplace Balancer, and cross-state pricing.
+- NOT change the core fare formulas. Only extend them to support per-category display and selection.
+- Keep everything NYC TLC-compliant and commission logic intact.
+
+────────────────────────
+C2 – Detailed Requirements
+────────────────────────
+
+1) Flow Integration
+   1.1. Current flow (based on screenshots):
+        - Rider opens /customer (or equivalent) home screen.
+        - Pickup detection + destination selection.
+        - Rider presses “See prices”.
+        - A map + single fare estimate page appears (showing distance, time, total).
+   1.2. Update this flow so that after the route and basic estimate are known, we show a **Vehicle Category Selection panel** with per-category fares.
+   1.3. Keep the route preview and basic info (distance, time, route choice) exactly as they are; we are **adding** category selection, not replacing the existing screen.
+   1.4. The final “Request ride” action must clearly show which vehicle category was selected.
+
+2) Vehicle Category List UI (Rider side)
+   For this screen:
+
+   2.1. Show a scrollable or stacked list of options (similar to Uber):
+        For each category:
+        - Category name (e.g., “SafeGo X”).
+        - Short description (use consistent text, can be in English for now):
+          - SafeGo X: “Everyday rides for up to 4 riders.”
+          - SafeGo Comfort: “Newer, more comfortable cars with extra legroom.”
+          - SafeGo Comfort XL: “Spacious comfort for larger groups.”
+          - SafeGo XL: “Standard larger vehicles for up to 6 riders.”
+          - SafeGo Black: “Premium black cars with professional drivers.”
+          - SafeGo Black SUV: “High-end black SUVs for up to 6 riders.”
+          - SafeGo WAV: “Wheelchair-accessible vehicles.”
+        - Capacity badge (e.g., “1–4”, “1–6”).
+        - Estimated arrival time (eta) if available from dispatch; if not, reuse the existing ETA or show a reasonable placeholder logic consistent with the current system.
+        - Total estimated fare for this trip, already including:
+          - Base fare for that category
+          - Distance/time pricing
+          - Surge factor (if any, from AI balancer)
+          - TLC regulatory fees
+          - Out-of-town / long-trip / tolls as applicable
+          - SafeGo service fee and commission handling as currently implemented.
+
+   2.2. Visual Design:
+        - The rider should see categories ordered from cheapest to most expensive:
+          SafeGo X → Comfort → Comfort XL → XL → Black → Black SUV → WAV
+        - WAV may be visually highlighted (accessibility badge).
+        - Show a “Recommended” tag when:
+          - Marketplace balancer suggests a particular category (e.g., SAFEGO_X as default, or a cheaper category that meets capacity).
+
+   2.3. Selection:
+        - Exactly **one** category must be selected at a time.
+        - Tapping on a card selects it and visually highlights the card.
+        - The “Request ride” button uses the currently selected category.
+        - Default selection should be:
+          - SafeGo X, unless the passenger count (once implemented) exceeds X capacity.
+          - If future passenger count field exists, ensure category capacity check respects it.
+
+3) Backend / API Integration
+   3.1. Identify the current fare estimation endpoint used when the rider presses “See prices”.
+        - Do NOT rename the endpoint.
+        - Do NOT change core TLC logic.
+   3.2. If the fare engine already supports vehicleCategory / categoryId:
+        - Use that parameter to request per-category estimates.
+        - Implement a thin wrapper that, for a given route and time, requests prices for all eligible categories (at least the 7 core ones).
+   3.3. If the fare engine currently assumes a default category:
+        - Extend it in a backward-compatible way by:
+          - Adding a vehicleCategory parameter with default “SAFEGO_X”.
+          - Internally mapping category → per-mile/per-minute/base fare multipliers, **without** touching TLC pass-through fee logic.
+   3.4. Ensure the API response for the new category list includes:
+        - categoryCode (SAFEGO_X, SAFEGO_COMFORT, etc.)
+        - displayName (“SafeGo X”, ...)
+        - estimatedFareTotal (rider total)
+        - estimatedFareComponents (for breakdown modal if needed: base, distance, time, TLC fees, service fee, surge)
+        - surgeFactor (if present)
+        - etaMinutes or etaRange
+   3.5. Respect all existing guards:
+        - TLC minimum pay engine still runs and may adjust the subtotal.
+        - All TLC fees must be tagged as non-commissionable and remain outside the commission base.
+        - Cross-state engine still overrides normal pricing for cross-state trips.
+
+4) Dispatch Compatibility
+   4.1. When a rider confirms the ride:
+        - The ride record must store the selected categoryCode.
+   4.2. Dispatch logic must:
+        - Filter drivers by:
+          - vehicle eligibility for that category,
+          - admin approval for that category,
+          - driver category preferences,
+          - WAV accessibility constraints.
+        - This logic already exists for multi-category system; just ensure the rider’s selected category is correctly propagated into whatever matching function is used.
+   4.3. Do NOT change:
+        - Category prefix rules,
+        - WAV isolation logic,
+        - Premium category restrictions (BLACK, BLACK_SUV).
+
+5) Fare Breakdown & Transparency
+   5.1. The category selection view may show **only total fare** on the list.
+   5.2. Provide a way (modal, accordion, or separate “View fare breakdown” link) to view the detailed breakdown for the selected category:
+        - Rider fare subtotal (base + distance + time)
+        - Surge
+        - TLC regulatory fees (each line item with label and amount)
+        - SafeGo service fee
+        - Estimated total
+   5.3. Use the existing FareBreakdown component and flags:
+        - Keep using all flags like:
+          - crossCityApplied / crossStateApplied
+          - regulatoryFeeApplied / airportFeeApplied
+          - borderZoneFeeApplied / returnDeadheadApplied
+          - stateMinimumFareApplied
+          - and any new TLC flags.
+        - DO NOT rename or repurpose existing flags.
+
+6) Security & Access
+   6.1. Ensure the new endpoints:
+        - Are only callable by authenticated riders.
+        - Do not leak internal admin information (driver identities, internal margins, payout splits).
+   6.2. Only return rider-facing information:
+        - Rider total and breakdown,
+        - Category info, ETA,
+        - Public labels for regulatory fees (e.g., “NYC Congestion Fee”).
+
+7) Tests (C2)
+   7.1. Add tests for:
+        - Per-category fare estimation for a normal NYC trip.
+        - Cross-state trip (e.g., NYC → NJ) showing dedicated cross-state pricing but still per-category multipliers.
+        - TLC heavy trip (airport + congestion + tolls) for several categories.
+        - Enforcement that TLC fees remain non-commissionable in the category totals.
+        - Correct ordering of categories by price.
+        - Dispatch integration receiving the correct categoryCode from ride request.
+   7.2. Add UI tests (if framework exists) or snapshot tests to ensure:
+        - 7 categories render correctly.
+        - Default selection is SafeGo X.
+        - Selection changes update the “Request ride” payload.
+
+8) Documentation
+   8.1. Update replit.md (or equivalent project doc) with a concise section:
+        - “C2 – Rider Vehicle Category Pricing UI”
+        - High-level architecture (how rider UI calls fare engine per category).
+        - Notes on how TLC rules and AI Marketplace Balancer are preserved.
+        - Any new environment variables or config flags.
+
+9) Non-Goals (for this task)
+   - Do NOT implement:
+     - New loyalty or promo coupon logic.
+     - New KYC flows.
+     - Changes to Eats / Business / Courier booking.
+   - Do NOT change numeric TLC constants, commission percentages, or already-agreed surge tuning.
+
+────────────────────────
+EXECUTION PLAN
+────────────────────────
+
+Follow this concrete sequence:
+
+1) Inspect existing code:
+   - Locate the rider “See prices” flow and the current fare estimate screen.
+   - Locate the fare estimation endpoint and TLC fee pipeline.
+   - Locate the multi-category vehicle and dispatch modules.
+
+2) Backend:
+   - Add or extend an endpoint to return per-category fare estimates for a given trip (pickup, dropoff, time).
+   - Ensure it uses existing fare engine, TLC rules, surge, and AI balancer.
+   - Make the response rider-safe (no internal payout/margin details).
+
+3) Frontend (Customer App):
+   - Add a Vehicle Category Selection panel under/near the existing estimate.
+   - Render all 7 categories with proper labels and totals.
+   - Wire selection into the final “Request ride” action so the ride stores selected category.
+
+4) Dispatch integration:
+   - Confirm that ride creation passes categoryCode into dispatch.
+   - Verify dispatch uses existing eligibility + preferences logic.
+
+5) Testing:
+   - Add unit/integration tests as described in the Tests section.
+   - Run existing TLC test suite to ensure no regressions.
+
+6) Documentation:
+   - Update replit.md with the new C2 feature and technical notes.
+
+Finally, when done:
+- Summarize what changed.
+- Confirm that:
+  - C1 (basic ride flow) still works unchanged.
+  - C2 (category pricing UI) is working end-to-end.
+  - All TLC and commission tests still pass.

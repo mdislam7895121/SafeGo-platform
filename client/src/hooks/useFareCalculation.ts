@@ -1,6 +1,6 @@
 /**
  * Fare Calculation Hook
- * Fetches real-time fare calculations from the server
+ * Fetches real-time fare calculations from the server for all 7 SAFEGO vehicle categories
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -9,7 +9,8 @@ import type {
   AllFaresResponse, 
   RouteInfoRequest, 
   RideTypeCode,
-  RouteFareBreakdown 
+  RouteFareBreakdown,
+  VehicleCategoryId
 } from "@/lib/fareTypes";
 
 interface UseFareCalculationParams {
@@ -29,8 +30,10 @@ interface FareCalculationState {
   isLoading: boolean;
   error: Error | null;
   getFare: (rideTypeCode: RideTypeCode, routeId: string) => RouteFareBreakdown | null;
+  getCategoryFare: (categoryId: VehicleCategoryId, routeId: string) => RouteFareBreakdown | null;
   getCheapestFare: (routeId: string) => { rideTypeCode: RideTypeCode; fare: RouteFareBreakdown } | null;
   getRouteFareForRideType: (rideTypeCode: RideTypeCode) => RouteFareBreakdown | null;
+  getRouteFareForCategory: (categoryId: VehicleCategoryId) => RouteFareBreakdown | null;
   currency: string;
 }
 
@@ -52,9 +55,10 @@ export function useFareCalculation({
     dropoffLng !== null && 
     routes.length > 0;
 
+  // Use the new category-based endpoint for all 7 SAFEGO vehicle categories
   const { data, isLoading, error } = useQuery<AllFaresResponse>({
     queryKey: [
-      "/api/fares/calculate-all",
+      "/api/fares/calculate-categories",
       pickupLat,
       pickupLng,
       dropoffLat,
@@ -63,7 +67,7 @@ export function useFareCalculation({
       surgeMultiplier,
     ],
     queryFn: async () => {
-      return await apiRequest("/api/fares/calculate-all", {
+      return await apiRequest("/api/fares/calculate-categories", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -112,6 +116,12 @@ export function useFareCalculation({
     return fareMatrix[rideTypeCode]?.[routeId] || null;
   };
 
+  // Get fare for a specific SAFEGO vehicle category and route
+  const getCategoryFare = (categoryId: VehicleCategoryId, routeId: string): RouteFareBreakdown | null => {
+    if (!fareMatrix) return null;
+    return fareMatrix[categoryId]?.[routeId] || null;
+  };
+
   const getCheapestFare = (routeId: string): { rideTypeCode: RideTypeCode; fare: RouteFareBreakdown } | null => {
     if (!fareMatrix) return null;
     
@@ -134,13 +144,22 @@ export function useFareCalculation({
     return fareMatrix[rideTypeCode]?.[firstRouteId] || null;
   };
 
+  // Get the fare for a specific SAFEGO vehicle category using the first available route
+  const getRouteFareForCategory = (categoryId: VehicleCategoryId): RouteFareBreakdown | null => {
+    if (!fareMatrix || routes.length === 0) return null;
+    const firstRouteId = routes[0].routeId;
+    return fareMatrix[categoryId]?.[firstRouteId] || null;
+  };
+
   return {
     fareMatrix,
     isLoading,
     error: error as Error | null,
     getFare,
+    getCategoryFare,
     getCheapestFare,
     getRouteFareForRideType,
+    getRouteFareForCategory,
     currency: data?.currency || "USD",
   };
 }

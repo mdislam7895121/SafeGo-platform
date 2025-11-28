@@ -120,6 +120,7 @@ export default function RideConfirmPage() {
           promoCode: promo?.valid ? promo.code : null,
           promoCodeId: promo?.valid ? promo.promoCodeId : null,
           paymentMethod: state.paymentMethod.type === "cash" ? "cash" : "online",
+          vehicleCategoryId: state.selectedOption.code,
         }),
       });
 

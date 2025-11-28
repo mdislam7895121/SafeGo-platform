@@ -279,7 +279,7 @@ export default function RideOptionsPage() {
   } = useRideBooking();
   
   const [selectedVehicleCategory, setSelectedVehicleCategory] = useState<VehicleCategoryId>(
-    (state.selectedOption?.code as VehicleCategoryId) || "X"
+    (state.selectedOption?.code as VehicleCategoryId) || "SAFEGO_X"
   );
   const [selectedPaymentId, setSelectedPaymentId] = useState(
     state.paymentMethod?.id || mockPaymentMethods.find(p => p.isDefault)?.id || mockPaymentMethods[0].id

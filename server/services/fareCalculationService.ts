@@ -2899,6 +2899,235 @@ export class FareCalculationService {
   }
   
   /**
+   * Calculate fares for all 7 SAFEGO vehicle categories
+   * Returns per-category pricing using multipliers from vehicleCategories.ts
+   * This extends the base fare calculation with category-specific adjustments
+   */
+  async calculateAllCategoryFares(
+    pickupLat: number,
+    pickupLng: number,
+    dropoffLat: number,
+    dropoffLng: number,
+    routes: RouteInfo[],
+    surgeMultiplier?: number,
+    countryCode?: string,
+    cityCode?: string
+  ): Promise<{
+    success: boolean;
+    categoryFares: Map<string, FareCalculationResult>;
+    rideTypeCount: number;
+    routeCount: number;
+    currency: string;
+    calculatedAt: Date;
+  }> {
+    // Import vehicle category configuration
+    const vehicleCategoriesModule = await import("@shared/vehicleCategories");
+    const VEHICLE_CATEGORIES = vehicleCategoriesModule.VEHICLE_CATEGORIES;
+    const VEHICLE_CATEGORY_ORDER = vehicleCategoriesModule.VEHICLE_CATEGORY_ORDER;
+    type VehicleCategoryIdType = keyof typeof VEHICLE_CATEGORIES;
+    
+    const categoryFares = new Map<string, FareCalculationResult>();
+    
+    // First, calculate base fare using STANDARD/X category
+    // This gives us the TLC-compliant base fare
+    const baseFareResult = await this.calculateFares({
+      pickupLat,
+      pickupLng,
+      dropoffLat,
+      dropoffLng,
+      rideTypeCode: "STANDARD", // Base category
+      routes,
+      countryCode,
+      cityCode,
+      surgeMultiplier,
+    });
+    
+    if (!baseFareResult.success) {
+      return {
+        success: false,
+        categoryFares,
+        rideTypeCount: 0,
+        routeCount: routes.length,
+        currency: "USD",
+        calculatedAt: new Date(),
+      };
+    }
+    
+    // For each vehicle category, apply multipliers to the base fare
+    for (const categoryId of VEHICLE_CATEGORY_ORDER) {
+      const category = VEHICLE_CATEGORIES[categoryId as VehicleCategoryIdType];
+      if (!category || !category.isActive) continue;
+      
+      // Clone route fares and apply category multipliers
+      const categoryRouteFares = baseFareResult.routeFares.map(baseRouteFare => {
+        // Get the base components (before any multipliers)
+        const preMultiplierBaseFare = baseRouteFare.baseFare;
+        const preMultiplierDistanceFare = baseRouteFare.distanceFare;
+        const preMultiplierTimeFare = baseRouteFare.timeFare;
+        
+        // Apply category-specific multipliers
+        const adjustedBaseFare = roundCurrency(preMultiplierBaseFare * category.baseMultiplier);
+        const adjustedDistanceFare = roundCurrency(preMultiplierDistanceFare * category.perMileMultiplier);
+        const adjustedTimeFare = roundCurrency(preMultiplierTimeFare * category.perMinuteMultiplier);
+        
+        // Calculate category-adjusted trip cost
+        let categoryTripCost = adjustedBaseFare + adjustedDistanceFare + adjustedTimeFare;
+        
+        // Track if multiplier was applied
+        const multiplierApplied = 
+          category.baseMultiplier !== 1.0 || 
+          category.perMileMultiplier !== 1.0 || 
+          category.perMinuteMultiplier !== 1.0;
+        
+        // Apply category minimum fare
+        let minimumApplied = false;
+        if (categoryTripCost < category.minimumFare) {
+          categoryTripCost = category.minimumFare;
+          minimumApplied = true;
+        }
+        
+        // Calculate the fare adjustment amount
+        const baselineSubtotal = preMultiplierBaseFare + preMultiplierDistanceFare + preMultiplierTimeFare;
+        const categoryAdjustment = roundCurrency(categoryTripCost - baselineSubtotal);
+        
+        // The rest of the fare components (fees, tolls, surcharges) remain the same
+        // They don't participate in category multipliers per spec:
+        // "Multipliers applied AFTER TLC base fare but BEFORE surcharges"
+        const fixedCosts = 
+          baseRouteFare.nightSurcharge +
+          baseRouteFare.peakHourSurcharge +
+          baseRouteFare.shortTripAdjustment +
+          baseRouteFare.longDistanceFee +
+          baseRouteFare.crossCitySurcharge +
+          baseRouteFare.crossStateSurcharge +
+          baseRouteFare.returnDeadheadFee +
+          baseRouteFare.congestionFee +
+          baseRouteFare.tlcAirportFee +
+          baseRouteFare.tlcAVFFee +
+          baseRouteFare.tlcBCFFee +
+          baseRouteFare.tlcHVRFFee +
+          baseRouteFare.tlcStateSurcharge +
+          baseRouteFare.tlcLongTripFee +
+          baseRouteFare.tlcOutOfTownFee +
+          baseRouteFare.airportFee +
+          baseRouteFare.borderZoneFee +
+          baseRouteFare.stateRegulatoryFee +
+          baseRouteFare.tollsTotal +
+          baseRouteFare.regulatoryFeesTotal +
+          baseRouteFare.additionalFeesTotal;
+        
+        // Apply surge to category-adjusted trip cost
+        const effectiveSurge = baseRouteFare.surgeMultiplier;
+        const surgedCategoryTripCost = roundCurrency(categoryTripCost * effectiveSurge);
+        const categorySurgeAmount = roundCurrency(surgedCategoryTripCost - categoryTripCost);
+        
+        // Calculate new subtotal with category adjustment
+        const newSubtotal = roundCurrency(surgedCategoryTripCost + fixedCosts);
+        
+        // Recalculate service fee on new subtotal
+        const serviceFeeRate = baseRouteFare.serviceFee / (baseRouteFare.subtotal || 1);
+        const newServiceFee = roundCurrency(newSubtotal * serviceFeeRate);
+        
+        // Calculate new total fare
+        let newTotalFare = roundCurrency(newSubtotal + newServiceFee);
+        
+        // Apply category minimum if still below
+        if (newTotalFare < category.minimumFare) {
+          newTotalFare = category.minimumFare;
+          minimumApplied = true;
+        }
+        
+        // Recalculate driver payout proportionally
+        const driverPayoutRatio = baseRouteFare.driverPayout / (baseRouteFare.totalFare || 1);
+        const newDriverPayout = roundCurrency(newTotalFare * driverPayoutRatio);
+        const newCommission = roundCurrency(newTotalFare - newDriverPayout);
+        
+        return {
+          ...baseRouteFare,
+          // Category identification
+          vehicleCategoryId: categoryId,
+          vehicleCategoryDisplayName: category.displayName,
+          vehicleCategoryMultiplierApplied: multiplierApplied,
+          vehicleCategoryMinimumApplied: minimumApplied,
+          vehicleCategoryMinimumFare: category.minimumFare,
+          
+          // Adjusted fare components
+          preMultiplierBaseFare,
+          preMultiplierDistanceFare,
+          preMultiplierTimeFare,
+          baseFare: adjustedBaseFare,
+          distanceFare: adjustedDistanceFare,
+          timeFare: adjustedTimeFare,
+          
+          // Surge amount recalculated
+          surgeAmount: categorySurgeAmount,
+          
+          // New totals
+          subtotal: newSubtotal,
+          serviceFee: newServiceFee,
+          totalFare: newTotalFare,
+          
+          // Recalculated payouts
+          driverPayout: newDriverPayout,
+          safegoCommission: newCommission,
+        };
+      });
+      
+      // Determine cheapest and fastest routes for this category
+      let cheapestRouteId = categoryRouteFares[0]?.routeId;
+      let fastestRouteId = categoryRouteFares[0]?.routeId;
+      let minFare = categoryRouteFares[0]?.totalFare ?? Infinity;
+      let minDuration = categoryRouteFares[0]?.durationMinutes ?? Infinity;
+      
+      for (const fare of categoryRouteFares) {
+        if (fare.totalFare < minFare) {
+          minFare = fare.totalFare;
+          cheapestRouteId = fare.routeId;
+        }
+        if (fare.durationMinutes < minDuration) {
+          minDuration = fare.durationMinutes;
+          fastestRouteId = fare.routeId;
+        }
+      }
+      
+      // Mark cheapest and fastest
+      for (const fare of categoryRouteFares) {
+        fare.isCheapest = fare.routeId === cheapestRouteId;
+        fare.isFastest = fare.routeId === fastestRouteId;
+      }
+      
+      // Create the category fare result
+      const categoryResult: FareCalculationResult = {
+        success: true,
+        rideType: {
+          code: categoryId as RideTypeCode,
+          name: category.displayName,
+          description: category.description,
+          capacity: category.seatCount,
+        },
+        routeFares: categoryRouteFares,
+        cheapestRouteId,
+        fastestRouteId,
+        currency: "USD",
+        calculatedAt: new Date(),
+      };
+      
+      categoryFares.set(categoryId, categoryResult);
+    }
+    
+    console.log(`[FareCalculation] Calculated fares for ${categoryFares.size} vehicle categories across ${routes.length} routes`);
+    
+    return {
+      success: true,
+      categoryFares,
+      rideTypeCount: categoryFares.size,
+      routeCount: routes.length,
+      currency: "USD",
+      calculatedAt: new Date(),
+    };
+  }
+  
+  /**
    * Log fare calculation for audit trail
    */
   async logFareCalculation(
