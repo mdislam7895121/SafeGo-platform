@@ -30,8 +30,12 @@ import {
   Wallet,
   User,
   CircleAlert,
+  Activity,
+  Gauge,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
+export type DemandLevel = "low" | "normal" | "high";
 
 export interface FareBreakdownData {
   tripFare: number;
@@ -70,6 +74,11 @@ export interface FareBreakdownData {
   driverEarnings?: number;
   driverEarningsMinimumApplied?: boolean;
   marginProtectionCapped?: boolean;
+  demandLevel?: DemandLevel;
+  demandScore?: number;
+  commissionRate?: number;
+  dynamicCommissionApplied?: boolean;
+  commissionCapped?: boolean;
   // Consolidated flags object
   flags?: {
     trafficApplied?: boolean;
@@ -88,6 +97,8 @@ export interface FareBreakdownData {
     shortTripAdjustmentApplied?: boolean;
     marginProtectionApplied?: boolean;
     marginProtectionCapped?: boolean;
+    dynamicCommissionApplied?: boolean;
+    commissionCapped?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -326,13 +337,44 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           )}
           {breakdown.platformCommission !== undefined && (
             <div className="flex items-center justify-between py-1.5">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Wallet className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Platform commission (15%)</span>
+                <span className="text-sm">
+                  {(breakdown.dynamicCommissionApplied || breakdown.flags?.dynamicCommissionApplied)
+                    ? `Dynamic commission (${breakdown.commissionRate?.toFixed(1) || '15'}%)`
+                    : `Platform commission (${breakdown.commissionRate?.toFixed(1) || '15'}%)`
+                  }
+                </span>
+                {(breakdown.dynamicCommissionApplied || breakdown.flags?.dynamicCommissionApplied) && breakdown.demandLevel && (
+                  <Badge 
+                    variant={breakdown.demandLevel === 'high' ? 'destructive' : breakdown.demandLevel === 'low' ? 'secondary' : 'outline'}
+                    className="text-xs"
+                    data-testid="badge-demand-level"
+                  >
+                    {breakdown.demandLevel === 'high' ? 'High demand' : breakdown.demandLevel === 'low' ? 'Low demand' : 'Normal'}
+                  </Badge>
+                )}
+                {(breakdown.commissionCapped || breakdown.flags?.commissionCapped) && (
+                  <Badge variant="outline" className="text-xs" data-testid="badge-commission-capped">
+                    Capped
+                  </Badge>
+                )}
               </div>
               <span className="text-sm" data-testid="text-platform-commission">
                 {formatCurrency(breakdown.platformCommission, currency)}
               </span>
+            </div>
+          )}
+          {(breakdown.dynamicCommissionApplied || breakdown.flags?.dynamicCommissionApplied) && breakdown.demandLevel && (
+            <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+              <Activity className="h-3 w-3" />
+              <span>Based on current demand</span>
+              {breakdown.demandScore !== undefined && (
+                <span className="flex items-center gap-1">
+                  <Gauge className="h-3 w-3" />
+                  Score: {breakdown.demandScore}
+                </span>
+              )}
             </div>
           )}
         </div>
