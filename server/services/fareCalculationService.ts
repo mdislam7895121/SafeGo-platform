@@ -844,6 +844,14 @@ const TLC_AIRPORT_ZONES: TLCAirportConfig[] = [
 // ============================================
 const TLC_AVF_FEE = 0.30;
 
+// ============================================
+// TLC Black Car Fund (BCF) Contribution
+// 2.75% mandatory contribution on rider fare
+// Applies to all NYC trips, excludes out-of-state and zero-fare promo rides
+// Formula: bcfFee = subtotalBeforeCommission * 0.0275
+// ============================================
+const TLC_BCF_RATE = 0.0275; // 2.75%
+
 // NYC Borough codes for AVF eligibility detection
 const NYC_BOROUGH_CODES = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
 const NYC_STATE_CODE = 'NY';
@@ -1440,6 +1448,34 @@ export class FareCalculationService {
     if (avfEligible) {
       tlcAVFFee = TLC_AVF_FEE;
       tlcAVFFeeApplied = true;
+    }
+    
+    // ============================================
+    // STEP 6D. TLC BLACK CAR FUND (BCF) CONTRIBUTION
+    // 2.75% mandatory contribution on rider fare
+    // PERCENTAGE-based regulatory fee calculated on fare before service fee
+    // Applied to all NYC trips, excludes out-of-state and zero-fare promo rides
+    // Formula: bcfFee = fareBase * 0.0275
+    // Full amount is pass-through (remitted to Black Car Fund, not SafeGo revenue)
+    // ============================================
+    let tlcBCFFee = 0;
+    let tlcBCFFeeApplied = false;
+    const tlcBCFFeeRate = TLC_BCF_RATE; // 2.75%
+    
+    // BCF applies to NYC trips only (same eligibility as AVF, but also checks for zero-fare)
+    // BCF eligibility uses the same state check as AVF: both endpoints must be in NY
+    // Also requires a non-zero fare base (excludes fully discounted promo rides)
+    const bcfFareBase = surgeAdjusted + nightSurcharge + peakHourSurcharge + longDistanceFee + 
+      congestionFee + tlcAirportFee + tlcAVFFee;
+    
+    // BCF applies if:
+    // 1. Both pickup and dropoff are in NY state (not cross-state)
+    // 2. The fare base is greater than zero (not a fully discounted ride)
+    const bcfEligible = bothStatesAreNY && bcfFareBase > 0;
+    
+    if (bcfEligible) {
+      tlcBCFFee = roundCurrency(bcfFareBase * TLC_BCF_RATE);
+      tlcBCFFeeApplied = true;
     }
     
     // ============================================
