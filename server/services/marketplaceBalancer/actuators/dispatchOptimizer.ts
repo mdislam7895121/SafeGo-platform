@@ -8,6 +8,7 @@
  * - Low cancellation history
  * - Fatigue score
  * - Proximity to demand zones
+ * - Vehicle category eligibility (Step 2)
  */
 
 import {
@@ -19,6 +20,14 @@ import {
   ZoneMetrics,
   GeoLocation,
 } from '@shared/marketplace';
+
+import {
+  VehicleCategoryId,
+  isValidVehicleCategoryId,
+  canVehicleServeCategory,
+  getEligibleDriverCategories,
+  VEHICLE_CATEGORIES,
+} from '@shared/vehicleCategories';
 
 // ========================================
 // SCORING WEIGHTS
@@ -191,21 +200,34 @@ export class DispatchOptimizer {
     zoneId: string,
     availableDrivers: DriverScoreInput[],
     isPremiumTrip: boolean = false,
-    demandForecast?: DemandForecast
+    demandForecast?: DemandForecast,
+    requestedCategory?: VehicleCategoryId
   ): DispatchDecision | null {
     if (availableDrivers.length === 0) {
       return null;
     }
+
+    // Step 2: Filter by vehicle category eligibility if a category is requested
+    let eligibleDrivers = availableDrivers;
+    if (requestedCategory) {
+      eligibleDrivers = this.filterByVehicleEligibility(availableDrivers, requestedCategory);
+      console.log(`[DispatchOptimizer] Filtered ${availableDrivers.length} drivers to ${eligibleDrivers.length} eligible for ${requestedCategory}`);
+      
+      if (eligibleDrivers.length === 0) {
+        console.log(`[DispatchOptimizer] No eligible drivers for category ${requestedCategory}`);
+        return null;
+      }
+    }
     
-    // Rank all drivers
-    const rankedDrivers = this.rankDrivers(availableDrivers, isPremiumTrip);
+    // Rank all eligible drivers
+    const rankedDrivers = this.rankDrivers(eligibleDrivers, isPremiumTrip);
     
     // Select the best driver
     const bestDriver = rankedDrivers[0];
     const alternatives = rankedDrivers.slice(1, 4).map(d => d.driverId);
     
     // Build dispatch factors
-    const driverInput = availableDrivers.find(d => d.driverId === bestDriver.driverId)!;
+    const driverInput = eligibleDrivers.find(d => d.driverId === bestDriver.driverId)!;
     const factors = this.buildDispatchFactors(bestDriver, driverInput);
     
     // Determine priority reason
@@ -220,6 +242,140 @@ export class DispatchOptimizer {
       priorityReason,
       factors,
     };
+  }
+
+  // ========================================
+  // STEP 2: VEHICLE CATEGORY ELIGIBILITY
+  // ========================================
+
+  /**
+   * Filter drivers by vehicle category eligibility
+   * Implements the dispatch matching rules:
+   * - X → X only
+   * - Comfort → Comfort + X
+   * - Comfort XL → Comfort XL + Comfort + X
+   * - XL → XL + Comfort XL + Comfort + X
+   * - Black → Black + Comfort + X (NOT XL, WAV)
+   * - Black SUV → Black SUV + Black + Comfort + X
+   * - WAV → WAV only
+   */
+  filterByVehicleEligibility(
+    drivers: DriverScoreInput[],
+    requestedCategory: VehicleCategoryId
+  ): DriverScoreInput[] {
+    return drivers.filter(driver => {
+      // Driver must have an approved vehicle category
+      if (!driver.vehicleCategory || !driver.vehicleCategoryApproved) {
+        return false;
+      }
+
+      // Check if driver's vehicle category is valid
+      if (!isValidVehicleCategoryId(driver.vehicleCategory)) {
+        return false;
+      }
+
+      // Special handling for WAV - must be wheelchair accessible
+      if (requestedCategory === 'WAV') {
+        if (!driver.wheelchairAccessible || driver.vehicleCategory !== 'WAV') {
+          return false;
+        }
+        return true;
+      }
+
+      // Check eligibility using the matrix
+      const eligibility = canVehicleServeCategory(
+        driver.vehicleCategory as VehicleCategoryId,
+        requestedCategory
+      );
+
+      return eligibility.isEligible;
+    });
+  }
+
+  /**
+   * Check if a specific driver is eligible for a category
+   */
+  isDriverEligible(
+    driver: DriverScoreInput,
+    requestedCategory: VehicleCategoryId
+  ): { eligible: boolean; reason?: string } {
+    if (!driver.vehicleCategory || !driver.vehicleCategoryApproved) {
+      return {
+        eligible: false,
+        reason: 'Driver does not have an approved vehicle category',
+      };
+    }
+
+    if (!isValidVehicleCategoryId(driver.vehicleCategory)) {
+      return {
+        eligible: false,
+        reason: 'Driver vehicle category is invalid',
+      };
+    }
+
+    // Special WAV handling
+    if (requestedCategory === 'WAV') {
+      if (!driver.wheelchairAccessible) {
+        return {
+          eligible: false,
+          reason: 'WAV rides require wheelchair-accessible vehicles only',
+        };
+      }
+      if (driver.vehicleCategory !== 'WAV') {
+        return {
+          eligible: false,
+          reason: 'Driver vehicle is not registered as WAV',
+        };
+      }
+      return { eligible: true };
+    }
+
+    const eligibility = canVehicleServeCategory(
+      driver.vehicleCategory as VehicleCategoryId,
+      requestedCategory
+    );
+
+    return {
+      eligible: eligibility.isEligible,
+      reason: eligibility.reason,
+    };
+  }
+
+  /**
+   * Get count of available drivers per vehicle category
+   */
+  getDriverCountsByCategory(
+    drivers: DriverScoreInput[]
+  ): Record<VehicleCategoryId, number> {
+    const counts: Record<VehicleCategoryId, number> = {
+      X: 0,
+      COMFORT: 0,
+      COMFORT_XL: 0,
+      XL: 0,
+      BLACK: 0,
+      BLACK_SUV: 0,
+      WAV: 0,
+    };
+
+    for (const driver of drivers) {
+      if (driver.vehicleCategory && 
+          driver.vehicleCategoryApproved && 
+          isValidVehicleCategoryId(driver.vehicleCategory)) {
+        counts[driver.vehicleCategory as VehicleCategoryId]++;
+      }
+    }
+
+    return counts;
+  }
+
+  /**
+   * Get eligible driver count for a specific category
+   */
+  getEligibleDriverCount(
+    drivers: DriverScoreInput[],
+    requestedCategory: VehicleCategoryId
+  ): number {
+    return this.filterByVehicleEligibility(drivers, requestedCategory).length;
   }
 
   private buildDispatchFactors(

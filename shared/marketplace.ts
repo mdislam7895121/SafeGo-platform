@@ -286,6 +286,9 @@ export interface DriverScoreInput {
   isInDemandZone: boolean;
   vehicleType: string;
   isPremiumDriver: boolean;
+  vehicleCategory?: string;
+  wheelchairAccessible?: boolean;
+  vehicleCategoryApproved?: boolean;
 }
 
 export interface DriverScoreResult {
