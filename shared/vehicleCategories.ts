@@ -647,3 +647,214 @@ export function isCategoryCompatible(
   // - SAFEGO_WAV → drivers with SAFEGO_WAV only
   return requestedCategory === driverCategory;
 }
+
+// ========================================
+// STEP 4: DRIVER CATEGORY PREFERENCES
+// ========================================
+// Allows drivers to select a subset of their eligible categories
+// Key rules:
+// - allowedCategories must be a subset of eligibleCategories
+// - On initial approval, allowedCategories = eligibleCategories (default)
+// - WAV drivers cannot disable SAFEGO_WAV (locked for accessibility)
+// - At least one category must be enabled at all times
+
+/**
+ * Get all categories a vehicle is eligible to serve based on dispatch matrix
+ * This is computed from the vehicle's approved category
+ */
+export function getEligibleCategoriesForVehicle(
+  vehicleCategory: VehicleCategoryId
+): VehicleCategoryId[] {
+  return DISPATCH_ELIGIBILITY_MATRIX[vehicleCategory] || [];
+}
+
+/**
+ * Validate that allowedCategories is a valid subset of eligibleCategories
+ * Returns validation result with any errors
+ */
+export interface CategoryPreferencesValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  validatedAllowedCategories: VehicleCategoryId[];
+}
+
+export function validateAllowedCategories(
+  eligibleCategories: VehicleCategoryId[],
+  allowedCategories: VehicleCategoryId[],
+  isWAVVehicle: boolean = false
+): CategoryPreferencesValidation {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const validatedAllowedCategories: VehicleCategoryId[] = [];
+
+  // Filter to only valid categories that are in eligible set
+  for (const category of allowedCategories) {
+    if (eligibleCategories.includes(category)) {
+      validatedAllowedCategories.push(category);
+    } else {
+      warnings.push(`Category ${category} is not in eligible categories - ignored`);
+    }
+  }
+
+  // Must have at least one category enabled
+  if (validatedAllowedCategories.length === 0) {
+    errors.push("At least one category must be enabled");
+  }
+
+  // WAV vehicles must keep SAFEGO_WAV enabled
+  if (isWAVVehicle && eligibleCategories.includes("SAFEGO_WAV")) {
+    if (!validatedAllowedCategories.includes("SAFEGO_WAV")) {
+      errors.push("SAFEGO_WAV cannot be disabled for wheelchair-accessible vehicles (accessibility compliance)");
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+    validatedAllowedCategories,
+  };
+}
+
+/**
+ * Check if a category is locked (cannot be toggled off) for a vehicle
+ * Currently only SAFEGO_WAV is locked for WAV vehicles
+ */
+export function isCategoryLocked(
+  category: VehicleCategoryId,
+  vehicleCategory: VehicleCategoryId
+): { locked: boolean; reason?: string } {
+  if (category === "SAFEGO_WAV" && vehicleCategory === "SAFEGO_WAV") {
+    return {
+      locked: true,
+      reason: "SAFEGO_WAV must remain enabled for wheelchair-accessible vehicles to comply with accessibility requirements",
+    };
+  }
+  return { locked: false };
+}
+
+/**
+ * Check if turning off a category would leave no categories enabled
+ * Returns true if the category can safely be disabled
+ */
+export function canDisableCategory(
+  category: VehicleCategoryId,
+  currentAllowedCategories: VehicleCategoryId[],
+  vehicleCategory: VehicleCategoryId
+): { canDisable: boolean; reason?: string } {
+  // Check if locked
+  const lockStatus = isCategoryLocked(category, vehicleCategory);
+  if (lockStatus.locked) {
+    return { canDisable: false, reason: lockStatus.reason };
+  }
+
+  // Check if it's the last enabled category
+  const remainingCategories = currentAllowedCategories.filter(c => c !== category);
+  if (remainingCategories.length === 0) {
+    return {
+      canDisable: false,
+      reason: "Cannot disable the last enabled category - at least one must remain active",
+    };
+  }
+
+  return { canDisable: true };
+}
+
+/**
+ * Enhanced driver filter that checks BOTH eligibility AND allowed preferences
+ * This is the main dispatch function that should be used
+ */
+export function filterDriversByEligibilityAndPreferences<T extends { 
+  vehicleCategory: VehicleCategoryId | null | undefined;
+  allowedCategories?: VehicleCategoryId[] | string[] | null;
+}>(
+  drivers: T[],
+  requestedCategory: VehicleCategoryId
+): T[] {
+  const eligibleDriverCategories = getEligibleDriverCategories(requestedCategory);
+  
+  return drivers.filter(driver => {
+    // Must have an assigned vehicle category
+    if (!driver.vehicleCategory) {
+      return false;
+    }
+
+    // Driver's vehicle category must be eligible to serve this request type
+    if (!eligibleDriverCategories.includes(driver.vehicleCategory as VehicleCategoryId)) {
+      return false;
+    }
+
+    // Check driver's preferences (allowedCategories)
+    const allowedCategories = driver.allowedCategories as VehicleCategoryId[] | null | undefined;
+    
+    // If no preferences set, use eligibility (default behavior)
+    if (!allowedCategories || allowedCategories.length === 0) {
+      return true;
+    }
+
+    // Must have the requested category in their allowed preferences
+    return allowedCategories.includes(requestedCategory);
+  });
+}
+
+/**
+ * Get display information for category preferences UI
+ * Returns which categories can be toggled and their current state
+ */
+export interface CategoryPreferenceOption {
+  category: VehicleCategoryId;
+  displayName: string;
+  description: string;
+  isEligible: boolean;
+  isAllowed: boolean;
+  isLocked: boolean;
+  lockReason?: string;
+  canDisable: boolean;
+  disableReason?: string;
+}
+
+export function getCategoryPreferenceOptions(
+  vehicleCategory: VehicleCategoryId,
+  eligibleCategories: VehicleCategoryId[],
+  allowedCategories: VehicleCategoryId[]
+): CategoryPreferenceOption[] {
+  // Show all categories the vehicle is eligible for
+  return eligibleCategories.map(category => {
+    const config = VEHICLE_CATEGORIES[category];
+    const isAllowed = allowedCategories.includes(category);
+    const lockStatus = isCategoryLocked(category, vehicleCategory);
+    const disableStatus = isAllowed 
+      ? canDisableCategory(category, allowedCategories, vehicleCategory)
+      : { canDisable: true };
+
+    return {
+      category,
+      displayName: config.displayName,
+      description: config.shortDescription,
+      isEligible: true,
+      isAllowed,
+      isLocked: lockStatus.locked,
+      lockReason: lockStatus.reason,
+      canDisable: disableStatus.canDisable,
+      disableReason: disableStatus.reason,
+    };
+  });
+}
+
+/**
+ * Initialize allowedCategories when a vehicle is first approved
+ * Sets allowedCategories = eligibleCategories by default
+ */
+export function initializeVehiclePreferences(
+  vehicleCategory: VehicleCategoryId
+): {
+  eligibleCategories: VehicleCategoryId[];
+  allowedCategories: VehicleCategoryId[];
+} {
+  const eligibleCategories = getEligibleCategoriesForVehicle(vehicleCategory);
+  return {
+    eligibleCategories,
+    allowedCategories: [...eligibleCategories], // Start with all enabled
+  };
+}

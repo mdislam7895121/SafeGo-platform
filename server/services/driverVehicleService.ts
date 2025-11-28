@@ -24,6 +24,8 @@ import {
   isValidVehicleCategoryId,
   suggestVehicleCategory,
   REVERSE_DISPATCH_ELIGIBILITY,
+  initializeVehiclePreferences,
+  validateAllowedCategories,
 } from '@shared/vehicleCategories';
 
 // ========================================
@@ -453,6 +455,16 @@ export class DriverVehicleService {
         }
       }
 
+      // Initialize preferences on approval
+      let eligibleCategories: string[] = [];
+      let allowedCategories: string[] = [];
+      
+      if (input.approved && isValidVehicleCategoryId(input.vehicleCategory)) {
+        const preferences = initializeVehiclePreferences(input.vehicleCategory);
+        eligibleCategories = preferences.eligibleCategories;
+        allowedCategories = preferences.allowedCategories;
+      }
+
       const updatedVehicle = await prisma.vehicle.update({
         where: { id: input.vehicleId },
         data: {
@@ -460,11 +472,18 @@ export class DriverVehicleService {
           vehicleCategoryStatus: input.approved ? DocumentStatus.APPROVED : DocumentStatus.REJECTED,
           vehicleCategoryApprovedAt: input.approved ? new Date() : null,
           vehicleCategoryApprovedBy: input.approved ? input.adminUserId : null,
+          // Initialize category preferences on approval
+          eligibleCategories: input.approved ? eligibleCategories : [],
+          allowedCategories: input.approved ? allowedCategories : [],
+          preferencesLastUpdated: input.approved ? new Date() : null,
           updatedAt: new Date(),
         },
       });
 
       console.log(`[DriverVehicleService] Admin ${input.adminUserId} ${input.approved ? 'approved' : 'rejected'} vehicle ${input.vehicleId} for category ${input.vehicleCategory}`);
+      if (input.approved) {
+        console.log(`[DriverVehicleService] Initialized preferences for vehicle ${input.vehicleId}: eligible=${eligibleCategories.join(',')}, allowed=${allowedCategories.join(',')}`);
+      }
 
       return { success: true, data: updatedVehicle };
     } catch (error: any) {
@@ -676,6 +695,209 @@ export class DriverVehicleService {
     } catch (error: any) {
       console.error('[DriverVehicleService] Error getting pending vehicles:', error);
       return { success: false, error: error.message || 'Failed to get pending vehicles' };
+    }
+  }
+
+  // ========================================
+  // DRIVER CATEGORY PREFERENCES
+  // ========================================
+
+  /**
+   * Get driver's category preferences for their primary vehicle
+   */
+  async getDriverCategoryPreferences(driverId: string): Promise<VehicleServiceResult<{
+    vehicleId: string;
+    vehicleCategory: VehicleCategoryId;
+    eligibleCategories: VehicleCategoryId[];
+    allowedCategories: VehicleCategoryId[];
+    preferencesLastUpdated: Date | null;
+  }>> {
+    try {
+      const vehicle = await prisma.vehicle.findFirst({
+        where: {
+          driverId,
+          isPrimary: true,
+          isActive: true,
+          vehicleCategoryStatus: DocumentStatus.APPROVED,
+        },
+        select: {
+          id: true,
+          vehicleCategory: true,
+          eligibleCategories: true,
+          allowedCategories: true,
+          preferencesLastUpdated: true,
+        },
+      });
+
+      if (!vehicle) {
+        return { success: false, error: 'No approved primary vehicle found' };
+      }
+
+      if (!vehicle.vehicleCategory || !isValidVehicleCategoryId(vehicle.vehicleCategory)) {
+        return { success: false, error: 'Vehicle category not set or invalid' };
+      }
+
+      return {
+        success: true,
+        data: {
+          vehicleId: vehicle.id,
+          vehicleCategory: vehicle.vehicleCategory as VehicleCategoryId,
+          eligibleCategories: vehicle.eligibleCategories as VehicleCategoryId[],
+          allowedCategories: vehicle.allowedCategories as VehicleCategoryId[],
+          preferencesLastUpdated: vehicle.preferencesLastUpdated,
+        },
+      };
+    } catch (error: any) {
+      console.error('[DriverVehicleService] Error getting category preferences:', error);
+      return { success: false, error: error.message || 'Failed to get category preferences' };
+    }
+  }
+
+  /**
+   * Update driver's allowed categories (driver app)
+   */
+  async updateDriverCategoryPreferences(
+    driverId: string,
+    newAllowedCategories: VehicleCategoryId[]
+  ): Promise<VehicleServiceResult<{
+    vehicleId: string;
+    allowedCategories: VehicleCategoryId[];
+  }>> {
+    try {
+      const vehicle = await prisma.vehicle.findFirst({
+        where: {
+          driverId,
+          isPrimary: true,
+          isActive: true,
+          vehicleCategoryStatus: DocumentStatus.APPROVED,
+        },
+      });
+
+      if (!vehicle) {
+        return { success: false, error: 'No approved primary vehicle found' };
+      }
+
+      if (!vehicle.vehicleCategory || !isValidVehicleCategoryId(vehicle.vehicleCategory)) {
+        return { success: false, error: 'Vehicle category not approved' };
+      }
+
+      const eligibleCategories = vehicle.eligibleCategories as VehicleCategoryId[];
+      const isWAV = vehicle.vehicleCategory === 'SAFEGO_WAV';
+
+      // Validate the new allowed categories
+      const validation = validateAllowedCategories(eligibleCategories, newAllowedCategories, isWAV);
+
+      if (!validation.isValid) {
+        return {
+          success: false,
+          error: validation.errors.join('; '),
+          validationErrors: validation.errors,
+          validationWarnings: validation.warnings,
+        };
+      }
+
+      const updatedVehicle = await prisma.vehicle.update({
+        where: { id: vehicle.id },
+        data: {
+          allowedCategories: validation.validatedAllowedCategories,
+          preferencesLastUpdated: new Date(),
+          updatedAt: new Date(),
+        },
+      });
+
+      console.log(`[DriverVehicleService] Driver ${driverId} updated preferences: allowed=${validation.validatedAllowedCategories.join(',')}`);
+
+      return {
+        success: true,
+        data: {
+          vehicleId: updatedVehicle.id,
+          allowedCategories: updatedVehicle.allowedCategories as VehicleCategoryId[],
+        },
+      };
+    } catch (error: any) {
+      console.error('[DriverVehicleService] Error updating category preferences:', error);
+      return { success: false, error: error.message || 'Failed to update category preferences' };
+    }
+  }
+
+  /**
+   * Admin: Reset driver's preferences to default (all eligible categories)
+   */
+  async adminResetCategoryPreferences(
+    vehicleId: string,
+    adminUserId: string
+  ): Promise<VehicleServiceResult<{
+    vehicleId: string;
+    eligibleCategories: VehicleCategoryId[];
+    allowedCategories: VehicleCategoryId[];
+  }>> {
+    try {
+      const vehicle = await prisma.vehicle.findUnique({
+        where: { id: vehicleId },
+        include: {
+          driver: {
+            select: { id: true, fullName: true, firstName: true, lastName: true },
+          },
+        },
+      });
+
+      if (!vehicle) {
+        return { success: false, error: 'Vehicle not found' };
+      }
+
+      if (!vehicle.vehicleCategory || !isValidVehicleCategoryId(vehicle.vehicleCategory)) {
+        return { success: false, error: 'Vehicle category not approved' };
+      }
+
+      // Re-initialize preferences
+      const preferences = initializeVehiclePreferences(vehicle.vehicleCategory as VehicleCategoryId);
+
+      const updatedVehicle = await prisma.vehicle.update({
+        where: { id: vehicleId },
+        data: {
+          eligibleCategories: preferences.eligibleCategories,
+          allowedCategories: preferences.allowedCategories,
+          preferencesResetAt: new Date(),
+          preferencesResetBy: adminUserId,
+          updatedAt: new Date(),
+        },
+      });
+
+      // Create audit log entry
+      await prisma.auditLog.create({
+        data: {
+          id: crypto.randomUUID(),
+          actorId: adminUserId,
+          actorEmail: 'admin@safego.com',
+          actorRole: 'admin',
+          actionType: 'RESET_CATEGORY_PREFERENCES',
+          entityType: 'vehicle',
+          entityId: vehicleId,
+          description: `Reset category preferences for vehicle ${vehicleId}`,
+          metadata: {
+            driverId: vehicle.driverId,
+            driverName: vehicle.driver?.fullName || `${vehicle.driver?.firstName} ${vehicle.driver?.lastName}`,
+            vehicleCategory: vehicle.vehicleCategory,
+            previousAllowedCategories: vehicle.allowedCategories,
+            newAllowedCategories: preferences.allowedCategories,
+            resetReason: 'Admin reset',
+          },
+        },
+      });
+
+      console.log(`[DriverVehicleService] Admin ${adminUserId} reset preferences for vehicle ${vehicleId}`);
+
+      return {
+        success: true,
+        data: {
+          vehicleId: updatedVehicle.id,
+          eligibleCategories: updatedVehicle.eligibleCategories as VehicleCategoryId[],
+          allowedCategories: updatedVehicle.allowedCategories as VehicleCategoryId[],
+        },
+      };
+    } catch (error: any) {
+      console.error('[DriverVehicleService] Error resetting category preferences:', error);
+      return { success: false, error: error.message || 'Failed to reset category preferences' };
     }
   }
 }

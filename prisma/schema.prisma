@@ -1135,6 +1135,13 @@ model Vehicle {
   categoryRejectedAt      DateTime?         // When category was rejected
   categoryRejectedBy      String?           // Admin who rejected
   
+  // Step 4: Driver Category Preferences (subset of eligibleCategories)
+  eligibleCategories      String[]          @default([]) // Categories vehicle qualifies for based on dispatch matrix
+  allowedCategories       String[]          @default([]) // Driver's preferred subset of eligible categories
+  preferencesLastUpdated  DateTime?         // When driver last updated preferences
+  preferencesResetAt      DateTime?         // When admin last reset preferences
+  preferencesResetBy      String?           // Admin who reset preferences
+  
   vehicleDocuments        VehicleDocument[]
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
