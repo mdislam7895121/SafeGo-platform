@@ -44,6 +44,25 @@ import {
   TripCategory,
   AirportCode,
 } from '../services/tlcReportGenerator';
+import {
+  auditTrip,
+  auditTrips,
+  auditFareConsistency,
+  auditDriverPayConsistency,
+  auditLocationAccuracy,
+  auditTimeDistanceIntegrity,
+  auditTLCFees,
+  auditAirportFee,
+  auditTolls,
+  autoReconcile,
+  reconcileTrip,
+  exportAuditResults,
+  generateAuditLogEntry,
+  AuditFilters,
+  AuditCategory,
+  AuditSeverity,
+} from '../services/tlcAuditEngine';
+import type { TripRecordReport } from '../services/tlcReportGenerator';
 
 const router = Router();
 
@@ -661,6 +680,430 @@ router.post('/reports/validate-trip', authenticateToken, requireRole(['admin']),
     console.error('TLC Trip Validation error:', error);
     res.status(500).json({ success: false, error: 'Failed to validate trip record' });
   }
+});
+
+// ============================================
+// TLC Audit & Reconciliation Routes
+// ============================================
+
+function parseAuditFilters(query: Record<string, unknown>): AuditFilters {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  
+  return {
+    startDate: query.startDate ? new Date(query.startDate as string) : thirtyDaysAgo,
+    endDate: query.endDate ? new Date(query.endDate as string) : now,
+    driverId: query.driverId as string | undefined,
+    tripId: query.tripId as string | undefined,
+    category: query.category as AuditCategory | undefined,
+    severity: query.severity as AuditSeverity | undefined,
+    onlyWithFindings: query.onlyWithFindings === 'true',
+  };
+}
+
+router.post('/audit/trip', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const tripData = req.body as TripRecordReport;
+    
+    if (!tripData.tripId || !tripData.driverId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'tripId and driverId are required' 
+      });
+    }
+    
+    const auditResult = auditTrip(tripData);
+    
+    res.json({
+      success: true,
+      data: auditResult,
+      meta: {
+        tripId: tripData.tripId,
+        overallStatus: auditResult.overallStatus,
+        findingsCount: auditResult.findings.length,
+        autoFixApplied: auditResult.autoFixApplied,
+      },
+    });
+  } catch (error) {
+    console.error('TLC Trip Audit error:', error);
+    res.status(500).json({ success: false, error: 'Failed to audit trip' });
+  }
+});
+
+router.post('/audit/batch', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { trips } = req.body as { trips: TripRecordReport[] };
+    const filters = parseAuditFilters(req.query as Record<string, unknown>);
+    
+    if (!trips || !Array.isArray(trips) || trips.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'trips array is required and must not be empty' 
+      });
+    }
+    
+    const { results, summary } = await auditTrips(trips, filters);
+    
+    res.json({
+      success: true,
+      data: { results, summary },
+      meta: {
+        totalTripsAudited: summary.totalTripsAudited,
+        totalFindings: summary.totalFindingsCount,
+        auditScore: summary.auditScore,
+        timestamp: summary.auditTimestamp.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('TLC Batch Audit error:', error);
+    res.status(500).json({ success: false, error: 'Failed to run batch audit' });
+  }
+});
+
+router.post('/audit/reconcile', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { trips } = req.body as { trips: TripRecordReport[] };
+    
+    if (!trips || !Array.isArray(trips) || trips.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'trips array is required and must not be empty' 
+      });
+    }
+    
+    const { reconciliations, summary } = await autoReconcile(trips);
+    
+    const successCount = reconciliations.filter(r => r.success).length;
+    const reviewCount = reconciliations.filter(r => r.requiresManualReview).length;
+    
+    const auditLog = generateAuditLogEntry(
+      'BATCH_RECONCILE',
+      `batch_${Date.now()}`,
+      { 
+        tripsProcessed: trips.length,
+        successCount,
+        reviewCount,
+        autoFixedCount: summary.autoFixedCount,
+      },
+      req.user?.userId || 'system'
+    );
+    
+    res.json({
+      success: true,
+      data: { reconciliations, summary, auditLog },
+      meta: {
+        tripsProcessed: trips.length,
+        successfulReconciliations: successCount,
+        requiresReview: reviewCount,
+        autoFixesApplied: summary.autoFixedCount,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error('TLC Reconciliation error:', error);
+    res.status(500).json({ success: false, error: 'Failed to reconcile trips' });
+  }
+});
+
+router.post('/audit/fare-check', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const tripData = req.body as TripRecordReport;
+    
+    if (!tripData.tripId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'tripId is required' 
+      });
+    }
+    
+    const fareResult = auditFareConsistency(tripData);
+    
+    res.json({
+      success: true,
+      data: fareResult,
+      meta: {
+        tripId: tripData.tripId,
+        isValid: fareResult.isValid,
+        variance: fareResult.variance,
+      },
+    });
+  } catch (error) {
+    console.error('TLC Fare Check error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check fare consistency' });
+  }
+});
+
+router.post('/audit/driver-pay-check', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const tripData = req.body as TripRecordReport;
+    
+    if (!tripData.tripId || !tripData.driverId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'tripId and driverId are required' 
+      });
+    }
+    
+    const payResult = auditDriverPayConsistency(tripData);
+    
+    res.json({
+      success: true,
+      data: payResult,
+      meta: {
+        tripId: tripData.tripId,
+        driverId: tripData.driverId,
+        isValid: payResult.isValid,
+        meetsMinimum: payResult.tlcMinimumCheck.meetsMinimum,
+        adjustmentRequired: payResult.tlcMinimumCheck.adjustmentRequired,
+      },
+    });
+  } catch (error) {
+    console.error('TLC Driver Pay Check error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check driver pay consistency' });
+  }
+});
+
+router.post('/audit/location-check', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const tripData = req.body as TripRecordReport;
+    
+    if (!tripData.tripId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'tripId is required' 
+      });
+    }
+    
+    const locationResult = auditLocationAccuracy(tripData);
+    
+    res.json({
+      success: true,
+      data: locationResult,
+      meta: {
+        tripId: tripData.tripId,
+        isValid: locationResult.isValid,
+        computedPickup: locationResult.computedPickupBorough,
+        computedDropoff: locationResult.computedDropoffBorough,
+      },
+    });
+  } catch (error) {
+    console.error('TLC Location Check error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check location accuracy' });
+  }
+});
+
+router.post('/audit/time-distance-check', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const tripData = req.body as TripRecordReport;
+    
+    if (!tripData.tripId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'tripId is required' 
+      });
+    }
+    
+    const timeDistanceResult = auditTimeDistanceIntegrity(tripData);
+    
+    res.json({
+      success: true,
+      data: timeDistanceResult,
+      meta: {
+        tripId: tripData.tripId,
+        isValid: timeDistanceResult.isValid,
+        speedMph: timeDistanceResult.speedMph,
+        isRealisticSpeed: timeDistanceResult.isRealisticSpeed,
+      },
+    });
+  } catch (error) {
+    console.error('TLC Time/Distance Check error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check time/distance integrity' });
+  }
+});
+
+router.post('/audit/tlc-fees-check', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const tripData = req.body as TripRecordReport;
+    
+    if (!tripData.tripId) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'tripId is required' 
+      });
+    }
+    
+    const feeFindings = auditTLCFees(tripData);
+    const airportFindings = auditAirportFee(tripData);
+    const tollFindings = auditTolls(tripData);
+    
+    const allFindings = [...feeFindings, ...airportFindings, ...tollFindings];
+    
+    res.json({
+      success: true,
+      data: {
+        findings: allFindings,
+        feeBreakdown: {
+          avf: { expected: 0.125, actual: tripData.avfFee },
+          bcf: { expected: 0.625, actual: tripData.bcfFee },
+          hvrf: { expected: 0.05, actual: tripData.hvrfFee },
+          stateSurcharge: { expected: 2.50, actual: tripData.stateSurcharge },
+          congestion: { expected: 2.75, actual: tripData.congestionFee },
+          airport: { expected: 5.00, actual: tripData.airportFee },
+          longTrip: { expected: 2.50, actual: tripData.longTripSurcharge },
+          outOfTown: { expected: 17.50, actual: tripData.outOfTownReturnFee },
+        },
+      },
+      meta: {
+        tripId: tripData.tripId,
+        totalFindings: allFindings.length,
+        hasErrors: allFindings.length > 0,
+      },
+    });
+  } catch (error) {
+    console.error('TLC Fees Check error:', error);
+    res.status(500).json({ success: false, error: 'Failed to check TLC fees' });
+  }
+});
+
+router.get('/audit/export', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { trips } = req.body as { trips?: TripRecordReport[] };
+    const format = (req.query.format as 'json' | 'csv') || 'json';
+    const reportType = (req.query.reportType as 'FULL_AUDIT' | 'FINDINGS_ONLY' | 'SUMMARY') || 'FULL_AUDIT';
+    const filters = parseAuditFilters(req.query as Record<string, unknown>);
+    
+    if (!trips || !Array.isArray(trips)) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'trips array is required in request body' 
+      });
+    }
+    
+    const { results, summary } = await auditTrips(trips, filters);
+    const { reconciliations } = await autoReconcile(trips);
+    
+    const exportData = exportAuditResults(results, summary, reconciliations, format, reportType, filters);
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${exportData.filename}"`);
+      res.send(exportData.data);
+    } else {
+      res.json({
+        success: true,
+        data: exportData.data,
+        meta: {
+          filename: exportData.filename,
+          format: exportData.format,
+          reportType: exportData.reportType,
+          generatedAt: exportData.generatedAt.toISOString(),
+          totalFindings: exportData.findings.length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('TLC Audit Export error:', error);
+    res.status(500).json({ success: false, error: 'Failed to export audit results' });
+  }
+});
+
+router.post('/audit/export', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { trips } = req.body as { trips: TripRecordReport[] };
+    const format = (req.query.format as 'json' | 'csv') || 'json';
+    const reportType = (req.query.reportType as 'FULL_AUDIT' | 'FINDINGS_ONLY' | 'SUMMARY') || 'FULL_AUDIT';
+    const filters = parseAuditFilters(req.query as Record<string, unknown>);
+    
+    if (!trips || !Array.isArray(trips) || trips.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'trips array is required and must not be empty' 
+      });
+    }
+    
+    const { results, summary } = await auditTrips(trips, filters);
+    const { reconciliations } = await autoReconcile(trips);
+    
+    const exportData = exportAuditResults(results, summary, reconciliations, format, reportType, filters);
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${exportData.filename}"`);
+      res.send(exportData.data);
+    } else {
+      res.json({
+        success: true,
+        data: exportData.data,
+        meta: {
+          filename: exportData.filename,
+          format: exportData.format,
+          reportType: exportData.reportType,
+          generatedAt: exportData.generatedAt.toISOString(),
+          totalFindings: exportData.findings.length,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('TLC Audit Export error:', error);
+    res.status(500).json({ success: false, error: 'Failed to export audit results' });
+  }
+});
+
+router.get('/audit/categories', authenticateToken, requireRole(['admin']), (req: AuthRequest, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      categories: [
+        { id: 'FARE_MISMATCH', name: 'Fare Mismatch', description: 'Final fare does not match sum of components' },
+        { id: 'DRIVER_PAY_MISMATCH', name: 'Driver Pay Mismatch', description: 'Driver payout calculation errors' },
+        { id: 'TOLL_MISMATCH', name: 'Toll Mismatch', description: 'Incorrect or suspicious toll charges' },
+        { id: 'AIRPORT_FEE_ERROR', name: 'Airport Fee Error', description: 'Missing or incorrect airport access fees' },
+        { id: 'TLC_FEE_ERROR', name: 'TLC Fee Error', description: 'Incorrect AVF/BCF/HVRF/State surcharge' },
+        { id: 'ZONE_MISMATCH', name: 'Zone Mismatch', description: 'Borough or zone detection errors' },
+        { id: 'TIME_DISTANCE_ERROR', name: 'Time/Distance Error', description: 'Unrealistic trip metrics' },
+        { id: 'MISSING_RECORD', name: 'Missing Record', description: 'Required trip data is missing' },
+        { id: 'SUSPICIOUS_EARNINGS', name: 'Suspicious Earnings', description: 'Unusually high or low earnings' },
+        { id: 'UNDERPAID_DRIVER', name: 'Underpaid Driver', description: 'Driver paid below TLC minimum' },
+      ],
+      severities: [
+        { id: 'CRITICAL', name: 'Critical', description: 'Requires immediate attention', color: 'red' },
+        { id: 'WARNING', name: 'Warning', description: 'Should be reviewed', color: 'yellow' },
+        { id: 'INFO', name: 'Info', description: 'For informational purposes', color: 'blue' },
+        { id: 'VALID', name: 'Valid', description: 'No issues found', color: 'green' },
+      ],
+      fixStatuses: [
+        { id: 'AUTO_FIXED', name: 'Auto-Fixed', description: 'Automatically corrected' },
+        { id: 'REQUIRES_REVIEW', name: 'Requires Review', description: 'Needs manual review' },
+        { id: 'UNFIXABLE', name: 'Unfixable', description: 'Cannot be automatically fixed' },
+        { id: 'NOT_APPLICABLE', name: 'Not Applicable', description: 'No fix needed' },
+      ],
+    },
+  });
+});
+
+router.get('/audit/tolerances', authenticateToken, requireRole(['admin']), (req: AuthRequest, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      fareVarianceCents: 5,
+      distanceVariancePercent: 10,
+      durationVariancePercent: 15,
+      minSpeedMph: 0,
+      maxSpeedMph: 120,
+      roundingTolerance: 0.01,
+      tlcFees: {
+        avfFee: 0.125,
+        bcfFee: 0.625,
+        hvrfFee: 0.05,
+        stateSurcharge: 2.50,
+        congestionFee: 2.75,
+        airportAccessFee: 5.00,
+        longTripThresholdMiles: 20,
+        longTripSurcharge: 2.50,
+        outOfTownReturnFee: 17.50,
+      },
+    },
+  });
 });
 
 export default router;
