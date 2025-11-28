@@ -72,6 +72,8 @@ export interface FareBreakdownData {
   tlcBCFFee?: number;
   tlcBCFFeeRate?: number;
   tlcBCFFeeApplied?: boolean;
+  tlcHVRFFee?: number;
+  tlcHVRFFeeApplied?: boolean;
   
   surgeAmount?: number;
   surgeMultiplier?: number;
@@ -125,6 +127,7 @@ export interface FareBreakdownData {
     tlcAirportFeeApplied?: boolean;
     tlcAVFFeeApplied?: boolean;
     tlcBCFFeeApplied?: boolean;
+    tlcHVRFFeeApplied?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -401,6 +404,14 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           icon={FileText} 
           label={`NYC Black Car Fund (${((breakdown.tlcBCFFeeRate ?? 0.0275) * 100).toFixed(2)}%)`}
           amount={breakdown.tlcBCFFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.tlcHVRFFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Shield} 
+          label="NYC HVFHV Workers' Comp"
+          amount={breakdown.tlcHVRFFee ?? 0} 
           currency={currency} 
         />
       )}
