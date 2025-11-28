@@ -837,6 +837,50 @@ const TLC_AIRPORT_ZONES: TLCAirportConfig[] = [
   },
 ];
 
+// ============================================
+// TLC Accessible Vehicle Fund (AVF) Fee
+// $0.30 flat fee for all NYC HVFHV trips
+// Applies to non-wheelchair trips, excludes out-of-state and paratransit
+// ============================================
+const TLC_AVF_FEE = 0.30;
+
+// NYC Borough codes for AVF eligibility detection
+const NYC_BOROUGH_CODES = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
+const NYC_STATE_CODE = 'NY';
+
+/**
+ * Check if a trip is eligible for TLC AVF fee
+ * AVF applies to all NYC trips except:
+ * - Out-of-state trips
+ * - Pre-scheduled paratransit services
+ */
+function isEligibleForTLCAVFFee(
+  pickupStateCode: string | undefined,
+  dropoffStateCode: string | undefined,
+  pickupBoroughCode: string | undefined,
+  dropoffBoroughCode: string | undefined,
+  isParatransit: boolean = false
+): boolean {
+  // AVF does NOT apply to paratransit services
+  if (isParatransit) {
+    return false;
+  }
+  
+  // Check if trip is in NYC (either pickup or dropoff must be in NYC)
+  const pickupInNYC = pickupStateCode === NYC_STATE_CODE && 
+    (pickupBoroughCode ? NYC_BOROUGH_CODES.includes(pickupBoroughCode.toLowerCase()) : false);
+  const dropoffInNYC = dropoffStateCode === NYC_STATE_CODE && 
+    (dropoffBoroughCode ? NYC_BOROUGH_CODES.includes(dropoffBoroughCode.toLowerCase()) : false);
+  
+  // AVF applies if either pickup or dropoff is in NYC
+  // but NOT if both are out-of-state
+  if (!pickupInNYC && !dropoffInNYC) {
+    return false;
+  }
+  
+  return true;
+}
+
 /**
  * Detect if a point is within any TLC-regulated airport zone
  * Uses precise polygon-based geo-detection for accurate boundary matching
@@ -1338,6 +1382,39 @@ export class FareCalculationService {
       tlcAirportName = dropoffTLCAirport.name;
       tlcAirportCode = dropoffTLCAirport.code;
       tlcAirportFeeApplied = true;
+    }
+    
+    // ============================================
+    // STEP 6C. TLC ACCESSIBLE VEHICLE FUND (AVF) FEE
+    // $0.30 flat regulatory fee for all NYC HVFHV trips
+    // FLAT regulatory fee - does NOT participate in surge
+    // Full amount is pass-through (remitted to government)
+    // Excludes out-of-state trips and paratransit services
+    // ============================================
+    let tlcAVFFee = 0;
+    let tlcAVFFeeApplied = false;
+    
+    // Determine state and borough codes for AVF eligibility
+    // Using the matched zones and pickup/dropoff location info
+    const pickupStateCode = matchedPickupZones.find(z => z.zoneType === 'state')?.zoneId?.toUpperCase();
+    const dropoffStateCode = matchedDropoffZones.find(z => z.zoneType === 'state')?.zoneId?.toUpperCase();
+    const pickupBoroughCode = matchedPickupZones.find(z => z.zoneType === 'borough')?.zoneId;
+    const dropoffBoroughCode = matchedDropoffZones.find(z => z.zoneType === 'borough')?.zoneId;
+    
+    // AVF applies to NYC trips (state code NY with valid borough)
+    // Also check if congestion fee was applied (indicates Manhattan trip)
+    // or if TLC airport fee was applied (indicates NYC metro trip)
+    const avfEligible = isEligibleForTLCAVFFee(
+      pickupStateCode,
+      dropoffStateCode,
+      pickupBoroughCode,
+      dropoffBoroughCode,
+      false // isParatransit - would be passed from request in production
+    ) || congestionFeeApplied || tlcAirportFeeApplied;
+    
+    if (avfEligible) {
+      tlcAVFFee = TLC_AVF_FEE;
+      tlcAVFFeeApplied = true;
     }
     
     // ============================================
