@@ -4,7 +4,7 @@
  * This module contains the deterministic fare calculation pipeline
  * without any database dependencies. It can be tested in isolation.
  * 
- * Pipeline Order (18 steps):
+ * Pipeline Order (19 steps):
  * 1. Base fare calculation
  * 2. Short-trip adjustment
  * 3. Traffic multiplier
@@ -21,9 +21,21 @@
  * 14. Additional fees
  * 15. Service fee
  * 16. Fare guards (min/max)
- * 17. Driver minimum payout
- * 18. Margin protection
+ * 17. Dynamic commission calculation (demand-based bands)
+ * 18. Driver minimum payout
+ * 19. Margin protection
  */
+
+import { 
+  detectDemand, 
+  calculateDynamicCommissionRate, 
+  getDemandLevelFromContext,
+  DemandLevel, 
+  DemandInput, 
+  DemandResult,
+  CommissionBands,
+  DEFAULT_COMMISSION_BANDS,
+} from './demandEngine';
 
 export type RideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
 
@@ -56,7 +68,11 @@ export interface FareConfig {
   customerServiceFee: number;
   platformCommissionPercent: number;
   driverEarningsPercent: number;
+  useDynamicCommission?: boolean;
+  commissionBands?: CommissionBands;
 }
+
+export { DemandLevel, DemandInput, DemandResult, CommissionBands, DEFAULT_COMMISSION_BANDS };
 
 export const DEFAULT_COMMISSION_CONFIG = {
   customerServiceFee: 1.99,
@@ -117,6 +133,12 @@ export interface TimeContext {
   dayOfWeek: number; // 0 = Sunday, 6 = Saturday
 }
 
+export interface DemandContext {
+  activeRides?: number;
+  availableDrivers?: number;
+  etaDensity?: number;
+}
+
 export interface FareEngineContext {
   fareConfig: FareConfig;
   rideTypeCode: RideTypeCode;
@@ -130,6 +152,7 @@ export interface FareEngineContext {
   tolls: TollInfo[];
   stateRegulatoryFees: StateRegulatoryFee[];
   additionalFees: { id: string; name: string; amount: number }[];
+  demandContext?: DemandContext;
 }
 
 export interface FeeBreakdownItem {
@@ -161,6 +184,8 @@ export interface FareFlags {
   minimumFareApplied: boolean;
   driverMinimumPayoutApplied: boolean;
   marginProtectionApplied: boolean;
+  dynamicCommissionApplied: boolean;
+  commissionCapped: boolean;
 }
 
 export interface FeeSuppressionEntry {
@@ -235,6 +260,12 @@ export interface FareEngineResult {
   platformCommission: number;
   driverEarnings: number;
   driverEarningsMinimumApplied: boolean;
+  
+  demandLevel: DemandLevel;
+  demandScore: number;
+  commissionRate: number;
+  dynamicCommissionApplied: boolean;
+  commissionCapped: boolean;
   
   marginProtectionApplied: boolean;
   marginProtectionCapped: boolean;
@@ -350,6 +381,7 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     tolls,
     stateRegulatoryFees,
     additionalFees,
+    demandContext,
   } = context;
 
   const suppressionEntries: FeeSuppressionEntry[] = [];
@@ -629,16 +661,55 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   }
 
   // ============================================
-  // STEP 17: CUSTOMER SERVICE FEE & DRIVER EARNINGS
-  // New Commission Model:
-  // - Customer service fee: fixed $1.99 per trip
-  // - Driver earnings: max((totalFare * 0.85), $5.00)
-  // - Platform commission: 15% of final fare
+  // STEP 17: DYNAMIC COMMISSION CALCULATION
+  // Dynamic Commission System (Model A):
+  // - Demand detection based on surge, time, and supply/demand metrics
+  // - Commission bands: Low (10-12%), Normal (13-15%), High (15-18%)
+  // - Hard cap: 18%, Hard floor: 10%
+  // - Applied on final fare BEFORE service fee
   // ============================================
   const customerServiceFee = fareConfig.customerServiceFee ?? DEFAULT_COMMISSION_CONFIG.customerServiceFee;
   const driverEarningsPercent = fareConfig.driverEarningsPercent ?? DEFAULT_COMMISSION_CONFIG.driverEarningsPercent;
-  const platformCommissionPercent = fareConfig.platformCommissionPercent ?? DEFAULT_COMMISSION_CONFIG.platformCommissionPercent;
+  const staticCommissionPercent = fareConfig.platformCommissionPercent ?? DEFAULT_COMMISSION_CONFIG.platformCommissionPercent;
   const driverMinimumEarnings = fareConfig.driverMinimumPayout ?? DEFAULT_COMMISSION_CONFIG.driverMinimumEarnings;
+  const useDynamicCommission = fareConfig.useDynamicCommission ?? true;
+  const commissionBands = fareConfig.commissionBands ?? DEFAULT_COMMISSION_BANDS;
+  
+  const demandInput: DemandInput = {
+    activeRides: demandContext?.activeRides ?? 50,
+    availableDrivers: demandContext?.availableDrivers ?? 50,
+    surgeMultiplier: effectiveSurge,
+    etaDensity: demandContext?.etaDensity ?? 5,
+    hour: timeContext.hour,
+    dayOfWeek: timeContext.dayOfWeek,
+  };
+  
+  const demandResult = detectDemand(demandInput);
+  const demandLevel: DemandLevel = demandResult.demandLevel;
+  const demandScore = demandResult.demandScore;
+  
+  let dynamicCommissionApplied = false;
+  let commissionCapped = false;
+  let effectiveCommissionRate: number;
+  
+  if (useDynamicCommission) {
+    effectiveCommissionRate = calculateDynamicCommissionRate(demandResult, commissionBands);
+    dynamicCommissionApplied = true;
+    
+    if (effectiveCommissionRate < commissionBands.hardFloor) {
+      effectiveCommissionRate = commissionBands.hardFloor;
+      commissionCapped = true;
+    }
+    if (effectiveCommissionRate > commissionBands.hardCap) {
+      effectiveCommissionRate = commissionBands.hardCap;
+      commissionCapped = true;
+    }
+  } else {
+    effectiveCommissionRate = staticCommissionPercent;
+  }
+  
+  const commissionRate = effectiveCommissionRate;
+  const platformCommissionPercent = effectiveCommissionRate;
   
   const driverTolls = tolls
     .filter(t => t.paidToDriver)
@@ -656,11 +727,19 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   let driverPayout = Math.max(legacyDriverPayout, fareConfig.driverMinimumPayout);
 
   // ============================================
-  // STEP 18: MARGIN PROTECTION
-  // If effective platform commission < 15%:
+  // STEP 18: DRIVER MINIMUM PAYOUT ENFORCEMENT
+  // Ensure driver always receives at least $5.00
+  // ============================================
+  if (driverEarnings < driverMinimumEarnings) {
+    driverEarnings = driverMinimumEarnings;
+  }
+
+  // ============================================
+  // STEP 19: MARGIN PROTECTION
+  // If effective platform commission < target rate:
   // 1. Increase fare (respecting maximum fare cap)
-  // 2. If still < 15%, reduce driver earnings (never below $5)
-  // 3. If still < 15%, accept reduced margin and set marginProtectionCapped: true
+  // 2. If still < target, reduce driver earnings (never below $5)
+  // 3. If still < target, accept reduced margin and set marginProtectionCapped: true
   // ============================================
   const allRegulatoryFees = roundCurrency(stateRegulatoryFee);
   
@@ -772,6 +851,8 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     minimumFareApplied,
     driverMinimumPayoutApplied,
     marginProtectionApplied,
+    dynamicCommissionApplied,
+    commissionCapped,
   };
 
   const feeSuppressionLog: FeeSuppressionLog = {
@@ -839,6 +920,12 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     platformCommission,
     driverEarnings,
     driverEarningsMinimumApplied,
+    
+    demandLevel,
+    demandScore,
+    commissionRate,
+    dynamicCommissionApplied,
+    commissionCapped,
     
     marginProtectionApplied,
     marginProtectionCapped,
