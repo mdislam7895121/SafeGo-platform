@@ -1646,7 +1646,7 @@ export class FareCalculationService {
     // 11. SUBTOTAL (Before service fee and discounts)
     // Promo discounts apply AFTER fees, BEFORE service fee
     // ============================================
-    // TLC fees (congestion + airport) are FLAT regulatory fees applied post-surge
+    // TLC fees (congestion + airport + AVF) are FLAT regulatory fees applied post-surge
     // They do NOT participate in surge - full amounts are pass-through to government
     const subtotalBeforeDiscount = roundCurrency(
       surgeAdjusted + 
@@ -1655,6 +1655,7 @@ export class FareCalculationService {
       longDistanceFee +
       congestionFee +
       tlcAirportFee +
+      tlcAVFFee +
       crossCitySurcharge +
       crossStateSurcharge +
       returnDeadheadFee +
@@ -1770,11 +1771,12 @@ export class FareCalculationService {
     // - State regulatory fees (state-specific fees remitted to government)
     // - TLC congestion fee (NYC congestion zone fee remitted to government)
     // - TLC airport fee (airport access fee remitted to government)
+    // - TLC AVF fee (Accessible Vehicle Fund fee remitted to government)
     // Note: Additional fees (booking, safety, eco) and service fee are SafeGo revenue
     // Note: TLC fees are included in pre-surge base but surged portion is SafeGo revenue;
     //       only original amounts are pass-through
     const allRegulatoryFees = roundCurrency(
-      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee
+      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee
     );
     const calcPassThroughCosts = (payout: number) => 
       roundCurrency(payout + allRegulatoryFees);
