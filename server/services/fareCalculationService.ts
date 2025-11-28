@@ -181,6 +181,22 @@ export interface FareFlags {
   promoApplied: boolean;
   stateMinimumFareApplied: boolean;
   shortTripAdjustmentApplied: boolean;
+  maximumFareApplied: boolean;
+  minimumFareApplied: boolean;
+  driverMinimumPayoutApplied: boolean;
+  marginProtectionApplied: boolean;
+}
+
+export interface FeeSuppressionEntry {
+  fee: string;
+  suppressedBy: string;
+  reason: string;
+  wouldHaveBeenAmount?: number;
+}
+
+export interface FeeSuppressionLog {
+  entries: FeeSuppressionEntry[];
+  timestamp: Date;
 }
 
 export interface RouteFareBreakdown {
@@ -272,6 +288,9 @@ export interface RouteFareBreakdown {
   
   // Matched zones for logging
   matchedZoneIds: string[];
+  
+  // Fee suppression log for audit
+  feeSuppressionLog: FeeSuppressionLog;
   
   // Display helpers
   isCheapest?: boolean;
@@ -796,6 +815,27 @@ export class FareCalculationService {
   ): Promise<RouteFareBreakdown> {
     const now = new Date();
     
+    // Initialize fee suppression log for audit trail
+    const feeSuppressionLog: FeeSuppressionLog = {
+      entries: [],
+      timestamp: now,
+    };
+    
+    // Helper to add suppression entry
+    const addSuppression = (fee: string, suppressedBy: string, reason: string, wouldHaveBeenAmount?: number) => {
+      feeSuppressionLog.entries.push({ fee, suppressedBy, reason, wouldHaveBeenAmount });
+    };
+    
+    // ============================================
+    // DETERMINISTIC PIPELINE ORDER (Per Spec):
+    // 1. base → 2. traffic → 3. surge → 4. time-based → 
+    // 5. long-distance → 6. tolls → 7. airport → 
+    // 8. cross-state → 9. cross-city → 10. border-zone → 
+    // 11. regulatory → 12. deadhead → 13. service → 
+    // 14. promo → 15. max-fare → 16. driver-min → 
+    // 17. margin-protection → 18. final
+    // ============================================
+    
     // ============================================
     // 1. BASE FARE COMPONENTS
     // ============================================
@@ -929,11 +969,13 @@ export class FareCalculationService {
     }
     
     // ============================================
-    // 7C. CROSS-CITY AND CROSS-STATE SURCHARGES
-    // Priority rules per spec:
-    // - Cross-state takes precedence over cross-city
-    // - Airport can override cross-city IF config.AIRPORT_OVERRIDES_CROSS_CITY is true
-    // - Airport does NOT override cross-state
+    // 8-10. GEO-BASED FEES WITH CONFLICT RULES
+    // Pipeline order: airport → cross-state → cross-city → border-zone
+    // Conflict rules:
+    // - airportFeeApplied does NOT override crossStateApplied
+    // - crossStateApplied ALWAYS suppresses crossCityApplied
+    // - airportFeeApplied suppresses crossCityApplied (if AIRPORT_OVERRIDES_CROSS_CITY)
+    // - borderZoneFeeApplied works unless crossStateApplied suppresses it
     // ============================================
     let crossCitySurcharge = 0;
     let crossStateSurcharge = 0;
@@ -943,30 +985,54 @@ export class FareCalculationService {
     // Check configurable airport override behavior
     const airportOverridesCrossCity = DEFAULT_FARE_RULES.AIRPORT_OVERRIDES_CROSS_CITY;
     
-    // Cross-state takes precedence over cross-city
-    if (pickupStateCode && dropoffStateCode && pickupStateCode !== dropoffStateCode) {
+    // Detect if cross-city or cross-state trip
+    const isCrossCityTrip = pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode;
+    const isCrossStateTrip = pickupStateCode && dropoffStateCode && pickupStateCode !== dropoffStateCode;
+    
+    // Step 1: Apply cross-state fee (highest priority for geo-based conflicts)
+    if (isCrossStateTrip) {
       crossStateSurcharge = crossStateSurchargeAmount;
       crossStateApplied = true;
-    } else if (pickupCityCode && dropoffCityCode && pickupCityCode !== dropoffCityCode) {
-      // Apply cross-city surcharge UNLESS:
-      // 1. Cross-state is already applied (handled above)
-      // 2. Airport fee is applied AND airportOverridesCrossCity is true
-      const shouldSkipCrossCity = airportFeeApplied && airportOverridesCrossCity;
-      if (!shouldSkipCrossCity) {
+      
+      // Cross-state suppresses cross-city
+      if (isCrossCityTrip) {
+        addSuppression('crossCitySurcharge', 'crossStateSurcharge', 
+          'Cross-state trip supersedes cross-city surcharge', crossCitySurchargeAmount);
+      }
+    } 
+    // Step 2: Apply cross-city fee (if not suppressed)
+    else if (isCrossCityTrip) {
+      // Check if airport fee should suppress cross-city
+      const airportSuppressesCrossCity = airportFeeApplied && airportOverridesCrossCity;
+      
+      if (airportSuppressesCrossCity) {
+        addSuppression('crossCitySurcharge', 'airportFee', 
+          'Airport fee overrides cross-city surcharge (AIRPORT_OVERRIDES_CROSS_CITY=true)', 
+          crossCitySurchargeAmount);
+      } else {
         crossCitySurcharge = crossCitySurchargeAmount;
         crossCityApplied = true;
       }
     }
     
+    // Step 3: Border zone suppression by cross-state
+    if (borderZoneFeeApplied && crossStateApplied) {
+      // Cross-state trips suppress border zone fees
+      borderZoneFee = 0;
+      borderZoneFeeApplied = false;
+      addSuppression('borderZoneFee', 'crossStateSurcharge', 
+        'Cross-state trip supersedes border zone fee', DEFAULT_FARE_RULES.BORDER_ZONE_FEE);
+    }
+    
     // ============================================
-    // 7D. RETURN DEADHEAD CHARGE (Uber-style)
-    // For cross-state rides or trips exceeding service area
+    // 12. RETURN DEADHEAD CHARGE (Uber-style)
+    // ONLY applies when crossStateApplied is true
     // ============================================
     let returnDeadheadFee = 0;
     let returnDeadheadApplied = false;
     let excessReturnMiles = 0;
     
-    // Calculate excess return miles for cross-state trips
+    // Protection: Return deadhead fee ONLY when cross-state is applied
     if (crossStateApplied) {
       // Estimate return distance as the straight-line distance from dropoff to pickup
       const returnDistance = haversineDistanceMiles(
@@ -1312,6 +1378,10 @@ export class FareCalculationService {
       promoApplied: false, // Will be set by promo engine
       stateMinimumFareApplied,
       shortTripAdjustmentApplied,
+      maximumFareApplied,
+      minimumFareApplied,
+      driverMinimumPayoutApplied,
+      marginProtectionApplied,
     };
     
     // Calculate effective discount percentage
@@ -1401,6 +1471,9 @@ export class FareCalculationService {
       stateMinimumFareApplied,
       
       matchedZoneIds,
+      
+      // Fee suppression log for audit
+      feeSuppressionLog,
     };
   }
   
