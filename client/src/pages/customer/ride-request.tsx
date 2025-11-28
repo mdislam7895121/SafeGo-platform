@@ -58,6 +58,7 @@ interface FareEstimate {
   etaMinutes: number;
   etaWithTrafficMinutes: number;
   distanceKm: number;
+  distanceMiles: number;
   trafficLevel: "light" | "moderate" | "heavy";
   trafficLabel: string;
 }
@@ -347,6 +348,7 @@ export default function RideRequest() {
         destination: { lat: dropoff.lat, lng: dropoff.lng },
         travelMode: google.maps.TravelMode.DRIVING,
         provideRouteAlternatives: true,
+        unitSystem: google.maps.UnitSystem.IMPERIAL,
         drivingOptions: {
           departureTime: new Date(),
           trafficModel: google.maps.TrafficModel.BEST_GUESS,
@@ -413,16 +415,17 @@ export default function RideRequest() {
     setIsCalculatingFare(true);
     
     const distanceKm = route.distanceMeters / 1000;
+    const distanceMiles = route.distanceMeters / 1609.34;
     const etaMinutes = Math.ceil(route.durationSeconds / 60);
     const etaWithTrafficMinutes = Math.ceil(route.durationInTrafficSeconds / 60);
     const trafficLevel = getTrafficLevel(route.durationInTrafficSeconds, route.durationSeconds);
     const trafficLabel = getTrafficLevelLabel(trafficLevel);
     
     const baseFare = 2.50;
-    const perKmRate = 1.25;
+    const perMileRate = 2.00;
     const perMinRate = 0.30;
     
-    const distanceFare = distanceKm * perKmRate;
+    const distanceFare = distanceMiles * perMileRate;
     const timeFare = etaWithTrafficMinutes * perMinRate;
     const totalFare = baseFare + distanceFare + timeFare;
     
@@ -435,6 +438,7 @@ export default function RideRequest() {
       etaMinutes,
       etaWithTrafficMinutes,
       distanceKm: Math.round(distanceKm * 10) / 10,
+      distanceMiles: Math.round(distanceMiles * 10) / 10,
       trafficLevel,
       trafficLabel,
     });
@@ -755,7 +759,7 @@ export default function RideRequest() {
                   </div>
                 </div>
                 <div className="text-right text-sm">
-                  <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceKm} km</p>
+                  <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
                   <p className="font-medium" data-testid="text-eta">
                     ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
                   </p>
