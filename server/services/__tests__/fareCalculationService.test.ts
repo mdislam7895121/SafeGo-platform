@@ -304,11 +304,14 @@ describe('FareEngine - Comprehensive Regression Tests', () => {
       
       expect(result.flags.airportFeeApplied).toBe(true);
       expect(result.flags.crossCityApplied).toBe(false);
+      expect(result.crossCitySurcharge).toBe(0);
+      expect(result.airportFee).toBeGreaterThan(0);
       
       const suppressionEntry = result.feeSuppressionLog.entries.find(
         e => e.fee === 'crossCitySurcharge' && e.suppressedBy === 'airportFee'
       );
       expect(suppressionEntry).toBeDefined();
+      expect(suppressionEntry?.wouldHaveBeenAmount).toBe(5.00);
     });
 
     it('airport should NOT suppress cross-state', () => {
