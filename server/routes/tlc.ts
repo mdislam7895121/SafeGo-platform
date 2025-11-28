@@ -29,6 +29,21 @@ import {
   TLCHourlyInput,
   TLCWeeklyInput,
 } from '../services/tlcMinimumPayEngine';
+import {
+  generateTripRecordReport,
+  generateDriverPayReport,
+  generateHVFHVSummaryReport,
+  generateOutOfTownReport,
+  generateAccessibilityReport,
+  generateAirportActivityReport,
+  exportReport,
+  validateTripRecord,
+  validateDriverPayReport,
+  TLCReportFilters,
+  BoroughCode,
+  TripCategory,
+  AirportCode,
+} from '../services/tlcReportGenerator';
 
 const router = Router();
 
@@ -390,5 +405,262 @@ function getWeekEnd(): Date {
   weekEnd.setHours(23, 59, 59, 999);
   return weekEnd;
 }
+
+function parseReportFilters(query: Record<string, unknown>): TLCReportFilters {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  
+  return {
+    startDate: query.startDate ? new Date(query.startDate as string) : thirtyDaysAgo,
+    endDate: query.endDate ? new Date(query.endDate as string) : now,
+    driverId: query.driverId as string | undefined,
+    borough: query.borough as BoroughCode | undefined,
+    tripType: query.tripType as TripCategory | undefined,
+    airportCode: query.airportCode as AirportCode | undefined,
+    minFare: query.minFare ? Number(query.minFare) : undefined,
+    maxFare: query.maxFare ? Number(query.maxFare) : undefined,
+  };
+}
+
+router.get('/reports/trip-records', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const filters = parseReportFilters(req.query as Record<string, unknown>);
+    const report = await generateTripRecordReport(filters);
+    
+    res.json({ 
+      success: true, 
+      data: report,
+      meta: {
+        totalRecords: report.length,
+        periodStart: filters.startDate.toISOString(),
+        periodEnd: filters.endDate.toISOString(),
+        generatedAt: new Date().toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error('TLC Trip Record Report error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate trip record report' });
+  }
+});
+
+router.get('/reports/driver-pay', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const filters = parseReportFilters(req.query as Record<string, unknown>);
+    const report = await generateDriverPayReport(filters);
+    
+    const validated = report.map(r => ({
+      ...r,
+      validation: validateDriverPayReport(r),
+    }));
+    
+    res.json({ 
+      success: true, 
+      data: validated,
+      meta: {
+        totalDrivers: report.length,
+        periodStart: filters.startDate.toISOString(),
+        periodEnd: filters.endDate.toISOString(),
+        generatedAt: new Date().toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error('TLC Driver Pay Report error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate driver pay report' });
+  }
+});
+
+router.get('/reports/hvfhv-summary', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const filters = parseReportFilters(req.query as Record<string, unknown>);
+    const report = await generateHVFHVSummaryReport(filters);
+    
+    res.json({ 
+      success: true, 
+      data: report,
+      meta: {
+        periodStart: filters.startDate.toISOString(),
+        periodEnd: filters.endDate.toISOString(),
+        generatedAt: report.reportGeneratedAt.toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error('TLC HVFHV Summary Report error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate HVFHV summary report' });
+  }
+});
+
+router.get('/reports/out-of-town', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const filters = parseReportFilters(req.query as Record<string, unknown>);
+    const report = await generateOutOfTownReport(filters);
+    
+    res.json({ 
+      success: true, 
+      data: report,
+      meta: {
+        totalTrips: report.trips.length,
+        periodStart: filters.startDate.toISOString(),
+        periodEnd: filters.endDate.toISOString(),
+        generatedAt: report.reportGeneratedAt.toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error('TLC Out-of-Town Report error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate out-of-town report' });
+  }
+});
+
+router.get('/reports/accessibility', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const filters = parseReportFilters(req.query as Record<string, unknown>);
+    const report = await generateAccessibilityReport(filters);
+    
+    res.json({ 
+      success: true, 
+      data: report,
+      meta: {
+        periodStart: filters.startDate.toISOString(),
+        periodEnd: filters.endDate.toISOString(),
+        generatedAt: report.reportGeneratedAt.toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error('TLC Accessibility Report error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate accessibility report' });
+  }
+});
+
+router.get('/reports/airport-activity', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const filters = parseReportFilters(req.query as Record<string, unknown>);
+    const report = await generateAirportActivityReport(filters);
+    
+    res.json({ 
+      success: true, 
+      data: report,
+      meta: {
+        totalAirportTrips: report.summary.totalAirportTrips,
+        periodStart: filters.startDate.toISOString(),
+        periodEnd: filters.endDate.toISOString(),
+        generatedAt: report.reportGeneratedAt.toISOString(),
+      }
+    });
+  } catch (error) {
+    console.error('TLC Airport Activity Report error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate airport activity report' });
+  }
+});
+
+router.get('/reports/export/:reportType', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const { reportType } = req.params;
+    const format = (req.query.format as 'json' | 'csv') || 'json';
+    const filters = parseReportFilters(req.query as Record<string, unknown>);
+    
+    const validTypes = ['TRR', 'DPR', 'HSR', 'OUT_OF_TOWN', 'ACCESSIBILITY', 'AIRPORT'];
+    if (!validTypes.includes(reportType.toUpperCase())) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Invalid report type. Valid types: ${validTypes.join(', ')}` 
+      });
+    }
+    
+    const exportResult = await exportReport(
+      reportType.toUpperCase() as 'TRR' | 'DPR' | 'HSR' | 'OUT_OF_TOWN' | 'ACCESSIBILITY' | 'AIRPORT',
+      format,
+      filters
+    );
+    
+    if (format === 'csv') {
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${exportResult.filename}"`);
+      res.send(exportResult.data);
+    } else {
+      res.json({ 
+        success: true, 
+        data: exportResult.data,
+        meta: {
+          filename: exportResult.filename,
+          recordCount: exportResult.recordCount,
+          generatedAt: exportResult.generatedAt.toISOString(),
+        }
+      });
+    }
+  } catch (error) {
+    console.error('TLC Report Export error:', error);
+    res.status(500).json({ success: false, error: 'Failed to export report' });
+  }
+});
+
+router.get('/reports/available', authenticateToken, requireRole(['admin']), (req: AuthRequest, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      reports: [
+        {
+          id: 'TRR',
+          name: 'Trip Record Report',
+          description: 'Individual trip records with all TLC-required fields',
+          exportFormats: ['json', 'csv'],
+        },
+        {
+          id: 'DPR',
+          name: 'Driver Pay Report',
+          description: 'Driver earnings with TLC minimum pay adjustments',
+          exportFormats: ['json', 'csv'],
+        },
+        {
+          id: 'HSR',
+          name: 'HVFHV Summary Report',
+          description: 'Aggregated monthly summary for TLC submission',
+          exportFormats: ['json', 'csv'],
+        },
+        {
+          id: 'OUT_OF_TOWN',
+          name: 'Out-of-Town Trips Report',
+          description: 'NYC to Out-of-State and return fee tracking',
+          exportFormats: ['json', 'csv'],
+        },
+        {
+          id: 'ACCESSIBILITY',
+          name: 'Accessibility Report',
+          description: 'AVF collection and accessible vehicle metrics',
+          exportFormats: ['json', 'csv'],
+        },
+        {
+          id: 'AIRPORT',
+          name: 'Airport Activity Report',
+          description: 'Airport pickup/dropoff activity and fees',
+          exportFormats: ['json', 'csv'],
+        },
+      ],
+      filters: {
+        startDate: 'ISO date string (default: 30 days ago)',
+        endDate: 'ISO date string (default: now)',
+        driverId: 'Filter by specific driver',
+        borough: 'MANHATTAN | BROOKLYN | QUEENS | BRONX | STATEN_ISLAND | OUT_OF_NYC',
+        tripType: 'NYC_TO_NYC | NYC_TO_OOS | OOS_TO_NYC | AIRPORT_PICKUP | AIRPORT_DROPOFF | MANHATTAN_CONGESTION | LONG_TRIP',
+        airportCode: 'JFK | LGA | EWR | WCY',
+        minFare: 'Minimum fare amount',
+        maxFare: 'Maximum fare amount',
+      },
+    },
+  });
+});
+
+router.post('/reports/validate-trip', authenticateToken, requireRole(['admin']), async (req: AuthRequest, res: Response) => {
+  try {
+    const tripData = req.body;
+    const validation = validateTripRecord(tripData);
+    
+    res.json({
+      success: true,
+      data: validation,
+    });
+  } catch (error) {
+    console.error('TLC Trip Validation error:', error);
+    res.status(500).json({ success: false, error: 'Failed to validate trip record' });
+  }
+});
 
 export default router;
