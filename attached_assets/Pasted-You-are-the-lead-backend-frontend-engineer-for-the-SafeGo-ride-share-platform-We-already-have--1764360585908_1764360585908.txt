@@ -1,0 +1,311 @@
+You are the lead backend + frontend engineer for the SafeGo ride-share platform.
+
+We already have:
+- Full USA + NYC TLC fare engine implemented
+- AI Marketplace Balancer (surge, incentives, commissions, etc.)
+- 7 rider vehicle categories wired into the fare engine and rider UI with real-time pricing:
+  1. SAFEGO_X
+  2. SAFEGO_COMFORT
+  3. SAFEGO_COMFORT_XL
+  4. SAFEGO_XL
+  5. SAFEGO_BLACK
+  6. SAFEGO_BLACK_SUV
+  7. SAFEGO_WAV (Accessible)
+- Cross-state dedicated pricing already implemented
+
+Now we must complete the **vehicle category system for drivers + dispatch**, so that the app always knows:
+- Which driver has which category
+- Which driver can receive which trip
+- Categories stay TLC-compliant and cannot be faked by drivers
+
+Follow the instructions below carefully. Do not break existing fare logic, TLC rules, or AI Marketplace Balancer. Make all changes incrementally, with tests.
+
+────────────────────────
+1. DOMAIN & DATA MODEL CHANGES
+────────────────────────
+
+1.1. Introduce a strong, shared VehicleCategory enum
+
+- In the shared types module (where ride types / fare enums live), define a strict enum:
+
+  - SAFEGO_X
+  - SAFEGO_COMFORT
+  - SAFEGO_COMFORT_XL
+  - SAFEGO_XL
+  - SAFEGO_BLACK
+  - SAFEGO_BLACK_SUV
+  - SAFEGO_WAV
+
+- Ensure this enum is reused across:
+  - Driver/Vehicle models
+  - Dispatch/matching logic
+  - Ride request DTOs
+  - Fare engine (where categories are already integrated)
+  - Any existing category strings should be refactored to use this enum (without breaking behavior).
+
+1.2. Extend persistence models (Prisma / ORM)
+
+- In the database schema for vehicles (or create one if not present), ensure we have a dedicated `Vehicle` model with at least:
+
+  - id
+  - driverId (FK to Driver)
+  - make
+  - model
+  - year
+  - bodyType (e.g. SEDAN, SUV, MINIVAN)
+  - seats (int)
+  - luxury (boolean)
+  - wheelchairAccessible (boolean)
+  - plateNumber
+  - tlcLicenseNumber / hvfhvPermit (if not already stored)
+  - vehicleCategory (VehicleCategory enum)
+  - status: PENDING_VERIFICATION | APPROVED | REJECTED
+  - createdAt / updatedAt
+
+- If driver currently has vehicle fields directly on the Driver model, migrate them to the Vehicle model without breaking existing data:
+  - Add Vehicle model
+  - Migrate fields in a backwards-compatible way
+  - Update any code that assumes a single vehicle on Driver to use the primary/active vehicle.
+
+- Run migrations and fix any type errors.
+
+1.3. Link Driver to active vehicle
+
+- On the Driver model or type, expose:
+
+  - `activeVehicleId` (FK to Vehicle)
+  - Optionally, computed `activeVehicle` (via relation).
+
+- For now we assume each driver has one active vehicle. If multiple vehicles exist, the one with `activeVehicleId` is used for matching and fare.
+
+────────────────────────
+2. DRIVER ONBOARDING: VEHICLE REGISTRATION
+────────────────────────
+
+2.1. Backend APIs for driver vehicle submission
+
+- Add secure driver routes/endpoints for:
+  - `POST /driver/vehicle` – create or update vehicle draft
+  - `GET /driver/vehicle` – fetch current vehicle info and verification status
+
+- The POST payload should include:
+  - make, model, year
+  - bodyType
+  - seats
+  - color
+  - wheelchairAccessible (boolean)
+  - plateNumber
+  - TLC fields (tlcLicenseNumber, hvfhvPermit, baseAffiliation, etc.)
+  - **No direct vehicleCategory field from the driver.** Drivers must NOT be able to set the category themselves.
+
+- When the driver submits:
+  - Create or update the Vehicle row
+  - Set `status = PENDING_VERIFICATION`
+  - Do not allow the driver to come online until:
+    - The vehicle’s status is APPROVED
+    - `activeVehicleId` is set
+
+2.2. Auto-suggested category (internal only, not trusted)
+
+- Implement a small internal helper that can SUGGEST a category based on vehicle properties (but not enforce it):
+
+  Example heuristic:
+  - If wheelchairAccessible => SUGGEST SAFEGO_WAV
+  - Else if bodyType == SUV and seats >= 6 and luxury == true => SUGGEST SAFEGO_BLACK_SUV
+  - Else if bodyType == SUV and seats >= 6 => SUGGEST SAFEGO_XL
+  - Else if bodyType == SEDAN and luxury == true => SUGGEST SAFEGO_BLACK or SAFEGO_COMFORT
+      (use a field like `requestedCategory` to store the suggestion)
+  - Else => SAFEGO_X
+
+- Store this suggestion in a non-authoritative field such as `suggestedCategory` on Vehicle, but DO NOT use it for matching or pricing until an admin confirms it.
+
+────────────────────────
+3. ADMIN PANEL: VEHICLE VERIFICATION & CATEGORY ASSIGNMENT
+────────────────────────
+
+3.1. Admin list view: pending vehicles
+
+- In the Admin UI, add a section: **“Vehicle Verification & Categories”**.
+- Create a list/table view of all Vehicles with `status = PENDING_VERIFICATION`, showing:
+  - Driver name + ID
+  - Vehicle make / model / year / bodyType / seats
+  - TLC license / permit / base affiliation
+  - suggestedCategory (from our heuristic)
+  - Uploaded documents (if the project already supports document uploads, just link/display; otherwise, stub for future).
+
+3.2. Admin detail view & actions
+
+- On click of a pending row, show a detail view where admin can:
+
+  - See all vehicle + TLC info
+  - See the auto `suggestedCategory` value (read-only)
+  - Set the authoritative `vehicleCategory` via dropdown using the VehicleCategory enum
+  - Choose one of:
+    - APPROVE (sets status=APPROVED, assigns category, sets driver.activeVehicleId)
+    - REJECT (status=REJECTED, with optional reason)
+    - REQUEST_CHANGES (if you already have a messaging/notification system)
+
+- When APPROVE is clicked:
+  - Persist `vehicleCategory`
+  - Set vehicle `status = APPROVED`
+  - Set driver’s `activeVehicleId` to this vehicle
+  - Optionally, mark driver as able to go online (if your state machine for driver status exists).
+
+3.3. Security & auditing
+
+- Ensure that:
+  - Only admin roles can access these endpoints and UI
+  - Drivers cannot modify `vehicleCategory`, `status`, or any admin fields
+  - Add simple audit logs / events (e.g. “Vehicle 123 approved as SAFEGO_BLACK by admin 456 at time T”).
+
+────────────────────────
+4. RIDER REQUEST FLOW & DISPATCH MATCHING
+────────────────────────
+
+We already have rider-side vehicle categories and fare engine wiring. Now we connect dispatch.
+
+4.1. Ride request DTO
+
+- Ensure the ride request model contains:
+  - `requestedCategory: VehicleCategory`
+  - `requestedCategoryDisplayName` (optional, for UI)
+- Make sure this field is required when the rider books a trip.
+
+4.2. Matching rules
+
+- Implement a dispatch/matching service that, given a ride request, selects eligible drivers.
+
+- Start with a clear **eligibility filter**:
+
+  - Driver is online and available
+  - Driver has an `activeVehicleId`
+  - Active vehicle has `status = APPROVED`
+  - Active vehicle has a `vehicleCategory` compatible with the requested category
+  - Driver is within the search radius of the pickup
+  - Driver is not blocked or suspended
+
+- Define a simple compatibility matrix function:
+
+  - For now, we keep rules simple and conservative:
+
+    - SAFEGO_X → drivers with SAFEGO_X (optionally SAFEGO_COMFORT, SAFEGO_BLACK if up-leveling is allowed later).
+    - SAFEGO_COMFORT → drivers with SAFEGO_COMFORT only
+    - SAFEGO_COMFORT_XL → drivers with SAFEGO_COMFORT_XL only
+    - SAFEGO_XL → drivers with SAFEGO_XL only
+    - SAFEGO_BLACK → drivers with SAFEGO_BLACK only
+    - SAFEGO_BLACK_SUV → drivers with SAFEGO_BLACK_SUV only
+    - SAFEGO_WAV → drivers with SAFEGO_WAV only
+
+  - Implement this as a pure function (e.g. `isCategoryCompatible(requested: VehicleCategory, driverCategory: VehicleCategory): boolean`) so we can adjust the business rules later.
+
+4.3. Driver selection strategy
+
+- From the filtered list, pick a driver using a simple strategy:
+  - Nearest ETA
+  - Tie-breaker: highest rating, then least recent trip
+- Ensure this logic is in a deterministic, testable function.
+
+4.4. Ride and fare alignment
+
+- When a driver is assigned, make sure:
+  - `ride.requestedCategory` is stored
+  - `ride.assignedCategory` is stored (must equal the driver’s vehicleCategory)
+  - The fare engine uses `assignedCategory` to compute the fare (or uses the category from the driver vehicle), to prevent mismatches between UI and backend.
+
+- Ensure all NYC TLC fare logic, surcharges, and caps continue to work unchanged; the only difference is which per-mile / per-minute rates or multipliers apply for the category (already wired in).
+
+────────────────────────
+5. UI UPDATES (DRIVER & RIDER)
+────────────────────────
+
+5.1. Rider UI
+
+- Confirm the rider booking screen:
+  - Shows all 7 categories with:
+    - Name (SafeGo X, SafeGo Comfort, etc.)
+    - Capacity (e.g. 1-4 riders, 1-6 riders)
+    - Short description (standard, extra-legroom, luxury, accessible, etc.)
+    - Estimated price from fare engine
+
+- When a category is tapped:
+  - It sets `requestedCategory` correctly in the booking request.
+
+5.2. Driver app UI
+
+- On driver profile / vehicle page:
+  - Show:
+    - Vehicle info
+    - Verification status (PENDING / APPROVED / REJECTED)
+    - Assigned SafeGo category (read-only, e.g. “SafeGo Black SUV”)
+  - If PENDING:
+    - Show a banner “Your vehicle is under review. You can go online after approval.”
+  - If REJECTED:
+    - Show the rejection reason and option to resubmit.
+
+────────────────────────
+6. TESTING & VALIDATION
+────────────────────────
+
+6.1. Unit tests
+
+- Add or extend tests to cover:
+
+  - VehicleCategory enum usage (no raw strings).
+  - Auto-suggest helper for common vehicle configurations.
+  - Admin approval flow:
+    - PENDING → APPROVED sets vehicleCategory and driver.activeVehicleId.
+    - PENDING → REJECTED denies driver going online.
+  - Driver cannot modify vehicleCategory or status via public APIs.
+  - `isCategoryCompatible` matrix for all 7 categories.
+  - Dispatch selection:
+    - Correctly filters by category, status, distance, availability.
+    - Picks nearest and/or highest-rated driver.
+
+6.2. Integration / E2E scenarios
+
+- Add deterministic scenarios where:
+  - Rider selects SafeGo X:
+    - Only SAFEGO_X drivers are eligible.
+  - Rider selects SafeGo Black:
+    - Only SAFEGO_BLACK drivers are eligible.
+  - Rider selects SafeGo WAV:
+    - Only SAFEGO_WAV drivers with wheelchairAccessible = true are eligible.
+  - Unapproved vehicles are never offered a trip.
+
+- Ensure integration with TLC fare engine:
+  - A SafeGo Black trip within NYC triggers NYC TLC fares + Black-specific rates.
+  - Cross-state SafeGo Black trips use the dedicated cross-state fare logic already implemented.
+  - Regulatory fees (congestion, AVF, BCF, HVRF, state surcharge, long trip, out-of-town, tolls) remain unchanged.
+
+────────────────────────
+7. SECURITY & SAFETY
+────────────────────────
+
+- Enforce strong API authorization:
+  - Drivers:
+    - Can only CRUD their own vehicle’s basic properties (make, model, docs).
+    - Cannot see or set `vehicleCategory`, `status`, or audit data.
+  - Admin:
+    - Only admin roles can access vehicle verification and category assignment.
+- Validate all inputs server-side and sanitize any user content.
+- Log all admin actions for future audit (who approved which vehicle as which category).
+
+────────────────────────
+8. FINAL DELIVERABLE
+────────────────────────
+
+- Implement all the steps above.
+- Fix all type errors and ensure the application builds and runs.
+- Run the full test suite and add tests where necessary so that:
+  - Vehicle categories, driver onboarding, admin verification, and dispatch all pass.
+- Finally, update `replit.md` with a **“Vehicle Categories & Dispatch”** section summarizing:
+  - The VehicleCategory enum
+  - Driver onboarding + verification flow
+  - Admin responsibilities
+  - Dispatch compatibility rules
+  - How this integrates with the existing fare engine and TLC rules.
+
+When everything is complete and verified, summarize the changes for the user in plain language and confirm that:
+- Riders see correct categories with pricing.
+- Drivers see their approved category.
+- Dispatch always sends each trip to a driver whose vehicle category matches the rider’s choice.

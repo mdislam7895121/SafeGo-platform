@@ -16,6 +16,16 @@
  */
 
 export type VehicleCategoryId = 
+  | "SAFEGO_X" 
+  | "SAFEGO_COMFORT" 
+  | "SAFEGO_COMFORT_XL" 
+  | "SAFEGO_XL" 
+  | "SAFEGO_BLACK" 
+  | "SAFEGO_BLACK_SUV" 
+  | "SAFEGO_WAV";
+
+// Legacy short-form category IDs for backwards compatibility
+export type LegacyVehicleCategoryId = 
   | "X" 
   | "COMFORT" 
   | "COMFORT_XL" 
@@ -23,6 +33,23 @@ export type VehicleCategoryId =
   | "BLACK" 
   | "BLACK_SUV" 
   | "WAV";
+
+// Vehicle body types for category suggestion
+export type VehicleBodyType = 
+  | "SEDAN"
+  | "SUV"
+  | "MINIVAN"
+  | "HATCHBACK"
+  | "WAGON"
+  | "CROSSOVER"
+  | "VAN";
+
+// Vehicle verification status
+export type VehicleVerificationStatus = 
+  | "PENDING_VERIFICATION"
+  | "APPROVED"
+  | "REJECTED"
+  | "REQUEST_CHANGES";
 
 export interface VehicleCategoryConfig {
   id: VehicleCategoryId;
@@ -49,8 +76,8 @@ export interface VehicleCategoryConfig {
 }
 
 export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig> = {
-  X: {
-    id: "X",
+  SAFEGO_X: {
+    id: "SAFEGO_X",
     displayName: "SafeGo X",
     description: "Standard everyday rides with reliable service",
     shortDescription: "Most affordable everyday rides",
@@ -68,8 +95,8 @@ export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig
       minModelYear: 2012,
     },
   },
-  COMFORT: {
-    id: "COMFORT",
+  SAFEGO_COMFORT: {
+    id: "SAFEGO_COMFORT",
     displayName: "SafeGo Comfort",
     description: "Newer, more comfortable cars with extra legroom",
     shortDescription: "Newer cars with extra comfort",
@@ -86,8 +113,8 @@ export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig
       minModelYear: 2016,
     },
   },
-  COMFORT_XL: {
-    id: "COMFORT_XL",
+  SAFEGO_COMFORT_XL: {
+    id: "SAFEGO_COMFORT_XL",
     displayName: "SafeGo Comfort XL",
     description: "Larger vehicles with Comfort-level ride quality",
     shortDescription: "Comfort ride for bigger groups",
@@ -104,8 +131,8 @@ export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig
       minModelYear: 2016,
     },
   },
-  XL: {
-    id: "XL",
+  SAFEGO_XL: {
+    id: "SAFEGO_XL",
     displayName: "SafeGo XL",
     description: "Bigger vehicles for groups and luggage",
     shortDescription: "Spacious rides for groups",
@@ -122,8 +149,8 @@ export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig
       minModelYear: 2012,
     },
   },
-  BLACK: {
-    id: "BLACK",
+  SAFEGO_BLACK: {
+    id: "SAFEGO_BLACK",
     displayName: "SafeGo Black",
     description: "Premium black cars with professional drivers",
     shortDescription: "Premium black cars",
@@ -143,8 +170,8 @@ export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig
       interiorColor: "Black",
     },
   },
-  BLACK_SUV: {
-    id: "BLACK_SUV",
+  SAFEGO_BLACK_SUV: {
+    id: "SAFEGO_BLACK_SUV",
     displayName: "SafeGo Black SUV",
     description: "Large luxury SUVs for VIP groups",
     shortDescription: "Luxury SUVs for groups",
@@ -164,8 +191,8 @@ export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig
       interiorColor: "Black",
     },
   },
-  WAV: {
-    id: "WAV",
+  SAFEGO_WAV: {
+    id: "SAFEGO_WAV",
     displayName: "SafeGo WAV",
     description: "Wheelchair accessible vehicles with trained drivers",
     shortDescription: "Wheelchair accessible vehicles",
@@ -184,14 +211,35 @@ export const VEHICLE_CATEGORIES: Record<VehicleCategoryId, VehicleCategoryConfig
   },
 };
 
+// Legacy category ID mapping (for backwards compatibility)
+export const LEGACY_TO_SAFEGO_CATEGORY_MAP: Record<LegacyVehicleCategoryId, VehicleCategoryId> = {
+  X: "SAFEGO_X",
+  COMFORT: "SAFEGO_COMFORT",
+  COMFORT_XL: "SAFEGO_COMFORT_XL",
+  XL: "SAFEGO_XL",
+  BLACK: "SAFEGO_BLACK",
+  BLACK_SUV: "SAFEGO_BLACK_SUV",
+  WAV: "SAFEGO_WAV",
+};
+
+export function normalizeCategoryId(id: string): VehicleCategoryId | null {
+  if (id in VEHICLE_CATEGORIES) {
+    return id as VehicleCategoryId;
+  }
+  if (id in LEGACY_TO_SAFEGO_CATEGORY_MAP) {
+    return LEGACY_TO_SAFEGO_CATEGORY_MAP[id as LegacyVehicleCategoryId];
+  }
+  return null;
+}
+
 export const VEHICLE_CATEGORY_ORDER: VehicleCategoryId[] = [
-  "X",
-  "COMFORT",
-  "COMFORT_XL",
-  "XL",
-  "BLACK",
-  "BLACK_SUV",
-  "WAV",
+  "SAFEGO_X",
+  "SAFEGO_COMFORT",
+  "SAFEGO_COMFORT_XL",
+  "SAFEGO_XL",
+  "SAFEGO_BLACK",
+  "SAFEGO_BLACK_SUV",
+  "SAFEGO_WAV",
 ];
 
 export function getVehicleCategory(id: VehicleCategoryId): VehicleCategoryConfig {
@@ -215,15 +263,15 @@ export function isValidVehicleCategoryId(id: string): id is VehicleCategoryId {
 export type LegacyRideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
 
 export const LEGACY_TO_NEW_CATEGORY_MAP: Record<LegacyRideTypeCode, VehicleCategoryId> = {
-  SAVER: "X",
-  STANDARD: "X",
-  COMFORT: "COMFORT",
-  XL: "XL",
-  PREMIUM: "BLACK",
+  SAVER: "SAFEGO_X",
+  STANDARD: "SAFEGO_X",
+  COMFORT: "SAFEGO_COMFORT",
+  XL: "SAFEGO_XL",
+  PREMIUM: "SAFEGO_BLACK",
 };
 
 export function mapLegacyRideTypeToCategory(legacyCode: LegacyRideTypeCode): VehicleCategoryId {
-  return LEGACY_TO_NEW_CATEGORY_MAP[legacyCode] || "X";
+  return LEGACY_TO_NEW_CATEGORY_MAP[legacyCode] || "SAFEGO_X";
 }
 
 export function applyVehicleMultipliers(
@@ -307,23 +355,23 @@ export function getCategoryETA(
 // - WAV → WAV only (isolated category)
 
 export const DISPATCH_ELIGIBILITY_MATRIX: Record<VehicleCategoryId, VehicleCategoryId[]> = {
-  X: ["X"],
-  COMFORT: ["COMFORT", "X"],
-  COMFORT_XL: ["COMFORT_XL", "COMFORT", "X"],
-  XL: ["XL", "COMFORT_XL", "COMFORT", "X"],
-  BLACK: ["BLACK", "COMFORT", "X"],
-  BLACK_SUV: ["BLACK_SUV", "BLACK", "COMFORT", "X"],
-  WAV: ["WAV"],
+  SAFEGO_X: ["SAFEGO_X"],
+  SAFEGO_COMFORT: ["SAFEGO_COMFORT", "SAFEGO_X"],
+  SAFEGO_COMFORT_XL: ["SAFEGO_COMFORT_XL", "SAFEGO_COMFORT", "SAFEGO_X"],
+  SAFEGO_XL: ["SAFEGO_XL", "SAFEGO_COMFORT_XL", "SAFEGO_COMFORT", "SAFEGO_X"],
+  SAFEGO_BLACK: ["SAFEGO_BLACK", "SAFEGO_COMFORT", "SAFEGO_X"],
+  SAFEGO_BLACK_SUV: ["SAFEGO_BLACK_SUV", "SAFEGO_BLACK", "SAFEGO_COMFORT", "SAFEGO_X"],
+  SAFEGO_WAV: ["SAFEGO_WAV"],
 };
 
 export const REVERSE_DISPATCH_ELIGIBILITY: Record<VehicleCategoryId, VehicleCategoryId[]> = {
-  X: ["X", "COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV"],
-  COMFORT: ["COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV"],
-  COMFORT_XL: ["COMFORT_XL", "XL"],
-  XL: ["XL"],
-  BLACK: ["BLACK", "BLACK_SUV"],
-  BLACK_SUV: ["BLACK_SUV"],
-  WAV: ["WAV"],
+  SAFEGO_X: ["SAFEGO_X", "SAFEGO_COMFORT", "SAFEGO_COMFORT_XL", "SAFEGO_XL", "SAFEGO_BLACK", "SAFEGO_BLACK_SUV"],
+  SAFEGO_COMFORT: ["SAFEGO_COMFORT", "SAFEGO_COMFORT_XL", "SAFEGO_XL", "SAFEGO_BLACK", "SAFEGO_BLACK_SUV"],
+  SAFEGO_COMFORT_XL: ["SAFEGO_COMFORT_XL", "SAFEGO_XL"],
+  SAFEGO_XL: ["SAFEGO_XL"],
+  SAFEGO_BLACK: ["SAFEGO_BLACK", "SAFEGO_BLACK_SUV"],
+  SAFEGO_BLACK_SUV: ["SAFEGO_BLACK_SUV"],
+  SAFEGO_WAV: ["SAFEGO_WAV"],
 };
 
 export interface DispatchEligibilityResult {
@@ -343,11 +391,11 @@ export function canVehicleServeCategory(
   
   let reason: string | undefined;
   if (!isEligible) {
-    if (requestedCategory === "WAV" && vehicleCategory !== "WAV") {
+    if (requestedCategory === "SAFEGO_WAV" && vehicleCategory !== "SAFEGO_WAV") {
       reason = "WAV rides require wheelchair-accessible vehicles only";
-    } else if (["BLACK", "BLACK_SUV"].includes(requestedCategory) && !["BLACK", "BLACK_SUV"].includes(vehicleCategory)) {
+    } else if (["SAFEGO_BLACK", "SAFEGO_BLACK_SUV"].includes(requestedCategory) && !["SAFEGO_BLACK", "SAFEGO_BLACK_SUV"].includes(vehicleCategory)) {
       reason = "Luxury rides require premium black vehicles";
-    } else if (requestedCategory === "XL" && vehicleCategory === "BLACK") {
+    } else if (requestedCategory === "SAFEGO_XL" && vehicleCategory === "SAFEGO_BLACK") {
       reason = "Black cars cannot serve XL rides (insufficient capacity)";
     } else {
       reason = `${VEHICLE_CATEGORIES[vehicleCategory].displayName} cannot serve ${VEHICLE_CATEGORIES[requestedCategory].displayName} rides`;
@@ -470,11 +518,18 @@ export function getHighestEligibleCategory(
   }
 ): VehicleCategoryId {
   // Check categories from highest tier to lowest
-  const categoryPriority: VehicleCategoryId[] = ["BLACK_SUV", "BLACK", "XL", "COMFORT_XL", "COMFORT", "X"];
+  const categoryPriority: VehicleCategoryId[] = [
+    "SAFEGO_BLACK_SUV", 
+    "SAFEGO_BLACK", 
+    "SAFEGO_XL", 
+    "SAFEGO_COMFORT_XL", 
+    "SAFEGO_COMFORT", 
+    "SAFEGO_X"
+  ];
   
   // WAV is special - only if wheelchair accessible
   if (vehicle.wheelchairAccessible) {
-    return "WAV";
+    return "SAFEGO_WAV";
   }
   
   for (const categoryId of categoryPriority) {
@@ -485,5 +540,110 @@ export function getHighestEligibleCategory(
   }
   
   // Default to X if nothing else matches
-  return "X";
+  return "SAFEGO_X";
+}
+
+// ========================================
+// STEP 3: AUTO-SUGGEST CATEGORY
+// ========================================
+// Suggests a category based on vehicle properties (internal, non-authoritative)
+// Admin must verify and approve the final category
+
+export interface SuggestedCategoryResult {
+  suggestedCategory: VehicleCategoryId;
+  confidence: "high" | "medium" | "low";
+  reasons: string[];
+}
+
+export function suggestVehicleCategory(
+  vehicle: {
+    bodyType?: VehicleBodyType | string | null;
+    seats?: number | null;
+    year?: number | null;
+    make?: string | null;
+    luxury?: boolean | null;
+    wheelchairAccessible?: boolean | null;
+    exteriorColor?: string | null;
+    interiorColor?: string | null;
+  }
+): SuggestedCategoryResult {
+  const reasons: string[] = [];
+  let suggestedCategory: VehicleCategoryId = "SAFEGO_X";
+  let confidence: "high" | "medium" | "low" = "low";
+
+  // WAV takes priority if wheelchair accessible
+  if (vehicle.wheelchairAccessible) {
+    suggestedCategory = "SAFEGO_WAV";
+    confidence = "high";
+    reasons.push("Vehicle is wheelchair accessible");
+    return { suggestedCategory, confidence, reasons };
+  }
+
+  const isBlackExterior = vehicle.exteriorColor?.toLowerCase() === "black";
+  const isBlackInterior = vehicle.interiorColor?.toLowerCase() === "black";
+  const isSuv = ["SUV", "CROSSOVER"].includes(vehicle.bodyType || "");
+  const isLargeVehicle = ["SUV", "MINIVAN", "VAN"].includes(vehicle.bodyType || "");
+  const hasLuxurySeats = (vehicle.seats || 4) >= 6;
+  const isLuxuryBrand = ["BMW", "Mercedes-Benz", "Audi", "Lexus", "Cadillac", "Lincoln", "Genesis"].includes(vehicle.make || "");
+  const isNewEnough = (vehicle.year || 0) >= 2018;
+  const isComfortYear = (vehicle.year || 0) >= 2016;
+
+  // Black SUV: SUV + Luxury + Black + 6+ seats
+  if (isSuv && hasLuxurySeats && vehicle.luxury && isBlackExterior && isBlackInterior) {
+    suggestedCategory = "SAFEGO_BLACK_SUV";
+    confidence = "high";
+    reasons.push("SUV body type with 6+ seats", "Luxury vehicle", "Black exterior and interior");
+  }
+  // Black: Sedan + Luxury + Black
+  else if (!isSuv && vehicle.luxury && isBlackExterior && isBlackInterior) {
+    suggestedCategory = "SAFEGO_BLACK";
+    confidence = "high";
+    reasons.push("Luxury sedan", "Black exterior and interior");
+  }
+  // XL: Large vehicle (SUV/Minivan) with 6+ seats
+  else if (isLargeVehicle && hasLuxurySeats) {
+    suggestedCategory = "SAFEGO_XL";
+    confidence = "high";
+    reasons.push("Large vehicle body type", "6+ seat capacity");
+  }
+  // Comfort XL: Large vehicle + comfort-level year
+  else if (isLargeVehicle && isComfortYear && (vehicle.seats || 4) >= 5) {
+    suggestedCategory = "SAFEGO_COMFORT_XL";
+    confidence = "medium";
+    reasons.push("Larger vehicle", "Newer model year (2016+)");
+  }
+  // Comfort: Newer sedan with luxury brand or newer year
+  else if ((isLuxuryBrand || isComfortYear) && !isLargeVehicle) {
+    suggestedCategory = "SAFEGO_COMFORT";
+    confidence = isLuxuryBrand ? "high" : "medium";
+    reasons.push(isLuxuryBrand ? "Premium brand" : "Newer model year (2016+)");
+  }
+  // Default to X
+  else {
+    suggestedCategory = "SAFEGO_X";
+    confidence = "low";
+    reasons.push("Standard vehicle - meets SafeGo X requirements");
+  }
+
+  return { suggestedCategory, confidence, reasons };
+}
+
+// ========================================
+// DISPATCH COMPATIBILITY FUNCTION
+// ========================================
+// Pure function for dispatch matching - exact category matching per spec
+
+export function isCategoryCompatible(
+  requestedCategory: VehicleCategoryId,
+  driverCategory: VehicleCategoryId
+): boolean {
+  // Strict matching as per spec:
+  // - SAFEGO_X → drivers with SAFEGO_X only
+  // - SAFEGO_COMFORT → drivers with SAFEGO_COMFORT only
+  // - SAFEGO_COMFORT_XL → drivers with SAFEGO_COMFORT_XL only
+  // - SAFEGO_XL → drivers with SAFEGO_XL only
+  // - SAFEGO_BLACK → drivers with SAFEGO_BLACK only
+  // - SAFEGO_BLACK_SUV → drivers with SAFEGO_BLACK_SUV only
+  // - SAFEGO_WAV → drivers with SAFEGO_WAV only
+  return requestedCategory === driverCategory;
 }

@@ -274,6 +274,11 @@ model DriverProfile {
   currentLat            Float?             // Current driver latitude
   currentLng            Float?             // Current driver longitude
   lastLocationUpdate    DateTime?          // When location was last updated
+  
+  // Step 4: Active Vehicle Management
+  activeVehicleId       String?            // FK to the driver's active/primary vehicle for dispatch
+  canGoOnline           Boolean            @default(false) // Driver can only go online if vehicle is approved
+  
   deliveries            Delivery[]
   driverComplaints      DriverComplaint[]
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1098,7 +1103,7 @@ model Vehicle {
   tlcLicenseStatus        DocumentStatus    @default(PENDING)
   
   // Step 2: Vehicle Category and Dispatch Eligibility
-  vehicleCategory         String?           // VehicleCategoryId: X, COMFORT, COMFORT_XL, XL, BLACK, BLACK_SUV, WAV
+  vehicleCategory         String?           // VehicleCategoryId: SAFEGO_X, SAFEGO_COMFORT, etc.
   vehicleCategoryStatus   DocumentStatus    @default(PENDING) // Admin approval for category
   vehicleCategoryApprovedAt DateTime?
   vehicleCategoryApprovedBy String?
@@ -1109,6 +1114,26 @@ model Vehicle {
   exteriorColor           String?           // Required for BLACK/BLACK_SUV
   interiorColor           String?           // Required for BLACK/BLACK_SUV
   seatCapacity            Int?              // Actual seat count for dispatch matching
+  
+  // Step 3: Vehicle Verification and Category Suggestion
+  bodyType                String?           // SEDAN, SUV, MINIVAN, HATCHBACK, WAGON, CROSSOVER, VAN
+  luxury                  Boolean           @default(false) // Is this a luxury vehicle
+  suggestedCategory       String?           // Auto-suggested category (not authoritative)
+  suggestedCategoryReasons String[]         @default([]) // Reasons for suggestion
+  vehicleVerificationStatus String          @default("PENDING_VERIFICATION") // PENDING_VERIFICATION, APPROVED, REJECTED, REQUEST_CHANGES
+  verificationRejectionReason String?       // Reason if rejected
+  verificationRequestChangesNotes String?   // Notes if requesting changes
+  verifiedAt              DateTime?         // When vehicle was verified
+  verifiedBy              String?           // Admin who verified
+  tlcBaseAffiliation      String?           // TLC base affiliation
+  hvfhvPermit             String?           // HVFHV permit number
+  
+  // Category approval tracking
+  categoryApprovalNotes   String?           // Admin notes for category decision
+  categoryApprovedAt      DateTime?         // Renamed from vehicleCategoryApprovedAt for consistency
+  categoryApprovedBy      String?           // Renamed from vehicleCategoryApprovedBy for consistency
+  categoryRejectedAt      DateTime?         // When category was rejected
+  categoryRejectedBy      String?           // Admin who rejected
   
   vehicleDocuments        VehicleDocument[]
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
