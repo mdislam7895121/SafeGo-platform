@@ -292,3 +292,198 @@ export function getCategoryETA(
   const category = VEHICLE_CATEGORIES[categoryId];
   return baseETAMinutes + category.etaMinutesOffset;
 }
+
+// ========================================
+// STEP 2: DISPATCH ELIGIBILITY MATRIX
+// ========================================
+// Defines which ride types each vehicle category can serve
+// Key rules:
+// - X drivers → X only
+// - Comfort → Comfort + X
+// - Comfort XL → Comfort XL + Comfort + X
+// - XL → XL + Comfort XL + Comfort + X
+// - Black → Black + Comfort + X (NOT XL, WAV)
+// - Black SUV → Black SUV + Black + Comfort + X
+// - WAV → WAV only (isolated category)
+
+export const DISPATCH_ELIGIBILITY_MATRIX: Record<VehicleCategoryId, VehicleCategoryId[]> = {
+  X: ["X"],
+  COMFORT: ["COMFORT", "X"],
+  COMFORT_XL: ["COMFORT_XL", "COMFORT", "X"],
+  XL: ["XL", "COMFORT_XL", "COMFORT", "X"],
+  BLACK: ["BLACK", "COMFORT", "X"],
+  BLACK_SUV: ["BLACK_SUV", "BLACK", "COMFORT", "X"],
+  WAV: ["WAV"],
+};
+
+export const REVERSE_DISPATCH_ELIGIBILITY: Record<VehicleCategoryId, VehicleCategoryId[]> = {
+  X: ["X", "COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV"],
+  COMFORT: ["COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV"],
+  COMFORT_XL: ["COMFORT_XL", "XL"],
+  XL: ["XL"],
+  BLACK: ["BLACK", "BLACK_SUV"],
+  BLACK_SUV: ["BLACK_SUV"],
+  WAV: ["WAV"],
+};
+
+export interface DispatchEligibilityResult {
+  isEligible: boolean;
+  reason?: string;
+  vehicleCategory: VehicleCategoryId;
+  requestedCategory: VehicleCategoryId;
+  eligibleCategories: VehicleCategoryId[];
+}
+
+export function canVehicleServeCategory(
+  vehicleCategory: VehicleCategoryId,
+  requestedCategory: VehicleCategoryId
+): DispatchEligibilityResult {
+  const eligibleCategories = DISPATCH_ELIGIBILITY_MATRIX[vehicleCategory] || [];
+  const isEligible = eligibleCategories.includes(requestedCategory);
+  
+  let reason: string | undefined;
+  if (!isEligible) {
+    if (requestedCategory === "WAV" && vehicleCategory !== "WAV") {
+      reason = "WAV rides require wheelchair-accessible vehicles only";
+    } else if (["BLACK", "BLACK_SUV"].includes(requestedCategory) && !["BLACK", "BLACK_SUV"].includes(vehicleCategory)) {
+      reason = "Luxury rides require premium black vehicles";
+    } else if (requestedCategory === "XL" && vehicleCategory === "BLACK") {
+      reason = "Black cars cannot serve XL rides (insufficient capacity)";
+    } else {
+      reason = `${VEHICLE_CATEGORIES[vehicleCategory].displayName} cannot serve ${VEHICLE_CATEGORIES[requestedCategory].displayName} rides`;
+    }
+  }
+  
+  return {
+    isEligible,
+    reason,
+    vehicleCategory,
+    requestedCategory,
+    eligibleCategories,
+  };
+}
+
+export function getEligibleDriverCategories(
+  requestedCategory: VehicleCategoryId
+): VehicleCategoryId[] {
+  return REVERSE_DISPATCH_ELIGIBILITY[requestedCategory] || [];
+}
+
+export function filterEligibleDrivers<T extends { vehicleCategory: VehicleCategoryId | null | undefined }>(
+  drivers: T[],
+  requestedCategory: VehicleCategoryId
+): T[] {
+  const eligibleCategories = getEligibleDriverCategories(requestedCategory);
+  return drivers.filter(driver => 
+    driver.vehicleCategory && eligibleCategories.includes(driver.vehicleCategory as VehicleCategoryId)
+  );
+}
+
+export interface VehicleCategoryValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export function validateVehicleForCategory(
+  vehicle: {
+    make?: string | null;
+    year?: number | null;
+    color?: string | null;
+    exteriorColor?: string | null;
+    interiorColor?: string | null;
+    wheelchairAccessible?: boolean | null;
+    seatCapacity?: number | null;
+  },
+  targetCategory: VehicleCategoryId
+): VehicleCategoryValidation {
+  const category = VEHICLE_CATEGORIES[targetCategory];
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const currentYear = new Date().getFullYear();
+  
+  // Model year requirements
+  if (category.requirements?.minModelYear) {
+    if (!vehicle.year) {
+      errors.push(`Vehicle year is required for ${category.displayName}`);
+    } else if (vehicle.year < category.requirements.minModelYear) {
+      errors.push(`${category.displayName} requires vehicles from ${category.requirements.minModelYear} or newer (vehicle is ${vehicle.year})`);
+    }
+  }
+  
+  // Preferred brands for luxury
+  if (category.requirements?.preferredBrands && category.requirements.preferredBrands.length > 0) {
+    if (!vehicle.make) {
+      warnings.push(`Vehicle make is recommended for ${category.displayName}`);
+    } else if (!category.requirements.preferredBrands.includes(vehicle.make)) {
+      warnings.push(`${category.displayName} typically includes ${category.requirements.preferredBrands.join(", ")} vehicles`);
+    }
+  }
+  
+  // Exterior color for BLACK/BLACK_SUV
+  if (category.requirements?.exteriorColor) {
+    const vehicleExtColor = vehicle.exteriorColor || vehicle.color;
+    if (!vehicleExtColor) {
+      errors.push(`Exterior color is required for ${category.displayName}`);
+    } else if (vehicleExtColor.toLowerCase() !== category.requirements.exteriorColor.toLowerCase()) {
+      errors.push(`${category.displayName} requires ${category.requirements.exteriorColor} exterior color`);
+    }
+  }
+  
+  // Interior color for BLACK/BLACK_SUV  
+  if (category.requirements?.interiorColor) {
+    if (!vehicle.interiorColor) {
+      errors.push(`Interior color is required for ${category.displayName}`);
+    } else if (vehicle.interiorColor.toLowerCase() !== category.requirements.interiorColor.toLowerCase()) {
+      errors.push(`${category.displayName} requires ${category.requirements.interiorColor} interior color`);
+    }
+  }
+  
+  // WAV accessibility requirement
+  if (category.requirements?.isAccessible) {
+    if (!vehicle.wheelchairAccessible) {
+      errors.push(`${category.displayName} requires wheelchair-accessible certification`);
+    }
+  }
+  
+  // Seat capacity check
+  if (vehicle.seatCapacity && vehicle.seatCapacity < category.seatCount) {
+    errors.push(`${category.displayName} requires at least ${category.seatCount} seats (vehicle has ${vehicle.seatCapacity})`);
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+export function getHighestEligibleCategory(
+  vehicle: {
+    make?: string | null;
+    year?: number | null;
+    color?: string | null;
+    exteriorColor?: string | null;
+    interiorColor?: string | null;
+    wheelchairAccessible?: boolean | null;
+    seatCapacity?: number | null;
+  }
+): VehicleCategoryId {
+  // Check categories from highest tier to lowest
+  const categoryPriority: VehicleCategoryId[] = ["BLACK_SUV", "BLACK", "XL", "COMFORT_XL", "COMFORT", "X"];
+  
+  // WAV is special - only if wheelchair accessible
+  if (vehicle.wheelchairAccessible) {
+    return "WAV";
+  }
+  
+  for (const categoryId of categoryPriority) {
+    const validation = validateVehicleForCategory(vehicle, categoryId);
+    if (validation.isValid) {
+      return categoryId;
+    }
+  }
+  
+  // Default to X if nothing else matches
+  return "X";
+}

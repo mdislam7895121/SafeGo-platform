@@ -1096,11 +1096,28 @@ model Vehicle {
   licensePlateRejectionReason    String?
   tlcLicenseNumber        String?
   tlcLicenseStatus        DocumentStatus    @default(PENDING)
+  
+  // Step 2: Vehicle Category and Dispatch Eligibility
+  vehicleCategory         String?           // VehicleCategoryId: X, COMFORT, COMFORT_XL, XL, BLACK, BLACK_SUV, WAV
+  vehicleCategoryStatus   DocumentStatus    @default(PENDING) // Admin approval for category
+  vehicleCategoryApprovedAt DateTime?
+  vehicleCategoryApprovedBy String?
+  wheelchairAccessible    Boolean           @default(false) // WAV eligibility flag
+  wavCertificationUrl     String?           // WAV certification document
+  wavCertificationExpiry  DateTime?
+  wavCertificationStatus  DocumentStatus    @default(PENDING)
+  exteriorColor           String?           // Required for BLACK/BLACK_SUV
+  interiorColor           String?           // Required for BLACK/BLACK_SUV
+  seatCapacity            Int?              // Actual seat count for dispatch matching
+  
   vehicleDocuments        VehicleDocument[]
   driver                  DriverProfile     @relation(fields: [driverId], references: [id], onDelete: Cascade)
 
   @@index([driverId])           // D1: Index for 1:N queries
   @@index([isPrimary])          // D1: Index for finding primary vehicle
+  @@index([vehicleCategory])    // Step 2: Index for category-based dispatch queries
+  @@index([wheelchairAccessible]) // Step 2: Index for WAV dispatch queries
+  // Note: One-primary-vehicle constraint enforced at application level in driverVehicleService.ts
   @@map("vehicles")
 }
 
