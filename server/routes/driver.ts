@@ -12,6 +12,16 @@ import {
   getFileUrl,
 } from "../middleware/upload";
 import { getVehicleDocumentsPayload } from "../services/documentStatusService";
+import {
+  VehicleCategoryId,
+  VEHICLE_CATEGORIES,
+  VEHICLE_CATEGORY_ORDER,
+  isValidVehicleCategoryId,
+  getVehicleCategory,
+  canVehicleServeCategory,
+  getEligibleDriverCategories,
+} from "@shared/vehicleCategories";
+import { driverVehicleService } from "../services/driverVehicleService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -1225,6 +1235,305 @@ router.patch("/vehicles/:id/set-primary", async (req: AuthRequest, res) => {
     }
     
     res.status(500).json({ error: "Failed to set primary vehicle" });
+  }
+});
+
+// ====================================================
+// D2: VEHICLE CATEGORY MANAGEMENT ENDPOINTS
+// Implements Uber-style 7-category dispatch eligibility
+// ====================================================
+
+// Zod schema for vehicle category request
+const vehicleCategoryRequestSchema = z.object({
+  vehicleCategory: z.enum(['X', 'COMFORT', 'COMFORT_XL', 'XL', 'BLACK', 'BLACK_SUV', 'WAV']),
+  wheelchairAccessible: z.boolean().optional(),
+  exteriorColor: z.string().max(30).optional(),
+  interiorColor: z.string().max(30).optional(),
+  seatCapacity: z.number().int().min(1).max(15).optional(),
+});
+
+// ====================================================
+// GET /api/driver/vehicle-categories
+// Get all vehicle categories and their requirements
+// ====================================================
+router.get("/vehicle-categories", async (_req, res) => {
+  try {
+    const categories = Object.entries(VEHICLE_CATEGORIES).map(([id, cat]) => ({
+      id,
+      ...cat,
+    }));
+
+    res.json({
+      categories,
+      categoryIds: VEHICLE_CATEGORY_ORDER,
+    });
+  } catch (error) {
+    console.error("Get vehicle categories error:", error);
+    res.status(500).json({ error: "Failed to fetch vehicle categories" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/vehicles/:id/category-eligibility
+// Check what categories a vehicle can serve based on its category
+// ====================================================
+router.get("/vehicles/:id/category-eligibility", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: vehicleId } = req.params;
+
+    if (!isValidUUID(vehicleId)) {
+      return res.status(400).json({ error: "Invalid vehicle ID format" });
+    }
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const vehicle = await prisma.vehicle.findFirst({
+      where: {
+        id: vehicleId,
+        driverId: driverProfile.id,
+        isActive: true,
+      },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    const vehicleCategory = (vehicle as any).vehicleCategory as VehicleCategoryId | null;
+    const vehicleCategoryStatus = (vehicle as any).vehicleCategoryStatus as string | null;
+
+    if (!vehicleCategory || !isValidVehicleCategoryId(vehicleCategory)) {
+      return res.json({
+        vehicleId: vehicle.id,
+        hasCategory: false,
+        message: "Vehicle has no category assigned. Please request a category.",
+        eligibleToServe: [],
+      });
+    }
+
+    const eligibleCategories = getEligibleDriverCategories(vehicleCategory);
+    const categoryInfo = getVehicleCategory(vehicleCategory);
+
+    res.json({
+      vehicleId: vehicle.id,
+      hasCategory: true,
+      vehicleCategory,
+      categoryStatus: vehicleCategoryStatus || 'pending',
+      categoryInfo,
+      eligibleToServe: eligibleCategories.map(catId => ({
+        categoryId: catId,
+        ...getVehicleCategory(catId),
+      })),
+      wheelchairAccessible: (vehicle as any).wheelchairAccessible || false,
+      wavEligible: vehicleCategory === 'WAV',
+    });
+  } catch (error) {
+    console.error("Get category eligibility error:", error);
+    res.status(500).json({ error: "Failed to fetch category eligibility" });
+  }
+});
+
+// ====================================================
+// POST /api/driver/vehicles/:id/request-category
+// Request a vehicle category for dispatch eligibility
+// Requires admin approval
+// ====================================================
+router.post("/vehicles/:id/request-category", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id: vehicleId } = req.params;
+
+    if (!isValidUUID(vehicleId)) {
+      return res.status(400).json({ error: "Invalid vehicle ID format" });
+    }
+
+    const validationResult = vehicleCategoryRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.errors,
+      });
+    }
+
+    const { vehicleCategory, wheelchairAccessible, exteriorColor, interiorColor, seatCapacity } = validationResult.data;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const vehicle = await prisma.vehicle.findFirst({
+      where: {
+        id: vehicleId,
+        driverId: driverProfile.id,
+        isActive: true,
+      },
+    });
+
+    if (!vehicle) {
+      return res.status(404).json({ error: "Vehicle not found" });
+    }
+
+    const categoryInfo = getVehicleCategory(vehicleCategory);
+    if (!categoryInfo) {
+      return res.status(400).json({ error: "Invalid vehicle category" });
+    }
+
+    if (vehicle.year) {
+      const currentYear = new Date().getFullYear();
+      const vehicleAge = currentYear - vehicle.year;
+      if (vehicleAge > categoryInfo.maxVehicleAge) {
+        return res.status(400).json({
+          error: `Vehicle too old for ${categoryInfo.name}. Max age: ${categoryInfo.maxVehicleAge} years, your vehicle: ${vehicleAge} years.`,
+        });
+      }
+    }
+
+    if (vehicleCategory === 'WAV' && !wheelchairAccessible) {
+      return res.status(400).json({
+        error: "WAV category requires wheelchair accessibility. Please confirm your vehicle is wheelchair accessible.",
+      });
+    }
+
+    const updateData: any = {
+      vehicleCategory,
+      vehicleCategoryStatus: 'pending',
+      updatedAt: new Date(),
+    };
+
+    if (wheelchairAccessible !== undefined) {
+      updateData.wheelchairAccessible = wheelchairAccessible;
+    }
+    if (exteriorColor) {
+      updateData.exteriorColor = exteriorColor;
+    }
+    if (interiorColor) {
+      updateData.interiorColor = interiorColor;
+    }
+    if (seatCapacity !== undefined) {
+      updateData.seatCapacity = seatCapacity;
+    }
+
+    const updatedVehicle = await prisma.vehicle.update({
+      where: { id: vehicleId },
+      data: updateData,
+    });
+
+    res.json({
+      success: true,
+      message: `Category ${categoryInfo.name} requested successfully. Pending admin approval.`,
+      vehicle: {
+        id: updatedVehicle.id,
+        vehicleType: updatedVehicle.vehicleType,
+        make: updatedVehicle.make,
+        model: updatedVehicle.vehicleModel,
+        vehicleCategory: (updatedVehicle as any).vehicleCategory,
+        categoryStatus: (updatedVehicle as any).vehicleCategoryStatus,
+        categoryInfo,
+      },
+    });
+  } catch (error) {
+    console.error("Request category error:", error);
+    res.status(500).json({ error: "Failed to request vehicle category" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/dispatch-eligibility
+// Get the driver's current dispatch eligibility based on primary vehicle
+// ====================================================
+router.get("/dispatch-eligibility", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      include: {
+        vehicles: {
+          where: { isActive: true, isPrimary: true },
+          take: 1,
+        },
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const primaryVehicle = driverProfile.vehicles[0];
+
+    if (!primaryVehicle) {
+      return res.json({
+        hasEligibility: false,
+        message: "No primary vehicle registered. Please register a vehicle first.",
+        eligibleCategories: [],
+      });
+    }
+
+    const vehicleCategory = (primaryVehicle as any).vehicleCategory as VehicleCategoryId | null;
+    const vehicleCategoryStatus = (primaryVehicle as any).vehicleCategoryStatus as string | null;
+
+    if (!vehicleCategory || !isValidVehicleCategoryId(vehicleCategory)) {
+      return res.json({
+        hasEligibility: false,
+        message: "Vehicle category not set. Please request a category for your vehicle.",
+        eligibleCategories: [],
+        vehicle: {
+          id: primaryVehicle.id,
+          make: primaryVehicle.make,
+          model: primaryVehicle.vehicleModel,
+        },
+      });
+    }
+
+    if (vehicleCategoryStatus !== 'approved') {
+      return res.json({
+        hasEligibility: false,
+        message: `Category ${vehicleCategory} is pending approval. You'll be eligible for dispatch once approved.`,
+        pendingCategory: vehicleCategory,
+        categoryStatus: vehicleCategoryStatus,
+        eligibleCategories: [],
+        vehicle: {
+          id: primaryVehicle.id,
+          make: primaryVehicle.make,
+          model: primaryVehicle.vehicleModel,
+        },
+      });
+    }
+
+    const eligibleCategories = getEligibleDriverCategories(vehicleCategory);
+
+    res.json({
+      hasEligibility: true,
+      vehicleCategory,
+      categoryInfo: getVehicleCategoryInfo(vehicleCategory),
+      eligibleCategories: eligibleCategories.map(catId => ({
+        categoryId: catId,
+        ...getVehicleCategory(catId),
+      })),
+      wheelchairAccessible: (primaryVehicle as any).wheelchairAccessible || false,
+      wavEligible: vehicleCategory === 'WAV',
+      vehicle: {
+        id: primaryVehicle.id,
+        make: primaryVehicle.make,
+        model: primaryVehicle.vehicleModel,
+        year: primaryVehicle.year,
+        color: primaryVehicle.color,
+      },
+    });
+  } catch (error) {
+    console.error("Get dispatch eligibility error:", error);
+    res.status(500).json({ error: "Failed to fetch dispatch eligibility" });
   }
 });
 
