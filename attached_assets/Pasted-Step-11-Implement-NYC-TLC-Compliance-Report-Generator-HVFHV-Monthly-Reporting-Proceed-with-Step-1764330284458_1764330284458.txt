@@ -1,0 +1,90 @@
+Step 11 — Implement NYC TLC Compliance Report Generator (HVFHV Monthly Reporting)
+
+Proceed with Step 11 of the NYC TLC regulatory workflow. Build the full TLC-compliant monthly report generator with the following requirements:
+
+1. Report Types (all required):
+   • Trip Record Report (TRR)
+   • Driver Pay Report (DPR)
+   • Aggregated HVFHV Summary Report (HSR)
+   • Out-of-Town Trips Report
+   • Accessibility Report (AVF-related)
+   • Airport Activity Report (JFK/LGA/EWR/WCY)
+
+2. Trip Record Report (TRR) Fields:
+   For every trip include:
+   - tripId
+   - driverId
+   - vehicleId
+   - pickupTime, dropoffTime
+   - pickupLocation (lat/lon + borough)
+   - dropoffLocation (lat/lon + borough)
+   - tripDistanceMiles, tripDurationMinutes
+   - fareSubtotal
+   - tolls
+   - congestionFee
+   - airportFee
+   - AVF, BCF, HVRF, State Surcharge
+   - longTripSurcharge
+   - outOfTownReturnFee
+   - promoUsed
+   - finalFare
+   - driverPayout
+   - commissionAmount
+   - tripCategory (NYC→NYC, NYC→OOS, OOS→NYC, inter-borough)
+
+3. Driver Pay Report (DPR):
+   - Total trips
+   - Total earnings (NYC TLC rules)
+   - Hourly earnings calculation
+   - Minimum pay guarantees (TLC HVRF logic)
+   - Incentives and bonuses
+   - Deductions (NONE for TLC fees)
+
+4. HVFHV Summary Report (HSR):
+   - Total trips per borough pair
+   - Accessibility fund totals
+   - Airport pickup counts per airport
+   - Manhattan congestion fee totals
+   - Out-of-town trip counts
+   - Long trip surcharge counts
+   - Driver working hours
+
+5. Export Formats:
+   - JSON
+   - CSV (TLC required format)
+   - Secure download endpoint /api/tlc/reports
+
+6. Validation Rules:
+   - Reject incomplete trip records
+   - Ensure tolls, fees, surcharges match the fare engine
+   - Recompute driver pay using regulated formulas to ensure accuracy
+   - Validate borough mapping (Brooklyn, Bronx, Queens, Manhattan, Staten Island)
+
+7. UI Requirements:
+   - Add “TLC Compliance Reports” section in admin dashboard
+   - Allow filtering:
+     • Date range
+     • Driver
+     • Borough
+     • Trip type (NYC→NYC / Out-of-town / Airport / Manhattan Congestion Zone)
+   - Show downloadable files with timestamps
+
+8. Testing:
+   Add 50+ automated test cases verifying:
+   - Correct TRR fields
+   - Correct DPR calculations (per-minute + per-mile TLC formula)
+   - Correct HSR aggregation
+   - Correct mapping of boroughs/zones
+   - Tolls + fees match toll engine and surcharge engine outputs
+   - No TLC-fee commission applied
+   - Out-of-town + long trip combinations
+   - Monthly totals match sample datasets
+
+9. Documentation:
+   Update replit.md with:
+     • All report definitions
+     • Sample outputs
+     • TLC reference standards
+     • Sequence diagrams (fare engine → payout engine → reporting)
+
+Complete Step 11 and confirm once the TLC Compliance Report Generator is fully implemented and validated.
