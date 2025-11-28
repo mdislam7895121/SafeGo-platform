@@ -179,6 +179,7 @@ export interface FareFlags {
   tlcAVFFeeApplied: boolean;
   tlcBCFFeeApplied: boolean;
   tlcHVRFFeeApplied: boolean;
+  tlcStateSurchargeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -243,6 +244,7 @@ export interface RouteFareBreakdown {
   tlcBCFFee: number;
   tlcBCFFeeRate: number;
   tlcHVRFFee: number;
+  tlcStateSurcharge: number;
   airportFee: number;
   airportCode?: string;
   borderZoneFee: number;
@@ -299,6 +301,7 @@ export interface RouteFareBreakdown {
   tlcAVFFeeApplied: boolean;
   tlcBCFFeeApplied: boolean;
   tlcHVRFFeeApplied: boolean;
+  tlcStateSurchargeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
@@ -867,6 +870,15 @@ const TLC_BCF_RATE = 0.0275; // 2.75%
 // Excluded for: out-of-state trips, airport-to-airport outside NYC, zero subtotal
 // ============================================
 const TLC_HVRF_FEE = 0.75;
+
+// ============================================
+// NYC FHV State Surcharge
+// $0.50 flat fee for all NYC-to-NYC FHV trips
+// Mandated by NY State for rideshare/FHV services
+// Applies to NYC-to-NYC trips only
+// Excluded for: cross-state trips, trips outside NYC, zero subtotal
+// ============================================
+const TLC_STATE_SURCHARGE = 0.50;
 
 // NYC Borough codes for AVF eligibility detection
 const NYC_BOROUGH_CODES = ['manhattan', 'brooklyn', 'queens', 'bronx', 'staten_island'];
@@ -1550,6 +1562,39 @@ export class FareCalculationService {
     }
     
     // ============================================
+    // STEP 6F. NYC FHV STATE SURCHARGE
+    // $0.50 flat fee for all NYC-to-NYC FHV trips
+    // Mandated by NY State for rideshare/FHV services
+    // FLAT regulatory fee - does NOT participate in surge multiplier
+    // Full amount is pass-through (remitted to NY State, not SafeGo revenue)
+    // Applies to NYC-to-NYC trips only
+    // Excluded for: cross-state trips, trips outside NYC, zero subtotal
+    // ============================================
+    let tlcStateSurcharge = 0;
+    let tlcStateSurchargeApplied = false;
+    
+    // State Surcharge eligibility: NYC-to-NYC trips only
+    // Uses same eligibility as HVRF (both states NY, subtotal > 0, not airport-to-airport outside NYC)
+    // Also requires at least one endpoint to be in NYC borough
+    const stateSurchargeSubtotalCheck = surgeAdjusted + nightSurcharge + peakHourSurcharge + 
+      longDistanceFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee;
+    
+    // State Surcharge applies if:
+    // 1. Both pickup and dropoff are in NY state (not cross-state)
+    // 2. At least one endpoint is in an NYC borough (trip touches NYC)
+    // 3. The subtotal is greater than zero (not a fully discounted ride)
+    const pickupInNYCBorough = matchedPickupZones.some(z => NYC_BOROUGH_CODES.includes(z.zoneId.toLowerCase()));
+    const dropoffInNYCBorough = matchedDropoffZones.some(z => NYC_BOROUGH_CODES.includes(z.zoneId.toLowerCase()));
+    const tripTouchesNYC = pickupInNYCBorough || dropoffInNYCBorough;
+    
+    const stateSurchargeEligible = bothStatesAreNY && tripTouchesNYC && stateSurchargeSubtotalCheck > 0;
+    
+    if (stateSurchargeEligible) {
+      tlcStateSurcharge = TLC_STATE_SURCHARGE;
+      tlcStateSurchargeApplied = true;
+    }
+    
+    // ============================================
     // 7. CROSS-CITY AND CROSS-STATE SURCHARGES
     // ============================================
     const crossCitySurchargeAmount = fareConfig.crossCitySurcharge
@@ -1777,10 +1822,11 @@ export class FareCalculationService {
     // 11. SUBTOTAL (Before service fee and discounts)
     // Promo discounts apply AFTER fees, BEFORE service fee
     // ============================================
-    // TLC fees (congestion + airport + AVF + BCF + HVRF) are regulatory fees applied post-surge
+    // TLC fees (congestion + airport + AVF + BCF + HVRF + State Surcharge) are regulatory fees applied post-surge
     // They do NOT participate in surge - full amounts are pass-through to government
     // BCF (2.75%) is calculated on the pre-commission fare base
     // HVRF ($0.75) is a flat fee for workers' compensation
+    // State Surcharge ($0.50) is a flat NY State FHV surcharge
     const subtotalBeforeDiscount = roundCurrency(
       surgeAdjusted + 
       nightSurcharge + 
@@ -1791,6 +1837,7 @@ export class FareCalculationService {
       tlcAVFFee +
       tlcBCFFee +
       tlcHVRFFee +
+      tlcStateSurcharge +
       crossCitySurcharge +
       crossStateSurcharge +
       returnDeadheadFee +
@@ -1909,11 +1956,12 @@ export class FareCalculationService {
     // - TLC AVF fee (Accessible Vehicle Fund fee remitted to government)
     // - TLC BCF fee (Black Car Fund contribution remitted to BCF, not SafeGo revenue)
     // - TLC HVRF fee (Workers' Compensation fee remitted to HVRF fund, not SafeGo revenue)
+    // - TLC State Surcharge (NY State FHV surcharge remitted to NY State, not SafeGo revenue)
     // Note: Additional fees (booking, safety, eco) and service fee are SafeGo revenue
     // Note: TLC fees are included in pre-surge base but surged portion is SafeGo revenue;
     //       only original amounts are pass-through
     const allRegulatoryFees = roundCurrency(
-      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee
+      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee + tlcHVRFFee + tlcStateSurcharge
     );
     const calcPassThroughCosts = (payout: number) => 
       roundCurrency(payout + allRegulatoryFees);
@@ -2050,6 +2098,7 @@ export class FareCalculationService {
       tlcAVFFeeApplied,
       tlcBCFFeeApplied,
       tlcHVRFFeeApplied,
+      tlcStateSurchargeApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -2108,6 +2157,7 @@ export class FareCalculationService {
       tlcBCFFee,
       tlcBCFFeeRate,
       tlcHVRFFee,
+      tlcStateSurcharge,
       airportFee,
       airportCode,
       borderZoneFee,
@@ -2157,6 +2207,7 @@ export class FareCalculationService {
       tlcAVFFeeApplied,
       tlcBCFFeeApplied,
       tlcHVRFFeeApplied,
+      tlcStateSurchargeApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
