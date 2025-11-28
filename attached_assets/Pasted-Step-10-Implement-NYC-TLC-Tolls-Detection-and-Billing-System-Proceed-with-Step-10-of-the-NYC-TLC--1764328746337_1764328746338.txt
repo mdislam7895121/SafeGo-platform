@@ -1,0 +1,71 @@
+Step 10 — Implement NYC TLC Tolls Detection and Billing System
+
+Proceed with Step 10 of the NYC TLC regulatory workflow. Add the official tolls system with the following specifications:
+
+1. Toll Detection Rules:
+   - Detect toll crossings using polygon-based or waypoint-based detection.
+   - Supported toll facilities:
+       • Verrazzano Bridge
+       • Hugh L. Carey Tunnel (Battery Tunnel)
+       • Queens-Midtown Tunnel
+       • RFK/Triborough Bridge
+       • Whitestone Bridge
+       • Throgs Neck Bridge
+       • George Washington Bridge
+       • Goethals Bridge
+       • Bayonne Bridge
+       • Outerbridge Crossing
+       • Lincoln Tunnel
+       • Holland Tunnel
+   - Detect direction: inbound/outbound pricing where applicable.
+
+2. Toll Pricing:
+   - Use published EZ-Pass rates (standard TLC requirement).
+   - If API toll data exists, prioritize API.
+   - If toll = unknown → default to NYC TLC standard toll table.
+
+3. Commission Rules:
+   - Tolls are a full pass-through → NOT commissionable.
+   - NOT included in discounts or promo reductions.
+   - NOT part of minimum fare calculations.
+
+4. Fare Pipeline Position:
+   Insert AFTER:
+       • Out-of-Town Return Fee (Step 6H)
+   BEFORE:
+       • Service Fee
+       • Commission
+       • Driver Payout
+
+5. API Response Fields:
+   - tolls: array of detected toll objects
+   - totalTolls: numeric
+   - tollsApplied: boolean
+
+6. UI Requirements:
+   - FareBreakdown UI must show each toll separately:
+       • Name
+       • Amount
+       • Direction (if applicable)
+   - Show “Tolls” section when any toll applies.
+
+7. Test Coverage:
+   Add 40+ test cases covering:
+       • NYC → NJ via Holland Tunnel (apply correct toll)
+       • NJ → NYC via Lincoln Tunnel (apply correct toll)
+       • Queens → Manhattan via Midtown Tunnel
+       • Bronx → Queens via Whitestone
+       • Staten Island → Brooklyn via Verrazzano
+       • No tolls for within-borough routes
+       • Combined toll + airport fee + congestion fee
+       • Promo active → toll stays unchanged
+       • Out-of-town + toll combinations
+       • Sequence: tolls must appear before service fee/commission
+       • Tolls excluded from commission and payout math
+
+8. Documentation:
+   - Add a complete “NYC TLC Toll Rules” section to replit.md.
+   - Include a full table of bridges/tunnels and their default rates.
+   - Include examples of correct billing and sequences.
+
+Complete Step 10 and verify before we proceed to Step 11 (Final TLC Reconciliation Reports).

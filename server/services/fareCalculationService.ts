@@ -927,6 +927,199 @@ const OUT_OF_TOWN_NY_COUNTIES = ['nassau', 'suffolk', 'westchester'];
 // New Jersey state code for out-of-town detection
 const NJ_STATE_CODE = 'NJ';
 
+// ============================================
+// NYC TLC TOLL FACILITIES - EZ-PASS RATES
+// ============================================
+// All rates are standard EZ-Pass passenger car rates as of 2024
+// Rates vary by direction (inbound to Manhattan vs outbound) where applicable
+// All tolls are full pass-through costs (not commissionable)
+// ============================================
+
+interface NYCTollFacility {
+  id: string;
+  name: string;
+  shortName: string;
+  segmentIdentifiers: string[];
+  ezPassRate: number;
+  ezPassRatePeak?: number;
+  direction?: 'inbound' | 'outbound' | 'both';
+  inboundOnly?: boolean;
+  operator: 'MTA' | 'PANYNJ' | 'TBTA';
+}
+
+const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
+  {
+    id: 'verrazzano_bridge',
+    name: 'Verrazzano-Narrows Bridge',
+    shortName: 'Verrazzano Bridge',
+    segmentIdentifiers: ['verrazzano', 'verrazano', 'verrazzano-narrows', 'verrazzano narrows'],
+    ezPassRate: 6.94,
+    ezPassRatePeak: 10.17,
+    inboundOnly: true,
+    operator: 'MTA',
+  },
+  {
+    id: 'battery_tunnel',
+    name: 'Hugh L. Carey Tunnel (Brooklyn-Battery)',
+    shortName: 'Battery Tunnel',
+    segmentIdentifiers: ['hugh l. carey', 'battery tunnel', 'brooklyn-battery', 'brooklyn battery'],
+    ezPassRate: 6.94,
+    ezPassRatePeak: 10.17,
+    inboundOnly: true,
+    operator: 'MTA',
+  },
+  {
+    id: 'queens_midtown_tunnel',
+    name: 'Queens-Midtown Tunnel',
+    shortName: 'Midtown Tunnel',
+    segmentIdentifiers: ['queens-midtown', 'midtown tunnel', 'queens midtown'],
+    ezPassRate: 6.94,
+    ezPassRatePeak: 10.17,
+    inboundOnly: true,
+    operator: 'MTA',
+  },
+  {
+    id: 'rfk_bridge',
+    name: 'Robert F. Kennedy Bridge (Triborough)',
+    shortName: 'RFK Bridge',
+    segmentIdentifiers: ['rfk', 'triborough', 'triboro', 'robert f. kennedy'],
+    ezPassRate: 6.94,
+    ezPassRatePeak: 10.17,
+    inboundOnly: true,
+    operator: 'MTA',
+  },
+  {
+    id: 'whitestone_bridge',
+    name: 'Bronx-Whitestone Bridge',
+    shortName: 'Whitestone Bridge',
+    segmentIdentifiers: ['whitestone', 'bronx-whitestone', 'bronx whitestone'],
+    ezPassRate: 6.94,
+    ezPassRatePeak: 10.17,
+    inboundOnly: true,
+    operator: 'MTA',
+  },
+  {
+    id: 'throgs_neck_bridge',
+    name: 'Throgs Neck Bridge',
+    shortName: 'Throgs Neck',
+    segmentIdentifiers: ['throgs neck', 'throgsneck', 'throgs'],
+    ezPassRate: 6.94,
+    ezPassRatePeak: 10.17,
+    inboundOnly: true,
+    operator: 'MTA',
+  },
+  {
+    id: 'george_washington_bridge',
+    name: 'George Washington Bridge',
+    shortName: 'GW Bridge',
+    segmentIdentifiers: ['george washington', 'gw bridge', 'gwb'],
+    ezPassRate: 13.75,
+    ezPassRatePeak: 16.75,
+    direction: 'both',
+    operator: 'PANYNJ',
+  },
+  {
+    id: 'goethals_bridge',
+    name: 'Goethals Bridge',
+    shortName: 'Goethals Bridge',
+    segmentIdentifiers: ['goethals'],
+    ezPassRate: 13.75,
+    ezPassRatePeak: 16.75,
+    direction: 'both',
+    operator: 'PANYNJ',
+  },
+  {
+    id: 'bayonne_bridge',
+    name: 'Bayonne Bridge',
+    shortName: 'Bayonne Bridge',
+    segmentIdentifiers: ['bayonne'],
+    ezPassRate: 13.75,
+    ezPassRatePeak: 16.75,
+    direction: 'both',
+    operator: 'PANYNJ',
+  },
+  {
+    id: 'outerbridge_crossing',
+    name: 'Outerbridge Crossing',
+    shortName: 'Outerbridge',
+    segmentIdentifiers: ['outerbridge'],
+    ezPassRate: 13.75,
+    ezPassRatePeak: 16.75,
+    direction: 'both',
+    operator: 'PANYNJ',
+  },
+  {
+    id: 'lincoln_tunnel',
+    name: 'Lincoln Tunnel',
+    shortName: 'Lincoln Tunnel',
+    segmentIdentifiers: ['lincoln tunnel', 'lincoln tun'],
+    ezPassRate: 13.75,
+    ezPassRatePeak: 16.75,
+    direction: 'both',
+    operator: 'PANYNJ',
+  },
+  {
+    id: 'holland_tunnel',
+    name: 'Holland Tunnel',
+    shortName: 'Holland Tunnel',
+    segmentIdentifiers: ['holland tunnel', 'holland tun'],
+    ezPassRate: 13.75,
+    ezPassRatePeak: 16.75,
+    direction: 'both',
+    operator: 'PANYNJ',
+  },
+];
+
+/**
+ * Detect NYC TLC toll facilities from route toll segments
+ * Uses segment name matching and returns structured toll information
+ */
+function detectNYCTLCTolls(
+  tollSegments: string[],
+  isPeakHour: boolean = false
+): Array<{
+  facility: NYCTollFacility;
+  amount: number;
+  isPeak: boolean;
+}> {
+  const detectedTolls: Array<{
+    facility: NYCTollFacility;
+    amount: number;
+    isPeak: boolean;
+  }> = [];
+  
+  const processedFacilities = new Set<string>();
+  
+  for (const segment of tollSegments) {
+    const normalizedSegment = segment.toLowerCase().trim();
+    
+    for (const facility of NYC_TLC_TOLL_FACILITIES) {
+      if (processedFacilities.has(facility.id)) continue;
+      
+      const matches = facility.segmentIdentifiers.some(identifier =>
+        normalizedSegment.includes(identifier.toLowerCase()) ||
+        identifier.toLowerCase().includes(normalizedSegment)
+      );
+      
+      if (matches) {
+        const rate = isPeakHour && facility.ezPassRatePeak
+          ? facility.ezPassRatePeak
+          : facility.ezPassRate;
+        
+        detectedTolls.push({
+          facility,
+          amount: rate,
+          isPeak: isPeakHour && !!facility.ezPassRatePeak,
+        });
+        
+        processedFacilities.add(facility.id);
+      }
+    }
+  }
+  
+  return detectedTolls;
+}
+
 /**
  * Check if a trip is eligible for TLC AVF fee
  * AVF applies to all NYC trips except:
