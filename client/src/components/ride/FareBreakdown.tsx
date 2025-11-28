@@ -76,6 +76,8 @@ export interface FareBreakdownData {
   tlcHVRFFeeApplied?: boolean;
   tlcStateSurcharge?: number;
   tlcStateSurchargeApplied?: boolean;
+  tlcLongTripFee?: number;
+  tlcLongTripFeeApplied?: boolean;
   
   surgeAmount?: number;
   surgeMultiplier?: number;
@@ -131,6 +133,7 @@ export interface FareBreakdownData {
     tlcBCFFeeApplied?: boolean;
     tlcHVRFFeeApplied?: boolean;
     tlcStateSurchargeApplied?: boolean;
+    tlcLongTripFeeApplied?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -423,6 +426,14 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           icon={Flag} 
           label="NY State Surcharge"
           amount={breakdown.tlcStateSurcharge ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.tlcLongTripFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Clock} 
+          label="NYC Long Trip Surcharge"
+          amount={breakdown.tlcLongTripFee ?? 0} 
           currency={currency} 
         />
       )}
