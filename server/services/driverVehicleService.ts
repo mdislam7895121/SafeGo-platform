@@ -16,11 +16,14 @@ import { prisma } from '../db';
 import { DocumentStatus } from '@prisma/client';
 import {
   VehicleCategoryId,
+  VehicleBodyType,
   VEHICLE_CATEGORIES,
   validateVehicleForCategory,
   getHighestEligibleCategory,
   canVehicleServeCategory,
   isValidVehicleCategoryId,
+  suggestVehicleCategory,
+  REVERSE_DISPATCH_ELIGIBILITY,
 } from '@shared/vehicleCategories';
 
 // ========================================
@@ -40,7 +43,6 @@ export interface VehicleRegistrationInput {
   licensePlate: string;
   seatCapacity?: number;
   wheelchairAccessible?: boolean;
-  vehicleCategory?: VehicleCategoryId;
   isPrimary?: boolean;
   notes?: string;
   tlcLicenseNumber?: string;
@@ -55,6 +57,10 @@ export interface VehicleRegistrationInput {
   wavCertificationExpiry?: Date;
   plateCountry?: string;
   plateState?: string;
+  bodyType?: VehicleBodyType | string;
+  luxury?: boolean;
+  tlcBaseAffiliation?: string;
+  hvfhvPermit?: string;
 }
 
 export interface VehicleUpdateInput {
@@ -69,7 +75,6 @@ export interface VehicleUpdateInput {
   licensePlate?: string;
   seatCapacity?: number;
   wheelchairAccessible?: boolean;
-  vehicleCategory?: VehicleCategoryId;
   isPrimary?: boolean;
   notes?: string;
   tlcLicenseNumber?: string;
@@ -84,6 +89,10 @@ export interface VehicleUpdateInput {
   wavCertificationExpiry?: Date;
   plateCountry?: string;
   plateState?: string;
+  bodyType?: VehicleBodyType | string;
+  luxury?: boolean;
+  tlcBaseAffiliation?: string;
+  hvfhvPermit?: string;
 }
 
 export interface VehicleAdminApprovalInput {
@@ -110,6 +119,8 @@ export class DriverVehicleService {
   
   /**
    * Register a new vehicle for a driver
+   * Note: Vehicle category is NOT auto-assigned. Admin must verify and assign the category.
+   * The system auto-suggests a category for admin review.
    */
   async registerVehicle(input: VehicleRegistrationInput): Promise<VehicleServiceResult<any>> {
     try {
@@ -123,44 +134,17 @@ export class DriverVehicleService {
         return { success: false, error: 'Driver not found' };
       }
 
-      // Determine vehicle category if not provided
-      let vehicleCategory = input.vehicleCategory;
-      if (!vehicleCategory) {
-        vehicleCategory = getHighestEligibleCategory({
-          make: input.make,
-          year: input.year,
-          color: input.color,
-          exteriorColor: input.exteriorColor,
-          interiorColor: input.interiorColor,
-          wheelchairAccessible: input.wheelchairAccessible,
-          seatCapacity: input.seatCapacity,
-        });
-      }
-
-      // Validate vehicle for requested category
-      if (vehicleCategory && isValidVehicleCategoryId(vehicleCategory)) {
-        const validation = validateVehicleForCategory(
-          {
-            make: input.make,
-            year: input.year,
-            color: input.color,
-            exteriorColor: input.exteriorColor,
-            interiorColor: input.interiorColor,
-            wheelchairAccessible: input.wheelchairAccessible,
-            seatCapacity: input.seatCapacity,
-          },
-          vehicleCategory
-        );
-
-        if (!validation.isValid) {
-          return {
-            success: false,
-            error: 'Vehicle does not meet category requirements',
-            validationErrors: validation.errors,
-            validationWarnings: validation.warnings,
-          };
-        }
-      }
+      // Auto-suggest category based on vehicle properties (for admin review)
+      const suggestion = suggestVehicleCategory({
+        bodyType: input.bodyType,
+        seats: input.seatCapacity,
+        year: input.year,
+        make: input.make,
+        luxury: input.luxury,
+        wheelchairAccessible: input.wheelchairAccessible,
+        exteriorColor: input.exteriorColor || input.color,
+        interiorColor: input.interiorColor,
+      });
 
       // Handle primary vehicle constraint
       const isPrimary = input.isPrimary ?? (driver.vehicles.length === 0);
@@ -173,7 +157,7 @@ export class DriverVehicleService {
         });
       }
 
-      // Create the vehicle
+      // Create the vehicle - NO vehicleCategory assigned, admin must approve
       const vehicle = await prisma.vehicle.create({
         data: {
           driverId: input.driverId,
@@ -188,7 +172,6 @@ export class DriverVehicleService {
           licensePlate: input.licensePlate,
           seatCapacity: input.seatCapacity,
           wheelchairAccessible: input.wheelchairAccessible ?? false,
-          vehicleCategory: vehicleCategory,
           vehicleCategoryStatus: DocumentStatus.PENDING,
           isPrimary,
           isActive: true,
@@ -208,13 +191,30 @@ export class DriverVehicleService {
           wavCertificationStatus: input.wavCertificationUrl ? DocumentStatus.PENDING : DocumentStatus.PENDING,
           plateCountry: input.plateCountry,
           plateState: input.plateState,
+          bodyType: input.bodyType,
+          luxury: input.luxury ?? false,
+          suggestedCategory: suggestion.suggestedCategory,
+          suggestedCategoryReasons: suggestion.reasons,
+          vehicleVerificationStatus: 'PENDING_VERIFICATION',
+          tlcBaseAffiliation: input.tlcBaseAffiliation,
+          hvfhvPermit: input.hvfhvPermit,
           updatedAt: new Date(),
         },
       });
 
-      console.log(`[DriverVehicleService] Registered vehicle ${vehicle.id} for driver ${input.driverId}, category: ${vehicleCategory}`);
+      console.log(`[DriverVehicleService] Registered vehicle ${vehicle.id} for driver ${input.driverId}, suggested: ${suggestion.suggestedCategory} (${suggestion.confidence})`);
 
-      return { success: true, data: vehicle };
+      return { 
+        success: true, 
+        data: {
+          ...vehicle,
+          suggestion: {
+            suggestedCategory: suggestion.suggestedCategory,
+            confidence: suggestion.confidence,
+            reasons: suggestion.reasons,
+          },
+        },
+      };
     } catch (error: any) {
       console.error('[DriverVehicleService] Error registering vehicle:', error);
       return { success: false, error: error.message || 'Failed to register vehicle' };
@@ -223,6 +223,7 @@ export class DriverVehicleService {
 
   /**
    * Update an existing vehicle
+   * Note: Updates to vehicle properties reset verification status for admin re-review
    */
   async updateVehicle(vehicleId: string, driverId: string, input: VehicleUpdateInput): Promise<VehicleServiceResult<any>> {
     try {
@@ -234,29 +235,6 @@ export class DriverVehicleService {
         return { success: false, error: 'Vehicle not found or does not belong to driver' };
       }
 
-      // If changing category, validate requirements
-      if (input.vehicleCategory && isValidVehicleCategoryId(input.vehicleCategory)) {
-        const vehicleData = {
-          make: input.make ?? existingVehicle.make,
-          year: input.year ?? existingVehicle.year,
-          color: input.color ?? existingVehicle.color,
-          exteriorColor: input.exteriorColor ?? existingVehicle.exteriorColor,
-          interiorColor: input.interiorColor ?? existingVehicle.interiorColor,
-          wheelchairAccessible: input.wheelchairAccessible ?? existingVehicle.wheelchairAccessible,
-          seatCapacity: input.seatCapacity ?? existingVehicle.seatCapacity,
-        };
-
-        const validation = validateVehicleForCategory(vehicleData, input.vehicleCategory);
-        if (!validation.isValid) {
-          return {
-            success: false,
-            error: 'Vehicle does not meet category requirements',
-            validationErrors: validation.errors,
-            validationWarnings: validation.warnings,
-          };
-        }
-      }
-
       // Handle primary vehicle changes
       if (input.isPrimary === true && !existingVehicle.isPrimary) {
         await prisma.vehicle.updateMany({
@@ -265,23 +243,95 @@ export class DriverVehicleService {
         });
       }
 
-      // Reset category status if category changed
-      const categoryChanged = input.vehicleCategory && input.vehicleCategory !== existingVehicle.vehicleCategory;
+      // Re-calculate suggested category if relevant properties changed
+      const vehiclePropsChanged = (
+        input.bodyType !== undefined ||
+        input.seatCapacity !== undefined ||
+        input.year !== undefined ||
+        input.make !== undefined ||
+        input.luxury !== undefined ||
+        input.wheelchairAccessible !== undefined ||
+        input.exteriorColor !== undefined ||
+        input.interiorColor !== undefined
+      );
+
+      let suggestion = null;
+      if (vehiclePropsChanged) {
+        suggestion = suggestVehicleCategory({
+          bodyType: input.bodyType ?? existingVehicle.bodyType,
+          seats: input.seatCapacity ?? existingVehicle.seatCapacity,
+          year: input.year ?? existingVehicle.year,
+          make: input.make ?? existingVehicle.make,
+          luxury: input.luxury ?? existingVehicle.luxury,
+          wheelchairAccessible: input.wheelchairAccessible ?? existingVehicle.wheelchairAccessible,
+          exteriorColor: input.exteriorColor ?? existingVehicle.exteriorColor,
+          interiorColor: input.interiorColor ?? existingVehicle.interiorColor,
+        });
+      }
+
+      // Prepare update data (exclude any undefined values)
+      const updateData: any = {
+        updatedAt: new Date(),
+      };
+      
+      if (input.vehicleType !== undefined) updateData.vehicleType = input.vehicleType;
+      if (input.vehicleModel !== undefined) updateData.vehicleModel = input.vehicleModel;
+      if (input.vehiclePlate !== undefined) updateData.vehiclePlate = input.vehiclePlate;
+      if (input.make !== undefined) updateData.make = input.make;
+      if (input.year !== undefined) updateData.year = input.year;
+      if (input.color !== undefined) updateData.color = input.color;
+      if (input.exteriorColor !== undefined) updateData.exteriorColor = input.exteriorColor;
+      if (input.interiorColor !== undefined) updateData.interiorColor = input.interiorColor;
+      if (input.licensePlate !== undefined) updateData.licensePlate = input.licensePlate;
+      if (input.seatCapacity !== undefined) updateData.seatCapacity = input.seatCapacity;
+      if (input.wheelchairAccessible !== undefined) updateData.wheelchairAccessible = input.wheelchairAccessible;
+      if (input.isPrimary !== undefined) updateData.isPrimary = input.isPrimary;
+      if (input.notes !== undefined) updateData.notes = input.notes;
+      if (input.tlcLicenseNumber !== undefined) updateData.tlcLicenseNumber = input.tlcLicenseNumber;
+      if (input.insurancePolicyNumber !== undefined) updateData.insurancePolicyNumber = input.insurancePolicyNumber;
+      if (input.registrationDocumentUrl !== undefined) updateData.registrationDocumentUrl = input.registrationDocumentUrl;
+      if (input.registrationExpiry !== undefined) updateData.registrationExpiry = input.registrationExpiry;
+      if (input.insuranceDocumentUrl !== undefined) updateData.insuranceDocumentUrl = input.insuranceDocumentUrl;
+      if (input.insuranceExpiry !== undefined) updateData.insuranceExpiry = input.insuranceExpiry;
+      if (input.dmvInspectionImageUrl !== undefined) updateData.dmvInspectionImageUrl = input.dmvInspectionImageUrl;
+      if (input.dmvInspectionExpiry !== undefined) updateData.dmvInspectionExpiry = input.dmvInspectionExpiry;
+      if (input.wavCertificationUrl !== undefined) updateData.wavCertificationUrl = input.wavCertificationUrl;
+      if (input.wavCertificationExpiry !== undefined) updateData.wavCertificationExpiry = input.wavCertificationExpiry;
+      if (input.plateCountry !== undefined) updateData.plateCountry = input.plateCountry;
+      if (input.plateState !== undefined) updateData.plateState = input.plateState;
+      if (input.bodyType !== undefined) updateData.bodyType = input.bodyType;
+      if (input.luxury !== undefined) updateData.luxury = input.luxury;
+      if (input.tlcBaseAffiliation !== undefined) updateData.tlcBaseAffiliation = input.tlcBaseAffiliation;
+      if (input.hvfhvPermit !== undefined) updateData.hvfhvPermit = input.hvfhvPermit;
+
+      // Update suggestion if properties changed
+      if (suggestion) {
+        updateData.suggestedCategory = suggestion.suggestedCategory;
+        updateData.suggestedCategoryReasons = suggestion.reasons;
+        // Reset verification status for re-review
+        updateData.vehicleVerificationStatus = 'PENDING_VERIFICATION';
+        updateData.vehicleCategory = null;
+        updateData.vehicleCategoryStatus = DocumentStatus.PENDING;
+      }
 
       const vehicle = await prisma.vehicle.update({
         where: { id: vehicleId },
-        data: {
-          ...input,
-          vehicleCategoryStatus: categoryChanged ? DocumentStatus.PENDING : undefined,
-          vehicleCategoryApprovedAt: categoryChanged ? null : undefined,
-          vehicleCategoryApprovedBy: categoryChanged ? null : undefined,
-          updatedAt: new Date(),
-        },
+        data: updateData,
       });
 
       console.log(`[DriverVehicleService] Updated vehicle ${vehicleId} for driver ${driverId}`);
 
-      return { success: true, data: vehicle };
+      return { 
+        success: true, 
+        data: {
+          ...vehicle,
+          suggestion: suggestion ? {
+            suggestedCategory: suggestion.suggestedCategory,
+            confidence: suggestion.confidence,
+            reasons: suggestion.reasons,
+          } : undefined,
+        },
+      };
     } catch (error: any) {
       console.error('[DriverVehicleService] Error updating vehicle:', error);
       return { success: false, error: error.message || 'Failed to update vehicle' };
@@ -524,13 +574,13 @@ export class DriverVehicleService {
    */
   private getEligibleVehicleCategories(requestedCategory: VehicleCategoryId): string[] {
     const reverseMap: Record<VehicleCategoryId, VehicleCategoryId[]> = {
-      X: ["X", "COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV"],
-      COMFORT: ["COMFORT", "COMFORT_XL", "XL", "BLACK", "BLACK_SUV"],
-      COMFORT_XL: ["COMFORT_XL", "XL"],
-      XL: ["XL"],
-      BLACK: ["BLACK", "BLACK_SUV"],
-      BLACK_SUV: ["BLACK_SUV"],
-      WAV: ["WAV"],
+      SAFEGO_X: ["SAFEGO_X", "SAFEGO_COMFORT", "SAFEGO_COMFORT_XL", "SAFEGO_XL", "SAFEGO_BLACK", "SAFEGO_BLACK_SUV"],
+      SAFEGO_COMFORT: ["SAFEGO_COMFORT", "SAFEGO_COMFORT_XL", "SAFEGO_XL", "SAFEGO_BLACK", "SAFEGO_BLACK_SUV"],
+      SAFEGO_COMFORT_XL: ["SAFEGO_COMFORT_XL", "SAFEGO_XL"],
+      SAFEGO_XL: ["SAFEGO_XL"],
+      SAFEGO_BLACK: ["SAFEGO_BLACK", "SAFEGO_BLACK_SUV"],
+      SAFEGO_BLACK_SUV: ["SAFEGO_BLACK_SUV"],
+      SAFEGO_WAV: ["SAFEGO_WAV"],
     };
     return reverseMap[requestedCategory] || [];
   }
