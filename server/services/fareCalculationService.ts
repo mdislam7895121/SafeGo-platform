@@ -958,6 +958,7 @@ interface NYCTollFacility {
   direction?: 'inbound' | 'outbound' | 'both';
   inboundOnly?: boolean;
   operator: 'MTA' | 'PANYNJ' | 'TBTA';
+  tollTargetBorough?: string;
 }
 
 const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
@@ -970,6 +971,7 @@ const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
     ezPassRatePeak: 10.17,
     inboundOnly: true,
     operator: 'MTA',
+    tollTargetBorough: 'Staten Island',
   },
   {
     id: 'battery_tunnel',
@@ -980,6 +982,7 @@ const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
     ezPassRatePeak: 10.17,
     inboundOnly: true,
     operator: 'MTA',
+    tollTargetBorough: 'Manhattan',
   },
   {
     id: 'queens_midtown_tunnel',
@@ -990,6 +993,7 @@ const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
     ezPassRatePeak: 10.17,
     inboundOnly: true,
     operator: 'MTA',
+    tollTargetBorough: 'Manhattan',
   },
   {
     id: 'rfk_bridge',
@@ -1000,6 +1004,7 @@ const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
     ezPassRatePeak: 10.17,
     inboundOnly: true,
     operator: 'MTA',
+    tollTargetBorough: 'Manhattan',
   },
   {
     id: 'whitestone_bridge',
@@ -1010,6 +1015,7 @@ const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
     ezPassRatePeak: 10.17,
     inboundOnly: true,
     operator: 'MTA',
+    tollTargetBorough: 'Manhattan',
   },
   {
     id: 'throgs_neck_bridge',
@@ -1020,6 +1026,7 @@ const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
     ezPassRatePeak: 10.17,
     inboundOnly: true,
     operator: 'MTA',
+    tollTargetBorough: 'Manhattan',
   },
   {
     id: 'george_washington_bridge',
@@ -1084,24 +1091,126 @@ const NYC_TLC_TOLL_FACILITIES: NYCTollFacility[] = [
 ];
 
 /**
+ * Determines if a trip is traveling inbound (toward Manhattan) based on
+ * pickup and dropoff location metadata.
+ * 
+ * Manhattan-bound direction detection (for MTA inbound-only tolls):
+ * - MTA inbound-only tolls ONLY apply when dropoff is Manhattan
+ * - Trips between outer boroughs (Queens → Bronx, Staten Island → Brooklyn)
+ *   do NOT qualify as inbound even if route passes through a toll facility
+ * - If dropoff is Manhattan and pickup is not Manhattan -> inbound
+ * - If both are Manhattan -> inbound (within Manhattan)
+ * - If dropoff is NOT Manhattan -> outbound (no MTA inbound toll applies)
+ * 
+ * For NY-NJ crossings (PANYNJ bridges/tunnels):
+ * - If pickup is in NJ and dropoff is in NY -> eastbound (NY-bound)
+ * - If pickup is in NY and dropoff is in NJ -> westbound (NJ-bound)
+ * - Both directions are charged for PANYNJ facilities
+ */
+function determineTripDirection(
+  pickupStateCode: string | undefined,
+  dropoffStateCode: string | undefined,
+  pickupBoroughCode: string | undefined,
+  dropoffBoroughCode: string | undefined
+): {
+  isInbound: boolean;  // Manhattan-bound for MTA facilities (dropoff MUST be Manhattan)
+  isNYBound: boolean;  // NY-bound for PANYNJ crossings
+  actualDirection: 'eastbound' | 'westbound' | 'inbound' | 'outbound' | 'unknown';
+} {
+  const isManhattan = (borough: string | undefined) => 
+    borough?.toLowerCase() === 'manhattan' || borough?.toLowerCase() === 'new york';
+  
+  const dropoffIsManhattan = isManhattan(dropoffBoroughCode);
+  
+  const pickupIsNY = pickupStateCode?.toUpperCase() === 'NY';
+  const dropoffIsNY = dropoffStateCode?.toUpperCase() === 'NY';
+  const pickupIsNJ = pickupStateCode?.toUpperCase() === 'NJ';
+  const dropoffIsNJ = dropoffStateCode?.toUpperCase() === 'NJ';
+  
+  // Determine Manhattan-bound (inbound) for MTA facilities
+  // CRITICAL: MTA inbound-only tolls ONLY apply when DROPOFF is Manhattan
+  // Trips like Queens → Bronx, Staten Island → Brooklyn are NOT inbound
+  // even if the route passes through a toll facility
+  let isInbound = false;
+  let inboundDirection: 'inbound' | 'outbound' | 'unknown' = 'unknown';
+  
+  if (dropoffIsManhattan) {
+    // Dropoff is Manhattan - this qualifies as inbound
+    isInbound = true;
+    inboundDirection = 'inbound';
+  } else {
+    // Dropoff is NOT Manhattan - not inbound for MTA toll purposes
+    // This covers: Manhattan → Brooklyn, Queens → Bronx, etc.
+    isInbound = false;
+    inboundDirection = 'outbound';
+  }
+  
+  // Determine NY-bound (eastbound) for PANYNJ crossings
+  let isNYBound = false;
+  let nynjDirection: 'eastbound' | 'westbound' | 'unknown' = 'unknown';
+  
+  if (pickupIsNJ && dropoffIsNY) {
+    isNYBound = true;
+    nynjDirection = 'eastbound';
+  } else if (pickupIsNY && dropoffIsNJ) {
+    isNYBound = false;
+    nynjDirection = 'westbound';
+  }
+  
+  // Return actual direction based on crossing type
+  const actualDirection = nynjDirection !== 'unknown' ? nynjDirection : inboundDirection;
+  
+  return {
+    isInbound,
+    isNYBound,
+    actualDirection,
+  };
+}
+
+/**
  * Detect NYC TLC toll facilities from route toll segments
  * Uses segment name matching and returns structured toll information
+ * 
+ * Direction-aware toll detection:
+ * - MTA bridges (inboundOnly): Only charged when traveling Manhattan-bound
+ * - PANYNJ crossings (direction='both'): Charged in both directions
+ * 
+ * @param tollSegments - Array of toll segment names from Directions API
+ * @param isPeakHour - Whether current time is peak pricing period
+ * @param pickupStateCode - State code of pickup location (e.g., 'NY', 'NJ')
+ * @param dropoffStateCode - State code of dropoff location
+ * @param pickupBoroughCode - Borough code of pickup (e.g., 'Manhattan', 'Brooklyn')
+ * @param dropoffBoroughCode - Borough code of dropoff
  */
 function detectNYCTLCTolls(
   tollSegments: string[],
-  isPeakHour: boolean = false
+  isPeakHour: boolean = false,
+  pickupStateCode?: string,
+  dropoffStateCode?: string,
+  pickupBoroughCode?: string,
+  dropoffBoroughCode?: string
 ): Array<{
   facility: NYCTollFacility;
   amount: number;
   isPeak: boolean;
+  direction: 'eastbound' | 'westbound' | 'inbound' | 'outbound' | 'unknown';
 }> {
   const detectedTolls: Array<{
     facility: NYCTollFacility;
     amount: number;
     isPeak: boolean;
+    direction: 'eastbound' | 'westbound' | 'inbound' | 'outbound' | 'unknown';
   }> = [];
   
   const processedFacilities = new Set<string>();
+  
+  // Determine trip direction
+  const { isInbound, isNYBound, actualDirection } = determineTripDirection(
+    pickupStateCode,
+    dropoffStateCode,
+    pickupBoroughCode,
+    dropoffBoroughCode
+  );
   
   for (const segment of tollSegments) {
     const normalizedSegment = segment.toLowerCase().trim();
@@ -1115,15 +1224,44 @@ function detectNYCTLCTolls(
       );
       
       if (matches) {
-        const rate = isPeakHour && facility.ezPassRatePeak
-          ? facility.ezPassRatePeak
-          : facility.ezPassRate;
+        // Check if toll should apply based on direction
+        let shouldApplyToll = true;
+        let tollDirection = actualDirection;
         
-        detectedTolls.push({
-          facility,
-          amount: rate,
-          isPeak: isPeakHour && !!facility.ezPassRatePeak,
-        });
+        if (facility.inboundOnly && facility.tollTargetBorough) {
+          // MTA bridges: only charge when traveling toward the toll target borough
+          // Verrazzano: toll on Staten Island-bound (dropoff = Staten Island)
+          // Battery, Midtown, RFK, Whitestone, Throgs Neck: toll on Manhattan-bound (dropoff = Manhattan)
+          const targetBorough = facility.tollTargetBorough.toLowerCase();
+          const dropoffNormalized = dropoffBoroughCode?.toLowerCase() || '';
+          const isHeadingToTarget = dropoffNormalized === targetBorough || 
+            (targetBorough === 'manhattan' && dropoffNormalized === 'new york');
+          
+          shouldApplyToll = isHeadingToTarget;
+          tollDirection = isHeadingToTarget ? 'inbound' : 'outbound';
+        } else if (facility.direction === 'both') {
+          // PANYNJ crossings: charge in both directions
+          shouldApplyToll = true;
+          // Determine specific direction for PANYNJ crossings
+          if (pickupStateCode?.toUpperCase() === 'NJ' && dropoffStateCode?.toUpperCase() === 'NY') {
+            tollDirection = 'eastbound';
+          } else if (pickupStateCode?.toUpperCase() === 'NY' && dropoffStateCode?.toUpperCase() === 'NJ') {
+            tollDirection = 'westbound';
+          }
+        }
+        
+        if (shouldApplyToll) {
+          const rate = isPeakHour && facility.ezPassRatePeak
+            ? facility.ezPassRatePeak
+            : facility.ezPassRate;
+          
+          detectedTolls.push({
+            facility,
+            amount: rate,
+            isPeak: isPeakHour && !!facility.ezPassRatePeak,
+            direction: tollDirection,
+          });
+        }
         
         processedFacilities.add(facility.id);
       }
@@ -1132,6 +1270,14 @@ function detectNYCTLCTolls(
   
   return detectedTolls;
 }
+
+// Export for testing
+export { 
+  detectNYCTLCTolls, 
+  determineTripDirection, 
+  NYC_TLC_TOLL_FACILITIES,
+  type NYCTollFacility,
+};
 
 /**
  * Check if a trip is eligible for TLC AVF fee
@@ -2080,8 +2226,15 @@ export class FareCalculationService {
     // ============================================
     // 8. DETECT TOLLS (Step 6I - After Out-of-Town, Before Service Fee)
     // ============================================
-    // First, detect NYC TLC toll facilities
-    const tlcTolls = detectNYCTLCTolls(route.tollSegments || [], isPeakHour);
+    // First, detect NYC TLC toll facilities with direction-aware pricing
+    const tlcTolls = detectNYCTLCTolls(
+      route.tollSegments || [],
+      isPeakHour,
+      pickupStateCode,
+      dropoffStateCode,
+      pickupBoroughCode,
+      dropoffBoroughCode
+    );
     const tlcTollsBreakdown: TollBreakdownItem[] = tlcTolls.map(t => ({
       id: t.facility.id,
       name: t.facility.name,
@@ -2089,7 +2242,7 @@ export class FareCalculationService {
       amount: t.amount,
       isPeak: t.isPeak,
       operator: t.facility.operator,
-      direction: t.facility.direction,
+      direction: t.direction,
     }));
     
     // Calculate TLC tolls total
