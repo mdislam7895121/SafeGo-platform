@@ -43,7 +43,9 @@ import { SafeGoMap } from "@/components/maps/SafeGoMap";
 import { clientGetRouteAlternatives } from "@/hooks/useGoogleMaps";
 import { decodePolyline } from "@/lib/locationService";
 import { useFareCalculation } from "@/hooks/useFareCalculation";
+import { usePromoCalculation, formatCurrencyWithStrikethrough } from "@/hooks/usePromoCalculation";
 import type { RideTypeCode, RouteFareBreakdown, RouteInfoRequest } from "@/lib/fareTypes";
+import type { PromoResult } from "@/lib/promoTypes";
 
 // Define ride types with their visual properties (fares calculated dynamically)
 const RIDE_TYPE_CONFIG: Record<RideTypeCode, {
@@ -734,16 +736,25 @@ export default function RideOptionsPage() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right min-w-[80px]">
+                    <div className="text-right min-w-[100px]">
                       {isLoadingThisFare ? (
                         <Skeleton className="h-6 w-16 ml-auto" />
                       ) : fare ? (
                         <>
-                          <p className="text-lg font-bold" data-testid={`fare-${rideTypeCode}`}>
-                            {formatCurrency(fare.totalFare, currency)}
-                          </p>
+                          <div className="flex flex-col items-end">
+                            <span className="text-xs text-muted-foreground line-through" data-testid={`anchor-fare-${rideTypeCode}`}>
+                              {formatCurrency(fare.totalFare * 1.10, currency)}
+                            </span>
+                            <p className="text-lg font-bold text-green-600 dark:text-green-400" data-testid={`fare-${rideTypeCode}`}>
+                              {formatCurrency(fare.totalFare, currency)}
+                            </p>
+                          </div>
+                          <Badge variant="secondary" className="text-[9px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 mt-0.5">
+                            <Tag className="h-2.5 w-2.5 mr-0.5" />
+                            Promo Applied
+                          </Badge>
                           {fare.surgeMultiplier > 1 && (
-                            <Badge variant="destructive" className="text-[9px]">
+                            <Badge variant="destructive" className="text-[9px] ml-1">
                               {fare.surgeMultiplier}x surge
                             </Badge>
                           )}
@@ -837,26 +848,36 @@ export default function RideOptionsPage() {
           const config = RIDE_TYPE_CONFIG[selectedRideType];
           const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
           const fare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
+          const anchorFare = fare ? fare.totalFare * 1.10 : 0;
+          const savings = fare ? anchorFare - fare.totalFare : 0;
           
           return (
-            <Button
-              className="w-full"
-              size="lg"
-              onClick={handleConfirm}
-              disabled={!fare || isLoadingFares}
-              data-testid="button-confirm-ride-option"
-            >
-              {isLoadingFares ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Calculating fare...
-                </>
-              ) : fare ? (
-                <>Confirm {config.name} - {formatCurrency(fare.totalFare, currency)}</>
-              ) : (
-                <>Select a route to see fare</>
+            <div className="space-y-2">
+              {fare && savings > 0 && (
+                <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
+                  <Tag className="h-4 w-4" />
+                  <span className="font-medium">You save {formatCurrency(savings, currency)} with this promo!</span>
+                </div>
               )}
-            </Button>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={handleConfirm}
+                disabled={!fare || isLoadingFares}
+                data-testid="button-confirm-ride-option"
+              >
+                {isLoadingFares ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Calculating fare...
+                  </>
+                ) : fare ? (
+                  <>Confirm {config.name} - {formatCurrency(fare.totalFare, currency)}</>
+                ) : (
+                  <>Select a route to see fare</>
+                )}
+              </Button>
+            </div>
           );
         })()}
       </div>
