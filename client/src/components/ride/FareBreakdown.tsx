@@ -74,6 +74,8 @@ export interface FareBreakdownData {
   tlcBCFFeeApplied?: boolean;
   tlcHVRFFee?: number;
   tlcHVRFFeeApplied?: boolean;
+  tlcStateSurcharge?: number;
+  tlcStateSurchargeApplied?: boolean;
   
   surgeAmount?: number;
   surgeMultiplier?: number;
@@ -128,6 +130,7 @@ export interface FareBreakdownData {
     tlcAVFFeeApplied?: boolean;
     tlcBCFFeeApplied?: boolean;
     tlcHVRFFeeApplied?: boolean;
+    tlcStateSurchargeApplied?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -412,6 +415,14 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
           icon={Shield} 
           label="NYC HVFHV Workers' Comp"
           amount={breakdown.tlcHVRFFee ?? 0} 
+          currency={currency} 
+        />
+      )}
+      {(breakdown.tlcStateSurcharge ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={Flag} 
+          label="NY State Surcharge"
+          amount={breakdown.tlcStateSurcharge ?? 0} 
           currency={currency} 
         />
       )}

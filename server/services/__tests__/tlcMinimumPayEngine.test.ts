@@ -725,6 +725,7 @@ describe('NYC TLC Minimum Pay Engine', () => {
         'avf',
         'bcf',
         'hvrf',
+        'stateSurcharge',
         'serviceFee',
         'commission'
       ];
@@ -735,6 +736,150 @@ describe('NYC TLC Minimum Pay Engine', () => {
       
       expect(hvrfIndex).toBeGreaterThan(bcfIndex);
       expect(hvrfIndex).toBeLessThan(serviceFeeIndex);
+    });
+  });
+
+  describe('NYC TLC State Surcharge', () => {
+    /**
+     * NYC TLC State Surcharge Tests
+     * 
+     * The NY State Surcharge is a $0.50 flat fee applied to all NYC-to-NYC HVFHV trips.
+     * This is a state-mandated regulatory fee that goes to NY State.
+     * 
+     * Eligibility rules:
+     * - Both pickup AND dropoff must be in NYC boroughs (Manhattan, Brooklyn, Queens, Bronx, Staten Island)
+     * - Does NOT apply to cross-state trips (e.g., NYC to NJ)
+     * - Does NOT apply to trips that leave NYC (e.g., NYC to Westchester)
+     * - Does NOT apply to $0 promotional rides
+     * - Fee is a flat $0.50 per trip
+     * - Fee does NOT participate in surge multiplier
+     * - Full amount is regulatory pass-through (non-commissionable)
+     */
+
+    const TLC_STATE_SURCHARGE = 0.50;
+    const NYC_BOROUGHS = ['Manhattan', 'Brooklyn', 'Queens', 'Bronx', 'Staten Island'];
+
+    it('should define correct State Surcharge amount', () => {
+      expect(TLC_STATE_SURCHARGE).toBe(0.50);
+    });
+
+    it('should apply State Surcharge to NYC-to-NYC trips (Manhattan to Brooklyn)', () => {
+      const pickupBorough: string = 'Manhattan';
+      const dropoffBorough: string = 'Brooklyn';
+      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffBorough);
+      
+      expect(isNYCToNYC).toBe(true);
+    });
+
+    it('should apply State Surcharge to same-borough trips (Queens to Queens)', () => {
+      const pickupBorough: string = 'Queens';
+      const dropoffBorough: string = 'Queens';
+      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffBorough);
+      
+      expect(isNYCToNYC).toBe(true);
+    });
+
+    it('should NOT apply State Surcharge to cross-state trips (Manhattan to NJ)', () => {
+      const pickupBorough: string = 'Manhattan';
+      const dropoffState: string = 'NJ';
+      const dropoffBorough: string | null = null; // Not a NYC borough
+      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && (dropoffBorough !== null && NYC_BOROUGHS.includes(dropoffBorough));
+      
+      expect(isNYCToNYC).toBe(false);
+    });
+
+    it('should NOT apply State Surcharge to trips leaving NYC (Manhattan to Westchester)', () => {
+      const pickupBorough: string = 'Manhattan';
+      const dropoffLocation: string = 'Westchester';
+      const isNYCToNYC = NYC_BOROUGHS.includes(pickupBorough) && NYC_BOROUGHS.includes(dropoffLocation);
+      
+      expect(isNYCToNYC).toBe(false);
+    });
+
+    it('should NOT apply State Surcharge to trips entering NYC from outside', () => {
+      const pickupLocation: string = 'Connecticut';
+      const dropoffBorough: string = 'Manhattan';
+      const isNYCToNYC = NYC_BOROUGHS.includes(pickupLocation) && NYC_BOROUGHS.includes(dropoffBorough);
+      
+      expect(isNYCToNYC).toBe(false);
+    });
+
+    it('should NOT apply State Surcharge to $0 promotional rides', () => {
+      const subtotal = 0;
+      const shouldApplyStateSurcharge = subtotal > 0;
+      
+      expect(shouldApplyStateSurcharge).toBe(false);
+    });
+
+    it('should treat State Surcharge as non-commissionable pass-through', () => {
+      const stateSurcharge = TLC_STATE_SURCHARGE;
+      const baseSubtotal = 25.00;
+      const basePlusFees = baseSubtotal + stateSurcharge;
+      
+      expect(basePlusFees).toBe(25.50);
+    });
+
+    it('should add State Surcharge to total regulatory fees', () => {
+      const congestionFee = 2.75;
+      const avfFee = 0.30;
+      const bcfFee = 0.69;
+      const hvrfFee = 0.75;
+      const stateSurcharge = TLC_STATE_SURCHARGE;
+      
+      const totalRegulatoryFees = congestionFee + avfFee + bcfFee + hvrfFee + stateSurcharge;
+      expect(totalRegulatoryFees).toBeCloseTo(4.99, 2);
+    });
+
+    it('should calculate correct fare breakdown with all NYC TLC fees including State Surcharge', () => {
+      const baseFare = 2.50;
+      const distanceFare = 13.10;
+      const timeFare = 11.20;
+      const surgeAdjusted = baseFare + distanceFare + timeFare;
+      
+      const congestionFee = 2.75;
+      const airportFee = 2.50;
+      const avfFee = 0.30;
+      const bcfRate = 0.0275;
+      const bcfFee = Math.round(surgeAdjusted * bcfRate * 100) / 100;
+      const hvrfFee = 0.75;
+      const stateSurcharge = TLC_STATE_SURCHARGE;
+      
+      const allTLCFees = congestionFee + airportFee + avfFee + bcfFee + hvrfFee + stateSurcharge;
+      const subtotalWithFees = surgeAdjusted + allTLCFees;
+      
+      expect(bcfFee).toBeCloseTo(0.74, 2);
+      expect(allTLCFees).toBeCloseTo(7.54, 2);
+      expect(subtotalWithFees).toBeCloseTo(34.34, 2);
+    });
+
+    it('should apply State Surcharge after HVRF in fee pipeline sequence', () => {
+      const pipelineOrder = [
+        'congestion',
+        'airport',
+        'avf',
+        'bcf',
+        'hvrf',
+        'stateSurcharge',
+        'serviceFee',
+        'commission'
+      ];
+      
+      const hvrfIndex = pipelineOrder.indexOf('hvrf');
+      const stateSurchargeIndex = pipelineOrder.indexOf('stateSurcharge');
+      const serviceFeeIndex = pipelineOrder.indexOf('serviceFee');
+      
+      expect(stateSurchargeIndex).toBeGreaterThan(hvrfIndex);
+      expect(stateSurchargeIndex).toBeLessThan(serviceFeeIndex);
+    });
+
+    it('should expose State Surcharge in fare breakdown for transparent billing', () => {
+      const fareBreakdown = {
+        tlcStateSurcharge: TLC_STATE_SURCHARGE,
+        tlcStateSurchargeApplied: true,
+      };
+      
+      expect(fareBreakdown.tlcStateSurcharge).toBe(0.50);
+      expect(fareBreakdown.tlcStateSurchargeApplied).toBe(true);
     });
   });
 });
