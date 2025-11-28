@@ -41,6 +41,7 @@ import mapsRoutes from "./routes/maps"; // Google Maps proxy endpoints
 import faresRoutes from "./routes/fares"; // Multi-Route Fare Engine
 import promosRoutes from "./routes/promos"; // Promotion Engine
 import marketplaceBalancerRoutes from "./routes/marketplace-balancer"; // AI Marketplace Balancer
+import loyaltyRoutes from "./routes/loyalty"; // SafeGo Loyalty Engine
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { db } from "./db";
 
@@ -223,6 +224,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/fares", faresRoutes); // Multi-Route Fare Engine
   app.use("/api/promos", promosRoutes); // Promotion Engine
   app.use("/api/admin/marketplace", marketplaceBalancerRoutes); // AI Marketplace Balancer
+  app.use("/api/loyalty", loyaltyRoutes); // SafeGo Loyalty Engine
 
   const httpServer = createServer(app);
   
