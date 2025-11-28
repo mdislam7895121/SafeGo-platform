@@ -645,64 +645,116 @@ export default function RideOptionsPage() {
                   Select Ride Type
                 </p>
                 
-                {/* Mobile: Horizontal Scroll Pills */}
-                <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide lg:hidden -mx-3 sm:-mx-4 px-3 sm:px-4">
+                {/* Mobile: Horizontal Scroll Carousel */}
+                <div className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide lg:hidden -mx-3 sm:-mx-4 px-3 sm:px-4">
                   {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId) => {
                     const catConfig = VEHICLE_CATEGORIES[categoryId];
                     const Icon = getVehicleCategoryIcon(catConfig.iconType);
                     const isSelected = categoryId === selectedVehicleCategory;
                     const fare = currentRouteId ? getFare(categoryId, currentRouteId) : null;
                     const pillPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
-                    const pillFinalFare = fare ? fare.totalFare - pillPromoDiscount : 0;
+                    const pillFinalFare = fare ? Math.max(0, fare.totalFare - pillPromoDiscount) : 0;
                     const catUnavailable = isCategoryUnavailable(categoryId);
                     const catLimited = isCategoryLimited(categoryId);
                     const catAvailability = getAvailability(categoryId);
+                    const hasSurge = fare && fare.surgeMultiplier > 1;
+                    const driversNearby = catAvailability?.driversNearby ?? 0;
                     
                     return (
                       <Tooltip key={categoryId}>
                         <TooltipTrigger asChild>
                           <Button
-                            variant={isSelected ? "default" : "outline"}
-                            className={`flex-shrink-0 snap-start h-auto py-2 px-3 ${
+                            variant="outline"
+                            className={`flex-shrink-0 snap-start min-w-[90px] sm:min-w-[100px] h-auto rounded-xl border-2 p-2.5 sm:p-3 ${
                               catUnavailable 
-                                ? "opacity-50 cursor-not-allowed" 
+                                ? "opacity-50 cursor-not-allowed bg-muted/30 border-muted" 
                                 : isSelected 
-                                  ? "" 
-                                  : "hover-elevate"
+                                  ? "bg-primary/10 border-primary shadow-sm" 
+                                  : "bg-card border-border hover-elevate"
                             }`}
-                            onClick={() => !catUnavailable && handleSelectVehicleCategory(categoryId)}
+                            onClick={() => handleSelectVehicleCategory(categoryId)}
                             disabled={catUnavailable}
+                            aria-disabled={catUnavailable}
+                            aria-label={[
+                              catConfig.displayName,
+                              catUnavailable ? "unavailable" : catLimited ? "limited availability" : "available",
+                              fare ? formatCurrency(pillFinalFare, currency) : "loading price",
+                              hasSurge ? `surge pricing ${fare?.surgeMultiplier?.toFixed(1)}x` : "",
+                              pillPromoDiscount > 0 ? `${formatCurrency(pillPromoDiscount, currency)} discount applied` : "",
+                              !catUnavailable ? `${driversNearby} drivers nearby` : catAvailability?.reason || "",
+                            ].filter(Boolean).join(", ")}
                             data-testid={`ride-pill-${categoryId}`}
                           >
-                            <div className="flex flex-col items-center gap-1">
+                            <div className="flex flex-col items-center gap-1.5">
+                              {/* Icon with badges */}
                               <div className="relative">
-                                <Icon className="h-5 w-5" />
-                                {catUnavailable && (
-                                  <div className="absolute -top-1 -right-1">
-                                    <AlertCircle className="h-3 w-3 text-muted-foreground" />
+                                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                                  catUnavailable 
+                                    ? "bg-muted text-muted-foreground"
+                                    : isSelected 
+                                      ? "bg-primary text-primary-foreground" 
+                                      : "bg-muted/50"
+                                }`}>
+                                  <Icon className="h-5 w-5" />
+                                </div>
+                                {/* Surge indicator */}
+                                {hasSurge && !catUnavailable && (
+                                  <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full flex items-center gap-0.5">
+                                    <Zap className="h-2 w-2" />
+                                    {fare.surgeMultiplier.toFixed(1)}x
                                   </div>
                                 )}
-                                {catLimited && !catUnavailable && (
-                                  <div className="absolute -top-1 -right-1 h-2 w-2 bg-amber-500 rounded-full" />
-                                )}
-                                {isSelected && promoValidation?.valid && !catUnavailable && !catLimited && (
-                                  <div className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
+                                {/* Unavailable indicator */}
+                                {catUnavailable && (
+                                  <div className="absolute -top-1 -right-1 bg-muted-foreground text-background rounded-full p-0.5">
+                                    <AlertCircle className="h-2.5 w-2.5" />
+                                  </div>
                                 )}
                               </div>
-                              <span className="text-[10px] sm:text-xs font-medium">{catConfig.displayName.replace("SafeGo ", "")}</span>
+                              
+                              {/* Category name */}
+                              <span className={`text-[11px] sm:text-xs font-semibold text-center leading-tight ${
+                                catUnavailable ? "text-muted-foreground" : isSelected ? "text-primary" : ""
+                              }`}>
+                                {catConfig.displayName.replace("SafeGo ", "")}
+                              </span>
+                              
+                              {/* Price */}
                               {catUnavailable ? (
-                                <span className="text-[8px] text-muted-foreground">N/A</span>
+                                <span className="text-[9px] text-muted-foreground">Unavailable</span>
+                              ) : isLoadingFares ? (
+                                <Skeleton className="h-3 w-10" />
                               ) : (
-                                <span className={`text-[10px] font-bold ${pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                                <span className={`text-xs font-bold ${
+                                  pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""
+                                }`}>
                                   {fare ? formatCurrency(pillFinalFare, currency) : "--"}
                                 </span>
+                              )}
+                              
+                              {/* Availability badge */}
+                              {!catUnavailable && (
+                                <div className={`text-[8px] px-1.5 py-0.5 rounded-full ${
+                                  catLimited 
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                }`}>
+                                  {catLimited ? `${driversNearby} nearby` : `${driversNearby}+ drivers`}
+                                </div>
                               )}
                             </div>
                           </Button>
                         </TooltipTrigger>
-                        {(catUnavailable || catLimited) && (
-                          <TooltipContent side="bottom" className="text-xs">
-                            {catAvailability?.reason || (catUnavailable ? "Currently unavailable" : "Limited availability")}
+                        {(catUnavailable || catLimited || hasSurge) && (
+                          <TooltipContent side="bottom" className="text-xs max-w-[180px]">
+                            {catUnavailable 
+                              ? catAvailability?.reason || "Currently unavailable in your area"
+                              : catLimited
+                                ? `Limited drivers nearby. ${catAvailability?.reason || "Wait times may be longer."}`
+                                : hasSurge
+                                  ? `High demand - ${fare?.surgeMultiplier?.toFixed(1)}x surge pricing`
+                                  : ""
+                            }
                           </TooltipContent>
                         )}
                       </Tooltip>
@@ -711,43 +763,90 @@ export default function RideOptionsPage() {
                 </div>
 
                 {/* Desktop: Vertical List */}
-                <div className="hidden lg:block space-y-2">
-                  {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId) => {
+                <div className="hidden lg:block space-y-2" role="listbox" aria-label="Select vehicle category">
+                  {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId, index) => {
                     const catConfig = VEHICLE_CATEGORIES[categoryId];
                     const Icon = getVehicleCategoryIcon(catConfig.iconType);
                     const isSelected = categoryId === selectedVehicleCategory;
                     const fare = currentRouteId ? getFare(categoryId, currentRouteId) : null;
                     const catPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
-                    const catFinalFare = fare ? fare.totalFare - catPromoDiscount : 0;
+                    const catFinalFare = fare ? Math.max(0, fare.totalFare - catPromoDiscount) : 0;
                     const catAnchorFare = fare && catPromoDiscount > 0 ? fare.totalFare : 0;
                     const catUnavailable = isCategoryUnavailable(categoryId);
                     const catLimited = isCategoryLimited(categoryId);
                     const catAvailability = getAvailability(categoryId);
+                    const hasSurge = fare && fare.surgeMultiplier > 1;
+                    const driversNearby = catAvailability?.driversNearby ?? 0;
                     
                     return (
                       <Card
                         key={categoryId}
-                        className={`transition-all ${
+                        role="option"
+                        tabIndex={isSelected ? 0 : -1}
+                        aria-selected={isSelected}
+                        aria-disabled={catUnavailable}
+                        aria-label={[
+                          catConfig.displayName,
+                          catUnavailable ? "unavailable" : catLimited ? "limited availability" : "available",
+                          fare ? formatCurrency(catFinalFare, currency) : "loading price",
+                          hasSurge ? `surge pricing ${fare?.surgeMultiplier?.toFixed(1)}x` : "",
+                          catPromoDiscount > 0 ? `${formatCurrency(catPromoDiscount, currency)} discount applied` : "",
+                          !catUnavailable ? `${driversNearby} drivers nearby` : catAvailability?.reason || "",
+                        ].filter(Boolean).join(", ")}
+                        className={`transition-all outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                           catUnavailable 
                             ? "opacity-50 cursor-not-allowed"
                             : isSelected 
                               ? "ring-2 ring-primary border-primary cursor-pointer" 
                               : "hover-elevate cursor-pointer"
                         }`}
-                        onClick={() => !catUnavailable && handleSelectVehicleCategory(categoryId)}
+                        onClick={() => handleSelectVehicleCategory(categoryId)}
+                        onKeyDown={(e) => {
+                          if ((e.key === "Enter" || e.key === " ") && !catUnavailable) {
+                            e.preventDefault();
+                            handleSelectVehicleCategory(categoryId);
+                          }
+                          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                            e.preventDefault();
+                            const direction = e.key === "ArrowDown" ? 1 : -1;
+                            let nextIndex = index + direction;
+                            while (nextIndex >= 0 && nextIndex < VEHICLE_CATEGORY_ORDER_ACTIVE.length) {
+                              const nextCatId = VEHICLE_CATEGORY_ORDER_ACTIVE[nextIndex];
+                              if (!isCategoryUnavailable(nextCatId)) {
+                                const nextCard = document.querySelector(`[data-testid="ride-option-${nextCatId}"]`) as HTMLElement;
+                                if (nextCard) {
+                                  nextCard.focus();
+                                  handleSelectVehicleCategory(nextCatId);
+                                }
+                                break;
+                              }
+                              nextIndex += direction;
+                            }
+                          }
+                        }}
                         data-testid={`ride-option-${categoryId}`}
                       >
                         <CardContent className="p-3">
                           <div className="flex items-center gap-3">
-                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${
-                              catUnavailable 
-                                ? "bg-muted/50 text-muted-foreground"
-                                : isSelected 
-                                  ? "bg-primary text-primary-foreground" 
-                                  : "bg-muted"
-                            }`}>
-                              <Icon className="h-5 w-5" />
+                            {/* Icon with surge indicator */}
+                            <div className="relative">
+                              <div className={`h-12 w-12 rounded-xl flex items-center justify-center ${
+                                catUnavailable 
+                                  ? "bg-muted/50 text-muted-foreground"
+                                  : isSelected 
+                                    ? "bg-primary text-primary-foreground" 
+                                    : "bg-muted"
+                              }`}>
+                                <Icon className="h-5 w-5" />
+                              </div>
+                              {hasSurge && !catUnavailable && (
+                                <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full flex items-center gap-0.5">
+                                  <Zap className="h-2 w-2" />
+                                  {fare.surgeMultiplier.toFixed(1)}x
+                                </div>
+                              )}
                             </div>
+                            
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className={`font-semibold text-sm ${catUnavailable ? "text-muted-foreground" : ""}`}>
@@ -756,7 +855,13 @@ export default function RideOptionsPage() {
                                 {catConfig.isPopular && !catUnavailable && (
                                   <Badge variant="secondary" className="text-[9px]">Popular</Badge>
                                 )}
-                                {catLimited && !catUnavailable && (
+                                {hasSurge && !catUnavailable && (
+                                  <Badge className="text-[9px] bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-800">
+                                    <Zap className="h-2 w-2 mr-0.5" />
+                                    High demand
+                                  </Badge>
+                                )}
+                                {catLimited && !catUnavailable && !hasSurge && (
                                   <Badge variant="outline" className="text-[9px] border-amber-300 text-amber-600 dark:text-amber-400">
                                     Limited
                                   </Badge>
@@ -778,7 +883,7 @@ export default function RideOptionsPage() {
                                   : catConfig.shortDescription
                                 }
                               </p>
-                              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
                                   {catConfig.etaMinutesOffset + 5} min
@@ -787,11 +892,22 @@ export default function RideOptionsPage() {
                                   <Users className="h-3 w-3" />
                                   {catConfig.seatCount}
                                 </span>
+                                {!catUnavailable && (
+                                  <span className={`flex items-center gap-1 ${
+                                    catLimited ? "text-amber-600 dark:text-amber-400" : "text-green-600 dark:text-green-400"
+                                  }`}>
+                                    <Car className="h-3 w-3" />
+                                    {driversNearby > 0 ? `${driversNearby}${catLimited ? "" : "+"} nearby` : "Checking..."}
+                                  </span>
+                                )}
                               </div>
                             </div>
-                            <div className="text-right">
+                            
+                            <div className="text-right min-w-[70px]">
                               {catUnavailable ? (
                                 <span className="text-muted-foreground text-sm">--</span>
+                              ) : isLoadingFares ? (
+                                <Skeleton className="h-5 w-14 ml-auto" />
                               ) : fare ? (
                                 <>
                                   {catPromoDiscount > 0 && (
@@ -799,16 +915,22 @@ export default function RideOptionsPage() {
                                       {formatCurrency(catAnchorFare, currency)}
                                     </span>
                                   )}
-                                  <p className={`font-bold ${catPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                                  <p className={`font-bold text-base ${catPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
                                     {formatCurrency(catFinalFare, currency)}
                                   </p>
+                                  {hasSurge && (
+                                    <span className="text-[9px] text-orange-600 dark:text-orange-400">
+                                      Includes surge
+                                    </span>
+                                  )}
                                 </>
                               ) : (
-                                <Skeleton className="h-5 w-14" />
+                                <Skeleton className="h-5 w-14 ml-auto" />
                               )}
                             </div>
+                            
                             {isSelected && !catUnavailable && (
-                              <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                              <Check className="h-5 w-5 text-primary flex-shrink-0" />
                             )}
                           </div>
                         </CardContent>
