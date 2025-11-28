@@ -42,6 +42,7 @@ import faresRoutes from "./routes/fares"; // Multi-Route Fare Engine
 import promosRoutes from "./routes/promos"; // Promotion Engine
 import marketplaceBalancerRoutes from "./routes/marketplace-balancer"; // AI Marketplace Balancer
 import loyaltyRoutes from "./routes/loyalty"; // SafeGo Loyalty Engine
+import tlcRoutes from "./routes/tlc"; // NYC TLC HVFHV Minimum Pay Enforcement
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { db } from "./db";
 
@@ -225,6 +226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/promos", promosRoutes); // Promotion Engine
   app.use("/api/admin/marketplace", marketplaceBalancerRoutes); // AI Marketplace Balancer
   app.use("/api/loyalty", loyaltyRoutes); // SafeGo Loyalty Engine
+  app.use("/api/tlc", tlcRoutes); // NYC TLC HVFHV Minimum Pay Enforcement
 
   const httpServer = createServer(app);
   

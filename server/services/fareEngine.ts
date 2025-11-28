@@ -49,6 +49,12 @@ import {
   AirportSurgeZone,
 } from './surgeTimingEngine';
 
+import {
+  enforceTLCMinimumOnFare,
+  TLCPerRideResult,
+  NYC_TLC_CONFIG,
+} from './tlcMinimumPayEngine';
+
 export type RideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";
 
 export interface FareConfig {
@@ -301,6 +307,16 @@ export interface FareEngineResult {
   marginProtectionApplied: boolean;
   marginProtectionCapped: boolean;
   marginShortfall: number;
+  
+  tlcMinimumPayApplied: boolean;
+  tlcAdjustment: number;
+  tlcTimeBasedMinimum: number;
+  tlcHourlyEquivalent: number;
+  tlcFinalMinimum: number;
+  tlcUtilizationRate?: number;
+  tlcHourlyGuaranteeApplied?: boolean;
+  tlcWeeklyAdjustment?: number;
+  tlcDetails?: TLCPerRideResult;
   
   flags: FareFlags;
   feeSuppressionLog: FeeSuppressionLog;
@@ -899,6 +915,21 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
 
   const surgeCapped = surgeCappedByEngine;
   
+  // ============================================
+  // STEP 20: NYC TLC HVFHV MINIMUM PAY ENFORCEMENT
+  // Apply TLC minimum pay requirements for NYC trips
+  // Formula: max(time*$0.56 + distance*$1.31, hours*$27.86)
+  // ============================================
+  const tlcEnforcement = enforceTLCMinimumOnFare(
+    route.durationMinutes,
+    route.distanceMiles,
+    driverEarnings
+  );
+  
+  if (tlcEnforcement.tlcMinimumApplied) {
+    driverEarnings = tlcEnforcement.finalDriverPayout;
+  }
+  
   const flags: FareFlags = {
     trafficApplied,
     surgeApplied: effectiveSurge > 1,
@@ -1006,6 +1037,13 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     marginProtectionApplied,
     marginProtectionCapped,
     marginShortfall,
+    
+    tlcMinimumPayApplied: tlcEnforcement.tlcMinimumApplied,
+    tlcAdjustment: tlcEnforcement.tlcAdjustment,
+    tlcTimeBasedMinimum: tlcEnforcement.tlcDetails.timeBasedMinimum,
+    tlcHourlyEquivalent: tlcEnforcement.tlcDetails.hourlyEquivalentMinimum,
+    tlcFinalMinimum: tlcEnforcement.tlcDetails.tlcMinimumPay,
+    tlcDetails: tlcEnforcement.tlcDetails,
     
     flags,
     feeSuppressionLog,
