@@ -751,6 +751,223 @@ describe('DispatchOptimizer', () => {
 
     expect(avoidResult.avoid).toBe(true);
   });
+
+  // ========================================
+  // DRIVER CATEGORY PREFERENCES TESTS
+  // ========================================
+
+  describe('Category Preferences Filtering', () => {
+    test('should filter out drivers who have disabled requested category', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_XL', 'SAFEGO_COMFORT_XL'], // Disabled X and COMFORT
+        },
+        {
+          ...mockDriverInput,
+          driverId: 'driver_2',
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_XL', 'SAFEGO_COMFORT_XL', 'SAFEGO_COMFORT', 'SAFEGO_X'],
+        },
+      ];
+
+      const filtered = optimizer.filterByVehicleEligibility(drivers, 'X');
+      expect(filtered.length).toBe(1);
+      expect(filtered[0].driverId).toBe('driver_2');
+    });
+
+    test('should include driver when allowedCategories contains requested category', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'COMFORT',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_COMFORT', 'SAFEGO_X'],
+        },
+      ];
+
+      const filtered = optimizer.filterByVehicleEligibility(drivers, 'COMFORT');
+      expect(filtered.length).toBe(1);
+      expect(filtered[0].driverId).toBe('driver_1');
+    });
+
+    test('should allow all eligible categories when allowedCategories is not set', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          // No allowedCategories set - defaults to all eligible
+        },
+      ];
+
+      const filteredX = optimizer.filterByVehicleEligibility(drivers, 'X');
+      const filteredComfort = optimizer.filterByVehicleEligibility(drivers, 'COMFORT');
+      const filteredXL = optimizer.filterByVehicleEligibility(drivers, 'XL');
+
+      expect(filteredX.length).toBe(1);
+      expect(filteredComfort.length).toBe(1);
+      expect(filteredXL.length).toBe(1);
+    });
+
+    test('should allow all eligible categories when allowedCategories is empty array', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'COMFORT',
+          vehicleCategoryApproved: true,
+          allowedCategories: [], // Empty means all eligible
+        },
+      ];
+
+      const filteredX = optimizer.filterByVehicleEligibility(drivers, 'X');
+      const filteredComfort = optimizer.filterByVehicleEligibility(drivers, 'COMFORT');
+
+      expect(filteredX.length).toBe(1);
+      expect(filteredComfort.length).toBe(1);
+    });
+
+    test('should never filter out WAV regardless of preferences (accessibility requirement)', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'wav_driver',
+          vehicleCategory: 'WAV',
+          vehicleCategoryApproved: true,
+          wheelchairAccessible: true,
+          allowedCategories: [], // Even if empty, WAV cannot be disabled
+        },
+      ];
+
+      const filtered = optimizer.filterByVehicleEligibility(drivers, 'WAV');
+      expect(filtered.length).toBe(1);
+      expect(filtered[0].driverId).toBe('wav_driver');
+    });
+
+    test('should handle normalized category IDs with SAFEGO_ prefix', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'BLACK',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_BLACK', 'SAFEGO_COMFORT'],
+        },
+      ];
+
+      const filtered = optimizer.filterByVehicleEligibility(drivers, 'COMFORT');
+      expect(filtered.length).toBe(1);
+    });
+
+    test('should handle mixed category formats in allowedCategories', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['XL', 'SAFEGO_COMFORT_XL', 'COMFORT'], // Mixed formats
+        },
+      ];
+
+      const filteredXL = optimizer.filterByVehicleEligibility(drivers, 'XL');
+      const filteredComfort = optimizer.filterByVehicleEligibility(drivers, 'COMFORT');
+      const filteredComfortXL = optimizer.filterByVehicleEligibility(drivers, 'COMFORT_XL');
+
+      expect(filteredXL.length).toBe(1);
+      expect(filteredComfort.length).toBe(1);
+      expect(filteredComfortXL.length).toBe(1);
+    });
+
+    test('should still respect vehicle eligibility rules with preferences', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'X', // X can only serve X
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_X', 'SAFEGO_COMFORT'], // Even if COMFORT in preferences, X cannot serve COMFORT
+        },
+      ];
+
+      const filteredComfort = optimizer.filterByVehicleEligibility(drivers, 'COMFORT');
+      const filteredX = optimizer.filterByVehicleEligibility(drivers, 'X');
+
+      expect(filteredComfort.length).toBe(0); // X cannot serve COMFORT
+      expect(filteredX.length).toBe(1); // X can serve X
+    });
+
+    test('should correctly use isDriverEligible with preferences', () => {
+      const driverWithPreferences: DriverScoreInput = {
+        ...mockDriverInput,
+        vehicleCategory: 'BLACK',
+        vehicleCategoryApproved: true,
+        allowedCategories: ['SAFEGO_BLACK'], // Only BLACK enabled, not COMFORT or X
+      };
+
+      const eligibleBlack = optimizer.isDriverEligible(driverWithPreferences, 'BLACK');
+      const eligibleComfort = optimizer.isDriverEligible(driverWithPreferences, 'COMFORT');
+
+      expect(eligibleBlack.eligible).toBe(true);
+      expect(eligibleComfort.eligible).toBe(false);
+      expect(eligibleComfort.reason).toContain('disabled this category');
+    });
+
+    test('should select driver respecting preferences in full dispatch flow', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          etaMinutes: 2, // Best ETA
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_XL'], // Disabled X
+        },
+        {
+          ...mockDriverInput,
+          driverId: 'driver_2',
+          etaMinutes: 5, // Worse ETA
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_XL', 'SAFEGO_COMFORT_XL', 'SAFEGO_COMFORT', 'SAFEGO_X'],
+        },
+      ];
+
+      const decision = optimizer.selectBestDriver('req_1', 'test_zone', drivers, false, undefined, 'X');
+      expect(decision).not.toBeNull();
+      // Driver 1 has best ETA but disabled X, so driver 2 should be selected
+      expect(decision?.selectedDriverId).toBe('driver_2');
+    });
+
+    test('should return null when no drivers have requested category enabled', () => {
+      const drivers: DriverScoreInput[] = [
+        {
+          ...mockDriverInput,
+          driverId: 'driver_1',
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_XL'], // X disabled
+        },
+        {
+          ...mockDriverInput,
+          driverId: 'driver_2',
+          vehicleCategory: 'XL',
+          vehicleCategoryApproved: true,
+          allowedCategories: ['SAFEGO_XL', 'SAFEGO_COMFORT_XL'], // X disabled
+        },
+      ];
+
+      const decision = optimizer.selectBestDriver('req_1', 'test_zone', drivers, false, undefined, 'X');
+      expect(decision).toBeNull();
+    });
+  });
 });
 
 // ========================================
