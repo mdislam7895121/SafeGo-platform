@@ -896,7 +896,7 @@ export default function RideOptionsPage() {
                     Calculating fare...
                   </>
                 ) : selectedFare ? (
-                  <>Confirm {config.name} - {formatCurrency(finalFare, currency)}</>
+                  <>Confirm {categoryConfig.displayName} - {formatCurrency(finalFare, currency)}</>
                 ) : (
                   <>Select a route to see fare</>
                 )}
@@ -929,7 +929,7 @@ export default function RideOptionsPage() {
               Calculating...
             </>
           ) : selectedFare ? (
-            <>Confirm {config.name} - {formatCurrency(finalFare, currency)}</>
+            <>Confirm {categoryConfig.displayName} - {formatCurrency(finalFare, currency)}</>
           ) : (
             <>Select a route to see fare</>
           )}
@@ -940,7 +940,7 @@ export default function RideOptionsPage() {
         isOpen={showFareBreakdown}
         onClose={() => setShowFareBreakdown(false)}
         fareBreakdown={fareBreakdownFare}
-        rideTypeName={fareBreakdownRideType ? RIDE_TYPE_CONFIG[fareBreakdownRideType].name : ""}
+        rideTypeName={fareBreakdownCategory ? VEHICLE_CATEGORIES[fareBreakdownCategory].displayName : ""}
         currency={currency}
       />
     </div>

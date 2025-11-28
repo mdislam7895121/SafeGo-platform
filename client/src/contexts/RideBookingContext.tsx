@@ -18,7 +18,7 @@ export interface RideOption {
   currency: string;
   etaMinutes: number;
   capacity: number;
-  iconType: "economy" | "comfort" | "xl" | "premium";
+  iconType: "economy" | "comfort" | "xl" | "premium" | "suv" | "accessible";
   isPopular?: boolean;
   isEco?: boolean;
   surgeMultiplier?: number;
