@@ -29,7 +29,6 @@ import {
   AlertTriangle,
   Loader2,
   Navigation,
-  Info,
   DollarSign,
   MapPin,
   Timer,
@@ -37,17 +36,19 @@ import {
   FileText,
   Building2,
   TrendingUp,
+  ChevronDown,
 } from "lucide-react";
 import { useRideBooking, type RideOption, type PaymentMethod, type RouteAlternative } from "@/contexts/RideBookingContext";
 import { SafeGoMap } from "@/components/maps/SafeGoMap";
 import { clientGetRouteAlternatives } from "@/hooks/useGoogleMaps";
 import { decodePolyline } from "@/lib/locationService";
 import { useFareCalculation } from "@/hooks/useFareCalculation";
-import { usePromoCalculation, formatCurrencyWithStrikethrough } from "@/hooks/usePromoCalculation";
 import type { RideTypeCode, RouteFareBreakdown, RouteInfoRequest } from "@/lib/fareTypes";
-import type { PromoResult } from "@/lib/promoTypes";
 
-// Define ride types with their visual properties (fares calculated dynamically)
+import { PromoFareCard, type PromoType } from "@/components/ride/PromoFareCard";
+import { FareBreakdown, type FareBreakdownData } from "@/components/ride/FareBreakdown";
+import { RouteOptionsBar, type RouteOption as RouteOptionType } from "@/components/ride/RouteOptionCard";
+
 const RIDE_TYPE_CONFIG: Record<RideTypeCode, {
   name: string;
   description: string;
@@ -98,10 +99,12 @@ const RIDE_TYPE_CONFIG: Record<RideTypeCode, {
 const RIDE_TYPE_ORDER: RideTypeCode[] = ["SAVER", "STANDARD", "COMFORT", "XL", "PREMIUM"];
 
 function formatCurrency(amount: number, currency: string = "USD"): string {
-  if (currency === "USD") {
-    return `$${amount.toFixed(2)}`;
-  }
-  return `${amount.toFixed(2)} ${currency}`;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 function FareBreakdownDialog({
@@ -259,7 +262,7 @@ function FareBreakdownDialog({
 
 const mockPaymentMethods: PaymentMethod[] = [
   { id: "cash", type: "cash", label: "Cash", isDefault: true },
-  { id: "wallet", type: "wallet", label: "SafeGo Wallet (৳500)", isDefault: false },
+  { id: "wallet", type: "wallet", label: "SafeGo Wallet ($50.00)", isDefault: false },
   { id: "card-1234", type: "card", label: "Visa", lastFour: "1234", isDefault: false },
 ];
 
@@ -287,19 +290,12 @@ function getPaymentIcon(type: PaymentMethod["type"]) {
   }
 }
 
-function getRouteIcon(route: RouteAlternative) {
-  if (route.isFastest) return Zap;
-  if (route.avoidsHighways) return Navigation;
-  if (route.avoidsTolls) return Route;
-  return Route;
-}
-
-function getRouteBadgeText(route: RouteAlternative): string | null {
+function getRouteLabel(route: RouteAlternative): string {
   if (route.isFastest) return "Fastest";
   if (route.isShortest) return "Shortest";
   if (route.avoidsHighways) return "Local Roads";
   if (route.avoidsTolls) return "No Tolls";
-  return null;
+  return route.name || "Route";
 }
 
 export default function RideOptionsPage() {
@@ -324,12 +320,10 @@ export default function RideOptionsPage() {
   );
   const [promoInput, setPromoInput] = useState(state.promoCode || "");
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
-  const [showRouteSelector, setShowRouteSelector] = useState(false);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [showFareBreakdown, setShowFareBreakdown] = useState(false);
   const [fareBreakdownRideType, setFareBreakdownRideType] = useState<RideTypeCode | null>(null);
 
-  // Convert route alternatives to fare calculation format
   const fareRoutes: RouteInfoRequest[] = useMemo(() => {
     return state.routeAlternatives.map((route) => ({
       routeId: route.id,
@@ -345,9 +339,7 @@ export default function RideOptionsPage() {
     }));
   }, [state.routeAlternatives]);
 
-  // Use fare calculation hook
   const { 
-    fareMatrix, 
     isLoading: isLoadingFares, 
     getFare, 
     currency 
@@ -372,7 +364,6 @@ export default function RideOptionsPage() {
     setPaymentMethod(defaultPayment);
   }, [setStep, setPaymentMethod, selectedPaymentId, canProceedToOptions, setLocation]);
 
-  // Update selected option when ride type changes
   useEffect(() => {
     const config = RIDE_TYPE_CONFIG[selectedRideType];
     const selectedRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
@@ -395,18 +386,14 @@ export default function RideOptionsPage() {
     setSelectedOption(option);
   }, [selectedRideType, state.selectedRouteId, fareRoutes, getFare, currency, setSelectedOption]);
 
-  // Create a location key to track when locations change
-  // Use higher precision (7 decimals ~= 1cm) to catch meaningful location changes
   const locationKey = useMemo(() => {
     if (!state.pickup || !state.dropoff) return null;
     return `${state.pickup.lat.toFixed(7)},${state.pickup.lng.toFixed(7)}-${state.dropoff.lat.toFixed(7)},${state.dropoff.lng.toFixed(7)}`;
   }, [state.pickup, state.dropoff]);
 
-  // Track the last fetched location key to avoid unnecessary refetches
   const [lastFetchedLocationKey, setLastFetchedLocationKey] = useState<string | null>(null);
 
   useEffect(() => {
-    // Only fetch routes if we have locations and they've changed since last fetch
     if (state.pickup && state.dropoff && locationKey && locationKey !== lastFetchedLocationKey) {
       setIsLoadingRoutes(true);
       setLastFetchedLocationKey(locationKey);
@@ -439,9 +426,8 @@ export default function RideOptionsPage() {
     setShowPaymentSelector(false);
   };
 
-  const handleSelectRoute = (route: RouteAlternative) => {
-    setSelectedRoute(route.id);
-    setShowRouteSelector(false);
+  const handleSelectRouteOption = (routeOption: RouteOptionType) => {
+    setSelectedRoute(routeOption.id);
   };
 
   const handleApplyPromo = () => {
@@ -465,16 +451,10 @@ export default function RideOptionsPage() {
     setLocation("/rider/ride/dropoff");
   };
 
-  const handleShowFareBreakdown = (rideType: RideTypeCode) => {
-    setFareBreakdownRideType(rideType);
-    setShowFareBreakdown(true);
-  };
-
   const selectedPayment = mockPaymentMethods.find(p => p.id === selectedPaymentId);
   const selectedRoute = getSelectedRoute();
   const PaymentIcon = selectedPayment ? getPaymentIcon(selectedPayment.type) : Banknote;
   
-  // Get fare for fare breakdown dialog
   const fareBreakdownFare = fareBreakdownRideType && state.selectedRouteId
     ? getFare(fareBreakdownRideType, state.selectedRouteId)
     : null;
@@ -490,31 +470,64 @@ export default function RideOptionsPage() {
     return [];
   }, [selectedRoute?.polyline]);
 
+  const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
+  const selectedFare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
+  const anchorFare = selectedFare ? selectedFare.totalFare * 1.10 : 0;
+  const savedAmount = selectedFare ? anchorFare - selectedFare.totalFare : 0;
+  const config = RIDE_TYPE_CONFIG[selectedRideType];
+
+  const promoType: PromoType = savedAmount > 0 ? "PROMO_APPLIED" : "NONE";
+
+  const fareBreakdownData: FareBreakdownData | null = selectedFare ? {
+    tripFare: selectedFare.baseFare + selectedFare.distanceFare + selectedFare.timeFare,
+    trafficAdjustment: selectedFare.trafficAdjustment,
+    tolls: selectedFare.tollsTotal,
+    cityFees: selectedFare.regulatoryFeesTotal,
+    serviceFee: selectedFare.serviceFee,
+    promoDiscount: savedAmount,
+    totalFare: selectedFare.totalFare,
+  } : null;
+
+  const routeOptions: RouteOptionType[] = useMemo(() => {
+    return state.routeAlternatives.map((route) => {
+      const routeFare = getFare(selectedRideType, route.id);
+      return {
+        id: route.id,
+        label: getRouteLabel(route),
+        etaMinutes: route.durationMinutes,
+        distanceMiles: route.distanceMiles,
+        finalFare: routeFare?.totalFare || 0,
+        promoType: (routeFare ? "PROMO_APPLIED" : "NONE") as PromoType,
+        isSelected: route.id === state.selectedRouteId,
+      };
+    });
+  }, [state.routeAlternatives, state.selectedRouteId, selectedRideType, getFare]);
+
   return (
     <div className="flex flex-col h-full" data-testid="ride-options-page">
-      {/* Header - shared across all breakpoints */}
-      <div className="p-4 border-b bg-background">
+      {/* Header */}
+      <div className="p-3 sm:p-4 border-b bg-background sticky top-0 z-10">
         <div className="flex items-center gap-3 max-w-7xl mx-auto">
           <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-options">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="flex-1">
-            <h1 className="text-lg font-semibold" data-testid="text-options-title">Choose a Ride</h1>
-            <p className="text-sm text-muted-foreground">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold" data-testid="text-options-title">Choose a Ride</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
               {state.pickup?.address?.split(",")[0]} → {state.dropoff?.address?.split(",")[0]}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Main Content - Responsive Grid */}
+      {/* Main Content */}
       <div className="flex-1 overflow-y-auto lg:overflow-hidden">
-        <div className="max-w-7xl mx-auto lg:grid lg:grid-cols-2 lg:gap-6 lg:h-full lg:p-6">
+        <div className="max-w-7xl mx-auto lg:grid lg:grid-cols-[1fr,400px] xl:grid-cols-[1fr,450px] lg:gap-6 lg:h-full lg:p-6">
           
-          {/* Left Column: Map & Route Selector */}
+          {/* Left Column: Map & Route Options */}
           <div className="lg:flex lg:flex-col lg:h-full">
-            {/* Map - taller on desktop */}
-            <div className="h-40 sm:h-48 lg:flex-1 lg:min-h-[300px] relative lg:rounded-xl lg:overflow-hidden lg:border">
+            {/* Map */}
+            <div className="h-36 sm:h-44 lg:flex-1 lg:min-h-[280px] relative lg:rounded-xl lg:overflow-hidden lg:border">
               <SafeGoMap
                 pickupLocation={state.pickup ? {
                   lat: state.pickup.lat,
@@ -533,10 +546,10 @@ export default function RideOptionsPage() {
               />
               {selectedRoute && (
                 <div 
-                  className="absolute top-2 right-2 z-[1000] bg-background/95 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-lg border"
+                  className="absolute top-2 right-2 z-[1000] bg-background/95 backdrop-blur-sm rounded-lg px-2.5 py-1 sm:px-3 sm:py-1.5 shadow-lg border"
                   data-testid="route-info-badge"
                 >
-                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-sm">
                     <Clock className="h-3 w-3 text-muted-foreground" />
                     <span className="font-medium">{selectedRoute.durationMinutes} min</span>
                     <span className="text-muted-foreground">•</span>
@@ -546,330 +559,221 @@ export default function RideOptionsPage() {
                 </div>
               )}
             </div>
-            
-            {/* Route Selector - shown below map on desktop */}
-            <div className="hidden lg:block lg:mt-4">
-              {state.routeAlternatives.length > 0 && (
+
+            {/* Route Options - Using shared RouteOptionsBar component */}
+            {routeOptions.length > 0 && (
+              <div className="px-3 sm:px-4 py-3 lg:px-0 lg:mt-4">
+                {isLoadingRoutes && (
+                  <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading routes...
+                  </div>
+                )}
+                <RouteOptionsBar
+                  routes={routeOptions}
+                  onSelectRoute={handleSelectRouteOption}
+                  currency={currency}
+                />
+              </div>
+            )}
+
+            {isLoadingRoutes && routeOptions.length === 0 && (
+              <div className="px-3 sm:px-4 py-3 lg:px-0 lg:mt-4">
                 <Card>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        <Route className="h-4 w-4" />
-                        Route Options
-                      </p>
-                      {isLoadingRoutes && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                      <div className="flex-1">
+                        <Skeleton className="h-4 w-32 mb-2" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </div>
+
+          {/* Right Column: Ride Types, Promo Card, Breakdown, Payment, CTA */}
+          <div className="lg:flex lg:flex-col lg:h-full lg:overflow-y-auto">
+            <div className="p-3 sm:p-4 lg:p-0 space-y-3 sm:space-y-4 lg:flex-1">
+              
+              {/* Ride Type Selector */}
+              <div>
+                <p className="text-xs sm:text-sm font-medium mb-2 flex items-center gap-1.5">
+                  <Car className="h-3.5 w-3.5" />
+                  Select Ride Type
+                </p>
+                
+                {/* Mobile: Horizontal Scroll Pills */}
+                <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide lg:hidden -mx-3 sm:-mx-4 px-3 sm:px-4">
+                  {RIDE_TYPE_ORDER.map((rideTypeCode) => {
+                    const rideConfig = RIDE_TYPE_CONFIG[rideTypeCode];
+                    const Icon = getRideIcon(rideConfig.iconType);
+                    const isSelected = rideTypeCode === selectedRideType;
+                    const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
                     
-                    <div className="space-y-2">
-                      {state.routeAlternatives.map((route) => {
-                        const RouteIcon = getRouteIcon(route);
-                        const badgeText = getRouteBadgeText(route);
-                        const isSelected = route.id === state.selectedRouteId;
-                        
-                        return (
-                          <div
-                            key={route.id}
-                            className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                              isSelected 
-                                ? "ring-2 ring-primary border-primary bg-primary/5" 
-                                : "hover:bg-muted/50"
-                            }`}
-                            onClick={() => handleSelectRoute(route)}
-                            data-testid={`route-option-desktop-${route.id}`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                                isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
-                              }`}>
-                                <RouteIcon className="h-5 w-5" />
+                    return (
+                      <Button
+                        key={rideTypeCode}
+                        variant={isSelected ? "default" : "outline"}
+                        className={`flex-shrink-0 snap-start h-auto py-2 px-3 ${
+                          isSelected ? "" : "hover-elevate"
+                        }`}
+                        onClick={() => handleSelectRideType(rideTypeCode)}
+                        data-testid={`ride-pill-${rideTypeCode}`}
+                      >
+                        <div className="flex flex-col items-center gap-1">
+                          <Icon className="h-5 w-5" />
+                          <span className="text-[10px] sm:text-xs font-medium">{rideConfig.name.replace("SafeGo ", "")}</span>
+                          <span className="text-[10px] font-bold">
+                            {fare ? formatCurrency(fare.totalFare, currency) : "--"}
+                          </span>
+                        </div>
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                {/* Desktop: Vertical List */}
+                <div className="hidden lg:block space-y-2">
+                  {RIDE_TYPE_ORDER.map((rideTypeCode) => {
+                    const rideConfig = RIDE_TYPE_CONFIG[rideTypeCode];
+                    const Icon = getRideIcon(rideConfig.iconType);
+                    const isSelected = rideTypeCode === selectedRideType;
+                    const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
+                    const rideAnchorFare = fare ? fare.totalFare * 1.10 : 0;
+                    
+                    return (
+                      <Card
+                        key={rideTypeCode}
+                        className={`cursor-pointer transition-all ${
+                          isSelected 
+                            ? "ring-2 ring-primary border-primary" 
+                            : "hover-elevate"
+                        }`}
+                        onClick={() => handleSelectRideType(rideTypeCode)}
+                        data-testid={`ride-option-${rideTypeCode}`}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className={`h-11 w-11 rounded-xl flex items-center justify-center ${
+                              isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                            }`}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-sm">{rideConfig.name}</h3>
+                                {rideConfig.isPopular && (
+                                  <Badge variant="secondary" className="text-[9px]">Popular</Badge>
+                                )}
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-sm">{route.name}</span>
-                                  {badgeText && (
-                                    <Badge variant="secondary" className="text-[10px]">
-                                      {badgeText}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground truncate">
-                                  {route.summary || route.description}
-                                </p>
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {rideConfig.etaMinutes} min
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-3 w-3" />
+                                  {rideConfig.capacity}
+                                </span>
                               </div>
-                              <div className="text-right">
-                                <p className="font-medium text-sm">{route.durationMinutes} min</p>
-                                <p className="text-xs text-muted-foreground">{route.distanceMiles} mi</p>
-                              </div>
-                              {isSelected && (
-                                <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                            </div>
+                            <div className="text-right">
+                              {fare ? (
+                                <>
+                                  <span className="text-[10px] text-muted-foreground line-through block">
+                                    {formatCurrency(rideAnchorFare, currency)}
+                                  </span>
+                                  <p className="font-bold text-green-600 dark:text-green-400">
+                                    {formatCurrency(fare.totalFare, currency)}
+                                  </p>
+                                </>
+                              ) : (
+                                <Skeleton className="h-5 w-14" />
                               )}
                             </div>
+                            {isSelected && (
+                              <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                            )}
                           </div>
-                        );
-                      })}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Promo Fare Card - Using shared component */}
+              {selectedFare && (
+                <PromoFareCard
+                  rideType={config.name}
+                  etaMinutes={config.etaMinutes}
+                  finalFare={selectedFare.totalFare}
+                  anchorFare={anchorFare}
+                  savedAmount={savedAmount}
+                  promoType={promoType}
+                  currency={currency}
+                />
+              )}
+
+              {isLoadingFares && !selectedFare && (
+                <Card>
+                  <CardContent className="p-4 sm:p-5">
+                    <div className="flex justify-between items-start">
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                      <div className="text-right space-y-2">
+                        <Skeleton className="h-4 w-16 ml-auto" />
+                        <Skeleton className="h-8 w-20 ml-auto" />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
               )}
-            </div>
-          </div>
 
-          {/* Right Column: Ride Options, Payment, Promo, CTA */}
-          <div className="lg:flex lg:flex-col lg:h-full lg:overflow-y-auto">
-            <div className="p-4 lg:p-0 space-y-4 lg:flex-1">
-              {/* Mobile Route Selector - hidden on desktop */}
-              <div className="lg:hidden">
-                {state.routeAlternatives.length > 0 && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-sm font-medium flex items-center gap-2">
-                          <Route className="h-4 w-4" />
-                          Route Options
-                        </p>
-                        {isLoadingRoutes && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                      </div>
-                      
-                      {showRouteSelector ? (
-                        <div className="space-y-2">
-                          {state.routeAlternatives.map((route) => {
-                            const RouteIcon = getRouteIcon(route);
-                            const badgeText = getRouteBadgeText(route);
-                            const isSelected = route.id === state.selectedRouteId;
-                            
-                            return (
-                              <div
-                                key={route.id}
-                                className={`p-3 rounded-lg border cursor-pointer transition-all ${
-                                  isSelected 
-                                    ? "ring-2 ring-primary border-primary bg-primary/5" 
-                                    : "hover:bg-muted/50"
-                                }`}
-                                onClick={() => handleSelectRoute(route)}
-                                data-testid={`route-option-${route.id}`}
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                                    isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
-                                  }`}>
-                                    <RouteIcon className="h-5 w-5" />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-sm">{route.name}</span>
-                                      {badgeText && (
-                                        <Badge variant="secondary" className="text-[10px]">
-                                          {badgeText}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      {route.summary || route.description}
-                                    </p>
-                                  </div>
-                                  <div className="text-right">
-                                    <p className="font-medium text-sm">{route.durationMinutes} min</p>
-                                    <p className="text-xs text-muted-foreground">{route.distanceMiles} mi</p>
-                                  </div>
-                                  {isSelected && (
-                                    <Check className="h-5 w-5 text-primary flex-shrink-0" />
-                                  )}
-                                </div>
-                                {route.trafficDurationText && route.trafficDurationSeconds && 
-                                 route.trafficDurationSeconds > route.rawDurationSeconds && (
-                                  <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    <span>Traffic delay: {route.trafficDurationText}</span>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="w-full mt-2"
-                            onClick={() => setShowRouteSelector(false)}
-                            data-testid="button-collapse-routes"
-                          >
-                            Collapse
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-between"
-                          onClick={() => setShowRouteSelector(true)}
-                          data-testid="button-expand-routes"
-                        >
-                          <span className="flex items-center gap-2">
-                            {selectedRoute ? (
-                              <>
-                                {(() => {
-                                  const RouteIcon = getRouteIcon(selectedRoute);
-                                  return <RouteIcon className="h-4 w-4" />;
-                                })()}
-                                <span>{selectedRoute.name}</span>
-                                <span className="text-muted-foreground hidden sm:inline">
-                                  • {selectedRoute.durationMinutes} min • {selectedRoute.distanceMiles} mi
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <Route className="h-4 w-4" />
-                                <span>Select route</span>
-                              </>
-                            )}
-                          </span>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {state.routeAlternatives.length} options
-                          </Badge>
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
+              {/* Fare Breakdown - Using shared component */}
+              {fareBreakdownData && (
+                <>
+                  {/* Mobile: Accordion */}
+                  <div className="lg:hidden">
+                    <FareBreakdown 
+                      breakdown={fareBreakdownData} 
+                      currency={currency} 
+                      alwaysExpanded={false} 
+                    />
+                  </div>
+                  {/* Desktop: Always visible */}
+                  <div className="hidden lg:block">
+                    <FareBreakdown 
+                      breakdown={fareBreakdownData} 
+                      currency={currency} 
+                      alwaysExpanded={true} 
+                    />
+                  </div>
+                </>
+              )}
 
-                {isLoadingRoutes && state.routeAlternatives.length === 0 && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <Skeleton className="h-10 w-10 rounded-lg" />
-                        <div className="flex-1">
-                          <Skeleton className="h-4 w-32 mb-2" />
-                          <Skeleton className="h-3 w-48" />
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-
-              {/* Ride Type Options */}
-              <div className="space-y-2">
-                {RIDE_TYPE_ORDER.map((rideTypeCode) => {
-                  const config = RIDE_TYPE_CONFIG[rideTypeCode];
-                  const Icon = getRideIcon(config.iconType);
-                  const isSelected = rideTypeCode === selectedRideType;
-                  const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
-                  const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
-                  const isLoadingThisFare = isLoadingFares && !fare;
-                  
-                  return (
-                    <Card
-                      key={rideTypeCode}
-                      className={`cursor-pointer transition-all ${
-                        isSelected 
-                          ? "ring-2 ring-primary border-primary" 
-                          : "hover-elevate"
-                      }`}
-                      onClick={() => handleSelectRideType(rideTypeCode)}
-                      data-testid={`ride-option-${rideTypeCode}`}
-                    >
-                      <CardContent className="p-3 sm:p-4">
-                        <div className="flex items-center gap-3 sm:gap-4">
-                          <div className={`h-12 w-12 sm:h-14 sm:w-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                            isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
-                          }`}>
-                            <Icon className="h-6 w-6 sm:h-7 sm:w-7" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-semibold text-sm sm:text-base">{config.name}</h3>
-                              {config.isPopular && (
-                                <Badge variant="secondary" className="text-[10px]">Popular</Badge>
-                              )}
-                              {config.isEco && (
-                                <Badge variant="secondary" className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                                  Eco
-                                </Badge>
-                              )}
-                              {fare && (fare.tollsTotal > 0 || fare.regulatoryFeesTotal > 0) && (
-                                <Badge variant="outline" className="text-[10px]">
-                                  + fees
-                                </Badge>
-                              )}
-                            </div>
-                            <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">{config.description}</p>
-                            <div className="flex items-center gap-2 sm:gap-3 mt-1 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                {config.etaMinutes} min
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Users className="h-3 w-3" />
-                                {config.capacity}
-                              </span>
-                              {fare && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="h-5 px-1.5 text-xs hidden sm:flex"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleShowFareBreakdown(rideTypeCode);
-                                  }}
-                                  data-testid={`button-fare-breakdown-${rideTypeCode}`}
-                                >
-                                  <Info className="h-3 w-3 mr-1" />
-                                  Details
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right min-w-[80px] sm:min-w-[100px]">
-                            {isLoadingThisFare ? (
-                              <Skeleton className="h-6 w-14 sm:w-16 ml-auto" />
-                            ) : fare ? (
-                              <>
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[10px] sm:text-xs text-muted-foreground line-through" data-testid={`anchor-fare-${rideTypeCode}`}>
-                                    {formatCurrency(fare.totalFare * 1.10, currency)}
-                                  </span>
-                                  <p className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400" data-testid={`fare-${rideTypeCode}`}>
-                                    {formatCurrency(fare.totalFare, currency)}
-                                  </p>
-                                </div>
-                                <Badge variant="secondary" className="text-[8px] sm:text-[9px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 mt-0.5">
-                                  <Tag className="h-2 w-2 sm:h-2.5 sm:w-2.5 mr-0.5" />
-                                  Promo
-                                </Badge>
-                                {fare.surgeMultiplier > 1 && (
-                                  <Badge variant="destructive" className="text-[8px] sm:text-[9px] ml-1">
-                                    {fare.surgeMultiplier}x
-                                  </Badge>
-                                )}
-                              </>
-                            ) : (
-                              <p className="text-sm text-muted-foreground">--</p>
-                            )}
-                            {isSelected && (
-                              <Check className="h-4 w-4 sm:h-5 sm:w-5 text-primary ml-auto mt-1" />
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-
-              {/* Payment & Promo Card */}
+              {/* Payment & Promo Code */}
               <Card>
-                <CardContent className="p-4 space-y-4">
+                <CardContent className="p-3 sm:p-4 space-y-3 sm:space-y-4">
                   <div>
-                    <p className="text-sm font-medium mb-2">Payment Method</p>
+                    <p className="text-xs sm:text-sm font-medium mb-2">Payment Method</p>
                     <Button
                       variant="outline"
-                      className="w-full justify-between"
+                      className="w-full justify-between h-10 sm:h-11"
                       onClick={() => setShowPaymentSelector(!showPaymentSelector)}
                       data-testid="button-select-payment"
                     >
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-2 text-sm">
                         <PaymentIcon className="h-4 w-4" />
                         {selectedPayment?.label}
                         {selectedPayment?.lastFour && ` ••••${selectedPayment.lastFour}`}
                       </span>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${showPaymentSelector ? "rotate-180" : ""}`} />
                     </Button>
                     
                     {showPaymentSelector && (
@@ -880,7 +784,7 @@ export default function RideOptionsPage() {
                             <Button
                               key={payment.id}
                               variant={payment.id === selectedPaymentId ? "secondary" : "ghost"}
-                              className="w-full justify-start"
+                              className="w-full justify-start h-10"
                               onClick={() => handleSelectPayment(payment)}
                               data-testid={`payment-method-${payment.id}`}
                             >
@@ -898,114 +802,88 @@ export default function RideOptionsPage() {
                   </div>
 
                   <div>
-                    <p className="text-sm font-medium mb-2">Promo Code</p>
+                    <p className="text-xs sm:text-sm font-medium mb-2">Promo Code</p>
                     <div className="flex gap-2">
                       <Input
                         placeholder="Enter promo code"
                         value={promoInput}
                         onChange={(e) => setPromoInput(e.target.value)}
-                        className="flex-1"
+                        className="flex-1 h-10"
                         data-testid="input-promo-code"
                       />
                       <Button
                         variant="outline"
                         onClick={handleApplyPromo}
                         disabled={!promoInput.trim()}
+                        className="h-10"
                         data-testid="button-apply-promo"
                       >
-                        <Tag className="h-4 w-4 mr-1" />
-                        Apply
+                        <Tag className="h-4 w-4 sm:mr-1" />
+                        <span className="hidden sm:inline">Apply</span>
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Promo codes coming soon
-                    </p>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* CTA Section - Desktop: inside right column */}
+            {/* Desktop CTA */}
             <div className="hidden lg:block lg:mt-4 lg:pt-4 lg:border-t">
-              {(() => {
-                const config = RIDE_TYPE_CONFIG[selectedRideType];
-                const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
-                const fare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
-                const anchorFare = fare ? fare.totalFare * 1.10 : 0;
-                const savings = fare ? anchorFare - fare.totalFare : 0;
-                
-                return (
-                  <div className="space-y-3">
-                    {fare && savings > 0 && (
-                      <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 py-2 rounded-lg">
-                        <Tag className="h-4 w-4" />
-                        <span className="font-medium">You save {formatCurrency(savings, currency)} with this promo!</span>
-                      </div>
-                    )}
-                    <Button
-                      className="w-full"
-                      size="lg"
-                      onClick={handleConfirm}
-                      disabled={!fare || isLoadingFares}
-                      data-testid="button-confirm-ride-option-desktop"
-                    >
-                      {isLoadingFares ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Calculating fare...
-                        </>
-                      ) : fare ? (
-                        <>Confirm {config.name} - {formatCurrency(fare.totalFare, currency)}</>
-                      ) : (
-                        <>Select a route to see fare</>
-                      )}
-                    </Button>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile CTA - Fixed at bottom */}
-      <div className="lg:hidden p-4 border-t bg-background">
-        {(() => {
-          const config = RIDE_TYPE_CONFIG[selectedRideType];
-          const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
-          const fare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
-          const anchorFare = fare ? fare.totalFare * 1.10 : 0;
-          const savings = fare ? anchorFare - fare.totalFare : 0;
-          
-          return (
-            <div className="space-y-2">
-              {fare && savings > 0 && (
-                <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400">
+              {savedAmount > 0 && (
+                <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 py-2 rounded-lg mb-3">
                   <Tag className="h-4 w-4" />
-                  <span className="font-medium">You save {formatCurrency(savings, currency)} with this promo!</span>
+                  <span className="font-medium">You save {formatCurrency(savedAmount, currency)} with this promo!</span>
                 </div>
               )}
               <Button
                 className="w-full"
                 size="lg"
                 onClick={handleConfirm}
-                disabled={!fare || isLoadingFares}
-                data-testid="button-confirm-ride-option"
+                disabled={!selectedFare || isLoadingFares}
+                data-testid="button-confirm-ride-option-desktop"
               >
                 {isLoadingFares ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Calculating fare...
                   </>
-                ) : fare ? (
-                  <>Confirm {config.name} - {formatCurrency(fare.totalFare, currency)}</>
+                ) : selectedFare ? (
+                  <>Confirm {config.name} - {formatCurrency(selectedFare.totalFare, currency)}</>
                 ) : (
                   <>Select a route to see fare</>
                 )}
               </Button>
             </div>
-          );
-        })()}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile CTA - Fixed at bottom */}
+      <div className="lg:hidden p-3 sm:p-4 border-t bg-background">
+        {savedAmount > 0 && (
+          <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-green-600 dark:text-green-400 mb-2">
+            <Tag className="h-3.5 w-3.5" />
+            <span className="font-medium">You save {formatCurrency(savedAmount, currency)} with this promo!</span>
+          </div>
+        )}
+        <Button
+          className="w-full"
+          size="lg"
+          onClick={handleConfirm}
+          disabled={!selectedFare || isLoadingFares}
+          data-testid="button-confirm-ride-option"
+        >
+          {isLoadingFares ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Calculating...
+            </>
+          ) : selectedFare ? (
+            <>Confirm {config.name} - {formatCurrency(selectedFare.totalFare, currency)}</>
+          ) : (
+            <>Select a route to see fare</>
+          )}
+        </Button>
       </div>
 
       <FareBreakdownDialog
