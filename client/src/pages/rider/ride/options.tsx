@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -48,6 +47,7 @@ import type { RideTypeCode, RouteFareBreakdown, RouteInfoRequest } from "@/lib/f
 import { PromoFareCard, type PromoType } from "@/components/ride/PromoFareCard";
 import { FareBreakdown, type FareBreakdownData } from "@/components/ride/FareBreakdown";
 import { RouteOptionsBar, type RouteOption as RouteOptionType } from "@/components/ride/RouteOptionCard";
+import { PromoCodeInput } from "@/components/ride/PromoCodeInput";
 
 const RIDE_TYPE_CONFIG: Record<RideTypeCode, {
   name: string;
@@ -304,7 +304,6 @@ export default function RideOptionsPage() {
     state, 
     setSelectedOption, 
     setPaymentMethod, 
-    setPromoCode,
     setStep,
     setRouteAlternatives,
     setSelectedRoute,
@@ -318,7 +317,6 @@ export default function RideOptionsPage() {
   const [selectedPaymentId, setSelectedPaymentId] = useState(
     state.paymentMethod?.id || mockPaymentMethods.find(p => p.isDefault)?.id || mockPaymentMethods[0].id
   );
-  const [promoInput, setPromoInput] = useState(state.promoCode || "");
   const [showPaymentSelector, setShowPaymentSelector] = useState(false);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [showFareBreakdown, setShowFareBreakdown] = useState(false);
@@ -430,12 +428,6 @@ export default function RideOptionsPage() {
     setSelectedRoute(routeOption.id);
   };
 
-  const handleApplyPromo = () => {
-    if (promoInput.trim()) {
-      setPromoCode(promoInput.trim(), false);
-    }
-  };
-
   const handleConfirm = () => {
     const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
     const fare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
@@ -472,11 +464,15 @@ export default function RideOptionsPage() {
 
   const currentRouteId = state.selectedRouteId || (fareRoutes.length > 0 ? fareRoutes[0].routeId : null);
   const selectedFare = currentRouteId ? getFare(selectedRideType, currentRouteId) : null;
-  const anchorFare = selectedFare ? selectedFare.totalFare * 1.10 : 0;
-  const savedAmount = selectedFare ? anchorFare - selectedFare.totalFare : 0;
+  
+  const promoValidation = state.promoValidation;
+  const promoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
+  const anchorFare = selectedFare ? selectedFare.totalFare + promoDiscount : 0;
+  const savedAmount = promoDiscount;
+  const finalFare = selectedFare ? selectedFare.totalFare - promoDiscount : 0;
   const config = RIDE_TYPE_CONFIG[selectedRideType];
 
-  const promoType: PromoType = savedAmount > 0 ? "PROMO_APPLIED" : "NONE";
+  const promoType: PromoType = promoDiscount > 0 ? "PROMO_APPLIED" : "NONE";
 
   const fareBreakdownData: FareBreakdownData | null = selectedFare ? {
     tripFare: selectedFare.baseFare + selectedFare.distanceFare + selectedFare.timeFare,
@@ -484,8 +480,8 @@ export default function RideOptionsPage() {
     tolls: selectedFare.tollsTotal,
     cityFees: selectedFare.regulatoryFeesTotal,
     serviceFee: selectedFare.serviceFee,
-    promoDiscount: savedAmount,
-    totalFare: selectedFare.totalFare,
+    promoDiscount: promoDiscount,
+    totalFare: finalFare,
   } : null;
 
   const routeOptions: RouteOptionType[] = useMemo(() => {
@@ -612,6 +608,8 @@ export default function RideOptionsPage() {
                     const Icon = getRideIcon(rideConfig.iconType);
                     const isSelected = rideTypeCode === selectedRideType;
                     const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
+                    const pillPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
+                    const pillFinalFare = fare ? fare.totalFare - pillPromoDiscount : 0;
                     
                     return (
                       <Button
@@ -624,10 +622,15 @@ export default function RideOptionsPage() {
                         data-testid={`ride-pill-${rideTypeCode}`}
                       >
                         <div className="flex flex-col items-center gap-1">
-                          <Icon className="h-5 w-5" />
+                          <div className="relative">
+                            <Icon className="h-5 w-5" />
+                            {isSelected && promoValidation?.valid && (
+                              <div className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full" />
+                            )}
+                          </div>
                           <span className="text-[10px] sm:text-xs font-medium">{rideConfig.name.replace("SafeGo ", "")}</span>
-                          <span className="text-[10px] font-bold">
-                            {fare ? formatCurrency(fare.totalFare, currency) : "--"}
+                          <span className={`text-[10px] font-bold ${pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                            {fare ? formatCurrency(pillFinalFare, currency) : "--"}
                           </span>
                         </div>
                       </Button>
@@ -642,7 +645,9 @@ export default function RideOptionsPage() {
                     const Icon = getRideIcon(rideConfig.iconType);
                     const isSelected = rideTypeCode === selectedRideType;
                     const fare = currentRouteId ? getFare(rideTypeCode, currentRouteId) : null;
-                    const rideAnchorFare = fare ? fare.totalFare * 1.10 : 0;
+                    const ridePromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
+                    const rideFinalFare = fare ? fare.totalFare - ridePromoDiscount : 0;
+                    const rideAnchorFare = fare && ridePromoDiscount > 0 ? fare.totalFare : 0;
                     
                     return (
                       <Card
@@ -668,6 +673,16 @@ export default function RideOptionsPage() {
                                 {rideConfig.isPopular && (
                                   <Badge variant="secondary" className="text-[9px]">Popular</Badge>
                                 )}
+                                {isSelected && promoValidation?.valid && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="text-[9px] bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800"
+                                    data-testid={`promo-badge-${rideTypeCode}`}
+                                  >
+                                    <Tag className="h-2.5 w-2.5 mr-1" />
+                                    {promoValidation.code}
+                                  </Badge>
+                                )}
                               </div>
                               <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
@@ -683,11 +698,13 @@ export default function RideOptionsPage() {
                             <div className="text-right">
                               {fare ? (
                                 <>
-                                  <span className="text-[10px] text-muted-foreground line-through block">
-                                    {formatCurrency(rideAnchorFare, currency)}
-                                  </span>
-                                  <p className="font-bold text-green-600 dark:text-green-400">
-                                    {formatCurrency(fare.totalFare, currency)}
+                                  {ridePromoDiscount > 0 && (
+                                    <span className="text-[10px] text-muted-foreground line-through block">
+                                      {formatCurrency(rideAnchorFare, currency)}
+                                    </span>
+                                  )}
+                                  <p className={`font-bold ${ridePromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                                    {formatCurrency(rideFinalFare, currency)}
                                   </p>
                                 </>
                               ) : (
@@ -710,8 +727,8 @@ export default function RideOptionsPage() {
                 <PromoFareCard
                   rideType={config.name}
                   etaMinutes={config.etaMinutes}
-                  finalFare={selectedFare.totalFare}
-                  anchorFare={anchorFare}
+                  finalFare={finalFare}
+                  anchorFare={promoDiscount > 0 ? anchorFare : undefined}
                   savedAmount={savedAmount}
                   promoType={promoType}
                   currency={currency}
@@ -803,25 +820,12 @@ export default function RideOptionsPage() {
 
                   <div>
                     <p className="text-xs sm:text-sm font-medium mb-2">Promo Code</p>
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Enter promo code"
-                        value={promoInput}
-                        onChange={(e) => setPromoInput(e.target.value)}
-                        className="flex-1 h-10"
-                        data-testid="input-promo-code"
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={handleApplyPromo}
-                        disabled={!promoInput.trim()}
-                        className="h-10"
-                        data-testid="button-apply-promo"
-                      >
-                        <Tag className="h-4 w-4 sm:mr-1" />
-                        <span className="hidden sm:inline">Apply</span>
-                      </Button>
-                    </div>
+                    <PromoCodeInput
+                      originalFare={selectedFare?.totalFare || 0}
+                      rideTypeCode={selectedRideType}
+                      countryCode="US"
+                      isWalletPayment={selectedPayment?.type === "wallet"}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -829,10 +833,12 @@ export default function RideOptionsPage() {
 
             {/* Desktop CTA */}
             <div className="hidden lg:block lg:mt-4 lg:pt-4 lg:border-t">
-              {savedAmount > 0 && (
+              {savedAmount > 0 && promoValidation?.valid && (
                 <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 py-2 rounded-lg mb-3">
                   <Tag className="h-4 w-4" />
-                  <span className="font-medium">You save {formatCurrency(savedAmount, currency)} with this promo!</span>
+                  <span className="font-medium">
+                    {promoValidation.code} applied - You save {formatCurrency(savedAmount, currency)}!
+                  </span>
                 </div>
               )}
               <Button
@@ -848,7 +854,7 @@ export default function RideOptionsPage() {
                     Calculating fare...
                   </>
                 ) : selectedFare ? (
-                  <>Confirm {config.name} - {formatCurrency(selectedFare.totalFare, currency)}</>
+                  <>Confirm {config.name} - {formatCurrency(finalFare, currency)}</>
                 ) : (
                   <>Select a route to see fare</>
                 )}
@@ -860,10 +866,12 @@ export default function RideOptionsPage() {
 
       {/* Mobile CTA - Fixed at bottom */}
       <div className="lg:hidden p-3 sm:p-4 border-t bg-background">
-        {savedAmount > 0 && (
+        {savedAmount > 0 && promoValidation?.valid && (
           <div className="flex items-center justify-center gap-2 text-xs sm:text-sm text-green-600 dark:text-green-400 mb-2">
             <Tag className="h-3.5 w-3.5" />
-            <span className="font-medium">You save {formatCurrency(savedAmount, currency)} with this promo!</span>
+            <span className="font-medium">
+              {promoValidation.code} applied - You save {formatCurrency(savedAmount, currency)}!
+            </span>
           </div>
         )}
         <Button
@@ -879,7 +887,7 @@ export default function RideOptionsPage() {
               Calculating...
             </>
           ) : selectedFare ? (
-            <>Confirm {config.name} - {formatCurrency(selectedFare.totalFare, currency)}</>
+            <>Confirm {config.name} - {formatCurrency(finalFare, currency)}</>
           ) : (
             <>Select a route to see fare</>
           )}
