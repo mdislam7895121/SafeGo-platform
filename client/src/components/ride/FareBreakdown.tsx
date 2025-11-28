@@ -26,6 +26,10 @@ import {
   ArrowRightLeft,
   FileText,
   Flag,
+  DollarSign,
+  Wallet,
+  User,
+  CircleAlert,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -61,6 +65,11 @@ export interface FareBreakdownData {
   originalFare?: number;
   driverMinimumPayoutApplied?: boolean;
   effectiveDiscountPct?: number;
+  customerServiceFee?: number;
+  platformCommission?: number;
+  driverEarnings?: number;
+  driverEarningsMinimumApplied?: boolean;
+  marginProtectionCapped?: boolean;
   // Consolidated flags object
   flags?: {
     trafficApplied?: boolean;
@@ -77,6 +86,8 @@ export interface FareBreakdownData {
     promoApplied?: boolean;
     stateMinimumFareApplied?: boolean;
     shortTripAdjustmentApplied?: boolean;
+    marginProtectionApplied?: boolean;
+    marginProtectionCapped?: boolean;
   };
   // Legacy individual flags (for backward compatibility)
   crossCityApplied?: boolean;
@@ -268,6 +279,14 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         amount={breakdown.serviceFee} 
         currency={currency} 
       />
+      {(breakdown.customerServiceFee ?? 0) > 0 && (
+        <BreakdownLine 
+          icon={DollarSign} 
+          label="Customer service fee" 
+          amount={breakdown.customerServiceFee ?? 0} 
+          currency={currency} 
+        />
+      )}
       {breakdown.promoDiscount > 0 && (
         <BreakdownLine 
           icon={Tag} 
@@ -284,6 +303,41 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         currency={currency} 
         isTotal={true}
       />
+      
+      {/* Driver and Platform Earnings Section */}
+      {(breakdown.driverEarnings !== undefined || breakdown.platformCommission !== undefined) && (
+        <div className="border-t border-border mt-3 pt-3">
+          <div className="text-xs text-muted-foreground mb-2 font-medium">Earnings Breakdown</div>
+          {breakdown.driverEarnings !== undefined && (
+            <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Driver earnings</span>
+                {breakdown.driverEarningsMinimumApplied && (
+                  <Badge variant="secondary" className="text-xs" data-testid="badge-driver-minimum">
+                    Min applied
+                  </Badge>
+                )}
+              </div>
+              <span className="text-sm font-medium text-green-600 dark:text-green-400" data-testid="text-driver-earnings">
+                {formatCurrency(breakdown.driverEarnings, currency)}
+              </span>
+            </div>
+          )}
+          {breakdown.platformCommission !== undefined && (
+            <div className="flex items-center justify-between py-1.5">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Platform commission (15%)</span>
+              </div>
+              <span className="text-sm" data-testid="text-platform-commission">
+                {formatCurrency(breakdown.platformCommission, currency)}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+      
       {breakdown.minimumFareApplied && (
         <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
           <Shield className="h-3 w-3" />
@@ -299,6 +353,12 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
           <AlertCircle className="h-3 w-3" />
           <span>Fare capped at maximum</span>
+        </div>
+      )}
+      {(breakdown.marginProtectionCapped || breakdown.flags?.marginProtectionCapped) && (
+        <div className="flex items-center gap-2 pt-2 text-xs text-amber-600 dark:text-amber-400" data-testid="text-margin-protection-capped">
+          <CircleAlert className="h-3 w-3" />
+          <span>Margin protection capped - minimum commission not achieved</span>
         </div>
       )}
     </div>

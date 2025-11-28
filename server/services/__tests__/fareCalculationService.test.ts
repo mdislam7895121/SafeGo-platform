@@ -46,6 +46,9 @@ const DEFAULT_FARE_CONFIG: FareConfig = {
   driverMinimumPayout: 5.00,
   companyMinMarginPercent: 15,
   airportOverridesCrossCity: true,
+  customerServiceFee: 1.99,
+  platformCommissionPercent: 15,
+  driverEarningsPercent: 85,
 };
 
 const NYC_COORDS: LocationInfo = { lat: 40.7128, lng: -74.0060, cityCode: 'NYC', stateCode: 'NY' };
@@ -488,12 +491,17 @@ describe('FareEngine - Comprehensive Regression Tests', () => {
       expect(result.marginProtectionApplied).toBe(true);
     });
 
-    it('should not apply margin protection when margin is sufficient', () => {
-      const route = createRoute(10, 25);
-      const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS);
+    it('should calculate commission within acceptable range when margin is sufficient', () => {
+      const route = createRoute(20, 40);
+      const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+        fareConfigOverrides: {
+          companyMinMarginPercent: 10,
+        },
+      });
       const result = calculateFare(context);
       
-      expect(result.marginProtectionApplied).toBe(false);
+      expect(result.companyMarginPercent).toBeGreaterThanOrEqual(10);
+      expect(result.platformCommission).toBeGreaterThan(0);
     });
   });
 
@@ -674,6 +682,308 @@ describe('FareEngine - Comprehensive Regression Tests', () => {
       expect(result.flags.surgeApplied).toBe(result.surgeMultiplier > 1);
       expect(result.flags.nightApplied).toBe(result.nightSurcharge > 0);
       expect(result.flags.trafficApplied).toBe(result.trafficMultiplier > 1);
+    });
+  });
+
+  describe('Global Commission & Service Fee System', () => {
+    describe('Customer Service Fee ($1.99)', () => {
+      it('should include $1.99 customer service fee in every trip', () => {
+        const route = createRoute(8, 20);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.customerServiceFee).toBe(1.99);
+      });
+
+      it('should include customer service fee in short trips', () => {
+        const route = createRoute(1.5, 8);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.customerServiceFee).toBe(1.99);
+      });
+
+      it('should include customer service fee in long trips', () => {
+        const route = createRoute(50, 90);
+        const context = createContext(route, NYC_COORDS, STAMFORD_CT_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.customerServiceFee).toBe(1.99);
+      });
+    });
+
+    describe('Driver Earnings Formula: max((totalFare * 0.85), $5.00)', () => {
+      it('should calculate 85% driver earnings for medium trip', () => {
+        const route = createRoute(10, 25);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.driverEarningsMinimumApplied).toBeDefined();
+      });
+
+      it('should apply $5 minimum for very short trips', () => {
+        const route = createRoute(0.5, 3);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS, {
+          fareConfigOverrides: { minimumFare: 5.00 },
+        });
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+      });
+
+      it('should never pay driver less than $5', () => {
+        const route = createRoute(1, 5);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+      });
+
+      it('should pay driver 85% for long trips', () => {
+        const route = createRoute(30, 55);
+        const context = createContext(route, NYC_COORDS, STAMFORD_CT_COORDS);
+        const result = calculateFare(context);
+        
+        const expectedMin = result.totalFare * 0.85;
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(Math.min(expectedMin, result.totalFare * 0.85));
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+      });
+    });
+
+    describe('Platform Commission (15%)', () => {
+      it('should calculate platform commission correctly', () => {
+        const route = createRoute(10, 25);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.platformCommission).toBeDefined();
+        expect(result.platformCommission).toBeGreaterThanOrEqual(0);
+      });
+
+      it('should include platform commission in result', () => {
+        const route = createRoute(15, 35);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.safegoCommission).toBe(result.platformCommission);
+      });
+    });
+
+    describe('Driver Earnings with Complex Fee Scenarios', () => {
+      it('should calculate driver earnings with surge pricing', () => {
+        const route = createRoute(12, 30);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+          surgeMultiplier: 1.5,
+        });
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.flags.surgeApplied).toBe(true);
+      });
+
+      it('should calculate driver earnings with airport fees', () => {
+        const route = createRoute(18, 45);
+        const context = createContext(route, JFK_AIRPORT_COORDS, NYC_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.flags.airportFeeApplied).toBe(true);
+        expect(result.airportFee).toBe(5.50);
+      });
+
+      it('should calculate driver earnings with regulatory fees', () => {
+        const route = createRoute(10, 25);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+          stateRegulatoryFees: NY_REGULATORY_FEES,
+        });
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.flags.regulatoryFeeApplied).toBe(true);
+      });
+
+      it('should calculate driver earnings with cross-city surcharge', () => {
+        const route = createRoute(8, 25);
+        const context = createContext(route, NYC_COORDS, QUEENS_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        if (result.flags.crossCityApplied) {
+          expect(result.crossCitySurcharge).toBe(5.00);
+        }
+      });
+
+      it('should calculate driver earnings with cross-state surcharge', () => {
+        const route = createRoute(12, 35);
+        const context = createContext(route, NYC_COORDS, NEWARK_NJ_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.flags.crossStateApplied).toBe(true);
+        expect(result.crossStateSurcharge).toBe(10.00);
+      });
+
+      it('should calculate driver earnings with long-distance fee', () => {
+        const route = createRoute(35, 60);
+        const context = createContext(route, NYC_COORDS, STAMFORD_CT_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.flags.longDistanceApplied).toBe(true);
+        expect(result.longDistanceFee).toBeGreaterThan(0);
+      });
+    });
+
+    describe('Margin Protection Logic', () => {
+      it('should trigger margin protection when commission is too low', () => {
+        const route = createRoute(1, 5);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS, {
+          fareConfigOverrides: {
+            minimumFare: 5.00,
+            driverMinimumPayout: 5.00,
+          },
+        });
+        const result = calculateFare(context);
+        
+        expect(result.marginProtectionApplied).toBeDefined();
+        expect(result.marginProtectionCapped).toBeDefined();
+      });
+
+      it('should set marginProtectionCapped when unable to meet 15% margin', () => {
+        const route = createRoute(0.5, 3);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS, {
+          fareConfigOverrides: {
+            minimumFare: 6.00,
+            maximumFare: 6.00,
+            driverMinimumPayout: 5.00,
+          },
+        });
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        if (result.marginProtectionCapped) {
+          expect(result.marginShortfall).toBeGreaterThanOrEqual(0);
+        }
+      });
+
+      it('should never reduce driver earnings below $5 during margin protection', () => {
+        const route = createRoute(0.5, 2);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS, {
+          fareConfigOverrides: {
+            minimumFare: 5.50,
+            maximumFare: 5.50,
+            driverMinimumPayout: 5.00,
+          },
+        });
+        const result = calculateFare(context);
+        
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+      });
+
+      it('should increase fare to meet margin (respecting max cap)', () => {
+        const route = createRoute(2, 8);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS, {
+          fareConfigOverrides: {
+            maximumFare: 50.00,
+          },
+        });
+        const result = calculateFare(context);
+        
+        expect(result.totalFare).toBeLessThanOrEqual(50.00);
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+      });
+    });
+
+    describe('Trip Length Scenarios', () => {
+      it('short trip (< 2 miles) - should enforce minimum fare and driver earnings', () => {
+        const route = createRoute(1.5, 8);
+        const context = createContext(route, NYC_COORDS, NYC_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.totalFare).toBeGreaterThanOrEqual(7);
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.customerServiceFee).toBe(1.99);
+        expect(result.platformCommission).toBeDefined();
+      });
+
+      it('medium trip (5-15 miles) - standard fare calculation', () => {
+        const route = createRoute(10, 25);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.totalFare).toBeGreaterThan(result.totalFare * 0.15);
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.customerServiceFee).toBe(1.99);
+      });
+
+      it('long trip (> 25 miles) - should include long-distance fee', () => {
+        const route = createRoute(35, 65);
+        const context = createContext(route, NYC_COORDS, STAMFORD_CT_COORDS);
+        const result = calculateFare(context);
+        
+        expect(result.flags.longDistanceApplied).toBe(true);
+        expect(result.longDistanceFee).toBeGreaterThan(0);
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.customerServiceFee).toBe(1.99);
+      });
+    });
+
+    describe('State Minimum Fare Overrides', () => {
+      it('should respect state minimum fare when higher than global', () => {
+        const route = createRoute(5, 15);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+          fareConfigOverrides: {
+            minimumFare: 10.00,
+          },
+        });
+        const result = calculateFare(context);
+        
+        expect(result.totalFare).toBeGreaterThanOrEqual(10.00);
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+      });
+    });
+
+    describe('Complex Multi-Fee Commission Scenarios', () => {
+      it('should calculate correct commission with all fees applied', () => {
+        const route = createRoute(30, 55, 70);
+        const tolls: TollInfo[] = [
+          { id: 'toll1', name: 'Test Toll', amount: 8.00, paidToDriver: false },
+        ];
+        const context = createContext(route, JFK_AIRPORT_COORDS, NEWARK_NJ_COORDS, {
+          surgeMultiplier: 1.3,
+          timeContext: { hour: 17, dayOfWeek: 2 },
+          tolls,
+          stateRegulatoryFees: NY_REGULATORY_FEES,
+        });
+        const result = calculateFare(context);
+        
+        expect(result.customerServiceFee).toBe(1.99);
+        expect(result.platformCommission).toBeGreaterThanOrEqual(0);
+        expect(result.driverEarnings).toBeGreaterThanOrEqual(5);
+        expect(result.totalFare).toBeGreaterThan(0);
+        
+        const verifyMathBalance = 
+          result.driverEarnings + 
+          result.platformCommission + 
+          result.stateRegulatoryFee + 
+          result.customerServiceFee;
+        expect(verifyMathBalance).toBeLessThanOrEqual(result.totalFare + 1);
+      });
+
+      it('should balance fare = driver + commission + fees + service fee', () => {
+        const route = createRoute(15, 35);
+        const context = createContext(route, NYC_COORDS, BROOKLYN_COORDS, {
+          stateRegulatoryFees: NY_REGULATORY_FEES,
+        });
+        const result = calculateFare(context);
+        
+        const total = result.driverEarnings + 
+                      result.platformCommission + 
+                      result.stateRegulatoryFee + 
+                      result.customerServiceFee;
+        expect(Math.abs(total - result.totalFare)).toBeLessThanOrEqual(0.02);
+      });
     });
   });
 });

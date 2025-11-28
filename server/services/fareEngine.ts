@@ -53,7 +53,17 @@ export interface FareConfig {
   driverMinimumPayout: number;
   companyMinMarginPercent: number;
   airportOverridesCrossCity: boolean;
+  customerServiceFee: number;
+  platformCommissionPercent: number;
+  driverEarningsPercent: number;
 }
+
+export const DEFAULT_COMMISSION_CONFIG = {
+  customerServiceFee: 1.99,
+  platformCommissionPercent: 15,
+  driverEarningsPercent: 85,
+  driverMinimumEarnings: 5.00,
+};
 
 export interface RouteInput {
   routeId: string;
@@ -220,6 +230,11 @@ export interface FareEngineResult {
   driverMinimumPayoutApplied: boolean;
   safegoCommission: number;
   companyMarginPercent: number;
+  
+  customerServiceFee: number;
+  platformCommission: number;
+  driverEarnings: number;
+  driverEarningsMinimumApplied: boolean;
   
   marginProtectionApplied: boolean;
   marginProtectionCapped: boolean;
@@ -614,74 +629,107 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
   }
 
   // ============================================
-  // STEP 17: DRIVER PAYOUT WITH MINIMUM
+  // STEP 17: CUSTOMER SERVICE FEE & DRIVER EARNINGS
+  // New Commission Model:
+  // - Customer service fee: fixed $1.99 per trip
+  // - Driver earnings: max((totalFare * 0.85), $5.00)
+  // - Platform commission: 15% of final fare
   // ============================================
-  const driverDistanceEarnings = roundCurrency(route.distanceMiles * fareConfig.driverPerMileRate);
-  const driverTimeEarnings = roundCurrency(route.durationMinutes * fareConfig.driverPerMinuteRate);
+  const customerServiceFee = fareConfig.customerServiceFee ?? DEFAULT_COMMISSION_CONFIG.customerServiceFee;
+  const driverEarningsPercent = fareConfig.driverEarningsPercent ?? DEFAULT_COMMISSION_CONFIG.driverEarningsPercent;
+  const platformCommissionPercent = fareConfig.platformCommissionPercent ?? DEFAULT_COMMISSION_CONFIG.platformCommissionPercent;
+  const driverMinimumEarnings = fareConfig.driverMinimumPayout ?? DEFAULT_COMMISSION_CONFIG.driverMinimumEarnings;
+  
   const driverTolls = tolls
     .filter(t => t.paidToDriver)
     .reduce((sum, t) => sum + t.amount, 0);
   
-  const driverBasePayoutCalculated = roundCurrency(driverDistanceEarnings + driverTimeEarnings + driverTolls);
-  let driverPayout = Math.max(driverBasePayoutCalculated, fareConfig.driverMinimumPayout);
-  const driverMinimumPayoutApplied = driverBasePayoutCalculated < fareConfig.driverMinimumPayout;
+  const driverDistanceEarnings = roundCurrency(route.distanceMiles * fareConfig.driverPerMileRate);
+  const driverTimeEarnings = roundCurrency(route.durationMinutes * fareConfig.driverPerMinuteRate);
+  const legacyDriverPayout = roundCurrency(driverDistanceEarnings + driverTimeEarnings + driverTolls);
+  const driverMinimumPayoutApplied = legacyDriverPayout < fareConfig.driverMinimumPayout;
+  
+  let driverEarningsCalculated = roundCurrency(fareAfterGuards * driverEarningsPercent / 100);
+  let driverEarnings = Math.max(driverEarningsCalculated, driverMinimumEarnings);
+  const driverEarningsMinimumApplied = driverEarningsCalculated < driverMinimumEarnings;
+  
+  let driverPayout = Math.max(legacyDriverPayout, fareConfig.driverMinimumPayout);
 
   // ============================================
   // STEP 18: MARGIN PROTECTION
+  // If effective platform commission < 15%:
+  // 1. Increase fare (respecting maximum fare cap)
+  // 2. If still < 15%, reduce driver earnings (never below $5)
+  // 3. If still < 15%, accept reduced margin and set marginProtectionCapped: true
   // ============================================
   const allRegulatoryFees = roundCurrency(stateRegulatoryFee);
-  const calcPassThroughCosts = (payout: number) => roundCurrency(payout + allRegulatoryFees);
-  const calcCommission = (fare: number, payout: number) => roundCurrency(fare - calcPassThroughCosts(payout));
-  const calcMarginPercent = (fare: number, commission: number) => 
+  
+  const calcPlatformCommission = (fare: number, driverPay: number) => 
+    roundCurrency(fare - driverPay - allRegulatoryFees - customerServiceFee);
+  
+  const calcCommissionPercent = (fare: number, commission: number) => 
     fare > 0 ? roundCurrency((commission / fare) * 100) : 0;
   
-  const calcMinFareForMargin = (payout: number) => {
-    const marginDecimal = fareConfig.companyMinMarginPercent / 100;
+  const calcMinFareForMargin = (driverPay: number) => {
+    const marginDecimal = platformCommissionPercent / 100;
     if (marginDecimal >= 1) return Infinity;
-    const passThroughCosts = calcPassThroughCosts(payout);
+    const passThroughCosts = driverPay + allRegulatoryFees + customerServiceFee;
     return roundCurrency(passThroughCosts / (1 - marginDecimal));
   };
   
-  let safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+  let platformCommission = calcPlatformCommission(fareAfterGuards, driverEarnings);
   let marginProtectionApplied = false;
   let marginProtectionCapped = false;
   let marginShortfall = 0;
   
-  const targetMarginAmount = roundCurrency(fareAfterGuards * fareConfig.companyMinMarginPercent / 100);
+  const targetMarginAmount = roundCurrency(fareAfterGuards * platformCommissionPercent / 100);
   
-  if (safegoCommission < targetMarginAmount) {
+  if (platformCommission < targetMarginAmount) {
     marginProtectionApplied = true;
     
-    if (safegoCommission < 0 && driverPayout > fareConfig.driverMinimumPayout) {
-      driverPayout = fareConfig.driverMinimumPayout;
-      safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+    if (platformCommission < 0 && driverEarnings > driverMinimumEarnings) {
+      driverEarnings = driverMinimumEarnings;
+      platformCommission = calcPlatformCommission(fareAfterGuards, driverEarnings);
     }
     
-    if (calcMarginPercent(fareAfterGuards, safegoCommission) < fareConfig.companyMinMarginPercent) {
-      const neededFare = calcMinFareForMargin(driverPayout);
+    const currentMarginPercent = calcCommissionPercent(fareAfterGuards, platformCommission);
+    
+    if (currentMarginPercent < platformCommissionPercent) {
+      const neededFare = calcMinFareForMargin(driverEarnings);
       
       if (neededFare <= fareConfig.maximumFare) {
         fareAfterGuards = Math.max(fareAfterGuards, neededFare);
-        safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+        driverEarnings = Math.max(
+          roundCurrency(fareAfterGuards * driverEarningsPercent / 100),
+          driverMinimumEarnings
+        );
+        platformCommission = calcPlatformCommission(fareAfterGuards, driverEarnings);
       } else {
         if (!maximumFareApplied) {
           fareAfterGuards = fareConfig.maximumFare;
           maximumFareApplied = true;
-          safegoCommission = calcCommission(fareAfterGuards, driverPayout);
         }
         
-        if (calcMarginPercent(fareAfterGuards, safegoCommission) < fareConfig.companyMinMarginPercent) {
-          if (driverPayout > fareConfig.driverMinimumPayout) {
-            const targetPayout = roundCurrency(
-              fareAfterGuards * (1 - fareConfig.companyMinMarginPercent / 100) - allRegulatoryFees
+        driverEarnings = Math.max(
+          roundCurrency(fareAfterGuards * driverEarningsPercent / 100),
+          driverMinimumEarnings
+        );
+        platformCommission = calcPlatformCommission(fareAfterGuards, driverEarnings);
+        
+        const afterFareMargin = calcCommissionPercent(fareAfterGuards, platformCommission);
+        
+        if (afterFareMargin < platformCommissionPercent) {
+          if (driverEarnings > driverMinimumEarnings) {
+            const targetDriverEarnings = roundCurrency(
+              fareAfterGuards * (1 - platformCommissionPercent / 100) - allRegulatoryFees - customerServiceFee
             );
             
-            if (targetPayout >= fareConfig.driverMinimumPayout) {
-              driverPayout = targetPayout;
-              safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+            if (targetDriverEarnings >= driverMinimumEarnings) {
+              driverEarnings = targetDriverEarnings;
+              platformCommission = calcPlatformCommission(fareAfterGuards, driverEarnings);
             } else {
-              driverPayout = fareConfig.driverMinimumPayout;
-              safegoCommission = calcCommission(fareAfterGuards, driverPayout);
+              driverEarnings = driverMinimumEarnings;
+              platformCommission = calcPlatformCommission(fareAfterGuards, driverEarnings);
               marginProtectionCapped = true;
             }
           } else {
@@ -691,16 +739,17 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
       }
     }
     
-    const finalMarginPercent = calcMarginPercent(fareAfterGuards, safegoCommission);
-    if (finalMarginPercent < fareConfig.companyMinMarginPercent) {
+    const finalMarginPercent = calcCommissionPercent(fareAfterGuards, platformCommission);
+    if (finalMarginPercent < platformCommissionPercent) {
       marginProtectionCapped = true;
-      marginShortfall = roundCurrency(fareConfig.companyMinMarginPercent - finalMarginPercent);
+      marginShortfall = roundCurrency(platformCommissionPercent - finalMarginPercent);
     }
   }
   
-  safegoCommission = Math.max(0, safegoCommission);
+  platformCommission = Math.max(0, platformCommission);
+  const safegoCommission = platformCommission;
   const finalFare = fareAfterGuards;
-  const companyMarginPercent = calcMarginPercent(finalFare, safegoCommission);
+  const companyMarginPercent = calcCommissionPercent(finalFare, platformCommission);
   const absoluteMinimumFare = effectiveMinimumFare;
   const effectiveDiscountPct = 0;
 
@@ -785,6 +834,11 @@ export function calculateFare(context: FareEngineContext): FareEngineResult {
     driverMinimumPayoutApplied,
     safegoCommission,
     companyMarginPercent,
+    
+    customerServiceFee,
+    platformCommission,
+    driverEarnings,
+    driverEarningsMinimumApplied,
     
     marginProtectionApplied,
     marginProtectionCapped,
