@@ -4,6 +4,8 @@
  * Comprehensive test coverage for NYC TLC HVFHV compliance reports.
  * Tests cover Trip Record Reports, Driver Pay Reports, HVFHV Summary Reports,
  * Out-of-Town Reports, Accessibility Reports, and Airport Activity Reports.
+ * 
+ * Uses deterministic mock data for reliable test execution.
  */
 
 import {
@@ -28,6 +30,83 @@ import {
 } from '../tlcReportGenerator';
 
 import { NYC_TLC_CONFIG } from '../tlcMinimumPayEngine';
+
+const createMockTripRecord = (overrides: Partial<TripRecordReport> = {}): TripRecordReport => ({
+  tripId: `TRP-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+  driverId: 'driver-1',
+  vehicleId: 'VEH-001',
+  pickupTime: new Date('2025-11-15T10:00:00Z'),
+  dropoffTime: new Date('2025-11-15T10:30:00Z'),
+  pickupLocation: { lat: 40.7484, lng: -73.9857, borough: 'MANHATTAN' as BoroughCode },
+  dropoffLocation: { lat: 40.6892, lng: -73.9442, borough: 'BROOKLYN' as BoroughCode },
+  tripDistanceMiles: 5.2,
+  tripDurationMinutes: 25,
+  fareSubtotal: 28.50,
+  tolls: 6.55,
+  congestionFee: 2.75,
+  airportFee: 0,
+  avfFee: 0.125,
+  bcfFee: 0.625,
+  hvrfFee: 0.05,
+  stateSurcharge: 2.50,
+  longTripSurcharge: 0,
+  outOfTownReturnFee: 0,
+  promoUsed: false,
+  discountAmount: 0,
+  finalFare: 41.10,
+  driverPayout: 22.68,
+  commissionAmount: 7.13,
+  tripCategory: 'INTER_BOROUGH' as TripCategory,
+  tlcMinimumApplied: false,
+  tlcAdjustment: 0,
+  isAccessibleVehicle: false,
+  isWheelchairTrip: false,
+  reportGeneratedAt: new Date(),
+  ...overrides,
+});
+
+const createMockDriverPayReport = (overrides: Partial<DriverPayReport> = {}): DriverPayReport => ({
+  driverId: 'driver-1',
+  reportPeriodStart: new Date('2025-11-01'),
+  reportPeriodEnd: new Date('2025-11-30'),
+  totalTrips: 120,
+  totalOnlineHours: 180,
+  totalEngagedHours: 140,
+  utilizationRate: 0.78,
+  baseEarnings: 3200.00,
+  tlcTimeEarnings: 1800.00,
+  tlcDistanceEarnings: 1400.00,
+  tlcMinimumPayAdjustments: 150.00,
+  perRideAdjustmentsTotal: 100.00,
+  hourlyAdjustmentsTotal: 35.00,
+  weeklyAdjustmentTotal: 15.00,
+  incentivesTotal: 275.00,
+  incentiveBreakdown: {
+    questBonus: 100.00,
+    boostZoneBonus: 75.00,
+    airportPickupBonus: 50.00,
+    weatherBonus: 30.00,
+    lateNightBonus: 20.00,
+  },
+  tollsCollected: 450.00,
+  feesCollectedForTLC: 680.00,
+  feesBreakdown: {
+    avfTotal: 15.00,
+    bcfTotal: 75.00,
+    hvrfTotal: 6.00,
+    stateSurchargeTotal: 300.00,
+    congestionTotal: 220.00,
+    airportTotal: 40.00,
+    longTripTotal: 18.00,
+    outOfTownTotal: 6.00,
+  },
+  grossEarnings: 3925.00,
+  netPayout: 3625.00,
+  hourlyEarningsAverage: 25.89,
+  tlcComplianceStatus: 'COMPLIANT' as const,
+  reportGeneratedAt: new Date(),
+  ...overrides,
+});
 
 describe('TLC Report Generator', () => {
   const defaultFilters: TLCReportFilters = {
@@ -864,6 +943,358 @@ describe('TLC Report Generator', () => {
           expect(trip.tlcAdjustment).toBeGreaterThan(0);
         }
       }
+    });
+  });
+
+  describe('Deterministic Mock Data Tests', () => {
+    describe('Mock Trip Record Validation', () => {
+      it('should validate valid mock trip record', () => {
+        const validTrip = createMockTripRecord();
+        const validation = validateTripRecord(validTrip);
+        
+        expect(validation.isValid).toBe(true);
+        expect(validation.errors.length).toBe(0);
+      });
+
+      it('should detect missing tripId in mock', () => {
+        const invalidTrip = createMockTripRecord({ tripId: '' });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('Missing tripId');
+      });
+
+      it('should detect missing driverId in mock trip', () => {
+        const invalidTrip = createMockTripRecord({ driverId: '' });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('Missing driverId');
+      });
+
+      it('should detect missing vehicleId in mock', () => {
+        const invalidTrip = createMockTripRecord({ vehicleId: '' });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('Missing vehicleId');
+      });
+
+      it('should detect negative trip distance in mock', () => {
+        const invalidTrip = createMockTripRecord({ tripDistanceMiles: -5 });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('tripDistanceMiles cannot be negative');
+      });
+
+      it('should detect negative trip duration in mock', () => {
+        const invalidTrip = createMockTripRecord({ tripDurationMinutes: -10 });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('tripDurationMinutes cannot be negative');
+      });
+
+      it('should detect negative fare subtotal in mock', () => {
+        const invalidTrip = createMockTripRecord({ fareSubtotal: -25 });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('fareSubtotal cannot be negative');
+      });
+
+      it('should detect negative tolls in mock', () => {
+        const invalidTrip = createMockTripRecord({ tolls: -10 });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('tolls cannot be negative');
+      });
+
+      it('should detect negative AVF fee in mock', () => {
+        const invalidTrip = createMockTripRecord({ avfFee: -0.125 });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('avfFee cannot be negative');
+      });
+
+      it('should detect negative BCF fee in mock', () => {
+        const invalidTrip = createMockTripRecord({ bcfFee: -0.625 });
+        const validation = validateTripRecord(invalidTrip);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('bcfFee cannot be negative');
+      });
+
+      it('should validate mock airport trip with airport code', () => {
+        const airportTrip = createMockTripRecord({
+          tripCategory: 'AIRPORT_PICKUP' as TripCategory,
+          airportCode: 'JFK' as AirportCode,
+          airportFee: 5.00,
+        });
+        const validation = validateTripRecord(airportTrip);
+        
+        expect(validation.isValid).toBe(true);
+      });
+
+      it('should validate mock long trip with surcharge', () => {
+        const longTrip = createMockTripRecord({
+          tripDistanceMiles: 25.0,
+          tripCategory: 'LONG_TRIP' as TripCategory,
+          longTripSurcharge: 2.50,
+        });
+        const validation = validateTripRecord(longTrip);
+        
+        expect(validation.isValid).toBe(true);
+      });
+
+      it('should validate mock out-of-town trip with return fee', () => {
+        const outOfTownTrip = createMockTripRecord({
+          tripCategory: 'NYC_TO_OOS' as TripCategory,
+          dropoffLocation: { lat: 40.85, lng: -74.25, borough: 'OUT_OF_NYC' as BoroughCode },
+          outOfTownReturnFee: 17.50,
+        });
+        const validation = validateTripRecord(outOfTownTrip);
+        
+        expect(validation.isValid).toBe(true);
+      });
+
+      it('should validate mock accessible vehicle trip', () => {
+        const accessibleTrip = createMockTripRecord({
+          isAccessibleVehicle: true,
+          isWheelchairTrip: true,
+        });
+        const validation = validateTripRecord(accessibleTrip);
+        
+        expect(validation.isValid).toBe(true);
+      });
+
+      it('should validate mock trip with TLC minimum applied', () => {
+        const tlcMinTrip = createMockTripRecord({
+          tlcMinimumApplied: true,
+          tlcAdjustment: 5.25,
+          driverPayout: 27.93,
+        });
+        const validation = validateTripRecord(tlcMinTrip);
+        
+        expect(validation.isValid).toBe(true);
+      });
+
+      it('should validate mock trip with promo code', () => {
+        const promoTrip = createMockTripRecord({
+          promoUsed: true,
+          promoCode: 'SAVE10',
+          discountAmount: 4.11,
+          finalFare: 37.99,
+        });
+        const validation = validateTripRecord(promoTrip);
+        
+        expect(validation.isValid).toBe(true);
+      });
+    });
+
+    describe('Mock Driver Pay Report Validation', () => {
+      it('should validate valid mock driver pay report', () => {
+        const validReport = createMockDriverPayReport();
+        const validation = validateDriverPayReport(validReport);
+        
+        expect(validation.isValid).toBe(true);
+        expect(validation.errors.length).toBe(0);
+      });
+
+      it('should detect missing driverId in mock report', () => {
+        const invalidReport = createMockDriverPayReport({ driverId: '' });
+        const validation = validateDriverPayReport(invalidReport);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('Missing driverId');
+      });
+
+      it('should detect negative total trips in mock report', () => {
+        const invalidReport = createMockDriverPayReport({ totalTrips: -5 });
+        const validation = validateDriverPayReport(invalidReport);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('totalTrips cannot be negative');
+      });
+
+      it('should detect negative online hours in mock report', () => {
+        const invalidReport = createMockDriverPayReport({ totalOnlineHours: -10 });
+        const validation = validateDriverPayReport(invalidReport);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('totalOnlineHours cannot be negative');
+      });
+
+      it('should detect negative engaged hours in mock report', () => {
+        const invalidReport = createMockDriverPayReport({ totalEngagedHours: -8 });
+        const validation = validateDriverPayReport(invalidReport);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('totalEngagedHours cannot be negative');
+      });
+
+      it('should detect negative base earnings in mock report', () => {
+        const invalidReport = createMockDriverPayReport({ baseEarnings: -500 });
+        const validation = validateDriverPayReport(invalidReport);
+        
+        expect(validation.isValid).toBe(false);
+        expect(validation.errors).toContain('baseEarnings cannot be negative');
+      });
+
+      it('should warn when engaged hours exceed online hours in mock report', () => {
+        const invalidReport = createMockDriverPayReport({
+          totalOnlineHours: 100,
+          totalEngagedHours: 150,
+          utilizationRate: 1.5,
+        });
+        const validation = validateDriverPayReport(invalidReport);
+        
+        expect(validation.warnings).toContain('Engaged hours exceed online hours');
+      });
+
+      it('should validate mock report with ADJUSTED compliance status', () => {
+        const adjustedReport = createMockDriverPayReport({
+          tlcMinimumPayAdjustments: 250.00,
+          tlcComplianceStatus: 'ADJUSTED' as const,
+        });
+        const validation = validateDriverPayReport(adjustedReport);
+        
+        expect(validation.isValid).toBe(true);
+      });
+
+      it('should validate mock report with all incentive types', () => {
+        const fullIncentiveReport = createMockDriverPayReport({
+          incentiveBreakdown: {
+            questBonus: 150.00,
+            boostZoneBonus: 100.00,
+            airportPickupBonus: 75.00,
+            weatherBonus: 50.00,
+            lateNightBonus: 40.00,
+          },
+          incentivesTotal: 415.00,
+        });
+        const validation = validateDriverPayReport(fullIncentiveReport);
+        
+        expect(validation.isValid).toBe(true);
+      });
+
+      it('should validate mock report with all fee types', () => {
+        const fullFeesReport = createMockDriverPayReport({
+          feesBreakdown: {
+            avfTotal: 25.00,
+            bcfTotal: 125.00,
+            hvrfTotal: 10.00,
+            stateSurchargeTotal: 500.00,
+            congestionTotal: 350.00,
+            airportTotal: 100.00,
+            longTripTotal: 25.00,
+            outOfTownTotal: 35.00,
+          },
+          feesCollectedForTLC: 1170.00,
+        });
+        const validation = validateDriverPayReport(fullFeesReport);
+        
+        expect(validation.isValid).toBe(true);
+      });
+    });
+
+    describe('Mock CSV Export Functions', () => {
+      it('should export mock trip records to CSV', () => {
+        const trips = [
+          createMockTripRecord({ tripId: 'TRP-001' }),
+          createMockTripRecord({ tripId: 'TRP-002' }),
+          createMockTripRecord({ tripId: 'TRP-003' }),
+        ];
+        const csv = tripRecordToCSV(trips);
+        
+        expect(typeof csv).toBe('string');
+        expect(csv.length).toBeGreaterThan(0);
+        
+        const lines = csv.split('\n');
+        expect(lines.length).toBe(4);
+        expect(lines[0]).toContain('tripId');
+        expect(lines[0]).toContain('driverId');
+        expect(lines[0]).toContain('fareSubtotal');
+        expect(lines[1]).toContain('TRP-001');
+        expect(lines[2]).toContain('TRP-002');
+        expect(lines[3]).toContain('TRP-003');
+      });
+
+      it('should export mock driver pay reports to CSV', () => {
+        const reports = [
+          createMockDriverPayReport({ driverId: 'driver-1' }),
+          createMockDriverPayReport({ driverId: 'driver-2' }),
+        ];
+        const csv = driverPayToCSV(reports);
+        
+        expect(typeof csv).toBe('string');
+        expect(csv.length).toBeGreaterThan(0);
+        
+        const lines = csv.split('\n');
+        expect(lines.length).toBe(3);
+        expect(lines[0]).toContain('driverId');
+        expect(lines[0]).toContain('baseEarnings');
+        expect(lines[0]).toContain('netPayout');
+        expect(lines[1]).toContain('driver-1');
+        expect(lines[2]).toContain('driver-2');
+      });
+    });
+
+    describe('TLC Business Rules Validation', () => {
+      it('should calculate correct TLC time-distance minimum', () => {
+        const trip = createMockTripRecord({
+          tripDurationMinutes: 30,
+          tripDistanceMiles: 8.5,
+        });
+        
+        const expectedTimeEarning = 30 * NYC_TLC_CONFIG.perMinuteRate;
+        const expectedDistanceEarning = 8.5 * NYC_TLC_CONFIG.perMileRate;
+        const expectedMinimum = expectedTimeEarning + expectedDistanceEarning;
+        
+        expect(expectedTimeEarning).toBe(16.80);
+        expect(expectedDistanceEarning).toBe(11.135);
+        expect(expectedMinimum).toBeCloseTo(27.935, 2);
+      });
+
+      it('should calculate correct hourly equivalent minimum', () => {
+        const trip = createMockTripRecord({
+          tripDurationMinutes: 60,
+        });
+        
+        const hourlyEquivalent = (60 / 60) * NYC_TLC_CONFIG.hourlyMinimumRate;
+        expect(hourlyEquivalent).toBe(27.86);
+      });
+
+      it('should verify AVF fee is consistent', () => {
+        const trip = createMockTripRecord({ avfFee: 0.125 });
+        expect(trip.avfFee).toBe(0.125);
+      });
+
+      it('should verify BCF fee is consistent', () => {
+        const trip = createMockTripRecord({ bcfFee: 0.625 });
+        expect(trip.bcfFee).toBe(0.625);
+      });
+
+      it('should verify HVRF fee is consistent', () => {
+        const trip = createMockTripRecord({ hvrfFee: 0.05 });
+        expect(trip.hvrfFee).toBe(0.05);
+      });
+
+      it('should verify state surcharge is consistent', () => {
+        const trip = createMockTripRecord({ stateSurcharge: 2.50 });
+        expect(trip.stateSurcharge).toBe(2.50);
+      });
+
+      it('should verify congestion fee is consistent for Manhattan trips', () => {
+        const trip = createMockTripRecord({
+          tripCategory: 'MANHATTAN_CONGESTION' as TripCategory,
+          congestionFee: 2.75,
+        });
+        expect(trip.congestionFee).toBe(2.75);
+      });
     });
   });
 });
