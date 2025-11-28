@@ -1,0 +1,162 @@
+Design and implement a fully responsive Promo UI for the SafeGo ride estimate screen, so that it looks excellent on mobile, tablet, and desktop web.
+
+Important:
+- Do NOT change any pricing or promo logic.
+- Assume the backend already returns:
+  {
+    finalFare,
+    anchorFare,
+    originalFare,
+    promoType,        // "PROMO_APPLIED" | "SAVER" | "FIRST_RIDE" | "WALLET" | "NONE"
+    savedAmount,
+    etaMinutes,
+    distanceMiles,
+    rideType,         // "Saver" | "Standard" | "Comfort" | "XL" | "Premium"
+    breakdown: {
+      tripFare,
+      trafficAdjustment,
+      tolls,
+      cityFees,
+      serviceFee,
+      promoDiscount
+    },
+    routeOptions: [
+      {
+        id,
+        label,        // "Fastest", "Cheapest", "Less traffic", etc.
+        etaMinutes,
+        distanceMiles,
+        finalFare,
+        promoType,
+        isSelected
+      },
+      ...
+    ]
+  }
+
+Your job:
+ONLY build the layout, components, and styling so that the Promo UI is production quality on all devices.
+
+1) Layout Requirements
+
+- Mobile (<= 480px):
+  - Single-column layout.
+  - Order:
+    1) Map with route drawn.
+    2) Horizontal scrollable list of small route cards (for routeOptions).
+    3) Main Promo Fare Card for the selected route.
+    4) Fare breakdown accordion.
+    5) Primary "Request ride" button full-width at the bottom.
+
+- Tablet (~768–1024px):
+  - Either single-column with wider cards OR a simple 2-column layout:
+    - Top: map full-width.
+    - Bottom: left = routes, right = Promo Fare Card + breakdown.
+
+- Desktop (>= 1280px):
+  - Two-column layout:
+    - Left panel: map and routeOptions list.
+    - Right panel: Promo Panel (fare card + promo info + breakdown + CTA).
+  - Use a max-width container and center it; do not stretch content too wide.
+
+2) Promo Fare Card Component
+
+Create a reusable `<PromoFareCard />` with this structure:
+
+- Header row:
+  - Left: rideType + ETA (e.g., "Standard · 18–22 min").
+  - Right: finalFare in large, bold text (e.g., "$29.50").
+
+- Under the header:
+  - anchorFare shown with strikethrough if it is greater than finalFare (e.g., "Was $33.00").
+  - "You saved $X.XX" in smaller text using savedAmount.
+
+- Promo badge depending on promoType:
+  - PROMO_APPLIED → green pill: "Promo applied"
+  - SAVER → amber pill: "Saver"
+  - FIRST_RIDE → purple pill: "Welcome ride"
+  - WALLET → blue pill: "Wallet bonus"
+  - NONE → no badge
+
+- Small reassurance text:
+  - “Includes taxes, tolls, and city fees where applicable.”
+  - “No surprise charges at the end.”
+
+The component must adapt layout based on screen size (e.g., on desktop put price and promo badge side-by-side; on mobile stack them vertically).
+
+3) Route Options Bar
+
+Implement a `<RouteOptionCard />` for each route in routeOptions:
+
+- Show:
+  - label (Fastest, Cheapest, Less traffic, etc.)
+  - ETA (e.g., "21 min")
+  - Distance (e.g., "8.4 mi")
+  - Price (e.g., "$29.50")
+  - small promo badge if promoType is not NONE
+
+- On mobile:
+  - Display as a horizontal scrollable list (cards with snap behavior if possible).
+- On desktop:
+  - Display as a vertical list in the left panel under the map.
+
+- When a route is selected:
+  - Highlight the card (border, background).
+  - Trigger the parent to show that route’s details in the main PromoFareCard.
+
+4) Fare Breakdown UI
+
+Create a `<FareBreakdown />` component that:
+
+- Shows:
+  - Trip fare
+  - Traffic adjustment (if > 0)
+  - Tolls
+  - City/airport fees
+  - SafeGo service fee
+  - Promo discount (if any)
+  - Total = finalFare
+
+- Mobile:
+  - Use an accordion: collapsed by default with label "View fare details".
+- Desktop:
+  - Show as an always-visible section under the PromoFareCard with a clean card style.
+
+5) Visual Style
+
+- Use existing design system for colors and typography if available.
+- Make sure:
+  - finalFare has the strongest visual weight.
+  - promo badge colors are consistent and readable.
+  - anchorFare is clearly strikethrough but still legible.
+  - spacing is generous on desktop, tighter on mobile but not cramped.
+
+- Ensure good contrast for accessibility (no low-contrast gray-on-gray).
+
+6) Technical Choices
+
+- Use the current front-end stack (React + CSS/Tailwind/whatever is already used).
+- No inline styles unless necessary; prefer reusable classes.
+- Use media queries or the framework’s breakpoint utilities for responsiveness.
+- Do not create separate mobile and desktop pages; same components must adapt.
+
+7) No Logic Changes
+
+- Do NOT modify how fares are calculated.
+- Do NOT modify any API endpoints or request payloads.
+- Only read the existing pricing + promo response and render it in UI.
+
+8) Testing
+
+Test visually at:
+- ~390px width (phone)
+- ~768px width (tablet)
+- ~1440px width (desktop)
+
+Verify:
+- Nothing overflows horizontally.
+- Text does not overlap.
+- Route selection clearly updates the PromoFareCard and breakdown.
+- The UI feels professional and Uber-class on both mobile and desktop.
+
+After implementing, ensure the Promo UI looks great across devices and that the main interaction flow (select route → review fare + promo → request ride) is smooth and clear.
