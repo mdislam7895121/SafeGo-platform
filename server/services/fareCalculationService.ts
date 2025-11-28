@@ -851,8 +851,11 @@ const NYC_STATE_CODE = 'NY';
 /**
  * Check if a trip is eligible for TLC AVF fee
  * AVF applies to all NYC trips except:
- * - Out-of-state trips
+ * - Out-of-state trips (cross-state trips are NOT eligible)
  * - Pre-scheduled paratransit services
+ * 
+ * The AVF fee only applies when BOTH pickup AND dropoff are within NYC.
+ * A trip from NYC to another state (e.g., Manhattan → Newark) is NOT eligible.
  */
 function isEligibleForTLCAVFFee(
   pickupStateCode: string | undefined,
@@ -866,15 +869,22 @@ function isEligibleForTLCAVFFee(
     return false;
   }
   
-  // Check if trip is in NYC (either pickup or dropoff must be in NYC)
-  const pickupInNYC = pickupStateCode === NYC_STATE_CODE && 
+  // AVF does NOT apply to cross-state trips
+  // If both state codes are defined and they differ, this is a cross-state trip
+  if (pickupStateCode && dropoffStateCode && 
+      pickupStateCode.toUpperCase() !== dropoffStateCode.toUpperCase()) {
+    return false;
+  }
+  
+  // Check if trip is entirely within NYC (both pickup AND dropoff must be in NYC)
+  const pickupInNYC = pickupStateCode?.toUpperCase() === NYC_STATE_CODE && 
     (pickupBoroughCode ? NYC_BOROUGH_CODES.includes(pickupBoroughCode.toLowerCase()) : false);
-  const dropoffInNYC = dropoffStateCode === NYC_STATE_CODE && 
+  const dropoffInNYC = dropoffStateCode?.toUpperCase() === NYC_STATE_CODE && 
     (dropoffBoroughCode ? NYC_BOROUGH_CODES.includes(dropoffBoroughCode.toLowerCase()) : false);
   
-  // AVF applies if either pickup or dropoff is in NYC
-  // but NOT if both are out-of-state
-  if (!pickupInNYC && !dropoffInNYC) {
+  // AVF applies only if BOTH pickup AND dropoff are in NYC
+  // A trip entirely within NYC is eligible
+  if (!pickupInNYC || !dropoffInNYC) {
     return false;
   }
   
@@ -1398,17 +1408,34 @@ export class FareCalculationService {
     const avfPickupBoroughCode = matchedPickupZones.find(z => z.zoneType === 'borough')?.zoneId;
     const avfDropoffBoroughCode = matchedDropoffZones.find(z => z.zoneType === 'borough')?.zoneId;
     
-    // AVF applies to NYC trips (state code NY with valid borough)
-    // Also check if congestion fee was applied (indicates Manhattan trip)
-    // or if TLC airport fee was applied (indicates NYC metro trip)
-    // Use existing pickupStateCode/dropoffStateCode from function parameters
-    const avfEligible = isEligibleForTLCAVFFee(
+    // Check if this is a NYC airport (JFK, LGA, HPN) - NOT Newark (EWR)
+    // Newark Airport (EWR) is in New Jersey, so trips to/from EWR are cross-state
+    const NYC_AIRPORT_CODES = ['JFK', 'LGA', 'HPN'];
+    const isNYCAirportTrip = tlcAirportCode && NYC_AIRPORT_CODES.includes(tlcAirportCode);
+    
+    // Strict state check: Both pickup and dropoff must be confirmed as NY state
+    // This ensures fallback logic doesn't apply AVF when state metadata is missing
+    const bothStatesAreNY = pickupStateCode?.toUpperCase() === NYC_STATE_CODE && 
+      dropoffStateCode?.toUpperCase() === NYC_STATE_CODE;
+    
+    // AVF applies to NYC trips ONLY (never cross-state, never missing state data)
+    // Primary check: isEligibleForTLCAVFFee validates borough codes AND state codes
+    const avfPrimaryEligible = isEligibleForTLCAVFFee(
       pickupStateCode,
       dropoffStateCode,
       avfPickupBoroughCode,
       avfDropoffBoroughCode,
       false // isParatransit - would be passed from request in production
-    ) || congestionFeeApplied || tlcAirportFeeApplied;
+    );
+    
+    // Fallback eligibility requires BOTH state codes to be NY (strict guard)
+    // This prevents AVF from being applied when state metadata is missing or cross-state
+    // Fallback conditions:
+    // - congestionFeeApplied indicates a Manhattan trip (within NYC)
+    // - isNYCAirportTrip indicates a trip to/from a NYC airport (not Newark)
+    const avfFallbackEligible = bothStatesAreNY && (congestionFeeApplied || isNYCAirportTrip);
+    
+    const avfEligible = avfPrimaryEligible || avfFallbackEligible;
     
     if (avfEligible) {
       tlcAVFFee = TLC_AVF_FEE;
