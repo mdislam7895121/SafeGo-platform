@@ -175,6 +175,7 @@ export interface FareFlags {
   crossCityApplied: boolean;
   crossStateApplied: boolean;
   congestionFeeApplied: boolean;
+  tlcAirportFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -232,6 +233,9 @@ export interface RouteFareBreakdown {
   
   // Location-based fees
   congestionFee: number;
+  tlcAirportFee: number;
+  tlcAirportName?: string;
+  tlcAirportCode?: string;
   airportFee: number;
   airportCode?: string;
   borderZoneFee: number;
@@ -284,6 +288,7 @@ export interface RouteFareBreakdown {
   crossStateApplied: boolean;
   regulatoryFeeApplied: boolean;
   congestionFeeApplied: boolean;
+  tlcAirportFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
@@ -682,6 +687,181 @@ const MANHATTAN_CONGESTION_ZONE = {
 };
 
 /**
+ * NYC TLC Airport Access Fee Configurations
+ * Polygon-based geo-detection for accurate airport boundary matching
+ * 
+ * Fee amounts per NYC TLC HVFHV regulations:
+ * - JFK Airport: $2.50
+ * - LaGuardia Airport: $1.25
+ * - Newark Airport: $2.00
+ * - Westchester HPN: $1.00
+ * 
+ * Fee applies if pickup OR dropoff is inside the airport polygon boundary.
+ */
+interface TLCAirportConfig {
+  code: string;
+  name: string;
+  fee: number;
+  polygon: { lat: number; lng: number }[];
+  boundingBox: {
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+  };
+}
+
+const TLC_AIRPORT_ZONES: TLCAirportConfig[] = [
+  {
+    code: 'JFK',
+    name: 'John F. Kennedy International Airport',
+    fee: 2.50,
+    polygon: [
+      // JFK Airport boundary polygon (Queens, NY)
+      // Northwest corner (near Howard Beach)
+      { lat: 40.6598, lng: -73.8143 },
+      // Northeast corner (near Rosedale)
+      { lat: 40.6598, lng: -73.7501 },
+      // East side (Runway 31L area)
+      { lat: 40.6480, lng: -73.7501 },
+      // Southeast (Terminal area)
+      { lat: 40.6350, lng: -73.7620 },
+      // South side (Jamaica Bay)
+      { lat: 40.6220, lng: -73.7750 },
+      // Southwest (near Broad Channel)
+      { lat: 40.6220, lng: -73.8143 },
+      // West side (Jamaica Bay shoreline)
+      { lat: 40.6420, lng: -73.8143 },
+      // Close polygon
+      { lat: 40.6598, lng: -73.8143 },
+    ],
+    boundingBox: {
+      minLat: 40.6220,
+      maxLat: 40.6598,
+      minLng: -73.8143,
+      maxLng: -73.7501,
+    },
+  },
+  {
+    code: 'LGA',
+    name: 'LaGuardia Airport',
+    fee: 1.25,
+    polygon: [
+      // LaGuardia Airport boundary polygon (Queens, NY)
+      // Northwest (near Flushing Bay)
+      { lat: 40.7850, lng: -73.8890 },
+      // North (Marine Air Terminal area)
+      { lat: 40.7850, lng: -73.8680 },
+      // Northeast (Runway 4 end)
+      { lat: 40.7810, lng: -73.8600 },
+      // East side (Flushing Bay)
+      { lat: 40.7730, lng: -73.8600 },
+      // Southeast (Terminal B area)
+      { lat: 40.7680, lng: -73.8650 },
+      // South (Bowery Bay)
+      { lat: 40.7680, lng: -73.8810 },
+      // Southwest (Grand Central Parkway)
+      { lat: 40.7730, lng: -73.8890 },
+      // Close polygon
+      { lat: 40.7850, lng: -73.8890 },
+    ],
+    boundingBox: {
+      minLat: 40.7680,
+      maxLat: 40.7850,
+      minLng: -73.8890,
+      maxLng: -73.8600,
+    },
+  },
+  {
+    code: 'EWR',
+    name: 'Newark Liberty International Airport',
+    fee: 2.00,
+    polygon: [
+      // Newark Airport boundary polygon (Newark, NJ)
+      // Northwest corner
+      { lat: 40.7050, lng: -74.1900 },
+      // North (Terminal C area)
+      { lat: 40.7050, lng: -74.1600 },
+      // Northeast (I-95/NJ Turnpike)
+      { lat: 40.6950, lng: -74.1600 },
+      // East side
+      { lat: 40.6800, lng: -74.1650 },
+      // Southeast (Runway area)
+      { lat: 40.6700, lng: -74.1750 },
+      // South (Elizabeth area)
+      { lat: 40.6700, lng: -74.1900 },
+      // Southwest
+      { lat: 40.6850, lng: -74.1900 },
+      // Close polygon
+      { lat: 40.7050, lng: -74.1900 },
+    ],
+    boundingBox: {
+      minLat: 40.6700,
+      maxLat: 40.7050,
+      minLng: -74.1900,
+      maxLng: -74.1600,
+    },
+  },
+  {
+    code: 'HPN',
+    name: 'Westchester County Airport',
+    fee: 1.00,
+    polygon: [
+      // Westchester HPN Airport boundary polygon (White Plains, NY)
+      // Northwest corner
+      { lat: 41.0750, lng: -73.7150 },
+      // North
+      { lat: 41.0750, lng: -73.6950 },
+      // Northeast
+      { lat: 41.0680, lng: -73.6950 },
+      // East
+      { lat: 41.0600, lng: -73.6980 },
+      // Southeast
+      { lat: 41.0550, lng: -73.7050 },
+      // South
+      { lat: 41.0550, lng: -73.7150 },
+      // Southwest
+      { lat: 41.0620, lng: -73.7150 },
+      // Close polygon
+      { lat: 41.0750, lng: -73.7150 },
+    ],
+    boundingBox: {
+      minLat: 41.0550,
+      maxLat: 41.0750,
+      minLng: -73.7150,
+      maxLng: -73.6950,
+    },
+  },
+];
+
+/**
+ * Detect if a point is within any TLC-regulated airport zone
+ * Uses precise polygon-based geo-detection for accurate boundary matching
+ * Returns the airport config if found, null otherwise
+ */
+function detectTLCAirportZone(
+  point: { lat: number; lng: number }
+): TLCAirportConfig | null {
+  const lat = point.lat;
+  const lng = point.lng;
+  
+  for (const airport of TLC_AIRPORT_ZONES) {
+    // Quick bounding box pre-check for performance
+    const bb = airport.boundingBox;
+    if (lat < bb.minLat || lat > bb.maxLat || lng < bb.minLng || lng > bb.maxLng) {
+      continue;
+    }
+    
+    // Use precise polygon check for points within bounding box
+    if (isPointInPolygon(point, airport.polygon)) {
+      return airport;
+    }
+  }
+  
+  return null;
+}
+
+/**
  * Detect if a point is within the Manhattan Congestion Zone (below 96th Street)
  * Uses precise polygon-based geo-detection for accurate zone boundary matching
  * 
@@ -1068,7 +1248,7 @@ export class FareCalculationService {
     const trafficApplied = trafficMultiplier !== 1 || trafficAdjustment > 0;
     
     // ============================================
-    // 3. SURGE MULTIPLIER (Dynamic High-Demand)
+    // 4. SURGE MULTIPLIER (Dynamic High-Demand)
     // ============================================
     const effectiveSurge = Math.min(surgeMultiplier, Number(fareConfig.maxSurgeMultiplier));
     const surgeAdjusted = roundCurrency(trafficAdjusted * effectiveSurge);
@@ -1113,9 +1293,10 @@ export class FareCalculationService {
     }
     
     // ============================================
-    // 6A. NYC TLC CONGESTION PRICING
+    // 6A. NYC TLC CONGESTION PRICING (Post-Surge)
     // $2.75 flat fee for trips in Manhattan below 96th Street
-    // Applied AFTER TLC base fare, BEFORE airport fees
+    // FLAT regulatory fee - does NOT participate in surge
+    // Full amount is pass-through (remitted to government)
     // ============================================
     let congestionFee = 0;
     let congestionFeeApplied = false;
@@ -1126,6 +1307,34 @@ export class FareCalculationService {
     if (pickupInCongestionZone || dropoffInCongestionZone) {
       congestionFee = MANHATTAN_CONGESTION_ZONE.fee;
       congestionFeeApplied = true;
+    }
+    
+    // ============================================
+    // 6B. NYC TLC AIRPORT ACCESS FEE (Post-Surge)
+    // Flat fees for TLC-regulated airports (JFK, LGA, EWR, HPN)
+    // FLAT regulatory fee - does NOT participate in surge
+    // Full amount is pass-through (remitted to government)
+    // Fee applies if pickup OR dropoff is inside airport polygon
+    // ============================================
+    let tlcAirportFee = 0;
+    let tlcAirportFeeApplied = false;
+    let tlcAirportName: string | undefined;
+    let tlcAirportCode: string | undefined;
+    
+    const pickupTLCAirport = detectTLCAirportZone(pickup);
+    const dropoffTLCAirport = detectTLCAirportZone(dropoff);
+    
+    // Fee applies for pickup OR dropoff in airport zone (not cumulative)
+    if (pickupTLCAirport) {
+      tlcAirportFee = pickupTLCAirport.fee;
+      tlcAirportName = pickupTLCAirport.name;
+      tlcAirportCode = pickupTLCAirport.code;
+      tlcAirportFeeApplied = true;
+    } else if (dropoffTLCAirport) {
+      tlcAirportFee = dropoffTLCAirport.fee;
+      tlcAirportName = dropoffTLCAirport.name;
+      tlcAirportCode = dropoffTLCAirport.code;
+      tlcAirportFeeApplied = true;
     }
     
     // ============================================
@@ -1357,12 +1566,15 @@ export class FareCalculationService {
     // 11. SUBTOTAL (Before service fee and discounts)
     // Promo discounts apply AFTER fees, BEFORE service fee
     // ============================================
+    // TLC fees (congestion + airport) are FLAT regulatory fees applied post-surge
+    // They do NOT participate in surge - full amounts are pass-through to government
     const subtotalBeforeDiscount = roundCurrency(
       surgeAdjusted + 
       nightSurcharge + 
       peakHourSurcharge + 
       longDistanceFee +
       congestionFee +
+      tlcAirportFee +
       crossCitySurcharge +
       crossStateSurcharge +
       returnDeadheadFee +
@@ -1476,8 +1688,14 @@ export class FareCalculationService {
     // - Driver payout (includes distance, time, and driver-paid tolls)
     // - Regulatory fees (goes to government, not SafeGo)
     // - State regulatory fees (state-specific fees remitted to government)
+    // - TLC congestion fee (NYC congestion zone fee remitted to government)
+    // - TLC airport fee (airport access fee remitted to government)
     // Note: Additional fees (booking, safety, eco) and service fee are SafeGo revenue
-    const allRegulatoryFees = roundCurrency(regulatoryFeesTotal + stateRegulatoryFee);
+    // Note: TLC fees are included in pre-surge base but surged portion is SafeGo revenue;
+    //       only original amounts are pass-through
+    const allRegulatoryFees = roundCurrency(
+      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee
+    );
     const calcPassThroughCosts = (payout: number) => 
       roundCurrency(payout + allRegulatoryFees);
     
@@ -1609,6 +1827,7 @@ export class FareCalculationService {
       crossCityApplied,
       crossStateApplied,
       congestionFeeApplied,
+      tlcAirportFeeApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -1660,6 +1879,9 @@ export class FareCalculationService {
       
       // Location-based fees
       congestionFee,
+      tlcAirportFee,
+      tlcAirportName,
+      tlcAirportCode,
       airportFee,
       airportCode,
       borderZoneFee,
@@ -1705,6 +1927,7 @@ export class FareCalculationService {
       crossStateApplied,
       regulatoryFeeApplied,
       congestionFeeApplied,
+      tlcAirportFeeApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
