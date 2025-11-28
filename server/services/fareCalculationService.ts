@@ -177,6 +177,7 @@ export interface FareFlags {
   congestionFeeApplied: boolean;
   tlcAirportFeeApplied: boolean;
   tlcAVFFeeApplied: boolean;
+  tlcBCFFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneApplied: boolean;
   regulatoryFeeApplied: boolean;
@@ -238,6 +239,8 @@ export interface RouteFareBreakdown {
   tlcAirportName?: string;
   tlcAirportCode?: string;
   tlcAVFFee: number;
+  tlcBCFFee: number;
+  tlcBCFFeeRate: number;
   airportFee: number;
   airportCode?: string;
   borderZoneFee: number;
@@ -292,6 +295,7 @@ export interface RouteFareBreakdown {
   congestionFeeApplied: boolean;
   tlcAirportFeeApplied: boolean;
   tlcAVFFeeApplied: boolean;
+  tlcBCFFeeApplied: boolean;
   airportFeeApplied: boolean;
   borderZoneFeeApplied: boolean;
   returnDeadheadApplied: boolean;
@@ -1358,6 +1362,27 @@ export class FareCalculationService {
     }
     
     // ============================================
+    // PRE-TLC: DETECT REGULATORY ZONES EARLY FOR TLC FEE ELIGIBILITY
+    // Zone detection is needed before AVF/BCF for borough-level eligibility checks
+    // The results are also reused later for general regulatory fee processing
+    // ============================================
+    const pickupZones = await this.detectZones(pickup, true);
+    const dropoffZones = await this.detectZones(dropoff, false);
+    
+    // Extract borough codes for TLC fee eligibility (AVF, BCF)
+    // Zone format: { zone: RegulatoryZone, fees: RegulatoryFeeConfig[] }
+    const matchedPickupZones = pickupZones.map(z => ({
+      zoneId: z.zone.id,
+      zoneType: z.zone.zoneType,
+      stateCode: z.zone.stateCode,
+    }));
+    const matchedDropoffZones = dropoffZones.map(z => ({
+      zoneId: z.zone.id,
+      zoneType: z.zone.zoneType,
+      stateCode: z.zone.stateCode,
+    }));
+    
+    // ============================================
     // 6A. NYC TLC CONGESTION PRICING (Post-Surge)
     // $2.75 flat fee for trips in Manhattan below 96th Street
     // FLAT regulatory fee - does NOT participate in surge
@@ -1644,11 +1669,10 @@ export class FareCalculationService {
     const tollsTotal = roundCurrency(tollsBreakdown.reduce((sum, t) => sum + t.amount, 0));
     
     // ============================================
-    // 9. DETECT REGULATORY ZONES (NYC RTA, BCF, Airport)
+    // 9. PROCESS REGULATORY ZONE FEES (NYC RTA, BCF, Airport)
+    // Zone detection was already done earlier for TLC fee eligibility (AVF, BCF)
+    // Here we just process the fees from those pre-detected zones
     // ============================================
-    const pickupZones = await this.detectZones(pickup, true);
-    const dropoffZones = await this.detectZones(dropoff, false);
-    
     const allZoneIds = new Set<string>();
     const matchedZoneIds: string[] = [];
     const regulatoryFeesBreakdown: FeeBreakdownItem[] = [];
@@ -1707,8 +1731,9 @@ export class FareCalculationService {
     // 11. SUBTOTAL (Before service fee and discounts)
     // Promo discounts apply AFTER fees, BEFORE service fee
     // ============================================
-    // TLC fees (congestion + airport + AVF) are FLAT regulatory fees applied post-surge
+    // TLC fees (congestion + airport + AVF + BCF) are regulatory fees applied post-surge
     // They do NOT participate in surge - full amounts are pass-through to government
+    // BCF (2.75%) is calculated on the pre-commission fare base
     const subtotalBeforeDiscount = roundCurrency(
       surgeAdjusted + 
       nightSurcharge + 
@@ -1717,6 +1742,7 @@ export class FareCalculationService {
       congestionFee +
       tlcAirportFee +
       tlcAVFFee +
+      tlcBCFFee +
       crossCitySurcharge +
       crossStateSurcharge +
       returnDeadheadFee +
@@ -1833,11 +1859,12 @@ export class FareCalculationService {
     // - TLC congestion fee (NYC congestion zone fee remitted to government)
     // - TLC airport fee (airport access fee remitted to government)
     // - TLC AVF fee (Accessible Vehicle Fund fee remitted to government)
+    // - TLC BCF fee (Black Car Fund contribution remitted to BCF, not SafeGo revenue)
     // Note: Additional fees (booking, safety, eco) and service fee are SafeGo revenue
     // Note: TLC fees are included in pre-surge base but surged portion is SafeGo revenue;
     //       only original amounts are pass-through
     const allRegulatoryFees = roundCurrency(
-      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee
+      regulatoryFeesTotal + stateRegulatoryFee + congestionFee + tlcAirportFee + tlcAVFFee + tlcBCFFee
     );
     const calcPassThroughCosts = (payout: number) => 
       roundCurrency(payout + allRegulatoryFees);
@@ -1972,6 +1999,7 @@ export class FareCalculationService {
       congestionFeeApplied,
       tlcAirportFeeApplied,
       tlcAVFFeeApplied,
+      tlcBCFFeeApplied,
       airportFeeApplied,
       borderZoneApplied: borderZoneFeeApplied,
       regulatoryFeeApplied,
@@ -2027,6 +2055,8 @@ export class FareCalculationService {
       tlcAirportName,
       tlcAirportCode,
       tlcAVFFee,
+      tlcBCFFee,
+      tlcBCFFeeRate,
       airportFee,
       airportCode,
       borderZoneFee,
@@ -2074,6 +2104,7 @@ export class FareCalculationService {
       congestionFeeApplied,
       tlcAirportFeeApplied,
       tlcAVFFeeApplied,
+      tlcBCFFeeApplied,
       airportFeeApplied,
       borderZoneFeeApplied,
       returnDeadheadApplied,
