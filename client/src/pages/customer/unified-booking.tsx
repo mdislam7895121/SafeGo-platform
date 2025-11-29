@@ -621,7 +621,7 @@ export default function UnifiedBookingPage() {
   const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
   
   // Chat WebSocket hook - stays connected even when drawer is closed
-  const isChatActive = (rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && !!demoRideId;
+  const isChatActive = (rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && !!currentRideId;
   
   const handleNewDriverMessage = useCallback(() => {
     if (!isChatOpen) {
@@ -643,7 +643,7 @@ export default function UnifiedBookingPage() {
     markAsRead: markChatAsRead,
     clearUnread: clearChatUnread,
   } = useRideChat({
-    rideId: demoRideId,
+    rideId: currentRideId,
     isActive: isChatActive,
     isDrawerOpen: isChatOpen,
     onNewDriverMessage: handleNewDriverMessage,
@@ -3634,7 +3634,7 @@ export default function UnifiedBookingPage() {
       <SupportChatDrawer
         isOpen={isSupportChatOpen}
         onOpenChange={setIsSupportChatOpen}
-        rideId={demoRideId}
+        rideId={currentRideId}
         tripContext={pickup && dropoff ? {
           pickupAddress: pickup.address,
           dropoffAddress: dropoff.address,
