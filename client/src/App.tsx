@@ -12,11 +12,10 @@ import Signup from "@/pages/signup";
 import CustomerRegister from "@/pages/customer-register";
 
 // Customer pages
-import CustomerHome from "@/pages/customer/home";
+// NOTE: CustomerHome and RideRequest are LEGACY - now using UnifiedBooking
 import CustomerProfile from "@/pages/customer/profile";
 import CustomerKYC from "@/pages/customer/kyc";
 import CustomerActivity from "@/pages/customer/activity";
-import RideRequest from "@/pages/customer/ride-request";
 import RideDetails from "@/pages/customer/ride-details";
 import RideAssigned from "@/pages/customer/ride-assigned";
 import OrderConfirmation from "@/pages/customer/order-confirmation";
