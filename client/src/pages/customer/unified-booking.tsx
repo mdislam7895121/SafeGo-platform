@@ -804,17 +804,14 @@ export default function UnifiedBookingPage() {
                       );
                     })()}
 
-                    {/* Route Selection - Professional chip design - BEFORE ride selection per UX hierarchy */}
+                    {/* Route Selection - All 3 route buttons always visible */}
                     {routes.length > 1 && (
-                      <div className="pt-2 pb-1">
+                      <div className="pt-3 pb-2">
                         <p className="text-sm font-semibold mb-3">
                           Choose your route
                         </p>
-                        {/* Route Chips Container - Desktop: flex row, Mobile: horizontal scroll */}
-                        <div 
-                          className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible snap-x snap-mandatory md:snap-none"
-                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                        >
+                        {/* Route Chips Container - flex-wrap ensures all buttons visible */}
+                        <div className="flex flex-wrap gap-2">
                           {routes.map((route, index) => {
                             const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
                             const isActive = route.id === activeRouteId;
@@ -823,10 +820,10 @@ export default function UnifiedBookingPage() {
                               <button
                                 key={route.id}
                                 onClick={() => setActiveRouteId(route.id)}
-                                className={`relative flex-shrink-0 flex flex-col p-3 rounded-xl transition-all snap-start ${
+                                className={`relative flex flex-col p-3 rounded-xl transition-all flex-1 min-w-[31%] max-w-[33%] ${
                                   isActive 
-                                    ? "border-2 border-primary bg-primary/5 shadow-md min-w-[130px]" 
-                                    : "border border-border bg-background hover:border-primary/40 hover:shadow-sm min-w-[130px]"
+                                    ? "border-2 border-primary bg-primary/5 shadow-md" 
+                                    : "border border-border bg-background hover:border-primary/40 hover:shadow-sm"
                                 }`}
                                 data-testid={`route-button-${route.id}`}
                               >
@@ -837,11 +834,11 @@ export default function UnifiedBookingPage() {
                                   </div>
                                 )}
                                 {/* Route Label */}
-                                <span className={`text-sm font-semibold text-left pr-12 ${isActive ? "text-primary" : "text-foreground"}`}>
+                                <span className={`text-xs md:text-sm font-semibold text-left pr-10 truncate ${isActive ? "text-primary" : "text-foreground"}`}>
                                   {routeLabel}
                                 </span>
                                 {/* Duration and Distance on single line */}
-                                <span className="text-xs text-muted-foreground mt-1.5 text-left">
+                                <span className="text-[10px] md:text-xs text-muted-foreground mt-1 text-left truncate">
                                   {formatDurationMinutes(etaMin)} • {route.distanceMiles.toFixed(1)} mi
                                 </span>
                               </button>
