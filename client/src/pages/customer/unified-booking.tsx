@@ -244,6 +244,45 @@ export default function UnifiedBookingPage() {
     setIsClient(true);
   }, []);
 
+  // Fetch active promotions from backend and auto-apply default promo
+  useEffect(() => {
+    const fetchPromotions = async () => {
+      setIsLoadingPromos(true);
+      try {
+        const data = await apiRequest("/api/customer/active-promotions", {
+          method: "GET"
+        });
+        
+        if (data.promotions && data.promotions.length > 0) {
+          setAvailablePromos(data.promotions);
+          
+          // Auto-apply the default promo if one exists
+          const defaultPromo = data.promotions.find((p: BackendPromo) => p.isDefault);
+          if (defaultPromo) {
+            setAppliedPromo({
+              id: defaultPromo.id,
+              code: defaultPromo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
+              discountPercent: defaultPromo.discountType === "PERCENT" ? defaultPromo.value : 0,
+              discountFlat: defaultPromo.discountType === "FLAT" ? defaultPromo.value : 0,
+              discountType: defaultPromo.discountType,
+              maxDiscountAmount: defaultPromo.maxDiscountAmount,
+              label: defaultPromo.name,
+              description: defaultPromo.description,
+              isDefault: defaultPromo.isDefault
+            });
+            console.log("[UnifiedBooking] Auto-applied default promo:", defaultPromo.name);
+          }
+        }
+      } catch (error) {
+        console.error("[UnifiedBooking] Failed to fetch promotions:", error);
+      } finally {
+        setIsLoadingPromos(false);
+      }
+    };
+
+    fetchPromotions();
+  }, []);
+
   useEffect(() => {
     if (!pickup || !dropoff || !isGoogleMapsReady) return;
 

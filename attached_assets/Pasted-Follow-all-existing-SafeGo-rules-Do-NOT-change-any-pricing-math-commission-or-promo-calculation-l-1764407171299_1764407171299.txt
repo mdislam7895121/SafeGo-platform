@@ -1,0 +1,69 @@
+Follow all existing SafeGo rules. Do NOT change any pricing math, commission, or promo calculation logic. Only fix the UI so that active promos are always clearly visible on the unified customer booking experience.
+
+Context:
+- On my current desktop unified booking screen (the one that shows the SafeGo logo, the big origin/destination bar, and the map on the right), the ride cards look correct (SafeGo X, SafeGo Comfort, Limited/Popular badges, etc.).
+- However, even when a Saver / promo discount is applied in the backend, the UI still shows only the final price (e.g., $245.01) and no promo banner, no strikethrough original price, and no “You save $X.XX” text.
+- You previously updated `client/src/pages/customer/unified-booking.tsx` and said there is:
+  1) a light green pill banner with promo name and discount,
+  2) ride cards showing original price (strikethrough), bold final price, “You save $X.XX” text, and a green “Saver” badge.
+  But on my screen none of that appears.
+
+I need you to do the following **step by step** and explain in comments so I can verify:
+
+1. **Find the exact customer page currently used**
+   - Identify which React page is actually rendered for the route I’m using now (the one showing:
+     - the big origin/destination capsule,
+     - the map on the right,
+     - and the grid of SafeGo X / SafeGo Comfort cards).
+   - Confirm whether this is `unified-booking.tsx`, `/customer/index.tsx`, or a different page.
+   - Make sure there is only ONE active desktop booking layout for Ride (no duplicate or legacy layout). If there are older ride-list components, remove or disable them so only the new unified design is used.
+
+2. **Wire promo data into the ride cards**
+   - From whatever pricing / quote object we already use, make sure each ride card receives both:
+       - `originalPrice` (fare without promo)
+       - `finalPrice` (fare after promo)
+       - `savingsAmount` (originalPrice - finalPrice)
+       - optionally `promoName` (e.g. "SafeGo Everyday Saver") and `promoPercent`.
+   - If the backend already computes these (for the fare summary), reuse that data instead of recalculating.
+   - In the card props, add a simple boolean like `hasDiscount = originalPrice > finalPrice`.
+
+3. **Implement visible promo UI on each ride card**
+   For the ride card component that is used in the current layout:
+   - If `hasDiscount` is true:
+     - Show the **original price** in a small gray font with strikethrough on the same card, e.g. `$259.00` with `text-gray-400 line-through`.
+     - Show the **final price** as the main bold price, e.g. `$245.01` using the existing main price style.
+     - Under the prices, show a small green text line:  
+       `You save $X.XX` using a SafeGo green color (for example `#16A34A` or the existing green token).
+     - Add a small green **“Saver” pill badge** on the card (top-right or near the Popular/ Limited badges). Use a pill shape with a light green background and darker green text. This badge should appear only when `hasDiscount` is true.
+   - If `hasDiscount` is false:
+     - Do NOT render any of the promo UI (no Saver badge, no strikethrough, no “You save” text).
+
+4. **Add the top promo banner above the ride list**
+   - On the unified booking page, above the “Choose a ride” grid, add a single light green pill-shaped banner that appears only when **any** ride in the current quote has `hasDiscount = true`.
+   - Banner content:
+     - Left side: promo name and discount percent, e.g. `SafeGo Everyday Saver — 15% off your ride`.
+     - Right side: a subtle “Details” or “Applied” label.
+   - Use a background similar to `#ECFDF3` and keep the banner height reasonable so it looks like a slim notification, not a huge card.
+   - If there is no active promo, hide this banner completely.
+
+5. **Make sure this works for both desktop and mobile**
+   - The promo logic (banner + card-level UI) must work in both desktop layout and the responsive/mobile layout.
+   - On mobile:
+     - If the ride cards are in a vertical list or horizontal carousel, the same promo UI must still appear on each discounted card.
+     - Ensure nothing overflows the card width (no clipped text, no hidden badge).
+
+6. **Clean up legacy or conflicting promo UI**
+   - Search the codebase for any older promo components (e.g. previous “Everyday Saver” banners, “You save” chips, etc.) that are no longer used.
+   - Remove or disable them so that the new promo UI described above is the **only** promo display in the booking flow.
+
+7. **Verification steps (must perform and describe)**
+   - Use a test ride where a Saver promo is definitely active (for example, 15% discount) and confirm:
+     - The banner above the ride list is visible with the correct promo name and percent.
+     - Each discounted ride card shows:
+       - original price with strikethrough,
+       - bold final price,
+       - “You save $X.XX” line,
+       - a green “Saver” badge.
+   - Take a screenshot and confirm in your message that you see the promo visuals on the same page/layout that I see in my screenshots.
+
+Do not change any fare math, commission, or backend promo rules. Only fix how promo information is **displayed** on the unified customer booking UI and ensure it appears consistently in the layout I am currently using.
