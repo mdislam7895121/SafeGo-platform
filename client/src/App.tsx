@@ -26,6 +26,7 @@ import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
 import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import CustomerMyReviews from "@/pages/customer/my-reviews";
 import ParcelRequest from "@/pages/customer/parcel-request";
+import UnifiedBooking from "@/pages/customer/unified-booking";
 import CustomerSupport from "@/pages/customer/support";
 import MySupportTickets from "@/pages/customer/my-support-tickets";
 import CreateSupportTicket from "@/pages/customer/create-support-ticket";
@@ -313,6 +314,11 @@ function Router() {
       <Route path="/customer/parcel">
         <ProtectedRoute allowedRoles={["customer"]}>
           <ParcelRequest />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/unified-booking">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <UnifiedBooking />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/support">
