@@ -1293,28 +1293,6 @@ export default function UnifiedBookingPage() {
             )}
           </div>
           
-          {activeService === "ride" && showChooseRide && activeRoute && (
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t z-30 safe-area-bottom">
-              <Button
-                onClick={handleRequestRide}
-                disabled={!canRequestRide}
-                className="w-full h-14 text-base font-semibold rounded-xl shadow-lg"
-                data-testid="button-confirm-ride-mobile"
-              >
-                {isRequestingRide ? (
-                  <>
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Confirming...
-                  </>
-                ) : (
-                  <>
-                    Confirm Ride
-                    <span className="ml-2 opacity-90">• ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
         </div>
 
         <div className="flex-1 min-h-[250px] lg:min-h-0 relative overflow-hidden">
@@ -1391,6 +1369,30 @@ export default function UnifiedBookingPage() {
           )}
         </div>
       </div>
+
+      {/* Mobile Fixed Bottom Button - Outside all containers for proper positioning */}
+      {activeService === "ride" && showChooseRide && activeRoute && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t z-50 safe-area-bottom">
+          <Button
+            onClick={handleRequestRide}
+            disabled={!canRequestRide}
+            className="w-full h-14 text-base font-semibold rounded-xl shadow-lg"
+            data-testid="button-confirm-ride-mobile"
+          >
+            {isRequestingRide ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Confirming...
+              </>
+            ) : (
+              <>
+                Confirm Ride
+                <span className="ml-2 opacity-90">• ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
