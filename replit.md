@@ -60,3 +60,57 @@ The schema uses UUID primary keys, indexed foreign keys, and decimal types for m
 - **Environment Variables**: `DATABASE_URL`, `JWT_SECRET`, `NODE_ENV`, `ENCRYPTION_KEY`, `SESSION_SECRET`.
 - **Optional Integrations**: Twilio (SMS OTP), AgentMail (Email OTP).
 - **Google Maps Integration**: Client-side only using `GOOGLE_MAPS_API_KEY` for Maps JavaScript API, Places API, Directions API, and Geocoding API.
+
+## Security Rules - Data Visibility
+
+### PERMANENT VISIBILITY RULES (DO NOT MODIFY)
+
+These rules define what data each user role can see. Violations are security incidents.
+
+#### Customer (Rider) - NEVER Sees:
+- `driverPayout` / `driverEarnings` / `netEarnings`
+- `safegoCommission` / `safeGoCommission` / `platformCommission`
+- `commissionRate` / `commissionAmount` / `commissionPercentage`
+- `driverEarningsNet` / `driverEarningsBase`
+- Any field revealing how fare is split between platform and driver
+
+#### Customer (Rider) - CAN See:
+- `totalFare` / `finalFare` / `estimatedFare`
+- `baseFare`, `distanceFare`, `timeFare` (fare components)
+- `discountAmount` / `promoDiscount` / `promoCode`
+- `paymentMethod` / `paymentType`
+- `estimatedTime` / `estimatedDistance` / `etaMinutes`
+- `taxesAndSurcharges` / `regulatoryFeesTotal` (aggregate)
+- `tollsTotal` / `surgeAmount` / `surgeMultiplier`
+
+#### Driver - CAN See (in addition to customer fields):
+- All DRIVER-ONLY fields listed above
+- `bonusAmount` / `incentiveAmount`
+- `tollsBreakdown` / `regulatoryFeesBreakdown`
+- `tipAmount` / `tollsAmount` / `adjustments`
+
+### Implementation Enforcement
+
+1. **API Level** (server/routes/):
+   - Customer endpoints must strip driver-only fields before response
+   - Use `shared/visibilityRules.ts::stripDriverOnlyFields()` helper
+   - Validate responses don't contain driver-only fields
+
+2. **Component Level** (client/src/components/):
+   - `FareBreakdown` and `FareDetailsAccordion` have `showDriverEarnings` prop
+   - Defaults to `false` - only set `true` in driver-facing pages
+   - Type interfaces have DRIVER-ONLY comments on sensitive fields
+
+3. **Type Level** (shared/):
+   - `shared/visibilityRules.ts` defines `DRIVER_ONLY_FIELDS` array
+   - `CustomerSafeView<T>` type strips driver fields
+   - `validateCustomerSafe()` logs violations in dev
+
+### Files to Check When Modifying Fare/Earnings:
+- `shared/visibilityRules.ts` - Central visibility definitions
+- `client/src/lib/fareTypes.ts` - Client fare type definitions
+- `client/src/components/ride/FareBreakdown.tsx` - Main fare display
+- `client/src/components/ride/FareDetailsAccordion.tsx` - Compact fare display
+- `server/routes/customer.ts` - Customer API endpoints
+- `server/routes/rides.ts` - Ride endpoints (role-aware)
+- `server/routes/driver-trips.ts` - Driver-only earnings endpoints

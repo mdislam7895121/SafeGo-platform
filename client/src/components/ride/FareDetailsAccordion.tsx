@@ -2,6 +2,11 @@ import { ChevronDown, DollarSign, Clock, MapPin, Receipt, Percent, User, Buildin
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useState } from "react";
 
+/**
+ * Fare breakdown details for display
+ * NOTE: safegoCommission and driverEarnings are DRIVER-ONLY fields
+ * They should only be populated when showDriverEarnings=true (driver context)
+ */
 export interface FareBreakdownDetails {
   baseFare: number;
   timeCost: number;
@@ -10,8 +15,6 @@ export interface FareBreakdownDetails {
   taxesAndSurcharges: number;
   minimumFareAdjustment?: number;
   subtotal: number;
-  safegoCommission?: number;
-  driverEarnings?: number;
   discountAmount?: number;
   totalFare: number;
   distanceMiles: number;
@@ -21,13 +24,27 @@ export interface FareBreakdownDetails {
   promoCode?: string | null;
 }
 
-interface FareDetailsAccordionProps {
-  breakdown: FareBreakdownDetails;
-  className?: string;
-  showCommission?: boolean;
+/**
+ * Extended breakdown with driver-only fields
+ * Use this interface ONLY in driver-facing components
+ */
+export interface DriverFareBreakdownDetails extends FareBreakdownDetails {
+  safegoCommission: number;
+  driverEarnings: number;
 }
 
-export function FareDetailsAccordion({ breakdown, className = "", showCommission = true }: FareDetailsAccordionProps) {
+interface FareDetailsAccordionProps {
+  breakdown: FareBreakdownDetails | DriverFareBreakdownDetails;
+  className?: string;
+  /**
+   * Show driver earnings (commission and payout)
+   * SECURITY: Must be false for customer-facing UI
+   * Only set to true in driver-facing components
+   */
+  showDriverEarnings?: boolean;
+}
+
+export function FareDetailsAccordion({ breakdown, className = "", showDriverEarnings = false }: FareDetailsAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
@@ -118,8 +135,8 @@ export function FareDetailsAccordion({ breakdown, className = "", showCommission
             </>
           )}
 
-          {/* Commission Section - Only shown when showCommission is true */}
-          {showCommission && breakdown.safegoCommission !== undefined && breakdown.driverEarnings !== undefined && (
+          {/* Driver Earnings Section - ONLY shown for drivers, NEVER for customers */}
+          {showDriverEarnings && 'safegoCommission' in breakdown && 'driverEarnings' in breakdown && (
             <>
               <div className="h-px bg-border my-2" />
 
@@ -132,7 +149,7 @@ export function FareDetailsAccordion({ breakdown, className = "", showCommission
                     SafeGo commission (15%)
                   </span>
                   <span className="font-medium text-amber-600 dark:text-amber-400">
-                    -{formatCurrency(breakdown.safegoCommission)}
+                    -{formatCurrency((breakdown as DriverFareBreakdownDetails).safegoCommission)}
                   </span>
                 </div>
 
@@ -142,7 +159,7 @@ export function FareDetailsAccordion({ breakdown, className = "", showCommission
                     Driver earnings
                   </span>
                   <span className="font-medium text-green-600 dark:text-green-400">
-                    {formatCurrency(breakdown.driverEarnings)}
+                    {formatCurrency((breakdown as DriverFareBreakdownDetails).driverEarnings)}
                   </span>
                 </div>
               </div>

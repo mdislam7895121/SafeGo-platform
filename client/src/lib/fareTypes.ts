@@ -1,6 +1,11 @@
 /**
  * Fare Calculation Types for Client
  * Mirrors server/services/fareCalculationService.ts types
+ * 
+ * VISIBILITY RULES - DO NOT VIOLATE:
+ * - Fields marked as DRIVER-ONLY must NEVER be exposed to customers
+ * - Customer UI should use CustomerFareView or strip driver-only fields
+ * - See shared/visibilityRules.ts for enforcement utilities
  */
 
 import { type VehicleCategoryId as SafeGoVehicleCategoryId } from "@shared/vehicleCategories";
@@ -78,7 +83,15 @@ export interface RouteFareBreakdown {
   subtotal: number;
   totalFare: number;
   
+  /**
+   * DRIVER-ONLY: Amount paid to driver after commission
+   * Must NEVER be exposed to customer UI
+   */
   driverPayout: number;
+  /**
+   * DRIVER-ONLY: Platform commission amount
+   * Must NEVER be exposed to customer UI
+   */
   safegoCommission: number;
   
   matchedZoneIds: string[];

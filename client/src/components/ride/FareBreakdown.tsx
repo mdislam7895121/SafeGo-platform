@@ -141,12 +141,24 @@ export interface FareBreakdownData {
   driverMinimumPayoutApplied?: boolean;
   effectiveDiscountPct?: number;
   customerServiceFee?: number;
+  /**
+   * DRIVER-ONLY: Platform commission amount
+   * Must NEVER be exposed to customer UI - only shown when showDriverEarnings=true
+   */
   platformCommission?: number;
+  /**
+   * DRIVER-ONLY: Driver earnings after commission
+   * Must NEVER be exposed to customer UI - only shown when showDriverEarnings=true
+   */
   driverEarnings?: number;
   driverEarningsMinimumApplied?: boolean;
   marginProtectionCapped?: boolean;
   demandLevel?: DemandLevel;
   demandScore?: number;
+  /**
+   * DRIVER-ONLY: Commission rate percentage
+   * Must NEVER be exposed to customer UI - only shown when showDriverEarnings=true
+   */
   commissionRate?: number;
   dynamicCommissionApplied?: boolean;
   commissionCapped?: boolean;
@@ -199,6 +211,12 @@ export interface FareBreakdownProps {
   currency?: string;
   className?: string;
   alwaysExpanded?: boolean;
+  /**
+   * Show driver earnings section (commission and payout)
+   * SECURITY: Must be false for customer-facing UI
+   * Defaults to false - only set to true in driver-facing components
+   */
+  showDriverEarnings?: boolean;
 }
 
 function formatCurrency(amount: number, currency: string = "USD"): string {
@@ -294,7 +312,7 @@ function BreakdownLine({
   );
 }
 
-function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownData; currency: string }) {
+function BreakdownContent({ breakdown, currency, showDriverEarnings = false }: { breakdown: FareBreakdownData; currency: string; showDriverEarnings?: boolean }) {
   return (
     <div className="space-y-0.5">
       <BreakdownLine 
@@ -676,8 +694,8 @@ function BreakdownContent({ breakdown, currency }: { breakdown: FareBreakdownDat
         isTotal={true}
       />
       
-      {/* Driver and Platform Earnings Section */}
-      {(breakdown.driverEarnings !== undefined || breakdown.platformCommission !== undefined) && (
+      {/* Driver and Platform Earnings Section - ONLY shown when showDriverEarnings is true */}
+      {showDriverEarnings && (breakdown.driverEarnings !== undefined || breakdown.platformCommission !== undefined) && (
         <div className="border-t border-border mt-3 pt-3">
           <div className="text-xs text-muted-foreground mb-2 font-medium">Earnings Breakdown</div>
           {breakdown.driverEarnings !== undefined && (
@@ -778,6 +796,7 @@ export function FareBreakdown({
   currency = "USD",
   className = "",
   alwaysExpanded = false,
+  showDriverEarnings = false,
 }: FareBreakdownProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -789,7 +808,7 @@ export function FareBreakdown({
             <Receipt className="h-4 w-4" />
             Fare Details
           </h4>
-          <BreakdownContent breakdown={breakdown} currency={currency} />
+          <BreakdownContent breakdown={breakdown} currency={currency} showDriverEarnings={showDriverEarnings} />
         </CardContent>
       </Card>
     );
@@ -817,7 +836,7 @@ export function FareBreakdown({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0 px-4 pb-4">
-            <BreakdownContent breakdown={breakdown} currency={currency} />
+            <BreakdownContent breakdown={breakdown} currency={currency} showDriverEarnings={showDriverEarnings} />
           </CardContent>
         </CollapsibleContent>
       </Card>

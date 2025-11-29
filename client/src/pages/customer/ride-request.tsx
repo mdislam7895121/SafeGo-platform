@@ -67,8 +67,6 @@ interface FareEstimate {
   taxesAndSurcharges: number;
   minimumFareAdjustment: number;
   subtotal: number;
-  safegoCommission: number;
-  driverEarnings: number;
   totalFare: number;
   originalFare: number;
   discountAmount: number;
@@ -563,10 +561,6 @@ export default function RideRequest() {
     const minimumFareAdjustment = Math.round(Math.max(0, categoryConfig.minimumFare - calculatedSubtotal) * 100) / 100;
     const subtotal = Math.round(Math.max(calculatedSubtotal, categoryConfig.minimumFare) * 100) / 100;
     
-    const commissionRate = 0.15;
-    const safegoCommission = Math.round(subtotal * commissionRate * 100) / 100;
-    const driverEarnings = Math.round((subtotal - safegoCommission) * 100) / 100;
-    
     const originalFare = subtotal;
     
     // Calculate discount based on promo type (PERCENT or FLAT)
@@ -595,8 +589,6 @@ export default function RideRequest() {
       taxesAndSurcharges,
       minimumFareAdjustment,
       subtotal,
-      safegoCommission,
-      driverEarnings,
       totalFare: finalFare,
       originalFare,
       discountAmount,
@@ -1235,7 +1227,7 @@ export default function RideRequest() {
                 </Badge>
               </div>
               
-              {/* Fare Breakdown Accordion - Customer view (no commission shown) */}
+              {/* Fare Breakdown Accordion - Customer view (driver earnings hidden by default) */}
               <div className="mt-4 pt-3 border-t">
                 <FareDetailsAccordion 
                   breakdown={{
@@ -1254,7 +1246,6 @@ export default function RideRequest() {
                     perMinuteRate: fareEstimate.perMinuteRate,
                     promoCode: fareEstimate.promoCode,
                   }}
-                  showCommission={false}
                 />
               </div>
               
