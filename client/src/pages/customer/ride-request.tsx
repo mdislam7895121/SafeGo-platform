@@ -1222,131 +1222,137 @@ export default function RideRequest() {
         </div>
       </div>
 
-      {/* ========== MOBILE LAYOUT (< 1024px): STACKED ========== */}
-      <div className="lg:hidden flex-1 grid grid-rows-[minmax(40vh,1fr)_auto] overflow-hidden">
-        {/* Map section with overlay inputs */}
-        <div className="relative overflow-hidden z-[1]">
-        {isClient && (
-          <MapContainer
-            center={[mapCenter.lat, mapCenter.lng]}
-            zoom={14}
-            className="h-full w-full z-0"
-            zoomControl={false}
-            attributionControl={false}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; OpenStreetMap'
-            />
-            <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} />
-            
-            {pickup && pickupIcon && (
-              <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />
-            )}
-            {dropoff && dropoffIcon && (
-              <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />
-            )}
-            
-            {/* Render all routes - inactive routes first (dimmed), active route on top */}
-            {routePolylines.map(({ id, points }) => (
-              <Polyline
-                key={id}
-                positions={points}
-                pathOptions={{
-                  color: id === activeRouteId ? "#3B82F6" : "#94A3B8",
-                  weight: id === activeRouteId ? 5 : 3,
-                  opacity: id === activeRouteId ? 0.9 : 0.4,
-                }}
-                eventHandlers={{
-                  click: () => setActiveRouteId(id),
-                }}
+      {/* ========== MOBILE LAYOUT (< 1024px): UBER-STYLE VERTICAL LIST ==========
+       * MOBILE LAYOUT STRUCTURE:
+       * 1. Fixed-height map section (h-56 / 224px) with location card overlay
+       * 2. Scrollable content: promo banner → ride list (vertical rows) → fare summary
+       * 3. Sticky request button at bottom (always visible)
+       * 
+       * DESKTOP: Uses the 3-column grid layout above (hidden on mobile via lg:hidden)
+       */}
+      <div className="lg:hidden flex flex-col h-full overflow-hidden">
+        {/* MAP SECTION - Fixed height 224px with overlay inputs */}
+        <div className="h-56 relative flex-shrink-0 z-[1]">
+          {isClient && (
+            <MapContainer
+              center={[mapCenter.lat, mapCenter.lng]}
+              zoom={14}
+              className="h-full w-full z-0"
+              zoomControl={false}
+              attributionControl={false}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; OpenStreetMap'
               />
-            ))}
-          </MapContainer>
-        )}
-
-        {!pickup && (
-          <button
-            onClick={handleGetCurrentLocation}
-            disabled={isLocating}
-            className="absolute bottom-32 right-4 z-20 bg-background p-3 rounded-full shadow-lg border hover-elevate"
-            data-testid="button-recenter-map"
-          >
-            {isLocating ? (
-              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-            ) : (
-              <Crosshair className="h-6 w-6 text-blue-600" />
-            )}
-          </button>
-        )}
-
-        {/* C10-FIX: Pickup/dropoff box with solid white background - z-20 (above map) */}
-        <div className="absolute top-4 left-4 right-4 z-20">
-          <Card className="shadow-lg bg-background" data-testid="location-card">
-            <CardContent className="p-4 space-y-3">
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-                  <div className="h-3 w-3 rounded-full bg-blue-500 border-2 border-white shadow" />
-                  <div className="w-px h-8 bg-border" />
-                  <div className="h-3 w-3 rounded-full bg-red-500 border-2 border-white shadow" />
-                </div>
-                
-                <div className="pl-10 space-y-2">
-                  <GooglePlacesInput
-                    value={pickupQuery}
-                    onChange={setPickupQuery}
-                    onLocationSelect={handlePickupSelect}
-                    onCurrentLocation={handleGetCurrentLocation}
-                    isLoadingCurrentLocation={isLocating}
-                    placeholder={isLocating ? "Getting location..." : "Pickup location"}
-                    variant="pickup"
-                    showCurrentLocation={true}
-                    className="w-full"
-                  />
-                  
-                  <GooglePlacesInput
-                    value={dropoffQuery}
-                    onChange={setDropoffQuery}
-                    onLocationSelect={handleDropoffSelect}
-                    placeholder="Where to?"
-                    variant="dropoff"
-                    showCurrentLocation={false}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
-              {locationError && (
-                <Alert variant="destructive" className="mt-2" data-testid="location-error">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{locationError}</AlertDescription>
-                </Alert>
+              <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} />
+              
+              {pickup && pickupIcon && (
+                <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />
               )}
-            </CardContent>
-          </Card>
+              {dropoff && dropoffIcon && (
+                <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />
+              )}
+              
+              {routePolylines.map(({ id, points }) => (
+                <Polyline
+                  key={id}
+                  positions={points}
+                  pathOptions={{
+                    color: id === activeRouteId ? "#3B82F6" : "#94A3B8",
+                    weight: id === activeRouteId ? 5 : 3,
+                    opacity: id === activeRouteId ? 0.9 : 0.4,
+                  }}
+                  eventHandlers={{
+                    click: () => setActiveRouteId(id),
+                  }}
+                />
+              ))}
+            </MapContainer>
+          )}
 
-          {showSuggestions && (
-            <Card className="mt-3 shadow-lg max-h-[40vh] overflow-y-auto" data-testid="suggestions-card">
-              <CardContent className="p-2">
-                {validSavedPlaces.length > 0 && (
-                  <div className="mb-2">
-                    <p className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Saved Places
-                    </p>
-                    {savedPlaces.map((place) => (
-                      <SuggestionItem
-                        key={place.id}
-                        icon={getPlaceIcon(place.icon)}
-                        iconBg={getPlaceIconBg(place.icon)}
-                        title={place.name}
-                        subtitle={place.address}
-                        onClick={() => handleSuggestionClick(place)}
-                        testId={`suggestion-${place.id}`}
-                        disabled={place.lat === 0 && place.lng === 0}
-                      />
-                    ))}
+          {!pickup && (
+            <button
+              onClick={handleGetCurrentLocation}
+              disabled={isLocating}
+              className="absolute bottom-4 right-4 z-20 bg-background p-3 rounded-full shadow-lg border hover-elevate"
+              data-testid="button-recenter-map"
+            >
+              {isLocating ? (
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              ) : (
+                <Crosshair className="h-5 w-5 text-blue-600" />
+              )}
+            </button>
+          )}
+
+          {/* Location card overlay on map */}
+          <div className="absolute top-3 left-3 right-3 z-20">
+            <Card className="shadow-lg bg-background" data-testid="location-card">
+              <CardContent className="p-3 space-y-2">
+                <div className="relative">
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
+                    <div className="h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-white shadow" />
+                    <div className="w-px h-6 bg-border" />
+                    <div className="h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white shadow" />
                   </div>
+                  
+                  <div className="pl-8 space-y-1.5">
+                    <GooglePlacesInput
+                      value={pickupQuery}
+                      onChange={setPickupQuery}
+                      onLocationSelect={handlePickupSelect}
+                      onCurrentLocation={handleGetCurrentLocation}
+                      isLoadingCurrentLocation={isLocating}
+                      placeholder={isLocating ? "Getting location..." : "Pickup location"}
+                      variant="pickup"
+                      showCurrentLocation={true}
+                      className="w-full text-sm"
+                    />
+                    
+                    <GooglePlacesInput
+                      value={dropoffQuery}
+                      onChange={setDropoffQuery}
+                      onLocationSelect={handleDropoffSelect}
+                      placeholder="Where to?"
+                      variant="dropoff"
+                      showCurrentLocation={false}
+                      className="w-full text-sm"
+                    />
+                  </div>
+                </div>
+
+                {locationError && (
+                  <Alert variant="destructive" className="mt-1" data-testid="location-error">
+                    <AlertCircle className="h-3 w-3" />
+                    <AlertDescription className="text-xs">{locationError}</AlertDescription>
+                  </Alert>
                 )}
+              </CardContent>
+            </Card>
+
+            {showSuggestions && (
+              <Card className="mt-2 shadow-lg max-h-[30vh] overflow-y-auto" data-testid="suggestions-card">
+                <CardContent className="p-2">
+                  {validSavedPlaces.length > 0 && (
+                    <div className="mb-2">
+                      <p className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">
+                        Saved Places
+                      </p>
+                      {savedPlaces.map((place) => (
+                        <SuggestionItem
+                          key={place.id}
+                          icon={getPlaceIcon(place.icon)}
+                          iconBg={getPlaceIconBg(place.icon)}
+                          title={place.name}
+                          subtitle={place.address}
+                          onClick={() => handleSuggestionClick(place)}
+                          testId={`suggestion-${place.id}`}
+                          disabled={place.lat === 0 && place.lng === 0}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                 {recentLocations.length > 0 && (
                   <div>
@@ -1378,64 +1384,61 @@ export default function RideRequest() {
             </Card>
           )}
         </div>
-      </div>
-      {/* End of map section */}
+        {/* End of map section */}
+        </div>
 
-      {/* BOTTOM SHEET: Clean Uber-style vertical structure
-       * Structure: [A] Promo Banner -> [B] Heading -> [C] Cards (scrollable) -> [D] Request Button
-       * Max height: 58vh on mobile, 55vh desktop. Cards + fare area scrolls, button stays fixed.
-       */}
-      <div className="sticky bottom-0 z-20 bg-background border-t shadow-[0_-8px_24px_rgba(0,0,0,0.12)] flex flex-col max-h-[58vh] md:max-h-[55vh]">
-        
-        {/* [A] PROMO BANNER - Fixed at top of sheet */}
-        {activeRoute && appliedPromo && (
-          <div className="flex-shrink-0 px-4 pt-4 pb-2">
-            <div 
-              className="px-4 py-3 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
-              style={{ background: "#E7FCE5" }}
-              onClick={() => {
-                setAppliedPromo(null);
-                toast({ title: "Promo removed", description: "Viewing regular prices" });
-              }}
-              data-testid="promo-banner"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <Zap className="h-4 w-4 text-green-600" />
+        {/* SCROLLABLE CONTENT AREA - Promo + vertical ride list + fare summary */}
+        <div className="flex-1 overflow-y-auto bg-background pb-24">
+          
+          {/* Promo Banner - under map */}
+          {activeRoute && appliedPromo && (
+            <div className="px-4 pt-4 pb-2">
+              <div 
+                className="px-4 py-3 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
+                style={{ background: "#E7FCE5" }}
+                onClick={() => {
+                  setAppliedPromo(null);
+                  toast({ title: "Promo removed", description: "Viewing regular prices" });
+                }}
+                data-testid="promo-banner"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                    <Zap className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-800">{appliedPromo.label}</p>
+                    <p className="text-xs text-green-600">
+                      {appliedPromo.discountType === "PERCENT" 
+                        ? `${appliedPromo.discountPercent}% off` 
+                        : `$${appliedPromo.discountFlat} off`}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-green-800">{appliedPromo.label}</p>
-                  <p className="text-xs text-green-600">
-                    {appliedPromo.discountType === "PERCENT" 
-                      ? `${appliedPromo.discountPercent}% off your ride` 
-                      : `$${appliedPromo.discountFlat} off your ride`}
-                  </p>
-                </div>
+                <span className="text-[10px] text-green-600 font-medium">Tap to remove</span>
               </div>
-              <span className="text-xs text-green-600 font-medium">Tap to remove</span>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Apply Promo button when no promo active */}
-        {activeRoute && !appliedPromo && availablePromos.length > 0 && !isLoadingPromos && (
-          <div className="flex-shrink-0 px-4 pt-4 pb-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full h-11 text-sm gap-2 border-dashed border-green-300 text-green-700 hover:bg-green-50"
-              onClick={() => {
-                const promo = availablePromos[0];
-                setAppliedPromo({
-                  id: promo.id,
-                  code: promo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
-                  discountPercent: promo.discountType === "PERCENT" ? promo.value : 0,
-                  discountFlat: promo.discountType === "FLAT" ? promo.value : 0,
-                  discountType: promo.discountType,
-                  maxDiscountAmount: promo.maxDiscountAmount,
-                  label: promo.name,
-                  description: promo.description,
-                  isDefault: promo.isDefault
+          {/* Apply Promo button */}
+          {activeRoute && !appliedPromo && availablePromos.length > 0 && !isLoadingPromos && (
+            <div className="px-4 pt-4 pb-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-10 text-sm gap-2 border-dashed border-green-300 text-green-700 hover:bg-green-50"
+                onClick={() => {
+                  const promo = availablePromos[0];
+                  setAppliedPromo({
+                    id: promo.id,
+                    code: promo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
+                    discountPercent: promo.discountType === "PERCENT" ? promo.value : 0,
+                    discountFlat: promo.discountType === "FLAT" ? promo.value : 0,
+                    discountType: promo.discountType,
+                    maxDiscountAmount: promo.maxDiscountAmount,
+                    label: promo.name,
+                    description: promo.description,
+                    isDefault: promo.isDefault
                 });
                 toast({ title: "Promo applied!", description: `${promo.name} - ${promo.discountType === "PERCENT" ? `${promo.value}% off` : `$${promo.value} off`}` });
               }}
@@ -1447,33 +1450,19 @@ export default function RideRequest() {
           </div>
         )}
 
-        {/* [B] SECTION TITLE - Fixed below promo */}
-        {activeRoute && (
-          <div className="flex-shrink-0 px-4 pt-2 pb-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold flex items-center gap-2">
+          {/* Section title - Choose your ride */}
+          {activeRoute && (
+            <div className="px-4 pt-3 pb-2">
+              <p className="text-base font-semibold flex items-center gap-2">
                 <Car className="h-4 w-4" />
                 Choose your ride
               </p>
-              {isLoadingPromos && (
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Loading...</span>
-                </div>
-              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* [C] SCROLLABLE CONTENT - Cards + Fare summary scroll together */}
-        <div className="flex-1 overflow-y-auto px-4 pb-3">
-          {/* Ride cards carousel */}
+          {/* VERTICAL RIDE LIST - Uber-style full-width rows */}
           {activeRoute && (
-            <div 
-              className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 
-              role="group" 
-              aria-label="Vehicle category options"
-            >
+            <div className="px-4 space-y-2" data-testid="mobile-ride-list">
               {ACTIVE_VEHICLE_CATEGORIES.map((categoryId) => {
                 const catConfig = VEHICLE_CATEGORIES[categoryId];
                 const isSelected = categoryId === selectedVehicleCategory;
@@ -1482,196 +1471,108 @@ export default function RideRequest() {
                 const isUnavailable = checkUnavailable(categoryId);
                 const isLimited = checkLimited(categoryId);
                 const categoryETA = getETA(categoryId);
-                const etaText = categoryETA?.etaText ?? `${catConfig.etaMinutesOffset + 5} min`;
                 const etaMinutes = categoryETA?.etaMinutes ?? (catConfig.etaMinutesOffset + 5);
                 const hasDiscount = fareData.discountAmount > 0;
                 
                 return (
-                  <Tooltip key={categoryId}>
-                    <TooltipTrigger asChild>
-                      <div
-                        role="button"
-                        tabIndex={isUnavailable ? -1 : 0}
-                        onClick={() => !isUnavailable && setSelectedVehicleCategory(categoryId)}
-                        onKeyDown={(e) => {
-                          if ((e.key === 'Enter' || e.key === ' ') && !isUnavailable) {
-                            e.preventDefault();
-                            setSelectedVehicleCategory(categoryId);
-                          }
-                        }}
-                        aria-pressed={isSelected}
-                        aria-disabled={isUnavailable}
-                        aria-label={`${catConfig.displayName}, ${isUnavailable ? "No drivers nearby" : `$${fareData.finalFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaText}`}${isSelected ? ", selected" : ""}`}
-                        data-testid={`ride-pill-${categoryId}`}
-                        className={`
-                          w-[130px] rounded-[14px] p-3 flex-shrink-0 snap-start cursor-pointer
-                          transition-all duration-150 ease-out
-                          ${isSelected 
-                            ? "bg-white border-l-[4px] border-l-primary border-t border-r border-b border-[#E5E7EB] scale-[1.02]" 
-                            : isUnavailable
-                              ? "bg-muted/30 border border-[#E5E7EB] opacity-50 cursor-not-allowed"
-                              : "bg-white border border-[#E5E7EB] hover-elevate"
-                          }
-                        `}
-                        style={{
-                          boxShadow: isSelected 
-                            ? "0px 6px 16px rgba(0,0,0,0.12)" 
-                            : "0px 4px 14px rgba(0,0,0,0.08)",
-                        }}
-                      >
-                        {/* C10-FIX: Fixed height container prevents jumping on selection */}
-                        <div className="flex flex-col items-center gap-1.5 h-full">
-                          {/* 3D Vehicle Image - fixed height for consistency */}
-                          <div 
-                            className={`h-14 w-20 flex items-center justify-center overflow-hidden rounded-lg ${isUnavailable ? "opacity-40" : ""}`}
-                            style={{
-                              background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)",
-                            }}
-                          >
-                            <img 
-                              src={vehicleImage} 
-                              alt={catConfig.displayName}
-                              className={`w-[92%] h-[92%] object-contain transition-transform duration-200 ${isSelected ? "scale-105" : ""}`}
-                              style={{
-                                filter: isUnavailable 
-                                  ? "grayscale(1)" 
-                                  : "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))",
-                              }}
-                              data-testid={`img-vehicle-${categoryId}`}
-                            />
-                          </div>
-                          
-                          {/* Category Name - Full SafeGo branding, font-weight 600 */}
-                          <span 
-                            className={`text-xs text-center leading-tight whitespace-nowrap ${
-                              isUnavailable ? "text-muted-foreground" : "text-foreground"
-                            }`}
-                            style={{ fontWeight: 600 }}
-                          >
-                            {catConfig.displayName}
-                          </span>
-                          
-                          {isUnavailable ? (
-                            <span className="text-[10px] text-center" style={{ fontWeight: 400, color: "#6B7280" }}>
-                              No drivers nearby
-                            </span>
-                          ) : (
-                            <>
-                              {/* Price Display - Uber Style */}
-                              <div className="flex flex-col items-center gap-0.5">
-                                <span 
-                                  className="text-lg tracking-tight" 
-                                  style={{ fontWeight: 700, color: "#000000" }}
-                                  data-testid={`price-${categoryId}`}
-                                >
-                                  ${fareData.finalFare.toFixed(2)}
-                                </span>
-                                {hasDiscount && (
-                                  <span 
-                                    className="text-xs line-through" 
-                                    style={{ color: "#9CA3AF" }}
-                                    data-testid={`original-price-${categoryId}`}
-                                  >
-                                    ${fareData.originalFare.toFixed(2)}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              {/* You Save Badge - Green with lightning icon */}
-                              {hasDiscount && (
-                                <div 
-                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30" 
-                                  style={{ color: "#16A34A" }}
-                                  data-testid={`savings-${categoryId}`}
-                                >
-                                  <Zap className="h-2.5 w-2.5" aria-hidden="true" />
-                                  <span className="text-[10px]" style={{ fontWeight: 500 }}>
-                                    You save ${fareData.discountAmount.toFixed(2)}
-                                  </span>
-                                </div>
-                              )}
-                              
-                              {/* Seats & ETA */}
-                              <div className="flex items-center gap-1.5 text-[10px]" style={{ fontWeight: 400, color: "#6B7280" }}>
-                                <Users className="h-3 w-3" aria-hidden="true" />
-                                <span>{catConfig.seatCount}</span>
-                                <span className="opacity-50">|</span>
-                                <Clock className="h-3 w-3" aria-hidden="true" />
-                                <span data-testid={`eta-${categoryId}`}>{etaMinutes} min</span>
-                              </div>
-                            </>
-                          )}
-                          
-                          {/* Promo Badge - Green with lightning */}
-                          {hasDiscount && fareData.promoLabel && !isUnavailable && (
-                            <Badge 
-                              variant="secondary" 
-                              className="text-[8px] px-2 py-0.5 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0 rounded-full"
-                            >
-                              <Zap className="h-2 w-2 mr-0.5" />
-                              {fareData.promoLabel}
-                            </Badge>
-                          )}
-                          
-                          {/* Limited Badge - Yellow */}
-                          {isLimited && !isUnavailable && !hasDiscount && (
-                            <Badge 
-                              className="text-[8px] px-2 py-0.5 bg-amber-400 text-amber-950 border-0 rounded-full"
-                            >
-                              Limited
-                            </Badge>
-                          )}
-                          
-                          {/* Popular Badge - Blue */}
-                          {catConfig.isPopular && !isUnavailable && !isLimited && !hasDiscount && (
-                            <Badge 
-                              variant="secondary" 
-                              className="text-[8px] px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0 rounded-full"
-                            >
-                              Popular
-                            </Badge>
-                          )}
-                        </div>
+                  <div
+                    key={categoryId}
+                    role="button"
+                    tabIndex={isUnavailable ? -1 : 0}
+                    onClick={() => !isUnavailable && setSelectedVehicleCategory(categoryId)}
+                    onKeyDown={(e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && !isUnavailable) {
+                        e.preventDefault();
+                        setSelectedVehicleCategory(categoryId);
+                      }
+                    }}
+                    data-testid={`mobile-ride-row-${categoryId}`}
+                    className={`
+                      flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all
+                      ${isSelected 
+                        ? "bg-blue-50 dark:bg-blue-950/30 border-2 border-primary" 
+                        : isUnavailable
+                          ? "bg-muted/30 border border-[#E5E7EB] opacity-50 cursor-not-allowed"
+                          : "bg-background border border-[#E5E7EB] active:bg-muted/50"
+                      }
+                    `}
+                  >
+                    {/* Vehicle image - left */}
+                    <div 
+                      className="h-14 w-20 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden"
+                      style={{ background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)" }}
+                    >
+                      <img 
+                        src={vehicleImage} 
+                        alt={catConfig.displayName}
+                        className="w-full h-full object-contain"
+                        style={{ filter: isUnavailable ? "grayscale(1)" : "drop-shadow(0px 3px 8px rgba(0,0,0,0.12))" }}
+                      />
+                    </div>
+                    
+                    {/* Text info - middle */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-sm">{catConfig.displayName}</p>
+                        {catConfig.isPopular && !isUnavailable && (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-blue-100 text-blue-700 border-0">
+                            Popular
+                          </Badge>
+                        )}
+                        {isLimited && !isUnavailable && (
+                          <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 border-0">
+                            Limited
+                          </Badge>
+                        )}
                       </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs max-w-[220px] p-3">
-                      <p className="font-bold text-sm">{catConfig.displayName}</p>
-                      <p className="text-muted-foreground mt-1">
-                        {isUnavailable 
-                          ? "No drivers available in your area right now" 
-                          : catConfig.shortDescription
-                        }
-                      </p>
-                      {!isUnavailable && (
+                      <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-0.5">
+                          <Users className="h-3 w-3" />
+                          {catConfig.seatCount}
+                        </span>
+                        <span>•</span>
+                        <span>{isUnavailable ? "No drivers" : `${etaMinutes} min`}</span>
+                      </div>
+                      {hasDiscount && !isUnavailable && (
+                        <p className="text-[11px] font-medium mt-0.5" style={{ color: "#16A34A" }}>
+                          You save ${fareData.discountAmount.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Price - right */}
+                    <div className="flex-shrink-0 text-right">
+                      {isUnavailable ? (
+                        <p className="text-xs text-muted-foreground">N/A</p>
+                      ) : (
                         <>
-                          <p className="text-muted-foreground mt-1.5 flex items-center gap-1">
-                            <Clock className="h-3 w-3" /> Pickup in ~{etaMinutes} min
-                          </p>
+                          <p className="text-base font-bold">${fareData.finalFare.toFixed(2)}</p>
                           {hasDiscount && (
-                            <p className="text-green-600 dark:text-green-400 mt-1 font-medium">
-                              Promo applied - Save ${fareData.discountAmount.toFixed(2)}
+                            <p className="text-xs text-muted-foreground line-through">
+                              ${fareData.originalFare.toFixed(2)}
                             </p>
                           )}
                         </>
                       )}
-                    </TooltipContent>
-                  </Tooltip>
+                    </div>
+                  </div>
                 );
               })}
             </div>
           )}
 
           {/* Fare summary card */}
-        {fareEstimate && (
-          <Card 
-            className="rounded-[14px] overflow-hidden mt-4" 
-            style={{ 
-              background: "#FFFFFF",
-              border: "1px solid #E5E7EB",
-              boxShadow: "0px 4px 14px rgba(0,0,0,0.08)",
-            }}
-            data-testid="fare-estimate-card"
-          >
+          {fareEstimate && (
+            <div className="px-4 mt-3">
+              <Card 
+                className="rounded-[14px] overflow-hidden" 
+                style={{ 
+                  background: "#FFFFFF",
+                  border: "1px solid #E5E7EB",
+                  boxShadow: "0px 4px 14px rgba(0,0,0,0.08)",
+                }}
+                data-testid="fare-estimate-card"
+              >
             <CardContent className="p-4">
               {/* Promo Banner - if discount applied */}
               {fareEstimate.discountAmount > 0 && fareEstimate.promoCode && (
@@ -1830,11 +1731,12 @@ export default function RideRequest() {
                   </div>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          </div>
+          )}
 
-        {isCalculatingFare && (
+          {isCalculatingFare && (
           <div className="flex items-center justify-center gap-2 py-3">
             <Loader2 className="h-4 w-4 animate-spin" />
             <span className="text-sm text-muted-foreground">Calculating fare...</span>
@@ -1866,8 +1768,7 @@ export default function RideRequest() {
             </p>
           )}
         </div>
-      </div>
-      {/* End of bottom sheet */}
+        {/* End of scrollable content + sticky button */}
       </div>
       {/* End of mobile layout wrapper */}
     </div>

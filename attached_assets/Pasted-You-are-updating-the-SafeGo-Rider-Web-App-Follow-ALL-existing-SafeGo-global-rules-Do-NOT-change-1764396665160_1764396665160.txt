@@ -1,0 +1,183 @@
+You are updating the SafeGo Rider Web App.
+
+Follow ALL existing SafeGo global rules:
+- Do NOT change any backend logic: pricing, promos, commission, payouts, dispatch, route selection, driver matching, or KYC.
+- Only adjust the rider UI layout for mobile.
+- Security: Phase 1 only – no new API calls, no logging of PII, UI changes client-side only.
+
+Goal: Desktop layout is good. Fix the MOBILE layout for the ride request screen so it behaves more like Uber: clean map + vertical ride list + a clear “Request ride” button. Do NOT break the current desktop layout.
+
+Scope:
+- Pages:
+  - `client/src/pages/rider/ride-request.tsx` (or the equivalent ride request entry page)
+  - Any shared layout components used there (ride options list, map layout, promo banner, footer button)
+- Viewports:
+  - Mobile: < 768px width
+  - Desktop/tablet: >= 768px must remain visually and structurally the same as now
+
+---------------------------
+1. Audit current layout
+---------------------------
+1. Open the ride request page component (likely `ride-request.tsx` under `client/src/pages/rider/`).
+2. Identify:
+   - Where the map is rendered
+   - Where the ride options “cards” list is rendered
+   - Where the SafeGo promo banner (“SafeGo Everyday Saver”) is rendered
+   - Where the “Request ride” button is rendered
+3. Confirm which layout components are used (for example: a main container with map + list columns, a ride options list component, etc.).
+
+Do NOT change any business logic or hooks (fare calculation, promo, commission, driver availability, route selection). Only touch JSX structure and styling/layout.
+
+-----------------------------------
+2. Define a responsive layout shell
+-----------------------------------
+Goal: 
+- Desktop: keep the current two-column layout (left plan/promo/ride list, right map) exactly as it is now.
+- Mobile: switch to a clean vertical stack:
+  1) Map section
+  2) Promo banner
+  3) Ride list (vertical)
+  4) Request ride button fixed at the bottom
+
+Implementation:
+
+1. Wrap the main content in a responsive layout container, for example:
+
+   - On desktop (`md:` and up):
+     - Use flex or CSS grid with:
+       - Left panel: “Plan your ride” + promo + ride list
+       - Right panel: map
+     - Keep the existing structure as close as possible to what you have now.
+
+   - On mobile (below `md`):
+     - Use a single-column stack:
+       - Top: map (full width)
+       - Below: promo banner
+       - Below: ride options list
+       - Bottom: Request button
+
+2. If you are using Tailwind CSS, you can do something like:
+   - `flex-col md:flex-row` on the main container
+   - For the map panel: `order-1 md:order-2`
+   - For the ride list panel: `order-2 md:order-1`
+   - For the promo banner: place it inside the ride-list panel but visually below the map on mobile.
+
+3. Ensure the map is always visible on mobile:
+   - Height on mobile can be something like `h-64` or `min-h-[220px]`.
+   - The ride list should scroll separately (page scroll), NOT cover the map.
+
+------------------------------------------
+3. Mobile ride list: vertical single column
+------------------------------------------
+Right now on mobile the ride cards look cramped and the carousel overlaps the button. Fix that by creating a dedicated “mobile list” mode:
+
+1. Reuse the existing ride card component (the one already branded as SafeGo X, SafeGo Comfort, etc.) but allow a different layout for mobile.
+
+2. For mobile mode:
+   - Each item should be a full-width row, similar to Uber:
+     - Left: car image (your new 3D / angled image with white gradient background)
+     - Middle: title + short description (you already have: SafeGo X, SafeGo Comfort, etc. plus the small subtitle)
+     - Right: price block (current price bold, original price with strikethrough if promo, and optional “You save $X” as a small line under price or in green)
+   - Use padding around each row and a subtle divider between rows.
+   - Keep accessibility: card should still be clickable/selectable with clear selected state (border color or background highlight).
+
+3. Implementation details:
+   - Introduce a prop like `layoutMode: 'desktop' | 'mobile'` to the ride options list or ride card component.
+   - In the ride request page:
+     - On desktop: pass `layoutMode="desktop"` and keep the current card layout.
+     - On mobile: pass `layoutMode="mobile"` and render the compact vertical rows.
+   - Do NOT change any pricing, promo, commission, or business logic – just the layout and CSS.
+
+4. Make sure:
+   - Scroll on mobile is smooth and the list does not push the map offscreen permanently; the user can still scroll back up to see the map.
+   - The list section has enough bottom padding so that the last card is not covered by the sticky Request button.
+
+----------------------------------------
+4. Sticky “Request ride” button on mobile
+----------------------------------------
+The user reported that the “Request ride” text/button sometimes disappears on mobile. Fix this:
+
+1. Create a sticky bottom bar on mobile:
+   - Position: at the bottom of the viewport.
+   - Full width, with safe-area padding for devices with home indicator (iPhone).
+   - Contain a primary button, for example: “Request ride”.
+   - The button must call the same handler / function that currently sends the ride request (reuse the same onClick).
+
+2. Desktop:
+   - Keep the button where it is now (inside the ride summary or panel).
+   - Do NOT use the sticky bar on desktop.
+
+3. Implementation approach:
+   - Create a small component like `<MobileRequestBar />` that:
+     - Is only rendered on mobile (you can use CSS `hidden md:block` / `block md:hidden` style).
+     - Uses `position: sticky` or `fixed` at the bottom with a background and shadow so it stands out.
+   - Ensure it doesn’t overlap important content:
+     - Add `pb-20` or similar bottom padding to the main scroll area when this bar is visible.
+
+-----------------------------------
+5. Clean up spacing and typography
+-----------------------------------
+Mobile is currently “busy” and looks cluttered. Adjust spacing:
+
+1. In the mobile ride list:
+   - Use consistent vertical spacing: e.g., `gap-2` inside each row, `gap-3` between rows.
+   - Title (`SafeGo X`, etc.): keep bold, but slightly smaller than desktop if needed.
+   - Price: keep large and bold on the right.
+   - Remove any unnecessary repeated labels that wrap to two lines.
+
+2. Promo banner on mobile:
+   - Keep a single green banner under the map.
+   - First line: promo name, e.g., “SafeGo Everyday Saver”.
+   - Second line: smaller text, e.g., “15% off your ride”.
+   - On tap, allow the banner to collapse/expand or keep as a single compact bar. Make sure it does NOT push content weirdly or overlap the map.
+
+3. Make sure all fonts, icons, and dividers align to a simple 4px or 8px spacing grid so it feels neat.
+
+-----------------------------------
+6. Preserve all logic & visibility rules
+-----------------------------------
+VERY IMPORTANT:
+
+- Do NOT change any of the following:
+  - Fare calculation code
+  - Commission percentages
+  - Promo discount calculation
+  - Driver earnings logic
+  - Matching / dispatch logic
+  - Data visibility rules (customers must NOT see driver earnings or commission; drivers see their detailed breakdown in their own app only)
+
+- The only acceptable changes are:
+  - JSX structure
+  - CSS / Tailwind classes
+  - Responsive breakpoints
+  - Simple conditional rendering of mobile vs desktop layout
+
+-----------------------------------
+7. Testing checklist
+-----------------------------------
+After implementing:
+
+1. Desktop:
+   - Open the app in a desktop viewport.
+   - Verify:
+     - Layout remains the same as before (plan section left, map right, vertical list in the middle panel).
+     - Prices, promos, commission, and ride request flow all work exactly as before.
+
+2. Mobile:
+   - Use the Replit device preview (iPhone 15/14 Pro or similar).
+   - Steps:
+     - Go to `/customer/ride-request`.
+     - Enter pickup and dropoff.
+     - Confirm:
+       - Map is visible at the top.
+       - Promo banner appears under the map.
+       - “Choose your ride” list is a clean vertical list of ride options (no horizontal overflow).
+       - Each row shows car image (left), title and info (middle), price (right), and promo savings where applicable.
+       - The “Request ride” button is always visible at the bottom via the sticky bar.
+       - Tapping a ride option updates the selected ride AND the fare summary (if visible) without breaking.
+
+3. Regression:
+   - Ensure no console errors.
+   - Ensure all existing tests (if any) still pass.
+
+Finally, summarize in comments at the top of the updated ride-request page what you changed for MOBILE layout vs DESKTOP, so future work on SafeGo can follow the same pattern.
