@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,8 @@ import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { FareDetailsAccordion } from "@/components/ride/FareDetailsAccordion";
 import { RideStatusPanel, type DriverInfo as StatusDriverInfo } from "@/components/ride/RideStatusPanel";
 import { MobileLiveTracking } from "@/components/ride/MobileLiveTracking";
+import { RideReviewDialog } from "@/components/ride/RideReviewDialog";
+import { RideChatModal } from "@/components/ride/RideChatModal";
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_ORDER,
@@ -473,6 +475,7 @@ export default function UnifiedBookingPage() {
   const { user } = useAuth();
   const { isReady: isGoogleMapsReady } = useGoogleMaps();
   const { playDriverAssigned, playTripStarted, playTripCompleted } = useNotificationSound();
+  const [, setLocationRoute] = useLocation();
   const [isClient, setIsClient] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
@@ -607,6 +610,15 @@ export default function UnifiedBookingPage() {
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
+  
+  // Review dialog state
+  const [showRideReviewDialog, setShowRideReviewDialog] = useState(false);
+  
+  // Chat modal state
+  const [showChatModal, setShowChatModal] = useState(false);
+  
+  // Demo mode is true when there's no real backend ride
+  const isDemoMode = !currentRideId;
   
   // Developer debug mode (click logo 5 times to enable)
   const [showDebugControls, setShowDebugControls] = useState(false);
@@ -1193,8 +1205,59 @@ export default function UnifiedBookingPage() {
     toast({ title: "Trip completed", description: "Hope you had a safe ride!" });
   }, [rideStatus, toast, playTripCompleted]);
 
-  // Handle finishing the trip completion flow
-  const handleFinishTripFlow = useCallback(() => {
+  // Navigate to receipt page and reset state
+  const navigateToReceipt = useCallback((finalRating: number, finalTip: number | null) => {
+    // Generate a unique trip ID
+    const tripId = `trip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    
+    // Prepare receipt data for the receipt page
+    if (fareEstimate && driverInfo && pickup && dropoff) {
+      const receiptData = {
+        tripId,
+        status: "completed" as const,
+        pickupAddress: pickup.address,
+        dropoffAddress: dropoff.address,
+        tripStartTime: tripStartTime?.toISOString() || new Date().toISOString(),
+        tripEndTime: tripEndTime?.toISOString() || new Date().toISOString(),
+        distanceMiles: fareEstimate.distanceMiles,
+        etaWithTrafficMinutes: fareEstimate.etaWithTrafficMinutes,
+        vehicleCategory: selectedVehicleCategory,
+        driver: {
+          name: driverInfo.name,
+          rating: driverInfo.rating,
+          carModel: driverInfo.carModel,
+          carColor: driverInfo.carColor,
+          plateNumber: driverInfo.plateNumber,
+          avatarInitials: driverInfo.avatarInitials,
+        },
+        fareBreakdown: {
+          baseFare: fareEstimate.baseFare,
+          distanceFare: fareEstimate.distanceFare,
+          timeFare: fareEstimate.timeFare,
+          perMileRate: fareEstimate.perMileRate,
+          perMinuteRate: fareEstimate.perMinuteRate,
+          bookingFee: fareEstimate.bookingFee,
+          taxesAndSurcharges: fareEstimate.taxesAndSurcharges,
+          minimumFareAdjustment: fareEstimate.minimumFareAdjustment,
+          subtotal: fareEstimate.subtotal,
+          originalFare: fareEstimate.originalFare,
+          discountAmount: fareEstimate.discountAmount,
+          finalFare: fareEstimate.finalFare,
+          promoCode: fareEstimate.promoCode || null,
+          promoLabel: fareEstimate.promoLabel || null,
+        },
+        userRating: finalRating > 0 ? finalRating : undefined,
+        tipAmount: finalTip || undefined,
+        paymentMethod: "Cash",
+      };
+      
+      // Store receipt data in sessionStorage
+      sessionStorage.setItem(`trip_receipt_${tripId}`, JSON.stringify(receiptData));
+      
+      // Navigate to the receipt page
+      setLocationRoute(`/customer/trip-receipt/${tripId}`);
+    }
+    
     // Reset all ride state
     setRideStatus("SELECTING");
     setDriverInfo(null);
@@ -1220,9 +1283,32 @@ export default function UnifiedBookingPage() {
     setPickupToDropoffRoute([]);
     setPickupEtaMinutes(0);
     setPickupDistanceMiles(0);
+    // Close the review dialog
+    setShowRideReviewDialog(false);
+  }, [fareEstimate, driverInfo, pickup, dropoff, tripStartTime, tripEndTime, selectedVehicleCategory, setLocationRoute]);
+
+  // Handle opening the review dialog when trip is completed
+  const handleFinishTripFlow = useCallback(() => {
+    // Open the review dialog
+    setShowRideReviewDialog(true);
+  }, []);
+  
+  // Handle completing the review and navigating to receipt
+  const handleReviewComplete = useCallback((rating: number, tip: number | null) => {
+    // Update state with the rating and tip
+    setUserRating(rating);
+    setSelectedTip(tip);
     
-    toast({ title: "Thank you!", description: "We hope to see you again soon" });
-  }, [toast]);
+    // Navigate to receipt after a short delay to allow state update
+    setTimeout(() => {
+      navigateToReceipt(rating, tip);
+    }, 100);
+  }, [navigateToReceipt]);
+  
+  // Handle skipping the review
+  const handleReviewSkip = useCallback(() => {
+    navigateToReceipt(0, null);
+  }, [navigateToReceipt]);
 
   // Handle going back from cancelled state
   const handleBackFromCancelled = useCallback(() => {
@@ -2722,6 +2808,7 @@ export default function UnifiedBookingPage() {
                                   handleViewLiveMapDesktop();
                                 }
                               }}
+                              onMessageDriver={() => setShowChatModal(true)}
                               onCancelRide={handleCancelRideWithConfirm}
                               isCancelling={isCancellingRide}
                             />
@@ -2758,6 +2845,7 @@ export default function UnifiedBookingPage() {
                                   handleViewLiveMapDesktop();
                                 }
                               }}
+                              onMessageDriver={() => setShowChatModal(true)}
                             />
                             
                             {/* Debug control */}
@@ -2823,65 +2911,32 @@ export default function UnifiedBookingPage() {
                               </CardContent>
                             </Card>
                             
-                            {/* Rating section */}
+                            {/* Rating hint - clicking Done opens review dialog */}
                             <Card className="shadow-md rounded-xl overflow-hidden">
                               <CardContent className="p-4">
-                                <h3 className="font-semibold mb-3">Rate your driver</h3>
-                                
-                                {/* Driver info */}
-                                {driverInfo && (
-                                  <div className="flex items-center gap-3 mb-4">
+                                <div className="flex items-center gap-3">
+                                  {driverInfo && (
                                     <Avatar className="h-12 w-12">
                                       <AvatarFallback className="bg-primary text-primary-foreground font-bold">
                                         {driverInfo.avatarInitials}
                                       </AvatarFallback>
                                     </Avatar>
-                                    <div>
-                                      <p className="font-semibold">{driverInfo.name}</p>
-                                      <p className="text-xs text-muted-foreground">{driverInfo.carModel}</p>
-                                    </div>
+                                  )}
+                                  <div className="flex-1">
+                                    <p className="font-semibold">Rate your driver</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Tap Done to rate {driverInfo?.name.split(" ")[0] || "your driver"} and add a tip
+                                    </p>
                                   </div>
-                                )}
-                                
-                                {/* Star rating */}
-                                <div className="flex justify-center gap-2 mb-4">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <button
-                                      key={star}
-                                      onClick={() => setUserRating(star)}
-                                      className="p-1"
-                                      data-testid={`star-${star}`}
-                                    >
+                                  <div className="flex gap-0.5">
+                                    {[1, 2, 3, 4, 5].map((star) => (
                                       <Star 
-                                        className={`h-8 w-8 transition-colors ${
-                                          star <= userRating 
-                                            ? "fill-yellow-400 text-yellow-400" 
-                                            : "text-muted-foreground"
-                                        }`}
+                                        key={star}
+                                        className="h-5 w-5 text-muted-foreground/30"
                                       />
-                                    </button>
-                                  ))}
+                                    ))}
+                                  </div>
                                 </div>
-                                
-                                {/* Tip buttons */}
-                                <p className="text-sm font-medium mb-2">Add a tip</p>
-                                <div className="flex gap-2 flex-wrap">
-                                  {[null, 2, 4, 6].map((tip) => (
-                                    <Button
-                                      key={tip ?? "none"}
-                                      variant={selectedTip === tip ? "default" : "outline"}
-                                      size="sm"
-                                      onClick={() => setSelectedTip(tip)}
-                                      className="flex-1 min-w-[70px]"
-                                      data-testid={`tip-${tip ?? "none"}`}
-                                    >
-                                      {tip === null ? "No tip" : `$${tip}`}
-                                    </Button>
-                                  ))}
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                  Tips go directly to your driver.
-                                </p>
                               </CardContent>
                             </Card>
                           </div>
@@ -3455,6 +3510,35 @@ export default function UnifiedBookingPage() {
           isCancelling={isCancellingRide}
         />
       )}
+      
+      {/* Post-trip Review Dialog */}
+      <RideReviewDialog
+        open={showRideReviewDialog}
+        onOpenChange={setShowRideReviewDialog}
+        rideId={currentRideId}
+        driver={driverInfo ? {
+          name: driverInfo.name,
+          avatarInitials: driverInfo.avatarInitials,
+          carModel: driverInfo.carModel,
+          carColor: driverInfo.carColor,
+          plateNumber: driverInfo.plateNumber,
+        } : null}
+        onSuccess={handleReviewComplete}
+        onSkip={handleReviewSkip}
+        isDemoMode={isDemoMode}
+      />
+      
+      {/* Driver Chat Modal */}
+      <RideChatModal
+        open={showChatModal}
+        onOpenChange={setShowChatModal}
+        rideId={currentRideId}
+        driver={driverInfo ? {
+          name: driverInfo.name,
+          avatarInitials: driverInfo.avatarInitials,
+        } : null}
+        isDemoMode={isDemoMode}
+      />
     </div>
   );
 }

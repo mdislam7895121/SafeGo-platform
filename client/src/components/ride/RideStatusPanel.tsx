@@ -98,6 +98,7 @@ interface RideStatusPanelProps {
   onViewLiveMap?: () => void;
   onCancelRide?: () => void;
   onContactDriver?: () => void;
+  onMessageDriver?: () => void;
   onRateTrip?: (rating: number) => void;
   isCancelling?: boolean;
   showActions?: boolean;
@@ -151,6 +152,7 @@ export function RideStatusPanel({
   onViewLiveMap,
   onCancelRide,
   onContactDriver,
+  onMessageDriver,
   onRateTrip,
   isCancelling = false,
   showActions = true,
@@ -382,6 +384,17 @@ export function RideStatusPanel({
                   >
                     <Map className="h-4 w-4" />
                     View live map
+                  </Button>
+                )}
+                
+                {onMessageDriver && (
+                  <Button 
+                    onClick={onMessageDriver}
+                    variant="outline"
+                    size="icon"
+                    data-testid="button-message-driver"
+                  >
+                    <MessageCircle className="h-4 w-4" />
                   </Button>
                 )}
                 

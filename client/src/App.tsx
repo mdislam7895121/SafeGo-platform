@@ -34,6 +34,7 @@ import CreateSupportTicket from "@/pages/customer/create-support-ticket";
 import SupportTicketDetail from "@/pages/customer/support-ticket-detail";
 import CustomerWallet from "@/pages/customer/wallet";
 import CustomerNotifications from "@/pages/customer/notifications";
+import TripReceipt from "@/pages/customer/trip-receipt";
 import CustomerProfileSettings from "@/pages/customer/profile-settings";
 import CustomerPaymentMethods from "@/pages/customer/payment-methods";
 import CustomerSupportHub from "@/pages/customer-app/support-hub";
@@ -391,6 +392,11 @@ function Router() {
       <Route path="/customer/notifications">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerNotifications />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/trip-receipt/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <TripReceipt />
         </ProtectedRoute>
       </Route>
       {/* Customer Support Center Routes */}
