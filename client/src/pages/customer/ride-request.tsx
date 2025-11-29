@@ -1031,12 +1031,22 @@ export default function RideRequest() {
                         `}
                       >
                         <div className="flex flex-col items-center gap-1.5">
-                          {/* 3D Vehicle Image */}
-                          <div className={`h-16 w-24 flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-background via-muted/20 to-muted/40 ${isUnavailable ? "opacity-40 grayscale" : ""}`}>
+                          {/* 3D Vehicle Image - Uber Style */}
+                          <div 
+                            className={`h-16 w-24 flex items-center justify-center overflow-hidden rounded-[10px] ${isUnavailable ? "opacity-40 grayscale" : ""}`}
+                            style={{
+                              background: "linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)",
+                            }}
+                          >
                             <img 
                               src={vehicleImage} 
                               alt={catConfig.displayName}
-                              className="h-14 w-auto object-contain drop-shadow-lg"
+                              className="w-[92%] h-[92%] object-contain"
+                              style={{
+                                filter: isUnavailable 
+                                  ? "grayscale(1)" 
+                                  : "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))",
+                              }}
                               data-testid={`img-vehicle-${categoryId}`}
                             />
                           </div>
@@ -1066,11 +1076,15 @@ export default function RideRequest() {
                                 )}
                               </div>
                               
-                              {/* You Save Badge */}
+                              {/* You Save Badge - SafeGo Green #16A34A */}
                               {hasDiscount && (
-                                <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full" data-testid={`savings-${categoryId}`}>
+                                <div 
+                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30" 
+                                  style={{ color: "#16A34A" }}
+                                  data-testid={`savings-${categoryId}`}
+                                >
                                   <Zap className="h-2.5 w-2.5" aria-hidden="true" />
-                                  <span className="text-[10px] font-semibold">
+                                  <span className="text-[10px] font-bold">
                                     You save ${fareData.discountAmount.toFixed(2)}
                                   </span>
                                 </div>
@@ -1162,17 +1176,25 @@ export default function RideRequest() {
               
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  {/* 3D Vehicle Image */}
-                  <div className="h-20 w-28 rounded-xl bg-gradient-to-br from-muted/20 via-muted/40 to-muted/60 flex items-center justify-center overflow-hidden shadow-inner">
+                  {/* 3D Vehicle Image - Uber Style */}
+                  <div 
+                    className="h-20 w-28 rounded-[12px] flex items-center justify-center overflow-hidden"
+                    style={{
+                      background: "linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)",
+                    }}
+                  >
                     <img 
                       src={getVehicleCategoryImage(selectedVehicleCategory)} 
                       alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                      className="h-16 w-auto object-contain drop-shadow-lg"
+                      className="w-[92%] h-[92%] object-contain"
+                      style={{
+                        filter: "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))",
+                      }}
                       data-testid="img-selected-vehicle"
                     />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-muted-foreground">
+                    <p className="text-sm font-bold text-foreground whitespace-nowrap">
                       {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
                     </p>
                     {/* Price Display - Uber Style */}
@@ -1186,11 +1208,15 @@ export default function RideRequest() {
                         </p>
                       )}
                     </div>
-                    {/* You Save Badge */}
+                    {/* You Save Badge - SafeGo Green #16A34A */}
                     {fareEstimate.discountAmount > 0 && (
-                      <div className="flex items-center gap-1 mt-1.5 text-green-600 dark:text-green-400" data-testid="text-you-save">
+                      <div 
+                        className="flex items-center gap-1 mt-1.5" 
+                        style={{ color: "#16A34A" }}
+                        data-testid="text-you-save"
+                      >
                         <Zap className="h-3.5 w-3.5" />
-                        <span className="text-sm font-semibold">You save ${fareEstimate.discountAmount.toFixed(2)}</span>
+                        <span className="text-sm font-bold">You save ${fareEstimate.discountAmount.toFixed(2)}</span>
                       </div>
                     )}
                   </div>

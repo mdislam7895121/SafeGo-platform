@@ -109,7 +109,7 @@ export function VehicleCategoryCard({
         data-testid={`category-pill-${categoryId}`}
       >
         <div 
-          className="relative w-full pt-2 px-2"
+          className="relative w-full pt-2 px-2 rounded-t-[10px]"
           style={{
             background: "linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)",
           }}
@@ -117,8 +117,12 @@ export function VehicleCategoryCard({
           <img 
             src={vehicleImage} 
             alt={config.displayName}
-            className="w-full h-[48px] object-contain drop-shadow-md"
-            style={{ filter: isUnavailable ? "grayscale(1)" : "none" }}
+            className="w-[92%] mx-auto h-[52px] object-contain"
+            style={{ 
+              filter: isUnavailable 
+                ? "grayscale(1)" 
+                : "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))",
+            }}
           />
           {isSelected && (
             <div className="absolute top-1 right-1 h-5 w-5 bg-primary rounded-full flex items-center justify-center">
@@ -135,7 +139,7 @@ export function VehicleCategoryCard({
         </div>
         
         <div className="w-full px-2 py-2 flex flex-col items-center gap-0.5">
-          <span className="text-[11px] font-semibold text-foreground whitespace-nowrap">
+          <span className="text-[11px] font-bold text-foreground whitespace-nowrap text-center truncate max-w-full">
             {config.displayName}
           </span>
           
@@ -194,18 +198,19 @@ export function VehicleCategoryCard({
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
           <div 
-            className="relative w-[100px] h-[70px] rounded-lg flex items-center justify-center flex-shrink-0"
+            className="relative w-[110px] h-[75px] rounded-[10px] flex items-center justify-center flex-shrink-0"
             style={{
               background: "linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)",
-              boxShadow: "0px 4px 14px rgba(0,0,0,0.08)",
             }}
           >
             <img 
               src={vehicleImage} 
               alt={config.displayName}
-              className="w-[92%] h-[90%] object-contain"
+              className="w-[92%] h-[92%] object-contain"
               style={{ 
-                filter: isUnavailable ? "grayscale(1)" : "drop-shadow(0px 4px 8px rgba(0,0,0,0.15))",
+                filter: isUnavailable 
+                  ? "grayscale(1)" 
+                  : "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))",
               }}
             />
             {isWAV && (
@@ -217,7 +222,7 @@ export function VehicleCategoryCard({
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h3 className={`font-semibold text-base ${isUnavailable ? "text-muted-foreground" : "text-foreground"}`}>
+              <h3 className={`font-bold text-base whitespace-nowrap ${isUnavailable ? "text-muted-foreground" : "text-foreground"}`}>
                 {config.displayName}
               </h3>
               {config.isPopular && !isUnavailable && (
