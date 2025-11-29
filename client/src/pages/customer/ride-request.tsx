@@ -968,30 +968,26 @@ export default function RideRequest() {
         </div>
       </div>
 
-      {/* C10-FIX: Bottom panel with proper section spacing
-       * Order: Promo Banner -> Ride Cards -> Fare Summary -> Request Button
-       * z-index 10 for cards section
+      {/* BOTTOM SHEET: Clean Uber-style vertical structure
+       * Structure: [A] Promo Banner -> [B] Heading -> [C] Cards (scrollable) -> [D] Request Button
+       * Max height: 58vh on mobile, 55vh desktop. Cards + fare area scrolls, button stays fixed.
        */}
-      <div className="sticky bottom-0 z-10 bg-background border-t shadow-[0_-4px_12px_rgba(0,0,0,0.1)] flex flex-col max-h-[55vh] md:max-h-[50vh]">
-        {/* Scrollable content area */}
-        <div className="overflow-y-auto flex-1 px-4 pt-3 pb-2">
-          
-          {/* C10-FIX: Promo Banner Section - BELOW map, ABOVE ride cards */}
-          {activeRoute && appliedPromo && (
+      <div className="sticky bottom-0 z-20 bg-background border-t shadow-[0_-8px_24px_rgba(0,0,0,0.12)] flex flex-col max-h-[58vh] md:max-h-[55vh]">
+        
+        {/* [A] PROMO BANNER - Fixed at top of sheet */}
+        {activeRoute && appliedPromo && (
+          <div className="flex-shrink-0 px-4 pt-4 pb-2">
             <div 
-              className="mb-3 px-4 py-2.5 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
-              style={{ 
-                background: "#E7FCE5",
-                marginTop: "0px"
-              }}
+              className="px-4 py-3 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
+              style={{ background: "#E7FCE5" }}
               onClick={() => {
                 setAppliedPromo(null);
                 toast({ title: "Promo removed", description: "Viewing regular prices" });
               }}
               data-testid="promo-banner"
             >
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-full bg-green-500/20 flex items-center justify-center">
                   <Zap className="h-4 w-4 text-green-600" />
                 </div>
                 <div>
@@ -1005,42 +1001,43 @@ export default function RideRequest() {
               </div>
               <span className="text-xs text-green-600 font-medium">Tap to remove</span>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* C10-FIX: "Apply Promo" button when no promo is active */}
-          {activeRoute && !appliedPromo && availablePromos.length > 0 && !isLoadingPromos && (
-            <div className="mb-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full h-10 text-sm gap-2 border-dashed border-green-300 text-green-700 hover:bg-green-50"
-                onClick={() => {
-                  const promo = availablePromos[0];
-                  setAppliedPromo({
-                    id: promo.id,
-                    code: promo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
-                    discountPercent: promo.discountType === "PERCENT" ? promo.value : 0,
-                    discountFlat: promo.discountType === "FLAT" ? promo.value : 0,
-                    discountType: promo.discountType,
-                    maxDiscountAmount: promo.maxDiscountAmount,
-                    label: promo.name,
-                    description: promo.description,
-                    isDefault: promo.isDefault
-                  });
-                  toast({ title: "Promo applied!", description: `${promo.name} - ${promo.discountType === "PERCENT" ? `${promo.value}% off` : `$${promo.value} off`}` });
-                }}
-                data-testid="button-apply-promo"
-              >
-                <Zap className="h-4 w-4" />
-                Apply Promo Code
-              </Button>
-            </div>
-          )}
+        {/* Apply Promo button when no promo active */}
+        {activeRoute && !appliedPromo && availablePromos.length > 0 && !isLoadingPromos && (
+          <div className="flex-shrink-0 px-4 pt-4 pb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-11 text-sm gap-2 border-dashed border-green-300 text-green-700 hover:bg-green-50"
+              onClick={() => {
+                const promo = availablePromos[0];
+                setAppliedPromo({
+                  id: promo.id,
+                  code: promo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
+                  discountPercent: promo.discountType === "PERCENT" ? promo.value : 0,
+                  discountFlat: promo.discountType === "FLAT" ? promo.value : 0,
+                  discountType: promo.discountType,
+                  maxDiscountAmount: promo.maxDiscountAmount,
+                  label: promo.name,
+                  description: promo.description,
+                  isDefault: promo.isDefault
+                });
+                toast({ title: "Promo applied!", description: `${promo.name} - ${promo.discountType === "PERCENT" ? `${promo.value}% off` : `$${promo.value} off`}` });
+              }}
+              data-testid="button-apply-promo"
+            >
+              <Zap className="h-4 w-4" />
+              Apply Promo Code
+            </Button>
+          </div>
+        )}
 
-        {/* C10-FIX: Vehicle Category Selector with proper spacing */}
+        {/* [B] SECTION TITLE - Fixed below promo */}
         {activeRoute && (
-          <div data-testid="vehicle-category-selector" className={appliedPromo ? "mt-0" : "mt-1"}>
-            <div className="flex items-center justify-between mb-3">
+          <div className="flex-shrink-0 px-4 pt-2 pb-2">
+            <div className="flex items-center justify-between">
               <p className="text-sm font-semibold flex items-center gap-2">
                 <Car className="h-4 w-4" />
                 Choose your ride
@@ -1052,7 +1049,13 @@ export default function RideRequest() {
                 </div>
               )}
             </div>
-            {/* C10-FIX: Ride cards carousel with consistent sizing */}
+          </div>
+        )}
+
+        {/* [C] SCROLLABLE CONTENT - Cards + Fare summary scroll together */}
+        <div className="flex-1 overflow-y-auto px-4 pb-3">
+          {/* Ride cards carousel */}
+          {activeRoute && (
             <div 
               className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 
               role="group" 
@@ -1243,10 +1246,9 @@ export default function RideRequest() {
                 );
               })}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* C10-FIX: Fare summary card with proper spacing from ride cards */}
+          {/* Fare summary card */}
         {fareEstimate && (
           <Card 
             className="rounded-[14px] overflow-hidden mt-4" 
@@ -1427,12 +1429,12 @@ export default function RideRequest() {
         )}
         </div>
 
-        {/* C9-FIX: Button area stays fixed at bottom of sticky panel, never scrolls */}
-        <div className="flex-shrink-0 p-4 pt-2 bg-background border-t">
+        {/* [D] REQUEST RIDE BUTTON - Always visible, fixed at bottom, 52-56px height */}
+        <div className="flex-shrink-0 px-4 py-4 bg-background border-t">
           <Button
             onClick={handleRequestRide}
             disabled={!canRequestRide}
-            className="w-full h-12 text-base font-semibold"
+            className="w-full h-14 text-base font-semibold rounded-xl"
             data-testid="button-request-ride"
           >
             {isRequestingRide ? (

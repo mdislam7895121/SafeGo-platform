@@ -1,0 +1,90 @@
+Title: Fix /customer/ride bottom sheet layout and always show "Request ride" button
+
+Follow ALL existing SafeGo rules. Do NOT touch any backend logic:
+- no changes to fare calculation, promos, commission, driver earnings,
+  dispatch, or route selection.
+Only adjust the UI layout and styling of the customer ride screen.
+
+Context:
+On the `/customer/ride` page the new design looks messy on mobile:
+- The bottom section (cards + promo) is too tall.
+- A solid blue bar is visible, but the "Request ride" label is missing or
+  clipped.
+- The overall layout feels crowded and unbalanced.
+
+Goal:
+Make the ride screen clean and Uber-like:
+- Map + route visible at the top.
+- A structured bottom sheet that contains promo, heading, ride cards and
+  the Request ride button, with proper spacing.
+- The "Request ride" button must always be visible and readable.
+
+Tasks:
+
+1. Bottom sheet structure
+   Refactor the bottom content into a clear vertical structure:
+
+   [A] SafeGo Everyday Saver banner (if promo active)
+   [B] Section title line
+       - Icon: car
+       - Text: "Choose your ride"
+       - This line is inside the bottom sheet, not floating over the map.
+   [C] Ride cards (SafeGo X, SafeGo Comfort, etc.)
+   [D] Request ride button
+
+   All of A–D should live in one container that behaves like a bottom sheet
+   anchored to the bottom of the screen.
+
+2. Height and scroll behavior
+   For mobile viewport:
+   - The bottom sheet should have:
+       max-height: around 55–60vh (not full screen).
+       min-height: enough to show 1–2 cards plus the Request ride button.
+   - If the number of ride cards exceeds the available height, make the
+     cards area scrollable:
+       - ONLY the cards container scrolls (A + B + D stay fixed).
+   - The map area above must always remain visible, at least ~35–40% of the
+     viewport height.
+
+3. Request ride button fixes
+   - Ensure the "Request ride" button is:
+       height: 52–56px
+       full width of the bottom sheet (with left/right padding)
+       corner radius consistent with rest of the app
+   - Label text: "Request ride" (same as before).
+   - Text must be centered, visible, and not clipped on iOS Safari.
+   - The button must always be visible:
+       - Use a sticky/footer style inside the bottom sheet
+         (e.g., position: sticky; bottom: 0) OR keep it at the very bottom
+         of the sheet with padding so it never scrolls off.
+
+4. Spacing and alignment cleanup
+   - Add consistent padding around the bottom sheet:
+       padding: 16px inside the sheet.
+   - Between elements:
+       - 8–10px between banner and "Choose your ride" heading.
+       - 8px between heading and cards container.
+       - 12–16px between cards container and Request ride button.
+   - Make sure card heights are uniform so the sheet looks tidy.
+
+5. Desktop behavior
+   - On desktop, keep the current multi-column grid layout for the cards.
+   - Apply the same vertical structure: banner → heading → cards → Request
+     ride button.
+   - On larger screens, the bottom content does not need to behave like a
+     sliding sheet, but the Request ride button should still be clearly
+     visible without overlapping the map or being cropped.
+
+6. Do NOT change:
+   - Any fare, promo, or "You save" calculations.
+   - Any of the SafeGo ride card redesign from C7 (image, price, titles).
+   - Any API calls or ride request behavior.
+
+Acceptance criteria:
+   - On mobile, when a user selects pickup/dropoff, the map is visible at
+     the top and the bottom sheet is visually separated and tidy.
+   - The SafeGo Everyday Saver banner, "Choose your ride" heading, ride
+     cards, and Request ride button appear in that order.
+   - The "Request ride" button is always visible, with centered label, and
+     is not covered or cropped by any other element.
+   - Desktop layout keeps the same information hierarchy and looks clean.
