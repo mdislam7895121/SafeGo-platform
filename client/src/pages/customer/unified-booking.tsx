@@ -1157,10 +1157,12 @@ export default function UnifiedBookingPage() {
                 {showChooseRide && fareEstimate && (
                   <Card className="shadow-md rounded-xl overflow-hidden" data-testid="fare-summary-card">
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
+                      {/* Main fare display - responsive layout */}
+                      <div className="flex items-start justify-between gap-3">
+                        {/* Left side: Vehicle image + fare info */}
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div 
-                            className="h-20 w-28 rounded-xl flex items-center justify-center overflow-hidden p-3"
+                            className="h-16 w-20 md:h-20 md:w-28 rounded-xl flex items-center justify-center overflow-hidden p-2 flex-shrink-0"
                             style={{ background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)" }}
                           >
                             <img 
@@ -1171,12 +1173,13 @@ export default function UnifiedBookingPage() {
                               data-testid="img-selected-vehicle"
                             />
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">
                               {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
                             </p>
-                            <div className="flex items-baseline gap-2 mt-1">
-                              <p className="text-2xl font-bold" data-testid="text-fare">
+                            {/* Price row - aligned baseline */}
+                            <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+                              <p className="text-xl md:text-2xl font-bold" data-testid="text-fare">
                                 ${fareEstimate.finalFare.toFixed(2)}
                               </p>
                               {fareEstimate.discountAmount > 0 && (
@@ -1185,25 +1188,28 @@ export default function UnifiedBookingPage() {
                                 </p>
                               )}
                             </div>
+                            {/* Savings badge - directly below prices */}
                             {fareEstimate.discountAmount > 0 && (
-                              <div className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-green-50 w-fit text-green-600">
-                                <Zap className="h-3.5 w-3.5" />
-                                <span className="text-sm font-medium">You save ${fareEstimate.discountAmount.toFixed(2)}</span>
+                              <div className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full w-fit" style={{ background: "#DCFCE7" }}>
+                                <Zap className="h-3 w-3" style={{ color: "#16A34A" }} />
+                                <span className="text-xs font-semibold" style={{ color: "#166534" }}>You save ${fareEstimate.discountAmount.toFixed(2)}</span>
                               </div>
                             )}
                           </div>
                         </div>
-                        <div className="text-right text-sm">
-                          <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
-                          <p className="font-semibold" data-testid="text-eta">
+                        {/* Right side: Distance/time metadata - vertically centered */}
+                        <div className="text-right text-sm flex-shrink-0 flex flex-col justify-center">
+                          <p className="text-muted-foreground text-xs md:text-sm" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
+                          <p className="font-semibold text-xs md:text-sm" data-testid="text-eta">
                             ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
                           </p>
-                          <p className="text-xs mt-0.5 text-muted-foreground">
-                            Pickup in ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
+                          <p className="text-[10px] md:text-xs mt-0.5 text-muted-foreground">
+                            Pickup ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
                           </p>
                         </div>
                       </div>
                       
+                      {/* Status badges */}
                       <div className="mt-3 flex items-center gap-2 flex-wrap">
                         <Badge variant="secondary" className={`text-xs ${
                           fareEstimate.trafficLevel === "heavy" 
