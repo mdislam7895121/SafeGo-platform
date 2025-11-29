@@ -1,0 +1,127 @@
+Task: Unify the customer ride-request UI into a single device-friendly design that works identically on all devices (desktop, laptop, tablet, mobile). The layout may reflow responsively, but the UX and components must be the same everywhere.
+
+Global SafeGo rules:
+- Do NOT change backend logic: pricing, promos, commission, driver earnings, routing, dispatch, KYC, payments.
+- Only update the customer web UI layout, styling, and responsive behavior.
+- Re-use existing components (address inputs, ride cards, map, route selector, Request ride button).
+
+1. One unified screen for all devices
+- There must be ONE main ride-request screen (e.g., `/customer/ride-request`) used for all devices.
+- Remove any separate mobile "Good night, islam789 / See prices" step. No separate mobile wizard.
+- The flow must be:
+    1) User opens the ride screen.
+    2) User enters pickup & dropoff in the same address capsule panel.
+    3) Ride cards update with prices.
+    4) User chooses a ride.
+    5) User chooses a route.
+    6) User taps Request ride.
+- Same screen, same components, everywhere. Only layout changes with breakpoints.
+
+2. Address panel design (single capsule block)
+- At the TOP of the page, under the SafeGo header, show a single “Plan your ride” address panel.
+- Inside this panel:
+    - Line 1: bold label "Plan your ride".
+    - Line 2: a capsule for PICKUP:
+        - Left: blue dot.
+        - Text: pickup address (single line, ellipsis if long).
+        - Right side: 
+            - swap icon (⇅) to swap pickup/dropoff.
+            - edit icon (✎ or similar) to open address input.
+    - Line 3: a capsule for DROPOFF:
+        - Left: red dot.
+        - Text: dropoff address (single line, ellipsis).
+        - Right side: edit icon.
+- Add a small arrow icon at the far right of the whole panel:
+    - When arrow is tapped:
+        - Collapse/expand the panel (slide up/down) but NEVER destroy the state.
+    - Default behavior:
+        - On mobile: expanded when the page first loads.
+        - On desktop: expanded as well.
+- The address panel appears ONLY here. It must not reappear as a second or third block anywhere else (no duplicate address bars).
+
+3. Map behavior (always visible, no 2-second floating overlay)
+- The map should always be visible on the ride-request screen.
+- Remove the temporary 2-second “floating card over map” view when prices load.
+- Behavior:
+    - When user changes pickup or dropoff:
+        - Show a small loading indicator (spinner or “Updating prices…” message).
+        - Update route and prices.
+        - Keep the main layout stable (no full-screen transition).
+- Map should:
+    - Always show the route from pickup (A) to dropoff (B).
+    - Center/zoom so both A and B are visible.
+    - When the user chooses a different route, update the highlighted path.
+
+4. Layout structure (same components, responsive layout)
+
+4.1 Desktop / large screens (>= 1024px)
+- Main layout: 2-column with sticky bottom button
+    - Left column:
+        - Address panel (from step 2).
+        - SafeGo Everyday Saver banner (if promo active).
+        - “Choose your ride” section:
+            - All SafeGo ride cards in a vertical list:
+              SafeGo X, SafeGo Comfort, SafeGo Comfort XL, SafeGo XL, SafeGo Black, SafeGo Black SUV, SafeGo WAV.
+    - Right column:
+        - Map (full height of the column).
+        - Under the map: route selector buttons.
+- Route selector:
+    - 3 pill buttons in a row:
+        - Fastest
+        - Route 2
+        - Route 3
+    - All three must be fully visible (no cropping on the right).
+    - Equal width: use flex with `space-between` or `gap` and fixed min-width.
+- Request ride button:
+    - Full width, pinned at the bottom of the screen (sticky footer).
+    - Same look on all devices.
+
+4.2 Mobile / small screens (< 1024px)
+- Use the SAME components as desktop (no separate pages), just stack them vertically:
+    1) Address panel (expandable capsule).
+    2) SafeGo Everyday Saver banner.
+    3) “Choose your ride” list (SafeGo cards, one per row).
+    4) Map section (below the ride list, above the button).
+    5) Route selector directly above the Request ride button:
+        - 3 pill buttons in a horizontal scroll OR equal-width buttons that fit inside the screen. None of them should be clipped.
+    6) Request ride button pinned at the bottom.
+- When the user scrolls down, the address panel can collapse to save space:
+    - Collapsed state: show only pickup and dropoff in a single thin bar with the arrow icon.
+    - Tap arrow → expand the full panel again.
+
+5. Route selector and current-location zoom
+- When the user taps “Choose your route” or any route pill:
+    - Map zooms so the customer’s current location and the full route are clearly visible.
+    - On mobile, the map fills the middle of the screen between the ride list and the Request ride button (no part of the route buttons hidden).
+- Keep the text underneath:
+    - “Choose your favorite route on the map” on a single line.
+    - “Back to ride details” as a secondary link aligned to the right.
+
+6. Fix the 3 route buttons cropping issue
+- Adjust CSS so that on narrow devices:
+    - All three route pills are visible at once OR horizontally scrollable.
+    - No button is partially cut off at the right side.
+- Suggested implementation:
+    - Use `display: flex; justify-content: space-between; gap: 8px;`
+    - Each button with `flex: 1 1 0; text-align: center; white-space: nowrap;`.
+
+7. Device-friendly rule (very important)
+- Do NOT create different flows for desktop vs mobile.
+- The SAME React components / views must be used for all devices.
+- Only the layout (flex direction, stacking, widths, font sizes) may change by media queries / breakpoints.
+- There must never be:
+    - A special “Good night, islam789 / See prices” only on mobile.
+    - A different home screen only for desktop.
+- One screen, one flow, multiple responsive layouts.
+
+8. Safety & verification
+- Verify:
+    - Address panel appears once and works the same on all devices.
+    - Map always visible on the ride screen, no 2-second overlay screen.
+    - When user edits address, prices and routes update but the page does not jump or change structure.
+    - The three route buttons and the Request ride button are always fully visible.
+- Do not touch any backend APIs, pricing formulas, promo calculation, or commission logic – UI only.
+
+After implementing, please summarize:
+- Which components/files you changed.
+- How the unified layout behaves at ~375px width (mobile) and at ~1440px width (desktop).
