@@ -285,17 +285,23 @@ export default function RideRequest() {
   const [isMobile, setIsMobile] = useState(false);
   
   // Mobile detection effect - only trigger mobile-specific layout changes
+  // Also resets Route Explorer when switching to desktop viewport
   useEffect(() => {
     if (typeof window === "undefined") return;
     
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      // Reset Route Explorer when switching to desktop to ensure desktop layout remains unchanged
+      if (!mobile && isRouteExplorerOpen) {
+        setIsRouteExplorerOpen(false);
+      }
     };
     
     checkMobile();
     window.addEventListener("resize", checkMobile);
     return () => window.removeEventListener("resize", checkMobile);
-  }, []);
+  }, [isRouteExplorerOpen]);
 
   const { 
     getAvailability, 
@@ -1254,8 +1260,8 @@ export default function RideRequest() {
        * DESKTOP: Uses the 3-column grid layout above (hidden on mobile via lg:hidden)
        */}
       <div className="lg:hidden flex flex-col h-full overflow-hidden">
-        {/* MAP SECTION - Expands when Route Explorer is open */}
-        <div className={`relative flex-shrink-0 z-[1] transition-all duration-300 ${isRouteExplorerOpen ? 'flex-1 min-h-[60vh]' : 'h-56'}`}>
+        {/* MAP SECTION - Expands when Route Explorer is open (mobile only) */}
+        <div className={`relative flex-shrink-0 z-[1] transition-all duration-300 ${isMobile && isRouteExplorerOpen ? 'flex-1 min-h-[60vh]' : 'h-56'}`}>
           {isClient && (
             <MapContainer
               center={[mapCenter.lat, mapCenter.lng]}
@@ -1385,8 +1391,8 @@ export default function RideRequest() {
             )}
           </div>
 
-          {/* Route Chips Overlay - Only shown when Route Explorer is open (mobile) */}
-          {isRouteExplorerOpen && routes.length > 1 && (
+          {/* Route Chips Overlay - Only shown when Route Explorer is open (mobile only) */}
+          {isMobile && isRouteExplorerOpen && routes.length > 1 && (
             <div 
               className="absolute bottom-4 left-4 right-4 z-30 bg-white dark:bg-card rounded-2xl px-4 py-3"
               style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
@@ -1429,8 +1435,8 @@ export default function RideRequest() {
         {/* End of map section */}
         </div>
 
-        {/* SCROLLABLE CONTENT AREA - Hidden when Route Explorer is open */}
-        <div className={`flex-1 overflow-y-auto bg-background pb-24 ${isRouteExplorerOpen ? 'hidden' : ''}`}>
+        {/* SCROLLABLE CONTENT AREA - Hidden when Route Explorer is open (mobile only) */}
+        <div className={`flex-1 overflow-y-auto bg-background pb-24 ${isMobile && isRouteExplorerOpen ? 'hidden' : ''}`}>
           
           {/* Promo Banner - under map */}
           {activeRoute && appliedPromo && (
@@ -1791,8 +1797,8 @@ export default function RideRequest() {
           * No business logic is implemented here; only orchestrates layout and route selection based on existing state
           */}
         <div className="flex-shrink-0 px-4 py-4 bg-background border-t">
-          {/* Step 1: Show "Choose your route" when NOT in Route Explorer and has routes */}
-          {!isRouteExplorerOpen && activeRoute && routes.length > 0 && (
+          {/* Step 1: Show "Choose your route" when NOT in Route Explorer and has multiple routes (mobile only) */}
+          {isMobile && !isRouteExplorerOpen && activeRoute && routes.length > 1 && (
             <Button
               onClick={() => setIsRouteExplorerOpen(true)}
               disabled={!canRequestRide}
@@ -1804,8 +1810,11 @@ export default function RideRequest() {
             </Button>
           )}
 
-          {/* Show Request Ride directly when no routes yet or single route */}
-          {!isRouteExplorerOpen && (!activeRoute || routes.length <= 1) && (
+          {/* Show Request Ride directly when: 
+              - Route Explorer is closed AND (no routes yet OR single route)
+              - This covers: desktop always shows "Request ride", mobile shows it for single/no routes
+          */}
+          {!(isMobile && isRouteExplorerOpen) && !(isMobile && activeRoute && routes.length > 1) && (
             <Button
               onClick={handleRequestRide}
               disabled={!canRequestRide}
@@ -1823,8 +1832,8 @@ export default function RideRequest() {
             </Button>
           )}
 
-          {/* Step 2: Route Explorer open - show back + Request ride */}
-          {isRouteExplorerOpen && (
+          {/* Step 2: Route Explorer open - show back + Request ride (mobile only) */}
+          {isMobile && isRouteExplorerOpen && (
             <>
               {/* Top row: instruction + back link */}
               <div className="flex items-center justify-between mb-3">
