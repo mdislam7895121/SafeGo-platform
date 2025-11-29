@@ -471,12 +471,33 @@ export default function UnifiedBookingPage() {
   const fareEstimate = useMemo(() => {
     if (!activeRoute) return null;
     const breakdown = computeFareBreakdown(activeRoute, selectedVehicleCategory, appliedPromo);
+    
+    const durationHours = activeRoute.durationInTrafficSeconds / 3600;
+    const avgSpeedMph = durationHours > 0 ? activeRoute.distanceMiles / durationHours : 0;
+    
+    let trafficLevel: "light" | "moderate" | "heavy";
+    let trafficLabel: string;
+    
+    if (avgSpeedMph >= 35) {
+      trafficLevel = "light";
+      trafficLabel = "Light traffic on this route";
+    } else if (avgSpeedMph >= 20) {
+      trafficLevel = "moderate";
+      trafficLabel = "Moderate traffic";
+    } else if (avgSpeedMph > 0) {
+      trafficLevel = "heavy";
+      trafficLabel = "Heavy traffic";
+    } else {
+      trafficLevel = "light";
+      trafficLabel = "Traffic info unavailable";
+    }
+    
     return {
       ...breakdown,
       distanceMiles: activeRoute.distanceMiles.toFixed(1),
       etaWithTrafficMinutes: Math.ceil(activeRoute.durationInTrafficSeconds / 60),
-      trafficLevel: activeRoute.durationInTrafficSeconds > 1800 ? "heavy" : "light" as "heavy" | "light",
-      trafficLabel: activeRoute.durationInTrafficSeconds > 1800 ? "Heavy traffic" : "Light traffic",
+      trafficLevel,
+      trafficLabel,
       promoCode: appliedPromo?.code,
       promoLabel: appliedPromo?.label,
     };

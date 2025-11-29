@@ -1,0 +1,77 @@
+Task: Fix the real-time traffic indicator on the SafeGo ride booking screen so it reflects actual route conditions instead of a hardcoded or incorrect "Heavy traffic" label.
+
+Scope & Safety Rules
+- Do NOT change any fare calculation, surge, promo, commission, or payout logic.
+- Do NOT change routing provider or map behavior.
+- Only update how the traffic badge text and color are computed and displayed.
+- Desktop and mobile must stay visually consistent.
+
+1. Audit current implementation
+- Locate where the traffic badge ("Light traffic on this route" / "Heavy traffic") is computed and rendered for the selected ride:
+  • Ride details section under the selected vehicle card.
+  • Unified booking page: /customer/unified-booking (or the current booking page route).
+- Identify whether the label is:
+  • Hardcoded to "Heavy traffic", or
+  • Based on a placeholder flag that does not use real route data.
+
+2. Use real route data for traffic
+- Use the existing route data that we already have for:
+  • Distance (e.g., 94.9 mi)
+  • Duration (e.g., ~1h 42m)
+  • If available from the routing API: duration_in_traffic or a traffic_delay field.
+- Implement a stable traffic metric:
+
+  Option A (preferred – if duration_in_traffic or delay is available):
+    - baselineDuration = route.duration_without_traffic OR the minimum historical duration for that route if provided.
+    - trafficDelay = durationInTraffic - baselineDuration
+    - delayPct = (trafficDelay / baselineDuration) * 100
+
+  Option B (fallback – when only distance and duration are available):
+    - avgSpeedMph = distanceMiles / durationHours
+    - distanceMiles: the route’s distance in miles.
+    - durationHours: duration in hours.
+
+3. Define clear thresholds and labels
+- Implement one consistent rule set and use it everywhere:
+
+  If using delayPct:
+    - delayPct < 10%        → label: "Light traffic on this route" (green badge)
+    - 10% ≤ delayPct < 25%  → label: "Moderate traffic" (amber badge)
+    - delayPct ≥ 25%        → label: "Heavy traffic" (red badge)
+
+  If using avgSpeedMph:
+    - avgSpeedMph ≥ 35 mph  → "Light traffic on this route" (green badge)
+    - 20 ≤ avgSpeedMph < 35 → "Moderate traffic" (amber badge)
+    - avgSpeedMph < 20 mph  → "Heavy traffic" (red badge)
+
+- If the routing provider returns no traffic info at all:
+  • Hide the traffic badge OR show a neutral gray badge: "Traffic info unavailable".
+  • Never show "Heavy traffic" by default when we have no data.
+
+4. Keep the existing UI style
+- Reuse the current pill / badge component and only change:
+  • Text label.
+  • Color token (green for light, amber for moderate, red for heavy).
+- Do NOT change card layout, spacing, or typography.
+- Ensure the traffic badge stays in the same position under the selected ride details.
+
+5. Sync with route selection
+- Whenever the user:
+  • Changes the route (Fastest, CT-15 N and CT-8 N, I-684 N, etc.), or
+  • Changes pickup / dropoff,
+  recompute the traffic metric and update the badge immediately.
+- The badge must reflect the currently selected route’s conditions, not a previous route.
+
+6. Mobile behavior
+- On mobile, ensure:
+  • The badge remains visible under the selected ride card.
+  • It does not overlap with the "Confirm SafeGo [Category]" button.
+  • No horizontal scrolling is required to see the badge.
+
+7. Verification
+- Test with at least three scenarios:
+  • Short city trip with slow ETA → should show "Heavy traffic" or "Moderate traffic".
+  • Normal highway trip (like ~95 mi in ~1h 40m) → should show "Light traffic on this route".
+  • Case where traffic data is missing → badge hidden or "Traffic info unavailable", but never "Heavy traffic".
+
+Please implement this in a clean, non-breaking way and keep all pricing and dispatch logic untouched. Only the traffic indicator computation and its UI state should change.
