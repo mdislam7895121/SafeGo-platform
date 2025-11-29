@@ -661,7 +661,21 @@ export default function UnifiedBookingPage() {
   // Auto-fill pickup address from customer's current location on initial load
   // Only triggers once when: pickup is empty, location is available, permission not denied
   const hasAutoFilledPickup = useRef(false);
-  const [isAutoFillLoading, setIsAutoFillLoading] = useState(false);
+  const [isAutoFillLoading, setIsAutoFillLoading] = useState(true); // Start true to show initial loading
+  
+  // Timeout to stop waiting for geolocation after 3 seconds (for mobile webviews that don't support it)
+  useEffect(() => {
+    if (hasAutoFilledPickup.current) return;
+    
+    const timeout = setTimeout(() => {
+      if (!hasAutoFilledPickup.current) {
+        hasAutoFilledPickup.current = true;
+        setIsAutoFillLoading(false);
+      }
+    }, 3000);
+    
+    return () => clearTimeout(timeout);
+  }, []);
   
   useEffect(() => {
     // Guard: Only auto-fill once per page load
@@ -670,18 +684,30 @@ export default function UnifiedBookingPage() {
     // Guard: Wait for location data, skip if still loading
     if (isCustomerLocationLoading) return;
     
-    // Guard: Skip if permission was denied
-    if (isLocationPermissionDenied) return;
+    // Guard: Skip if permission was denied - stop loading indicator
+    if (isLocationPermissionDenied) {
+      hasAutoFilledPickup.current = true;
+      setIsAutoFillLoading(false);
+      return;
+    }
     
     // Guard: Skip if pickup already has a value (user typed or restored from session)
-    if (pickup || pickupQuery) return;
+    if (pickup || pickupQuery) {
+      hasAutoFilledPickup.current = true;
+      setIsAutoFillLoading(false);
+      return;
+    }
     
     // Guard: Need valid customer location coordinates
-    if (!customerLocation?.lat || !customerLocation?.lng) return;
+    if (!customerLocation?.lat || !customerLocation?.lng) {
+      // Location loading finished but no coordinates - stop loading
+      hasAutoFilledPickup.current = true;
+      setIsAutoFillLoading(false);
+      return;
+    }
     
     // Mark as attempted to prevent repeat calls
     hasAutoFilledPickup.current = true;
-    setIsAutoFillLoading(true);
     
     const autoFillPickup = async () => {
       try {
