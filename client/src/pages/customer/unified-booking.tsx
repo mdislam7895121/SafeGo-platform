@@ -81,6 +81,7 @@ import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { FareDetailsAccordion } from "@/components/ride/FareDetailsAccordion";
 import { RideStatusPanel, type DriverInfo as StatusDriverInfo } from "@/components/ride/RideStatusPanel";
 import { MobileLiveTracking } from "@/components/ride/MobileLiveTracking";
+import { PostTripRatingDialog } from "@/components/customer/PostTripRatingDialog";
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_ORDER,
@@ -607,7 +608,10 @@ export default function UnifiedBookingPage() {
   
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
+  const [userFeedback, setUserFeedback] = useState<string>("");
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
+  const [showRatingDialog, setShowRatingDialog] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
   
   // Developer debug mode (click logo 5 times to enable)
   const [showDebugControls, setShowDebugControls] = useState(false);
@@ -1192,10 +1196,15 @@ export default function UnifiedBookingPage() {
     playTripCompleted();
     
     toast({ title: "Trip completed", description: "Hope you had a safe ride!" });
+    
+    // Auto-open rating dialog after a short delay
+    setTimeout(() => {
+      setShowRatingDialog(true);
+    }, 500);
   }, [rideStatus, toast, playTripCompleted]);
 
   // Navigate to receipt page and reset state
-  const navigateToReceipt = useCallback((finalRating: number, finalTip: number | null) => {
+  const navigateToReceipt = useCallback((finalRating: number, finalFeedback: string, finalTip: number | null) => {
     // Generate a unique trip ID
     const tripId = `trip-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     
@@ -1236,6 +1245,7 @@ export default function UnifiedBookingPage() {
           promoLabel: fareEstimate.promoLabel || null,
         },
         userRating: finalRating > 0 ? finalRating : undefined,
+        userFeedback: finalFeedback || undefined,
         tipAmount: finalTip || undefined,
         paymentMethod: "Cash",
       };
@@ -1253,7 +1263,10 @@ export default function UnifiedBookingPage() {
     setTripStartTime(null);
     setTripEndTime(null);
     setUserRating(0);
+    setUserFeedback("");
     setSelectedTip(null);
+    setHasRated(false);
+    setShowRatingDialog(false);
     setRemainingMinutes(0);
     setRemainingMiles(0);
     // Reset driver tracking state
@@ -1274,10 +1287,23 @@ export default function UnifiedBookingPage() {
     setPickupDistanceMiles(0);
   }, [fareEstimate, driverInfo, pickup, dropoff, tripStartTime, tripEndTime, selectedVehicleCategory, setLocationRoute]);
 
+  // Handle rating submission from the dialog
+  const handleRatingSubmit = useCallback((rating: number, feedback: string) => {
+    setUserRating(rating);
+    setUserFeedback(feedback);
+    setHasRated(true);
+    setShowRatingDialog(false);
+    
+    toast({
+      title: "Thanks for your feedback!",
+      description: `You rated your trip ${rating} star${rating > 1 ? "s" : ""}.`,
+    });
+  }, [toast]);
+
   // Handle completing trip and navigating to receipt
   const handleFinishTripFlow = useCallback(() => {
-    navigateToReceipt(userRating, selectedTip);
-  }, [navigateToReceipt, userRating, selectedTip]);
+    navigateToReceipt(userRating, userFeedback, selectedTip);
+  }, [navigateToReceipt, userRating, userFeedback, selectedTip]);
 
   // Handle going back from cancelled state
   const handleBackFromCancelled = useCallback(() => {
@@ -2878,8 +2904,12 @@ export default function UnifiedBookingPage() {
                               </CardContent>
                             </Card>
                             
-                            {/* Rating hint - clicking Done opens review dialog */}
-                            <Card className="shadow-md rounded-xl overflow-hidden">
+                            {/* Rating card - shows different UI based on hasRated */}
+                            <Card 
+                              className={`shadow-md rounded-xl overflow-hidden ${hasRated ? "hover-elevate cursor-pointer" : ""}`}
+                              onClick={hasRated ? () => setShowRatingDialog(true) : undefined}
+                              data-testid="rating-card"
+                            >
                               <CardContent className="p-4">
                                 <div className="flex items-center gap-3">
                                   {driverInfo && (
@@ -2890,20 +2920,53 @@ export default function UnifiedBookingPage() {
                                     </Avatar>
                                   )}
                                   <div className="flex-1">
-                                    <p className="font-semibold">Rate your driver</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      Tap Done to rate {driverInfo?.name.split(" ")[0] || "your driver"} and add a tip
-                                    </p>
+                                    {hasRated ? (
+                                      <>
+                                        <div className="flex items-center gap-2">
+                                          <p className="font-semibold">{driverInfo?.name || "Driver"}</p>
+                                          <Badge variant="secondary" className="text-xs" data-testid="badge-rated">
+                                            Rated
+                                          </Badge>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground">
+                                          Tap to view your rating
+                                        </p>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <p className="font-semibold">Rate your driver</p>
+                                        <p className="text-sm text-muted-foreground">
+                                          Tap below to rate {driverInfo?.name.split(" ")[0] || "your driver"}
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
                                   <div className="flex gap-0.5">
                                     {[1, 2, 3, 4, 5].map((star) => (
                                       <Star 
                                         key={star}
-                                        className="h-5 w-5 text-muted-foreground/30"
+                                        className={`h-5 w-5 ${
+                                          hasRated && star <= userRating
+                                            ? "fill-yellow-400 text-yellow-400"
+                                            : "text-muted-foreground/30"
+                                        }`}
                                       />
                                     ))}
                                   </div>
                                 </div>
+                                
+                                {/* Rate Now button if not yet rated */}
+                                {!hasRated && (
+                                  <Button
+                                    variant="outline"
+                                    className="w-full mt-3"
+                                    onClick={() => setShowRatingDialog(true)}
+                                    data-testid="button-rate-now"
+                                  >
+                                    <Star className="h-4 w-4 mr-2" />
+                                    Rate Now
+                                  </Button>
+                                )}
                               </CardContent>
                             </Card>
                           </div>
@@ -3240,16 +3303,28 @@ export default function UnifiedBookingPage() {
               </Button>
             )}
             
-            {/* TRIP_COMPLETED: Show done button */}
+            {/* TRIP_COMPLETED: Show done button (only after rating) */}
             {rideStatus === "TRIP_COMPLETED" && (
-              <Button
-                onClick={handleFinishTripFlow}
-                size="lg"
-                className="w-full text-base font-semibold"
-                data-testid="button-done-mobile"
-              >
-                Done
-              </Button>
+              hasRated ? (
+                <Button
+                  onClick={handleFinishTripFlow}
+                  size="lg"
+                  className="w-full text-base font-semibold"
+                  data-testid="button-done-mobile"
+                >
+                  Done
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setShowRatingDialog(true)}
+                  size="lg"
+                  className="w-full text-base font-semibold"
+                  data-testid="button-rate-trip-mobile"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  Rate Your Trip
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -3477,6 +3552,18 @@ export default function UnifiedBookingPage() {
           isCancelling={isCancellingRide}
         />
       )}
+
+      {/* Post-Trip Rating Dialog */}
+      <PostTripRatingDialog
+        open={showRatingDialog}
+        onOpenChange={setShowRatingDialog}
+        driverInfo={driverInfo}
+        vehicleCategory={selectedVehicleCategory}
+        onSubmit={handleRatingSubmit}
+        initialRating={userRating}
+        initialFeedback={userFeedback}
+        hasAlreadyRated={hasRated}
+      />
       
     </div>
   );

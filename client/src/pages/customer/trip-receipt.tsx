@@ -62,6 +62,7 @@ interface TripReceiptData {
     promoLabel: string | null;
   };
   userRating?: number;
+  userFeedback?: string;
   tipAmount?: number;
   paymentMethod?: string;
 }
