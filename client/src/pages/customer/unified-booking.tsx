@@ -1242,6 +1242,28 @@ export default function UnifiedBookingPage() {
                           }}
                         />
                       </div>
+
+                      {/* Confirm Ride Button - Desktop only (mobile uses fixed bottom) */}
+                      <div className="hidden lg:block mt-4 pt-3 border-t">
+                        <Button
+                          onClick={handleRequestRide}
+                          disabled={!canRequestRide}
+                          className="w-full h-12 text-base font-semibold rounded-xl"
+                          data-testid="button-confirm-ride-desktop"
+                        >
+                          {isRequestingRide ? (
+                            <>
+                              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                              Confirming...
+                            </>
+                          ) : (
+                            <>
+                              Confirm {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                              <span className="ml-2 opacity-90">• ${fareEstimate.finalFare.toFixed(2)}</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 )}
@@ -1272,21 +1294,21 @@ export default function UnifiedBookingPage() {
           </div>
           
           {activeService === "ride" && showChooseRide && activeRoute && (
-            <div className="lg:hidden flex-shrink-0 p-4 bg-background/95 backdrop-blur-sm border-t z-20">
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t z-30 safe-area-bottom">
               <Button
                 onClick={handleRequestRide}
                 disabled={!canRequestRide}
                 className="w-full h-14 text-base font-semibold rounded-xl shadow-lg"
-                data-testid="button-request-ride"
+                data-testid="button-confirm-ride-mobile"
               >
                 {isRequestingRide ? (
                   <>
                     <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                    Requesting...
+                    Confirming...
                   </>
                 ) : (
                   <>
-                    Request {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                    Confirm Ride
                     <span className="ml-2 opacity-90">• ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
                   </>
                 )}
