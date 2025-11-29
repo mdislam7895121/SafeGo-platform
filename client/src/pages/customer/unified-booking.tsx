@@ -1232,8 +1232,10 @@ export default function UnifiedBookingPage() {
                         <Badge variant="secondary" className={`text-xs ${
                           fareEstimate.trafficLevel === "heavy" 
                             ? "bg-red-100 text-red-700" 
-                            : "bg-green-100 text-green-700"
-                        }`}>
+                            : fareEstimate.trafficLevel === "moderate"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-green-100 text-green-700"
+                        }`} data-testid="badge-traffic">
                           <Car className="h-3 w-3 mr-1" />
                           {fareEstimate.trafficLabel}
                         </Badge>
