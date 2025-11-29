@@ -33,6 +33,8 @@ import {
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { getVehicleCategoryImage } from "@/lib/vehicleMedia";
+import { FareDetailsAccordion, type FareBreakdownDetails } from "@/components/ride/FareDetailsAccordion";
 
 interface LocationData {
   address: string;
@@ -60,12 +62,20 @@ interface FareEstimate {
   baseFare: number;
   distanceFare: number;
   timeFare: number;
+  bookingFee: number;
+  taxesAndSurcharges: number;
+  minimumFareAdjustment: number;
+  subtotal: number;
+  safegoCommission: number;
+  driverEarnings: number;
   totalFare: number;
   currency: string;
   etaMinutes: number;
   etaWithTrafficMinutes: number;
   distanceKm: number;
   distanceMiles: number;
+  perMileRate: number;
+  perMinuteRate: number;
   trafficLevel: "light" | "moderate" | "heavy";
   trafficLabel: string;
 }
@@ -441,61 +451,73 @@ export default function RideRequest() {
     }
   }, [pickup, dropoff]);
 
-  const calculateFareForCategory = useCallback((route: RouteData, categoryId: VehicleCategoryId) => {
+  const computeFareBreakdown = useCallback((route: RouteData, categoryId: VehicleCategoryId) => {
     const categoryConfig = VEHICLE_CATEGORIES[categoryId];
-    const distanceMiles = route.distanceMeters / 1609.34;
-    const etaWithTrafficMinutes = Math.ceil(route.durationInTrafficSeconds / 60);
-    
-    const baseFare = 2.50 * categoryConfig.baseMultiplier;
-    const perMileRate = 2.00 * categoryConfig.perMileMultiplier;
-    const perMinRate = 0.30 * categoryConfig.perMinuteMultiplier;
-    
-    const distanceFare = distanceMiles * perMileRate;
-    const timeFare = etaWithTrafficMinutes * perMinRate;
-    let totalFare = baseFare + distanceFare + timeFare;
-    
-    totalFare = Math.max(totalFare, categoryConfig.minimumFare);
-    
-    return Math.round(totalFare * 100) / 100;
-  }, []);
-
-  const calculateFareFromRoute = useCallback((route: RouteData) => {
-    setIsCalculatingFare(true);
-    
     const distanceKm = route.distanceMeters / 1000;
     const distanceMiles = route.distanceMeters / 1609.34;
     const etaMinutes = Math.ceil(route.durationSeconds / 60);
     const etaWithTrafficMinutes = Math.ceil(route.durationInTrafficSeconds / 60);
-    const trafficLevel = getTrafficLevel(route.durationInTrafficSeconds, route.durationSeconds);
-    const trafficLabel = getTrafficLevelLabel(trafficLevel);
     
-    const categoryConfig = VEHICLE_CATEGORIES[selectedVehicleCategory];
-    const baseFare = 2.50 * categoryConfig.baseMultiplier;
-    const perMileRate = 2.00 * categoryConfig.perMileMultiplier;
-    const perMinRate = 0.30 * categoryConfig.perMinuteMultiplier;
+    const baseFare = Math.round(2.50 * categoryConfig.baseMultiplier * 100) / 100;
+    const perMileRate = Math.round(2.00 * categoryConfig.perMileMultiplier * 100) / 100;
+    const perMinuteRate = Math.round(0.30 * categoryConfig.perMinuteMultiplier * 100) / 100;
     
-    const distanceFare = distanceMiles * perMileRate;
-    const timeFare = etaWithTrafficMinutes * perMinRate;
-    let totalFare = baseFare + distanceFare + timeFare;
+    const distanceFare = Math.round(distanceMiles * perMileRate * 100) / 100;
+    const timeFare = Math.round(etaWithTrafficMinutes * perMinuteRate * 100) / 100;
     
-    totalFare = Math.max(totalFare, categoryConfig.minimumFare);
+    const bookingFee = 2.00;
+    const taxRate = 0.08875;
+    const rideCost = baseFare + distanceFare + timeFare;
+    const taxesAndSurcharges = Math.round(rideCost * taxRate * 100) / 100;
     
-    setFareEstimate({
-      baseFare: Math.round(baseFare * 100) / 100,
-      distanceFare: Math.round(distanceFare * 100) / 100,
-      timeFare: Math.round(timeFare * 100) / 100,
-      totalFare: Math.round(totalFare * 100) / 100,
-      currency: "USD",
-      etaMinutes,
-      etaWithTrafficMinutes,
+    const calculatedSubtotal = rideCost + bookingFee + taxesAndSurcharges;
+    const minimumFareAdjustment = Math.round(Math.max(0, categoryConfig.minimumFare - calculatedSubtotal) * 100) / 100;
+    const subtotal = Math.round(Math.max(calculatedSubtotal, categoryConfig.minimumFare) * 100) / 100;
+    
+    const commissionRate = 0.15;
+    const safegoCommission = Math.round(subtotal * commissionRate * 100) / 100;
+    const driverEarnings = Math.round((subtotal - safegoCommission) * 100) / 100;
+    
+    return {
+      baseFare,
+      distanceFare,
+      timeFare,
+      bookingFee,
+      taxesAndSurcharges,
+      minimumFareAdjustment,
+      subtotal,
+      safegoCommission,
+      driverEarnings,
+      totalFare: subtotal,
       distanceKm: Math.round(distanceKm * 10) / 10,
       distanceMiles: Math.round(distanceMiles * 10) / 10,
+      perMileRate,
+      perMinuteRate,
+      etaMinutes,
+      etaWithTrafficMinutes,
+    };
+  }, []);
+
+  const calculateFareForCategory = useCallback((route: RouteData, categoryId: VehicleCategoryId) => {
+    return computeFareBreakdown(route, categoryId).totalFare;
+  }, [computeFareBreakdown]);
+
+  const calculateFareFromRoute = useCallback((route: RouteData) => {
+    setIsCalculatingFare(true);
+    
+    const trafficLevel = getTrafficLevel(route.durationInTrafficSeconds, route.durationSeconds);
+    const trafficLabel = getTrafficLevelLabel(trafficLevel);
+    const breakdown = computeFareBreakdown(route, selectedVehicleCategory);
+    
+    setFareEstimate({
+      ...breakdown,
+      currency: "USD",
       trafficLevel,
       trafficLabel,
     });
     
     setIsCalculatingFare(false);
-  }, [selectedVehicleCategory]);
+  }, [selectedVehicleCategory, computeFareBreakdown]);
 
   useEffect(() => {
     if (pickup && dropoff) {
@@ -809,17 +831,17 @@ export default function RideRequest() {
             >
               {ACTIVE_VEHICLE_CATEGORIES.map((categoryId) => {
                 const catConfig = VEHICLE_CATEGORIES[categoryId];
-                const Icon = getVehicleCategoryIcon(catConfig.iconType);
                 const isSelected = categoryId === selectedVehicleCategory;
                 const categoryFare = calculateFareForCategory(activeRoute, categoryId);
                 const etaMinutes = catConfig.etaMinutesOffset + Math.ceil(activeRoute.durationInTrafficSeconds / 60);
+                const vehicleImage = getVehicleCategoryImage(categoryId);
                 
                 return (
                   <Tooltip key={categoryId}>
                     <TooltipTrigger asChild>
                       <Button
                         variant="outline"
-                        className={`min-w-[100px] h-auto rounded-xl border-2 p-3 flex-shrink-0 snap-start ${
+                        className={`min-w-[110px] h-auto rounded-xl border-2 p-2.5 flex-shrink-0 snap-start ${
                           isSelected 
                             ? "bg-primary/10 border-primary shadow-sm" 
                             : "bg-card border-border hover-elevate"
@@ -829,13 +851,14 @@ export default function RideRequest() {
                         aria-label={`${catConfig.displayName}, $${categoryFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaMinutes} minutes ETA${isSelected ? ", selected" : ""}`}
                         data-testid={`ride-pill-${categoryId}`}
                       >
-                        <div className="flex flex-col items-center gap-1.5">
-                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                            isSelected 
-                              ? "bg-primary text-primary-foreground" 
-                              : "bg-muted/50"
-                          }`}>
-                            <Icon className="h-5 w-5" />
+                        <div className="flex flex-col items-center gap-1">
+                          <div className="h-14 w-20 flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-b from-muted/30 to-muted/60">
+                            <img 
+                              src={vehicleImage} 
+                              alt={catConfig.displayName}
+                              className="h-12 w-auto object-contain drop-shadow-sm"
+                              data-testid={`img-vehicle-${categoryId}`}
+                            />
                           </div>
                           <span className={`text-xs font-semibold text-center leading-tight ${
                             isSelected ? "text-primary" : ""
@@ -875,9 +898,14 @@ export default function RideRequest() {
           <Card className="bg-muted/50" data-testid="fare-estimate-card">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <CreditCard className="h-4 w-4 text-primary" />
+                <div className="flex items-center gap-3">
+                  <div className="h-16 w-20 rounded-lg bg-gradient-to-b from-muted/30 to-muted/60 flex items-center justify-center overflow-hidden">
+                    <img 
+                      src={getVehicleCategoryImage(selectedVehicleCategory)} 
+                      alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                      className="h-14 w-auto object-contain drop-shadow-sm"
+                      data-testid="img-selected-vehicle"
+                    />
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">
@@ -913,6 +941,28 @@ export default function RideRequest() {
                   <Wallet className="h-3 w-3 mr-1" />
                   Card/Wallet only
                 </Badge>
+              </div>
+              
+              {/* Fare Breakdown Accordion */}
+              <div className="mt-3 pt-3 border-t">
+                <FareDetailsAccordion 
+                  breakdown={{
+                    baseFare: fareEstimate.baseFare,
+                    timeCost: fareEstimate.timeFare,
+                    distanceCost: fareEstimate.distanceFare,
+                    bookingFee: fareEstimate.bookingFee,
+                    taxesAndSurcharges: fareEstimate.taxesAndSurcharges,
+                    minimumFareAdjustment: fareEstimate.minimumFareAdjustment,
+                    subtotal: fareEstimate.subtotal,
+                    safegoCommission: fareEstimate.safegoCommission,
+                    driverEarnings: fareEstimate.driverEarnings,
+                    totalFare: fareEstimate.totalFare,
+                    distanceMiles: fareEstimate.distanceMiles,
+                    durationMinutes: fareEstimate.etaWithTrafficMinutes,
+                    perMileRate: fareEstimate.perMileRate,
+                    perMinuteRate: fareEstimate.perMinuteRate,
+                  }}
+                />
               </div>
               
               {/* Route Selection */}
