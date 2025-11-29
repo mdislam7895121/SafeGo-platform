@@ -600,6 +600,129 @@ export default function RideOptionsPage() {
               )}
             </div>
 
+            {/* Mobile: Vehicle Category Selector - Horizontal Scroll Carousel */}
+            <div className="px-3 sm:px-4 py-3 lg:hidden">
+              <p className="text-xs sm:text-sm font-medium mb-2 flex items-center gap-1.5">
+                <Car className="h-3.5 w-3.5" />
+                Select Ride Type
+              </p>
+              <div className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-3 sm:-mx-4 px-3 sm:px-4" role="group" aria-label="Vehicle category options">
+                {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId) => {
+                  const catConfig = VEHICLE_CATEGORIES[categoryId];
+                  const Icon = getVehicleCategoryIcon(catConfig.iconType);
+                  const isSelected = categoryId === selectedVehicleCategory;
+                  const fare = currentRouteId ? getFare(categoryId, currentRouteId) : null;
+                  const pillPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
+                  const pillFinalFare = fare ? Math.max(0, fare.totalFare - pillPromoDiscount) : 0;
+                  const catUnavailable = isCategoryUnavailable(categoryId);
+                  const catLimited = isCategoryLimited(categoryId);
+                  const catAvailability = getAvailability(categoryId);
+                  const hasSurge = fare && fare.surgeMultiplier > 1;
+                  const driversNearby = catAvailability?.driversNearby ?? 0;
+                  const unavailableReason = catAvailability?.reason || "No drivers available in your area";
+                  const statusId = `mobile-carousel-status-${categoryId}`;
+                  
+                  return (
+                    <div key={categoryId} className="flex-shrink-0 snap-start">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`min-w-[90px] sm:min-w-[100px] h-auto rounded-xl border-2 p-2.5 sm:p-3 ${
+                              catUnavailable 
+                                ? "opacity-50 cursor-not-allowed bg-muted/30 border-muted" 
+                                : isSelected 
+                                  ? "bg-primary/10 border-primary shadow-sm" 
+                                  : "bg-card border-border hover-elevate"
+                            }`}
+                            onClick={() => handleSelectVehicleCategory(categoryId)}
+                            aria-pressed={isSelected}
+                            aria-disabled={catUnavailable || undefined}
+                            aria-describedby={catUnavailable ? statusId : undefined}
+                            aria-label={[
+                              catConfig.displayName,
+                              isSelected ? "selected" : "",
+                              catUnavailable ? "unavailable" : catLimited ? "limited availability" : "available",
+                              fare ? formatCurrency(pillFinalFare, currency) : "loading price",
+                              hasSurge ? `surge pricing ${fare?.surgeMultiplier?.toFixed(1)}x` : "",
+                              pillPromoDiscount > 0 ? `${formatCurrency(pillPromoDiscount, currency)} discount applied` : "",
+                              !catUnavailable ? `${driversNearby} drivers nearby` : "",
+                            ].filter(Boolean).join(", ")}
+                            data-testid={`ride-pill-${categoryId}`}
+                          >
+                            <div className="flex flex-col items-center gap-1.5">
+                              <div className="relative">
+                                <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                                  catUnavailable 
+                                    ? "bg-muted text-muted-foreground"
+                                    : isSelected 
+                                      ? "bg-primary text-primary-foreground" 
+                                      : "bg-muted/50"
+                                }`}>
+                                  <Icon className="h-5 w-5" />
+                                </div>
+                                {hasSurge && !catUnavailable && (
+                                  <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full flex items-center gap-0.5">
+                                    <Zap className="h-2 w-2" />
+                                    {fare.surgeMultiplier.toFixed(1)}x
+                                  </div>
+                                )}
+                                {catUnavailable && (
+                                  <div className="absolute -top-1 -right-1 bg-muted-foreground text-background rounded-full p-0.5">
+                                    <AlertCircle className="h-2.5 w-2.5" />
+                                  </div>
+                                )}
+                              </div>
+                              <span className={`text-[11px] sm:text-xs font-semibold text-center leading-tight ${
+                                catUnavailable ? "text-muted-foreground" : isSelected ? "text-primary" : ""
+                              }`}>
+                                {catConfig.displayName.replace("SafeGo ", "")}
+                              </span>
+                              {catUnavailable ? (
+                                <span className="text-[9px] text-muted-foreground">Unavailable</span>
+                              ) : isLoadingFares ? (
+                                <Skeleton className="h-3 w-10" />
+                              ) : (
+                                <span className={`text-xs font-bold ${
+                                  pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""
+                                }`}>
+                                  {fare ? formatCurrency(pillFinalFare, currency) : "--"}
+                                </span>
+                              )}
+                              {!catUnavailable && (
+                                <div className={`text-[8px] px-1.5 py-0.5 rounded-full ${
+                                  catLimited 
+                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                                    : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                                }`}>
+                                  {catLimited ? `${driversNearby} nearby` : `${driversNearby}+ drivers`}
+                                </div>
+                              )}
+                            </div>
+                          </Button>
+                        </TooltipTrigger>
+                        {(catUnavailable || catLimited || hasSurge) && (
+                          <TooltipContent side="bottom" className="text-xs max-w-[180px]">
+                            {catUnavailable 
+                              ? unavailableReason
+                              : catLimited
+                                ? `Limited drivers nearby. ${catAvailability?.reason || "Wait times may be longer."}`
+                                : hasSurge
+                                  ? `High demand - ${fare?.surgeMultiplier?.toFixed(1)}x surge pricing`
+                                  : ""
+                            }
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                      {catUnavailable && (
+                        <span id={statusId} className="sr-only">{unavailableReason}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Route Options - Using shared RouteOptionsBar component */}
             {routeOptions.length > 0 && (
               <div className="px-3 sm:px-4 py-3 lg:px-0 lg:mt-4">
@@ -634,146 +757,17 @@ export default function RideOptionsPage() {
             )}
           </div>
 
-          {/* Right Column: Ride Types, Promo Card, Breakdown, Payment, CTA */}
-          <div className="lg:flex lg:flex-col lg:h-full lg:overflow-y-auto">
-            <div className="p-3 sm:p-4 lg:p-0 space-y-3 sm:space-y-4 lg:flex-1">
+          {/* Right Column: Desktop Ride Types, Promo Card, Breakdown, Payment, CTA */}
+          <div className="hidden lg:flex lg:flex-col lg:h-full lg:overflow-y-auto">
+            <div className="lg:p-0 space-y-3 sm:space-y-4 lg:flex-1">
               
-              {/* Ride Type Selector */}
+              {/* Desktop: Ride Type Selector - Vertical List */}
               <div>
                 <p className="text-xs sm:text-sm font-medium mb-2 flex items-center gap-1.5">
                   <Car className="h-3.5 w-3.5" />
                   Select Ride Type
                 </p>
-                
-                {/* Mobile: Horizontal Scroll Carousel */}
-                <div className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide lg:hidden -mx-3 sm:-mx-4 px-3 sm:px-4" role="group" aria-label="Vehicle category options">
-                  {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId) => {
-                    const catConfig = VEHICLE_CATEGORIES[categoryId];
-                    const Icon = getVehicleCategoryIcon(catConfig.iconType);
-                    const isSelected = categoryId === selectedVehicleCategory;
-                    const fare = currentRouteId ? getFare(categoryId, currentRouteId) : null;
-                    const pillPromoDiscount = promoValidation?.valid ? promoValidation.discountAmount : 0;
-                    const pillFinalFare = fare ? Math.max(0, fare.totalFare - pillPromoDiscount) : 0;
-                    const catUnavailable = isCategoryUnavailable(categoryId);
-                    const catLimited = isCategoryLimited(categoryId);
-                    const catAvailability = getAvailability(categoryId);
-                    const hasSurge = fare && fare.surgeMultiplier > 1;
-                    const driversNearby = catAvailability?.driversNearby ?? 0;
-                    const unavailableReason = catAvailability?.reason || "No drivers available in your area";
-                    const statusId = `mobile-status-${categoryId}`;
-                    
-                    return (
-                      <div key={categoryId} className="flex-shrink-0 snap-start">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className={`min-w-[90px] sm:min-w-[100px] h-auto rounded-xl border-2 p-2.5 sm:p-3 ${
-                                catUnavailable 
-                                  ? "opacity-50 cursor-not-allowed bg-muted/30 border-muted" 
-                                  : isSelected 
-                                    ? "bg-primary/10 border-primary shadow-sm" 
-                                    : "bg-card border-border hover-elevate"
-                              }`}
-                              onClick={() => handleSelectVehicleCategory(categoryId)}
-                              aria-pressed={isSelected}
-                              aria-disabled={catUnavailable || undefined}
-                              aria-describedby={catUnavailable ? statusId : undefined}
-                              aria-label={[
-                                catConfig.displayName,
-                                isSelected ? "selected" : "",
-                                catUnavailable ? "unavailable" : catLimited ? "limited availability" : "available",
-                                fare ? formatCurrency(pillFinalFare, currency) : "loading price",
-                                hasSurge ? `surge pricing ${fare?.surgeMultiplier?.toFixed(1)}x` : "",
-                                pillPromoDiscount > 0 ? `${formatCurrency(pillPromoDiscount, currency)} discount applied` : "",
-                                !catUnavailable ? `${driversNearby} drivers nearby` : "",
-                              ].filter(Boolean).join(", ")}
-                              data-testid={`ride-pill-${categoryId}`}
-                            >
-                              <div className="flex flex-col items-center gap-1.5">
-                                {/* Icon with badges */}
-                                <div className="relative">
-                                  <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                                    catUnavailable 
-                                      ? "bg-muted text-muted-foreground"
-                                      : isSelected 
-                                        ? "bg-primary text-primary-foreground" 
-                                        : "bg-muted/50"
-                                  }`}>
-                                    <Icon className="h-5 w-5" />
-                                  </div>
-                                  {/* Surge indicator */}
-                                  {hasSurge && !catUnavailable && (
-                                    <div className="absolute -top-1 -right-1 bg-orange-500 text-white text-[8px] font-bold px-1 py-0.5 rounded-full flex items-center gap-0.5">
-                                      <Zap className="h-2 w-2" />
-                                      {fare.surgeMultiplier.toFixed(1)}x
-                                    </div>
-                                  )}
-                                  {/* Unavailable indicator */}
-                                  {catUnavailable && (
-                                    <div className="absolute -top-1 -right-1 bg-muted-foreground text-background rounded-full p-0.5">
-                                      <AlertCircle className="h-2.5 w-2.5" />
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                {/* Category name */}
-                                <span className={`text-[11px] sm:text-xs font-semibold text-center leading-tight ${
-                                  catUnavailable ? "text-muted-foreground" : isSelected ? "text-primary" : ""
-                                }`}>
-                                  {catConfig.displayName.replace("SafeGo ", "")}
-                                </span>
-                                
-                                {/* Price */}
-                                {catUnavailable ? (
-                                  <span className="text-[9px] text-muted-foreground">Unavailable</span>
-                                ) : isLoadingFares ? (
-                                  <Skeleton className="h-3 w-10" />
-                                ) : (
-                                  <span className={`text-xs font-bold ${
-                                    pillPromoDiscount > 0 ? "text-green-600 dark:text-green-400" : ""
-                                  }`}>
-                                    {fare ? formatCurrency(pillFinalFare, currency) : "--"}
-                                  </span>
-                                )}
-                                
-                                {/* Availability badge */}
-                                {!catUnavailable && (
-                                  <div className={`text-[8px] px-1.5 py-0.5 rounded-full ${
-                                    catLimited 
-                                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                      : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                                  }`}>
-                                    {catLimited ? `${driversNearby} nearby` : `${driversNearby}+ drivers`}
-                                  </div>
-                                )}
-                              </div>
-                            </Button>
-                          </TooltipTrigger>
-                          {(catUnavailable || catLimited || hasSurge) && (
-                            <TooltipContent side="bottom" className="text-xs max-w-[180px]">
-                              {catUnavailable 
-                                ? unavailableReason
-                                : catLimited
-                                  ? `Limited drivers nearby. ${catAvailability?.reason || "Wait times may be longer."}`
-                                  : hasSurge
-                                    ? `High demand - ${fare?.surgeMultiplier?.toFixed(1)}x surge pricing`
-                                    : ""
-                              }
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                        {/* Screen-reader only status for unavailable categories */}
-                        {catUnavailable && (
-                          <span id={statusId} className="sr-only">{unavailableReason}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Desktop: Vertical List */}
-                <div className="hidden lg:block space-y-2" role="listbox" aria-label="Select vehicle category">
+                <div className="space-y-2" role="listbox" aria-label="Select vehicle category">
                   {VEHICLE_CATEGORY_ORDER_ACTIVE.map((categoryId, index) => {
                     const catConfig = VEHICLE_CATEGORIES[categoryId];
                     const Icon = getVehicleCategoryIcon(catConfig.iconType);
