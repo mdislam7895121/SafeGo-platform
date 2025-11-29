@@ -1020,28 +1020,33 @@ export default function RideRequest() {
                         aria-label={`${catConfig.displayName}, ${isUnavailable ? "No drivers nearby" : `$${fareData.finalFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaText}`}${isSelected ? ", selected" : ""}`}
                         data-testid={`ride-pill-${categoryId}`}
                         className={`
-                          min-w-[140px] h-auto rounded-2xl p-3 flex-shrink-0 snap-start cursor-pointer
+                          min-w-[140px] h-auto rounded-[14px] p-4 flex-shrink-0 snap-start cursor-pointer
                           transition-all duration-200 ease-out
                           ${isSelected 
-                            ? "bg-card border-2 border-primary shadow-lg shadow-primary/20 scale-[1.02]" 
+                            ? "bg-white border-l-[4px] border-l-primary border-t border-r border-b border-[#E5E7EB]" 
                             : isUnavailable
-                              ? "bg-muted/30 border border-border/50 opacity-50 cursor-not-allowed"
-                              : "bg-card border border-border/80 shadow-md hover:shadow-lg hover:border-primary/40 hover:scale-[1.01]"
+                              ? "bg-muted/30 border border-[#E5E7EB] opacity-50 cursor-not-allowed"
+                              : "bg-white border border-[#E5E7EB] hover-elevate"
                           }
                         `}
+                        style={{
+                          boxShadow: isSelected 
+                            ? "0 8px 24px rgba(15, 23, 42, 0.08)" 
+                            : "0px 4px 14px rgba(0,0,0,0.08)",
+                        }}
                       >
-                        <div className="flex flex-col items-center gap-1.5">
+                        <div className="flex flex-col items-center gap-2">
                           {/* 3D Vehicle Image - Uber Style */}
                           <div 
-                            className={`h-16 w-24 flex items-center justify-center overflow-hidden rounded-[10px] ${isUnavailable ? "opacity-40 grayscale" : ""}`}
+                            className={`h-16 w-24 flex items-center justify-center overflow-hidden rounded-[12px] p-3 ${isUnavailable ? "opacity-40" : ""}`}
                             style={{
-                              background: "linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)",
+                              background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)",
                             }}
                           >
                             <img 
                               src={vehicleImage} 
                               alt={catConfig.displayName}
-                              className="w-[92%] h-[92%] object-contain"
+                              className={`w-[92%] h-[92%] object-contain transition-transform duration-200 ${isSelected ? "scale-105" : ""}`}
                               style={{
                                 filter: isUnavailable 
                                   ? "grayscale(1)" 
@@ -1051,47 +1056,58 @@ export default function RideRequest() {
                             />
                           </div>
                           
-                          {/* Category Name */}
-                          <span className={`text-xs font-bold text-center leading-tight tracking-tight ${
-                            isSelected ? "text-primary" : isUnavailable ? "text-muted-foreground" : "text-foreground"
-                          }`}>
-                            {catConfig.displayName.replace("SafeGo ", "")}
+                          {/* Category Name - Full SafeGo branding, font-weight 600 */}
+                          <span 
+                            className={`text-xs text-center leading-tight whitespace-nowrap ${
+                              isUnavailable ? "text-muted-foreground" : "text-foreground"
+                            }`}
+                            style={{ fontWeight: 600 }}
+                          >
+                            {catConfig.displayName}
                           </span>
                           
                           {isUnavailable ? (
-                            <span className="text-[10px] text-muted-foreground text-center font-medium">
+                            <span className="text-[10px] text-center" style={{ fontWeight: 400, color: "#6B7280" }}>
                               No drivers nearby
                             </span>
                           ) : (
                             <>
                               {/* Price Display - Uber Style */}
-                              <div className="flex items-baseline gap-1.5 justify-center">
-                                <span className={`text-lg font-black tracking-tight ${isSelected ? "text-primary" : "text-foreground"}`} data-testid={`price-${categoryId}`}>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span 
+                                  className="text-lg tracking-tight" 
+                                  style={{ fontWeight: 700, color: "#000000" }}
+                                  data-testid={`price-${categoryId}`}
+                                >
                                   ${fareData.finalFare.toFixed(2)}
                                 </span>
                                 {hasDiscount && (
-                                  <span className="text-xs text-muted-foreground line-through" data-testid={`original-price-${categoryId}`}>
+                                  <span 
+                                    className="text-xs line-through" 
+                                    style={{ color: "#9CA3AF" }}
+                                    data-testid={`original-price-${categoryId}`}
+                                  >
                                     ${fareData.originalFare.toFixed(2)}
                                   </span>
                                 )}
                               </div>
                               
-                              {/* You Save Badge - SafeGo Green #16A34A */}
+                              {/* You Save Badge - Green with lightning icon */}
                               {hasDiscount && (
                                 <div 
-                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30" 
+                                  className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30" 
                                   style={{ color: "#16A34A" }}
                                   data-testid={`savings-${categoryId}`}
                                 >
                                   <Zap className="h-2.5 w-2.5" aria-hidden="true" />
-                                  <span className="text-[10px] font-bold">
+                                  <span className="text-[10px]" style={{ fontWeight: 500 }}>
                                     You save ${fareData.discountAmount.toFixed(2)}
                                   </span>
                                 </div>
                               )}
                               
                               {/* Seats & ETA */}
-                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                              <div className="flex items-center gap-1.5 text-[10px]" style={{ fontWeight: 400, color: "#6B7280" }}>
                                 <Users className="h-3 w-3" aria-hidden="true" />
                                 <span>{catConfig.seatCount}</span>
                                 <span className="opacity-50">|</span>
@@ -1101,23 +1117,32 @@ export default function RideRequest() {
                             </>
                           )}
                           
-                          {/* Promo Badge */}
+                          {/* Promo Badge - Green with lightning */}
                           {hasDiscount && fareData.promoLabel && !isUnavailable && (
-                            <Badge variant="secondary" className="text-[8px] px-2 py-0.5 bg-primary/10 text-primary border-0">
+                            <Badge 
+                              variant="secondary" 
+                              className="text-[8px] px-2 py-0.5 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0 rounded-full"
+                            >
+                              <Zap className="h-2 w-2 mr-0.5" />
                               {fareData.promoLabel}
                             </Badge>
                           )}
                           
-                          {/* Limited Badge */}
+                          {/* Limited Badge - Yellow */}
                           {isLimited && !isUnavailable && !hasDiscount && (
-                            <Badge variant="outline" className="text-[8px] px-2 py-0.5 border-amber-400/50 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20">
+                            <Badge 
+                              className="text-[8px] px-2 py-0.5 bg-amber-400 text-amber-950 border-0 rounded-full"
+                            >
                               Limited
                             </Badge>
                           )}
                           
-                          {/* Popular Badge */}
+                          {/* Popular Badge - Blue */}
                           {catConfig.isPopular && !isUnavailable && !isLimited && !hasDiscount && (
-                            <Badge variant="secondary" className="text-[8px] px-2 py-0.5">
+                            <Badge 
+                              variant="secondary" 
+                              className="text-[8px] px-2 py-0.5 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border-0 rounded-full"
+                            >
                               Popular
                             </Badge>
                           )}
@@ -1153,7 +1178,15 @@ export default function RideRequest() {
         )}
 
         {fareEstimate && (
-          <Card className="bg-card border shadow-lg" data-testid="fare-estimate-card">
+          <Card 
+            className="rounded-[14px] overflow-hidden" 
+            style={{ 
+              background: "#FFFFFF",
+              border: "1px solid #E5E7EB",
+              boxShadow: "0px 4px 14px rgba(0,0,0,0.08)",
+            }}
+            data-testid="fare-estimate-card"
+          >
             <CardContent className="p-4">
               {/* Promo Banner - if discount applied */}
               {fareEstimate.discountAmount > 0 && fareEstimate.promoCode && (
@@ -1161,13 +1194,13 @@ export default function RideRequest() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-800/40 flex items-center justify-center">
-                        <Zap className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                        <Zap className="h-3.5 w-3.5" style={{ color: "#16A34A" }} />
                       </div>
-                      <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                      <span className="text-sm" style={{ fontWeight: 600, color: "#16A34A" }}>
                         {fareEstimate.promoLabel || `${fareEstimate.promoCode} applied`}
                       </span>
                     </div>
-                    <span className="text-sm font-bold text-green-600 dark:text-green-400" data-testid="text-savings-amount">
+                    <span className="text-sm" style={{ fontWeight: 700, color: "#16A34A" }} data-testid="text-savings-amount">
                       -${fareEstimate.discountAmount.toFixed(2)}
                     </span>
                   </div>
@@ -1178,15 +1211,15 @@ export default function RideRequest() {
                 <div className="flex items-center gap-4">
                   {/* 3D Vehicle Image - Uber Style */}
                   <div 
-                    className="h-20 w-28 rounded-[12px] flex items-center justify-center overflow-hidden"
+                    className="h-20 w-28 rounded-[12px] flex items-center justify-center overflow-hidden p-3"
                     style={{
-                      background: "linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)",
+                      background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)",
                     }}
                   >
                     <img 
                       src={getVehicleCategoryImage(selectedVehicleCategory)} 
                       alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                      className="w-[92%] h-[92%] object-contain"
+                      className="w-[92%] h-[92%] object-contain scale-105"
                       style={{
                         filter: "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))",
                       }}
@@ -1194,16 +1227,27 @@ export default function RideRequest() {
                     />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-foreground whitespace-nowrap">
+                    <p 
+                      className="text-sm text-foreground whitespace-nowrap"
+                      style={{ fontWeight: 600 }}
+                    >
                       {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
                     </p>
                     {/* Price Display - Uber Style */}
                     <div className="flex items-baseline gap-2 mt-1">
-                      <p className="font-black text-2xl tracking-tight" data-testid="text-fare-estimate">
+                      <p 
+                        className="text-2xl tracking-tight" 
+                        style={{ fontWeight: 700, color: "#000000" }}
+                        data-testid="text-fare-estimate"
+                      >
                         ${fareEstimate.finalFare.toFixed(2)}
                       </p>
                       {fareEstimate.discountAmount > 0 && (
-                        <p className="text-sm text-muted-foreground line-through" data-testid="text-original-fare">
+                        <p 
+                          className="text-sm line-through" 
+                          style={{ color: "#9CA3AF" }}
+                          data-testid="text-original-fare"
+                        >
                           ${fareEstimate.originalFare.toFixed(2)}
                         </p>
                       )}
@@ -1211,22 +1255,22 @@ export default function RideRequest() {
                     {/* You Save Badge - SafeGo Green #16A34A */}
                     {fareEstimate.discountAmount > 0 && (
                       <div 
-                        className="flex items-center gap-1 mt-1.5" 
+                        className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 w-fit" 
                         style={{ color: "#16A34A" }}
                         data-testid="text-you-save"
                       >
                         <Zap className="h-3.5 w-3.5" />
-                        <span className="text-sm font-bold">You save ${fareEstimate.discountAmount.toFixed(2)}</span>
+                        <span className="text-sm" style={{ fontWeight: 500 }}>You save ${fareEstimate.discountAmount.toFixed(2)}</span>
                       </div>
                     )}
                   </div>
                 </div>
                 <div className="text-right text-sm">
-                  <p className="text-muted-foreground font-medium" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
-                  <p className="font-semibold" data-testid="text-trip-eta">
+                  <p style={{ fontWeight: 500, color: "#6B7280" }} data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
+                  <p style={{ fontWeight: 600 }} data-testid="text-trip-eta">
                     ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-pickup-eta">
+                  <p className="text-xs mt-0.5" style={{ fontWeight: 400, color: "#6B7280" }} data-testid="text-pickup-eta">
                     Pickup in ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
                   </p>
                 </div>
