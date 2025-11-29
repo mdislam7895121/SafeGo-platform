@@ -278,6 +278,24 @@ export default function RideRequest() {
   const [availablePromos, setAvailablePromos] = useState<BackendPromo[]>([]);
   const [isLoadingPromos, setIsLoadingPromos] = useState(false);
   const [isMapsReady, setIsMapsReady] = useState(false);
+  
+  // Mobile-only UI state for Route Explorer - allows riders to see full map and choose route
+  // This state is ONLY used for mobile-specific layout changes and does NOT affect business logic
+  const [isRouteExplorerOpen, setIsRouteExplorerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Mobile detection effect - only trigger mobile-specific layout changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   const { 
     getAvailability, 
