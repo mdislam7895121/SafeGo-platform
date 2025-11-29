@@ -743,9 +743,9 @@ export default function UnifiedBookingPage() {
         )}
       </header>
 
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
-        <div className="lg:w-[40%] lg:max-w-[480px] lg:flex-shrink-0 lg:overflow-y-auto lg:border-r flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-24 lg:pb-4">
+      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
+        <div className="flex-1 lg:flex-none lg:w-[40%] lg:max-w-[480px] lg:flex-shrink-0 lg:border-r flex flex-col min-h-0 overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 lg:pb-4 min-h-0">
             
             {activeService === "ride" && (
               <>
