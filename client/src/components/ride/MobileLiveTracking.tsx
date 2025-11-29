@@ -17,9 +17,21 @@ import {
   Loader2,
   ChevronUp,
   ChevronDown,
+  Gauge,
+  ArrowUp,
+  CornerUpRight,
+  CornerUpLeft,
+  CornerDownRight,
+  CornerDownLeft,
 } from "lucide-react";
 import { getVehicleCategoryImage } from "@/lib/vehicleMedia";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
+
+export interface TurnInstruction {
+  text: string;
+  distanceFeet: number;
+  maneuver: string;
+}
 
 export type DriverTrackingStatus = 
   | "DRIVER_ON_THE_WAY" 
@@ -64,7 +76,10 @@ interface MobileLiveTrackingProps {
   distanceMiles?: number;
   vehicleCategory: VehicleCategoryId;
   driverPosition: { lat: number; lng: number } | null;
+  interpolatedPosition?: { lat: number; lng: number } | null;
   driverHeading: number;
+  speedMph?: number;
+  nextTurn?: TurnInstruction | null;
   pickupLocation: { lat: number; lng: number } | null;
   dropoffLocation: { lat: number; lng: number } | null;
   routePoints: [number, number][];
@@ -218,6 +233,40 @@ function formatDuration(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+function formatEtaText(minutes: number): string {
+  if (minutes <= 1) return "Arriving now";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+function formatDistance(feet: number): string {
+  if (feet < 528) return `${Math.round(feet / 10) * 10} ft`;
+  const miles = feet / 5280;
+  if (miles < 0.1) return `${Math.round(feet)} ft`;
+  return `${miles.toFixed(1)} mi`;
+}
+
+function getTurnIcon(maneuver: string) {
+  switch (maneuver) {
+    case "right":
+      return <CornerUpRight className="h-5 w-5" />;
+    case "sharp_right":
+      return <CornerDownRight className="h-5 w-5" />;
+    case "slight_right":
+      return <CornerUpRight className="h-5 w-5" />;
+    case "left":
+      return <CornerUpLeft className="h-5 w-5" />;
+    case "sharp_left":
+      return <CornerDownLeft className="h-5 w-5" />;
+    case "slight_left":
+      return <CornerUpLeft className="h-5 w-5" />;
+    default:
+      return <ArrowUp className="h-5 w-5" />;
+  }
+}
+
 export function MobileLiveTracking({
   status,
   driver,
@@ -226,7 +275,10 @@ export function MobileLiveTracking({
   distanceMiles,
   vehicleCategory,
   driverPosition,
+  interpolatedPosition,
   driverHeading,
+  speedMph,
+  nextTurn,
   pickupLocation,
   dropoffLocation,
   routePoints,
@@ -252,20 +304,24 @@ export function MobileLiveTracking({
     return createRotatedDriverIcon(driverHeading);
   }, [driverHeading]);
 
+  const displayPosition = interpolatedPosition || driverPosition;
+
   const getStatusText = () => {
     switch (normalizedStatus) {
       case "DRIVER_ON_THE_WAY":
-        return `On the way · ${pickupEtaMinutes || 0} min`;
+        return pickupEtaMinutes && pickupEtaMinutes <= 1 
+          ? "Arriving now" 
+          : `On the way · ${formatEtaText(pickupEtaMinutes || 0)}`;
       case "DRIVER_ARRIVED":
         return "Driver arrived";
       case "ON_TRIP":
-        return `${formatDuration(dropoffEtaMinutes || 0)} to destination`;
+        return `${formatEtaText(dropoffEtaMinutes || 0)} to destination`;
       default:
         return "Tracking";
     }
   };
 
-  const mapCenter = driverPosition || pickupLocation || { lat: 40.7128, lng: -74.006 };
+  const mapCenter = displayPosition || pickupLocation || { lat: 40.7128, lng: -74.006 };
 
   return (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col" data-testid="mobile-live-tracking">
@@ -321,7 +377,7 @@ export function MobileLiveTracking({
             />
             
             <MapFollowDriver 
-              driverPosition={driverPosition}
+              driverPosition={displayPosition}
               isFollowing={isFollowingDriver}
               onUserInteraction={onUserInteraction}
             />
@@ -333,9 +389,9 @@ export function MobileLiveTracking({
               <Marker position={[dropoffLocation.lat, dropoffLocation.lng]} icon={dropoffIcon} />
             )}
             
-            {driverPosition && (
+            {displayPosition && (
               <Marker 
-                position={[driverPosition.lat, driverPosition.lng]} 
+                position={[displayPosition.lat, displayPosition.lng]} 
                 icon={rotatedDriverIcon}
                 zIndexOffset={1000}
               />
@@ -420,7 +476,20 @@ export function MobileLiveTracking({
           {/* Expanded Content */}
           {isBottomSheetExpanded && (
             <>
-              {/* ETA & Distance */}
+              {/* Turn-by-Turn Preview */}
+              {nextTurn && (normalizedStatus === "DRIVER_ON_THE_WAY" || normalizedStatus === "ON_TRIP") && (
+                <div className="flex items-center gap-3 p-3 bg-primary/5 dark:bg-primary/10 rounded-xl border border-primary/20" data-testid="mobile-turn-preview">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    {getTurnIcon(nextTurn.maneuver)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{nextTurn.text}</p>
+                    <p className="text-xs text-muted-foreground">in {formatDistance(nextTurn.distanceFeet)}</p>
+                  </div>
+                </div>
+              )}
+              
+              {/* ETA, Distance & Speed */}
               <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl">
                 {(normalizedStatus === "DRIVER_ON_THE_WAY" || normalizedStatus === "DRIVER_ARRIVED") && (
                   <>
@@ -428,10 +497,10 @@ export function MobileLiveTracking({
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-xs text-muted-foreground">Pickup</p>
-                        <p className="font-semibold text-sm">
+                        <p className="font-semibold text-sm" data-testid="mobile-text-pickup-eta">
                           {normalizedStatus === "DRIVER_ARRIVED" 
                             ? "Arrived" 
-                            : `~${pickupEtaMinutes || 0} min`}
+                            : formatEtaText(pickupEtaMinutes || 0)}
                         </p>
                       </div>
                     </div>
@@ -444,6 +513,15 @@ export function MobileLiveTracking({
                         </div>
                       </div>
                     )}
+                    {speedMph !== undefined && speedMph > 0 && normalizedStatus === "DRIVER_ON_THE_WAY" && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Speed</p>
+                          <p className="font-semibold text-sm" data-testid="mobile-text-driver-speed">{speedMph} mph</p>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
                 
@@ -453,8 +531,8 @@ export function MobileLiveTracking({
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-xs text-muted-foreground">ETA</p>
-                        <p className="font-semibold text-sm">
-                          ~{formatDuration(dropoffEtaMinutes || 0)}
+                        <p className="font-semibold text-sm" data-testid="mobile-text-dropoff-eta">
+                          {formatEtaText(dropoffEtaMinutes || 0)}
                         </p>
                       </div>
                     </div>
@@ -464,6 +542,15 @@ export function MobileLiveTracking({
                         <div>
                           <p className="text-xs text-muted-foreground">Distance</p>
                           <p className="font-semibold text-sm">{distanceMiles.toFixed(1)} mi</p>
+                        </div>
+                      </div>
+                    )}
+                    {speedMph !== undefined && speedMph > 0 && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Speed</p>
+                          <p className="font-semibold text-sm" data-testid="mobile-text-driver-speed">{speedMph} mph</p>
                         </div>
                       </div>
                     )}

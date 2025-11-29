@@ -207,6 +207,59 @@ function calculateBearing(from: { lat: number; lng: number }, to: { lat: number;
   return (bearing + 360) % 360;
 }
 
+function calculateDistance(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  const R = 3959;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  
+  const dLat = toRad(to.lat - from.lat);
+  const dLon = toRad(to.lng - from.lng);
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1) * Math.cos(lat2) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  
+  return R * c;
+}
+
+function interpolatePosition(
+  from: { lat: number; lng: number }, 
+  to: { lat: number; lng: number }, 
+  t: number
+): { lat: number; lng: number } {
+  return {
+    lat: from.lat + (to.lat - from.lat) * t,
+    lng: from.lng + (to.lng - from.lng) * t,
+  };
+}
+
+function detectTurnDirection(currentHeading: number, nextHeading: number): string {
+  let diff = ((nextHeading - currentHeading + 540) % 360) - 180;
+  
+  if (Math.abs(diff) < 30) return "continue";
+  if (diff > 0 && diff < 90) return "slight_right";
+  if (diff >= 90 && diff < 135) return "right";
+  if (diff >= 135) return "sharp_right";
+  if (diff < 0 && diff > -90) return "slight_left";
+  if (diff <= -90 && diff > -135) return "left";
+  return "sharp_left";
+}
+
+function getManeuverText(maneuver: string): string {
+  const texts: Record<string, string> = {
+    continue: "Continue straight",
+    slight_right: "Bear right",
+    right: "Turn right",
+    sharp_right: "Make a sharp right",
+    slight_left: "Bear left",
+    left: "Turn left",
+    sharp_left: "Make a sharp left",
+  };
+  return texts[maneuver] || "Continue";
+}
+
 function createRotatedDriverIcon(heading: number): L.DivIcon {
   const arrowRotation = heading - 45;
   return L.divIcon({
@@ -416,13 +469,22 @@ export default function UnifiedBookingPage() {
   
   // Live driver tracking state
   const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [interpolatedPosition, setInterpolatedPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [driverPositionIndex, setDriverPositionIndex] = useState<number>(0);
   const [driverHeading, setDriverHeading] = useState<number>(0);
+  const [driverSpeedMph, setDriverSpeedMph] = useState<number>(0);
+  const [nextTurnInstruction, setNextTurnInstruction] = useState<{
+    text: string;
+    distanceFeet: number;
+    maneuver: string;
+  } | null>(null);
   const [isFollowingDriver, setIsFollowingDriver] = useState<boolean>(true);
   const [isDriverPositionLoading, setIsDriverPositionLoading] = useState<boolean>(false);
   const desktopMapRef = useRef<HTMLDivElement | null>(null);
   const driverSimulationRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const prevDriverPositionRef = useRef<{ lat: number; lng: number } | null>(null);
+  const prevTimestampRef = useRef<number>(Date.now());
   
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
@@ -938,8 +1000,57 @@ export default function UnifiedBookingPage() {
       if (cancelTimeoutRef.current) {
         clearTimeout(cancelTimeoutRef.current);
       }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
   }, []);
+  
+  // Detect next turn in route
+  const detectNextTurn = useCallback((fromIndex: number): { text: string; distanceFeet: number; maneuver: string } | null => {
+    if (activeRoutePoints.length < 3 || fromIndex >= activeRoutePoints.length - 2) return null;
+    
+    const lookAhead = Math.min(20, activeRoutePoints.length - fromIndex - 1);
+    let cumulativeDistance = 0;
+    
+    for (let i = fromIndex; i < fromIndex + lookAhead - 1; i++) {
+      const p1 = { lat: activeRoutePoints[i][0], lng: activeRoutePoints[i][1] };
+      const p2 = { lat: activeRoutePoints[i + 1][0], lng: activeRoutePoints[i + 1][1] };
+      const p3 = { lat: activeRoutePoints[i + 2][0], lng: activeRoutePoints[i + 2][1] };
+      
+      const heading1 = calculateBearing(p1, p2);
+      const heading2 = calculateBearing(p2, p3);
+      const maneuver = detectTurnDirection(heading1, heading2);
+      
+      if (maneuver !== "continue") {
+        const distanceToTurn = cumulativeDistance + calculateDistance(p1, p2);
+        const distanceFeet = Math.round(distanceToTurn * 5280);
+        
+        return {
+          text: getManeuverText(maneuver),
+          distanceFeet,
+          maneuver,
+        };
+      }
+      
+      cumulativeDistance += calculateDistance(p1, p2);
+    }
+    
+    return null;
+  }, [activeRoutePoints]);
+
+  // Calculate remaining distance from index to target
+  const calculateRemainingDistance = useCallback((fromIndex: number, toIndex: number): number => {
+    if (activeRoutePoints.length < 2 || fromIndex >= toIndex) return 0;
+    
+    let distance = 0;
+    for (let i = fromIndex; i < toIndex && i < activeRoutePoints.length - 1; i++) {
+      const from = { lat: activeRoutePoints[i][0], lng: activeRoutePoints[i][1] };
+      const to = { lat: activeRoutePoints[i + 1][0], lng: activeRoutePoints[i + 1][1] };
+      distance += calculateDistance(from, to);
+    }
+    return distance;
+  }, [activeRoutePoints]);
 
   // Memoize a unique key for the route to detect actual route changes
   const routePointsKey = useMemo(() => {
@@ -954,143 +1065,183 @@ export default function UnifiedBookingPage() {
   // Track if simulation has been initialized for current route
   const simulationInitializedRef = useRef<string>('');
 
-  // Driver position simulation - moves driver along route polyline
+  // Driver position simulation - moves driver along route polyline with smooth animation
   useEffect(() => {
-    // Only simulate when driver is assigned or trip is in progress
     const isTrackingDriver = rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS";
     
     if (!isTrackingDriver) {
-      // Clear simulation if ride is cancelled or completed
       if (driverSimulationRef.current) {
         clearInterval(driverSimulationRef.current);
         driverSimulationRef.current = null;
       }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
       setDriverPosition(null);
+      setInterpolatedPosition(null);
       setDriverPositionIndex(0);
       setDriverHeading(0);
+      setDriverSpeedMph(0);
+      setNextTurnInstruction(null);
       prevDriverPositionRef.current = null;
+      prevTimestampRef.current = Date.now();
       simulationInitializedRef.current = '';
       return;
     }
 
-    // Need route points to simulate
-    if (activeRoutePoints.length === 0) {
-      return;
-    }
+    if (activeRoutePoints.length === 0) return;
 
-    // Check if we already have a simulation running for this route
     if (driverSimulationRef.current && simulationInitializedRef.current === routePointsKey) {
-      // Simulation already running for this route, don't restart
       return;
     }
 
-    // Clear existing interval before creating new one (for new route)
     if (driverSimulationRef.current) {
       clearInterval(driverSimulationRef.current);
       driverSimulationRef.current = null;
     }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
 
-    // Initialize driver position at start of route (near pickup) only for NEW routes
     const startIndex = Math.max(0, Math.floor(activeRoutePoints.length * 0.1));
     let currentIndex = startIndex;
     
-    // Only set initial position if this is a new simulation
     if (simulationInitializedRef.current !== routePointsKey) {
       const initialPosition = {
         lat: activeRoutePoints[startIndex][0],
         lng: activeRoutePoints[startIndex][1]
       };
       
-      // Set initial position
       setDriverPositionIndex(startIndex);
       setDriverPosition(initialPosition);
-      
-      // Initialize prevDriverPositionRef so first bearing calculation works
+      setInterpolatedPosition(initialPosition);
       prevDriverPositionRef.current = initialPosition;
+      prevTimestampRef.current = Date.now();
       
-      // Calculate initial heading toward first distinct forward point
-      // Skip identical consecutive coordinates to avoid NaN from bearing calc
       let initialHeading = 0;
-      let foundValidHeading = false;
-      for (let i = startIndex + 1; i < activeRoutePoints.length && !foundValidHeading; i++) {
-        const candidatePoint = {
-          lat: activeRoutePoints[i][0],
-          lng: activeRoutePoints[i][1]
-        };
-        // Check if this point is distinct from initial position
+      for (let i = startIndex + 1; i < activeRoutePoints.length; i++) {
+        const candidatePoint = { lat: activeRoutePoints[i][0], lng: activeRoutePoints[i][1] };
         if (candidatePoint.lat !== initialPosition.lat || candidatePoint.lng !== initialPosition.lng) {
           const bearing = calculateBearing(initialPosition, candidatePoint);
-          // Guard against NaN - only accept valid bearings
           if (!isNaN(bearing) && isFinite(bearing)) {
             initialHeading = bearing;
-            foundValidHeading = true;
+            break;
           }
-          // Continue loop if bearing was invalid to try next point
         }
       }
       setDriverHeading(initialHeading);
       
+      const turn = detectNextTurn(startIndex);
+      setNextTurnInstruction(turn);
+      
+      const endIdx = rideStatus === "DRIVER_ASSIGNED" 
+        ? Math.floor(activeRoutePoints.length * 0.3) 
+        : activeRoutePoints.length - 1;
+      const remainingDist = calculateRemainingDistance(startIndex, endIdx);
+      setRemainingMiles(remainingDist);
+      setRemainingMinutes(Math.max(1, Math.ceil(remainingDist * 2)));
+      
       simulationInitializedRef.current = routePointsKey;
     }
 
-    // Capture rideStatus for use in interval closure
     const capturedRideStatus = rideStatus;
+    const GPS_UPDATE_INTERVAL = 3000;
 
-    // Simulate driver movement every 3 seconds
     driverSimulationRef.current = setInterval(() => {
-      // Determine how far to move based on ride status
-      const step = capturedRideStatus === "DRIVER_ASSIGNED" ? 2 : 3; // Move faster during trip
+      const step = capturedRideStatus === "DRIVER_ASSIGNED" ? 2 : 3;
       const maxIndex = activeRoutePoints.length - 1;
       let newIndex = currentIndex + step;
       
-      // For DRIVER_ASSIGNED, stop at pickup location (roughly 30% through route for demo)
       if (capturedRideStatus === "DRIVER_ASSIGNED") {
         const pickupStopIndex = Math.min(maxIndex, Math.floor(activeRoutePoints.length * 0.3));
-        if (newIndex >= pickupStopIndex) {
-          newIndex = pickupStopIndex;
-        }
+        if (newIndex >= pickupStopIndex) newIndex = pickupStopIndex;
       }
       
-      // For TRIP_IN_PROGRESS, move toward dropoff
-      if (newIndex > maxIndex) {
-        newIndex = maxIndex;
-      }
+      if (newIndex > maxIndex) newIndex = maxIndex;
       
-      // Update driver position and calculate heading
       if (activeRoutePoints[newIndex]) {
         const newPosition = {
           lat: activeRoutePoints[newIndex][0],
           lng: activeRoutePoints[newIndex][1]
         };
         
-        // Calculate heading from previous position to new position
-        // Only update if positions are distinct to avoid NaN from bearing calc
-        if (prevDriverPositionRef.current && (
-          prevDriverPositionRef.current.lat !== newPosition.lat || 
-          prevDriverPositionRef.current.lng !== newPosition.lng
-        )) {
+        const now = Date.now();
+        const timeDeltaHours = (now - prevTimestampRef.current) / 3600000;
+        
+        if (prevDriverPositionRef.current && timeDeltaHours > 0) {
+          const distance = calculateDistance(prevDriverPositionRef.current, newPosition);
+          const speed = Math.round(distance / timeDeltaHours);
+          setDriverSpeedMph(Math.min(speed, 65));
+          
           const bearing = calculateBearing(prevDriverPositionRef.current, newPosition);
-          // Guard against NaN - keep previous heading if calc fails
-          if (!isNaN(bearing)) {
+          if (!isNaN(bearing) && isFinite(bearing)) {
             setDriverHeading(bearing);
           }
         }
         
-        // Update refs and state
+        const startPos = prevDriverPositionRef.current || newPosition;
+        const startHeading = driverHeading;
+        const targetHeading = calculateBearing(startPos, newPosition);
+        let animationStart: number | null = null;
+        
+        const animateMove = (timestamp: number) => {
+          if (animationStart === null) animationStart = timestamp;
+          const elapsed = timestamp - animationStart;
+          const progress = Math.min(elapsed / GPS_UPDATE_INTERVAL, 1);
+          
+          const easeProgress = progress < 0.5 
+            ? 2 * progress * progress 
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+          
+          const interpolated = interpolatePosition(startPos, newPosition, easeProgress);
+          setInterpolatedPosition(interpolated);
+          
+          if (!isNaN(targetHeading) && isFinite(targetHeading)) {
+            let diff = ((targetHeading - startHeading + 540) % 360) - 180;
+            const smoothHeading = (startHeading + diff * easeProgress + 360) % 360;
+            setDriverHeading(smoothHeading);
+          }
+          
+          if (progress < 1) {
+            animationFrameRef.current = requestAnimationFrame(animateMove);
+          }
+        };
+        
+        animationFrameRef.current = requestAnimationFrame(animateMove);
+        
         prevDriverPositionRef.current = newPosition;
+        prevTimestampRef.current = now;
         currentIndex = newIndex;
         setDriverPositionIndex(newIndex);
         setDriverPosition(newPosition);
+        
+        const turn = detectNextTurn(newIndex);
+        setNextTurnInstruction(turn);
+        
+        const endIdx = capturedRideStatus === "DRIVER_ASSIGNED" 
+          ? Math.floor(activeRoutePoints.length * 0.3) 
+          : activeRoutePoints.length - 1;
+        const remainingDist = calculateRemainingDistance(newIndex, endIdx);
+        setRemainingMiles(remainingDist);
+        
+        const avgSpeed = driverSpeedMph > 0 ? driverSpeedMph : 25;
+        setRemainingMinutes(Math.max(1, Math.ceil((remainingDist / avgSpeed) * 60)));
       }
-    }, 3000);
+    }, GPS_UPDATE_INTERVAL);
 
     return () => {
       if (driverSimulationRef.current) {
         clearInterval(driverSimulationRef.current);
         driverSimulationRef.current = null;
       }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
     };
-  }, [rideStatus, activeRoutePoints, routePointsKey]);
+  }, [rideStatus, activeRoutePoints, routePointsKey, detectNextTurn, calculateRemainingDistance, driverHeading, driverSpeedMph]);
 
   // Handle scroll to map and highlight driver (desktop)
   const handleViewLiveMapDesktop = useCallback(() => {
@@ -2226,9 +2377,11 @@ export default function UnifiedBookingPage() {
                             <RideStatusPanel
                               status="DRIVER_ASSIGNED"
                               driver={statusDriverInfo}
-                              pickupEtaMinutes={driverInfo?.pickupEtaMinutes || 5}
-                              distanceMiles={parseFloat(fareEstimate.distanceMiles) * 0.3}
+                              pickupEtaMinutes={remainingMinutes || driverInfo?.pickupEtaMinutes || 5}
+                              distanceMiles={remainingMiles || parseFloat(fareEstimate.distanceMiles) * 0.3}
                               vehicleCategory={selectedVehicleCategory}
+                              speedMph={driverSpeedMph}
+                              nextTurn={nextTurnInstruction}
                               onViewLiveMap={() => {
                                 if (window.innerWidth < 768) {
                                   handleOpenMobileLiveTracking();
@@ -2263,6 +2416,8 @@ export default function UnifiedBookingPage() {
                               dropoffEtaMinutes={remainingMinutes}
                               distanceMiles={remainingMiles}
                               vehicleCategory={selectedVehicleCategory}
+                              speedMph={driverSpeedMph}
+                              nextTurn={nextTurnInstruction}
                               onViewLiveMap={() => {
                                 if (window.innerWidth < 768) {
                                   handleOpenMobileLiveTracking();
@@ -2925,14 +3080,17 @@ export default function UnifiedBookingPage() {
         <MobileLiveTracking
           status={rideStatus}
           driver={statusDriverInfo}
-          pickupEtaMinutes={driverInfo?.pickupEtaMinutes || 5}
+          pickupEtaMinutes={remainingMinutes || driverInfo?.pickupEtaMinutes || 5}
           dropoffEtaMinutes={remainingMinutes}
           distanceMiles={rideStatus === "DRIVER_ASSIGNED" 
-            ? parseFloat(fareEstimate?.distanceMiles || "0") * 0.3 
+            ? (remainingMiles || parseFloat(fareEstimate?.distanceMiles || "0") * 0.3)
             : remainingMiles}
           vehicleCategory={selectedVehicleCategory}
           driverPosition={driverPosition}
+          interpolatedPosition={interpolatedPosition}
           driverHeading={driverHeading}
+          speedMph={driverSpeedMph}
+          nextTurn={nextTurnInstruction}
           pickupLocation={pickup}
           dropoffLocation={dropoff}
           routePoints={activeRoutePoints}

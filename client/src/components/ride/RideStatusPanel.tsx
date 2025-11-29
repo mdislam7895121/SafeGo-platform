@@ -15,9 +15,21 @@ import {
   Map,
   X,
   Loader2,
+  Gauge,
+  ArrowUp,
+  CornerUpRight,
+  CornerUpLeft,
+  CornerDownRight,
+  CornerDownLeft,
 } from "lucide-react";
 import { getVehicleCategoryImage } from "@/lib/vehicleMedia";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
+
+export interface TurnInstruction {
+  text: string;
+  distanceFeet: number;
+  maneuver: string;
+}
 
 export type DriverTrackingStatus = 
   | "DRIVER_ON_THE_WAY" 
@@ -81,6 +93,8 @@ interface RideStatusPanelProps {
   finalFare?: number;
   tripDurationMinutes?: number;
   tripDistanceMiles?: number;
+  speedMph?: number;
+  nextTurn?: TurnInstruction | null;
   onViewLiveMap?: () => void;
   onCancelRide?: () => void;
   onContactDriver?: () => void;
@@ -96,6 +110,32 @@ function formatDuration(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
+function formatDistance(feet: number): string {
+  if (feet < 528) return `${Math.round(feet / 10) * 10} ft`;
+  const miles = feet / 5280;
+  if (miles < 0.1) return `${Math.round(feet)} ft`;
+  return `${miles.toFixed(1)} mi`;
+}
+
+function getTurnIcon(maneuver: string) {
+  switch (maneuver) {
+    case "right":
+      return <CornerUpRight className="h-4 w-4" />;
+    case "sharp_right":
+      return <CornerDownRight className="h-4 w-4" />;
+    case "slight_right":
+      return <CornerUpRight className="h-4 w-4" />;
+    case "left":
+      return <CornerUpLeft className="h-4 w-4" />;
+    case "sharp_left":
+      return <CornerDownLeft className="h-4 w-4" />;
+    case "slight_left":
+      return <CornerUpLeft className="h-4 w-4" />;
+    default:
+      return <ArrowUp className="h-4 w-4" />;
+  }
+}
+
 export function RideStatusPanel({
   status,
   driver,
@@ -106,6 +146,8 @@ export function RideStatusPanel({
   finalFare,
   tripDurationMinutes,
   tripDistanceMiles,
+  speedMph,
+  nextTurn,
   onViewLiveMap,
   onCancelRide,
   onContactDriver,
@@ -115,6 +157,14 @@ export function RideStatusPanel({
 }: RideStatusPanelProps) {
   const categoryConfig = VEHICLE_CATEGORIES[vehicleCategory];
   const normalizedStatus = normalizeStatus(status);
+  
+  const formatEtaText = (minutes: number): string => {
+    if (minutes <= 1) return "Arriving now";
+    if (minutes < 60) return `${minutes} min`;
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  };
 
   const getStatusTitle = () => {
     switch (normalizedStatus) {
@@ -199,53 +249,86 @@ export function RideStatusPanel({
 
           {/* ETA & Distance Info */}
           {normalizedStatus !== "TRIP_COMPLETED" && (
-            <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-xl">
-              {(normalizedStatus === "DRIVER_ON_THE_WAY" || normalizedStatus === "DRIVER_ARRIVED") && (
-                <>
-                  <div className="flex items-center gap-2 flex-1">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Pickup</p>
-                      <p className="font-semibold text-sm">
-                        {normalizedStatus === "DRIVER_ARRIVED" 
-                          ? "Arrived" 
-                          : `~${pickupEtaMinutes || 0} min`}
-                      </p>
-                    </div>
-                  </div>
-                  {normalizedStatus === "DRIVER_ON_THE_WAY" && distanceMiles !== undefined && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-4 p-3 bg-muted/30 rounded-xl">
+                {(normalizedStatus === "DRIVER_ON_THE_WAY" || normalizedStatus === "DRIVER_ARRIVED") && (
+                  <>
                     <div className="flex items-center gap-2 flex-1">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <Clock className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="text-xs text-muted-foreground">Distance</p>
-                        <p className="font-semibold text-sm">{distanceMiles.toFixed(1)} mi</p>
+                        <p className="text-xs text-muted-foreground">Pickup</p>
+                        <p className="font-semibold text-sm" data-testid="text-pickup-eta">
+                          {normalizedStatus === "DRIVER_ARRIVED" 
+                            ? "Arrived" 
+                            : formatEtaText(pickupEtaMinutes || 0)}
+                        </p>
                       </div>
                     </div>
-                  )}
-                </>
-              )}
+                    {normalizedStatus === "DRIVER_ON_THE_WAY" && distanceMiles !== undefined && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Distance</p>
+                          <p className="font-semibold text-sm">{distanceMiles.toFixed(1)} mi</p>
+                        </div>
+                      </div>
+                    )}
+                    {normalizedStatus === "DRIVER_ON_THE_WAY" && speedMph !== undefined && speedMph > 0 && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Speed</p>
+                          <p className="font-semibold text-sm" data-testid="text-driver-speed">{speedMph} mph</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+                
+                {normalizedStatus === "ON_TRIP" && (
+                  <>
+                    <div className="flex items-center gap-2 flex-1">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">ETA</p>
+                        <p className="font-semibold text-sm" data-testid="text-dropoff-eta">
+                          {formatEtaText(dropoffEtaMinutes || 0)}
+                        </p>
+                      </div>
+                    </div>
+                    {distanceMiles !== undefined && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Navigation className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Distance</p>
+                          <p className="font-semibold text-sm">{distanceMiles.toFixed(1)} mi</p>
+                        </div>
+                      </div>
+                    )}
+                    {speedMph !== undefined && speedMph > 0 && (
+                      <div className="flex items-center gap-2 flex-1">
+                        <Gauge className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-xs text-muted-foreground">Speed</p>
+                          <p className="font-semibold text-sm" data-testid="text-driver-speed">{speedMph} mph</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
               
-              {normalizedStatus === "ON_TRIP" && (
-                <>
-                  <div className="flex items-center gap-2 flex-1">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">ETA</p>
-                      <p className="font-semibold text-sm">
-                        ~{formatDuration(dropoffEtaMinutes || 0)}
-                      </p>
-                    </div>
+              {/* Turn-by-Turn Preview */}
+              {nextTurn && (normalizedStatus === "DRIVER_ON_THE_WAY" || normalizedStatus === "ON_TRIP") && (
+                <div className="flex items-center gap-3 p-3 bg-primary/5 dark:bg-primary/10 rounded-xl border border-primary/20" data-testid="turn-preview">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    {getTurnIcon(nextTurn.maneuver)}
                   </div>
-                  {distanceMiles !== undefined && (
-                    <div className="flex items-center gap-2 flex-1">
-                      <Navigation className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <p className="text-xs text-muted-foreground">Distance</p>
-                        <p className="font-semibold text-sm">{distanceMiles.toFixed(1)} mi</p>
-                      </div>
-                    </div>
-                  )}
-                </>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{nextTurn.text}</p>
+                    <p className="text-xs text-muted-foreground">in {formatDistance(nextTurn.distanceFeet)}</p>
+                  </div>
+                </div>
               )}
             </div>
           )}
