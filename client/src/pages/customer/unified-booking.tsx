@@ -2631,10 +2631,10 @@ export default function UnifiedBookingPage() {
                             <RideStatusPanel
                               status="DRIVER_ASSIGNED"
                               driver={statusDriverInfo}
-                              pickupEtaMinutes={remainingMinutes || driverInfo?.pickupEtaMinutes || 5}
-                              distanceMiles={remainingMiles || parseFloat(fareEstimate.distanceMiles) * 0.3}
+                              pickupEtaMinutes={effectiveEtaMinutes || driverInfo?.pickupEtaMinutes || 5}
+                              distanceMiles={effectiveRemainingMiles || parseFloat(fareEstimate.distanceMiles) * 0.3}
                               vehicleCategory={selectedVehicleCategory}
-                              speedMph={driverSpeedMph}
+                              speedMph={effectiveSpeedMph}
                               nextTurn={nextTurnInstruction}
                               onViewLiveMap={() => {
                                 if (window.innerWidth < 768) {
@@ -2667,10 +2667,10 @@ export default function UnifiedBookingPage() {
                             <RideStatusPanel
                               status="TRIP_IN_PROGRESS"
                               driver={statusDriverInfo}
-                              dropoffEtaMinutes={remainingMinutes}
-                              distanceMiles={remainingMiles}
+                              dropoffEtaMinutes={effectiveEtaMinutes}
+                              distanceMiles={effectiveRemainingMiles}
                               vehicleCategory={selectedVehicleCategory}
-                              speedMph={driverSpeedMph}
+                              speedMph={effectiveSpeedMph}
                               nextTurn={nextTurnInstruction}
                               onViewLiveMap={() => {
                                 if (window.innerWidth < 768) {
@@ -3294,8 +3294,8 @@ export default function UnifiedBookingPage() {
                 <div className="text-right">
                   <p className="text-sm font-bold text-primary">
                     {rideStatus === "DRIVER_ASSIGNED" 
-                      ? `~${driverInfo.pickupEtaMinutes} min` 
-                      : `~${formatDurationMinutes(remainingMinutes)}`}
+                      ? `~${effectiveEtaMinutes || driverInfo.pickupEtaMinutes} min` 
+                      : `~${formatDurationMinutes(effectiveEtaMinutes)}`}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {rideStatus === "DRIVER_ASSIGNED" ? "to pickup" : "remaining"}
