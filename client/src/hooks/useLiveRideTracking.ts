@@ -102,7 +102,7 @@ export function useLiveRideTracking({
     if (!rideId) return;
     
     try {
-      const response = await apiRequest(`/api/rides/${rideId}/live-tracking`, "GET");
+      const response = await apiRequest(`/api/rides/${rideId}/live-tracking`, { method: "GET" });
       
       if (!isMountedRef.current) return;
       

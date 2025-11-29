@@ -12,6 +12,7 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SoundToggle } from "@/components/SoundToggle";
 import { useCustomerLocation, createCustomerLocationIcon } from "@/hooks/useCustomerLocation";
+import { useLiveRideTracking } from "@/hooks/useLiveRideTracking";
 import {
   Car,
   UtensilsCrossed,
@@ -508,6 +509,10 @@ export default function UnifiedBookingPage() {
   const [rideStatus, setRideStatus] = useState<RideStatus>("SELECTING");
   const rideStatusRef = useRef<RideStatus>("SELECTING");
   const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
+  
+  // Backend ride tracking - when a real rideId exists, use backend tracking
+  const [currentRideId, setCurrentRideId] = useState<string | null>(null);
+  const [useSimulation, setUseSimulation] = useState(true); // Demo mode by default
   const [tripStartTime, setTripStartTime] = useState<Date | null>(null);
   const [tripEndTime, setTripEndTime] = useState<Date | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(0);
@@ -550,6 +555,53 @@ export default function UnifiedBookingPage() {
     if (!isClient) return null;
     return createCustomerLocationIcon();
   }, [isClient]);
+  
+  // Backend live tracking hook - activated when we have a real rideId
+  const isTrackingActive = rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS";
+  const {
+    data: liveTrackingData,
+    driverPosition: backendDriverPosition,
+    driverHeading: backendDriverHeading,
+    speedMph: backendSpeedMph,
+    etaMinutes: backendEtaMinutes,
+    remainingDistanceMiles: backendRemainingMiles,
+    isLoading: isLiveTrackingLoading,
+    error: liveTrackingError,
+  } = useLiveRideTracking({
+    rideId: currentRideId,
+    enabled: !useSimulation && isTrackingActive && !!currentRideId,
+    pollingIntervalMs: 3000,
+    onStatusChange: (newStatus, oldStatus) => {
+      console.log("[LiveTracking] Status changed:", oldStatus, "->", newStatus);
+      // Could trigger status sync here if backend status differs from local
+    },
+  });
+  
+  // Use backend data when available, otherwise use simulation values
+  const effectiveDriverPosition = useMemo(() => {
+    if (!useSimulation && backendDriverPosition) return backendDriverPosition;
+    return interpolatedPosition || driverPosition;
+  }, [useSimulation, backendDriverPosition, interpolatedPosition, driverPosition]);
+  
+  const effectiveDriverHeading = useMemo(() => {
+    if (!useSimulation && backendDriverHeading !== undefined) return backendDriverHeading;
+    return driverHeading;
+  }, [useSimulation, backendDriverHeading, driverHeading]);
+  
+  const effectiveSpeedMph = useMemo(() => {
+    if (!useSimulation && backendSpeedMph !== undefined) return backendSpeedMph;
+    return driverSpeedMph;
+  }, [useSimulation, backendSpeedMph, driverSpeedMph]);
+  
+  const effectiveEtaMinutes = useMemo(() => {
+    if (!useSimulation && backendEtaMinutes !== undefined) return backendEtaMinutes;
+    return remainingMinutes;
+  }, [useSimulation, backendEtaMinutes, remainingMinutes]);
+  
+  const effectiveRemainingMiles = useMemo(() => {
+    if (!useSimulation && backendRemainingMiles !== undefined) return backendRemainingMiles;
+    return remainingMiles;
+  }, [useSimulation, backendRemainingMiles, remainingMiles]);
   
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
