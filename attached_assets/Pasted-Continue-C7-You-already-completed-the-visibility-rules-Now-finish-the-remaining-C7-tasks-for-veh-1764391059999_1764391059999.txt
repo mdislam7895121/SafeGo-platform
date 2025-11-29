@@ -1,0 +1,150 @@
+Continue C7. You already completed the visibility rules.  
+Now finish the remaining C7 tasks for vehicle images and full UI polish.
+
+Follow all SafeGo rules strictly.  
+Do NOT change any backend logic (pricing, commission, promo, commission split, dispatch, routing).  
+Only update the rider-side UI.
+
+1. Vehicle image system (3D, left-angle)
+
+   a) Add / confirm vehicle images under:
+      client/src/assets/vehicles/
+
+      Use Uber-style 3D renders with a consistent angle:
+      - front-left 3D / ¾ view
+      - car slightly rotated so the LEFT side and a bit of the front are visible
+      - shot from a slightly elevated camera so the roof is visible
+      - white or very light background only
+
+      Filenames:
+      - safego-x-sedan.png
+      - safego-comfort-sedan.png
+      - safego-comfort-xl-suv.png
+      - safego-xl-minivan.png
+      - safego-black-sedan.png
+      - safego-black-suv.png
+      - safego-wav-van.png
+
+   b) All images must:
+      - share the SAME aspect ratio
+      - use the same crop (wheels aligned horizontally at the bottom)
+      - be scaled so each car appears same visual size across all categories
+      - no stretching or distortion
+
+2. Image mapping helper
+
+   Create or update:
+   client/src/utils/getVehicleImage.ts
+
+   Implement a function getVehicleImage(rideTypeCode) that maps:
+
+     SAFEGO_X         → safego-x-sedan.png
+     SAFEGO_COMFORT   → safego-comfort-sedan.png
+     SAFEGO_COMFORT_XL→ safego-comfort-xl-suv.png
+     SAFEGO_XL        → safego-xl-minivan.png
+     SAFEGO_BLACK     → safego-black-sedan.png
+     SAFEGO_BLACK_SUV → safego-black-suv.png
+     SAFEGO_WAV       → safego-wav-van.png
+
+   Export and reuse this helper in all rider views.
+
+3. Apply images everywhere
+
+   Use getVehicleImage in:
+   - the ride type carousel cards
+   - the selected ride summary panel
+
+   So when the user switches between categories, the corresponding 3D left-angle image updates instantly in both the card and the summary.
+
+4. Image container UI (Uber-style)
+
+   For the image wrapper in the ride card:
+
+   - width: ~92% of the card
+   - height: auto, object-fit: contain
+   - center horizontally and vertically
+   - background:
+       linear-gradient(180deg, #FFFFFF 40%, #F8F8F8 100%)
+   - border-radius: 12px
+   - add soft shadow:
+       filter: drop-shadow(0px 4px 14px rgba(0,0,0,0.15));
+
+   Ensure there is consistent padding so the car never touches the edges.
+
+5. SafeGo-branded titles
+
+   Update all visible category titles in the rider UI to:
+
+     SafeGo X
+     SafeGo Comfort
+     SafeGo Comfort XL
+     SafeGo XL
+     SafeGo Black
+     SafeGo Black SUV
+     SafeGo WAV
+
+   Rules:
+   - bold title (font-weight: 600)
+   - centered under the image, above the price
+   - single line only (no wrapping); adjust font-size if needed
+
+6. Professional price presentation
+
+   For each ride card:
+
+   - Current price: large, bold, dark (#000000)
+   - Original price (when promo is active): smaller, gray, strikethrough
+   - Savings line: “You save $X.XX”
+       • color: #16A34A
+       • small but readable
+       • placed directly under the prices
+
+   The price and commission engine must NOT be changed, only the labels and styling.
+
+7. Card layout polish
+
+   For each ride card (carousel item):
+
+   - padding: 16px inside the card
+   - border-radius: 14px
+   - border: 1px solid #E5E7EB
+   - subtle background: #FFFFFF
+   - subtle hover / active shadow:
+       box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08) when selected
+   - subtext (capacity, ETA, pickup time) in #6B7280, small font (weight 400)
+
+8. Badge system
+
+   Reuse the existing logic, but apply clear visual styles:
+
+   - “Limited” → small yellow pill badge
+   - “Popular” (SafeGo X default) → small blue pill badge
+   - Promo / saver → green lightning pill (“SafeGo Everyday Saver”)
+
+   Do NOT change how these flags are computed, only how they are rendered.
+
+9. Mobile + desktop behavior
+
+   - Mobile: keep horizontal scroll carousel; cards should remain fully visible with proper padding.
+   - Desktop: keep multi-column layout.
+   - Both must show the same 3D left-angle vehicle images, SafeGo titles, price styling, and badges.
+
+10. No backend changes
+
+   Confirm that you did NOT modify:
+   - fare calculation formulas
+   - commission / earnings logic
+   - promo application
+   - driver eligibility / rideTypeCode values
+   - dispatch matching
+   - routes or ETA
+
+At the end:
+
+   - Restart the app
+   - Take a screenshot of:
+       • the rider carousel with all 7 categories visible
+       • the selected ride summary panel
+   - Confirm that all images are 3D, front-left angle, visually consistent.
+   - Confirm no backend logic was changed.
+   - Save a checkpoint.
