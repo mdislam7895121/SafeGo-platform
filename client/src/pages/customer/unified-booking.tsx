@@ -13,6 +13,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SoundToggle } from "@/components/SoundToggle";
 import { useCustomerLocation, createCustomerLocationIcon } from "@/hooks/useCustomerLocation";
 import { useLiveRideTracking } from "@/hooks/useLiveRideTracking";
+import { reverseGeocode } from "@/lib/locationService";
 import {
   Car,
   UtensilsCrossed,
@@ -656,6 +657,63 @@ export default function UnifiedBookingPage() {
       setHasInitialCentered(true);
     }
   }, [hasInitialCentered, pickup, dropoff, customerLocation]);
+
+  // Auto-fill pickup address from customer's current location on initial load
+  // Only triggers once when: pickup is empty, location is available, permission not denied
+  const hasAutoFilledPickup = useRef(false);
+  const [isAutoFillLoading, setIsAutoFillLoading] = useState(false);
+  
+  useEffect(() => {
+    // Guard: Only auto-fill once per page load
+    if (hasAutoFilledPickup.current) return;
+    
+    // Guard: Wait for location data, skip if still loading
+    if (isCustomerLocationLoading) return;
+    
+    // Guard: Skip if permission was denied
+    if (isLocationPermissionDenied) return;
+    
+    // Guard: Skip if pickup already has a value (user typed or restored from session)
+    if (pickup || pickupQuery) return;
+    
+    // Guard: Need valid customer location coordinates
+    if (!customerLocation?.lat || !customerLocation?.lng) return;
+    
+    // Mark as attempted to prevent repeat calls
+    hasAutoFilledPickup.current = true;
+    setIsAutoFillLoading(true);
+    
+    const autoFillPickup = async () => {
+      try {
+        const address = await reverseGeocode(customerLocation.lat, customerLocation.lng);
+        
+        // Verify we got a real address (not just coordinates fallback)
+        if (address && address.includes(",")) {
+          const location: LocationData = {
+            address,
+            lat: customerLocation.lat,
+            lng: customerLocation.lng,
+          };
+          
+          // Only apply if user hasn't started typing in the meantime
+          setPickup(currentPickup => {
+            if (!currentPickup) {
+              setPickupQuery(address);
+              return location;
+            }
+            return currentPickup;
+          });
+        }
+      } catch (error) {
+        // Silently fail - user can still manually enter address
+        console.warn("[UnifiedBooking] Auto-fill pickup failed:", error);
+      } finally {
+        setIsAutoFillLoading(false);
+      }
+    };
+    
+    autoFillPickup();
+  }, [customerLocation, isCustomerLocationLoading, isLocationPermissionDenied, pickup, pickupQuery]);
 
   const routePolylines = useMemo(() => {
     return routes.map((route) => ({
@@ -2332,8 +2390,8 @@ export default function UnifiedBookingPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <div className="h-2 w-2 rounded-full bg-blue-500" />
-                                  <span className="text-sm font-medium truncate">
-                                    {pickup ? pickup.address.split(",")[0] : "Set pickup"}
+                                  <span className={`text-sm font-medium truncate ${isAutoFillLoading ? "text-muted-foreground/60" : ""}`}>
+                                    {pickup ? pickup.address.split(",")[0] : (isAutoFillLoading ? "Detecting location..." : "Set pickup")}
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -2367,8 +2425,8 @@ export default function UnifiedBookingPage() {
                                   onChange={setPickupQuery}
                                   onLocationSelect={handlePickupSelect}
                                   onCurrentLocation={handleGetCurrentLocation}
-                                  isLoadingCurrentLocation={isLocating}
-                                  placeholder={isLocating ? "Getting location..." : "Enter pickup location"}
+                                  isLoadingCurrentLocation={isLocating || isAutoFillLoading}
+                                  placeholder={isAutoFillLoading ? "Detecting location..." : (isLocating ? "Getting location..." : "Enter pickup location")}
                                   variant="pickup"
                                   showCurrentLocation={true}
                                   hideIcon={true}

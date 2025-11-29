@@ -1,0 +1,77 @@
+You must follow the SafeGo master rules while making any change:
+
+- Platform: SafeGo has four roles – Customer, Driver, Restaurant, Admin – and three core services – Ride, Eats, Parcel – all sharing a unified booking and tracking logic.
+- Device-friendly UI: The same design must behave correctly on desktop web and mobile preview (responsive, no broken layouts, no duplicated forms).
+- Customer ride flow: For Ride, the customer flow is: /customer/book (enter pickup/dropoff) → pricing/route selection → vehicle selection → confirm ride → live tracking → trip complete.
+- Security: Use the browser’s built-in geolocation API only with explicit user permission, never fake or hard-coded coordinates, and always handle permission denied / timeout / error cases gracefully.
+- Reuse existing code: Re-use existing SafeGo hooks, utilities, and map components (e.g. any existing geolocation or reverse-geocoding helpers) instead of adding new ad-hoc logic. Don’t break unified-booking or live-tracking.
+
+Now fix the specific regression:
+
+GOAL  
+On the /customer/book page, the pickup field used to auto-fill with the customer’s current address. Now it only shows “Enter pickup location” and does not detect the current address. Restore the previous behavior in a clean, maintainable way, without breaking any other ride flow pages.
+
+REQUIREMENTS
+
+1. Find and reuse existing geolocation logic
+   - Search the client for any existing hooks or utilities such as:
+     - useCurrentLocation, useGeolocation, useBrowserLocation
+     - reverseGeocodeAddress, geocodeToAddress, locationToAddress
+     - any code currently used in unified booking or live tracking to get the customer’s coordinates.
+   - Do NOT duplicate the logic in multiple places. Create or reuse a single shared helper/hook if needed.
+
+2. Re-enable auto pickup detection on /customer/book
+   - File to update: client/src/pages/customer/book.tsx (or the actual file that implements /customer/book).
+   - On initial mount of this page:
+     - If the pickup field is empty AND location permission has not been explicitly denied:
+       - trigger the geolocation flow once (not in a tight loop).
+       - while loading, show a subtle “Detecting location…” state (e.g. gray placeholder text).
+       - once coordinates are retrieved and reverse-geocoded, set:
+         - pickupAddress text (e.g. “188 Sutter Ave, Brooklyn, NY 11212”)
+         - pickup coordinates for the map marker.
+   - If the user has already typed a pickup address, DO NOT overwrite it automatically.
+
+3. Proper error and permission handling
+   - If the browser denies geolocation permission, or an error/timeout occurs:
+     - keep the pickup field as “Enter pickup location”
+     - do NOT show any fake address
+     - optionally show a small helper text: “Turn on location to auto-fill pickup” (non-blocking).
+   - Make sure there is no console error spam.
+
+4. Keep map and input in sync
+   - When auto-detected pickup is applied:
+     - move the pickup pin on the map to that location.
+     - ensure pan/zoom centers around the pickup point at a sensible zoom level for city view.
+   - If the user later edits the pickup address manually, update the underlying coordinates consistently (reuse existing geocoding logic already used in the ride flow).
+
+5. Don’t break unified booking or live tracking
+   - Do NOT remove or change any logic on:
+     - /customer
+     - /customer/ride
+     - /customer/unified-booking
+     - /customer/live or any live tracking map
+   - If any shared hook is being used by those pages, update it in a backwards-compatible way so that:
+     - unified booking still works as before
+     - live driver tracking and ETA remain untouched.
+
+6. Testing (you must self-test before saying the task is done)
+   - Desktop:
+     - Open /customer/book
+     - Allow location permission
+     - Confirm the pickup field automatically fills with a real address near the current location and the pickup pin appears there.
+   - Mobile preview (iPhone 14 / similar):
+     - Open /customer/book
+     - Confirm the same behavior: auto-filled pickup address and map centered correctly.
+   - Permission denied scenario:
+     - Simulate denied geolocation (or turn it off in the browser).
+     - Verify no auto-fill happens, no fake address is shown, and the page still works with manual address entry.
+
+7. Code quality constraints
+   - No hard-coded demo coordinates or strings like “Office”, “Demo location”, etc.
+   - No debug logs left in production code.
+   - Keep type-safety (TypeScript) intact and avoid any-typed shortcuts.
+
+Once finished, summarize exactly:
+- which file(s) you updated,
+- which hook or helper now powers the pickup auto-detection,
+- and how to turn the feature off if we need to later.
