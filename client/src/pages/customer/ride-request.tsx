@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { RideAddressHeader } from "@/components/rider/RideAddressHeader";
-import { AddressSummaryCapsule } from "@/components/rider/AddressSummaryCapsule";
+import { MobileAddressCapsule } from "@/components/rider/MobileAddressCapsule";
 import { 
   reverseGeocode, 
   getSavedPlaces, 
@@ -1374,10 +1374,11 @@ export default function RideRequest() {
                 dropoff={dropoff}
               />
             ) : (
-              /* Screen 2/3: Compact Address Summary Capsule */
-              <AddressSummaryCapsule
+              /* Screen 2/3: Compact MobileAddressCapsule in collapsed mode */
+              <MobileAddressCapsule
                 pickup={pickup}
                 dropoff={dropoff}
+                mode="collapsed"
                 onEdit={() => {
                   setIsEditingAddresses(true);
                   setIsRouteExplorerOpen(false); // Close Route Explorer to show full inputs
@@ -1439,14 +1440,15 @@ export default function RideRequest() {
             )}
           </div>
 
-          {/* Route Chips Overlay - Only shown when Route Explorer is open (mobile only) */}
+          {/* Route Pills Overlay - Only shown when Route Explorer is open (mobile only) 
+               Pills flex equally to fill width - no horizontal scroll, all 3 visible */}
           {isMobile && isRouteExplorerOpen && routes.length > 1 && (
             <div 
               className="absolute bottom-4 left-4 right-4 z-30 bg-white dark:bg-card rounded-2xl px-4 py-3"
               style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
-              data-testid="route-chips-overlay"
+              data-testid="route-pills-overlay"
             >
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <div className="flex justify-between gap-2">
                 {routes.map((route, index) => {
                   const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
                   const distMi = route.distanceMiles.toFixed(1);
@@ -1459,20 +1461,21 @@ export default function RideRequest() {
                       onClick={() => setActiveRouteId(route.id)}
                       aria-pressed={isActive}
                       tabIndex={0}
+                      style={{ flex: "1 1 0" }}
                       className={`
-                        flex-shrink-0 px-4 py-2 rounded-full transition-all
+                        min-w-0 px-2 py-2 rounded-full transition-all text-center
                         ${isActive 
                           ? "bg-blue-50 dark:bg-blue-950/40 border-2 border-blue-600" 
-                          : "bg-[#F9FAFB] dark:bg-muted border border-transparent hover:border-gray-300"
+                          : "bg-[#F9FAFB] dark:bg-muted border border-[#D1D5DB] hover:border-gray-400"
                         }
                       `}
-                      data-testid={`route-chip-${route.id}`}
+                      data-testid={`route-pill-${route.id}`}
                     >
-                      <p className={`text-sm font-medium whitespace-nowrap ${isActive ? "text-blue-600" : "text-foreground"}`}>
+                      <p className={`text-xs font-medium truncate ${isActive ? "text-blue-600" : "text-foreground"}`}>
                         {label}
                       </p>
-                      <p className="text-xs text-muted-foreground whitespace-nowrap">
-                        {etaMin} min • {distMi} mi
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {etaMin} min · {distMi} mi
                       </p>
                     </button>
                   );
