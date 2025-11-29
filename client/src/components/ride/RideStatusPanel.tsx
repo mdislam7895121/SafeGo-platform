@@ -21,6 +21,7 @@ import {
   CornerUpLeft,
   CornerDownRight,
   CornerDownLeft,
+  Headphones,
 } from "lucide-react";
 import { getVehicleCategoryImage } from "@/lib/vehicleMedia";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
@@ -99,6 +100,7 @@ interface RideStatusPanelProps {
   onCancelRide?: () => void;
   onContactDriver?: () => void;
   onMessageDriver?: () => void;
+  onContactSupport?: () => void;
   onRateTrip?: (rating: number) => void;
   isCancelling?: boolean;
   showActions?: boolean;
@@ -154,6 +156,7 @@ export function RideStatusPanel({
   onCancelRide,
   onContactDriver,
   onMessageDriver,
+  onContactSupport,
   onRateTrip,
   isCancelling = false,
   showActions = true,
@@ -418,6 +421,16 @@ export function RideStatusPanel({
                     data-testid="button-contact-driver"
                   >
                     <Phone className="h-4 w-4" />
+                  </Button>
+                )}
+                {onContactSupport && (
+                  <Button 
+                    onClick={onContactSupport}
+                    variant="outline"
+                    size="icon"
+                    data-testid="button-contact-support-ride"
+                  >
+                    <Headphones className="h-4 w-4" />
                   </Button>
                 )}
               </div>

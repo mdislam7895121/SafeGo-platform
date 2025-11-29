@@ -3,8 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { 
   ArrowLeft, User, MapPin, Phone, CreditCard, Shield, 
-  Edit, Star, Clock, Home, Briefcase, Heart, Bell, Globe, CheckCircle2 
+  Edit, Star, Clock, Home, Briefcase, Heart, Bell, Globe, CheckCircle2, Headphones 
 } from "lucide-react";
+import { SupportChatDrawer } from "@/components/customer/SupportChatDrawer";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +14,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 
 export default function CustomerProfile() {
+  const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
+  
   const { data: profileData, isLoading } = useQuery({
     queryKey: ["/api/customer/home"],
   });
@@ -379,7 +382,40 @@ export default function CustomerProfile() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Support Center Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Headphones className="h-5 w-5" />
+              Support Center
+            </CardTitle>
+            <CardDescription>Get help with your account or rides</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => setIsSupportChatOpen(true)}
+              className="w-full justify-start gap-3"
+              data-testid="button-contact-support-profile"
+            >
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Headphones className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <p className="font-medium">Contact Support</p>
+                <p className="text-sm text-muted-foreground">Chat with our support team</p>
+              </div>
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+      
+      {/* Support Chat Drawer */}
+      <SupportChatDrawer
+        isOpen={isSupportChatOpen}
+        onOpenChange={setIsSupportChatOpen}
+      />
 
       {/* Bottom Navigation */}
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border h-16 flex items-center justify-around px-6 z-10">

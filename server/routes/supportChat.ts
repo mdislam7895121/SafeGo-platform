@@ -154,7 +154,7 @@ router.post("/chat/verify", authenticateToken, async (req: AuthRequest, res) => 
 // ====================================================
 
 const sendMessageSchema = z.object({
-  content: z.string().min(1, "Message cannot be empty").max(2000, "Message too long"),
+  content: z.string().min(1, "Message cannot be empty").max(500, "Message too long (max 500 characters)"),
 });
 
 router.post("/chat/start", authenticateToken, async (req: AuthRequest, res) => {

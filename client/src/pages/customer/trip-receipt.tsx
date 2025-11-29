@@ -23,7 +23,9 @@ import {
   Percent,
   Building2,
   Copy,
+  Headphones,
 } from "lucide-react";
+import { SupportChatDrawer } from "@/components/customer/SupportChatDrawer";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
 import { formatDurationMinutes } from "@/lib/formatters";
 
@@ -74,6 +76,7 @@ export default function TripReceipt() {
   const { toast } = useToast();
   
   const [receiptData, setReceiptData] = useState<TripReceiptData | null>(null);
+  const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(`trip_receipt_${tripId}`);
@@ -440,7 +443,29 @@ Thank you for riding with SafeGo!
             {'share' in navigator ? 'Share' : 'Copy'}
           </Button>
         </div>
+        
+        {/* Contact Support */}
+        <Button
+          variant="outline"
+          onClick={() => setIsSupportChatOpen(true)}
+          className="w-full"
+          data-testid="button-contact-support-receipt"
+        >
+          <Headphones className="h-4 w-4 mr-2" />
+          Need help? Contact Support
+        </Button>
       </div>
+      
+      {/* Support Chat Drawer */}
+      <SupportChatDrawer
+        isOpen={isSupportChatOpen}
+        onOpenChange={setIsSupportChatOpen}
+        rideId={tripId}
+        tripContext={{
+          pickupAddress: receiptData.pickupAddress,
+          dropoffAddress: receiptData.dropoffAddress,
+        }}
+      />
 
       {/* Fixed bottom button */}
       <div 
