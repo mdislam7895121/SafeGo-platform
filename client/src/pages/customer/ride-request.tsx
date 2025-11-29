@@ -16,6 +16,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
+import { RideAddressHeader } from "@/components/rider/RideAddressHeader";
 import { 
   reverseGeocode, 
   getSavedPlaces, 
@@ -477,6 +478,27 @@ export default function RideRequest() {
     }
   }, [isClient, hasCheckedStorage, pickup, handleGetCurrentLocation]);
 
+  // Swap pickup and dropoff addresses
+  const handleSwapAddresses = useCallback(() => {
+    if (!pickup || !dropoff) return;
+    
+    // Swap the location data
+    const tempPickup = pickup;
+    const tempDropoff = dropoff;
+    const tempPickupQuery = pickupQuery;
+    const tempDropoffQuery = dropoffQuery;
+    
+    setPickup(tempDropoff);
+    setDropoff(tempPickup);
+    setPickupQuery(tempDropoffQuery);
+    setDropoffQuery(tempPickupQuery);
+    
+    toast({
+      title: "Addresses swapped",
+      description: "Pickup and dropoff locations have been swapped",
+    });
+  }, [pickup, dropoff, pickupQuery, dropoffQuery, toast]);
+
   // Fetch routes using Google Maps DirectionsService (client-side)
   const fetchRoutes = useCallback(async () => {
     if (!pickup || !dropoff) {
@@ -816,50 +838,30 @@ export default function RideRequest() {
         
         {/* LEFT COLUMN: Plan your ride sidebar */}
         <div className="flex flex-col gap-4 overflow-y-auto">
-          <Card className="shadow-lg bg-background rounded-xl border border-[#E5E7EB]" data-testid="desktop-sidebar">
-            <CardContent className="p-5 space-y-4">
-              <h2 className="text-lg font-semibold">Plan your ride</h2>
-              
-              {/* Pickup/Dropoff inputs */}
-              <div className="relative">
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-                  <div className="h-3 w-3 rounded-full bg-blue-500 border-2 border-white shadow" />
-                  <div className="w-px h-10 bg-border" />
-                  <div className="h-3 w-3 rounded-full bg-red-500 border-2 border-white shadow" />
-                </div>
-                
-                <div className="pl-10 space-y-3">
-                  <GooglePlacesInput
-                    value={pickupQuery}
-                    onChange={setPickupQuery}
-                    onLocationSelect={handlePickupSelect}
-                    onCurrentLocation={handleGetCurrentLocation}
-                    isLoadingCurrentLocation={isLocating}
-                    placeholder={isLocating ? "Getting location..." : "Pickup location"}
-                    variant="pickup"
-                    showCurrentLocation={true}
-                    className="w-full"
-                  />
-                  
-                  <GooglePlacesInput
-                    value={dropoffQuery}
-                    onChange={setDropoffQuery}
-                    onLocationSelect={handleDropoffSelect}
-                    placeholder="Where to?"
-                    variant="dropoff"
-                    showCurrentLocation={false}
-                    className="w-full"
-                  />
-                </div>
-              </div>
+          {/* Professional Address Header for Desktop */}
+          <RideAddressHeader
+            pickupQuery={pickupQuery}
+            dropoffQuery={dropoffQuery}
+            onPickupQueryChange={setPickupQuery}
+            onDropoffQueryChange={setDropoffQuery}
+            onPickupSelect={handlePickupSelect}
+            onDropoffSelect={handleDropoffSelect}
+            onSwapAddresses={handleSwapAddresses}
+            onCurrentLocation={handleGetCurrentLocation}
+            isLocatingCurrentLocation={isLocating}
+            locationError={locationError}
+            focusedField={focusedField}
+            onPickupFocus={() => setFocusedField("pickup")}
+            onPickupBlur={() => setFocusedField(null)}
+            onDropoffFocus={() => setFocusedField("dropoff")}
+            onDropoffBlur={() => setFocusedField(null)}
+            pickup={pickup}
+            dropoff={dropoff}
+          />
 
-              {locationError && (
-                <Alert variant="destructive" data-testid="location-error">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{locationError}</AlertDescription>
-                </Alert>
-              )}
-
+          {/* Promo & Payment Card */}
+          <Card className="shadow-[0_6px_18px_rgba(0,0,0,0.06)] bg-white dark:bg-card rounded-xl border border-[#E5E7EB] dark:border-border" style={{ borderRadius: "16px" }} data-testid="desktop-promo-card">
+            <CardContent className="p-4 space-y-3">
               {/* Promo Banner in sidebar for desktop */}
               {activeRoute && appliedPromo && (
                 <div 
@@ -1286,53 +1288,30 @@ export default function RideRequest() {
             </button>
           )}
 
-          {/* Location card overlay on map */}
+          {/* Professional Address Header - Uber-grade styling */}
           <div className="absolute top-3 left-3 right-3 z-20">
-            <Card className="shadow-lg bg-background" data-testid="location-card">
-              <CardContent className="p-3 space-y-2">
-                <div className="relative">
-                  <div className="absolute left-2 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
-                    <div className="h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-white shadow" />
-                    <div className="w-px h-6 bg-border" />
-                    <div className="h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white shadow" />
-                  </div>
-                  
-                  <div className="pl-8 space-y-1.5">
-                    <GooglePlacesInput
-                      value={pickupQuery}
-                      onChange={setPickupQuery}
-                      onLocationSelect={handlePickupSelect}
-                      onCurrentLocation={handleGetCurrentLocation}
-                      isLoadingCurrentLocation={isLocating}
-                      placeholder={isLocating ? "Getting location..." : "Pickup location"}
-                      variant="pickup"
-                      showCurrentLocation={true}
-                      className="w-full text-sm"
-                    />
-                    
-                    <GooglePlacesInput
-                      value={dropoffQuery}
-                      onChange={setDropoffQuery}
-                      onLocationSelect={handleDropoffSelect}
-                      placeholder="Where to?"
-                      variant="dropoff"
-                      showCurrentLocation={false}
-                      className="w-full text-sm"
-                    />
-                  </div>
-                </div>
-
-                {locationError && (
-                  <Alert variant="destructive" className="mt-1" data-testid="location-error">
-                    <AlertCircle className="h-3 w-3" />
-                    <AlertDescription className="text-xs">{locationError}</AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
+            <RideAddressHeader
+              pickupQuery={pickupQuery}
+              dropoffQuery={dropoffQuery}
+              onPickupQueryChange={setPickupQuery}
+              onDropoffQueryChange={setDropoffQuery}
+              onPickupSelect={handlePickupSelect}
+              onDropoffSelect={handleDropoffSelect}
+              onSwapAddresses={handleSwapAddresses}
+              onCurrentLocation={handleGetCurrentLocation}
+              isLocatingCurrentLocation={isLocating}
+              locationError={locationError}
+              focusedField={focusedField}
+              onPickupFocus={() => setFocusedField("pickup")}
+              onPickupBlur={() => setFocusedField(null)}
+              onDropoffFocus={() => setFocusedField("dropoff")}
+              onDropoffBlur={() => setFocusedField(null)}
+              pickup={pickup}
+              dropoff={dropoff}
+            />
 
             {showSuggestions && (
-              <Card className="mt-2 shadow-lg max-h-[30vh] overflow-y-auto" data-testid="suggestions-card">
+              <Card className="mt-2 shadow-[0_6px_18px_rgba(0,0,0,0.06)] border border-[#E5E7EB] dark:border-border max-h-[30vh] overflow-y-auto" style={{ borderRadius: "16px" }} data-testid="suggestions-card">
                 <CardContent className="p-2">
                   {validSavedPlaces.length > 0 && (
                     <div className="mb-2">
@@ -1354,36 +1333,36 @@ export default function RideRequest() {
                     </div>
                   )}
 
-                {recentLocations.length > 0 && (
-                  <div>
-                    <p className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Recent Places
-                    </p>
-                    {recentLocations.slice(0, 5).map((recent) => (
-                      <SuggestionItem
-                        key={recent.id}
-                        icon={Clock}
-                        iconBg="bg-muted text-muted-foreground"
-                        title={recent.address.split(",")[0]}
-                        subtitle={recent.address.split(",").slice(1, 3).join(",").trim() || "Recent destination"}
-                        onClick={() => handleSuggestionClick(recent)}
-                        testId={`suggestion-recent-${recent.id}`}
-                      />
-                    ))}
-                  </div>
-                )}
+                  {recentLocations.length > 0 && (
+                    <div>
+                      <p className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Recent Places
+                      </p>
+                      {recentLocations.slice(0, 5).map((recent) => (
+                        <SuggestionItem
+                          key={recent.id}
+                          icon={Clock}
+                          iconBg="bg-muted text-muted-foreground"
+                          title={recent.address.split(",")[0]}
+                          subtitle={recent.address.split(",").slice(1, 3).join(",").trim() || "Recent destination"}
+                          onClick={() => handleSuggestionClick(recent)}
+                          testId={`suggestion-recent-${recent.id}`}
+                        />
+                      ))}
+                    </div>
+                  )}
 
-                {validSavedPlaces.length === 0 && recentLocations.length === 0 && (
-                  <div className="text-center py-6 text-muted-foreground">
-                    <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">No saved or recent places yet</p>
-                    <p className="text-xs mt-1">Your frequent destinations will appear here</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                  {validSavedPlaces.length === 0 && recentLocations.length === 0 && (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <MapPin className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No saved or recent places yet</p>
+                      <p className="text-xs mt-1">Your frequent destinations will appear here</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         {/* End of map section */}
         </div>
 

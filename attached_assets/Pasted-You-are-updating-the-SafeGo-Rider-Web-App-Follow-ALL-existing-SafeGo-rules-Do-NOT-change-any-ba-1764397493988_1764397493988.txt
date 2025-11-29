@@ -1,0 +1,189 @@
+You are updating the SafeGo Rider Web App.
+
+Follow ALL existing SafeGo rules:
+- Do NOT change any backend or business logic (location search, geocoding, autofill, ride creation, pricing, promos, commission, matching, KYC).
+- Only update the UI layout and styling for the pickup/dropoff address bars on the rider “Plan your ride” page.
+- Security: no new external calls, no extra logging of PII. Pure front-end refactor.
+
+Goal:
+Make the pickup + dropoff address bars look professional and Uber-grade on both desktop and mobile, while keeping all current functionality.
+
+Scope:
+- Page: `client/src/pages/rider/ride-request.tsx` (or equivalent)
+- Components: the header area that renders the “Plan your ride” section and the two address inputs.
+
+--------------------------------
+1. Extract a dedicated header component
+--------------------------------
+1. Locate the JSX that renders:
+   - The “Plan your ride” title
+   - The pickup address field
+   - The dropoff address field
+
+2. Extract this into a reusable component, e.g.:
+   - `RideAddressHeader` in `client/src/components/rider/RideAddressHeader.tsx`
+
+3. The new component must receive all logic as props:
+   - `pickupAddress`, `dropoffAddress`
+   - `onPickupChange`, `onDropoffChange`
+   - `onSwapAddresses` (if already implemented)
+   - `onPickupFocus`, `onDropoffFocus` (if used for suggestions)
+   - Do NOT re-implement business logic inside this component; only call the existing handlers.
+
+4. Replace the old inline JSX in `ride-request.tsx` with the new `<RideAddressHeader ... />` while keeping all props and handlers wired the same way.
+
+--------------------------------
+2. Card container design (both desktop + mobile)
+--------------------------------
+Update `RideAddressHeader` container styling to be a clean card:
+
+- Full-width on mobile, constrained within the left panel on desktop (respect existing layout).
+- Use a white card with:
+  - background: `#FFFFFF`
+  - border: `1px solid #E5E7EB`
+  - border-radius: `16px`
+  - box-shadow: `0 6px 18px rgba(0,0,0,0.06)` (very soft)
+  - padding: `16px` on all sides
+  - vertical spacing between internal rows: `12px`
+
+Inside the card:
+
+- Top row: a small title text:
+  - Label: `Plan your ride`
+  - Font weight: 600
+  - Font size: 0.9rem
+  - Color: neutral gray (`#111827`)
+
+--------------------------------
+3. Professional input rows (Pickup & Dropoff)
+--------------------------------
+For each address (pickup and dropoff), render a structured row instead of a plain input:
+
+Layout:
+- A flex row:
+  - Left: circular icon
+  - Middle: label + address text
+  - Right: optional swap button (only on the pickup row, see below)
+
+Details:
+
+1. Left icon:
+   - 32x32 circle
+   - Pickup:
+     - Background: `#EFF6FF` (soft blue)
+     - Icon: a small solid marker or letter `A` in `#2563EB`
+   - Dropoff:
+     - Background: `#FEF2F2` (soft red)
+     - Icon: a small solid marker or letter `B` in `#DC2626`
+
+2. Text block (middle):
+   - Two lines stacked vertically:
+     - Line 1: label
+       - Pickup row: `Pickup`
+       - Dropoff row: `Dropoff`
+       - Style: uppercase or small caps, `font-size: 0.75rem`, `font-weight: 500`, color `#6B7280`
+     - Line 2: address value
+       - Show the current address string.
+       - Style: `font-size: 0.95rem–1rem`, `font-weight: 500`, color `#111827`
+       - If the address is too long, truncate with ellipsis: single line only.
+
+   - The entire text block acts as the click / focus target:
+     - On click or tap, focus the underlying input and open autocomplete.
+
+3. Underlying input:
+   - Keep a real `<input>` or `<textarea>` but make it visually minimal:
+     - `opacity: 0` or width/height 0 but accessible via label, OR
+     - Use a positioned input with no border/background.
+   - The main visual representation is the formatted text block above.
+   - Ensure accessibility (screen readers can still see the label + value).
+
+--------------------------------
+4. Swap button between Pickup and Dropoff
+--------------------------------
+If swap functionality already exists, wire it into the UI; if not, only add the button skeleton that calls the existing handler when available.
+
+Design:
+- On the right side of the pickup row (desktop and mobile), place a small circular icon button:
+  - 32x32 size
+  - Background: `#F3F4F6`
+  - Icon: vertical arrows `⇅` or a standard “swap” icon
+  - Tooltip / aria-label: `Swap pickup and dropoff`
+- Clicking/tapping triggers `onSwapAddresses` passed from parent.
+- Do NOT create new business logic; rely on the existing handler or no-op if not provided.
+
+--------------------------------
+5. Mobile-specific layout tweaks
+--------------------------------
+On mobile viewports (< 768px):
+
+- The `RideAddressHeader` card should be full-width with:
+  - `margin-inline: 12px`
+  - `margin-top: 8px`
+  - `margin-bottom: 8px`
+- Each address row should have:
+  - Vertical padding: `10–12px`
+  - A thin divider (`<hr>`) between pickup and dropoff rows with color `#E5E7EB`
+- Ensure the map remains clearly visible under the card:
+  - Do NOT let the address card grow excessively tall.
+  - If an address is extremely long, truncate with ellipsis.
+
+Focus states:
+- When pickup or dropoff is active:
+  - Add a subtle border highlight around that row (`border: 1px solid #2563EB`, `border-radius: 12px`, `background: #EFF6FF` for pickup, `#FEF2F2` for dropoff).
+  - Keep padding consistent so the layout doesn’t “jump”.
+
+--------------------------------
+6. Desktop layout preservation
+--------------------------------
+For desktop/tablet viewports (>= 768px):
+
+- Keep the existing overall two-column layout of the ride request page:
+  - Left: Plan your ride + promo + rides list
+  - Right: Map
+- The new `RideAddressHeader` must fit into the left column exactly where the old address block was.
+- Do NOT change:
+  - Map position or size
+  - Ride cards panel structure
+  - Promo banner behaviour
+
+Only the internal look & feel of the address card is updated.
+
+--------------------------------
+7. Behaviour & autocomplete
+--------------------------------
+- Do NOT change any of the following:
+  - How address search is performed
+  - When API calls are made to the geocoding service
+  - How location suggestions are rendered
+  - Any validation or error handling logic
+
+- You may adjust the suggestion dropdown styling so that:
+  - It anchors to the active row (pickup or dropoff).
+  - It does not overflow off-screen on mobile.
+  - It has a white background, border, and shadow matching the card.
+
+--------------------------------
+8. Testing checklist
+--------------------------------
+After implementing:
+
+1. Desktop:
+   - Enter pickup and dropoff.
+   - Confirm:
+     - Address bars show new visuals (icons + labels + truncated text).
+     - Suggestion dropdown still works.
+     - Swapping (if available) still works.
+     - No layout regression to the map or ride list.
+
+2. Mobile (use device preview):
+   - Open the ride request page.
+   - Check:
+     - Card spacing looks clean; it does not feel cluttered.
+     - Pickup/Dropoff labels are readable.
+     - Long addresses appear truncated with ellipsis, not wrapping into 3–4 lines.
+     - Tapping opens suggestions and focus states correctly.
+     - The rest of the page (promo, rides list, Request ride button) is unchanged except for improved spacing around the header.
+
+3. Ensure there are no console errors and all existing tests still pass.
+
+Document in a short comment at the top of `RideAddressHeader.tsx` what this component does and that it is UI-only (no business logic inside).
