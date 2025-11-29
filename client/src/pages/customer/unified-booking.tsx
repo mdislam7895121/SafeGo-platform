@@ -1418,6 +1418,8 @@ export default function UnifiedBookingPage() {
                       })}
                     </div>
                   </>
+                ) : null}
+                  </>
                 ) : (
                   /* Address Input View - When NOT in choose-ride mode */
                   <>
@@ -1682,6 +1684,7 @@ export default function UnifiedBookingPage() {
                           </div>
                         </div>
                       )}
+                    </div>
                     </div>
                   ) : (
                     /* Non-SELECTING Status Panels */
