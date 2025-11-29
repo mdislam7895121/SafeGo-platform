@@ -81,8 +81,6 @@ import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { FareDetailsAccordion } from "@/components/ride/FareDetailsAccordion";
 import { RideStatusPanel, type DriverInfo as StatusDriverInfo } from "@/components/ride/RideStatusPanel";
 import { MobileLiveTracking } from "@/components/ride/MobileLiveTracking";
-import { RideReviewDialog } from "@/components/ride/RideReviewDialog";
-import { RideChatModal } from "@/components/ride/RideChatModal";
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_ORDER,
@@ -610,15 +608,6 @@ export default function UnifiedBookingPage() {
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
-  
-  // Review dialog state
-  const [showRideReviewDialog, setShowRideReviewDialog] = useState(false);
-  
-  // Chat modal state
-  const [showChatModal, setShowChatModal] = useState(false);
-  
-  // Demo mode is true when there's no real backend ride
-  const isDemoMode = !currentRideId;
   
   // Developer debug mode (click logo 5 times to enable)
   const [showDebugControls, setShowDebugControls] = useState(false);
@@ -1283,32 +1272,12 @@ export default function UnifiedBookingPage() {
     setPickupToDropoffRoute([]);
     setPickupEtaMinutes(0);
     setPickupDistanceMiles(0);
-    // Close the review dialog
-    setShowRideReviewDialog(false);
   }, [fareEstimate, driverInfo, pickup, dropoff, tripStartTime, tripEndTime, selectedVehicleCategory, setLocationRoute]);
 
-  // Handle opening the review dialog when trip is completed
+  // Handle completing trip and navigating to receipt
   const handleFinishTripFlow = useCallback(() => {
-    // Open the review dialog
-    setShowRideReviewDialog(true);
-  }, []);
-  
-  // Handle completing the review and navigating to receipt
-  const handleReviewComplete = useCallback((rating: number, tip: number | null) => {
-    // Update state with the rating and tip
-    setUserRating(rating);
-    setSelectedTip(tip);
-    
-    // Navigate to receipt after a short delay to allow state update
-    setTimeout(() => {
-      navigateToReceipt(rating, tip);
-    }, 100);
-  }, [navigateToReceipt]);
-  
-  // Handle skipping the review
-  const handleReviewSkip = useCallback(() => {
-    navigateToReceipt(0, null);
-  }, [navigateToReceipt]);
+    navigateToReceipt(userRating, selectedTip);
+  }, [navigateToReceipt, userRating, selectedTip]);
 
   // Handle going back from cancelled state
   const handleBackFromCancelled = useCallback(() => {
@@ -2808,7 +2777,6 @@ export default function UnifiedBookingPage() {
                                   handleViewLiveMapDesktop();
                                 }
                               }}
-                              onMessageDriver={() => setShowChatModal(true)}
                               onCancelRide={handleCancelRideWithConfirm}
                               isCancelling={isCancellingRide}
                             />
@@ -2845,7 +2813,6 @@ export default function UnifiedBookingPage() {
                                   handleViewLiveMapDesktop();
                                 }
                               }}
-                              onMessageDriver={() => setShowChatModal(true)}
                             />
                             
                             {/* Debug control */}
@@ -3511,34 +3478,6 @@ export default function UnifiedBookingPage() {
         />
       )}
       
-      {/* Post-trip Review Dialog */}
-      <RideReviewDialog
-        open={showRideReviewDialog}
-        onOpenChange={setShowRideReviewDialog}
-        rideId={currentRideId}
-        driver={driverInfo ? {
-          name: driverInfo.name,
-          avatarInitials: driverInfo.avatarInitials,
-          carModel: driverInfo.carModel,
-          carColor: driverInfo.carColor,
-          plateNumber: driverInfo.plateNumber,
-        } : null}
-        onSuccess={handleReviewComplete}
-        onSkip={handleReviewSkip}
-        isDemoMode={isDemoMode}
-      />
-      
-      {/* Driver Chat Modal */}
-      <RideChatModal
-        open={showChatModal}
-        onOpenChange={setShowChatModal}
-        rideId={currentRideId}
-        driver={driverInfo ? {
-          name: driverInfo.name,
-          avatarInitials: driverInfo.avatarInitials,
-        } : null}
-        isDemoMode={isDemoMode}
-      />
     </div>
   );
 }

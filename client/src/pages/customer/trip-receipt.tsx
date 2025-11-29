@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -21,6 +22,7 @@ import {
   Star,
   Percent,
   Building2,
+  Copy,
 } from "lucide-react";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
 import { formatDurationMinutes } from "@/lib/formatters";
@@ -68,6 +70,7 @@ export default function TripReceipt() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/customer/trip-receipt/:id");
   const tripId = params?.id;
+  const { toast } = useToast();
   
   const [receiptData, setReceiptData] = useState<TripReceiptData | null>(null);
 
@@ -146,16 +149,31 @@ Thank you for riding with SafeGo!
   };
 
   const handleShare = async () => {
-    const shareData = {
-      title: 'SafeGo Trip Receipt',
-      text: `My SafeGo trip from ${receiptData.pickupAddress} to ${receiptData.dropoffAddress} - $${fareBreakdown.finalFare.toFixed(2)}`,
-    };
+    const shareText = `My SafeGo trip from ${receiptData.pickupAddress} to ${receiptData.dropoffAddress} - $${fareBreakdown.finalFare.toFixed(2)}`;
     
     if (navigator.share) {
       try {
-        await navigator.share(shareData);
+        await navigator.share({
+          title: 'SafeGo Trip Receipt',
+          text: shareText,
+        });
       } catch {
-        // User cancelled or share failed
+        // User cancelled share
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Copied to clipboard",
+          description: "Trip receipt details have been copied.",
+        });
+      } catch {
+        toast({
+          title: "Unable to share",
+          description: "Could not copy receipt details.",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -286,13 +304,16 @@ Thank you for riding with SafeGo!
                 <span data-testid="text-taxes">${fareBreakdown.taxesAndSurcharges.toFixed(2)}</span>
               </div>
               
-              {/* Minimum fare adjustment (if applicable) */}
-              {fareBreakdown.minimumFareAdjustment > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Minimum fare adjustment</span>
-                  <span data-testid="text-min-fare">${fareBreakdown.minimumFareAdjustment.toFixed(2)}</span>
-                </div>
-              )}
+              {/* Minimum fare adjustment */}
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Minimum fare adjustment</span>
+                <span data-testid="text-min-fare" className={fareBreakdown.minimumFareAdjustment === 0 ? "text-muted-foreground" : ""}>
+                  {fareBreakdown.minimumFareAdjustment > 0 
+                    ? `$${fareBreakdown.minimumFareAdjustment.toFixed(2)}`
+                    : "Not applicable"
+                  }
+                </span>
+              </div>
 
               <Separator className="my-2" />
               
@@ -404,17 +425,19 @@ Thank you for riding with SafeGo!
             <Download className="h-4 w-4 mr-2" />
             Download
           </Button>
-          {'share' in navigator && (
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={handleShare}
-              data-testid="button-share"
-            >
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={handleShare}
+            data-testid="button-share"
+          >
+            {'share' in navigator ? (
               <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
-          )}
+            ) : (
+              <Copy className="h-4 w-4 mr-2" />
+            )}
+            {'share' in navigator ? 'Share' : 'Copy'}
+          </Button>
         </div>
       </div>
 
