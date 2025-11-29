@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { RideAddressHeader } from "@/components/rider/RideAddressHeader";
+import { AddressSummaryCapsule } from "@/components/rider/AddressSummaryCapsule";
 import { 
   reverseGeocode, 
   getSavedPlaces, 
@@ -284,6 +285,10 @@ export default function RideRequest() {
   const [isRouteExplorerOpen, setIsRouteExplorerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
+  // Mobile-only UI state for address editing - forces return to Screen 1 (Plan Your Ride)
+  // When true, shows full address inputs; when false, shows compact summary on Screens 2/3
+  const [isEditingAddresses, setIsEditingAddresses] = useState(false);
+  
   // Mobile detection effect - only trigger mobile-specific layout changes
   // Also resets Route Explorer when switching to desktop viewport
   useEffect(() => {
@@ -317,6 +322,28 @@ export default function RideRequest() {
   });
 
   const activeRoute = useMemo(() => routes.find(r => r.id === activeRouteId), [routes, activeRouteId]);
+  
+  /**
+   * Mobile Screen Logic (UI-only, no business logic changes):
+   * Screen 1 (Plan Your Ride): Show full address inputs - when no routes yet OR user is editing
+   * Screen 2 (Choose Your Ride): Show compact summary - when routes exist, not editing, not in Route Explorer
+   * Screen 3 (Choose Your Route): Show compact summary - when Route Explorer is open
+   * 
+   * Full address inputs appear ONLY on Screen 1
+   * Compact AddressSummaryCapsule appears on Screens 2 and 3
+   */
+  const mobileScreen: 1 | 2 | 3 = useMemo(() => {
+    if (!isMobile) return 1; // Desktop always uses full inputs
+    if (isRouteExplorerOpen) return 3; // Route Explorer open = Screen 3
+    if (routes.length > 0 && !isEditingAddresses) return 2; // Has routes, not editing = Screen 2
+    return 1; // Default to Screen 1 (Plan Your Ride)
+  }, [isMobile, isRouteExplorerOpen, routes.length, isEditingAddresses]);
+  
+  // When user selects new addresses, exit edit mode and close Route Explorer
+  const handleEditComplete = useCallback(() => {
+    setIsEditingAddresses(false);
+    setIsRouteExplorerOpen(false);
+  }, []);
   
   const routePolylines = useMemo(() => {
     if (typeof window === "undefined" || !routes.length) return [];
@@ -1315,29 +1342,47 @@ export default function RideRequest() {
             </button>
           )}
 
-          {/* Professional Address Header - Uber-grade styling */}
+          {/* Mobile Address UI - Conditional based on screen
+              Screen 1: Full RideAddressHeader with inputs
+              Screen 2/3: Compact AddressSummaryCapsule */}
           <div className="absolute top-3 left-3 right-3 z-20">
-            <RideAddressHeader
-              pickupQuery={pickupQuery}
-              dropoffQuery={dropoffQuery}
-              onPickupQueryChange={setPickupQuery}
-              onDropoffQueryChange={setDropoffQuery}
-              onPickupSelect={handlePickupSelect}
-              onDropoffSelect={handleDropoffSelect}
-              onSwapAddresses={handleSwapAddresses}
-              onCurrentLocation={handleGetCurrentLocation}
-              isLocatingCurrentLocation={isLocating}
-              locationError={locationError}
-              focusedField={focusedField}
-              onPickupFocus={() => setFocusedField("pickup")}
-              onPickupBlur={() => setFocusedField(null)}
-              onDropoffFocus={() => setFocusedField("dropoff")}
-              onDropoffBlur={() => setFocusedField(null)}
-              pickup={pickup}
-              dropoff={dropoff}
-            />
+            {mobileScreen === 1 ? (
+              /* Screen 1: Full Address Inputs (Plan Your Ride) */
+              <RideAddressHeader
+                pickupQuery={pickupQuery}
+                dropoffQuery={dropoffQuery}
+                onPickupQueryChange={setPickupQuery}
+                onDropoffQueryChange={setDropoffQuery}
+                onPickupSelect={(loc) => {
+                  handlePickupSelect(loc);
+                  handleEditComplete();
+                }}
+                onDropoffSelect={(loc) => {
+                  handleDropoffSelect(loc);
+                  handleEditComplete();
+                }}
+                onSwapAddresses={handleSwapAddresses}
+                onCurrentLocation={handleGetCurrentLocation}
+                isLocatingCurrentLocation={isLocating}
+                locationError={locationError}
+                focusedField={focusedField}
+                onPickupFocus={() => setFocusedField("pickup")}
+                onPickupBlur={() => setFocusedField(null)}
+                onDropoffFocus={() => setFocusedField("dropoff")}
+                onDropoffBlur={() => setFocusedField(null)}
+                pickup={pickup}
+                dropoff={dropoff}
+              />
+            ) : (
+              /* Screen 2/3: Compact Address Summary Capsule */
+              <AddressSummaryCapsule
+                pickup={pickup}
+                dropoff={dropoff}
+                onEdit={() => setIsEditingAddresses(true)}
+              />
+            )}
 
-            {showSuggestions && (
+            {mobileScreen === 1 && showSuggestions && (
               <Card className="mt-2 shadow-[0_6px_18px_rgba(0,0,0,0.06)] border border-[#E5E7EB] dark:border-border max-h-[30vh] overflow-y-auto" style={{ borderRadius: "16px" }} data-testid="suggestions-card">
                 <CardContent className="p-2">
                   {validSavedPlaces.length > 0 && (
