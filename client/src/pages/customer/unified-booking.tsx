@@ -736,33 +736,32 @@ export default function UnifiedBookingPage() {
                       </div>
                     </div>
 
-                    {/* Promo Banner */}
-                    {appliedPromo && (
-                      <div 
-                        className="px-4 py-3 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
-                        style={{ background: "#E7FCE5" }}
-                        onClick={() => {
-                          setAppliedPromo(null);
-                          toast({ title: "Promo removed" });
-                        }}
-                        data-testid="promo-banner"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                            <Zap className="h-4 w-4 text-green-600" />
+                    {/* Global Promo Strip - Uber-style savings banner */}
+                    {/* Only show when promo exists AND there's actual savings on the selected vehicle */}
+                    {(() => {
+                      const selectedFareData = calculateFareForCategory(activeRoute, selectedVehicleCategory);
+                      const hasActualSavings = appliedPromo && selectedFareData.discountAmount > 0;
+                      return hasActualSavings && (
+                        <div 
+                          className="px-4 py-2.5 rounded-full flex items-center justify-between"
+                          style={{ background: "#DCFCE7" }}
+                          data-testid="promo-banner"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-7 w-7 rounded-full bg-green-500/20 flex items-center justify-center">
+                              <Zap className="h-3.5 w-3.5 text-green-600" />
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-bold" style={{ color: "#166534" }}>{appliedPromo.label}</span>
+                              <span className="text-xs font-medium" style={{ color: "#166534" }}>
+                                • You save ${selectedFareData.discountAmount.toFixed(2)} on this ride
+                              </span>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-green-800">{appliedPromo.label}</p>
-                            <p className="text-xs text-green-600">
-                              {appliedPromo.discountType === "PERCENT" 
-                                ? `${appliedPromo.discountPercent}% off` 
-                                : `$${appliedPromo.discountFlat} off`}
-                            </p>
-                          </div>
+                          <span className="text-[10px] font-medium whitespace-nowrap ml-2" style={{ color: "#6B7280" }}>Applied automatically</span>
                         </div>
-                        <span className="text-[10px] text-green-600 font-medium">Tap to remove</span>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Choose Your Ride Title */}
                     <div className="flex items-center justify-between">
@@ -788,7 +787,6 @@ export default function UnifiedBookingPage() {
                         const etaMinutes = categoryETA?.etaMinutes ?? (catConfig.etaMinutesOffset + 5);
                         const hasDiscount = fareData.discountAmount > 0;
                         
-                        const isSaver = categoryId === "SAFEGO_X";
                         const isPremium = categoryId.includes("BLACK");
                         
                         return (
@@ -814,8 +812,11 @@ export default function UnifiedBookingPage() {
                                   Popular
                                 </Badge>
                               )}
-                              {isSaver && !isUnavailable && (
-                                <Badge className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white border-0 shadow-sm">
+                              {hasDiscount && !isUnavailable && (
+                                <Badge 
+                                  className="text-[10px] px-1.5 py-0.5 border-0 shadow-sm flex items-center"
+                                  style={{ background: "#BBF7D0", color: "#166534" }}
+                                >
                                   <Sparkles className="h-2.5 w-2.5 mr-0.5" />
                                   Saver
                                 </Badge>
@@ -876,18 +877,18 @@ export default function UnifiedBookingPage() {
                                 {isUnavailable ? (
                                   <p className="text-sm text-muted-foreground">No drivers nearby</p>
                                 ) : (
-                                  <div className="flex items-baseline justify-between">
+                                  <div className="flex flex-col gap-1">
                                     <div className="flex items-baseline gap-2">
                                       <p className="text-lg font-bold">${fareData.finalFare.toFixed(2)}</p>
                                       {hasDiscount && (
-                                        <p className="text-xs text-muted-foreground line-through">
+                                        <p className="text-sm line-through" style={{ color: "#6B7280" }}>
                                           ${fareData.originalFare.toFixed(2)}
                                         </p>
                                       )}
                                     </div>
                                     {hasDiscount && (
-                                      <p className="text-[11px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                                        Save ${fareData.discountAmount.toFixed(2)}
+                                      <p className="text-xs font-medium" style={{ color: "#16A34A" }}>
+                                        You save ${fareData.discountAmount.toFixed(2)}
                                       </p>
                                     )}
                                   </div>
