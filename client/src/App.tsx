@@ -265,10 +265,10 @@ function Router() {
       <Route path="/signup" component={Signup} />
       <Route path="/customer-register" component={CustomerRegister} />
 
-      {/* Customer routes */}
+      {/* Customer routes - NEW UNIFIED BOOKING DESIGN */}
       <Route path="/customer">
         <ProtectedRoute allowedRoles={["customer"]}>
-          <CustomerHome />
+          <UnifiedBooking />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/profile">
@@ -281,14 +281,15 @@ function Router() {
           <CustomerActivity />
         </ProtectedRoute>
       </Route>
+      {/* LEGACY ROUTES - Redirected to use NEW unified booking design */}
       <Route path="/customer/ride">
         <ProtectedRoute allowedRoles={["customer"]}>
-          <RideRequest />
+          <UnifiedBooking />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/ride-request">
         <ProtectedRoute allowedRoles={["customer"]}>
-          <RideRequest />
+          <UnifiedBooking />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/food/orders">

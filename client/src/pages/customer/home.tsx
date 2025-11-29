@@ -1,3 +1,16 @@
+/**
+ * LEGACY CUSTOMER HOME PAGE
+ * 
+ * This component is NO LONGER RENDERED in customer-facing routes.
+ * All customer booking now uses UnifiedBooking (/customer/unified-booking.tsx).
+ * 
+ * DO NOT DELETE - keeping for reference and potential rollback.
+ * 
+ * Routes that previously used this:
+ * - /customer (now uses UnifiedBooking)
+ * 
+ * @deprecated Use UnifiedBooking instead
+ */
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";

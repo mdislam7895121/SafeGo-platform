@@ -1,3 +1,18 @@
+/**
+ * LEGACY RIDE REQUEST PAGE
+ * 
+ * This component is NO LONGER RENDERED in customer-facing routes.
+ * All customer booking now uses UnifiedBooking (/customer/unified-booking.tsx).
+ * 
+ * DO NOT DELETE - keeping for reference and potential rollback.
+ * 
+ * Routes that previously used this:
+ * - /customer/ride (now uses UnifiedBooking)
+ * - /customer/ride-request (now uses UnifiedBooking)
+ * - /customer via CustomerHome on desktop (now uses UnifiedBooking)
+ * 
+ * @deprecated Use UnifiedBooking instead
+ */
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, MapPin, Navigation, Crosshair, Loader2, Clock, Home, Briefcase, Star, ChevronRight, CreditCard, Wallet, AlertCircle, Car, Route as RouteIcon, Users, Crown, Sparkles, Zap, Accessibility, ChevronUp, ChevronDown } from "lucide-react";
