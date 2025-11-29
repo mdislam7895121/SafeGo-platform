@@ -794,11 +794,13 @@ export default function RideRequest() {
   };
 
   return (
-    /* C9-FIX: Changed from flex-col to a grid layout that ensures map is always visible
-     * Mobile: map takes 40% of viewport, bottom content scrolls in remaining 60%
-     * Desktop: map takes more space, bottom content is compact
+    /* C10-FIX: Uber-style layout with proper section spacing
+     * Mobile: map takes 40% viewport, bottom content scrolls
+     * Desktop: map takes 60vh, content is compact
+     * z-index: map(1) < cards(10) < address-box(20) < header(30)
      */
-    <div className="h-screen grid grid-rows-[auto_minmax(35vh,1fr)_auto] md:grid-rows-[auto_1fr_auto] relative overflow-hidden" data-testid="plan-your-ride-page">
+    <div className="h-screen grid grid-rows-[auto_minmax(40vh,1fr)_auto] md:grid-rows-[auto_60vh_auto] relative overflow-hidden bg-muted/30" data-testid="plan-your-ride-page">
+      {/* Header - z-30 */}
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b p-4">
         <div className="flex items-center gap-3">
           <Link href="/customer">
@@ -810,8 +812,8 @@ export default function RideRequest() {
         </div>
       </div>
 
-      {/* C9-FIX: Map section with minimum height guarantee (35vh on mobile) */}
-      <div className="relative overflow-hidden min-h-[35vh] md:min-h-0">
+      {/* C10-FIX: Map section - fixed height 40vh mobile, 60vh desktop */}
+      <div className="relative overflow-hidden z-[1]">
         {isClient && (
           <MapContainer
             center={[mapCenter.lat, mapCenter.lng]}
@@ -866,8 +868,9 @@ export default function RideRequest() {
           </button>
         )}
 
+        {/* C10-FIX: Pickup/dropoff box with solid white background - z-20 (above map) */}
         <div className="absolute top-4 left-4 right-4 z-20">
-          <Card className="shadow-lg" data-testid="location-card">
+          <Card className="shadow-lg bg-background" data-testid="location-card">
             <CardContent className="p-4 space-y-3">
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 flex flex-col items-center gap-1">
@@ -965,69 +968,93 @@ export default function RideRequest() {
         </div>
       </div>
 
-      {/* C9-FIX: Bottom panel is sticky so request button is always visible
-       * Internal content scrolls if too tall, but button remains at bottom
+      {/* C10-FIX: Bottom panel with proper section spacing
+       * Order: Promo Banner -> Ride Cards -> Fare Summary -> Request Button
+       * z-index 10 for cards section
        */}
-      <div className="sticky bottom-0 z-30 bg-background border-t shadow-[0_-4px_12px_rgba(0,0,0,0.1)] flex flex-col max-h-[55vh] md:max-h-[60vh]">
-        {/* Scrollable content area - vehicle cards and fare details */}
-        <div className="overflow-y-auto flex-1 p-4 pb-2 space-y-4">
-        {/* Vehicle Category Selector - Horizontal Scroll Carousel */}
+      <div className="sticky bottom-0 z-10 bg-background border-t shadow-[0_-4px_12px_rgba(0,0,0,0.1)] flex flex-col max-h-[55vh] md:max-h-[50vh]">
+        {/* Scrollable content area */}
+        <div className="overflow-y-auto flex-1 px-4 pt-3 pb-2">
+          
+          {/* C10-FIX: Promo Banner Section - BELOW map, ABOVE ride cards */}
+          {activeRoute && appliedPromo && (
+            <div 
+              className="mb-3 px-4 py-2.5 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
+              style={{ 
+                background: "#E7FCE5",
+                marginTop: "0px"
+              }}
+              onClick={() => {
+                setAppliedPromo(null);
+                toast({ title: "Promo removed", description: "Viewing regular prices" });
+              }}
+              data-testid="promo-banner"
+            >
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <Zap className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-green-800">{appliedPromo.label}</p>
+                  <p className="text-xs text-green-600">
+                    {appliedPromo.discountType === "PERCENT" 
+                      ? `${appliedPromo.discountPercent}% off your ride` 
+                      : `$${appliedPromo.discountFlat} off your ride`}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs text-green-600 font-medium">Tap to remove</span>
+            </div>
+          )}
+
+          {/* C10-FIX: "Apply Promo" button when no promo is active */}
+          {activeRoute && !appliedPromo && availablePromos.length > 0 && !isLoadingPromos && (
+            <div className="mb-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full h-10 text-sm gap-2 border-dashed border-green-300 text-green-700 hover:bg-green-50"
+                onClick={() => {
+                  const promo = availablePromos[0];
+                  setAppliedPromo({
+                    id: promo.id,
+                    code: promo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
+                    discountPercent: promo.discountType === "PERCENT" ? promo.value : 0,
+                    discountFlat: promo.discountType === "FLAT" ? promo.value : 0,
+                    discountType: promo.discountType,
+                    maxDiscountAmount: promo.maxDiscountAmount,
+                    label: promo.name,
+                    description: promo.description,
+                    isDefault: promo.isDefault
+                  });
+                  toast({ title: "Promo applied!", description: `${promo.name} - ${promo.discountType === "PERCENT" ? `${promo.value}% off` : `$${promo.value} off`}` });
+                }}
+                data-testid="button-apply-promo"
+              >
+                <Zap className="h-4 w-4" />
+                Apply Promo Code
+              </Button>
+            </div>
+          )}
+
+        {/* C10-FIX: Vehicle Category Selector with proper spacing */}
         {activeRoute && (
-          <div data-testid="vehicle-category-selector">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
-                <Car className="h-3.5 w-3.5" />
-                Select Ride Type
+          <div data-testid="vehicle-category-selector" className={appliedPromo ? "mt-0" : "mt-1"}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <Car className="h-4 w-4" />
+                Choose your ride
               </p>
-              {/* Promo Status Indicator */}
-              {isLoadingPromos ? (
+              {isLoadingPromos && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 className="h-3 w-3 animate-spin" />
-                  <span>Loading promos...</span>
+                  <span>Loading...</span>
                 </div>
-              ) : appliedPromo ? (
-                <Badge 
-                  variant="secondary" 
-                  className="h-7 gap-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover-elevate cursor-pointer"
-                  onClick={() => {
-                    setAppliedPromo(null);
-                    toast({ title: "Promo removed", description: "Viewing regular prices" });
-                  }}
-                  data-testid="badge-active-promo"
-                >
-                  <Zap className="h-3 w-3" />
-                  <span className="font-semibold">{appliedPromo.label}</span>
-                  <span className="opacity-70">| Click to remove</span>
-                </Badge>
-              ) : availablePromos.length > 0 ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 text-xs gap-1"
-                  onClick={() => {
-                    const promo = availablePromos[0];
-                    setAppliedPromo({
-                      id: promo.id,
-                      code: promo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
-                      discountPercent: promo.discountType === "PERCENT" ? promo.value : 0,
-                      discountFlat: promo.discountType === "FLAT" ? promo.value : 0,
-                      discountType: promo.discountType,
-                      maxDiscountAmount: promo.maxDiscountAmount,
-                      label: promo.name,
-                      description: promo.description,
-                      isDefault: promo.isDefault
-                    });
-                    toast({ title: "Promo applied!", description: `${promo.name} - ${promo.discountType === "PERCENT" ? `${promo.value}% off` : `$${promo.value} off`}` });
-                  }}
-                  data-testid="button-apply-promo"
-                >
-                  <Zap className="h-3 w-3" />
-                  Apply Promo
-                </Button>
-              ) : null}
+              )}
             </div>
+            {/* C10-FIX: Ride cards carousel with consistent sizing */}
             <div 
-              className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 
+              className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 
               role="group" 
               aria-label="Vehicle category options"
             >
@@ -1061,23 +1088,26 @@ export default function RideRequest() {
                         aria-label={`${catConfig.displayName}, ${isUnavailable ? "No drivers nearby" : `$${fareData.finalFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaText}`}${isSelected ? ", selected" : ""}`}
                         data-testid={`ride-pill-${categoryId}`}
                         className={`
-                          min-w-[140px] h-auto rounded-[14px] p-4 flex-shrink-0 snap-start cursor-pointer
-                          transition-all duration-200 ease-out
+                          w-[130px] rounded-[14px] p-3 flex-shrink-0 snap-start cursor-pointer
+                          transition-all duration-150 ease-out
                           ${isSelected 
-                            ? "bg-white border-l-[4px] border-l-primary border-t border-r border-b border-[#E5E7EB]" 
+                            ? "bg-white border-l-[4px] border-l-primary border-t border-r border-b border-[#E5E7EB] scale-[1.02]" 
                             : isUnavailable
                               ? "bg-muted/30 border border-[#E5E7EB] opacity-50 cursor-not-allowed"
                               : "bg-white border border-[#E5E7EB] hover-elevate"
                           }
                         `}
                         style={{
-                          boxShadow: "0px 4px 14px rgba(0,0,0,0.08)",
+                          boxShadow: isSelected 
+                            ? "0px 6px 16px rgba(0,0,0,0.12)" 
+                            : "0px 4px 14px rgba(0,0,0,0.08)",
                         }}
                       >
-                        <div className="flex flex-col items-center gap-2">
-                          {/* 3D Vehicle Image - Uber Style */}
+                        {/* C10-FIX: Fixed height container prevents jumping on selection */}
+                        <div className="flex flex-col items-center gap-1.5 h-full">
+                          {/* 3D Vehicle Image - fixed height for consistency */}
                           <div 
-                            className={`h-16 w-24 flex items-center justify-center overflow-hidden rounded-[12px] p-3 ${isUnavailable ? "opacity-40" : ""}`}
+                            className={`h-14 w-20 flex items-center justify-center overflow-hidden rounded-lg ${isUnavailable ? "opacity-40" : ""}`}
                             style={{
                               background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)",
                             }}
@@ -1216,9 +1246,10 @@ export default function RideRequest() {
           </div>
         )}
 
+        {/* C10-FIX: Fare summary card with proper spacing from ride cards */}
         {fareEstimate && (
           <Card 
-            className="rounded-[14px] overflow-hidden" 
+            className="rounded-[14px] overflow-hidden mt-4" 
             style={{ 
               background: "#FFFFFF",
               border: "1px solid #E5E7EB",

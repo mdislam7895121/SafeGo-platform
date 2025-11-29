@@ -1,0 +1,77 @@
+C10 — Fix full ride screen layout (map + cards + saver banner)
+
+Goal:
+The current ride selection screen looks visually messy because the map,
+pickup/dropoff box, promo banner, and ride cards are stacked without proper spacing.
+Fix the entire layout to match Uber-level cleanliness.
+
+Do NOT change any backend logic. Only layout and spacing.
+
+TASK BREAKDOWN:
+
+1. Map Section (Top)
+   • The map must take a fixed height:
+        – Mobile: 38–42% of viewport height
+        – Desktop: left column (fixed height ~60vh)
+   • Map should never collapse or be hidden behind cards.
+   • Add a solid white container behind the pickup/dropoff box
+     so it does not blend with the map.
+   • Add proper z-index:
+       – pickup/dropoff box (z-index 20)
+       – map (z-index 1)
+       – ride cards (z-index 10, BELOW the address box but ABOVE the background)
+
+2. Promo Banner Section (“SafeGo Everyday Saver”)
+   • Place the promo banner BELOW the map, ABOVE the ride cards.
+   • Add:
+        margin-top: 12px
+        padding: 10px 16px
+        rounded corners: 12px
+        background: #E7FCE5
+   • Make sure this banner never overlaps the map or ride cards.
+
+3. Ride Card Carousel Section
+   • Add clear vertical spacing:
+        margin-top: 12px   (if promo active)
+        margin-top: 20px   (if no promo)
+   • Each ride card must have:
+        – max-width fixed (same size for all)
+        – equal padding
+        – equal image height
+        – no jumping in size when selected
+   • Keep the left/right scroll behavior unchanged.
+
+4. Spacing Rules (Make everything breathable)
+   Apply globally on the ride screen:
+      • Section gap: 16–20px
+      • Do NOT allow cards to touch the map
+      • Do NOT let promo banner touch cards
+      • Ensure consistent padding inside the container
+
+5. Mobile Layout Priority
+   Order must always be:
+      (1) Map
+      (2) Promo Banner (if active)
+      (3) Ride Cards
+      (4) Fare summary (after a card is tapped)
+      (5) Request ride button
+
+6. Desktop Layout Priority
+   • Left column: Map + address input + route
+   • Right column: All ride cards in a clean multi-column grid
+
+7. No Logic Changes
+   Do NOT touch:
+      – fare calculation
+      – route calculation
+      – promo logic
+      – commission logic
+      – driver matching
+   Only fix the UI layout and visual spacing.
+
+Deliverables:
+   ✓ Clean Uber-style vertical spacing
+   ✓ Map fully visible, not overlapped
+   ✓ Promo banner placed correctly
+   ✓ Ride cards aligned and evenly spaced
+   ✓ No jumping, no overlapping, no squashed layout
