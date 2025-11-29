@@ -965,11 +965,12 @@ export default function RideRequest() {
         </div>
       </div>
 
-      {/* C9-FIX: Bottom panel with max-height constraint and overflow scroll on mobile
-       * This ensures map remains visible while allowing scroll through ride options
+      {/* C9-FIX: Bottom panel is sticky so request button is always visible
+       * Internal content scrolls if too tall, but button remains at bottom
        */}
-      <div className="z-30 bg-background border-t shadow-[0_-4px_12px_rgba(0,0,0,0.1)] max-h-[55vh] md:max-h-[60vh] overflow-y-auto">
-        <div className="p-4 space-y-4">
+      <div className="sticky bottom-0 z-30 bg-background border-t shadow-[0_-4px_12px_rgba(0,0,0,0.1)] flex flex-col max-h-[55vh] md:max-h-[60vh]">
+        {/* Scrollable content area - vehicle cards and fare details */}
+        <div className="overflow-y-auto flex-1 p-4 pb-2 space-y-4">
         {/* Vehicle Category Selector - Horizontal Scroll Carousel */}
         {activeRoute && (
           <div data-testid="vehicle-category-selector">
@@ -1393,28 +1394,31 @@ export default function RideRequest() {
             <span className="text-sm text-muted-foreground">Calculating fare...</span>
           </div>
         )}
+        </div>
 
-        <Button
-          onClick={handleRequestRide}
-          disabled={!canRequestRide}
-          className="w-full h-12 text-base font-semibold"
-          data-testid="button-request-ride"
-        >
-          {isRequestingRide ? (
-            <>
-              <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-              Requesting...
-            </>
-          ) : (
-            "Request ride"
+        {/* C9-FIX: Button area stays fixed at bottom of sticky panel, never scrolls */}
+        <div className="flex-shrink-0 p-4 pt-2 bg-background border-t">
+          <Button
+            onClick={handleRequestRide}
+            disabled={!canRequestRide}
+            className="w-full h-12 text-base font-semibold"
+            data-testid="button-request-ride"
+          >
+            {isRequestingRide ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Requesting...
+              </>
+            ) : (
+              "Request ride"
+            )}
+          </Button>
+
+          {!pickup && !dropoff && (
+            <p className="text-center text-xs text-muted-foreground mt-2">
+              Set pickup and dropoff to continue
+            </p>
           )}
-        </Button>
-
-        {!pickup && !dropoff && (
-          <p className="text-center text-xs text-muted-foreground">
-            Set pickup and dropoff to continue
-          </p>
-        )}
         </div>
       </div>
     </div>
