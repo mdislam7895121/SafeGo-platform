@@ -116,25 +116,36 @@ const dropoffIcon = L.divIcon({
 function MapBoundsHandler({
   pickupLocation,
   dropoffLocation,
+  routePoints,
 }: {
   pickupLocation: LocationData | null;
   dropoffLocation: LocationData | null;
+  routePoints?: [number, number][];
 }) {
   const map = useMap();
 
   useEffect(() => {
-    if (pickupLocation && dropoffLocation) {
+    if (routePoints && routePoints.length > 0) {
+      const bounds = L.latLngBounds(routePoints);
+      if (pickupLocation) {
+        bounds.extend([pickupLocation.lat, pickupLocation.lng]);
+      }
+      if (dropoffLocation) {
+        bounds.extend([dropoffLocation.lat, dropoffLocation.lng]);
+      }
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+    } else if (pickupLocation && dropoffLocation) {
       const bounds = L.latLngBounds(
         [pickupLocation.lat, pickupLocation.lng],
         [dropoffLocation.lat, dropoffLocation.lng]
       );
-      map.fitBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
     } else if (pickupLocation) {
       map.setView([pickupLocation.lat, pickupLocation.lng], 15);
     } else if (dropoffLocation) {
       map.setView([dropoffLocation.lat, dropoffLocation.lng], 15);
     }
-  }, [map, pickupLocation, dropoffLocation]);
+  }, [map, pickupLocation, dropoffLocation, routePoints]);
 
   return null;
 }
@@ -223,6 +234,11 @@ export default function UnifiedBookingPage() {
       points: decodePolyline(route.polyline),
     }));
   }, [routes]);
+
+  const activeRoutePoints = useMemo(() => {
+    const activePolyline = routePolylines.find(p => p.id === activeRouteId);
+    return activePolyline?.points || [];
+  }, [routePolylines, activeRouteId]);
 
   useEffect(() => {
     setIsClient(true);
@@ -888,27 +904,47 @@ export default function UnifiedBookingPage() {
                       })}
                     </div>
 
-                    {/* Route Selection (if multiple routes) */}
-                    {routes.length > 1 && (
-                      <div className="pt-2">
-                        <p className="text-xs text-muted-foreground mb-2 font-medium">Alternative routes:</p>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
+                    {/* Route Selection - Always visible when routes exist */}
+                    {routes.length > 0 && (
+                      <div className="pt-3 pb-2">
+                        <p className="text-xs text-muted-foreground mb-3 font-medium">
+                          {routes.length > 1 ? "Choose your route:" : "Your route:"}
+                        </p>
+                        <div 
+                          className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide"
+                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                        >
                           {routes.map((route, index) => {
                             const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
                             const isActive = route.id === activeRouteId;
                             return (
-                              <Button
+                              <button
                                 key={route.id}
-                                variant={isActive ? "default" : "outline"}
-                                size="sm"
-                                className={`flex-shrink-0 text-xs h-9 ${isActive ? "" : "opacity-70"}`}
                                 onClick={() => setActiveRouteId(route.id)}
+                                className={`flex-shrink-0 flex flex-col items-start p-3 rounded-xl border-2 transition-all min-w-[140px] ${
+                                  isActive 
+                                    ? "border-primary bg-primary/5 shadow-md" 
+                                    : "border-border bg-background hover:border-primary/30 hover:shadow-sm"
+                                }`}
                                 data-testid={`route-button-${route.id}`}
                               >
-                                <RouteIcon className="h-3 w-3 mr-1" />
-                                {index === 0 ? "Fastest" : route.summary || `Alt ${index}`}
-                                <span className="ml-1 opacity-75">({formatDurationMinutes(etaMin)})</span>
-                              </Button>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className={`h-2.5 w-2.5 rounded-full ${isActive ? "bg-primary" : "bg-muted-foreground/40"}`} />
+                                  <span className={`text-sm font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
+                                    {index === 0 ? "Fastest" : route.summary || `Route ${index + 1}`}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                  <span className="font-medium">{formatDurationMinutes(etaMin)}</span>
+                                  <span>•</span>
+                                  <span>{route.distanceMiles.toFixed(1)} mi</span>
+                                </div>
+                                {isActive && (
+                                  <div className="mt-2 text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                    Selected
+                                  </div>
+                                )}
+                              </button>
                             );
                           })}
                         </div>
@@ -1176,12 +1212,12 @@ export default function UnifiedBookingPage() {
             )}
           </div>
           
-          {activeService === "ride" && (
-            <div className="lg:hidden flex-shrink-0 p-4 bg-background/95 backdrop-blur-sm border-t sticky bottom-0">
+          {activeService === "ride" && showChooseRide && activeRoute && (
+            <div className="lg:hidden flex-shrink-0 p-4 bg-background/95 backdrop-blur-sm border-t z-20">
               <Button
                 onClick={handleRequestRide}
                 disabled={!canRequestRide}
-                className="w-full h-14 text-base font-semibold rounded-xl"
+                className="w-full h-14 text-base font-semibold rounded-xl shadow-lg"
                 data-testid="button-request-ride"
               >
                 {isRequestingRide ? (
@@ -1190,14 +1226,12 @@ export default function UnifiedBookingPage() {
                     Requesting...
                   </>
                 ) : (
-                  "Request ride"
+                  <>
+                    Request {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                    <span className="ml-2 opacity-90">• ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
+                  </>
                 )}
               </Button>
-              {!pickup && !dropoff && (
-                <p className="text-center text-xs text-muted-foreground mt-2">
-                  Set pickup and dropoff to continue
-                </p>
-              )}
             </div>
           )}
         </div>
@@ -1215,7 +1249,7 @@ export default function UnifiedBookingPage() {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution='&copy; OpenStreetMap'
               />
-              <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} />
+              <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} routePoints={activeRoutePoints} />
               
               {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
               {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
@@ -1252,23 +1286,28 @@ export default function UnifiedBookingPage() {
             </button>
           )}
 
-          <div className="hidden lg:flex absolute bottom-4 left-4 right-4 justify-center">
-            <Button
-              onClick={handleRequestRide}
-              disabled={!canRequestRide}
-              className="w-full max-w-[400px] h-14 text-lg font-semibold rounded-xl shadow-lg"
-              data-testid="button-request-ride-desktop"
-            >
-              {isRequestingRide ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Requesting...
-                </>
-              ) : (
-                "Request ride"
-              )}
-            </Button>
-          </div>
+          {showChooseRide && activeRoute && (
+            <div className="hidden lg:flex absolute bottom-4 left-4 right-4 justify-center z-20">
+              <Button
+                onClick={handleRequestRide}
+                disabled={!canRequestRide}
+                className="w-full max-w-[400px] h-14 text-lg font-semibold rounded-xl shadow-lg"
+                data-testid="button-request-ride-desktop"
+              >
+                {isRequestingRide ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Requesting...
+                  </>
+                ) : (
+                  <>
+                    Request {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                    <span className="ml-2 opacity-90">• ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>
