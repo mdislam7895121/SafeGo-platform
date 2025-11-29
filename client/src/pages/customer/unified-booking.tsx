@@ -29,6 +29,8 @@ import {
   Pencil,
   ArrowRight,
   Sparkles,
+  Map,
+  Navigation,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -191,6 +193,8 @@ export default function UnifiedBookingPage() {
   const { isReady: isGoogleMapsReady } = useGoogleMaps();
   const [isClient, setIsClient] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
+  const [isMobileAddressExpanded, setIsMobileAddressExpanded] = useState(false);
 
   const [activeService, setActiveService] = useState<ServiceType>("ride");
 
@@ -747,9 +751,65 @@ export default function UnifiedBookingPage() {
                 {/* Choose Ride View - Compact Header with Pickup/Dropoff */}
                 {showChooseRide && pickup && dropoff && activeRoute ? (
                   <>
-                    {/* Compact Location Header - No Input Bars */}
+                    {/* MOBILE: Address Capsule - Uber-style pill */}
+                    <div className="md:hidden">
+                      <div 
+                        className="rounded-full px-4 py-2.5 flex items-center gap-3 border"
+                        style={{ background: "#F9FAFB", borderColor: "#E5E7EB" }}
+                        data-testid="mobile-address-capsule"
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="flex flex-col items-center gap-0.5">
+                            <div className="h-2 w-2 rounded-full bg-blue-500" />
+                            <div className="w-0.5 h-3 bg-border" />
+                            <div className="h-2 w-2 rounded-full bg-red-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{pickup.address.split(",")[0]}</p>
+                            <p className="text-xs font-medium truncate text-muted-foreground">{dropoff.address.split(",")[0]}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button 
+                            onClick={() => setIsMobileAddressExpanded(!isMobileAddressExpanded)}
+                            className="h-7 w-7 rounded-full flex items-center justify-center bg-muted/50 hover:bg-muted"
+                            data-testid="button-expand-address"
+                          >
+                            {isMobileAddressExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                          </button>
+                          <button 
+                            onClick={handleEditLocations}
+                            className="h-7 w-7 rounded-full flex items-center justify-center bg-muted/50 hover:bg-muted"
+                            data-testid="button-edit-address-mobile"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Expanded address editor */}
+                      {isMobileAddressExpanded && (
+                        <div className="mt-2 p-3 rounded-xl bg-muted/30 border border-border space-y-2">
+                          <div className="flex items-center gap-2 p-2 bg-background rounded-lg">
+                            <div className="h-2 w-2 rounded-full bg-blue-500" />
+                            <span className="text-sm flex-1 truncate">{pickup.address}</span>
+                          </div>
+                          <div className="flex items-center gap-2 p-2 bg-background rounded-lg">
+                            <div className="h-2 w-2 rounded-full bg-red-500" />
+                            <span className="text-sm flex-1 truncate">{dropoff.address}</span>
+                          </div>
+                          <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                            <span className="font-medium">{activeRoute.distanceMiles.toFixed(1)} mi</span>
+                            <span>•</span>
+                            <span>{formatDurationMinutes(Math.ceil(activeRoute.durationInTrafficSeconds / 60))}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* DESKTOP: Compact Location Header - Original style */}
                     <div 
-                      className="bg-background rounded-xl border border-border p-3 shadow-sm"
+                      className="hidden md:block bg-background rounded-xl border border-border p-3 shadow-sm"
                       data-testid="ride-locations-header"
                     >
                       <div className="flex items-center justify-between">
@@ -825,14 +885,45 @@ export default function UnifiedBookingPage() {
                       );
                     })()}
 
-                    {/* Route Selection - All 3 route buttons always visible */}
+                    {/* Route Selection */}
                     {routes.length > 1 && (
                       <div className="pt-3 pb-2">
                         <p className="text-sm font-semibold mb-3">
                           Choose your route
                         </p>
-                        {/* Route Chips Container - flex-wrap ensures all buttons visible */}
-                        <div className="flex flex-wrap gap-2">
+                        
+                        {/* MOBILE: Horizontal scrollable route chips */}
+                        <div className="md:hidden -mx-4 px-4">
+                          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                            {routes.map((route, index) => {
+                              const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
+                              const isActive = route.id === activeRouteId;
+                              const routeLabel = index === 0 ? "Fastest" : (route.summary || `Route ${index + 1}`);
+                              return (
+                                <button
+                                  key={route.id}
+                                  onClick={() => setActiveRouteId(route.id)}
+                                  className={`relative flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-full transition-all whitespace-nowrap ${
+                                    isActive 
+                                      ? "border-2 border-primary bg-blue-50 dark:bg-blue-900/30" 
+                                      : "border border-border bg-background hover:border-primary/40"
+                                  }`}
+                                  data-testid={`route-chip-${route.id}`}
+                                >
+                                  <span className={`text-sm font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
+                                    {routeLabel}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDurationMinutes(etaMin)} · {route.distanceMiles.toFixed(1)} mi
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        
+                        {/* DESKTOP: Flex-wrap route buttons */}
+                        <div className="hidden md:flex flex-wrap gap-2">
                           {routes.map((route, index) => {
                             const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
                             const isActive = route.id === activeRouteId;
@@ -866,9 +957,10 @@ export default function UnifiedBookingPage() {
                             );
                           })}
                         </div>
-                        {/* Selected Route Summary Line */}
+                        
+                        {/* Selected Route Summary Line - Desktop only */}
                         {activeRoute && (
-                          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
+                          <div className="hidden md:flex mt-3 text-xs text-muted-foreground items-center gap-1">
                             <span className="font-medium">
                               {routes.findIndex(r => r.id === activeRouteId) === 0 
                                 ? "Fastest" 
@@ -882,18 +974,127 @@ export default function UnifiedBookingPage() {
                         )}
                       </div>
                     )}
+                    
+                    {/* MOBILE: View on Map Button */}
+                    <div className="md:hidden">
+                      <button
+                        onClick={() => setIsMobileMapOpen(true)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border bg-muted/30 hover:bg-muted/50 transition-colors"
+                        data-testid="button-view-map-mobile"
+                      >
+                        <Map className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">View on map</span>
+                      </button>
+                    </div>
 
                     {/* Choose Your Ride Title */}
                     <div className="flex items-center justify-between">
-                      <p className="text-base font-semibold">Choose a ride</p>
+                      <p className="text-sm md:text-base font-semibold">Choose a ride</p>
                       <p className="text-xs text-muted-foreground">
                         {VEHICLE_CATEGORY_ORDER.filter(id => !checkUnavailable(id)).length} available
                       </p>
                     </div>
 
-                    {/* Uber-style Ride Cards - Vertical list mobile, responsive grid desktop */}
+                    {/* MOBILE: Uber-style Horizontal Ride Cards */}
+                    <div className="md:hidden space-y-2" data-testid="ride-cards-mobile">
+                      {VEHICLE_CATEGORY_ORDER.map((categoryId: VehicleCategoryId) => {
+                        const catConfig = VEHICLE_CATEGORIES[categoryId];
+                        const isSelected = categoryId === selectedVehicleCategory;
+                        const fareData = calculateFareForCategory(activeRoute, categoryId);
+                        const vehicleImage = getVehicleCategoryImage(categoryId);
+                        const isUnavailable = checkUnavailable(categoryId);
+                        const isLimited = checkLimited(categoryId);
+                        const categoryETA = getETA(categoryId);
+                        const etaMinutes = categoryETA?.etaMinutes ?? (catConfig.etaMinutesOffset + 5);
+                        const hasDiscount = fareData.discountAmount > 0;
+                        const isPremium = categoryId.includes("BLACK");
+                        
+                        return (
+                          <div
+                            key={categoryId}
+                            role="button"
+                            tabIndex={isUnavailable ? -1 : 0}
+                            onClick={() => !isUnavailable && setSelectedVehicleCategory(categoryId)}
+                            onKeyDown={(e) => e.key === "Enter" && !isUnavailable && setSelectedVehicleCategory(categoryId)}
+                            className={`relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                              isSelected 
+                                ? "ring-2 ring-primary bg-primary/5" 
+                                : isUnavailable
+                                  ? "bg-muted/40 opacity-60 cursor-not-allowed"
+                                  : "bg-background border border-border hover:border-primary/30"
+                            }`}
+                            data-testid={`ride-card-mobile-${categoryId}`}
+                          >
+                            {/* Tag Badges - Top Right */}
+                            <div className="absolute top-1.5 right-1.5 flex gap-1 z-10">
+                              {catConfig.isPopular && !isUnavailable && (
+                                <Badge className="text-[9px] px-1 py-0 bg-blue-500 text-white border-0">
+                                  Popular
+                                </Badge>
+                              )}
+                              {isLimited && !isUnavailable && (
+                                <Badge className="text-[9px] px-1 py-0 bg-amber-500 text-white border-0">
+                                  Limited
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Left: Car Image */}
+                            <div 
+                              className="h-14 w-20 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden"
+                              style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 100%)" }}
+                            >
+                              <img 
+                                src={vehicleImage} 
+                                alt={catConfig.displayName}
+                                className="h-12 w-auto object-contain"
+                                style={{ 
+                                  filter: isUnavailable 
+                                    ? "grayscale(1) opacity(0.5)" 
+                                    : "drop-shadow(0px 4px 8px rgba(0,0,0,0.1))"
+                                }}
+                              />
+                            </div>
+
+                            {/* Middle: Title + Caption */}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate">{catConfig.displayName}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {isUnavailable ? "Unavailable" : `${etaMinutes} min away · ${catConfig.seatCount} seats`}
+                              </p>
+                            </div>
+
+                            {/* Right: Price Section */}
+                            <div className="text-right flex-shrink-0">
+                              {isUnavailable ? (
+                                <p className="text-xs text-muted-foreground">N/A</p>
+                              ) : (
+                                <>
+                                  {hasDiscount && (
+                                    <p className="text-xs line-through text-muted-foreground">
+                                      ${fareData.originalFare.toFixed(2)}
+                                    </p>
+                                  )}
+                                  <p className="text-base font-bold">${fareData.finalFare.toFixed(2)}</p>
+                                  {hasDiscount && (
+                                    <Badge 
+                                      className="text-[9px] px-1 py-0 border-0 mt-0.5"
+                                      style={{ background: "#DCFCE7", color: "#166534" }}
+                                    >
+                                      Saver
+                                    </Badge>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* DESKTOP: Grid Ride Cards */}
                     <div 
-                      className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                      className="hidden md:grid grid-cols-2 gap-3"
                       data-testid="ride-cards-grid"
                     >
                       {VEHICLE_CATEGORY_ORDER.map((categoryId: VehicleCategoryId) => {
@@ -1171,16 +1372,65 @@ export default function UnifiedBookingPage() {
                   </>
                 )}
 
-                {/* Fare Summary Card - Shows when vehicle is selected */}
+                {/* MOBILE: Compact Selected Ride Summary */}
                 {showChooseRide && fareEstimate && (
-                  <Card className="shadow-md rounded-xl overflow-hidden" data-testid="fare-summary-card">
+                  <div className="md:hidden rounded-xl border border-border bg-background p-3" data-testid="mobile-ride-summary">
+                    <div className="flex items-center gap-3">
+                      {/* Car Image */}
+                      <div 
+                        className="h-12 w-16 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 100%)" }}
+                      >
+                        <img 
+                          src={getVehicleCategoryImage(selectedVehicleCategory)} 
+                          alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                          className="h-10 w-auto object-contain"
+                          style={{ filter: "drop-shadow(0px 3px 6px rgba(0,0,0,0.1))" }}
+                        />
+                      </div>
+                      
+                      {/* Ride Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold">{VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}</p>
+                          <p className="text-base font-bold">${fareEstimate.finalFare.toFixed(2)}</p>
+                        </div>
+                        {fareEstimate.discountAmount > 0 && (
+                          <p className="text-xs" style={{ color: "#16A34A" }}>You save ${fareEstimate.discountAmount.toFixed(2)}</p>
+                        )}
+                      </div>
+                      
+                      {/* Badges */}
+                      <div className="flex flex-col gap-1 flex-shrink-0">
+                        <Badge variant="secondary" className={`text-[10px] ${
+                          fareEstimate.trafficLevel === "heavy" 
+                            ? "bg-red-100 text-red-700" 
+                            : fareEstimate.trafficLevel === "moderate"
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-green-100 text-green-700"
+                        }`}>
+                          <Car className="h-2.5 w-2.5 mr-0.5" />
+                          {fareEstimate.trafficLevel === "heavy" ? "Heavy" : fareEstimate.trafficLevel === "moderate" ? "Moderate" : "Light"}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px]">
+                          <Wallet className="h-2.5 w-2.5 mr-0.5" />
+                          Card
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* DESKTOP: Fare Summary Card - Shows when vehicle is selected */}
+                {showChooseRide && fareEstimate && (
+                  <Card className="hidden md:block shadow-md rounded-xl overflow-hidden" data-testid="fare-summary-card">
                     <CardContent className="p-4">
                       {/* Main fare display - responsive layout */}
                       <div className="flex items-start justify-between gap-3">
                         {/* Left side: Vehicle image + fare info */}
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div 
-                            className="h-16 w-20 md:h-20 md:w-28 rounded-xl flex items-center justify-center overflow-hidden p-2 flex-shrink-0"
+                            className="h-20 w-28 rounded-xl flex items-center justify-center overflow-hidden p-2 flex-shrink-0"
                             style={{ background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)" }}
                           >
                             <img 
@@ -1197,7 +1447,7 @@ export default function UnifiedBookingPage() {
                             </p>
                             {/* Price row - aligned baseline */}
                             <div className="flex items-baseline gap-2 mt-1 flex-wrap">
-                              <p className="text-xl md:text-2xl font-bold" data-testid="text-fare">
+                              <p className="text-2xl font-bold" data-testid="text-fare">
                                 ${fareEstimate.finalFare.toFixed(2)}
                               </p>
                               {fareEstimate.discountAmount > 0 && (
@@ -1318,7 +1568,8 @@ export default function UnifiedBookingPage() {
           
         </div>
 
-        <div className="flex-1 min-h-[250px] lg:min-h-0 relative overflow-hidden">
+        {/* Map Section - Hidden on mobile, shown on desktop */}
+        <div className="hidden md:block flex-1 min-h-0 relative overflow-hidden">
           {isClient && (
             <MapContainer
               center={[mapCenter.lat, mapCenter.lng]}
@@ -1395,11 +1646,11 @@ export default function UnifiedBookingPage() {
 
       {/* Mobile Fixed Bottom Button - Outside all containers for proper positioning */}
       {activeService === "ride" && showChooseRide && activeRoute && (
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t z-50 safe-area-bottom">
+        <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur-sm border-t z-50 safe-area-bottom">
           <Button
             onClick={handleRequestRide}
             disabled={!canRequestRide}
-            className="w-full h-14 text-base font-semibold rounded-xl shadow-lg"
+            className="w-full h-[52px] text-base font-semibold rounded-t-2xl rounded-b-xl shadow-lg"
             data-testid="button-confirm-ride-mobile"
           >
             {isRequestingRide ? (
@@ -1409,11 +1660,108 @@ export default function UnifiedBookingPage() {
               </>
             ) : (
               <>
-                Confirm Ride
-                <span className="ml-2 opacity-90">• ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
+                Confirm {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                <span className="ml-2 opacity-90">· ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
               </>
             )}
           </Button>
+        </div>
+      )}
+
+      {/* Mobile Map Overlay/Bottom Sheet */}
+      {isMobileMapOpen && (
+        <div className="md:hidden fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
+          {/* Header with close button */}
+          <div className="flex items-center justify-between p-4 border-b">
+            <h2 className="text-lg font-semibold">Route Map</h2>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setIsMobileMapOpen(false)}
+              data-testid="button-close-map"
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          {/* Map takes most of the screen */}
+          <div className="flex-1 relative">
+            {isClient && (
+              <MapContainer
+                center={[mapCenter.lat, mapCenter.lng]}
+                zoom={14}
+                className="h-full w-full"
+                zoomControl={true}
+                attributionControl={false}
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; OpenStreetMap'
+                />
+                <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} routePoints={activeRoutePoints} />
+                
+                {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
+                {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
+                
+                {routePolylines.map(({ id, points }) => (
+                  <Polyline
+                    key={id}
+                    positions={points}
+                    pathOptions={{
+                      color: id === activeRouteId ? "#3B82F6" : "#94A3B8",
+                      weight: id === activeRouteId ? 5 : 3,
+                      opacity: id === activeRouteId ? 0.9 : 0.4,
+                    }}
+                    eventHandlers={{
+                      click: () => setActiveRouteId(id),
+                    }}
+                  />
+                ))}
+              </MapContainer>
+            )}
+          </div>
+          
+          {/* Bottom section with route chips */}
+          <div className="p-4 border-t bg-background">
+            {routes.length > 1 && (
+              <div className="mb-3">
+                <p className="text-sm font-semibold mb-2">Choose your route</p>
+                <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  {routes.map((route, index) => {
+                    const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
+                    const isActive = route.id === activeRouteId;
+                    const routeLabel = index === 0 ? "Fastest" : (route.summary || `Route ${index + 1}`);
+                    return (
+                      <button
+                        key={route.id}
+                        onClick={() => setActiveRouteId(route.id)}
+                        className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full transition-all whitespace-nowrap ${
+                          isActive 
+                            ? "border-2 border-primary bg-blue-50 dark:bg-blue-900/30" 
+                            : "border border-border bg-background"
+                        }`}
+                        data-testid={`map-route-chip-${route.id}`}
+                      >
+                        <span className={`text-sm font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
+                          {routeLabel}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDurationMinutes(etaMin)} · {route.distanceMiles.toFixed(1)} mi
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <Button 
+              onClick={() => setIsMobileMapOpen(false)}
+              className="w-full h-12 rounded-xl"
+              data-testid="button-done-map"
+            >
+              Done
+            </Button>
+          </div>
         </div>
       )}
     </div>
