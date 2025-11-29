@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -31,7 +31,31 @@ import {
   Sparkles,
   Map,
   Navigation,
+  Star,
+  Phone,
+  MessageCircle,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
+
+type RideStatus = 
+  | "SELECTING"
+  | "CONFIRMING"
+  | "SEARCHING_DRIVER"
+  | "DRIVER_ASSIGNED"
+  | "TRIP_IN_PROGRESS"
+  | "TRIP_COMPLETED"
+  | "TRIP_CANCELLED";
+
+interface DriverInfo {
+  name: string;
+  rating: number;
+  carModel: string;
+  carColor: string;
+  plateNumber: string;
+  avatarInitials: string;
+  pickupEtaMinutes: number;
+}
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -221,6 +245,49 @@ export default function UnifiedBookingPage() {
 
   const [isRequestingRide, setIsRequestingRide] = useState(false);
   const [showChooseRide, setShowChooseRide] = useState(false);
+
+  // Ride flow state machine
+  const [rideStatus, setRideStatus] = useState<RideStatus>("SELECTING");
+  const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
+  const [tripStartTime, setTripStartTime] = useState<Date | null>(null);
+  const [tripEndTime, setTripEndTime] = useState<Date | null>(null);
+  const [remainingMinutes, setRemainingMinutes] = useState<number>(0);
+  const [remainingMiles, setRemainingMiles] = useState<number>(0);
+  
+  // Rating and tip state (UI only, no backend)
+  const [userRating, setUserRating] = useState<number>(0);
+  const [selectedTip, setSelectedTip] = useState<number | null>(null);
+  
+  // Developer debug mode (click logo 5 times to enable)
+  const [showDebugControls, setShowDebugControls] = useState(false);
+  const [debugClickCount, setDebugClickCount] = useState(0);
+  const debugClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const handleDebugClick = useCallback(() => {
+    setDebugClickCount(prev => {
+      const newCount = prev + 1;
+      if (newCount >= 5) {
+        setShowDebugControls(current => !current);
+        toast({ 
+          title: showDebugControls ? "Debug mode disabled" : "Debug mode enabled",
+          description: showDebugControls ? "Developer controls hidden" : "Developer controls now visible"
+        });
+        return 0;
+      }
+      return newCount;
+    });
+    
+    // Reset count after 2 seconds of no clicks
+    if (debugClickTimeoutRef.current) {
+      clearTimeout(debugClickTimeoutRef.current);
+    }
+    debugClickTimeoutRef.current = setTimeout(() => {
+      setDebugClickCount(0);
+    }, 2000);
+  }, [showDebugControls, toast]);
+  
+  // Ref for search timeout
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { getETA, isUnavailable: checkUnavailable, isLimited: checkLimited } = useCategoryAvailability({
     pickupLat: pickup?.lat ?? null,
@@ -510,12 +577,116 @@ export default function UnifiedBookingPage() {
 
   const canRequestRide = pickup && dropoff && activeRoute && selectedVehicleCategory;
 
+  // Mock driver data for simulation
+  const mockDrivers: DriverInfo[] = [
+    { name: "John D.", rating: 4.9, carModel: "Toyota Camry", carColor: "Gray", plateNumber: "ABC-1234", avatarInitials: "JD", pickupEtaMinutes: 4 },
+    { name: "Sarah M.", rating: 4.8, carModel: "Honda Accord", carColor: "Black", plateNumber: "XYZ-5678", avatarInitials: "SM", pickupEtaMinutes: 5 },
+    { name: "Mike R.", rating: 4.7, carModel: "Nissan Altima", carColor: "White", plateNumber: "DEF-9012", avatarInitials: "MR", pickupEtaMinutes: 3 },
+  ];
+
   const handleRequestRide = useCallback(async () => {
     if (!canRequestRide) return;
+    
+    // Move to CONFIRMING briefly, then to SEARCHING_DRIVER
+    setRideStatus("CONFIRMING");
     setIsRequestingRide(true);
-    toast({ title: "Finding your driver...", description: "Please wait while we match you with a nearby driver" });
-    setTimeout(() => setIsRequestingRide(false), 2000);
-  }, [canRequestRide, toast]);
+    
+    // Immediately transition to SEARCHING_DRIVER
+    setTimeout(() => {
+      setRideStatus("SEARCHING_DRIVER");
+      setIsRequestingRide(false);
+      
+      // Simulate driver search (3-5 seconds)
+      const searchDuration = 3000 + Math.random() * 2000;
+      searchTimeoutRef.current = setTimeout(() => {
+        // Assign a random driver
+        const driver = mockDrivers[Math.floor(Math.random() * mockDrivers.length)];
+        setDriverInfo(driver);
+        setRideStatus("DRIVER_ASSIGNED");
+        
+        toast({ 
+          title: "Driver found!", 
+          description: `${driver.name} is on the way in a ${driver.carColor} ${driver.carModel}` 
+        });
+      }, searchDuration);
+    }, 500);
+  }, [canRequestRide, toast, mockDrivers]);
+
+  // Handle ride cancellation
+  const handleCancelRide = useCallback(() => {
+    // Clear any pending timeouts
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+    
+    if (rideStatus === "SEARCHING_DRIVER") {
+      // Cancel before driver assigned - go back to selecting
+      setRideStatus("SELECTING");
+      toast({ title: "Ride cancelled", description: "Your ride request has been cancelled" });
+    } else if (rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") {
+      // Cancel after driver assigned - show cancelled state
+      setRideStatus("TRIP_CANCELLED");
+      toast({ title: "Ride cancelled", description: "Your ride has been cancelled" });
+    }
+    
+    setDriverInfo(null);
+    setIsRequestingRide(false);
+  }, [rideStatus, toast]);
+
+  // Handle starting the trip (debug control)
+  const handleStartTrip = useCallback(() => {
+    if (rideStatus !== "DRIVER_ASSIGNED") return;
+    
+    setTripStartTime(new Date());
+    setRemainingMinutes(activeRoute ? Math.ceil(activeRoute.durationInTrafficSeconds / 60) : 90);
+    setRemainingMiles(activeRoute?.distanceMiles || 90);
+    setRideStatus("TRIP_IN_PROGRESS");
+    
+    toast({ title: "Trip started", description: "You're on your way to your destination" });
+  }, [rideStatus, activeRoute, toast]);
+
+  // Handle completing the trip (debug control)
+  const handleCompleteTrip = useCallback(() => {
+    if (rideStatus !== "TRIP_IN_PROGRESS") return;
+    
+    setTripEndTime(new Date());
+    setRemainingMinutes(0);
+    setRemainingMiles(0);
+    setRideStatus("TRIP_COMPLETED");
+    
+    toast({ title: "Trip completed", description: "Hope you had a safe ride!" });
+  }, [rideStatus, toast]);
+
+  // Handle finishing the trip completion flow
+  const handleFinishTripFlow = useCallback(() => {
+    // Reset all ride state
+    setRideStatus("SELECTING");
+    setDriverInfo(null);
+    setTripStartTime(null);
+    setTripEndTime(null);
+    setUserRating(0);
+    setSelectedTip(null);
+    setRemainingMinutes(0);
+    setRemainingMiles(0);
+    
+    toast({ title: "Thank you!", description: "We hope to see you again soon" });
+  }, [toast]);
+
+  // Handle going back from cancelled state
+  const handleBackFromCancelled = useCallback(() => {
+    setRideStatus("SELECTING");
+    setDriverInfo(null);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const services = [
     {
@@ -549,14 +720,18 @@ export default function UnifiedBookingPage() {
       >
         <div className="h-16 px-4 lg:px-6">
           <div className="h-full max-w-7xl mx-auto flex items-center justify-between gap-4">
-            {/* Left: Logo */}
+            {/* Left: Logo - Click 5 times to enable debug mode */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <Link href="/customer" className="flex items-center gap-2" data-testid="link-logo">
+              <div 
+                className="flex items-center gap-2 cursor-pointer" 
+                onClick={handleDebugClick}
+                data-testid="link-logo"
+              >
                 <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-sm">
                   <Car className="h-5 w-5 text-primary-foreground" />
                 </div>
                 <span className="font-bold text-xl tracking-tight hidden sm:inline">SafeGo</span>
-              </Link>
+              </div>
             </div>
 
             {/* Center: Service Switcher - Desktop Horizontal Tabs */}
@@ -996,13 +1171,16 @@ export default function UnifiedBookingPage() {
                       </button>
                     </div>
 
-                    {/* Choose Your Ride Title */}
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm md:text-base font-semibold">Choose a ride</p>
-                      <p className="text-xs text-muted-foreground">
-                        {VEHICLE_CATEGORY_ORDER.filter(id => !checkUnavailable(id)).length} available
-                      </p>
-                    </div>
+                    {/* Ride Selection Content - Only show when SELECTING */}
+                    {rideStatus === "SELECTING" ? (
+                      <>
+                        {/* Choose Your Ride Title */}
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm md:text-base font-semibold">Choose a ride</p>
+                          <p className="text-xs text-muted-foreground">
+                            {VEHICLE_CATEGORY_ORDER.filter(id => !checkUnavailable(id)).length} available
+                          </p>
+                        </div>
 
                     {/* MOBILE: Ride Cards List */}
                     <div 
@@ -1504,11 +1682,455 @@ export default function UnifiedBookingPage() {
                         </div>
                       )}
                     </div>
+                  </>
+                ) : (
+                  /* Non-SELECTING Status Panels */
+                  <>
+                        {/* SEARCHING_DRIVER Status Panel */}
+                        {rideStatus === "SEARCHING_DRIVER" && fareEstimate && (
+                          <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-searching">
+                            <CardContent className="p-4">
+                              <div className="text-center">
+                                <h3 className="text-lg font-semibold mb-4">Finding your driver…</h3>
+                                
+                                {/* Selected ride info */}
+                                <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl mb-4">
+                                  <div 
+                                    className="h-16 w-20 rounded-lg flex items-center justify-center flex-shrink-0"
+                                    style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 100%)" }}
+                                  >
+                                    <img 
+                                      src={getVehicleCategoryImage(selectedVehicleCategory)} 
+                                      alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                                      className="h-14 w-auto object-contain"
+                                      style={{ filter: "drop-shadow(0px 4px 8px rgba(0,0,0,0.1))" }}
+                                    />
+                                  </div>
+                                  <div className="flex-1 text-left">
+                                    <p className="font-semibold">{VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}</p>
+                                    <p className="text-xl font-bold">${fareEstimate.finalFare.toFixed(2)}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {routes.findIndex(r => r.id === activeRouteId) === 0 ? "Fastest" : (activeRoute?.summary || "Route")} · {formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)} · {fareEstimate.distanceMiles} mi
+                                    </p>
+                                  </div>
+                                </div>
+                                
+                                {/* Loading indicator */}
+                                <div className="flex items-center justify-center gap-2 mb-4">
+                                  <div className="flex gap-1">
+                                    <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                                    <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                                    <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+                                  </div>
+                                </div>
+                                
+                                <p className="text-sm text-muted-foreground mb-4">
+                                  We are looking for the best nearby driver for you.
+                                </p>
+                                
+                                <button
+                                  onClick={handleCancelRide}
+                                  className="text-sm text-destructive hover:underline"
+                                  data-testid="button-cancel-searching"
+                                >
+                                  Cancel ride
+                                </button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* DRIVER_ASSIGNED Status Panel */}
+                        {rideStatus === "DRIVER_ASSIGNED" && driverInfo && fareEstimate && (
+                          <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-driver-assigned">
+                            <CardContent className="p-4">
+                              <h3 className="text-lg font-semibold mb-4">Your driver is on the way</h3>
+                              
+                              {/* Driver and car info */}
+                              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl mb-4">
+                                <Avatar className="h-16 w-16">
+                                  <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
+                                    {driverInfo.avatarInitials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <p className="font-semibold text-lg">{driverInfo.name}</p>
+                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                    <span>{driverInfo.rating}</span>
+                                  </div>
+                                  <p className="text-sm mt-1">{driverInfo.carModel} · {driverInfo.carColor}</p>
+                                  <p className="text-xs font-mono bg-muted px-2 py-0.5 rounded w-fit mt-1">{driverInfo.plateNumber}</p>
+                                </div>
+                              </div>
+                              
+                              {/* Timing info */}
+                              <div className="space-y-2 mb-4">
+                                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
+                                  <span className="text-sm font-medium">Pickup in</span>
+                                  <span className="font-bold text-primary">~{driverInfo.pickupEtaMinutes} min</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                                  <span>Distance: {fareEstimate.distanceMiles} mi</span>
+                                  <span>~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}</span>
+                                </div>
+                              </div>
+                              
+                              {/* Actions */}
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  className="flex-1"
+                                  onClick={() => setIsMobileMapOpen(true)}
+                                  data-testid="button-view-live-map"
+                                >
+                                  <Map className="h-4 w-4 mr-2" />
+                                  View live map
+                                </Button>
+                              </div>
+                              
+                              <button
+                                onClick={handleCancelRide}
+                                className="w-full text-sm text-destructive hover:underline mt-4"
+                                data-testid="button-cancel-assigned"
+                              >
+                                Cancel ride
+                              </button>
+                              
+                              {/* Debug control */}
+                              {showDebugControls && (
+                                <div className="mt-4 pt-4 border-t">
+                                  <p className="text-xs text-muted-foreground mb-2">Debug Controls:</p>
+                                  <Button size="sm" onClick={handleStartTrip} data-testid="debug-start-trip">
+                                    Start Trip
+                                  </Button>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* TRIP_IN_PROGRESS Status Panel */}
+                        {rideStatus === "TRIP_IN_PROGRESS" && driverInfo && fareEstimate && (
+                          <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-in-progress">
+                            <CardContent className="p-4">
+                              <h3 className="text-lg font-semibold mb-4">On trip to your destination</h3>
+                              
+                              {/* Driver info */}
+                              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl mb-4">
+                                <Avatar className="h-12 w-12">
+                                  <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                                    {driverInfo.avatarInitials}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <p className="font-semibold">{driverInfo.name}</p>
+                                  <p className="text-xs text-muted-foreground">{driverInfo.carModel} · {driverInfo.plateNumber}</p>
+                                </div>
+                              </div>
+                              
+                              {/* Progress info */}
+                              <div className="p-4 bg-primary/5 rounded-xl mb-4">
+                                <p className="text-sm text-muted-foreground mb-1">Remaining</p>
+                                <p className="text-xl font-bold">
+                                  ~{formatDurationMinutes(remainingMinutes)} · {remainingMiles.toFixed(1)} mi
+                                </p>
+                              </div>
+                              
+                              {/* Actions */}
+                              <Button 
+                                variant="outline" 
+                                className="w-full"
+                                onClick={() => setIsMobileMapOpen(true)}
+                                data-testid="button-view-live-map-progress"
+                              >
+                                <Map className="h-4 w-4 mr-2" />
+                                View live map
+                              </Button>
+                              
+                              <p className="text-xs text-muted-foreground text-center mt-4">
+                                If you need help, please contact SafeGo support.
+                              </p>
+                              
+                              {/* Debug control */}
+                              {showDebugControls && (
+                                <div className="mt-4 pt-4 border-t">
+                                  <p className="text-xs text-muted-foreground mb-2">Debug Controls:</p>
+                                  <Button size="sm" onClick={handleCompleteTrip} data-testid="debug-complete-trip">
+                                    Complete Trip
+                                  </Button>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* TRIP_COMPLETED Status Panel */}
+                        {rideStatus === "TRIP_COMPLETED" && fareEstimate && (
+                          <div className="space-y-4" data-testid="status-completed">
+                            {/* Confirmation header */}
+                            <div className="text-center py-4">
+                              <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-green-100 flex items-center justify-center">
+                                <CheckCircle2 className="h-8 w-8 text-green-600" />
+                              </div>
+                              <h2 className="text-xl font-bold">Trip completed</h2>
+                              <p className="text-muted-foreground">Hope you had a safe ride.</p>
+                            </div>
+                            
+                            {/* Trip summary card */}
+                            <Card className="shadow-md rounded-xl overflow-hidden">
+                              <CardContent className="p-4">
+                                <h3 className="font-semibold mb-3">Trip Summary</h3>
+                                
+                                {/* Addresses */}
+                                <div className="space-y-2 mb-4">
+                                  <div className="flex items-start gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-blue-500 mt-1.5" />
+                                    <p className="text-sm flex-1">{pickup?.address}</p>
+                                  </div>
+                                  <div className="flex items-start gap-2">
+                                    <div className="h-2 w-2 rounded-full bg-red-500 mt-1.5" />
+                                    <p className="text-sm flex-1">{dropoff?.address}</p>
+                                  </div>
+                                </div>
+                                
+                                {/* Date/time and route */}
+                                <div className="text-sm text-muted-foreground space-y-1 mb-4">
+                                  <p>{tripEndTime?.toLocaleDateString()} at {tripEndTime?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                  <p>{routes.findIndex(r => r.id === activeRouteId) === 0 ? "Fastest" : (activeRoute?.summary || "Route")} · {formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)} · {fareEstimate.distanceMiles} mi</p>
+                                </div>
+                                
+                                {/* Final price */}
+                                <div className="flex items-baseline justify-between border-t pt-3">
+                                  <span className="font-semibold">Final Price</span>
+                                  <span className="text-2xl font-bold">${fareEstimate.finalFare.toFixed(2)}</span>
+                                </div>
+                                
+                                {fareEstimate.discountAmount > 0 && (
+                                  <p className="text-sm text-green-600 mt-1">
+                                    Promo {fareEstimate.promoCode} applied · You saved ${fareEstimate.discountAmount.toFixed(2)}
+                                  </p>
+                                )}
+                              </CardContent>
+                            </Card>
+                            
+                            {/* Rating section */}
+                            <Card className="shadow-md rounded-xl overflow-hidden">
+                              <CardContent className="p-4">
+                                <h3 className="font-semibold mb-3">Rate your driver</h3>
+                                
+                                {/* Driver info */}
+                                {driverInfo && (
+                                  <div className="flex items-center gap-3 mb-4">
+                                    <Avatar className="h-12 w-12">
+                                      <AvatarFallback className="bg-primary text-primary-foreground font-bold">
+                                        {driverInfo.avatarInitials}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="font-semibold">{driverInfo.name}</p>
+                                      <p className="text-xs text-muted-foreground">{driverInfo.carModel}</p>
+                                    </div>
+                                  </div>
+                                )}
+                                
+                                {/* Star rating */}
+                                <div className="flex justify-center gap-2 mb-4">
+                                  {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                      key={star}
+                                      onClick={() => setUserRating(star)}
+                                      className="p-1"
+                                      data-testid={`star-${star}`}
+                                    >
+                                      <Star 
+                                        className={`h-8 w-8 transition-colors ${
+                                          star <= userRating 
+                                            ? "fill-yellow-400 text-yellow-400" 
+                                            : "text-muted-foreground"
+                                        }`}
+                                      />
+                                    </button>
+                                  ))}
+                                </div>
+                                
+                                {/* Tip buttons */}
+                                <p className="text-sm font-medium mb-2">Add a tip</p>
+                                <div className="flex gap-2 flex-wrap">
+                                  {[null, 2, 4, 6].map((tip) => (
+                                    <Button
+                                      key={tip ?? "none"}
+                                      variant={selectedTip === tip ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() => setSelectedTip(tip)}
+                                      className="flex-1 min-w-[70px]"
+                                      data-testid={`tip-${tip ?? "none"}`}
+                                    >
+                                      {tip === null ? "No tip" : `$${tip}`}
+                                    </Button>
+                                  ))}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Tips go directly to your driver.
+                                </p>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )}
+
+                        {/* TRIP_CANCELLED Status Panel */}
+                        {rideStatus === "TRIP_CANCELLED" && (
+                          <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-cancelled">
+                            <CardContent className="p-4 text-center">
+                              <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-red-100 flex items-center justify-center">
+                                <AlertCircle className="h-8 w-8 text-red-600" />
+                              </div>
+                              <h2 className="text-xl font-bold mb-2">Ride Cancelled</h2>
+                              <p className="text-muted-foreground mb-6">Your ride has been cancelled.</p>
+                              
+                              <Button 
+                                onClick={handleBackFromCancelled}
+                                className="w-full"
+                                data-testid="button-back-home"
+                              >
+                                Back to home
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
 
-                {/* DESKTOP: Fare Summary Card - Shows when vehicle is selected */}
-                {showChooseRide && fareEstimate && (
+                {/* DESKTOP: Fare Summary Card - Shows when vehicle is selected AND in SELECTING state */}
+                {showChooseRide && fareEstimate && rideStatus === "SELECTING" && (
+                      <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-searching">
+                        <CardContent className="p-4">
+                          <div className="text-center">
+                            <h3 className="text-lg font-semibold mb-4">Finding your driver…</h3>
+                            
+                            {/* Selected ride info */}
+                            <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl mb-4">
+                              <div 
+                                className="h-16 w-20 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 100%)" }}
+                              >
+                                <img 
+                                  src={getVehicleCategoryImage(selectedVehicleCategory)} 
+                                  alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                                  className="h-14 w-auto object-contain"
+                                  style={{ filter: "drop-shadow(0px 4px 8px rgba(0,0,0,0.1))" }}
+                                />
+                              </div>
+                              <div className="flex-1 text-left">
+                                <p className="font-semibold">{VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}</p>
+                                <p className="text-xl font-bold">${fareEstimate.finalFare.toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {routes.findIndex(r => r.id === activeRouteId) === 0 ? "Fastest" : (activeRoute?.summary || "Route")} · {formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)} · {fareEstimate.distanceMiles} mi
+                                </p>
+                              </div>
+                            </div>
+                            
+                            {/* Loading indicator */}
+                            <div className="flex items-center justify-center gap-2 mb-4">
+                              <div className="flex gap-1">
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+                                <div className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
+                              </div>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground mb-4">
+                              We are looking for the best nearby driver for you.
+                            </p>
+                            
+                            <button
+                              onClick={handleCancelRide}
+                              className="text-sm text-destructive hover:underline"
+                              data-testid="button-cancel-searching"
+                            >
+                              Cancel ride (before driver is assigned)
+                            </button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* DRIVER_ASSIGNED Status Panel */}
+                    {rideStatus === "DRIVER_ASSIGNED" && driverInfo && fareEstimate && (
+                      <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-driver-assigned">
+                        <CardContent className="p-4">
+                          <h3 className="text-lg font-semibold mb-4">Your driver is on the way</h3>
+                          
+                          {/* Driver and car info */}
+                          <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl mb-4">
+                            <Avatar className="h-16 w-16">
+                              <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
+                                {driverInfo.avatarInitials}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="font-semibold text-lg">{driverInfo.name}</p>
+                              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span>{driverInfo.rating}</span>
+                              </div>
+                              <p className="text-sm mt-1">{driverInfo.carModel} · {driverInfo.carColor}</p>
+                              <p className="text-xs font-mono bg-muted px-2 py-0.5 rounded w-fit mt-1">{driverInfo.plateNumber}</p>
+                            </div>
+                          </div>
+                          
+                          {/* Timing info */}
+                          <div className="space-y-2 mb-4">
+                            <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
+                              <span className="text-sm font-medium">Pickup in</span>
+                              <span className="font-bold text-primary">~{driverInfo.pickupEtaMinutes} min</span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm text-muted-foreground">
+                              <span>Distance: {fareEstimate.distanceMiles} mi</span>
+                              <span>~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}</span>
+                            </div>
+                          </div>
+                          
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="outline" 
+                              className="flex-1"
+                              onClick={() => setIsMobileMapOpen(true)}
+                              data-testid="button-view-live-map"
+                            >
+                              <Map className="h-4 w-4 mr-2" />
+                              View live map
+                            </Button>
+                          </div>
+                          
+                          <button
+                            onClick={handleCancelRide}
+                            className="w-full text-sm text-destructive hover:underline mt-4"
+                            data-testid="button-cancel-assigned"
+                          >
+                            Cancel ride
+                          </button>
+                          
+                          {/* Debug control */}
+                          {showDebugControls && (
+                            <div className="mt-4 pt-4 border-t">
+                              <p className="text-xs text-muted-foreground mb-2">Debug Controls:</p>
+                              <Button size="sm" onClick={handleStartTrip} data-testid="debug-start-trip">
+                                Start Trip
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* DESKTOP: Fare Summary Card - Shows when vehicle is selected AND in SELECTING state */}
+                {showChooseRide && fareEstimate && rideStatus === "SELECTING" && (
                   <Card className="hidden md:block shadow-md rounded-xl overflow-hidden" data-testid="fare-summary-card">
                     <CardContent className="p-4">
                       {/* Main fare display - responsive layout */}
@@ -1730,7 +2352,7 @@ export default function UnifiedBookingPage() {
         </div>
       </div>
 
-      {/* Mobile Sticky Confirm Bar - Professional Uber-style */}
+      {/* Mobile Sticky Bottom Bar - Different actions based on ride status */}
       {activeService === "ride" && showChooseRide && activeRoute && (
         <div 
           className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background"
@@ -1740,25 +2362,40 @@ export default function UnifiedBookingPage() {
           }}
         >
           <div className="px-4 py-3">
-            <Button
-              onClick={handleRequestRide}
-              disabled={!canRequestRide}
-              size="lg"
-              className="w-full text-base font-semibold"
-              data-testid="button-confirm-ride-mobile"
-            >
-              {isRequestingRide ? (
-                <>
-                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                  Confirming...
-                </>
-              ) : (
-                <>
-                  Confirm {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                  <span className="ml-2 font-bold">· ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
-                </>
-              )}
-            </Button>
+            {/* SELECTING: Show confirm button */}
+            {rideStatus === "SELECTING" && (
+              <Button
+                onClick={handleRequestRide}
+                disabled={!canRequestRide}
+                size="lg"
+                className="w-full text-base font-semibold"
+                data-testid="button-confirm-ride-mobile"
+              >
+                {isRequestingRide ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Confirming...
+                  </>
+                ) : (
+                  <>
+                    Confirm {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                    <span className="ml-2 font-bold">· ${fareEstimate?.finalFare.toFixed(2) || "..."}</span>
+                  </>
+                )}
+              </Button>
+            )}
+            
+            {/* TRIP_COMPLETED: Show done button */}
+            {rideStatus === "TRIP_COMPLETED" && (
+              <Button
+                onClick={handleFinishTripFlow}
+                size="lg"
+                className="w-full text-base font-semibold"
+                data-testid="button-done-mobile"
+              >
+                Done
+              </Button>
+            )}
           </div>
         </div>
       )}
