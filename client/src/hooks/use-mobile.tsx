@@ -20,7 +20,11 @@ export function useIsMobile() {
 }
 
 export function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = React.useState<boolean | undefined>(undefined)
+  // Initialize synchronously to avoid flash of wrong layout
+  const [isDesktop, setIsDesktop] = React.useState<boolean>(() => {
+    if (typeof window === 'undefined') return false
+    return window.innerWidth >= DESKTOP_BREAKPOINT
+  })
 
   React.useEffect(() => {
     const mql = window.matchMedia(`(min-width: ${DESKTOP_BREAKPOINT}px)`)
@@ -28,9 +32,10 @@ export function useIsDesktop() {
       setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT)
     }
     mql.addEventListener("change", onChange)
+    // Sync initial state in case SSR hydration differs
     setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT)
     return () => mql.removeEventListener("change", onChange)
   }, [])
 
-  return !!isDesktop
+  return isDesktop
 }
