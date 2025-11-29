@@ -1378,7 +1378,10 @@ export default function RideRequest() {
               <AddressSummaryCapsule
                 pickup={pickup}
                 dropoff={dropoff}
-                onEdit={() => setIsEditingAddresses(true)}
+                onEdit={() => {
+                  setIsEditingAddresses(true);
+                  setIsRouteExplorerOpen(false); // Close Route Explorer to show full inputs
+                }}
               />
             )}
 
