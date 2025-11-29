@@ -1,0 +1,282 @@
+SAFEGO – UNIFIED WEB BOOKING PAGE (RIDE + FOOD + PARCEL)
+
+You are redesigning the SafeGo CUSTOMER WEB BOOKING page for three services:
+1) Ride Service
+2) Food Delivery Service
+3) Parcel Delivery Service
+
+This is a corporate web experience (NOT a mobile app clone, NOT Uber app behavior).
+
+====================================================
+GLOBAL RULES
+====================================================
+- Do NOT modify backend business logic:
+  - No changes to pricing engine, commissions, payouts, driver earnings, restaurant earnings, or routing APIs.
+- Do NOT touch driver, restaurant, or admin portals.
+- ONLY change:
+  - Customer web UI layout
+  - Styling (CSS)
+  - Component composition and responsiveness
+- There must be ONE unified layout for all devices (desktop-first, responsive).
+- Do NOT create separate flows for mobile vs desktop. Same components, same steps, only layout changes.
+
+====================================================
+1. PAGE STRUCTURE
+====================================================
+The main SafeGo booking page must have this structure:
+
+A) TOP NAV BAR
+   - Left: SafeGo logo
+   - Center/right: links like “Home, About, Services, Help”
+   - Right: Login/Profile, language selector, support icon
+
+B) SERVICE SWITCHER (3-SERVICE SELECTOR)
+   - Below the nav bar, show a horizontal selector with 3 options:
+     1) SafeGo Ride
+     2) SafeGo Eats
+     3) SafeGo Parcel
+   - Each option is a clickable card/tab with:
+     - Icon
+     - Title
+     - Short subtitle:
+       • Ride – “Point-to-point rides”
+       • Eats – “Order from nearby restaurants”
+       • Parcel – “Send packages and documents”
+   - Exactly ONE is active at a time.
+   - Active state:
+     - SafeGo Blue border and background tint
+     - Bold title
+   - Switching service does NOT change page, only the left panel content and right panel context.
+
+C) MAIN CONTENT AREA (TWO PANELS)
+   - A two-column layout:
+     - LEFT PANEL: Service-specific booking form
+     - RIGHT PANEL: Map / context panel
+   - On desktop (≥ 1024px):
+     - Left panel width ~40%
+     - Right panel width ~60%
+   - On smaller devices:
+     - Left panel stacks on top
+     - Right panel (map) stacks below
+     - Same elements, same order.
+
+====================================================
+2. SERVICE-SPECIFIC PANELS (LEFT SIDE)
+====================================================
+
+Implement a React-style service state, e.g. `activeService = "ride" | "food" | "parcel"` and render different form content based on that.
+
+--------------------------------------------
+2.1 SafeGo Ride Panel (Ride Booking)
+--------------------------------------------
+Section title: “Book a ride”
+
+FIELDS:
+1) Pickup Address
+   - Text input with location pin icon
+   - Autocomplete suggestions as user types
+
+2) Dropoff Address
+   - Text input with destination icon
+   - Autocomplete suggestions
+
+3) Ride Options Row:
+   - When pickup + dropoff are valid:
+     - Show a “Show prices” button.
+     - Optional “Now / Schedule” selector.
+     - Payment method selector below.
+
+4) Ride List:
+   - After “Show prices” is clicked:
+     - Render a vertical list of ride cards:
+       - SafeGo X
+       - SafeGo Comfort
+       - SafeGo Comfort XL
+       - SafeGo XL
+       - SafeGo Black
+       - SafeGo Black SUV
+       - SafeGo WAV
+   - Each ride card:
+     - Left: 3D car image (side-front angle, consistent style)
+     - Center:
+       - Ride name (bold)
+       - Short description (seats, comfort level)
+     - Right:
+       - ETA
+       - Price (bold)
+       - Original price (if promo) with strikethrough
+
+5) Route Options:
+   - Under the ride list, show 3 horizontally aligned route buttons:
+     - “Fastest”
+     - “Route B”
+     - “Route C”
+   - All three must fit fully on desktop width.
+   - Use flex layout with equal widths.
+   - Selected route button uses SafeGo Blue border and filled background.
+
+6) Request Ride:
+   - Full-width “Request ride” button at bottom of the left panel.
+   - Enabled only when:
+     - Pickup set
+     - Dropoff set
+     - Ride selected
+     - Route selected
+
+--------------------------------------------
+2.2 SafeGo Eats Panel (Food Service)
+--------------------------------------------
+Section title: “Order food”
+
+FIELDS:
+1) Delivery Address
+   - Address input for customer location
+   - Autocomplete supported
+   - Required before showing restaurant list
+
+2) Search & Filter
+   - Restaurant search input (“Search restaurants or cuisine”)
+   - Optional filter chips:
+     - Cuisine types (e.g., American, Pizza, Indian, etc.)
+     - Delivery fee (Low, Free)
+     - Rating (4+ stars)
+
+3) Restaurant List
+   - Scrollable list of restaurants:
+     - Restaurant thumbnail/logo
+     - Name (bold)
+     - Cuisine type
+     - Rating + delivery time
+     - Delivery fee or “Free delivery”
+   - Clicking a restaurant:
+     - Shows menu below or in a nested section:
+       - Food items list with:
+         - Name
+         - Short description
+         - Price
+         - “Add to cart” button
+
+4) Cart Summary
+   - Right side of the left panel (or at bottom):
+     - Items added
+     - Subtotal
+     - Delivery fee
+     - Estimated total
+   - “Place order” button:
+     - Full-width
+     - Primary color SafeGo Blue
+
+Note: You are ONLY building the UI; connect to existing API endpoints if available, otherwise mock data for now. Do not change restaurant business logic.
+
+--------------------------------------------
+2.3 SafeGo Parcel Panel (Parcel Service)
+--------------------------------------------
+Section title: “Send a parcel”
+
+FIELDS:
+1) Sender Address
+   - Input with “Sender” label
+   - Autocomplete supported
+
+2) Receiver Address
+   - Input with “Receiver” label
+   - Autocomplete supported
+
+3) Parcel Details
+   - Package type dropdown:
+     - Document, Box, Fragile, Oversized
+   - Approx. weight input (kg or lbs)
+   - Size category:
+     - Small / Medium / Large
+
+4) Delivery Options
+   - Radio buttons:
+     - Standard delivery
+     - Express delivery
+   - Show estimated time and price adjustment.
+
+5) Price Summary
+   - When all fields are valid, show:
+     - Base fare
+     - Distance cost
+     - Service fee
+     - Total price (bold)
+
+6) Request Courier
+   - Full-width “Request courier” button at bottom of left panel.
+
+====================================================
+3. RIGHT PANEL – CONTEXT AREA (MAP / INFO)
+====================================================
+
+Right panel must dynamically adapt based on active service:
+
+1) For Ride:
+   - Show a map with route from pickup to dropoff.
+   - Fit both points with padding.
+   - Update route when user changes route selection.
+
+2) For Food:
+   - Show a map with:
+     - Delivery address
+     - Restaurant locations in the search radius
+   - Optional cluster markers for restaurants.
+
+3) For Parcel:
+   - Show the route from sender to receiver.
+   - Clearly indicate pickup and dropoff markers.
+
+Common rules:
+- Map must NEVER be hidden by overlays.
+- No 2-second floating card overlays.
+- Map always responds to form changes (address updates, selection changes).
+
+====================================================
+4. RESPONSIVE BEHAVIOR
+====================================================
+
+For desktop (>= 1024px):
+- Show two-column layout:
+  - Left: form + list
+  - Right: map
+- Scrollable left panel, sticky map on the right.
+
+For mobile/tablet:
+- Stack vertically:
+  - Top: Service switcher
+  - Then: Left panel contents (form + list + buttons)
+  - Bottom: Map (full width)
+- Same components, same order.
+- No separate mobile-specific screens, no bottom sheets, no full-screen overlays.
+
+====================================================
+5. CLEANUP & ALIGNMENT
+====================================================
+
+- Remove ANY extra, duplicated address sections from older ride-only implementations.
+- Only ONE address section per service panel.
+- Fix:
+  - Route buttons so they are never cut off.
+  - Request buttons so they never overlap other content.
+  - All text must remain readable without overflow.
+- Spacing:
+  - 16px horizontal padding for panels
+  - 24px vertical gaps between sections
+  - 8–12px gaps between inline elements
+
+====================================================
+6. DELIVERABLE
+====================================================
+
+End result must be:
+- One unified SafeGo web booking page
+- Three services: Ride, Eats, Parcel
+- Corporate, clean, desktop-first but responsive
+- No app-like sliding behavior
+- No duplication of flows
+- Map + form working together for each service
+
+After implementing, list:
+- Components added/modified
+- How activeService switcher controls left + right panels
+- Any shared hooks or state containers you used.
