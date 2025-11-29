@@ -16,12 +16,26 @@ import {
   Loader2,
   ChevronUp,
   ChevronDown,
-  ArrowLeft,
   Users,
   Zap,
   Wallet,
   Route as RouteIcon,
+  Menu,
+  User,
+  Home,
+  Clock,
+  HelpCircle,
+  X,
 } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { FareDetailsAccordion } from "@/components/ride/FareDetailsAccordion";
 import {
@@ -159,8 +173,10 @@ function formatDurationMinutes(mins: number): string {
 
 export default function UnifiedBookingPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const { isReady: isGoogleMapsReady } = useGoogleMaps();
   const [isClient, setIsClient] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [activeService, setActiveService] = useState<ServiceType>("ride");
 
@@ -431,60 +447,210 @@ export default function UnifiedBookingPage() {
     },
   ];
 
+  const userInitials = user?.email?.substring(0, 2).toUpperCase() || "SG";
+
   return (
     <div className="h-screen flex flex-col bg-muted/30" data-testid="unified-booking-page">
-      <header className="flex-shrink-0 z-30 bg-background/95 backdrop-blur-sm border-b px-4 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/customer">
-              <Button variant="ghost" size="icon" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <h1 className="text-lg font-bold text-primary" data-testid="text-logo">SafeGo</h1>
-          </div>
-          <nav className="hidden md:flex items-center gap-4">
-            <Link href="/customer" className="text-sm text-muted-foreground hover:text-foreground">Home</Link>
-            <Link href="/customer/activity" className="text-sm text-muted-foreground hover:text-foreground">Activity</Link>
-            <Link href="/customer/support" className="text-sm text-muted-foreground hover:text-foreground">Help</Link>
-          </nav>
-        </div>
-      </header>
+      {/* Uber-style Sticky Header */}
+      <header 
+        className="sticky top-0 z-50 w-full bg-background border-b shadow-sm"
+        data-testid="safego-header"
+      >
+        <div className="h-16 px-4 lg:px-6">
+          <div className="h-full max-w-7xl mx-auto flex items-center justify-between gap-4">
+            {/* Left: Logo */}
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <Link href="/customer" className="flex items-center gap-2" data-testid="link-logo">
+                <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-sm">
+                  <Car className="h-5 w-5 text-primary-foreground" />
+                </div>
+                <span className="font-bold text-xl tracking-tight hidden sm:inline">SafeGo</span>
+              </Link>
+            </div>
 
-      <div className="border-b bg-background">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex gap-3 overflow-x-auto pb-1">
-            {services.map((service) => {
-              const isActive = activeService === service.id;
-              const Icon = service.icon;
-              return (
-                <button
-                  key={service.id}
-                  onClick={() => setActiveService(service.id)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all min-w-[180px] flex-shrink-0 ${
-                    isActive
-                      ? "border-primary bg-primary/5 shadow-sm"
-                      : "border-border bg-background hover:border-primary/30 hover:bg-muted/50"
-                  }`}
-                  data-testid={`service-tab-${service.id}`}
-                >
-                  <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                    isActive ? "bg-primary/10" : "bg-muted"
-                  }`}>
-                    <Icon className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+            {/* Center: Service Switcher - Desktop Horizontal Tabs */}
+            <nav className="hidden md:flex items-center" data-testid="desktop-service-switcher">
+              <div className="flex items-center bg-muted/60 rounded-full p-1">
+                {services.map((service) => {
+                  const isActive = activeService === service.id;
+                  const Icon = service.icon;
+                  return (
+                    <button
+                      key={service.id}
+                      onClick={() => setActiveService(service.id)}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                        isActive
+                          ? "bg-foreground text-background shadow-sm"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      }`}
+                      data-testid={`service-tab-${service.id}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{service.id === "ride" ? "Ride" : service.id === "eats" ? "Eats" : "Parcel"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
+
+            {/* Center: Service Switcher - Mobile Dropdown */}
+            <div className="md:hidden flex-1 flex justify-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="gap-2 px-4 rounded-full border-border"
+                    data-testid="mobile-service-dropdown"
+                  >
+                    {activeService === "ride" && <Car className="h-4 w-4" />}
+                    {activeService === "eats" && <UtensilsCrossed className="h-4 w-4" />}
+                    {activeService === "parcel" && <Package className="h-4 w-4" />}
+                    <span className="capitalize">{activeService}</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="center" className="w-48">
+                  {services.map((service) => {
+                    const Icon = service.icon;
+                    return (
+                      <DropdownMenuItem 
+                        key={service.id}
+                        onClick={() => setActiveService(service.id)}
+                        className={activeService === service.id ? "bg-muted" : ""}
+                        data-testid={`mobile-service-${service.id}`}
+                      >
+                        <Icon className="h-4 w-4 mr-2" />
+                        {service.id === "ride" ? "Ride" : service.id === "eats" ? "Eats" : "Parcel"}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Right: Navigation + Profile */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Desktop Navigation Links */}
+              <nav className="hidden lg:flex items-center gap-1 mr-2" data-testid="desktop-nav">
+                <Link href="/customer">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground" data-testid="nav-home">
+                    <Home className="h-4 w-4" />
+                    Home
+                  </Button>
+                </Link>
+                <Link href="/customer/activity">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground" data-testid="nav-activity">
+                    <Clock className="h-4 w-4" />
+                    Activity
+                  </Button>
+                </Link>
+                <Link href="/customer/support">
+                  <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-foreground" data-testid="nav-help">
+                    <HelpCircle className="h-4 w-4" />
+                    Help
+                  </Button>
+                </Link>
+              </nav>
+
+              {/* Profile Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="rounded-full"
+                    data-testid="button-profile"
+                  >
+                    <Avatar className="h-8 w-8 border-2 border-border">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-3 py-2 border-b">
+                    <p className="text-sm font-medium">{user?.email || "Guest"}</p>
+                    <p className="text-xs text-muted-foreground">SafeGo Account</p>
                   </div>
-                  <div className="text-left">
-                    <p className={`text-sm font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
-                      {service.title}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{service.subtitle}</p>
+                  <Link href="/customer/profile">
+                    <DropdownMenuItem data-testid="menu-profile">
+                      <User className="h-4 w-4 mr-2" />
+                      Profile
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/customer/wallet">
+                    <DropdownMenuItem data-testid="menu-wallet">
+                      <Wallet className="h-4 w-4 mr-2" />
+                      Wallet
+                    </DropdownMenuItem>
+                  </Link>
+                  <DropdownMenuSeparator />
+                  {/* Mobile-only nav links */}
+                  <div className="lg:hidden">
+                    <Link href="/customer">
+                      <DropdownMenuItem data-testid="mobile-nav-home">
+                        <Home className="h-4 w-4 mr-2" />
+                        Home
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/customer/activity">
+                      <DropdownMenuItem data-testid="mobile-nav-activity">
+                        <Clock className="h-4 w-4 mr-2" />
+                        Activity
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link href="/customer/support">
+                      <DropdownMenuItem data-testid="mobile-nav-help">
+                        <HelpCircle className="h-4 w-4 mr-2" />
+                        Help
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuSeparator />
                   </div>
-                </button>
-              );
-            })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {/* Mobile Menu Button - Hidden on larger screens */}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="lg:hidden"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                data-testid="button-mobile-menu"
+              >
+                {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+
+        {/* Mobile Navigation Drawer */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden border-t bg-background animate-in slide-in-from-top-2 duration-200">
+            <div className="px-4 py-3 space-y-1">
+              <Link href="/customer" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-menu-home">
+                  <Home className="h-5 w-5" />
+                  Home
+                </Button>
+              </Link>
+              <Link href="/customer/activity" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-menu-activity">
+                  <Clock className="h-5 w-5" />
+                  Activity
+                </Button>
+              </Link>
+              <Link href="/customer/support" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-menu-help">
+                  <HelpCircle className="h-5 w-5" />
+                  Help
+                </Button>
+              </Link>
+            </div>
+          </div>
+        )}
+      </header>
 
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
         <div className="lg:w-[40%] lg:max-w-[480px] lg:flex-shrink-0 lg:overflow-y-auto lg:border-r flex flex-col">
