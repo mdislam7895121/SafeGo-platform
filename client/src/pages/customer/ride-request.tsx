@@ -1245,14 +1245,17 @@ export default function RideRequest() {
       {/* ========== MOBILE LAYOUT (< 1024px): UBER-STYLE VERTICAL LIST ==========
        * MOBILE LAYOUT STRUCTURE:
        * 1. Fixed-height map section (h-56 / 224px) with location card overlay
+       *    - When Route Explorer is open: map expands to take most of screen (flex-1)
        * 2. Scrollable content: promo banner → ride list (vertical rows) → fare summary
+       *    - When Route Explorer is open: ride list is hidden, only route chips shown
        * 3. Sticky request button at bottom (always visible)
        * 
+       * isRouteExplorerOpen is a mobile-only UI state for layout orchestration
        * DESKTOP: Uses the 3-column grid layout above (hidden on mobile via lg:hidden)
        */}
       <div className="lg:hidden flex flex-col h-full overflow-hidden">
-        {/* MAP SECTION - Fixed height 224px with overlay inputs */}
-        <div className="h-56 relative flex-shrink-0 z-[1]">
+        {/* MAP SECTION - Expands when Route Explorer is open */}
+        <div className={`relative flex-shrink-0 z-[1] transition-all duration-300 ${isRouteExplorerOpen ? 'flex-1 min-h-[60vh]' : 'h-56'}`}>
           {isClient && (
             <MapContainer
               center={[mapCenter.lat, mapCenter.lng]}
@@ -1381,11 +1384,53 @@ export default function RideRequest() {
               </Card>
             )}
           </div>
+
+          {/* Route Chips Overlay - Only shown when Route Explorer is open (mobile) */}
+          {isRouteExplorerOpen && routes.length > 1 && (
+            <div 
+              className="absolute bottom-4 left-4 right-4 z-30 bg-white dark:bg-card rounded-2xl px-4 py-3"
+              style={{ boxShadow: "0 4px 12px rgba(0,0,0,0.12)" }}
+              data-testid="route-chips-overlay"
+            >
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {routes.map((route, index) => {
+                  const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
+                  const distMi = route.distanceMiles.toFixed(1);
+                  const isActive = route.id === activeRouteId;
+                  const label = index === 0 ? "Fastest" : route.summary || `Route ${index + 1}`;
+                  
+                  return (
+                    <button
+                      key={route.id}
+                      onClick={() => setActiveRouteId(route.id)}
+                      aria-pressed={isActive}
+                      tabIndex={0}
+                      className={`
+                        flex-shrink-0 px-4 py-2 rounded-full transition-all
+                        ${isActive 
+                          ? "bg-blue-50 dark:bg-blue-950/40 border-2 border-blue-600" 
+                          : "bg-[#F9FAFB] dark:bg-muted border border-transparent hover:border-gray-300"
+                        }
+                      `}
+                      data-testid={`route-chip-${route.id}`}
+                    >
+                      <p className={`text-sm font-medium whitespace-nowrap ${isActive ? "text-blue-600" : "text-foreground"}`}>
+                        {label}
+                      </p>
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">
+                        {etaMin} min • {distMi} mi
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         {/* End of map section */}
         </div>
 
-        {/* SCROLLABLE CONTENT AREA - Promo + vertical ride list + fare summary */}
-        <div className="flex-1 overflow-y-auto bg-background pb-24">
+        {/* SCROLLABLE CONTENT AREA - Hidden when Route Explorer is open */}
+        <div className={`flex-1 overflow-y-auto bg-background pb-24 ${isRouteExplorerOpen ? 'hidden' : ''}`}>
           
           {/* Promo Banner - under map */}
           {activeRoute && appliedPromo && (
