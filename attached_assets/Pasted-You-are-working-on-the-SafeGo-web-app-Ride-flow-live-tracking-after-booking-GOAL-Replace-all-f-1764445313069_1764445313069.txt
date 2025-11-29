@@ -1,0 +1,163 @@
+You are working on the SafeGo web app (Ride flow – live tracking after booking).
+
+GOAL
+Replace all fake/demo tracking data with real, backend-driven, Uber-style live tracking so that:
+1) The car icon always reflects the real driver location and heading,
+2) The passenger sees their true current location on the map,
+3) Speed and ETA are calculated from real telemetry, not hard-coded values,
+4) The map always focuses on the actual path between driver and passenger (or passenger and dropoff).
+
+VERY IMPORTANT RULES
+- Do NOT break any existing flows: booking, route selection, fare details, cancel ride.
+- Keep all existing UI styling and components (cards, badges, buttons) exactly as they are.
+- Only replace the logic that powers the live map and the status panel values.
+- No random numbers, no fake paths, no fake speed. If there is no data, show a safe placeholder like “—” instead of inventing values.
+- Respect security and privacy: use authenticated APIs only, don’t expose raw internal IDs in the client, and don’t leak other riders’ or drivers’ data.
+
+STEP 1 – BACKEND: Real tracking endpoint
+1. Find the backend code that currently serves the live ride tracking / simulation
+   (for example something like `/api/rides/:rideId/tracking` or similar).
+2. Implement a single source of truth tracking endpoint, for example:
+
+   `GET /api/rides/:rideId/live-tracking`
+
+   Response should include (adjust names to match our codebase):
+   - `rideId`
+   - `status` (e.g., "DRIVER_ASSIGNED", "DRIVER_EN_ROUTE", "PICKED_UP", "COMPLETED", "CANCELLED")
+   - `passengerLocation`: `{ lat, lng }` (last known user position, if available)
+   - `driverLocation`: `{ lat, lng, headingDeg, speedMps, updatedAt }`
+   - `routePolylineToPickup`: encoded or array polyline from driver to pickup (optional but recommended)
+   - `routePolylineToDropoff`: encoded or array polyline from pickup to dropoff
+   - `pickupLocation`: `{ lat, lng }`
+   - `dropoffLocation`: `{ lat, lng }`
+   - `etaSecondsToPickup`
+   - `etaSecondsToDropoff`
+   - `distanceMetersToPickup`
+   - `distanceMetersToDropoff`
+
+3. Wire this endpoint to REAL data:
+   - If we already store driver GPS updates (e.g., from the driver app), use those records.
+   - Compute `speedMps` from successive driver GPS points: distance delta / time delta.
+   - Compute `headingDeg` from the bearing between last two driver positions.
+   - If there is not enough data for speed or heading, return `null` and let the client handle it gracefully (no guessing).
+
+4. Expose this data either through:
+   - Server-Sent Events or WebSocket stream, OR
+   - A polling endpoint that can be called every 3–5 seconds.
+   If you add streaming, keep a simple polling fallback for environments where streaming is not available.
+
+5. Enforce security:
+   - Require authentication and that the requester is either the ride’s passenger OR an authorized admin.
+   - Do not include any sensitive driver metadata beyond what is needed (name, rating, car model, plate, etc. are already shown in the ride card; don’t repeat extra PII in this API).
+   - Validate `rideId` to prevent enumeration or access to other users’ rides.
+
+STEP 2 – FRONTEND: Use real tracking data instead of simulation
+1. Locate the components used after booking to show tracking, for example:
+   - `client/src/pages/customer/unified-booking.tsx`
+   - `client/src/components/ride/LiveRideStatusPanel.tsx`
+   - `client/src/components/maps/LiveRideMap.tsx`
+   Use the real paths from the project; these names are examples.
+
+2. Remove or disable ALL fake/demo logic, such as:
+   - Hard-coded paths or polylines,
+   - Random speed values (e.g., always around 59–65 mph),
+   - Fake “bear right in 1.4 mi” messages generated from static data,
+   - Any loop that moves the marker artificially instead of using backend positions.
+
+3. Introduce a single React hook for tracking, for example:
+
+   `useLiveRideTracking(rideId: string)`
+
+   This hook should:
+   - Call the new backend endpoint (or subscribe to SSE/WebSocket).
+   - Return the normalized data:
+     - `driverLocation`, `passengerLocation`,
+     - `pickupLocation`, `dropoffLocation`,
+     - `routeToPickup`, `routeToDropoff`,
+     - `etaToPickup`, `etaToDropoff`,
+     - `distanceToPickup`, `distanceToDropoff`,
+     - `status`.
+   - Handle polling every 3–5 seconds if streaming is not used.
+   - Handle loading and error states gracefully (no crashes; show a small “Reconnecting…” or similar if needed).
+
+4. Update the status panel UI to use this live data:
+   - “Pickup in ~X min”: use `etaToPickup` when status is DRIVER_ASSIGNED / DRIVER_EN_ROUTE.
+   - “Distance: Y mi”: use `distanceToPickup` or `distanceToDropoff` depending on ride status.
+   - “Speed: Z mph”: compute from `speedMps` -> mph and round sensibly (e.g., `Math.round(speedMps * 2.236936)`).
+   - Do NOT show more than is realistic:
+     - If speed is `null`, show “Speed: —”.
+     - If ETA is unavailable, show “Calculating…” instead of a fake value.
+
+5. Make the map follow REAL positions:
+   - Show:
+     - Blue dot: passenger’s current location (from browser Geolocation API).
+     - Green arrow/car icon: driver’s current location and heading.
+     - Polyline from driver to pickup (before pickup).
+     - Polyline from pickup to dropoff (after pickup).
+   - When `View live map` is opened:
+     - Fit bounds so that both driver and passenger (or passenger and dropoff) are visible.
+     - Keep updating bounds smoothly as positions change, but avoid extreme jumping (use interpolation and easing, not drastic recentering every tick).
+   - Rotate the car icon to the `headingDeg` from the backend; if `headingDeg` is `null`, leave the icon in a default orientation.
+
+6. Passenger current location:
+   - Use `navigator.geolocation.getCurrentPosition` and `watchPosition` (or the equivalent utility in our codebase) to fetch the passenger’s real location.
+   - If permission is denied:
+     - Do NOT crash.
+     - Use the pickup location as the passenger reference point and hide the “current blue dot” if we can’t get it.
+
+STEP 3 – Fix the “wrong direction” issue
+1. Ensure the driver route is always computed FROM driver -> pickup (before pickup) and FROM pickup -> dropoff (after pickup).
+2. The polyline currently drawn from pickup to dropoff while the driver is still far away should be corrected:
+   - Before pickup:
+     - Focus on driver->pickup segment for turn-by-turn hints and ETA.
+   - After pickup:
+     - Focus on pickup->dropoff route.
+3. Verify that:
+   - The car icon moves along the appropriate segment.
+   - Distance and ETA values shrink over time in a realistic way (no growing distance while heading toward the passenger).
+4. Add unit/integration tests for the direction and distance math where possible.
+
+STEP 4 – Realistic speeds and limits
+1. Remove any hard-coded “65 mph” or similar caps used only to look realistic.
+2. Use the raw speed from GPS or compute it from position deltas.
+3. Apply basic safety filtering:
+   - If speed is wildly unrealistic (e.g., > 120 mph), treat it as invalid and do not display it.
+4. Display speed in:
+   - mph for US region,
+   - (Leave conversion hooks ready for other regions later, but do not overcomplicate now.)
+
+STEP 5 – UX & fallback behavior
+1. If tracking temporarily fails (network issues, backend unavailable, etc.):
+   - Keep the last known positions on the map.
+   - Show a small non-blocking indicator like “Trying to reconnect…” in the status card.
+2. When the ride moves from:
+   - “Driver is on the way” -> “Arriving now” -> “On trip” -> “Completed”,
+   - Ensure the UI state and map overlay change accordingly:
+     - Pre-pickup: driver->pickup route, ETA to pickup.
+     - On trip: pickup->dropoff route, ETA to dropoff.
+     - Completed: freeze map with final path and no more live polling.
+3. Confirm that this logic works on both desktop layout and mobile layout without breaking the responsive design you already implemented.
+
+DELIVERABLES
+- Updated backend live-tracking endpoint wired to real driver and ride data.
+- Updated React hook and components that:
+  - Use real tracking data,
+  - Render the correct map path and markers,
+  - Show realistic ETA, distance, and speed,
+  - Handle errors and missing data safely.
+- No regression in:
+  - Booking flow,
+  - Route selection,
+  - Fare details,
+  - Promo and pricing display,
+  - Cancel ride flow.
+
+After implementation, run through these manual checks:
+1) Book a ride where the simulated driver starts far away and moves toward the pickup:
+   - Verify the car icon always heads toward the passenger/location, not away.
+   - Verify ETA decreases as expected.
+2) Let the simulation transition to “On trip”:
+   - Verify the route switches to pickup->dropoff.
+   - Verify ETA now refers to dropoff, not pickup.
+3) Open “View live map” on both desktop preview and mobile preview:
+   - Confirm user current location, driver icon, and route all look natural and continuous.

@@ -1212,4 +1212,345 @@ router.patch("/:id/destination", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/rides/:id/live-tracking
+// Real-time tracking data for active ride
+// ====================================================
+router.get("/:id/live-tracking", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    // Fetch ride with driver info
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        customerId: true,
+        driverId: true,
+        status: true,
+        currentLeg: true,
+        pickupAddress: true,
+        pickupLat: true,
+        pickupLng: true,
+        dropoffAddress: true,
+        dropoffLat: true,
+        dropoffLng: true,
+        routePolyline: true,
+        distanceMiles: true,
+        durationMinutes: true,
+        trafficEtaSeconds: true,
+        acceptedAt: true,
+        arrivedAt: true,
+        tripStartedAt: true,
+      },
+    });
+
+    if (!ride) {
+      return res.status(404).json({ error: "Ride not found" });
+    }
+
+    // Authorization: only ride's customer or admin can access tracking
+    if (role === "customer") {
+      const customerProfile = await prisma.customerProfile.findUnique({ where: { userId } });
+      if (ride.customerId !== customerProfile?.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    } else if (role !== "admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Only allow tracking for active rides
+    const activeStatuses = ["accepted", "driver_arriving", "arrived", "in_progress"];
+    if (!activeStatuses.includes(ride.status)) {
+      return res.json({
+        rideId: ride.id,
+        status: ride.status,
+        isActive: false,
+        message: "Ride is not in an active tracking state",
+      });
+    }
+
+    // Get driver info and latest location
+    let driverLocation = null;
+    let driverInfo = null;
+
+    if (ride.driverId) {
+      const driver = await prisma.driverProfile.findUnique({
+        where: { id: ride.driverId },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          rating: true,
+          photoUrl: true,
+          currentLat: true,
+          currentLng: true,
+          lastLocationUpdate: true,
+        },
+      });
+
+      if (driver) {
+        driverInfo = {
+          id: driver.id,
+          firstName: driver.firstName,
+          lastName: driver.lastName,
+          rating: driver.rating ? Number(driver.rating) : null,
+          photoUrl: driver.photoUrl,
+        };
+
+        // Get latest location from RideLiveLocation table
+        const latestLocation = await prisma.rideLiveLocation.findFirst({
+          where: { rideId: id },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (latestLocation) {
+          // Calculate speed from last two positions
+          const previousLocation = await prisma.rideLiveLocation.findFirst({
+            where: { 
+              rideId: id,
+              createdAt: { lt: latestLocation.createdAt }
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          let calculatedSpeedMps: number | null = null;
+          let calculatedHeading: number | null = latestLocation.heading;
+
+          if (previousLocation) {
+            const timeDiffMs = latestLocation.createdAt.getTime() - previousLocation.createdAt.getTime();
+            if (timeDiffMs > 0 && timeDiffMs < 30000) { // Only calculate if within 30 seconds
+              const distanceMeters = haversineDistance(
+                previousLocation.lat,
+                previousLocation.lng,
+                latestLocation.lat,
+                latestLocation.lng
+              );
+              calculatedSpeedMps = distanceMeters / (timeDiffMs / 1000);
+              
+              // Calculate heading if not provided
+              if (calculatedHeading === null) {
+                calculatedHeading = calculateBearing(
+                  previousLocation.lat,
+                  previousLocation.lng,
+                  latestLocation.lat,
+                  latestLocation.lng
+                );
+              }
+            }
+          }
+
+          // Use stored speed if available, otherwise use calculated
+          const speedMps = latestLocation.speed !== null 
+            ? latestLocation.speed / 3.6  // Convert km/h to m/s
+            : calculatedSpeedMps;
+
+          driverLocation = {
+            lat: latestLocation.lat,
+            lng: latestLocation.lng,
+            headingDeg: calculatedHeading,
+            speedMps: speedMps,
+            accuracy: latestLocation.accuracy,
+            updatedAt: latestLocation.createdAt.toISOString(),
+          };
+        } else if (driver.currentLat !== null && driver.currentLng !== null) {
+          // Fallback to driver profile location
+          driverLocation = {
+            lat: Number(driver.currentLat),
+            lng: Number(driver.currentLng),
+            headingDeg: null,
+            speedMps: null,
+            accuracy: null,
+            updatedAt: driver.lastLocationUpdate?.toISOString() || null,
+          };
+        }
+      }
+    }
+
+    // Determine current phase and calculate ETAs
+    const isPickedUp = ride.status === "in_progress";
+    let etaSecondsToPickup: number | null = null;
+    let etaSecondsToDropoff: number | null = null;
+    let distanceMetersToPickup: number | null = null;
+    let distanceMetersToDropoff: number | null = null;
+
+    if (driverLocation && ride.pickupLat && ride.pickupLng) {
+      distanceMetersToPickup = haversineDistance(
+        driverLocation.lat,
+        driverLocation.lng,
+        ride.pickupLat,
+        ride.pickupLng
+      );
+      
+      // Estimate ETA based on average city speed (25 mph = 11.2 m/s)
+      const avgSpeedMps = driverLocation.speedMps && driverLocation.speedMps > 2 
+        ? driverLocation.speedMps 
+        : 11.2;
+      etaSecondsToPickup = Math.round(distanceMetersToPickup / avgSpeedMps);
+    }
+
+    if (ride.dropoffLat && ride.dropoffLng) {
+      if (isPickedUp && driverLocation) {
+        distanceMetersToDropoff = haversineDistance(
+          driverLocation.lat,
+          driverLocation.lng,
+          ride.dropoffLat,
+          ride.dropoffLng
+        );
+      } else if (ride.pickupLat && ride.pickupLng) {
+        distanceMetersToDropoff = haversineDistance(
+          ride.pickupLat,
+          ride.pickupLng,
+          ride.dropoffLat,
+          ride.dropoffLng
+        );
+      }
+      
+      if (distanceMetersToDropoff !== null) {
+        const avgSpeedMps = driverLocation?.speedMps && driverLocation.speedMps > 2 
+          ? driverLocation.speedMps 
+          : 11.2;
+        etaSecondsToDropoff = Math.round(distanceMetersToDropoff / avgSpeedMps);
+      }
+    }
+
+    res.json({
+      rideId: ride.id,
+      status: ride.status,
+      currentLeg: ride.currentLeg,
+      isActive: true,
+      
+      driverInfo,
+      driverLocation,
+      
+      pickupLocation: ride.pickupLat && ride.pickupLng ? {
+        lat: ride.pickupLat,
+        lng: ride.pickupLng,
+        address: ride.pickupAddress,
+      } : null,
+      
+      dropoffLocation: ride.dropoffLat && ride.dropoffLng ? {
+        lat: ride.dropoffLat,
+        lng: ride.dropoffLng,
+        address: ride.dropoffAddress,
+      } : null,
+      
+      routePolyline: ride.routePolyline,
+      
+      etaSecondsToPickup: isPickedUp ? null : etaSecondsToPickup,
+      etaSecondsToDropoff,
+      distanceMetersToPickup: isPickedUp ? null : distanceMetersToPickup,
+      distanceMetersToDropoff,
+      
+      timestamps: {
+        acceptedAt: ride.acceptedAt?.toISOString() || null,
+        arrivedAt: ride.arrivedAt?.toISOString() || null,
+        tripStartedAt: ride.tripStartedAt?.toISOString() || null,
+      },
+    });
+  } catch (error) {
+    console.error("Live tracking error:", error);
+    res.status(500).json({ error: "Failed to fetch tracking data" });
+  }
+});
+
+// ====================================================
+// POST /api/rides/:id/driver-location
+// Driver updates their location during ride
+// ====================================================
+router.post("/:id/driver-location", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    if (role !== "driver") {
+      return res.status(403).json({ error: "Only drivers can update location" });
+    }
+
+    const { lat, lng, heading, speed, accuracy } = req.body;
+
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return res.status(400).json({ error: "Valid lat and lng are required" });
+    }
+
+    const driverProfile = await prisma.driverProfile.findUnique({ where: { userId } });
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Verify driver is assigned to this ride
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      select: { driverId: true, status: true },
+    });
+
+    if (!ride || ride.driverId !== driverProfile.id) {
+      return res.status(403).json({ error: "Not assigned to this ride" });
+    }
+
+    const activeStatuses = ["accepted", "driver_arriving", "arrived", "in_progress"];
+    if (!activeStatuses.includes(ride.status)) {
+      return res.status(400).json({ error: "Ride is not active" });
+    }
+
+    // Store location in RideLiveLocation
+    await prisma.rideLiveLocation.create({
+      data: {
+        rideId: id,
+        driverId: driverProfile.id,
+        lat,
+        lng,
+        heading: typeof heading === 'number' ? heading : null,
+        speed: typeof speed === 'number' ? speed : null,
+        accuracy: typeof accuracy === 'number' ? accuracy : null,
+      },
+    });
+
+    // Also update driver's current location
+    await prisma.driverProfile.update({
+      where: { id: driverProfile.id },
+      data: {
+        currentLat: lat,
+        currentLng: lng,
+        lastLocationUpdate: new Date(),
+      },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Update driver location error:", error);
+    res.status(500).json({ error: "Failed to update location" });
+  }
+});
+
+// Helper: Calculate haversine distance between two points in meters
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Helper: Calculate bearing between two points in degrees
+function calculateBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const lat1Rad = lat1 * Math.PI / 180;
+  const lat2Rad = lat2 * Math.PI / 180;
+  
+  const x = Math.sin(dLng) * Math.cos(lat2Rad);
+  const y = Math.cos(lat1Rad) * Math.sin(lat2Rad) -
+    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+  
+  let bearing = Math.atan2(x, y) * 180 / Math.PI;
+  return (bearing + 360) % 360;
+}
+
 export default router;
