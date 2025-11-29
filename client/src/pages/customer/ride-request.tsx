@@ -70,6 +70,11 @@ interface FareEstimate {
   safegoCommission: number;
   driverEarnings: number;
   totalFare: number;
+  originalFare: number;
+  discountAmount: number;
+  finalFare: number;
+  promoCode: string | null;
+  promoLabel: string | null;
   currency: string;
   etaMinutes: number;
   etaWithTrafficMinutes: number;
@@ -79,6 +84,12 @@ interface FareEstimate {
   perMinuteRate: number;
   trafficLevel: "light" | "moderate" | "heavy";
   trafficLabel: string;
+}
+
+interface AppliedPromo {
+  code: string;
+  discountPercent: number;
+  label: string;
 }
 
 function getVehicleCategoryIcon(iconType: VehicleCategoryConfig["iconType"]) {
@@ -242,6 +253,7 @@ export default function RideRequest() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeFetchCompleted, setRouteFetchCompleted] = useState(false);
   const [selectedVehicleCategory, setSelectedVehicleCategory] = useState<VehicleCategoryId>("SAFEGO_X");
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
 
   const { 
     getAvailability, 
@@ -465,7 +477,7 @@ export default function RideRequest() {
     }
   }, [pickup, dropoff]);
 
-  const computeFareBreakdown = useCallback((route: RouteData, categoryId: VehicleCategoryId) => {
+  const computeFareBreakdown = useCallback((route: RouteData, categoryId: VehicleCategoryId, appliedPromo?: { code: string; discountPercent: number; label: string } | null) => {
     const categoryConfig = VEHICLE_CATEGORIES[categoryId];
     const distanceKm = route.distanceMeters / 1000;
     const distanceMiles = route.distanceMeters / 1609.34;
@@ -492,6 +504,14 @@ export default function RideRequest() {
     const safegoCommission = Math.round(subtotal * commissionRate * 100) / 100;
     const driverEarnings = Math.round((subtotal - safegoCommission) * 100) / 100;
     
+    const originalFare = subtotal;
+    const discountAmount = appliedPromo 
+      ? Math.round(originalFare * (appliedPromo.discountPercent / 100) * 100) / 100 
+      : 0;
+    const finalFare = Math.round((originalFare - discountAmount) * 100) / 100;
+    const promoCode = appliedPromo?.code ?? null;
+    const promoLabel = appliedPromo?.label ?? null;
+    
     return {
       baseFare,
       distanceFare,
@@ -502,7 +522,12 @@ export default function RideRequest() {
       subtotal,
       safegoCommission,
       driverEarnings,
-      totalFare: subtotal,
+      totalFare: finalFare,
+      originalFare,
+      discountAmount,
+      finalFare,
+      promoCode,
+      promoLabel,
       distanceKm: Math.round(distanceKm * 10) / 10,
       distanceMiles: Math.round(distanceMiles * 10) / 10,
       perMileRate,
@@ -513,15 +538,22 @@ export default function RideRequest() {
   }, []);
 
   const calculateFareForCategory = useCallback((route: RouteData, categoryId: VehicleCategoryId) => {
-    return computeFareBreakdown(route, categoryId).totalFare;
-  }, [computeFareBreakdown]);
+    const breakdown = computeFareBreakdown(route, categoryId, appliedPromo);
+    return {
+      finalFare: breakdown.finalFare,
+      originalFare: breakdown.originalFare,
+      discountAmount: breakdown.discountAmount,
+      promoCode: breakdown.promoCode,
+      promoLabel: breakdown.promoLabel,
+    };
+  }, [computeFareBreakdown, appliedPromo]);
 
   const calculateFareFromRoute = useCallback((route: RouteData) => {
     setIsCalculatingFare(true);
     
     const trafficLevel = getTrafficLevel(route.durationInTrafficSeconds, route.durationSeconds);
     const trafficLabel = getTrafficLevelLabel(trafficLevel);
-    const breakdown = computeFareBreakdown(route, selectedVehicleCategory);
+    const breakdown = computeFareBreakdown(route, selectedVehicleCategory, appliedPromo);
     
     setFareEstimate({
       ...breakdown,
@@ -531,7 +563,7 @@ export default function RideRequest() {
     });
     
     setIsCalculatingFare(false);
-  }, [selectedVehicleCategory, computeFareBreakdown]);
+  }, [selectedVehicleCategory, computeFareBreakdown, appliedPromo]);
 
   useEffect(() => {
     if (pickup && dropoff) {
@@ -542,12 +574,12 @@ export default function RideRequest() {
     }
   }, [pickup, dropoff, fetchRoutes]);
 
-  // Calculate fare when active route or vehicle category changes
+  // Calculate fare when active route, vehicle category, or promo changes
   useEffect(() => {
     if (activeRoute) {
       calculateFareFromRoute(activeRoute);
     }
-  }, [activeRoute, calculateFareFromRoute, selectedVehicleCategory]);
+  }, [activeRoute, calculateFareFromRoute, selectedVehicleCategory, appliedPromo]);
 
   const handlePickupSelect = useCallback((location: { address: string; lat: number; lng: number }) => {
     setPickup(location);
@@ -834,10 +866,31 @@ export default function RideRequest() {
         {/* Vehicle Category Selector - Horizontal Scroll Carousel */}
         {activeRoute && (
           <div data-testid="vehicle-category-selector">
-            <p className="text-xs sm:text-sm font-medium mb-2 flex items-center gap-1.5">
-              <Car className="h-3.5 w-3.5" />
-              Select Ride Type
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                <Car className="h-3.5 w-3.5" />
+                Select Ride Type
+              </p>
+              {/* Demo Promo Toggle for Testing */}
+              <Button
+                variant={appliedPromo ? "default" : "outline"}
+                size="sm"
+                className={`h-7 text-xs gap-1 ${appliedPromo ? "bg-green-600 hover:bg-green-700" : ""}`}
+                onClick={() => {
+                  if (appliedPromo) {
+                    setAppliedPromo(null);
+                    toast({ title: "Promo removed", description: "Viewing regular prices" });
+                  } else {
+                    setAppliedPromo({ code: "SAFE15", discountPercent: 15, label: "15% off first ride" });
+                    toast({ title: "Promo applied!", description: "SAFE15 - 15% off your ride" });
+                  }
+                }}
+                data-testid="button-toggle-promo"
+              >
+                <Zap className="h-3 w-3" />
+                {appliedPromo ? "Remove Promo" : "Apply SAFE15"}
+              </Button>
+            </div>
             <div 
               className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 
               role="group" 
@@ -846,91 +899,142 @@ export default function RideRequest() {
               {ACTIVE_VEHICLE_CATEGORIES.map((categoryId) => {
                 const catConfig = VEHICLE_CATEGORIES[categoryId];
                 const isSelected = categoryId === selectedVehicleCategory;
-                const categoryFare = calculateFareForCategory(activeRoute, categoryId);
+                const fareData = calculateFareForCategory(activeRoute, categoryId);
                 const vehicleImage = getVehicleCategoryImage(categoryId);
                 const isUnavailable = checkUnavailable(categoryId);
                 const isLimited = checkLimited(categoryId);
-                const availability = getAvailability(categoryId);
                 const categoryETA = getETA(categoryId);
                 const etaText = categoryETA?.etaText ?? `${catConfig.etaMinutesOffset + 5} min`;
                 const etaMinutes = categoryETA?.etaMinutes ?? (catConfig.etaMinutesOffset + 5);
+                const hasDiscount = fareData.discountAmount > 0;
                 
                 return (
                   <Tooltip key={categoryId}>
                     <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        disabled={isUnavailable}
-                        className={`min-w-[110px] h-auto rounded-xl border-2 p-2.5 flex-shrink-0 snap-start ${
-                          isSelected 
-                            ? "bg-primary/10 border-primary shadow-sm" 
-                            : isUnavailable
-                              ? "bg-muted/50 border-border opacity-60 cursor-not-allowed"
-                              : "bg-card border-border hover-elevate"
-                        }`}
+                      <div
+                        role="button"
+                        tabIndex={isUnavailable ? -1 : 0}
                         onClick={() => !isUnavailable && setSelectedVehicleCategory(categoryId)}
+                        onKeyDown={(e) => {
+                          if ((e.key === 'Enter' || e.key === ' ') && !isUnavailable) {
+                            e.preventDefault();
+                            setSelectedVehicleCategory(categoryId);
+                          }
+                        }}
                         aria-pressed={isSelected}
                         aria-disabled={isUnavailable}
-                        aria-label={`${catConfig.displayName}, ${isUnavailable ? "No drivers nearby" : `$${categoryFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaText}`}${isSelected ? ", selected" : ""}`}
+                        aria-label={`${catConfig.displayName}, ${isUnavailable ? "No drivers nearby" : `$${fareData.finalFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaText}`}${isSelected ? ", selected" : ""}`}
                         data-testid={`ride-pill-${categoryId}`}
+                        className={`
+                          min-w-[140px] h-auto rounded-2xl p-3 flex-shrink-0 snap-start cursor-pointer
+                          transition-all duration-200 ease-out
+                          ${isSelected 
+                            ? "bg-card border-2 border-primary shadow-lg shadow-primary/20 scale-[1.02]" 
+                            : isUnavailable
+                              ? "bg-muted/30 border border-border/50 opacity-50 cursor-not-allowed"
+                              : "bg-card border border-border/80 shadow-md hover:shadow-lg hover:border-primary/40 hover:scale-[1.01]"
+                          }
+                        `}
                       >
-                        <div className="flex flex-col items-center gap-1">
-                          <div className={`h-14 w-20 flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-b from-muted/30 to-muted/60 ${isUnavailable ? "opacity-50" : ""}`}>
+                        <div className="flex flex-col items-center gap-1.5">
+                          {/* 3D Vehicle Image */}
+                          <div className={`h-16 w-24 flex items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-background via-muted/20 to-muted/40 ${isUnavailable ? "opacity-40 grayscale" : ""}`}>
                             <img 
                               src={vehicleImage} 
                               alt={catConfig.displayName}
-                              className="h-12 w-auto object-contain drop-shadow-sm"
+                              className="h-14 w-auto object-contain drop-shadow-lg"
                               data-testid={`img-vehicle-${categoryId}`}
                             />
                           </div>
-                          <span className={`text-xs font-semibold text-center leading-tight ${
-                            isSelected ? "text-primary" : isUnavailable ? "text-muted-foreground" : ""
+                          
+                          {/* Category Name */}
+                          <span className={`text-xs font-bold text-center leading-tight tracking-tight ${
+                            isSelected ? "text-primary" : isUnavailable ? "text-muted-foreground" : "text-foreground"
                           }`}>
                             {catConfig.displayName.replace("SafeGo ", "")}
                           </span>
+                          
                           {isUnavailable ? (
-                            <span className="text-[10px] text-muted-foreground text-center">
+                            <span className="text-[10px] text-muted-foreground text-center font-medium">
                               No drivers nearby
                             </span>
                           ) : (
                             <>
-                              <span className={`text-sm font-bold ${isSelected ? "text-primary" : ""}`}>
-                                ${categoryFare.toFixed(2)}
-                              </span>
-                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                                <Users className="h-2.5 w-2.5" aria-hidden="true" />
+                              {/* Price Display - Uber Style */}
+                              <div className="flex items-baseline gap-1.5 justify-center">
+                                <span className={`text-lg font-black tracking-tight ${isSelected ? "text-primary" : "text-foreground"}`} data-testid={`price-${categoryId}`}>
+                                  ${fareData.finalFare.toFixed(2)}
+                                </span>
+                                {hasDiscount && (
+                                  <span className="text-xs text-muted-foreground line-through" data-testid={`original-price-${categoryId}`}>
+                                    ${fareData.originalFare.toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* You Save Badge */}
+                              {hasDiscount && (
+                                <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-2 py-0.5 rounded-full" data-testid={`savings-${categoryId}`}>
+                                  <Zap className="h-2.5 w-2.5" aria-hidden="true" />
+                                  <span className="text-[10px] font-semibold">
+                                    You save ${fareData.discountAmount.toFixed(2)}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {/* Seats & ETA */}
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-medium">
+                                <Users className="h-3 w-3" aria-hidden="true" />
                                 <span>{catConfig.seatCount}</span>
-                                <span className="mx-0.5">•</span>
-                                <Clock className="h-2.5 w-2.5" aria-hidden="true" />
+                                <span className="opacity-50">|</span>
+                                <Clock className="h-3 w-3" aria-hidden="true" />
                                 <span data-testid={`eta-${categoryId}`}>{etaMinutes} min</span>
                               </div>
                             </>
                           )}
-                          {isLimited && !isUnavailable && (
-                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-amber-300 text-amber-600 dark:text-amber-400">
+                          
+                          {/* Promo Badge */}
+                          {hasDiscount && fareData.promoLabel && !isUnavailable && (
+                            <Badge variant="secondary" className="text-[8px] px-2 py-0.5 bg-primary/10 text-primary border-0">
+                              {fareData.promoLabel}
+                            </Badge>
+                          )}
+                          
+                          {/* Limited Badge */}
+                          {isLimited && !isUnavailable && !hasDiscount && (
+                            <Badge variant="outline" className="text-[8px] px-2 py-0.5 border-amber-400/50 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20">
                               Limited
                             </Badge>
                           )}
-                          {catConfig.isPopular && !isUnavailable && !isLimited && (
-                            <Badge variant="secondary" className="text-[8px] px-1.5 py-0">
+                          
+                          {/* Popular Badge */}
+                          {catConfig.isPopular && !isUnavailable && !isLimited && !hasDiscount && (
+                            <Badge variant="secondary" className="text-[8px] px-2 py-0.5">
                               Popular
                             </Badge>
                           )}
                         </div>
-                      </Button>
+                      </div>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs max-w-[200px]">
-                      <p className="font-medium">{catConfig.displayName}</p>
-                      <p className="text-muted-foreground">
+                    <TooltipContent side="top" className="text-xs max-w-[220px] p-3">
+                      <p className="font-bold text-sm">{catConfig.displayName}</p>
+                      <p className="text-muted-foreground mt-1">
                         {isUnavailable 
                           ? "No drivers available in your area right now" 
                           : catConfig.shortDescription
                         }
                       </p>
                       {!isUnavailable && (
-                        <p className="text-muted-foreground mt-1">
-                          Pickup in ~{etaMinutes} min
-                        </p>
+                        <>
+                          <p className="text-muted-foreground mt-1.5 flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> Pickup in ~{etaMinutes} min
+                          </p>
+                          {hasDiscount && (
+                            <p className="text-green-600 dark:text-green-400 mt-1 font-medium">
+                              Promo applied - Save ${fareData.discountAmount.toFixed(2)}
+                            </p>
+                          )}
+                        </>
                       )}
                     </TooltipContent>
                   </Tooltip>
@@ -941,41 +1045,78 @@ export default function RideRequest() {
         )}
 
         {fareEstimate && (
-          <Card className="bg-muted/50" data-testid="fare-estimate-card">
-            <CardContent className="p-3">
+          <Card className="bg-card border shadow-lg" data-testid="fare-estimate-card">
+            <CardContent className="p-4">
+              {/* Promo Banner - if discount applied */}
+              {fareEstimate.discountAmount > 0 && fareEstimate.promoCode && (
+                <div className="mb-3 -mt-1 -mx-1 px-3 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800/30">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-green-100 dark:bg-green-800/40 flex items-center justify-center">
+                        <Zap className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                        {fareEstimate.promoLabel || `${fareEstimate.promoCode} applied`}
+                      </span>
+                    </div>
+                    <span className="text-sm font-bold text-green-600 dark:text-green-400" data-testid="text-savings-amount">
+                      -${fareEstimate.discountAmount.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="h-16 w-20 rounded-lg bg-gradient-to-b from-muted/30 to-muted/60 flex items-center justify-center overflow-hidden">
+                <div className="flex items-center gap-4">
+                  {/* 3D Vehicle Image */}
+                  <div className="h-20 w-28 rounded-xl bg-gradient-to-br from-muted/20 via-muted/40 to-muted/60 flex items-center justify-center overflow-hidden shadow-inner">
                     <img 
                       src={getVehicleCategoryImage(selectedVehicleCategory)} 
                       alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                      className="h-14 w-auto object-contain drop-shadow-sm"
+                      className="h-16 w-auto object-contain drop-shadow-lg"
                       data-testid="img-selected-vehicle"
                     />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm font-medium text-muted-foreground">
                       {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
                     </p>
-                    <p className="font-semibold text-lg" data-testid="text-fare-estimate">
-                      ${fareEstimate.totalFare.toFixed(2)}
-                    </p>
+                    {/* Price Display - Uber Style */}
+                    <div className="flex items-baseline gap-2 mt-1">
+                      <p className="font-black text-2xl tracking-tight" data-testid="text-fare-estimate">
+                        ${fareEstimate.finalFare.toFixed(2)}
+                      </p>
+                      {fareEstimate.discountAmount > 0 && (
+                        <p className="text-sm text-muted-foreground line-through" data-testid="text-original-fare">
+                          ${fareEstimate.originalFare.toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                    {/* You Save Badge */}
+                    {fareEstimate.discountAmount > 0 && (
+                      <div className="flex items-center gap-1 mt-1.5 text-green-600 dark:text-green-400" data-testid="text-you-save">
+                        <Zap className="h-3.5 w-3.5" />
+                        <span className="text-sm font-semibold">You save ${fareEstimate.discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="text-right text-sm">
-                  <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
-                  <p className="font-medium" data-testid="text-trip-eta">
-                    Trip: ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
+                  <p className="text-muted-foreground font-medium" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
+                  <p className="font-semibold" data-testid="text-trip-eta">
+                    ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
                   </p>
-                  <p className="text-xs text-muted-foreground" data-testid="text-pickup-eta">
-                    Pickup: ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid="text-pickup-eta">
+                    Pickup in ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
                   </p>
                 </div>
               </div>
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
+              
+              {/* Status Badges */}
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
                 <Badge 
                   variant="secondary" 
-                  className={`text-xs ${
+                  className={`text-xs font-medium ${
                     fareEstimate.trafficLevel === "heavy" 
                       ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" 
                       : fareEstimate.trafficLevel === "moderate"
@@ -986,14 +1127,14 @@ export default function RideRequest() {
                   <Car className="h-3 w-3 mr-1" />
                   {fareEstimate.trafficLabel}
                 </Badge>
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="text-xs font-medium">
                   <Wallet className="h-3 w-3 mr-1" />
                   Card/Wallet only
                 </Badge>
               </div>
               
-              {/* Fare Breakdown Accordion */}
-              <div className="mt-3 pt-3 border-t">
+              {/* Fare Breakdown Accordion - Customer view (no commission shown) */}
+              <div className="mt-4 pt-3 border-t">
                 <FareDetailsAccordion 
                   breakdown={{
                     baseFare: fareEstimate.baseFare,
@@ -1002,15 +1143,16 @@ export default function RideRequest() {
                     bookingFee: fareEstimate.bookingFee,
                     taxesAndSurcharges: fareEstimate.taxesAndSurcharges,
                     minimumFareAdjustment: fareEstimate.minimumFareAdjustment,
-                    subtotal: fareEstimate.subtotal,
-                    safegoCommission: fareEstimate.safegoCommission,
-                    driverEarnings: fareEstimate.driverEarnings,
-                    totalFare: fareEstimate.totalFare,
+                    subtotal: fareEstimate.originalFare,
+                    discountAmount: fareEstimate.discountAmount,
+                    totalFare: fareEstimate.finalFare,
                     distanceMiles: fareEstimate.distanceMiles,
                     durationMinutes: fareEstimate.etaWithTrafficMinutes,
                     perMileRate: fareEstimate.perMileRate,
                     perMinuteRate: fareEstimate.perMinuteRate,
+                    promoCode: fareEstimate.promoCode,
                   }}
+                  showCommission={false}
                 />
               </div>
               

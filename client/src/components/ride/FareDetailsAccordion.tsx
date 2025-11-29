@@ -1,4 +1,4 @@
-import { ChevronDown, DollarSign, Clock, MapPin, Receipt, Percent, User, Building2, TrendingUp } from "lucide-react";
+import { ChevronDown, DollarSign, Clock, MapPin, Receipt, Percent, User, Building2, TrendingUp, Zap, Tag } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useState } from "react";
 
@@ -10,24 +10,28 @@ export interface FareBreakdownDetails {
   taxesAndSurcharges: number;
   minimumFareAdjustment?: number;
   subtotal: number;
-  safegoCommission: number;
-  driverEarnings: number;
+  safegoCommission?: number;
+  driverEarnings?: number;
+  discountAmount?: number;
   totalFare: number;
   distanceMiles: number;
   durationMinutes: number;
   perMileRate: number;
   perMinuteRate: number;
+  promoCode?: string | null;
 }
 
 interface FareDetailsAccordionProps {
   breakdown: FareBreakdownDetails;
   className?: string;
+  showCommission?: boolean;
 }
 
-export function FareDetailsAccordion({ breakdown, className = "" }: FareDetailsAccordionProps) {
+export function FareDetailsAccordion({ breakdown, className = "", showCommission = true }: FareDetailsAccordionProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const formatCurrency = (amount: number) => `$${amount.toFixed(2)}`;
+  const hasDiscount = (breakdown.discountAmount ?? 0) > 0;
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen} className={className}>
@@ -101,38 +105,66 @@ export function FareDetailsAccordion({ breakdown, className = "" }: FareDetailsA
             <span>{formatCurrency(breakdown.subtotal)}</span>
           </div>
 
-          <div className="h-px bg-border my-2" />
+          {/* Discount/Promo Section */}
+          {hasDiscount && (
+            <>
+              <div className="flex items-center justify-between text-green-600 dark:text-green-400" data-testid="fare-discount">
+                <span className="flex items-center gap-2">
+                  <Tag className="h-3.5 w-3.5" />
+                  {breakdown.promoCode ? `Promo (${breakdown.promoCode})` : "Discount applied"}
+                </span>
+                <span className="font-semibold">-{formatCurrency(breakdown.discountAmount ?? 0)}</span>
+              </div>
+            </>
+          )}
 
-          <div className="pt-1 space-y-2 text-xs">
-            <p className="text-muted-foreground font-medium uppercase tracking-wide">Earnings breakdown</p>
-            
-            <div className="flex items-center justify-between" data-testid="fare-commission">
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <Percent className="h-3 w-3" />
-                SafeGo commission (15%)
-              </span>
-              <span className="font-medium text-amber-600 dark:text-amber-400">
-                -{formatCurrency(breakdown.safegoCommission)}
-              </span>
-            </div>
+          {/* Commission Section - Only shown when showCommission is true */}
+          {showCommission && breakdown.safegoCommission !== undefined && breakdown.driverEarnings !== undefined && (
+            <>
+              <div className="h-px bg-border my-2" />
 
-            <div className="flex items-center justify-between" data-testid="fare-driver-earnings">
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <User className="h-3 w-3" />
-                Driver earnings
-              </span>
-              <span className="font-medium text-green-600 dark:text-green-400">
-                {formatCurrency(breakdown.driverEarnings)}
-              </span>
-            </div>
-          </div>
+              <div className="pt-1 space-y-2 text-xs">
+                <p className="text-muted-foreground font-medium uppercase tracking-wide">Earnings breakdown</p>
+                
+                <div className="flex items-center justify-between" data-testid="fare-commission">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <Percent className="h-3 w-3" />
+                    SafeGo commission (15%)
+                  </span>
+                  <span className="font-medium text-amber-600 dark:text-amber-400">
+                    -{formatCurrency(breakdown.safegoCommission)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between" data-testid="fare-driver-earnings">
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <User className="h-3 w-3" />
+                    Driver earnings
+                  </span>
+                  <span className="font-medium text-green-600 dark:text-green-400">
+                    {formatCurrency(breakdown.driverEarnings)}
+                  </span>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="h-px bg-border my-2" />
 
           <div className="flex items-center justify-between text-base font-bold pt-1" data-testid="fare-total">
-            <span>Total fare</span>
+            <span>Total {hasDiscount ? "after discount" : "fare"}</span>
             <span className="text-primary">{formatCurrency(breakdown.totalFare)}</span>
           </div>
+
+          {/* You Save Summary */}
+          {hasDiscount && (
+            <div className="flex items-center justify-center gap-1.5 mt-2 py-2 bg-green-50 dark:bg-green-900/20 rounded-lg" data-testid="fare-savings-summary">
+              <Zap className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                You save {formatCurrency(breakdown.discountAmount ?? 0)}
+              </span>
+            </div>
+          )}
         </div>
       </CollapsibleContent>
     </Collapsible>
