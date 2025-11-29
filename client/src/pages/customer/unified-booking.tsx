@@ -1935,6 +1935,7 @@ export default function UnifiedBookingPage() {
                     variant="ghost" 
                     size="icon" 
                     className="rounded-full"
+                    aria-label="Open profile menu"
                     data-testid="button-profile"
                   >
                     <Avatar className="h-8 w-8 border-2 border-border">
@@ -1949,39 +1950,44 @@ export default function UnifiedBookingPage() {
                     <p className="text-sm font-medium">{user?.email || "Guest"}</p>
                     <p className="text-xs text-muted-foreground">SafeGo Account</p>
                   </div>
-                  <Link href="/customer/profile">
-                    <DropdownMenuItem data-testid="menu-profile">
-                      <User className="h-4 w-4 mr-2" />
-                      Profile
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/customer/wallet">
-                    <DropdownMenuItem data-testid="menu-wallet">
-                      <Wallet className="h-4 w-4 mr-2" />
-                      Wallet
-                    </DropdownMenuItem>
-                  </Link>
+                  <DropdownMenuItem 
+                    onSelect={() => setLocationRoute("/customer/profile")}
+                    data-testid="menu-profile"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onSelect={() => setLocationRoute("/customer/wallet")}
+                    data-testid="menu-wallet"
+                  >
+                    <Wallet className="h-4 w-4 mr-2" />
+                    Wallet
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {/* Mobile-only nav links */}
                   <div className="lg:hidden">
-                    <Link href="/customer">
-                      <DropdownMenuItem data-testid="mobile-nav-home">
-                        <Home className="h-4 w-4 mr-2" />
-                        Home
-                      </DropdownMenuItem>
-                    </Link>
-                    <Link href="/customer/activity">
-                      <DropdownMenuItem data-testid="mobile-nav-activity">
-                        <Clock className="h-4 w-4 mr-2" />
-                        Activity
-                      </DropdownMenuItem>
-                    </Link>
-                    <Link href="/customer/support">
-                      <DropdownMenuItem data-testid="mobile-nav-help">
-                        <HelpCircle className="h-4 w-4 mr-2" />
-                        Help
-                      </DropdownMenuItem>
-                    </Link>
+                    <DropdownMenuItem 
+                      onSelect={() => setLocationRoute("/customer")}
+                      data-testid="mobile-nav-home"
+                    >
+                      <Home className="h-4 w-4 mr-2" />
+                      Home
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onSelect={() => setLocationRoute("/customer/activity")}
+                      data-testid="mobile-nav-activity"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Activity
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onSelect={() => setLocationRoute("/customer/support")}
+                      data-testid="mobile-nav-help"
+                    >
+                      <HelpCircle className="h-4 w-4 mr-2" />
+                      Help
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </div>
                 </DropdownMenuContent>
@@ -2015,6 +2021,12 @@ export default function UnifiedBookingPage() {
                 <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-menu-activity">
                   <Clock className="h-5 w-5" />
                   Activity
+                </Button>
+              </Link>
+              <Link href="/customer/profile" onClick={() => setIsMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start gap-3" data-testid="mobile-menu-profile">
+                  <User className="h-5 w-5" />
+                  Profile
                 </Button>
               </Link>
               <Link href="/customer/support" onClick={() => setIsMobileMenuOpen(false)}>

@@ -1,0 +1,86 @@
+The top-right profile icon in the SafeGo customer web app header does nothing when tapped/clicked. According to our SafeGo rules, the customer must always be able to open their profile from any customer page (Ride / Eats / Parcel). Your only goal in this loop is to make the profile entry work correctly, without breaking any existing flows.
+
+Context and constraints
+- Stack: React + TypeScript + React Router (customer web app).
+- There is already a customer profile implementation (profile.tsx) and the architect report marked "Profile" as [DONE].
+- Header/Navigation is also marked [DONE], but the profile icon button currently has no effect.
+- Authentication, ProtectedRoute, and visibility rules already exist and must not be broken.
+- Do NOT change admin/driver portals. This change is only for the customer app.
+
+Your tasks:
+
+1) Diagnose why the profile icon does nothing
+- Start the application and open the customer app at /customer.
+- Locate the header component used for the customer app (for example: Header.tsx, CustomerHeader.tsx, or the header inside unified-booking.tsx).
+- Find the profile avatar/icon button in that header:
+  - Check if it is a plain button with no onClick logic.
+  - Or if it tries to call navigate() to a route that does not exist.
+  - Or if the profile route is commented out in the router.
+- Confirm which route/file currently renders the profile screen (for example /customer/profile mapping to profile.tsx).
+
+2) Wire the profile icon to open the customer profile
+- Implement one of these, reusing existing components:
+  - Preferred: Wrap the icon in a React Router <Link> that navigates to /customer/profile.
+  - Alternative: Use const navigate = useNavigate() and onClick={() => navigate("/customer/profile")} on the icon/button.
+- Make sure:
+  - The route path you use matches the existing router configuration.
+  - You import and use the correct CustomerProfile component that already exists (profile.tsx or equivalent).
+- Do NOT create a new profile implementation; reuse the existing one.
+
+3) Ensure router configuration is correct and protected
+- In the main customer router configuration (e.g., AppRouter.tsx, CustomerRoutes.tsx, etc.):
+  - Verify there is a route similar to:
+    - <Route path="/customer/profile" element={<ProtectedRoute role="customer"><CustomerProfile /></ProtectedRoute>} />
+  - If this route is missing, add it using the existing ProtectedRoute and AuthContext patterns already used for other customer pages.
+- Requirements:
+  - Only authenticated customers can open the profile page.
+  - If not authenticated, redirect to the existing login flow (do not invent a new login page).
+  - Do not expose any admin or driver routes from this profile entry.
+
+4) Make sure the profile entry works from all customer pages
+- The profile icon must be visible and functional in:
+  - The main /customer booking screen (Ride tab).
+  - Any active ride tracking view (customer live map).
+  - Other customer pages like /customer/support, /customer/history, etc.
+- If multiple header variants exist (desktop and mobile):
+  - Ensure both variants use the same navigation behaviour for the profile icon.
+  - Avoid duplicating logic; extract a shared component if necessary.
+
+5) UX and accessibility requirements
+- Clicking or tapping the profile icon should do ONE clear thing:
+  - Either navigate to the full profile page (preferred), or
+  - Open a small profile menu where the first option is “View profile” and this navigates to /customer/profile.
+- Keyboard and screen reader basics:
+  - The icon must be a <button> or <a> with an accessible label like aria-label="Open profile".
+  - It should be focusable and triggerable via Enter/Space.
+- Keep the existing SafeGo branding and layout. Do not redesign the header.
+
+6) Safety and data protection
+- The profile page may show:
+  - Customer name
+  - Masked phone number (e.g., ***-***-8888)
+  - Trip count and stats
+  - KYC/verification status
+  - Links to settings, payment methods, and support center
+- Do NOT:
+  - Log sensitive profile data to the console.
+  - Expose unmasked PII in URLs or query parameters.
+  - Change any wallet or payout logic in this loop.
+
+7) Verification checklist (must all pass before you stop)
+- /customer renders normally with no blank screen and no new console errors.
+- From /customer:
+  - Click or tap the profile icon once:
+    - You are taken to the existing customer profile screen at /customer/profile OR a profile menu where “View profile” works.
+- From an active ride view:
+  - The same profile icon works in the same way.
+- ProtectedRoute still works:
+  - If you simulate a logged-out state, trying to open /customer/profile redirects to login as before.
+- No other navigation (Ride/Eats/Parcel tabs, support chat, booking flow) is broken.
+
+8) Report back
+- At the end, clearly state:
+  - Which file(s) you changed in the header/navigation.
+  - What route you wired the profile icon to.
+  - How you ensured security (ProtectedRoute/AuthContext).
+  - That the profile icon now works on desktop and mobile customer views.
