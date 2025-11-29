@@ -71,6 +71,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { FareDetailsAccordion } from "@/components/ride/FareDetailsAccordion";
+import { RideStatusPanel, type DriverInfo as StatusDriverInfo } from "@/components/ride/RideStatusPanel";
+import { MobileLiveTracking } from "@/components/ride/MobileLiveTracking";
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_ORDER,
@@ -373,8 +375,10 @@ export default function UnifiedBookingPage() {
   const [isClient, setIsClient] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
+  const [isMobileLiveTrackingOpen, setIsMobileLiveTrackingOpen] = useState(false);
   const [isMobileAddressExpanded, setIsMobileAddressExpanded] = useState(false);
   const [isMobileFareExpanded, setIsMobileFareExpanded] = useState(false);
+  const [isCancellingRide, setIsCancellingRide] = useState(false);
 
   const [activeService, setActiveService] = useState<ServiceType>("ride");
 
@@ -403,6 +407,7 @@ export default function UnifiedBookingPage() {
 
   // Ride flow state machine
   const [rideStatus, setRideStatus] = useState<RideStatus>("SELECTING");
+  const rideStatusRef = useRef<RideStatus>("SELECTING");
   const [driverInfo, setDriverInfo] = useState<DriverInfo | null>(null);
   const [tripStartTime, setTripStartTime] = useState<Date | null>(null);
   const [tripEndTime, setTripEndTime] = useState<Date | null>(null);
@@ -865,6 +870,62 @@ export default function UnifiedBookingPage() {
     prevDriverPositionRef.current = null;
   }, []);
 
+  // Convert driverInfo to StatusDriverInfo for RideStatusPanel
+  const statusDriverInfo: StatusDriverInfo | null = useMemo(() => {
+    if (!driverInfo) return null;
+    return {
+      id: `driver-${driverInfo.name.replace(/\s/g, "-").toLowerCase()}`,
+      name: driverInfo.name,
+      initials: driverInfo.avatarInitials,
+      rating: driverInfo.rating,
+      vehicleModel: driverInfo.carModel,
+      vehicleColor: driverInfo.carColor,
+      plate: driverInfo.plateNumber,
+    };
+  }, [driverInfo]);
+
+  // Handle opening mobile live tracking overlay
+  const handleOpenMobileLiveTracking = useCallback(() => {
+    setIsMobileLiveTrackingOpen(true);
+  }, []);
+
+  // Handle closing mobile live tracking overlay
+  const handleCloseMobileLiveTracking = useCallback(() => {
+    setIsMobileLiveTrackingOpen(false);
+  }, []);
+
+  // Reference for cancel timeout cleanup
+  const cancelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Keep rideStatusRef in sync with rideStatus state
+  useEffect(() => {
+    rideStatusRef.current = rideStatus;
+  }, [rideStatus]);
+
+  // Handle cancel ride with confirmation
+  const handleCancelRideWithConfirm = useCallback(() => {
+    // Prevent double-cancel
+    if (isCancellingRide) return;
+    
+    setIsCancellingRide(true);
+    
+    // Clear any existing cancel timeout
+    if (cancelTimeoutRef.current) {
+      clearTimeout(cancelTimeoutRef.current);
+    }
+    
+    // Simulate API call delay
+    cancelTimeoutRef.current = setTimeout(() => {
+      // Check LIVE status via ref - only cancel if still DRIVER_ASSIGNED
+      if (rideStatusRef.current === "DRIVER_ASSIGNED") {
+        handleCancelRide();
+      }
+      setIsCancellingRide(false);
+      setIsMobileLiveTrackingOpen(false);
+      cancelTimeoutRef.current = null;
+    }, 1000);
+  }, [handleCancelRide, isCancellingRide]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -873,6 +934,9 @@ export default function UnifiedBookingPage() {
       }
       if (driverSimulationRef.current) {
         clearInterval(driverSimulationRef.current);
+      }
+      if (cancelTimeoutRef.current) {
+        clearTimeout(cancelTimeoutRef.current);
       }
     };
   }, []);
@@ -2157,147 +2221,69 @@ export default function UnifiedBookingPage() {
                         )}
 
                         {/* DRIVER_ASSIGNED Status Panel */}
-                        {rideStatus === "DRIVER_ASSIGNED" && driverInfo && fareEstimate && (
-                          <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-driver-assigned">
-                            <CardContent className="p-4">
-                              <h3 className="text-lg font-semibold mb-4">Your driver is on the way</h3>
-                              
-                              {/* Driver and car info */}
-                              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-xl mb-4">
-                                <Avatar className="h-16 w-16">
-                                  <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-                                    {driverInfo.avatarInitials}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <p className="font-semibold text-lg">{driverInfo.name}</p>
-                                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                                    <span>{driverInfo.rating}</span>
-                                  </div>
-                                  <p className="text-sm mt-1">{driverInfo.carModel} · {driverInfo.carColor}</p>
-                                  <p className="text-xs font-mono bg-muted px-2 py-0.5 rounded w-fit mt-1">{driverInfo.plateNumber}</p>
-                                </div>
-                              </div>
-                              
-                              {/* Timing info */}
-                              <div className="space-y-2 mb-4">
-                                <div className="flex items-center justify-between p-3 bg-primary/5 rounded-lg">
-                                  <span className="text-sm font-medium">Pickup in</span>
-                                  <span className="font-bold text-primary">~{driverInfo.pickupEtaMinutes} min</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                                  <span>Distance: {fareEstimate.distanceMiles} mi</span>
-                                  <span>~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}</span>
-                                </div>
-                              </div>
-                              
-                              {/* Actions */}
-                              <div className="flex gap-2">
-                                {/* Mobile: open modal, Desktop: scroll to map */}
-                                <Button 
-                                  variant="outline" 
-                                  className="flex-1 md:hidden"
-                                  onClick={() => setIsMobileMapOpen(true)}
-                                  data-testid="button-view-live-map-mobile"
-                                >
-                                  <Map className="h-4 w-4 mr-2" />
-                                  View live map
-                                </Button>
-                                <Button 
-                                  variant="outline" 
-                                  className="flex-1 hidden md:flex"
-                                  onClick={handleViewLiveMapDesktop}
-                                  data-testid="button-view-live-map-desktop"
-                                >
-                                  <Map className="h-4 w-4 mr-2" />
-                                  View live map
-                                </Button>
-                              </div>
-                              
-                              <button
-                                onClick={handleCancelRide}
-                                className="w-full text-sm text-destructive hover:underline mt-4"
-                                data-testid="button-cancel-assigned"
-                              >
-                                Cancel ride
-                              </button>
-                              
-                              {/* Debug control */}
-                              {showDebugControls && (
-                                <div className="mt-4 pt-4 border-t">
+                        {rideStatus === "DRIVER_ASSIGNED" && statusDriverInfo && fareEstimate && (
+                          <div className="space-y-3">
+                            <RideStatusPanel
+                              status="DRIVER_ASSIGNED"
+                              driver={statusDriverInfo}
+                              pickupEtaMinutes={driverInfo?.pickupEtaMinutes || 5}
+                              distanceMiles={parseFloat(fareEstimate.distanceMiles) * 0.3}
+                              vehicleCategory={selectedVehicleCategory}
+                              onViewLiveMap={() => {
+                                if (window.innerWidth < 768) {
+                                  handleOpenMobileLiveTracking();
+                                } else {
+                                  handleViewLiveMapDesktop();
+                                }
+                              }}
+                              onCancelRide={handleCancelRideWithConfirm}
+                              isCancelling={isCancellingRide}
+                            />
+                            
+                            {/* Debug control */}
+                            {showDebugControls && (
+                              <Card className="shadow-md rounded-xl overflow-hidden">
+                                <CardContent className="p-3">
                                   <p className="text-xs text-muted-foreground mb-2">Debug Controls:</p>
                                   <Button size="sm" onClick={handleStartTrip} data-testid="debug-start-trip">
                                     Start Trip
                                   </Button>
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
+                                </CardContent>
+                              </Card>
+                            )}
+                          </div>
                         )}
 
                         {/* TRIP_IN_PROGRESS Status Panel */}
-                        {rideStatus === "TRIP_IN_PROGRESS" && driverInfo && fareEstimate && (
-                          <Card className="shadow-md rounded-xl overflow-hidden" data-testid="status-in-progress">
-                            <CardContent className="p-4">
-                              <h3 className="text-lg font-semibold mb-4">On trip to your destination</h3>
-                              
-                              {/* Driver info */}
-                              <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl mb-4">
-                                <Avatar className="h-12 w-12">
-                                  <AvatarFallback className="bg-primary text-primary-foreground font-bold">
-                                    {driverInfo.avatarInitials}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1">
-                                  <p className="font-semibold">{driverInfo.name}</p>
-                                  <p className="text-xs text-muted-foreground">{driverInfo.carModel} · {driverInfo.plateNumber}</p>
-                                </div>
-                              </div>
-                              
-                              {/* Progress info */}
-                              <div className="p-4 bg-primary/5 rounded-xl mb-4">
-                                <p className="text-sm text-muted-foreground mb-1">Remaining</p>
-                                <p className="text-xl font-bold">
-                                  ~{formatDurationMinutes(remainingMinutes)} · {remainingMiles.toFixed(1)} mi
-                                </p>
-                              </div>
-                              
-                              {/* Actions - Mobile: open modal, Desktop: scroll to map */}
-                              <Button 
-                                variant="outline" 
-                                className="w-full md:hidden"
-                                onClick={() => setIsMobileMapOpen(true)}
-                                data-testid="button-view-live-map-progress-mobile"
-                              >
-                                <Map className="h-4 w-4 mr-2" />
-                                View live map
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                className="w-full hidden md:flex"
-                                onClick={handleViewLiveMapDesktop}
-                                data-testid="button-view-live-map-progress-desktop"
-                              >
-                                <Map className="h-4 w-4 mr-2" />
-                                View live map
-                              </Button>
-                              
-                              <p className="text-xs text-muted-foreground text-center mt-4">
-                                If you need help, please contact SafeGo support.
-                              </p>
-                              
-                              {/* Debug control */}
-                              {showDebugControls && (
-                                <div className="mt-4 pt-4 border-t">
+                        {rideStatus === "TRIP_IN_PROGRESS" && statusDriverInfo && fareEstimate && (
+                          <div className="space-y-3">
+                            <RideStatusPanel
+                              status="TRIP_IN_PROGRESS"
+                              driver={statusDriverInfo}
+                              dropoffEtaMinutes={remainingMinutes}
+                              distanceMiles={remainingMiles}
+                              vehicleCategory={selectedVehicleCategory}
+                              onViewLiveMap={() => {
+                                if (window.innerWidth < 768) {
+                                  handleOpenMobileLiveTracking();
+                                } else {
+                                  handleViewLiveMapDesktop();
+                                }
+                              }}
+                            />
+                            
+                            {/* Debug control */}
+                            {showDebugControls && (
+                              <Card className="shadow-md rounded-xl overflow-hidden">
+                                <CardContent className="p-3">
                                   <p className="text-xs text-muted-foreground mb-2">Debug Controls:</p>
                                   <Button size="sm" onClick={handleCompleteTrip} data-testid="debug-complete-trip">
                                     Complete Trip
                                   </Button>
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
+                                </CardContent>
+                              </Card>
+                            )}
+                          </div>
                         )}
 
                         {/* TRIP_COMPLETED Status Panel */}
@@ -2932,6 +2918,32 @@ export default function UnifiedBookingPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Mobile Live Tracking Overlay - Full screen map with bottom sheet */}
+      {isMobileLiveTrackingOpen && statusDriverInfo && (rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && (
+        <MobileLiveTracking
+          status={rideStatus}
+          driver={statusDriverInfo}
+          pickupEtaMinutes={driverInfo?.pickupEtaMinutes || 5}
+          dropoffEtaMinutes={remainingMinutes}
+          distanceMiles={rideStatus === "DRIVER_ASSIGNED" 
+            ? parseFloat(fareEstimate?.distanceMiles || "0") * 0.3 
+            : remainingMiles}
+          vehicleCategory={selectedVehicleCategory}
+          driverPosition={driverPosition}
+          driverHeading={driverHeading}
+          pickupLocation={pickup}
+          dropoffLocation={dropoff}
+          routePoints={activeRoutePoints}
+          remainingRoutePoints={remainingRoutePoints}
+          isFollowingDriver={isFollowingDriver}
+          onBack={handleCloseMobileLiveTracking}
+          onCancelRide={rideStatus === "DRIVER_ASSIGNED" ? handleCancelRideWithConfirm : undefined}
+          onRecenterDriver={handleRecenterOnDriver}
+          onUserInteraction={() => setIsFollowingDriver(false)}
+          isCancelling={isCancellingRide}
+        />
       )}
     </div>
   );
