@@ -276,6 +276,7 @@ export default function RideRequest() {
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
   const [availablePromos, setAvailablePromos] = useState<BackendPromo[]>([]);
   const [isLoadingPromos, setIsLoadingPromos] = useState(false);
+  const [isMapsReady, setIsMapsReady] = useState(false);
 
   const { 
     getAvailability, 
@@ -353,6 +354,36 @@ export default function RideRequest() {
     
     // Mark that we've checked storage so we can auto-detect location if needed
     setHasCheckedStorage(true);
+  }, []);
+
+  // Check when Google Maps SDK becomes ready and set state
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    // Check if already loaded
+    if (typeof google !== "undefined" && google.maps && google.maps.DirectionsService) {
+      setIsMapsReady(true);
+      return;
+    }
+    
+    // Poll for SDK availability
+    const checkMapsReady = setInterval(() => {
+      if (typeof google !== "undefined" && google.maps && google.maps.DirectionsService) {
+        console.log("[RideRequest] Google Maps SDK is now ready");
+        setIsMapsReady(true);
+        clearInterval(checkMapsReady);
+      }
+    }, 100);
+    
+    // Cleanup after 10 seconds max
+    const timeout = setTimeout(() => {
+      clearInterval(checkMapsReady);
+    }, 10000);
+    
+    return () => {
+      clearInterval(checkMapsReady);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Fetch active promotions from backend
@@ -633,13 +664,13 @@ export default function RideRequest() {
   }, [selectedVehicleCategory, computeFareBreakdown, appliedPromo]);
 
   useEffect(() => {
-    if (pickup && dropoff) {
+    if (pickup && dropoff && isMapsReady) {
       fetchRoutes();
-    } else {
+    } else if (!pickup || !dropoff) {
       setRoutes([]);
       setFareEstimate(null);
     }
-  }, [pickup, dropoff, fetchRoutes]);
+  }, [pickup, dropoff, fetchRoutes, isMapsReady]);
 
   // Calculate fare when active route, vehicle category, or promo changes
   useEffect(() => {
