@@ -190,6 +190,55 @@ const driverIconPulsing = L.divIcon({
   iconAnchor: [18, 18],
 });
 
+function calculateBearing(from: { lat: number; lng: number }, to: { lat: number; lng: number }): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const toDeg = (rad: number) => (rad * 180) / Math.PI;
+  
+  const lat1 = toRad(from.lat);
+  const lat2 = toRad(to.lat);
+  const dLon = toRad(to.lng - from.lng);
+  
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  
+  let bearing = toDeg(Math.atan2(y, x));
+  return (bearing + 360) % 360;
+}
+
+function createRotatedDriverIcon(heading: number): L.DivIcon {
+  const arrowRotation = heading - 45;
+  return L.divIcon({
+    className: "driver-marker-pulsing",
+    html: `<div style="
+      position: relative;
+      width: 36px; height: 36px;
+    ">
+      <div style="
+        position: absolute;
+        width: 36px; height: 36px; background: #10B981; 
+        border: 4px solid white; border-radius: 50%; 
+        box-shadow: 0 3px 12px rgba(0,0,0,0.4);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2;
+      ">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="transform: rotate(${arrowRotation}deg); transition: transform 0.3s ease;">
+          <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/>
+        </svg>
+      </div>
+      <div style="
+        position: absolute;
+        width: 36px; height: 36px;
+        background: rgba(16, 185, 129, 0.3);
+        border-radius: 50%;
+        animation: pulse 2s ease-out infinite;
+        z-index: 1;
+      "></div>
+    </div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+  });
+}
+
 function MapBoundsHandler({
   pickupLocation,
   dropoffLocation,
@@ -363,10 +412,12 @@ export default function UnifiedBookingPage() {
   // Live driver tracking state
   const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [driverPositionIndex, setDriverPositionIndex] = useState<number>(0);
+  const [driverHeading, setDriverHeading] = useState<number>(0);
   const [isFollowingDriver, setIsFollowingDriver] = useState<boolean>(true);
   const [isDriverPositionLoading, setIsDriverPositionLoading] = useState<boolean>(false);
   const desktopMapRef = useRef<HTMLDivElement | null>(null);
   const driverSimulationRef = useRef<NodeJS.Timeout | null>(null);
+  const prevDriverPositionRef = useRef<{ lat: number; lng: number } | null>(null);
   
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
@@ -795,7 +846,9 @@ export default function UnifiedBookingPage() {
     // Reset driver tracking state
     setDriverPosition(null);
     setDriverPositionIndex(0);
+    setDriverHeading(0);
     setIsFollowingDriver(true);
+    prevDriverPositionRef.current = null;
     
     toast({ title: "Thank you!", description: "We hope to see you again soon" });
   }, [toast]);
@@ -807,7 +860,9 @@ export default function UnifiedBookingPage() {
     // Reset driver tracking state
     setDriverPosition(null);
     setDriverPositionIndex(0);
+    setDriverHeading(0);
     setIsFollowingDriver(true);
+    prevDriverPositionRef.current = null;
   }, []);
 
   // Cleanup on unmount
@@ -848,6 +903,8 @@ export default function UnifiedBookingPage() {
       }
       setDriverPosition(null);
       setDriverPositionIndex(0);
+      setDriverHeading(0);
+      prevDriverPositionRef.current = null;
       simulationInitializedRef.current = '';
       return;
     }
@@ -875,11 +932,40 @@ export default function UnifiedBookingPage() {
     
     // Only set initial position if this is a new simulation
     if (simulationInitializedRef.current !== routePointsKey) {
-      setDriverPositionIndex(startIndex);
-      setDriverPosition({
+      const initialPosition = {
         lat: activeRoutePoints[startIndex][0],
         lng: activeRoutePoints[startIndex][1]
-      });
+      };
+      
+      // Set initial position
+      setDriverPositionIndex(startIndex);
+      setDriverPosition(initialPosition);
+      
+      // Initialize prevDriverPositionRef so first bearing calculation works
+      prevDriverPositionRef.current = initialPosition;
+      
+      // Calculate initial heading toward first distinct forward point
+      // Skip identical consecutive coordinates to avoid NaN from bearing calc
+      let initialHeading = 0;
+      let foundValidHeading = false;
+      for (let i = startIndex + 1; i < activeRoutePoints.length && !foundValidHeading; i++) {
+        const candidatePoint = {
+          lat: activeRoutePoints[i][0],
+          lng: activeRoutePoints[i][1]
+        };
+        // Check if this point is distinct from initial position
+        if (candidatePoint.lat !== initialPosition.lat || candidatePoint.lng !== initialPosition.lng) {
+          const bearing = calculateBearing(initialPosition, candidatePoint);
+          // Guard against NaN - only accept valid bearings
+          if (!isNaN(bearing) && isFinite(bearing)) {
+            initialHeading = bearing;
+            foundValidHeading = true;
+          }
+          // Continue loop if bearing was invalid to try next point
+        }
+      }
+      setDriverHeading(initialHeading);
+      
       simulationInitializedRef.current = routePointsKey;
     }
 
@@ -906,14 +992,31 @@ export default function UnifiedBookingPage() {
         newIndex = maxIndex;
       }
       
-      // Update driver position
+      // Update driver position and calculate heading
       if (activeRoutePoints[newIndex]) {
-        currentIndex = newIndex;
-        setDriverPositionIndex(newIndex);
-        setDriverPosition({
+        const newPosition = {
           lat: activeRoutePoints[newIndex][0],
           lng: activeRoutePoints[newIndex][1]
-        });
+        };
+        
+        // Calculate heading from previous position to new position
+        // Only update if positions are distinct to avoid NaN from bearing calc
+        if (prevDriverPositionRef.current && (
+          prevDriverPositionRef.current.lat !== newPosition.lat || 
+          prevDriverPositionRef.current.lng !== newPosition.lng
+        )) {
+          const bearing = calculateBearing(prevDriverPositionRef.current, newPosition);
+          // Guard against NaN - keep previous heading if calc fails
+          if (!isNaN(bearing)) {
+            setDriverHeading(bearing);
+          }
+        }
+        
+        // Update refs and state
+        prevDriverPositionRef.current = newPosition;
+        currentIndex = newIndex;
+        setDriverPositionIndex(newIndex);
+        setDriverPosition(newPosition);
       }
     }, 3000);
 
@@ -962,6 +1065,58 @@ export default function UnifiedBookingPage() {
   ];
 
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || "SG";
+
+  // Cached rotated driver icon - updates on every heading change
+  const cachedDriverIconRef = useRef<L.DivIcon | null>(null);
+  const lastHeadingRef = useRef<number | null>(null);
+  
+  const rotatedDriverIcon = useMemo(() => {
+    // Always update icon when heading changes to keep arrow direction accurate
+    if (lastHeadingRef.current === null || lastHeadingRef.current !== driverHeading) {
+      lastHeadingRef.current = driverHeading;
+      cachedDriverIconRef.current = createRotatedDriverIcon(driverHeading);
+    }
+    return cachedDriverIconRef.current!;
+  }, [driverHeading]);
+
+  // Calculate remaining route polyline based on driver position and ride phase
+  const remainingRoutePoints = useMemo(() => {
+    if (!driverPosition || activeRoutePoints.length < 2) return null;
+    
+    // Clamp driver index to valid range
+    const maxIdx = activeRoutePoints.length - 1;
+    const driverIdx = Math.min(Math.max(0, driverPositionIndex), maxIdx);
+    
+    if (rideStatus === "DRIVER_ASSIGNED") {
+      // Before pickup: show route ONLY from driver position to pickup location
+      // Pickup is approximately at 30% of the route
+      const pickupIdx = Math.min(maxIdx, Math.floor(activeRoutePoints.length * 0.3));
+      
+      // Clamp start index to not exceed pickup index
+      const startIdx = Math.min(driverIdx, pickupIdx);
+      
+      // Only show segment if there's remaining distance to pickup
+      if (startIdx < pickupIdx) {
+        return activeRoutePoints.slice(startIdx, pickupIdx + 1);
+      }
+      // Driver at or past pickup - show just a point marker (min 2 points for polyline)
+      return null;
+    } else if (rideStatus === "TRIP_IN_PROGRESS") {
+      // After pickup: show route from driver position to dropoff (end of route)
+      // Clamp start index to valid range
+      const startIdx = Math.min(driverIdx, maxIdx);
+      
+      // Need at least 2 points for a visible polyline
+      if (startIdx < maxIdx) {
+        return activeRoutePoints.slice(startIdx);
+      }
+      // Driver at destination
+      return null;
+    }
+    
+    // No tracking during other statuses
+    return null;
+  }, [driverPosition, driverPositionIndex, activeRoutePoints, rideStatus]);
 
   return (
     <div className="h-screen flex flex-col bg-muted/30" data-testid="unified-booking-page">
@@ -2461,7 +2616,7 @@ export default function UnifiedBookingPage() {
               {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
                 <Marker 
                   position={[driverPosition.lat, driverPosition.lng]} 
-                  icon={driverIconPulsing}
+                  icon={rotatedDriverIcon}
                   zIndexOffset={1000}
                 />
               )}
@@ -2480,6 +2635,18 @@ export default function UnifiedBookingPage() {
                   }}
                 />
               ))}
+              
+              {/* Remaining route polyline - shows driver's path to destination */}
+              {remainingRoutePoints && remainingRoutePoints.length > 1 && (
+                <Polyline
+                  positions={remainingRoutePoints}
+                  pathOptions={{
+                    color: "#10B981",
+                    weight: 6,
+                    opacity: 0.9,
+                  }}
+                />
+              )}
             </MapContainer>
           )}
           
@@ -2640,7 +2807,7 @@ export default function UnifiedBookingPage() {
                 {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
                   <Marker 
                     position={[driverPosition.lat, driverPosition.lng]} 
-                    icon={driverIconPulsing}
+                    icon={rotatedDriverIcon}
                     zIndexOffset={1000}
                   />
                 )}
@@ -2659,6 +2826,18 @@ export default function UnifiedBookingPage() {
                     }}
                   />
                 ))}
+                
+                {/* Remaining route polyline - shows driver's path to destination */}
+                {remainingRoutePoints && remainingRoutePoints.length > 1 && (
+                  <Polyline
+                    positions={remainingRoutePoints}
+                    pathOptions={{
+                      color: "#10B981",
+                      weight: 6,
+                      opacity: 0.9,
+                    }}
+                  />
+                )}
               </MapContainer>
             )}
             
