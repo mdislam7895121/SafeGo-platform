@@ -1,36 +1,17 @@
 /**
  * Vehicle Image Mapping Utility
  * 
- * C7 - Maps ride type codes to their corresponding 3D vehicle images.
- * All images use Uber-style front-left ¾ angle renders with white backgrounds.
+ * C7 - Re-exports the vehicle image mapping from the centralized source.
+ * This utility provides a consistent API for getting vehicle images by ride type code.
  */
 
-import safegoXSedan from "@assets/generated_images/safego_x_standard_sedan.png";
-import safegoComfortSedan from "@assets/generated_images/safego_comfort_premium_sedan.png";
-import safegoComfortXLSuv from "@assets/generated_images/safego_comfort_xl_suv.png";
-import safegoXLMinivan from "@assets/generated_images/safego_xl_minivan.png";
-import safegoBlackSedan from "@assets/generated_images/safego_black_luxury_sedan.png";
-import safegoBlackSuv from "@assets/generated_images/safego_black_suv_luxury.png";
-import safegoWavVan from "@assets/generated_images/safego_wav_accessible_van.png";
+import { 
+  getVehicleCategoryImage, 
+  VEHICLE_CATEGORY_IMAGES 
+} from "@/lib/vehicleMedia";
+import type { VehicleCategoryId } from "@shared/vehicleCategories";
 
-export type RideTypeCode = 
-  | "SAFEGO_X"
-  | "SAFEGO_COMFORT"
-  | "SAFEGO_COMFORT_XL"
-  | "SAFEGO_XL"
-  | "SAFEGO_BLACK"
-  | "SAFEGO_BLACK_SUV"
-  | "SAFEGO_WAV";
-
-const VEHICLE_IMAGE_MAP: Record<RideTypeCode, string> = {
-  SAFEGO_X: safegoXSedan,
-  SAFEGO_COMFORT: safegoComfortSedan,
-  SAFEGO_COMFORT_XL: safegoComfortXLSuv,
-  SAFEGO_XL: safegoXLMinivan,
-  SAFEGO_BLACK: safegoBlackSedan,
-  SAFEGO_BLACK_SUV: safegoBlackSuv,
-  SAFEGO_WAV: safegoWavVan,
-};
+export type RideTypeCode = VehicleCategoryId;
 
 /**
  * Get the vehicle image URL for a given ride type code.
@@ -40,10 +21,10 @@ const VEHICLE_IMAGE_MAP: Record<RideTypeCode, string> = {
  * 
  * @example
  * const imageUrl = getVehicleImage("SAFEGO_X");
- * // Returns: path to safego-x-sedan.png
  */
 export function getVehicleImage(rideTypeCode: RideTypeCode): string {
-  return VEHICLE_IMAGE_MAP[rideTypeCode];
+  return getVehicleCategoryImage(rideTypeCode);
 }
 
+export { VEHICLE_CATEGORY_IMAGES };
 export default getVehicleImage;
