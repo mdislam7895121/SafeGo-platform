@@ -139,6 +139,53 @@ const dropoffIcon = L.divIcon({
   iconAnchor: [12, 12],
 });
 
+const driverIcon = L.divIcon({
+  className: "driver-marker",
+  html: `<div style="
+    width: 36px; height: 36px; background: #10B981; 
+    border: 4px solid white; border-radius: 50%; 
+    box-shadow: 0 3px 12px rgba(0,0,0,0.4);
+    display: flex; align-items: center; justify-content: center;
+  ">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="transform: rotate(-45deg);">
+      <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/>
+    </svg>
+  </div>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+});
+
+const driverIconPulsing = L.divIcon({
+  className: "driver-marker-pulsing",
+  html: `<div style="
+    position: relative;
+    width: 36px; height: 36px;
+  ">
+    <div style="
+      position: absolute;
+      width: 36px; height: 36px; background: #10B981; 
+      border: 4px solid white; border-radius: 50%; 
+      box-shadow: 0 3px 12px rgba(0,0,0,0.4);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 2;
+    ">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white" style="transform: rotate(-45deg);">
+        <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z"/>
+      </svg>
+    </div>
+    <div style="
+      position: absolute;
+      width: 36px; height: 36px;
+      background: rgba(16, 185, 129, 0.3);
+      border-radius: 50%;
+      animation: pulse 2s ease-out infinite;
+      z-index: 1;
+    "></div>
+  </div>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 18],
+});
+
 function MapBoundsHandler({
   pickupLocation,
   dropoffLocation,
@@ -172,6 +219,60 @@ function MapBoundsHandler({
       map.setView([dropoffLocation.lat, dropoffLocation.lng], 15);
     }
   }, [map, pickupLocation, dropoffLocation, routePoints]);
+
+  return null;
+}
+
+function MapFollowDriver({
+  driverPosition,
+  isFollowing,
+  onUserInteraction,
+}: {
+  driverPosition: { lat: number; lng: number } | null;
+  isFollowing: boolean;
+  onUserInteraction?: () => void;
+}) {
+  const map = useMap();
+  const interactionDebounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!driverPosition || !isFollowing) return;
+    
+    // Smoothly pan to driver position
+    map.panTo([driverPosition.lat, driverPosition.lng], { animate: true, duration: 0.5 });
+  }, [map, driverPosition, isFollowing]);
+
+  // Detect user interaction to pause auto-follow (drag, zoom, touch) with debouncing
+  useEffect(() => {
+    if (!onUserInteraction) return;
+    
+    const handleInteraction = () => {
+      // Debounce: only fire once per 500ms
+      if (interactionDebounceRef.current) return;
+      
+      onUserInteraction();
+      
+      interactionDebounceRef.current = window.setTimeout(() => {
+        interactionDebounceRef.current = null;
+      }, 500);
+    };
+    
+    // Listen to all user interaction events
+    map.on("dragstart", handleInteraction);
+    map.on("zoomstart", handleInteraction);
+    map.on("mousedown", handleInteraction);
+    map.on("touchstart", handleInteraction);
+    
+    return () => {
+      map.off("dragstart", handleInteraction);
+      map.off("zoomstart", handleInteraction);
+      map.off("mousedown", handleInteraction);
+      map.off("touchstart", handleInteraction);
+      if (interactionDebounceRef.current) {
+        clearTimeout(interactionDebounceRef.current);
+      }
+    };
+  }, [map, onUserInteraction]);
 
   return null;
 }
@@ -253,6 +354,14 @@ export default function UnifiedBookingPage() {
   const [tripEndTime, setTripEndTime] = useState<Date | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(0);
   const [remainingMiles, setRemainingMiles] = useState<number>(0);
+  
+  // Live driver tracking state
+  const [driverPosition, setDriverPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverPositionIndex, setDriverPositionIndex] = useState<number>(0);
+  const [isFollowingDriver, setIsFollowingDriver] = useState<boolean>(true);
+  const [isDriverPositionLoading, setIsDriverPositionLoading] = useState<boolean>(false);
+  const desktopMapRef = useRef<HTMLDivElement | null>(null);
+  const driverSimulationRef = useRef<NodeJS.Timeout | null>(null);
   
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
@@ -669,6 +778,10 @@ export default function UnifiedBookingPage() {
     setSelectedTip(null);
     setRemainingMinutes(0);
     setRemainingMiles(0);
+    // Reset driver tracking state
+    setDriverPosition(null);
+    setDriverPositionIndex(0);
+    setIsFollowingDriver(true);
     
     toast({ title: "Thank you!", description: "We hope to see you again soon" });
   }, [toast]);
@@ -677,6 +790,10 @@ export default function UnifiedBookingPage() {
   const handleBackFromCancelled = useCallback(() => {
     setRideStatus("SELECTING");
     setDriverInfo(null);
+    // Reset driver tracking state
+    setDriverPosition(null);
+    setDriverPositionIndex(0);
+    setIsFollowingDriver(true);
   }, []);
 
   // Cleanup on unmount
@@ -685,7 +802,128 @@ export default function UnifiedBookingPage() {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
+      if (driverSimulationRef.current) {
+        clearInterval(driverSimulationRef.current);
+      }
     };
+  }, []);
+
+  // Memoize a unique key for the route to detect actual route changes
+  const routePointsKey = useMemo(() => {
+    if (activeRoutePoints.length === 0) return '';
+    // Use length + first point + middle point + last point for robust uniqueness
+    const first = activeRoutePoints[0];
+    const middle = activeRoutePoints[Math.floor(activeRoutePoints.length / 2)];
+    const last = activeRoutePoints[activeRoutePoints.length - 1];
+    return `${activeRoutePoints.length}:${first[0].toFixed(4)},${first[1].toFixed(4)}:${middle[0].toFixed(4)},${middle[1].toFixed(4)}:${last[0].toFixed(4)},${last[1].toFixed(4)}`;
+  }, [activeRoutePoints]);
+  
+  // Track if simulation has been initialized for current route
+  const simulationInitializedRef = useRef<string>('');
+
+  // Driver position simulation - moves driver along route polyline
+  useEffect(() => {
+    // Only simulate when driver is assigned or trip is in progress
+    const isTrackingDriver = rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS";
+    
+    if (!isTrackingDriver) {
+      // Clear simulation if ride is cancelled or completed
+      if (driverSimulationRef.current) {
+        clearInterval(driverSimulationRef.current);
+        driverSimulationRef.current = null;
+      }
+      setDriverPosition(null);
+      setDriverPositionIndex(0);
+      simulationInitializedRef.current = '';
+      return;
+    }
+
+    // Need route points to simulate
+    if (activeRoutePoints.length === 0) {
+      return;
+    }
+
+    // Check if we already have a simulation running for this route
+    if (driverSimulationRef.current && simulationInitializedRef.current === routePointsKey) {
+      // Simulation already running for this route, don't restart
+      return;
+    }
+
+    // Clear existing interval before creating new one (for new route)
+    if (driverSimulationRef.current) {
+      clearInterval(driverSimulationRef.current);
+      driverSimulationRef.current = null;
+    }
+
+    // Initialize driver position at start of route (near pickup) only for NEW routes
+    const startIndex = Math.max(0, Math.floor(activeRoutePoints.length * 0.1));
+    let currentIndex = startIndex;
+    
+    // Only set initial position if this is a new simulation
+    if (simulationInitializedRef.current !== routePointsKey) {
+      setDriverPositionIndex(startIndex);
+      setDriverPosition({
+        lat: activeRoutePoints[startIndex][0],
+        lng: activeRoutePoints[startIndex][1]
+      });
+      simulationInitializedRef.current = routePointsKey;
+    }
+
+    // Capture rideStatus for use in interval closure
+    const capturedRideStatus = rideStatus;
+
+    // Simulate driver movement every 3 seconds
+    driverSimulationRef.current = setInterval(() => {
+      // Determine how far to move based on ride status
+      const step = capturedRideStatus === "DRIVER_ASSIGNED" ? 2 : 3; // Move faster during trip
+      const maxIndex = activeRoutePoints.length - 1;
+      let newIndex = currentIndex + step;
+      
+      // For DRIVER_ASSIGNED, stop at pickup location (roughly 30% through route for demo)
+      if (capturedRideStatus === "DRIVER_ASSIGNED") {
+        const pickupStopIndex = Math.min(maxIndex, Math.floor(activeRoutePoints.length * 0.3));
+        if (newIndex >= pickupStopIndex) {
+          newIndex = pickupStopIndex;
+        }
+      }
+      
+      // For TRIP_IN_PROGRESS, move toward dropoff
+      if (newIndex > maxIndex) {
+        newIndex = maxIndex;
+      }
+      
+      // Update driver position
+      if (activeRoutePoints[newIndex]) {
+        currentIndex = newIndex;
+        setDriverPositionIndex(newIndex);
+        setDriverPosition({
+          lat: activeRoutePoints[newIndex][0],
+          lng: activeRoutePoints[newIndex][1]
+        });
+      }
+    }, 3000);
+
+    return () => {
+      if (driverSimulationRef.current) {
+        clearInterval(driverSimulationRef.current);
+        driverSimulationRef.current = null;
+      }
+    };
+  }, [rideStatus, activeRoutePoints, routePointsKey]);
+
+  // Handle scroll to map and highlight driver (desktop)
+  const handleViewLiveMapDesktop = useCallback(() => {
+    // Scroll to map section
+    if (desktopMapRef.current) {
+      desktopMapRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    // Reset follow mode
+    setIsFollowingDriver(true);
+  }, []);
+
+  // Handle re-center on driver
+  const handleRecenterOnDriver = useCallback(() => {
+    setIsFollowingDriver(true);
   }, []);
 
   const services = [
@@ -1781,11 +2019,21 @@ export default function UnifiedBookingPage() {
                               
                               {/* Actions */}
                               <div className="flex gap-2">
+                                {/* Mobile: open modal, Desktop: scroll to map */}
                                 <Button 
                                   variant="outline" 
-                                  className="flex-1"
+                                  className="flex-1 md:hidden"
                                   onClick={() => setIsMobileMapOpen(true)}
-                                  data-testid="button-view-live-map"
+                                  data-testid="button-view-live-map-mobile"
+                                >
+                                  <Map className="h-4 w-4 mr-2" />
+                                  View live map
+                                </Button>
+                                <Button 
+                                  variant="outline" 
+                                  className="flex-1 hidden md:flex"
+                                  onClick={handleViewLiveMapDesktop}
+                                  data-testid="button-view-live-map-desktop"
                                 >
                                   <Map className="h-4 w-4 mr-2" />
                                   View live map
@@ -1840,12 +2088,21 @@ export default function UnifiedBookingPage() {
                                 </p>
                               </div>
                               
-                              {/* Actions */}
+                              {/* Actions - Mobile: open modal, Desktop: scroll to map */}
                               <Button 
                                 variant="outline" 
-                                className="w-full"
+                                className="w-full md:hidden"
                                 onClick={() => setIsMobileMapOpen(true)}
-                                data-testid="button-view-live-map-progress"
+                                data-testid="button-view-live-map-progress-mobile"
+                              >
+                                <Map className="h-4 w-4 mr-2" />
+                                View live map
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                className="w-full hidden md:flex"
+                                onClick={handleViewLiveMapDesktop}
+                                data-testid="button-view-live-map-progress-desktop"
                               >
                                 <Map className="h-4 w-4 mr-2" />
                                 View live map
@@ -2153,7 +2410,7 @@ export default function UnifiedBookingPage() {
         </div>
 
         {/* Map Section - Hidden on mobile, shown on desktop */}
-        <div className="hidden md:block flex-1 min-h-0 relative overflow-hidden">
+        <div ref={desktopMapRef} className="hidden md:block flex-1 min-h-0 relative overflow-hidden">
           {isClient && (
             <MapContainer
               center={[mapCenter.lat, mapCenter.lng]}
@@ -2168,8 +2425,26 @@ export default function UnifiedBookingPage() {
               />
               <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} routePoints={activeRoutePoints} />
               
+              {/* Driver follow behavior when tracking */}
+              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+                <MapFollowDriver 
+                  driverPosition={driverPosition}
+                  isFollowing={isFollowingDriver}
+                  onUserInteraction={() => setIsFollowingDriver(false)}
+                />
+              )}
+              
               {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
               {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
+              
+              {/* Driver marker - shows when driver is assigned or trip in progress */}
+              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+                <Marker 
+                  position={[driverPosition.lat, driverPosition.lng]} 
+                  icon={driverIconPulsing}
+                  zIndexOffset={1000}
+                />
+              )}
               
               {routePolylines.map(({ id, points }) => (
                 <Polyline
@@ -2186,6 +2461,18 @@ export default function UnifiedBookingPage() {
                 />
               ))}
             </MapContainer>
+          )}
+          
+          {/* Re-center button - shows when user has panned away from driver */}
+          {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && !isFollowingDriver && (
+            <button
+              onClick={handleRecenterOnDriver}
+              className="absolute top-4 right-4 z-20 bg-background px-3 py-2 rounded-lg shadow-lg border hover-elevate flex items-center gap-2"
+              data-testid="button-recenter-driver"
+            >
+              <Navigation className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Re-center</span>
+            </button>
           )}
 
           {!pickup && (
@@ -2279,9 +2566,18 @@ export default function UnifiedBookingPage() {
       {/* Mobile Map Overlay/Bottom Sheet */}
       {isMobileMapOpen && (
         <div className="md:hidden fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
-          {/* Header with close button */}
+          {/* Header with close button - changes based on ride status */}
           <div className="flex items-center justify-between p-4 border-b">
-            <h2 className="text-lg font-semibold">Route Map</h2>
+            <div className="flex items-center gap-2">
+              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && (
+                <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              )}
+              <h2 className="text-lg font-semibold">
+                {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") 
+                  ? "Live driver location" 
+                  : "Route Map"}
+              </h2>
+            </div>
             <Button 
               variant="ghost" 
               size="icon" 
@@ -2308,8 +2604,26 @@ export default function UnifiedBookingPage() {
                 />
                 <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} routePoints={activeRoutePoints} />
                 
+                {/* Driver follow behavior when tracking */}
+                {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+                  <MapFollowDriver 
+                    driverPosition={driverPosition}
+                    isFollowing={isFollowingDriver}
+                    onUserInteraction={() => setIsFollowingDriver(false)}
+                  />
+                )}
+                
                 {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
                 {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
+                
+                {/* Driver marker - shows when driver is assigned or trip in progress */}
+                {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+                  <Marker 
+                    position={[driverPosition.lat, driverPosition.lng]} 
+                    icon={driverIconPulsing}
+                    zIndexOffset={1000}
+                  />
+                )}
                 
                 {routePolylines.map(({ id, points }) => (
                   <Polyline
@@ -2327,11 +2641,59 @@ export default function UnifiedBookingPage() {
                 ))}
               </MapContainer>
             )}
+            
+            {/* Driver position loading indicator */}
+            {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && isDriverPositionLoading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
+                <div className="flex items-center gap-2 px-4 py-2 bg-background rounded-lg shadow-lg">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Updating driver location...</span>
+                </div>
+              </div>
+            )}
+            
+            {/* Re-center button - shows when user has panned away from driver */}
+            {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && !isFollowingDriver && (
+              <button
+                onClick={handleRecenterOnDriver}
+                className="absolute top-4 right-4 z-20 bg-background px-3 py-2 rounded-lg shadow-lg border hover-elevate flex items-center gap-2"
+                data-testid="button-recenter-driver-mobile"
+              >
+                <Navigation className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Re-center</span>
+              </button>
+            )}
           </div>
           
-          {/* Bottom section with route chips */}
+          {/* Bottom section - different content based on ride status */}
           <div className="p-4 border-t bg-background">
-            {routes.length > 1 && (
+            {/* Show driver info when tracking */}
+            {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverInfo && (
+              <div className="flex items-center gap-3 mb-3 p-3 bg-muted/30 rounded-xl">
+                <Avatar className="h-10 w-10">
+                  <AvatarFallback className="bg-primary text-primary-foreground font-bold text-sm">
+                    {driverInfo.avatarInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">{driverInfo.name}</p>
+                  <p className="text-xs text-muted-foreground">{driverInfo.carModel} · {driverInfo.plateNumber}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-primary">
+                    {rideStatus === "DRIVER_ASSIGNED" 
+                      ? `~${driverInfo.pickupEtaMinutes} min` 
+                      : `~${formatDurationMinutes(remainingMinutes)}`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {rideStatus === "DRIVER_ASSIGNED" ? "to pickup" : "remaining"}
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {/* Route selection - only when not tracking driver */}
+            {rideStatus === "SELECTING" && routes.length > 1 && (
               <div className="mb-3">
                 <p className="text-sm font-semibold mb-2">Choose your route</p>
                 <div className="flex gap-2 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
@@ -2367,7 +2729,7 @@ export default function UnifiedBookingPage() {
               className="w-full h-12 rounded-xl"
               data-testid="button-done-map"
             >
-              Done
+              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") ? "Back to ride details" : "Done"}
             </Button>
           </div>
         </div>
