@@ -198,6 +198,7 @@ import AdminReferralSettingsEdit from "@/pages/admin/referral-settings-edit";
 import AdminOpportunityBonuses from "@/pages/admin/opportunity-bonuses";
 import AdminOpportunityBonusesEdit from "@/pages/admin/opportunity-bonuses-edit";
 import AdminDriverPromotions from "@/pages/admin/driver-promotions";
+import AdminRidePromotions from "@/pages/admin/ride-promotions";
 import AdminReviews from "@/pages/admin/reviews";
 import AdminMedia from "@/pages/admin/media";
 import AdminSupportChat from "@/pages/admin/support-chat";
@@ -1492,6 +1493,11 @@ function Router() {
       <Route path="/admin/driver-promotions">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminDriverPromotions />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ride-promotions">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminRidePromotions />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/reviews">

@@ -87,9 +87,31 @@ interface FareEstimate {
 }
 
 interface AppliedPromo {
+  id: string;
   code: string;
   discountPercent: number;
+  discountFlat?: number;
+  discountType: "PERCENT" | "FLAT";
+  maxDiscountAmount: number | null;
   label: string;
+  description: string | null;
+  isDefault: boolean;
+}
+
+interface BackendPromo {
+  id: string;
+  name: string;
+  description: string | null;
+  discountType: "PERCENT" | "FLAT";
+  value: number;
+  maxDiscountAmount: number | null;
+  appliesTo: string;
+  targetCities: string[];
+  targetCategories: string[];
+  userRule: string;
+  maxSurgeAllowed: number | null;
+  isDefault: boolean;
+  priority: number;
 }
 
 function getVehicleCategoryIcon(iconType: VehicleCategoryConfig["iconType"]) {
@@ -254,6 +276,8 @@ export default function RideRequest() {
   const [routeFetchCompleted, setRouteFetchCompleted] = useState(false);
   const [selectedVehicleCategory, setSelectedVehicleCategory] = useState<VehicleCategoryId>("SAFEGO_X");
   const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  const [availablePromos, setAvailablePromos] = useState<BackendPromo[]>([]);
+  const [isLoadingPromos, setIsLoadingPromos] = useState(false);
 
   const { 
     getAvailability, 
@@ -331,6 +355,45 @@ export default function RideRequest() {
     
     // Mark that we've checked storage so we can auto-detect location if needed
     setHasCheckedStorage(true);
+  }, []);
+
+  // Fetch active promotions from backend
+  useEffect(() => {
+    const fetchPromotions = async () => {
+      setIsLoadingPromos(true);
+      try {
+        const data = await apiRequest("/api/customer/active-promotions", {
+          method: "GET"
+        });
+        
+        if (data.promotions && data.promotions.length > 0) {
+          setAvailablePromos(data.promotions);
+          
+          // Auto-apply the default promo if one exists
+          const defaultPromo = data.promotions.find((p: BackendPromo) => p.isDefault);
+          if (defaultPromo) {
+            setAppliedPromo({
+              id: defaultPromo.id,
+              code: defaultPromo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
+              discountPercent: defaultPromo.discountType === "PERCENT" ? defaultPromo.value : 0,
+              discountFlat: defaultPromo.discountType === "FLAT" ? defaultPromo.value : 0,
+              discountType: defaultPromo.discountType,
+              maxDiscountAmount: defaultPromo.maxDiscountAmount,
+              label: defaultPromo.name,
+              description: defaultPromo.description,
+              isDefault: defaultPromo.isDefault
+            });
+            console.log("[RideRequest] Auto-applied default promo:", defaultPromo.name);
+          }
+        }
+      } catch (error) {
+        console.error("[RideRequest] Failed to fetch promotions:", error);
+      } finally {
+        setIsLoadingPromos(false);
+      }
+    };
+
+    fetchPromotions();
   }, []);
 
   const handleGetCurrentLocation = useCallback(async () => {
@@ -477,7 +540,7 @@ export default function RideRequest() {
     }
   }, [pickup, dropoff]);
 
-  const computeFareBreakdown = useCallback((route: RouteData, categoryId: VehicleCategoryId, appliedPromo?: { code: string; discountPercent: number; label: string } | null) => {
+  const computeFareBreakdown = useCallback((route: RouteData, categoryId: VehicleCategoryId, promo?: AppliedPromo | null) => {
     const categoryConfig = VEHICLE_CATEGORIES[categoryId];
     const distanceKm = route.distanceMeters / 1000;
     const distanceMiles = route.distanceMeters / 1609.34;
@@ -505,12 +568,24 @@ export default function RideRequest() {
     const driverEarnings = Math.round((subtotal - safegoCommission) * 100) / 100;
     
     const originalFare = subtotal;
-    const discountAmount = appliedPromo 
-      ? Math.round(originalFare * (appliedPromo.discountPercent / 100) * 100) / 100 
-      : 0;
+    
+    // Calculate discount based on promo type (PERCENT or FLAT)
+    let discountAmount = 0;
+    if (promo) {
+      if (promo.discountType === "PERCENT" && promo.discountPercent > 0) {
+        discountAmount = Math.round(originalFare * (promo.discountPercent / 100) * 100) / 100;
+        // Apply max discount cap if set
+        if (promo.maxDiscountAmount && discountAmount > promo.maxDiscountAmount) {
+          discountAmount = promo.maxDiscountAmount;
+        }
+      } else if (promo.discountType === "FLAT" && promo.discountFlat && promo.discountFlat > 0) {
+        discountAmount = Math.min(promo.discountFlat, originalFare);
+      }
+    }
+    
     const finalFare = Math.round((originalFare - discountAmount) * 100) / 100;
-    const promoCode = appliedPromo?.code ?? null;
-    const promoLabel = appliedPromo?.label ?? null;
+    const promoCode = promo?.code ?? null;
+    const promoLabel = promo?.label ?? null;
     
     return {
       baseFare,
@@ -871,25 +946,52 @@ export default function RideRequest() {
                 <Car className="h-3.5 w-3.5" />
                 Select Ride Type
               </p>
-              {/* Demo Promo Toggle for Testing */}
-              <Button
-                variant={appliedPromo ? "default" : "outline"}
-                size="sm"
-                className={`h-7 text-xs gap-1 ${appliedPromo ? "bg-green-600 hover:bg-green-700" : ""}`}
-                onClick={() => {
-                  if (appliedPromo) {
+              {/* Promo Status Indicator */}
+              {isLoadingPromos ? (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span>Loading promos...</span>
+                </div>
+              ) : appliedPromo ? (
+                <Badge 
+                  variant="secondary" 
+                  className="h-7 gap-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover-elevate cursor-pointer"
+                  onClick={() => {
                     setAppliedPromo(null);
                     toast({ title: "Promo removed", description: "Viewing regular prices" });
-                  } else {
-                    setAppliedPromo({ code: "SAFE15", discountPercent: 15, label: "15% off first ride" });
-                    toast({ title: "Promo applied!", description: "SAFE15 - 15% off your ride" });
-                  }
-                }}
-                data-testid="button-toggle-promo"
-              >
-                <Zap className="h-3 w-3" />
-                {appliedPromo ? "Remove Promo" : "Apply SAFE15"}
-              </Button>
+                  }}
+                  data-testid="badge-active-promo"
+                >
+                  <Zap className="h-3 w-3" />
+                  <span className="font-semibold">{appliedPromo.label}</span>
+                  <span className="opacity-70">| Click to remove</span>
+                </Badge>
+              ) : availablePromos.length > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => {
+                    const promo = availablePromos[0];
+                    setAppliedPromo({
+                      id: promo.id,
+                      code: promo.name.replace(/\s+/g, "").toUpperCase().substring(0, 10),
+                      discountPercent: promo.discountType === "PERCENT" ? promo.value : 0,
+                      discountFlat: promo.discountType === "FLAT" ? promo.value : 0,
+                      discountType: promo.discountType,
+                      maxDiscountAmount: promo.maxDiscountAmount,
+                      label: promo.name,
+                      description: promo.description,
+                      isDefault: promo.isDefault
+                    });
+                    toast({ title: "Promo applied!", description: `${promo.name} - ${promo.discountType === "PERCENT" ? `${promo.value}% off` : `$${promo.value} off`}` });
+                  }}
+                  data-testid="button-apply-promo"
+                >
+                  <Zap className="h-3 w-3" />
+                  Apply Promo
+                </Button>
+              ) : null}
             </div>
             <div 
               className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 

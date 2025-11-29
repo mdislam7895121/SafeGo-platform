@@ -3774,6 +3774,109 @@ model PromoLog {
   @@map("promo_logs")
 }
 
+// ============================================
+// GLOBAL RIDE PROMOTION ENGINE (C6)
+// ============================================
+
+enum RidePromoUserRule {
+  ALL_RIDES         // Applied to every ride
+  FIRST_RIDE        // Only for user's first ride
+  N_RIDES           // Applied to first N rides
+}
+
+enum RidePromoAppliesTo {
+  ALL               // All rides globally
+  CITY              // Specific cities only
+  CATEGORY          // Specific vehicle categories
+  USER_SEGMENT      // Specific user segments
+}
+
+enum RidePromoDiscountMode {
+  PERCENT           // Percentage discount
+  FLAT              // Fixed amount discount
+}
+
+// Global ride promotions (auto-applied, admin-managed)
+model RidePromotion {
+  id                    String                @id @default(uuid())
+  
+  // Basic info
+  name                  String                // e.g., "SafeGo Everyday Saver"
+  description           String?               @db.Text
+  
+  // Discount configuration
+  discountType          RidePromoDiscountMode @default(PERCENT)
+  value                 Decimal               @db.Decimal(10, 2) // Percentage (0-100) or flat amount
+  maxDiscountAmount     Decimal?              @db.Decimal(10, 2) // Cap for percentage discounts
+  
+  // Targeting
+  appliesTo             RidePromoAppliesTo    @default(ALL)
+  targetCities          String[]              @default([]) // City codes (if CITY)
+  targetCategories      String[]              @default([]) // Vehicle categories (if CATEGORY)
+  targetUserSegments    String[]              @default([]) // User segments (if USER_SEGMENT)
+  
+  // User eligibility rules
+  userRule              RidePromoUserRule     @default(ALL_RIDES)
+  rideCountLimit        Int?                  // For N_RIDES: apply to first N rides
+  
+  // Surge control
+  maxSurgeAllowed       Decimal?              @db.Decimal(4, 2) // Block promo if surge > this
+  
+  // Validity period
+  startAt               DateTime              @default(now())
+  endAt                 DateTime?             // null = no expiry
+  
+  // Usage limits
+  globalUsageLimit      Int?                  // Max total uses
+  currentUsageCount     Int                   @default(0)
+  usagePerUserLimit     Int?                  // Max uses per user
+  
+  // Status
+  isActive              Boolean               @default(true)
+  isDefault             Boolean               @default(false) // Default promo (e.g., Everyday Saver)
+  priority              Int                   @default(0)     // Higher = applied first
+  
+  // Metadata
+  createdBy             String?               // Admin user ID
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  // Relations
+  usages                RidePromotionUsage[]
+  
+  @@index([isActive])
+  @@index([isDefault])
+  @@index([startAt, endAt])
+  @@index([appliesTo])
+  @@index([priority])
+  @@map("ride_promotions")
+}
+
+// Track ride promotion usage per user
+model RidePromotionUsage {
+  id                    String          @id @default(uuid())
+  promotionId           String
+  userId                String
+  rideId                String?         // Set when ride is completed
+  
+  discountApplied       Decimal         @db.Decimal(10, 2)
+  originalFare          Decimal         @db.Decimal(10, 2)
+  finalFare             Decimal         @db.Decimal(10, 2)
+  
+  vehicleCategory       String?
+  cityCode              String?
+  
+  appliedAt             DateTime        @default(now())
+  
+  promotion             RidePromotion   @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([promotionId])
+  @@index([rideId])
+  @@index([appliedAt])
+  @@map("ride_promotion_usages")
+}
+
 // User-entered promo codes for rides
 model RidePromoCode {
   id                    String        @id @default(uuid())

@@ -11580,4 +11580,369 @@ router.get(
   }
 );
 
+// ============================================
+// RIDE PROMOTION MANAGEMENT (C6)
+// ============================================
+
+// GET /api/admin/ride-promotions - List all ride promotions
+router.get(
+  "/ride-promotions",
+  checkPermission(Permission.VIEW_SETTINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { isActive, page = "1", limit = "50" } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = Math.min(parseInt(limit as string, 10), 100);
+
+      const where: any = {};
+      if (isActive !== undefined) {
+        where.isActive = isActive === "true";
+      }
+
+      const [promotions, total] = await Promise.all([
+        prisma.ridePromotion.findMany({
+          where,
+          skip: (pageNum - 1) * limitNum,
+          take: limitNum,
+          orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+          include: {
+            _count: { select: { usages: true } },
+          },
+        }),
+        prisma.ridePromotion.count({ where }),
+      ]);
+
+      res.json({
+        promotions: promotions.map((p: any) => ({
+          ...p,
+          value: serializeDecimal(p.value),
+          maxDiscountAmount: p.maxDiscountAmount ? serializeDecimal(p.maxDiscountAmount) : null,
+          maxSurgeAllowed: p.maxSurgeAllowed ? serializeDecimal(p.maxSurgeAllowed) : null,
+          usageCount: p._count.usages,
+        })),
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error fetching ride promotions:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch promotions" });
+    }
+  }
+);
+
+// POST /api/admin/ride-promotions - Create a new ride promotion
+router.post(
+  "/ride-promotions",
+  checkPermission(Permission.MANAGE_SETTINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const {
+        name,
+        description,
+        discountType,
+        value,
+        maxDiscountAmount,
+        appliesTo,
+        targetCities,
+        targetCategories,
+        targetUserSegments,
+        userRule,
+        rideCountLimit,
+        maxSurgeAllowed,
+        startAt,
+        endAt,
+        globalUsageLimit,
+        usagePerUserLimit,
+        isActive,
+        priority,
+      } = req.body;
+
+      if (!name || !discountType || value === undefined || !appliesTo || !userRule) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const promotion = await prisma.ridePromotion.create({
+        data: {
+          name,
+          description,
+          discountType,
+          value,
+          maxDiscountAmount: maxDiscountAmount || null,
+          appliesTo,
+          targetCities: targetCities || [],
+          targetCategories: targetCategories || [],
+          targetUserSegments: targetUserSegments || [],
+          userRule,
+          rideCountLimit: rideCountLimit || null,
+          maxSurgeAllowed: maxSurgeAllowed || null,
+          startAt: startAt ? new Date(startAt) : new Date(),
+          endAt: endAt ? new Date(endAt) : null,
+          globalUsageLimit: globalUsageLimit || null,
+          usagePerUserLimit: usagePerUserLimit || null,
+          isActive: isActive ?? true,
+          priority: priority ?? 0,
+          createdBy: req.user?.id,
+        },
+      });
+
+      await logAudit({
+        entityType: "ride_promotion",
+        entityId: promotion.id,
+        action: "CREATE",
+        actorId: req.user?.id || "system",
+        actorRole: "admin",
+        changes: { created: promotion },
+      });
+
+      res.status(201).json({
+        ...promotion,
+        value: serializeDecimal(promotion.value),
+        maxDiscountAmount: promotion.maxDiscountAmount ? serializeDecimal(promotion.maxDiscountAmount) : null,
+        maxSurgeAllowed: promotion.maxSurgeAllowed ? serializeDecimal(promotion.maxSurgeAllowed) : null,
+      });
+    } catch (error: any) {
+      console.error("Error creating ride promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to create promotion" });
+    }
+  }
+);
+
+// GET /api/admin/ride-promotions/:id - Get a specific ride promotion
+router.get(
+  "/ride-promotions/:id",
+  checkPermission(Permission.VIEW_SETTINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      const promotion = await prisma.ridePromotion.findUnique({
+        where: { id },
+        include: {
+          usages: {
+            take: 100,
+            orderBy: { appliedAt: "desc" },
+          },
+          _count: { select: { usages: true } },
+        },
+      });
+
+      if (!promotion) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      res.json({
+        ...promotion,
+        value: serializeDecimal(promotion.value),
+        maxDiscountAmount: promotion.maxDiscountAmount ? serializeDecimal(promotion.maxDiscountAmount) : null,
+        maxSurgeAllowed: promotion.maxSurgeAllowed ? serializeDecimal(promotion.maxSurgeAllowed) : null,
+        usageCount: promotion._count.usages,
+        usages: promotion.usages.map((u: any) => ({
+          ...u,
+          discountApplied: serializeDecimal(u.discountApplied),
+          originalFare: serializeDecimal(u.originalFare),
+          finalFare: serializeDecimal(u.finalFare),
+        })),
+      });
+    } catch (error: any) {
+      console.error("Error fetching ride promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch promotion" });
+    }
+  }
+);
+
+// PATCH /api/admin/ride-promotions/:id - Update a ride promotion
+router.patch(
+  "/ride-promotions/:id",
+  checkPermission(Permission.MANAGE_SETTINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+
+      const existing = await prisma.ridePromotion.findUnique({ where: { id } });
+      if (!existing) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      const data: any = {};
+      if (updates.name !== undefined) data.name = updates.name;
+      if (updates.description !== undefined) data.description = updates.description;
+      if (updates.discountType !== undefined) data.discountType = updates.discountType;
+      if (updates.value !== undefined) data.value = updates.value;
+      if (updates.maxDiscountAmount !== undefined) data.maxDiscountAmount = updates.maxDiscountAmount;
+      if (updates.appliesTo !== undefined) data.appliesTo = updates.appliesTo;
+      if (updates.targetCities !== undefined) data.targetCities = updates.targetCities;
+      if (updates.targetCategories !== undefined) data.targetCategories = updates.targetCategories;
+      if (updates.targetUserSegments !== undefined) data.targetUserSegments = updates.targetUserSegments;
+      if (updates.userRule !== undefined) data.userRule = updates.userRule;
+      if (updates.rideCountLimit !== undefined) data.rideCountLimit = updates.rideCountLimit;
+      if (updates.maxSurgeAllowed !== undefined) data.maxSurgeAllowed = updates.maxSurgeAllowed;
+      if (updates.startAt !== undefined) data.startAt = new Date(updates.startAt);
+      if (updates.endAt !== undefined) data.endAt = updates.endAt ? new Date(updates.endAt) : null;
+      if (updates.globalUsageLimit !== undefined) data.globalUsageLimit = updates.globalUsageLimit;
+      if (updates.usagePerUserLimit !== undefined) data.usagePerUserLimit = updates.usagePerUserLimit;
+      if (updates.isActive !== undefined) data.isActive = updates.isActive;
+      if (updates.priority !== undefined) data.priority = updates.priority;
+
+      const promotion = await prisma.ridePromotion.update({
+        where: { id },
+        data,
+      });
+
+      await logAudit({
+        entityType: "ride_promotion",
+        entityId: promotion.id,
+        action: "UPDATE",
+        actorId: req.user?.id || "system",
+        actorRole: "admin",
+        changes: { before: existing, after: promotion },
+      });
+
+      res.json({
+        ...promotion,
+        value: serializeDecimal(promotion.value),
+        maxDiscountAmount: promotion.maxDiscountAmount ? serializeDecimal(promotion.maxDiscountAmount) : null,
+        maxSurgeAllowed: promotion.maxSurgeAllowed ? serializeDecimal(promotion.maxSurgeAllowed) : null,
+      });
+    } catch (error: any) {
+      console.error("Error updating ride promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to update promotion" });
+    }
+  }
+);
+
+// DELETE /api/admin/ride-promotions/:id - Delete a ride promotion
+router.delete(
+  "/ride-promotions/:id",
+  checkPermission(Permission.MANAGE_SETTINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      const existing = await prisma.ridePromotion.findUnique({ where: { id } });
+      if (!existing) {
+        return res.status(404).json({ error: "Promotion not found" });
+      }
+
+      if (existing.isDefault) {
+        return res.status(400).json({ error: "Cannot delete default promotion" });
+      }
+
+      await prisma.ridePromotionUsage.deleteMany({ where: { promotionId: id } });
+      await prisma.ridePromotion.delete({ where: { id } });
+
+      await logAudit({
+        entityType: "ride_promotion",
+        entityId: id,
+        action: "DELETE",
+        actorId: req.user?.id || "system",
+        actorRole: "admin",
+        changes: { deleted: existing },
+      });
+
+      res.json({ success: true, message: "Promotion deleted" });
+    } catch (error: any) {
+      console.error("Error deleting ride promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to delete promotion" });
+    }
+  }
+);
+
+// GET /api/admin/ride-promotions/:id/stats - Get promotion statistics
+router.get(
+  "/ride-promotions/:id/stats",
+  checkPermission(Permission.VIEW_SETTINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      const usages = await prisma.ridePromotionUsage.findMany({
+        where: { promotionId: id },
+      });
+
+      const totalDiscountGiven = usages.reduce((sum: number, u: any) => sum + Number(u.discountApplied), 0);
+      const totalOriginalFare = usages.reduce((sum: number, u: any) => sum + Number(u.originalFare), 0);
+      const uniqueUsers = new Set(usages.map((u: any) => u.userId)).size;
+
+      res.json({
+        totalUsages: usages.length,
+        uniqueUsers,
+        totalDiscountGiven: Math.round(totalDiscountGiven * 100) / 100,
+        totalOriginalFare: Math.round(totalOriginalFare * 100) / 100,
+        averageDiscount: usages.length > 0 ? Math.round((totalDiscountGiven / usages.length) * 100) / 100 : 0,
+      });
+    } catch (error: any) {
+      console.error("Error fetching promotion stats:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch stats" });
+    }
+  }
+);
+
+// POST /api/admin/ride-promotions/init-default - Initialize default promo
+router.post(
+  "/ride-promotions/init-default",
+  checkPermission(Permission.MANAGE_SETTINGS),
+  async (req: AuthRequest, res) => {
+    try {
+      const existingDefault = await prisma.ridePromotion.findFirst({
+        where: { isDefault: true, isActive: true },
+      });
+
+      if (existingDefault) {
+        return res.json({
+          success: true,
+          message: "Default promotion already exists",
+          promotion: {
+            ...existingDefault,
+            value: serializeDecimal(existingDefault.value),
+            maxDiscountAmount: existingDefault.maxDiscountAmount ? serializeDecimal(existingDefault.maxDiscountAmount) : null,
+          },
+        });
+      }
+
+      const promotion = await prisma.ridePromotion.create({
+        data: {
+          name: "SafeGo Everyday Saver",
+          description: "15% SafeGo promo applied",
+          discountType: "PERCENT",
+          value: 15,
+          maxDiscountAmount: 10,
+          appliesTo: "ALL",
+          userRule: "ALL_RIDES",
+          isActive: true,
+          isDefault: true,
+          priority: 100,
+          createdBy: req.user?.id,
+        },
+      });
+
+      await logAudit({
+        entityType: "ride_promotion",
+        entityId: promotion.id,
+        action: "CREATE",
+        actorId: req.user?.id || "system",
+        actorRole: "admin",
+        changes: { created: promotion, isDefaultPromo: true },
+      });
+
+      res.status(201).json({
+        success: true,
+        message: "Default promotion created",
+        promotion: {
+          ...promotion,
+          value: serializeDecimal(promotion.value),
+          maxDiscountAmount: promotion.maxDiscountAmount ? serializeDecimal(promotion.maxDiscountAmount) : null,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error initializing default promotion:", error);
+      res.status(500).json({ error: error.message || "Failed to initialize default promotion" });
+    }
+  }
+);
+
 export default router;

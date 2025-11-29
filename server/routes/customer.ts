@@ -1066,4 +1066,74 @@ router.get("/ride-options/availability/:categoryId", async (req: AuthRequest, re
   }
 });
 
+// GET /api/customer/active-promotions - Get active ride promotions
+router.get("/active-promotions", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.id;
+    const now = new Date();
+
+    const promotions = await prisma.ridePromotion.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { startAt: { lte: now }, endAt: null },
+          { startAt: { lte: now }, endAt: { gte: now } }
+        ]
+      },
+      orderBy: [{ priority: "desc" }, { isDefault: "desc" }],
+      take: 10
+    });
+
+    let userRideCount = 0;
+    if (userId) {
+      userRideCount = await prisma.ride.count({
+        where: { customerId: userId, status: "completed" }
+      });
+    }
+
+    const eligiblePromos = [];
+
+    for (const promo of promotions) {
+      let isEligible = true;
+
+      switch (promo.userRule) {
+        case "FIRST_RIDE":
+          if (userRideCount > 0) isEligible = false;
+          break;
+        case "N_RIDES":
+          if (promo.rideCountLimit && userRideCount >= promo.rideCountLimit) {
+            isEligible = false;
+          }
+          break;
+        case "ALL_RIDES":
+        default:
+          break;
+      }
+
+      if (isEligible) {
+        eligiblePromos.push({
+          id: promo.id,
+          name: promo.name,
+          description: promo.description,
+          discountType: promo.discountType,
+          value: Number(promo.value),
+          maxDiscountAmount: promo.maxDiscountAmount ? Number(promo.maxDiscountAmount) : null,
+          appliesTo: promo.appliesTo,
+          targetCities: promo.targetCities,
+          targetCategories: promo.targetCategories,
+          userRule: promo.userRule,
+          maxSurgeAllowed: promo.maxSurgeAllowed ? Number(promo.maxSurgeAllowed) : null,
+          isDefault: promo.isDefault,
+          priority: promo.priority
+        });
+      }
+    }
+
+    res.json({ promotions: eligiblePromos, userRideCount });
+  } catch (error) {
+    console.error("Get active promotions error:", error);
+    res.status(500).json({ error: "Failed to get promotions" });
+  }
+});
+
 export default router;
