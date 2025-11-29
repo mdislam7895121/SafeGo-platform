@@ -96,16 +96,14 @@ export function VehicleCategoryCard({
           flex-shrink-0 snap-start flex flex-col items-center 
           rounded-[14px] min-w-[100px] max-w-[110px] transition-all overflow-hidden
           ${isSelected 
-            ? "bg-background border-l-[3px] border-l-primary border-t border-r border-b border-[#E5E7EB]" 
+            ? "bg-background border-l-[4px] border-l-primary border-t border-r border-b border-[#E5E7EB]" 
             : isUnavailable 
               ? "bg-muted/50 border border-[#E5E7EB] opacity-50 cursor-not-allowed"
               : "bg-background border border-[#E5E7EB] hover-elevate cursor-pointer"
           }
         `}
         style={{ 
-          boxShadow: isSelected 
-            ? "0 8px 24px rgba(15, 23, 42, 0.08)" 
-            : "0px 4px 14px rgba(0,0,0,0.08)" 
+          boxShadow: "0px 4px 14px rgba(0,0,0,0.08)" 
         }}
         data-testid={`category-pill-${categoryId}`}
       >
@@ -198,9 +196,7 @@ export function VehicleCategoryCard({
         }
       `}
       style={{ 
-        boxShadow: isSelected 
-          ? "0 8px 24px rgba(15, 23, 42, 0.08)" 
-          : "0px 4px 14px rgba(0,0,0,0.08)",
+        boxShadow: "0px 4px 14px rgba(0,0,0,0.08)",
         background: "#FFFFFF",
       }}
       onClick={handleClick}

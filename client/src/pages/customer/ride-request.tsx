@@ -1030,9 +1030,7 @@ export default function RideRequest() {
                           }
                         `}
                         style={{
-                          boxShadow: isSelected 
-                            ? "0 8px 24px rgba(15, 23, 42, 0.08)" 
-                            : "0px 4px 14px rgba(0,0,0,0.08)",
+                          boxShadow: "0px 4px 14px rgba(0,0,0,0.08)",
                         }}
                       >
                         <div className="flex flex-col items-center gap-2">
