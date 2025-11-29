@@ -743,18 +743,20 @@ export default function UnifiedBookingPage() {
                       const hasActualSavings = appliedPromo && selectedFareData.discountAmount > 0;
                       return hasActualSavings && (
                         <div 
-                          className="px-4 py-2.5 rounded-full flex items-center justify-between"
-                          style={{ background: "#DCFCE7" }}
+                          className="px-4 py-2 rounded-full flex items-center justify-between"
+                          style={{ background: "#ECFDF3" }}
                           data-testid="promo-banner"
                         >
                           <div className="flex items-center gap-2.5">
-                            <div className="h-7 w-7 rounded-full bg-green-500/20 flex items-center justify-center">
-                              <Zap className="h-3.5 w-3.5 text-green-600" />
+                            <div className="h-7 w-7 rounded-full flex items-center justify-center" style={{ background: "rgba(22, 163, 74, 0.15)" }}>
+                              <Zap className="h-3.5 w-3.5" style={{ color: "#16A34A" }} />
                             </div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-bold" style={{ color: "#166534" }}>{appliedPromo.label}</span>
+                              <span className="text-sm font-semibold" style={{ color: "#166534" }}>{appliedPromo.label}</span>
                               <span className="text-xs font-medium" style={{ color: "#166534" }}>
-                                • You save ${selectedFareData.discountAmount.toFixed(2)} on this ride
+                                {appliedPromo.discountType === "PERCENT" 
+                                  ? `• ${appliedPromo.discountPercent}% off your ride`
+                                  : `• You save $${selectedFareData.discountAmount.toFixed(2)} on this trip`}
                               </span>
                             </div>
                           </div>
@@ -815,7 +817,7 @@ export default function UnifiedBookingPage() {
                               {hasDiscount && !isUnavailable && (
                                 <Badge 
                                   className="text-[10px] px-1.5 py-0.5 border-0 shadow-sm flex items-center"
-                                  style={{ background: "#BBF7D0", color: "#166534" }}
+                                  style={{ background: "#DCFCE7", color: "#166534" }}
                                 >
                                   <Sparkles className="h-2.5 w-2.5 mr-0.5" />
                                   Saver
