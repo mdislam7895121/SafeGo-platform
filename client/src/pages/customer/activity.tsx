@@ -1,10 +1,11 @@
-import { Link } from "wouter";
-import { ArrowLeft, User, Clock, Car, MapPin, Navigation } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { ArrowLeft, User, Clock, Car, MapPin, Navigation, ChevronRight, UtensilsCrossed, Package, HelpCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Ride {
   id: string;
@@ -24,6 +25,8 @@ interface Ride {
 }
 
 export default function CustomerActivity() {
+  const [, setLocationRoute] = useLocation();
+  
   const { data, isLoading } = useQuery<{ rides: Ride[] }>({
     queryKey: ["/api/customer/rides"],
   });
@@ -46,6 +49,20 @@ export default function CustomerActivity() {
     return status.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  const handleRideClick = (rideId: string, status: string) => {
+    if (status === "completed") {
+      setLocationRoute(`/customer/trip-receipt/${rideId}`);
+    } else if (status === "accepted" || status === "driver_arriving") {
+      setLocationRoute(`/customer/ride-assigned/${rideId}`);
+    } else {
+      setLocationRoute(`/customer/trip-receipt/${rideId}`);
+    }
+  };
+
+  const rides = data?.rides || [];
+  const completedRides = rides.filter(r => r.status === "completed");
+  const activeRides = rides.filter(r => r.status !== "completed" && !r.status.includes("cancelled"));
+
   return (
     <div className="min-h-screen bg-background pb-20">
       {/* Header */}
@@ -60,72 +77,195 @@ export default function CustomerActivity() {
         </div>
       </div>
 
-      <div className="p-6 space-y-4">
-        {isLoading ? (
-          <>
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-40 w-full" />
-          </>
-        ) : !data?.rides || data.rides.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Clock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No activity yet</h3>
-              <p className="text-muted-foreground text-sm">
-                Your ride, food, and parcel delivery history will appear here
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          data.rides.map((ride) => (
-            <Card key={ride.id} data-testid={`ride-${ride.id}`}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Ride</CardTitle>
-                  <Badge className={getStatusColor(ride.status)} data-testid={`status-${ride.id}`}>
-                    {getStatusLabel(ride.status)}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-start gap-3">
-                  <Navigation className="h-5 w-5 text-green-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Pickup</p>
-                    <p className="font-medium">{ride.pickupAddress}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <MapPin className="h-5 w-5 text-red-600 mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Dropoff</p>
-                    <p className="font-medium">{ride.dropoffAddress}</p>
-                  </div>
-                </div>
-                {ride.driver && (
-                  <div className="flex items-start gap-3 pt-2 border-t">
-                    <Car className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Driver</p>
-                      <p className="font-medium">{ride.driver.email}</p>
-                      {ride.driver.vehicle && (
-                        <p className="text-sm text-muted-foreground">
-                          {ride.driver.vehicle.vehicleModel} - {ride.driver.vehicle.vehiclePlate}
-                        </p>
-                      )}
-                    </div>
+      <div className="p-4">
+        <Tabs defaultValue="rides" className="w-full">
+          <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsTrigger value="rides" data-testid="tab-rides">
+              <Car className="h-4 w-4 mr-2" />
+              Rides
+            </TabsTrigger>
+            <TabsTrigger value="food" data-testid="tab-food">
+              <UtensilsCrossed className="h-4 w-4 mr-2" />
+              Food
+            </TabsTrigger>
+            <TabsTrigger value="parcel" data-testid="tab-parcel">
+              <Package className="h-4 w-4 mr-2" />
+              Parcel
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="rides" className="space-y-4">
+            {isLoading ? (
+              <>
+                <Skeleton className="h-40 w-full" />
+                <Skeleton className="h-40 w-full" />
+              </>
+            ) : rides.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Car className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No rides yet</h3>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Your ride history will appear here
+                  </p>
+                  <Link href="/customer">
+                    <Button data-testid="button-book-first-ride">Book your first ride</Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {activeRides.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Active</h3>
+                    {activeRides.map((ride) => (
+                      <Card 
+                        key={ride.id} 
+                        className="mb-3 hover-elevate cursor-pointer"
+                        onClick={() => handleRideClick(ride.id, ride.status)}
+                        data-testid={`ride-${ride.id}`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <Car className="h-5 w-5 text-primary" />
+                              <span className="font-medium">SafeGo Ride</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge className={getStatusColor(ride.status)} data-testid={`status-${ride.id}`}>
+                                {getStatusLabel(ride.status)}
+                              </Badge>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2">
+                              <div className="h-2 w-2 rounded-full bg-green-500 mt-2" />
+                              <p className="text-sm truncate flex-1">{ride.pickupAddress}</p>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <div className="h-2 w-2 rounded-full bg-red-500 mt-2" />
+                              <p className="text-sm truncate flex-1">{ride.dropoffAddress}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(ride.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className="font-bold">${Number(ride.serviceFare).toFixed(2)}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 )}
-                <div className="flex items-center justify-between pt-2 border-t">
-                  <span className="text-sm text-muted-foreground">
-                    {new Date(ride.createdAt).toLocaleDateString()}
-                  </span>
-                  <span className="text-lg font-bold">${Number(ride.serviceFare).toFixed(2)}</span>
-                </div>
+
+                {completedRides.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Past Rides</h3>
+                    {completedRides.map((ride) => (
+                      <Card 
+                        key={ride.id} 
+                        className="mb-3 hover-elevate cursor-pointer"
+                        onClick={() => handleRideClick(ride.id, ride.status)}
+                        data-testid={`ride-${ride.id}`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <Car className="h-5 w-5 text-muted-foreground" />
+                              <span className="font-medium">SafeGo Ride</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" data-testid={`status-${ride.id}`}>
+                                Completed
+                              </Badge>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2">
+                              <div className="h-2 w-2 rounded-full bg-green-500 mt-2" />
+                              <p className="text-sm truncate flex-1">{ride.pickupAddress}</p>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <div className="h-2 w-2 rounded-full bg-red-500 mt-2" />
+                              <p className="text-sm truncate flex-1">{ride.dropoffAddress}</p>
+                            </div>
+                          </div>
+                          {ride.driver && (
+                            <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                              <User className="h-4 w-4" />
+                              <span>{ride.driver.email?.split('@')[0]}</span>
+                              {ride.driver.vehicle && (
+                                <span>• {ride.driver.vehicle.vehicleModel}</span>
+                              )}
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t">
+                            <span className="text-sm text-muted-foreground">
+                              {new Date(ride.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className="font-bold">${Number(ride.serviceFare).toFixed(2)}</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+
+                {rides.length > 0 && (
+                  <Card className="bg-muted/50">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <HelpCircle className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium text-sm">Need help with a ride?</p>
+                          <p className="text-xs text-muted-foreground">Contact our support team</p>
+                        </div>
+                      </div>
+                      <Link href="/customer/support">
+                        <Button variant="outline" size="sm" data-testid="button-get-help">
+                          Get Help
+                        </Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          <TabsContent value="food" className="space-y-4">
+            <Card>
+              <CardContent className="p-12 text-center">
+                <UtensilsCrossed className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No food orders yet</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Your food delivery history will appear here
+                </p>
+                <Link href="/customer/food">
+                  <Button data-testid="button-order-food">Order Food</Button>
+                </Link>
               </CardContent>
             </Card>
-          ))
-        )}
+          </TabsContent>
+
+          <TabsContent value="parcel" className="space-y-4">
+            <Card>
+              <CardContent className="p-12 text-center">
+                <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No parcel deliveries yet</h3>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Your parcel delivery history will appear here
+                </p>
+                <Link href="/customer/parcel">
+                  <Button data-testid="button-send-parcel">Send a Parcel</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Bottom Navigation */}

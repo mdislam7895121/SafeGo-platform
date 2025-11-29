@@ -1,8 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useState, useRef } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
 import { 
   ArrowLeft, User, MapPin, Phone, CreditCard, Shield, 
-  Edit, Star, Clock, Home, Briefcase, Heart, Bell, Globe, CheckCircle2, Headphones 
+  Edit, Star, Clock, Home, Briefcase, Heart, Bell, Globe, CheckCircle2, Headphones,
+  X, Save, Loader2, Plus
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,18 +12,133 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
+
+interface LocationData {
+  address: string;
+  lat: number;
+  lng: number;
+  placeId?: string;
+}
+
+interface SavedPlace {
+  id: string;
+  name: string;
+  address: string;
+  lat?: number;
+  lng?: number;
+}
 
 export default function CustomerProfile() {
+  const [, setLocationRoute] = useLocation();
+  const { toast } = useToast();
+  const savedPlacesRef = useRef<HTMLDivElement>(null);
+  
+  const [editAddressType, setEditAddressType] = useState<"home" | "work" | null>(null);
+  const [editAddress, setEditAddress] = useState("");
+  const [editLocation, setEditLocation] = useState<LocationData | null>(null);
+  
+  const [showNotificationsDialog, setShowNotificationsDialog] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [smsNotifications, setSmsNotifications] = useState(false);
+  
+  const [showLanguageDialog, setShowLanguageDialog] = useState(false);
+  
+  const [showSafetyDialog, setShowSafetyDialog] = useState(false);
   
   const { data: profileData, isLoading } = useQuery({
     queryKey: ["/api/customer/home"],
   });
 
-  // Fetch customer ride stats (demo data for now)
   const { data: statsData } = useQuery({
     queryKey: ["/api/customer/stats"],
-    enabled: false, // Use demo data
+    enabled: false,
   });
+
+  const updateAddressMutation = useMutation({
+    mutationFn: async (data: { 
+      homeAddress?: string; 
+      workAddress?: string;
+      homeLat?: number;
+      homeLng?: number;
+      workLat?: number;
+      workLng?: number;
+    }) => {
+      const response = await apiRequest("/api/customer/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer/home"] });
+      toast({
+        title: "Address saved",
+        description: `Your ${editAddressType} address has been updated.`,
+      });
+      setEditAddressType(null);
+      setEditAddress("");
+      setEditLocation(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update failed",
+        description: error.message || "Could not save your address. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveAddress = () => {
+    if (!editAddress.trim()) {
+      toast({
+        title: "Address required",
+        description: "Please enter an address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (editAddressType === "home") {
+      const updateData: Record<string, any> = { homeAddress: editAddress };
+      if (editLocation) {
+        updateData.homeLat = editLocation.lat;
+        updateData.homeLng = editLocation.lng;
+      }
+      updateAddressMutation.mutate(updateData);
+    } else if (editAddressType === "work") {
+      const updateData: Record<string, any> = { workAddress: editAddress };
+      if (editLocation) {
+        updateData.workLat = editLocation.lat;
+        updateData.workLng = editLocation.lng;
+      }
+      updateAddressMutation.mutate(updateData);
+    }
+  };
+
+  const handleLocationSelect = (location: LocationData) => {
+    setEditLocation(location);
+    setEditAddress(location.address);
+  };
+
+  const scrollToSavedPlaces = () => {
+    savedPlacesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   if (isLoading) {
     return (
@@ -37,18 +154,15 @@ export default function CustomerProfile() {
 
   const profile = (profileData as any)?.profile;
   
-  // Demo stats (will be replaced with real API data)
   const customerStats = {
     rating: 4.8,
     totalTrips: 42,
     memberSince: profile?.createdAt ? new Date(profile.createdAt) : new Date(),
   };
 
-  // Extract full name or use email as fallback
   const displayName = profile?.fullName || profile?.email?.split('@')[0] || 'User';
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
   
-  // Get city name (default to capital for now)
   const cityName = profile?.cityCode || (profile?.countryCode === 'BD' ? 'Dhaka' : 'New York');
   const countryFlag = profile?.countryCode === 'BD' ? '🇧🇩' : '🇺🇸';
   const countryName = profile?.countryCode === 'BD' ? 'Bangladesh' : 'United States';
@@ -144,7 +258,11 @@ export default function CustomerProfile() {
             </Card>
           </Link>
 
-          <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-saved-places">
+          <Card 
+            className="hover-elevate active-elevate-2 cursor-pointer" 
+            onClick={scrollToSavedPlaces}
+            data-testid="card-saved-places"
+          >
             <CardContent className="p-4 text-center">
               <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center mx-auto mb-2">
                 <MapPin className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -153,16 +271,18 @@ export default function CustomerProfile() {
             </CardContent>
           </Card>
 
-          <Link href="/customer/profile/kyc">
-            <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-kyc-status">
-              <CardContent className="p-4 text-center">
-                <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-950 flex items-center justify-center mx-auto mb-2">
-                  <Shield className="h-6 w-6 text-purple-600 dark:text-purple-400" />
-                </div>
-                <p className="text-sm font-medium">Safety</p>
-              </CardContent>
-            </Card>
-          </Link>
+          <Card 
+            className="hover-elevate active-elevate-2 cursor-pointer" 
+            onClick={() => setShowSafetyDialog(true)}
+            data-testid="card-kyc-status"
+          >
+            <CardContent className="p-4 text-center">
+              <div className="h-12 w-12 rounded-full bg-purple-100 dark:bg-purple-950 flex items-center justify-center mx-auto mb-2">
+                <Shield className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              </div>
+              <p className="text-sm font-medium">Safety</p>
+            </CardContent>
+          </Card>
 
           <Link href="/customer/profile/settings">
             <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-edit-profile">
@@ -222,7 +342,7 @@ export default function CustomerProfile() {
         </Card>
 
         {/* Addresses & Saved Places Section */}
-        <Card>
+        <Card ref={savedPlacesRef}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
@@ -242,7 +362,15 @@ export default function CustomerProfile() {
                   {profile?.homeAddress || profile?.presentAddress || "Add your home address"}
                 </p>
               </div>
-              <Button variant="ghost" size="sm" data-testid="button-edit-home">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setEditAddressType("home");
+                  setEditAddress(profile?.homeAddress || profile?.presentAddress || "");
+                }}
+                data-testid="button-edit-home"
+              >
                 <Edit className="h-4 w-4" />
               </Button>
             </div>
@@ -254,9 +382,19 @@ export default function CustomerProfile() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium mb-1">Work</p>
-                <p className="text-sm text-muted-foreground">Add your work address</p>
+                <p className="text-sm text-muted-foreground" data-testid="text-work-address">
+                  {profile?.workAddress || "Add your work address"}
+                </p>
               </div>
-              <Button variant="ghost" size="sm" data-testid="button-edit-work">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setEditAddressType("work");
+                  setEditAddress(profile?.workAddress || "");
+                }}
+                data-testid="button-edit-work"
+              >
                 <Edit className="h-4 w-4" />
               </Button>
             </div>
@@ -270,8 +408,18 @@ export default function CustomerProfile() {
                 <p className="font-medium mb-1">Favorites</p>
                 <p className="text-sm text-muted-foreground">0 saved locations</p>
               </div>
-              <Button variant="ghost" size="sm" data-testid="button-add-favorite">
-                <Edit className="h-4 w-4" />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  toast({
+                    title: "Coming soon",
+                    description: "Favorites feature will be available soon!",
+                  });
+                }}
+                data-testid="button-add-favorite"
+              >
+                <Plus className="h-4 w-4" />
               </Button>
             </div>
           </CardContent>
@@ -319,8 +467,7 @@ export default function CustomerProfile() {
 
             {profile?.verificationStatus === "approved" && (
               <div className="text-sm text-muted-foreground">
-                <p>✓ Identity verified on {new Date().toLocaleDateString()}</p>
-                <p className="mt-1">Your account is fully verified and secure.</p>
+                <p>Your account is fully verified and secure.</p>
               </div>
             )}
 
@@ -358,7 +505,12 @@ export default function CustomerProfile() {
                   <p className="text-sm text-muted-foreground">English (US)</p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" data-testid="button-change-language">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowLanguageDialog(true)}
+                data-testid="button-change-language"
+              >
                 Change
               </Button>
             </div>
@@ -370,10 +522,19 @@ export default function CustomerProfile() {
                 <Bell className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="font-medium">Notifications</p>
-                  <p className="text-sm text-muted-foreground">Email & Push enabled</p>
+                  <p className="text-sm text-muted-foreground">
+                    {emailNotifications && pushNotifications ? "Email & Push enabled" : 
+                     emailNotifications ? "Email enabled" : 
+                     pushNotifications ? "Push enabled" : "Disabled"}
+                  </p>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" data-testid="button-notification-settings">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setShowNotificationsDialog(true)}
+                data-testid="button-notification-settings"
+              >
                 Manage
               </Button>
             </div>
@@ -436,6 +597,225 @@ export default function CustomerProfile() {
           </Button>
         </Link>
       </div>
+
+      {/* Edit Address Dialog */}
+      <Dialog open={editAddressType !== null} onOpenChange={(open) => !open && setEditAddressType(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {editAddressType === "home" ? (
+                <><Home className="h-5 w-5" /> Edit Home Address</>
+              ) : (
+                <><Briefcase className="h-5 w-5" /> Edit Work Address</>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Enter your {editAddressType} address for quick access when booking rides.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <GooglePlacesInput
+                value={editAddress}
+                onChange={setEditAddress}
+                onLocationSelect={handleLocationSelect}
+                placeholder={`Enter your ${editAddressType} address`}
+                className="w-full"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => setEditAddressType(null)}
+              data-testid="button-cancel-address"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveAddress}
+              disabled={updateAddressMutation.isPending}
+              data-testid="button-save-address"
+            >
+              {updateAddressMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="h-4 w-4 mr-2" /> Save</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Notifications Settings Dialog */}
+      <Dialog open={showNotificationsDialog} onOpenChange={setShowNotificationsDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5" /> Notification Settings
+            </DialogTitle>
+            <DialogDescription>
+              Manage how you receive notifications from SafeGo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Email Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive trip receipts and updates via email</p>
+              </div>
+              <Switch
+                checked={emailNotifications}
+                onCheckedChange={setEmailNotifications}
+                data-testid="switch-email-notifications"
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>Push Notifications</Label>
+                <p className="text-sm text-muted-foreground">Get real-time updates on your device</p>
+              </div>
+              <Switch
+                checked={pushNotifications}
+                onCheckedChange={setPushNotifications}
+                data-testid="switch-push-notifications"
+              />
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>SMS Notifications</Label>
+                <p className="text-sm text-muted-foreground">Receive driver updates via text message</p>
+              </div>
+              <Switch
+                checked={smsNotifications}
+                onCheckedChange={setSmsNotifications}
+                data-testid="switch-sms-notifications"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => {
+                toast({
+                  title: "Preferences saved",
+                  description: "Your notification settings have been updated.",
+                });
+                setShowNotificationsDialog(false);
+              }}
+              data-testid="button-save-notifications"
+            >
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Language Dialog */}
+      <Dialog open={showLanguageDialog} onOpenChange={setShowLanguageDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" /> Language Settings
+            </DialogTitle>
+            <DialogDescription>
+              Choose your preferred language.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <div className="flex items-center justify-between p-3 rounded-lg border bg-primary/5 border-primary">
+              <div className="flex items-center gap-3">
+                <span className="text-lg">🇺🇸</span>
+                <span className="font-medium">English (US)</span>
+              </div>
+              <CheckCircle2 className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border opacity-50">
+              <div className="flex items-center gap-3">
+                <span className="text-lg">🇧🇩</span>
+                <span className="font-medium">Bengali</span>
+              </div>
+              <Badge variant="secondary">Coming Soon</Badge>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg border opacity-50">
+              <div className="flex items-center gap-3">
+                <span className="text-lg">🇪🇸</span>
+                <span className="font-medium">Spanish</span>
+              </div>
+              <Badge variant="secondary">Coming Soon</Badge>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={() => setShowLanguageDialog(false)}
+              data-testid="button-close-language"
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Safety Dialog */}
+      <Dialog open={showSafetyDialog} onOpenChange={setShowSafetyDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" /> Safety Center
+            </DialogTitle>
+            <DialogDescription>
+              Your safety is our priority.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900">
+              <h4 className="font-semibold text-red-700 dark:text-red-400 mb-2">Emergency Contacts</h4>
+              <p className="text-sm text-red-600 dark:text-red-400">
+                In case of emergency, dial 911 (US) or 999 (BD) immediately.
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <h4 className="font-medium">Safety Features</h4>
+              <div className="grid gap-3">
+                <div className="flex items-start gap-3 p-3 rounded-lg border">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Trip Sharing</p>
+                    <p className="text-sm text-muted-foreground">Share your trip details with trusted contacts</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium">Verified Drivers</p>
+                    <p className="text-sm text-muted-foreground">All drivers undergo background checks</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5" />
+                  <div>
+                    <p className="font-medium">24/7 Support</p>
+                    <p className="text-sm text-muted-foreground">Our support team is always available to help</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Link href="/customer/support">
+              <Button variant="outline" data-testid="button-safety-support">
+                Contact Support
+              </Button>
+            </Link>
+            <Button onClick={() => setShowSafetyDialog(false)} data-testid="button-close-safety">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

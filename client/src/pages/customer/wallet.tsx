@@ -6,8 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
+interface WalletData {
+  wallet?: {
+    balance: string;
+  };
+  transactions?: Array<{
+    type: string;
+    amount: number;
+    description?: string;
+    createdAt: string;
+    referenceId?: string;
+  }>;
+}
+
 export default function CustomerWallet() {
-  const { data: walletData, isLoading } = useQuery({
+  const { data: walletData, isLoading } = useQuery<WalletData>({
     queryKey: ["/api/customer/wallet"],
   });
 
