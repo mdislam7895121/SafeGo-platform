@@ -1,13 +1,13 @@
 /**
  * VehicleCategoryCarousel Component
  * 
- * C3 - Rider Vehicle Category UI
+ * C7 - SafeGo Ride Card Full Redesign
  * Horizontal scrollable carousel of vehicle categories with per-category pricing.
  * Supports both mobile (horizontal pills) and desktop (vertical cards) layouts.
+ * Uber-quality design with consistent visual styling.
  */
 
 import { useMemo } from "react";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { 
   VehicleCategoryCard, 
   VehicleCategoryCardSkeleton,
@@ -78,8 +78,8 @@ export function VehicleCategoryCarousel({
   if (isLoading && activeCategories.length === 0) {
     return (
       <div className={variant === "horizontal" 
-        ? "flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide -mx-3 sm:-mx-4 px-3 sm:px-4" 
-        : "space-y-2"
+        ? "flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 
+        : "grid grid-cols-1 md:grid-cols-2 gap-3"
       }>
         {[1, 2, 3, 4, 5].map((i) => (
           <VehicleCategoryCardSkeleton 
@@ -94,7 +94,7 @@ export function VehicleCategoryCarousel({
   if (variant === "horizontal") {
     return (
       <div 
-        className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide -mx-3 sm:-mx-4 px-3 sm:px-4"
+        className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4"
         data-testid="category-carousel-horizontal"
       >
         {activeCategories.map((categoryId) => {
@@ -129,7 +129,7 @@ export function VehicleCategoryCarousel({
   }
 
   return (
-    <div className="space-y-2" data-testid="category-carousel-vertical">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="category-carousel-vertical">
       {activeCategories.map((categoryId) => {
         const config = VEHICLE_CATEGORIES[categoryId];
         const fare = getFareForCategory(categoryId);
@@ -164,7 +164,7 @@ export function VehicleCategoryCarousel({
 export function VehicleCategoryCarouselLoading({ variant = "horizontal" }: { variant?: "horizontal" | "vertical" }) {
   if (variant === "horizontal") {
     return (
-      <div className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide -mx-3 sm:-mx-4 px-3 sm:px-4">
+      <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
         {[1, 2, 3, 4, 5, 6, 7].map((i) => (
           <VehicleCategoryCardSkeleton key={i} variant="pill" />
         ))}
@@ -173,7 +173,7 @@ export function VehicleCategoryCarouselLoading({ variant = "horizontal" }: { var
   }
 
   return (
-    <div className="space-y-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {[1, 2, 3, 4, 5, 6, 7].map((i) => (
         <VehicleCategoryCardSkeleton key={i} variant="card" />
       ))}
