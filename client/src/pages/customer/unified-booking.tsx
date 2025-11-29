@@ -804,6 +804,67 @@ export default function UnifiedBookingPage() {
                       );
                     })()}
 
+                    {/* Route Selection - Professional chip design - BEFORE ride selection per UX hierarchy */}
+                    {routes.length > 1 && (
+                      <div className="pt-2 pb-1">
+                        <p className="text-sm font-semibold mb-3">
+                          Choose your route
+                        </p>
+                        {/* Route Chips Container - Desktop: flex row, Mobile: horizontal scroll */}
+                        <div 
+                          className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible snap-x snap-mandatory md:snap-none"
+                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+                        >
+                          {routes.map((route, index) => {
+                            const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
+                            const isActive = route.id === activeRouteId;
+                            const routeLabel = index === 0 ? "Fastest" : (route.summary || `Route ${index + 1}`);
+                            return (
+                              <button
+                                key={route.id}
+                                onClick={() => setActiveRouteId(route.id)}
+                                className={`relative flex-shrink-0 flex flex-col p-3 rounded-xl transition-all snap-start ${
+                                  isActive 
+                                    ? "border-2 border-primary bg-primary/5 shadow-md min-w-[130px]" 
+                                    : "border border-border bg-background hover:border-primary/40 hover:shadow-sm min-w-[130px]"
+                                }`}
+                                data-testid={`route-button-${route.id}`}
+                              >
+                                {/* Selected badge - Top right inside chip */}
+                                {isActive && (
+                                  <div className="absolute top-1.5 right-1.5 text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                                    Selected
+                                  </div>
+                                )}
+                                {/* Route Label */}
+                                <span className={`text-sm font-semibold text-left pr-12 ${isActive ? "text-primary" : "text-foreground"}`}>
+                                  {routeLabel}
+                                </span>
+                                {/* Duration and Distance on single line */}
+                                <span className="text-xs text-muted-foreground mt-1.5 text-left">
+                                  {formatDurationMinutes(etaMin)} • {route.distanceMiles.toFixed(1)} mi
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {/* Selected Route Summary Line */}
+                        {activeRoute && (
+                          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
+                            <span className="font-medium">
+                              {routes.findIndex(r => r.id === activeRouteId) === 0 
+                                ? "Fastest" 
+                                : (activeRoute.summary || "Selected route")}
+                            </span>
+                            <span>•</span>
+                            <span>{formatDurationMinutes(Math.ceil(activeRoute.durationInTrafficSeconds / 60))}</span>
+                            <span>•</span>
+                            <span>{activeRoute.distanceMiles.toFixed(1)} mi</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Choose Your Ride Title */}
                     <div className="flex items-center justify-between">
                       <p className="text-base font-semibold">Choose a ride</p>
@@ -945,67 +1006,6 @@ export default function UnifiedBookingPage() {
                         );
                       })}
                     </div>
-
-                    {/* Route Selection - Professional chip design */}
-                    {routes.length > 0 && (
-                      <div className="pt-4 pb-2">
-                        <p className="text-sm font-semibold mb-3">
-                          {routes.length > 1 ? "Choose your route" : "Your route"}
-                        </p>
-                        {/* Route Chips Container - Desktop: flex row, Mobile: horizontal scroll */}
-                        <div 
-                          className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible snap-x snap-mandatory md:snap-none"
-                          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-                        >
-                          {routes.map((route, index) => {
-                            const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
-                            const isActive = route.id === activeRouteId;
-                            const routeLabel = index === 0 ? "Fastest" : (route.summary || `Route ${index + 1}`);
-                            return (
-                              <button
-                                key={route.id}
-                                onClick={() => setActiveRouteId(route.id)}
-                                className={`relative flex-shrink-0 flex flex-col p-3 rounded-xl transition-all snap-start ${
-                                  isActive 
-                                    ? "border-2 border-primary bg-primary/5 shadow-md min-w-[130px]" 
-                                    : "border border-border bg-background hover:border-primary/40 hover:shadow-sm min-w-[130px]"
-                                }`}
-                                data-testid={`route-button-${route.id}`}
-                              >
-                                {/* Selected badge - Top right inside chip */}
-                                {isActive && (
-                                  <div className="absolute top-1.5 right-1.5 text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
-                                    Selected
-                                  </div>
-                                )}
-                                {/* Route Label */}
-                                <span className={`text-sm font-semibold text-left pr-12 ${isActive ? "text-primary" : "text-foreground"}`}>
-                                  {routeLabel}
-                                </span>
-                                {/* Duration and Distance on single line */}
-                                <span className="text-xs text-muted-foreground mt-1.5 text-left">
-                                  {formatDurationMinutes(etaMin)} • {route.distanceMiles.toFixed(1)} mi
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                        {/* Selected Route Summary Line */}
-                        {activeRoute && (
-                          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
-                            <span className="font-medium">
-                              {routes.findIndex(r => r.id === activeRouteId) === 0 
-                                ? "Fastest" 
-                                : (activeRoute.summary || "Selected route")}
-                            </span>
-                            <span>•</span>
-                            <span>{formatDurationMinutes(Math.ceil(activeRoute.durationInTrafficSeconds / 60))}</span>
-                            <span>•</span>
-                            <span>{activeRoute.distanceMiles.toFixed(1)} mi</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </>
                 ) : (
                   /* Address Input View - When NOT in choose-ride mode */
