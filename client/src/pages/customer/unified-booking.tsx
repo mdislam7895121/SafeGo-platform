@@ -607,9 +607,9 @@ export default function UnifiedBookingPage() {
   // Traffic-aware pickup ETA hook
   // Uses Google Directions API with real-time traffic or falls back to simulation
   const pickupLocationCoords = useMemo(() => {
-    if (pickupLocation) return { lat: pickupLocation.lat, lng: pickupLocation.lng };
+    if (pickup) return { lat: pickup.lat, lng: pickup.lng };
     return null;
-  }, [pickupLocation]);
+  }, [pickup]);
   
   // Developer test mode: force traffic condition
   const [forceTrafficCondition, setForceTrafficCondition] = useState<TrafficCondition | undefined>(undefined);
