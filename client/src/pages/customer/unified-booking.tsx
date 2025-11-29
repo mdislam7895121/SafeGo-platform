@@ -7,6 +7,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useGoogleMaps } from "@/hooks/useGoogleMaps";
+import { useNotificationSound } from "@/contexts/NotificationSoundContext";
+import { useTheme } from "@/contexts/ThemeContext";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { SoundToggle } from "@/components/SoundToggle";
 import {
   Car,
   UtensilsCrossed,
@@ -316,6 +320,7 @@ export default function UnifiedBookingPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isReady: isGoogleMapsReady } = useGoogleMaps();
+  const { playDriverAssigned, playTripStarted, playTripCompleted } = useNotificationSound();
   const [isClient, setIsClient] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileMapOpen, setIsMobileMapOpen] = useState(false);
@@ -713,13 +718,16 @@ export default function UnifiedBookingPage() {
         setDriverInfo(driver);
         setRideStatus("DRIVER_ASSIGNED");
         
+        // Play driver assigned notification sound
+        playDriverAssigned();
+        
         toast({ 
           title: "Driver found!", 
           description: `${driver.name} is on the way in a ${driver.carColor} ${driver.carModel}` 
         });
       }, searchDuration);
     }, 500);
-  }, [canRequestRide, toast, mockDrivers]);
+  }, [canRequestRide, toast, mockDrivers, playDriverAssigned]);
 
   // Handle ride cancellation
   const handleCancelRide = useCallback(() => {
@@ -752,8 +760,11 @@ export default function UnifiedBookingPage() {
     setRemainingMiles(activeRoute?.distanceMiles || 90);
     setRideStatus("TRIP_IN_PROGRESS");
     
+    // Play trip started notification sound
+    playTripStarted();
+    
     toast({ title: "Trip started", description: "You're on your way to your destination" });
-  }, [rideStatus, activeRoute, toast]);
+  }, [rideStatus, activeRoute, toast, playTripStarted]);
 
   // Handle completing the trip (debug control)
   const handleCompleteTrip = useCallback(() => {
@@ -764,8 +775,11 @@ export default function UnifiedBookingPage() {
     setRemainingMiles(0);
     setRideStatus("TRIP_COMPLETED");
     
+    // Play trip completed notification sound
+    playTripCompleted();
+    
     toast({ title: "Trip completed", description: "Hope you had a safe ride!" });
-  }, [rideStatus, toast]);
+  }, [rideStatus, toast, playTripCompleted]);
 
   // Handle finishing the trip completion flow
   const handleFinishTripFlow = useCallback(() => {
@@ -1055,6 +1069,12 @@ export default function UnifiedBookingPage() {
                   </Button>
                 </Link>
               </nav>
+
+              {/* Theme Toggle */}
+              <ThemeToggle variant="dropdown" />
+              
+              {/* Sound Toggle */}
+              <SoundToggle />
 
               {/* Profile Dropdown */}
               <DropdownMenu>
