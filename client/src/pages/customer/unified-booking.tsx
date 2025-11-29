@@ -946,50 +946,64 @@ export default function UnifiedBookingPage() {
                       })}
                     </div>
 
-                    {/* Route Selection - Always visible when routes exist */}
+                    {/* Route Selection - Professional chip design */}
                     {routes.length > 0 && (
-                      <div className="pt-3 pb-2">
-                        <p className="text-xs text-muted-foreground mb-3 font-medium">
-                          {routes.length > 1 ? "Choose your route:" : "Your route:"}
+                      <div className="pt-4 pb-2">
+                        <p className="text-sm font-semibold mb-3">
+                          {routes.length > 1 ? "Choose your route" : "Your route"}
                         </p>
+                        {/* Route Chips Container - Desktop: flex row, Mobile: horizontal scroll */}
                         <div 
-                          className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide"
+                          className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible snap-x snap-mandatory md:snap-none"
                           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
                         >
                           {routes.map((route, index) => {
                             const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
                             const isActive = route.id === activeRouteId;
+                            const routeLabel = index === 0 ? "Fastest" : (route.summary || `Route ${index + 1}`);
                             return (
                               <button
                                 key={route.id}
                                 onClick={() => setActiveRouteId(route.id)}
-                                className={`flex-shrink-0 flex flex-col items-start p-3 rounded-xl border-2 transition-all min-w-[140px] ${
+                                className={`relative flex-shrink-0 flex flex-col p-3 rounded-xl transition-all snap-start ${
                                   isActive 
-                                    ? "border-primary bg-primary/5 shadow-md" 
-                                    : "border-border bg-background hover:border-primary/30 hover:shadow-sm"
+                                    ? "border-2 border-primary bg-primary/5 shadow-md min-w-[130px]" 
+                                    : "border border-border bg-background hover:border-primary/40 hover:shadow-sm min-w-[130px]"
                                 }`}
                                 data-testid={`route-button-${route.id}`}
                               >
-                                <div className="flex items-center gap-2 mb-1">
-                                  <div className={`h-2.5 w-2.5 rounded-full ${isActive ? "bg-primary" : "bg-muted-foreground/40"}`} />
-                                  <span className={`text-sm font-semibold ${isActive ? "text-primary" : "text-foreground"}`}>
-                                    {index === 0 ? "Fastest" : route.summary || `Route ${index + 1}`}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                                  <span className="font-medium">{formatDurationMinutes(etaMin)}</span>
-                                  <span>•</span>
-                                  <span>{route.distanceMiles.toFixed(1)} mi</span>
-                                </div>
+                                {/* Selected badge - Top right inside chip */}
                                 {isActive && (
-                                  <div className="mt-2 text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                  <div className="absolute top-1.5 right-1.5 text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
                                     Selected
                                   </div>
                                 )}
+                                {/* Route Label */}
+                                <span className={`text-sm font-semibold text-left pr-12 ${isActive ? "text-primary" : "text-foreground"}`}>
+                                  {routeLabel}
+                                </span>
+                                {/* Duration and Distance on single line */}
+                                <span className="text-xs text-muted-foreground mt-1.5 text-left">
+                                  {formatDurationMinutes(etaMin)} • {route.distanceMiles.toFixed(1)} mi
+                                </span>
                               </button>
                             );
                           })}
                         </div>
+                        {/* Selected Route Summary Line */}
+                        {activeRoute && (
+                          <div className="mt-3 text-xs text-muted-foreground flex items-center gap-1">
+                            <span className="font-medium">
+                              {routes.findIndex(r => r.id === activeRouteId) === 0 
+                                ? "Fastest" 
+                                : (activeRoute.summary || "Selected route")}
+                            </span>
+                            <span>•</span>
+                            <span>{formatDurationMinutes(Math.ceil(activeRoute.durationInTrafficSeconds / 60))}</span>
+                            <span>•</span>
+                            <span>{activeRoute.distanceMiles.toFixed(1)} mi</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </>
