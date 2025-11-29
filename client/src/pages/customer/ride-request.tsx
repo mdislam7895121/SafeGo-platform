@@ -1,11 +1,18 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Navigation, Crosshair, Loader2, Clock, Home, Briefcase, Star, ChevronRight, CreditCard, Wallet, AlertCircle, Car, Route as RouteIcon } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, Crosshair, Loader2, Clock, Home, Briefcase, Star, ChevronRight, CreditCard, Wallet, AlertCircle, Car, Route as RouteIcon, Users, Crown, Sparkles, Zap, Accessibility } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { 
+  VEHICLE_CATEGORIES, 
+  VEHICLE_CATEGORY_ORDER, 
+  type VehicleCategoryId,
+  type VehicleCategoryConfig 
+} from "@shared/vehicleCategories";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
@@ -62,6 +69,28 @@ interface FareEstimate {
   trafficLevel: "light" | "moderate" | "heavy";
   trafficLabel: string;
 }
+
+function getVehicleCategoryIcon(iconType: VehicleCategoryConfig["iconType"]) {
+  switch (iconType) {
+    case "comfort":
+      return Sparkles;
+    case "xl":
+      return Users;
+    case "premium":
+      return Crown;
+    case "suv":
+      return Users;
+    case "accessible":
+      return Accessibility;
+    case "economy":
+    default:
+      return Car;
+  }
+}
+
+const ACTIVE_VEHICLE_CATEGORIES = VEHICLE_CATEGORY_ORDER.filter(
+  (id) => VEHICLE_CATEGORIES[id].isActive
+);
 
 function createPickupIcon() {
   if (typeof window === "undefined") return null;
@@ -201,6 +230,7 @@ export default function RideRequest() {
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeFetchCompleted, setRouteFetchCompleted] = useState(false);
+  const [selectedVehicleCategory, setSelectedVehicleCategory] = useState<VehicleCategoryId>("SAFEGO_X");
 
   const activeRoute = useMemo(() => routes.find(r => r.id === activeRouteId), [routes, activeRouteId]);
   
@@ -411,6 +441,24 @@ export default function RideRequest() {
     }
   }, [pickup, dropoff]);
 
+  const calculateFareForCategory = useCallback((route: RouteData, categoryId: VehicleCategoryId) => {
+    const categoryConfig = VEHICLE_CATEGORIES[categoryId];
+    const distanceMiles = route.distanceMeters / 1609.34;
+    const etaWithTrafficMinutes = Math.ceil(route.durationInTrafficSeconds / 60);
+    
+    const baseFare = 2.50 * categoryConfig.baseMultiplier;
+    const perMileRate = 2.00 * categoryConfig.perMileMultiplier;
+    const perMinRate = 0.30 * categoryConfig.perMinuteMultiplier;
+    
+    const distanceFare = distanceMiles * perMileRate;
+    const timeFare = etaWithTrafficMinutes * perMinRate;
+    let totalFare = baseFare + distanceFare + timeFare;
+    
+    totalFare = Math.max(totalFare, categoryConfig.minimumFare);
+    
+    return Math.round(totalFare * 100) / 100;
+  }, []);
+
   const calculateFareFromRoute = useCallback((route: RouteData) => {
     setIsCalculatingFare(true);
     
@@ -421,16 +469,19 @@ export default function RideRequest() {
     const trafficLevel = getTrafficLevel(route.durationInTrafficSeconds, route.durationSeconds);
     const trafficLabel = getTrafficLevelLabel(trafficLevel);
     
-    const baseFare = 2.50;
-    const perMileRate = 2.00;
-    const perMinRate = 0.30;
+    const categoryConfig = VEHICLE_CATEGORIES[selectedVehicleCategory];
+    const baseFare = 2.50 * categoryConfig.baseMultiplier;
+    const perMileRate = 2.00 * categoryConfig.perMileMultiplier;
+    const perMinRate = 0.30 * categoryConfig.perMinuteMultiplier;
     
     const distanceFare = distanceMiles * perMileRate;
     const timeFare = etaWithTrafficMinutes * perMinRate;
-    const totalFare = baseFare + distanceFare + timeFare;
+    let totalFare = baseFare + distanceFare + timeFare;
+    
+    totalFare = Math.max(totalFare, categoryConfig.minimumFare);
     
     setFareEstimate({
-      baseFare,
+      baseFare: Math.round(baseFare * 100) / 100,
       distanceFare: Math.round(distanceFare * 100) / 100,
       timeFare: Math.round(timeFare * 100) / 100,
       totalFare: Math.round(totalFare * 100) / 100,
@@ -444,7 +495,7 @@ export default function RideRequest() {
     });
     
     setIsCalculatingFare(false);
-  }, []);
+  }, [selectedVehicleCategory]);
 
   useEffect(() => {
     if (pickup && dropoff) {
@@ -455,12 +506,12 @@ export default function RideRequest() {
     }
   }, [pickup, dropoff, fetchRoutes]);
 
-  // Calculate fare when active route changes (no fallback - Google Directions only)
+  // Calculate fare when active route or vehicle category changes
   useEffect(() => {
     if (activeRoute) {
       calculateFareFromRoute(activeRoute);
     }
-  }, [activeRoute, calculateFareFromRoute]);
+  }, [activeRoute, calculateFareFromRoute, selectedVehicleCategory]);
 
   const handlePickupSelect = useCallback((location: { address: string; lat: number; lng: number }) => {
     setPickup(location);
@@ -523,6 +574,7 @@ export default function RideRequest() {
         dropoffLng: dropoff.lng,
         serviceFare: fareEstimate?.totalFare || 0,
         paymentMethod: "online",
+        rideTypeCode: selectedVehicleCategory,
       };
 
       await apiRequest("/api/rides", {
@@ -743,6 +795,82 @@ export default function RideRequest() {
       </div>
 
       <div className="sticky bottom-0 z-30 bg-background border-t p-4 space-y-4 shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
+        {/* Vehicle Category Selector - Horizontal Scroll Carousel */}
+        {activeRoute && (
+          <div data-testid="vehicle-category-selector">
+            <p className="text-xs sm:text-sm font-medium mb-2 flex items-center gap-1.5">
+              <Car className="h-3.5 w-3.5" />
+              Select Ride Type
+            </p>
+            <div 
+              className="flex gap-2.5 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide -mx-4 px-4" 
+              role="group" 
+              aria-label="Vehicle category options"
+            >
+              {ACTIVE_VEHICLE_CATEGORIES.map((categoryId) => {
+                const catConfig = VEHICLE_CATEGORIES[categoryId];
+                const Icon = getVehicleCategoryIcon(catConfig.iconType);
+                const isSelected = categoryId === selectedVehicleCategory;
+                const categoryFare = calculateFareForCategory(activeRoute, categoryId);
+                const etaMinutes = catConfig.etaMinutesOffset + Math.ceil(activeRoute.durationInTrafficSeconds / 60);
+                
+                return (
+                  <Tooltip key={categoryId}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={`min-w-[100px] h-auto rounded-xl border-2 p-3 flex-shrink-0 snap-start ${
+                          isSelected 
+                            ? "bg-primary/10 border-primary shadow-sm" 
+                            : "bg-card border-border hover-elevate"
+                        }`}
+                        onClick={() => setSelectedVehicleCategory(categoryId)}
+                        aria-pressed={isSelected}
+                        aria-label={`${catConfig.displayName}, $${categoryFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaMinutes} minutes ETA${isSelected ? ", selected" : ""}`}
+                        data-testid={`ride-pill-${categoryId}`}
+                      >
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
+                            isSelected 
+                              ? "bg-primary text-primary-foreground" 
+                              : "bg-muted/50"
+                          }`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <span className={`text-xs font-semibold text-center leading-tight ${
+                            isSelected ? "text-primary" : ""
+                          }`}>
+                            {catConfig.displayName.replace("SafeGo ", "")}
+                          </span>
+                          <span className={`text-sm font-bold ${isSelected ? "text-primary" : ""}`}>
+                            ${categoryFare.toFixed(2)}
+                          </span>
+                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                            <Users className="h-2.5 w-2.5" />
+                            <span>{catConfig.seatCount}</span>
+                            <span className="mx-0.5">•</span>
+                            <Clock className="h-2.5 w-2.5" />
+                            <span>{etaMinutes} min</span>
+                          </div>
+                          {catConfig.isPopular && (
+                            <Badge variant="secondary" className="text-[8px] px-1.5 py-0">
+                              Popular
+                            </Badge>
+                          )}
+                        </div>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs max-w-[200px]">
+                      <p className="font-medium">{catConfig.displayName}</p>
+                      <p className="text-muted-foreground">{catConfig.shortDescription}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {fareEstimate && (
           <Card className="bg-muted/50" data-testid="fare-estimate-card">
             <CardContent className="p-3">
@@ -752,7 +880,9 @@ export default function RideRequest() {
                     <CreditCard className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Estimated fare</p>
+                    <p className="text-sm text-muted-foreground">
+                      {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                    </p>
                     <p className="font-semibold text-lg" data-testid="text-fare-estimate">
                       ${fareEstimate.totalFare.toFixed(2)}
                     </p>
