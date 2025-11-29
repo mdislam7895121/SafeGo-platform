@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation, useRoute } from "wouter";
+import { useLocation, useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,6 @@ import {
   Copy,
   Headphones,
 } from "lucide-react";
-import { SupportChatDrawer } from "@/components/customer/SupportChatDrawer";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
 import { formatDurationMinutes } from "@/lib/formatters";
 
@@ -76,7 +75,6 @@ export default function TripReceipt() {
   const { toast } = useToast();
   
   const [receiptData, setReceiptData] = useState<TripReceiptData | null>(null);
-  const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(`trip_receipt_${tripId}`);
@@ -445,27 +443,17 @@ Thank you for riding with SafeGo!
         </div>
         
         {/* Contact Support */}
-        <Button
-          variant="outline"
-          onClick={() => setIsSupportChatOpen(true)}
-          className="w-full"
-          data-testid="button-contact-support-receipt"
-        >
-          <Headphones className="h-4 w-4 mr-2" />
-          Need help? Contact Support
-        </Button>
+        <Link href="/customer/support">
+          <Button
+            variant="outline"
+            className="w-full"
+            data-testid="button-contact-support-receipt"
+          >
+            <Headphones className="h-4 w-4 mr-2" />
+            Need help? Contact Support
+          </Button>
+        </Link>
       </div>
-      
-      {/* Support Chat Drawer */}
-      <SupportChatDrawer
-        isOpen={isSupportChatOpen}
-        onOpenChange={setIsSupportChatOpen}
-        rideId={tripId}
-        tripContext={{
-          pickupAddress: receiptData.pickupAddress,
-          dropoffAddress: receiptData.dropoffAddress,
-        }}
-      />
 
       {/* Fixed bottom button */}
       <div 

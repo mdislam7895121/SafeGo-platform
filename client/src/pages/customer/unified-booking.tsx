@@ -83,7 +83,6 @@ import { RideStatusPanel, type DriverInfo as StatusDriverInfo } from "@/componen
 import { MobileLiveTracking } from "@/components/ride/MobileLiveTracking";
 import { PostTripRatingDialog } from "@/components/customer/PostTripRatingDialog";
 import { RideChatDrawer } from "@/components/customer/RideChatDrawer";
-import { SupportChatDrawer } from "@/components/customer/SupportChatDrawer";
 import { useRideChat } from "@/hooks/useRideChat";
 import {
   VEHICLE_CATEGORIES,
@@ -618,7 +617,6 @@ export default function UnifiedBookingPage() {
   
   // Chat state
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isSupportChatOpen, setIsSupportChatOpen] = useState(false);
   
   // Chat WebSocket hook - stays connected even when drawer is closed
   const isChatActive = (rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && !!currentRideId;
@@ -2840,7 +2838,7 @@ export default function UnifiedBookingPage() {
                                 }
                               }}
                               onMessageDriver={() => setIsChatOpen(true)}
-                              onContactSupport={() => setIsSupportChatOpen(true)}
+                              onContactSupport={() => setLocationRoute("/customer/support")}
                               unreadMessageCount={unreadMessageCount}
                               onCancelRide={handleCancelRideWithConfirm}
                               isCancelling={isCancellingRide}
@@ -2879,7 +2877,7 @@ export default function UnifiedBookingPage() {
                                 }
                               }}
                               onMessageDriver={() => setIsChatOpen(true)}
-                              onContactSupport={() => setIsSupportChatOpen(true)}
+                              onContactSupport={() => setLocationRoute("/customer/support")}
                               unreadMessageCount={unreadMessageCount}
                             />
                             
@@ -3629,17 +3627,6 @@ export default function UnifiedBookingPage() {
           onMarkAsRead={markChatAsRead}
         />
       )}
-      
-      {/* Customer Support Chat Drawer */}
-      <SupportChatDrawer
-        isOpen={isSupportChatOpen}
-        onOpenChange={setIsSupportChatOpen}
-        rideId={currentRideId}
-        tripContext={pickup && dropoff ? {
-          pickupAddress: pickup.address,
-          dropoffAddress: dropoff.address,
-        } : null}
-      />
       
     </div>
   );

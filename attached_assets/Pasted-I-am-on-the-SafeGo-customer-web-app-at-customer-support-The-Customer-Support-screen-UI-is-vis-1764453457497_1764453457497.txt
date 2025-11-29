@@ -1,0 +1,74 @@
+I am on the SafeGo customer web app at /customer/support.
+
+The "Customer → Support" screen UI is visible:
+- Left side: "Verify Your Details" card with my name, masked phone, total trips counter, and a checkbox to confirm.
+- A "Start Chat" primary button under the verification card.
+- Right side: "Start Live Support" panel with info text.
+- Footer text: "SafeGo Support is available 24/7 – Typical response time: under 2 minutes."
+
+The problem:
+- None of the controls respond. Checking the box or clicking "Start Chat" does nothing.
+- I need a working Uber-style live support contact flow, not just a static screen.
+
+Your tasks:
+
+1. **Wire up the /customer/support page**
+   - Locate the customer support page component (likely `client/src/pages/customer/support.tsx` or similar).
+   - Fix any missing `onClick` handlers or state so that:
+     - The verification checkbox toggles a `isVerifiedForSupport` state.
+     - The "Start Chat" button is disabled until the user is verified, then becomes enabled.
+   - When the user clicks "Start Chat":
+     - If they are not logged in, show an auth-required message and redirect to login.
+     - If they are logged in and verified, open the **live support chat** panel.
+
+2. **Connect to the existing Support Center / chat components**
+   - Reuse the Support Center features that are already marked [DONE] in the status table:
+     - multi-page support center (tickets, live-chat, articles, contact)
+   - Embed or navigate to a proper chat view (for example: `/customer/support/chat` or an in-page `<SupportChatPanel />`).
+   - The chat view must include:
+     - Conversation history list (messages with timestamps and who sent them: customer vs support).
+     - A text input box and "Send" button.
+     - Basic typing state and auto-scroll to the latest message.
+
+   If there is no real backend yet:
+   - Implement a **safe demo mode**:
+     - Store messages in local state (or a lightweight store) per session.
+     - Simulate a short support reply (e.g., canned responses) so the customer sees that chat works.
+   - Keep the architecture ready to plug in a real backend later (e.g., WebSocket or polling API), but do NOT add any external services.
+
+3. **Entry points and navigation**
+   - Ensure the support chat is reachable from all three entry points mentioned earlier:
+     1) From an active ride (e.g., "Need help?" or "Contact support" button on the active ride panel).
+     2) From the completed trip receipt page.
+     3) From the profile / support menu.
+   - All of these should route to the same support screen and preserve context (for example, include the current `rideId` or `orderId` in the header so support can see what the user is asking about).
+
+4. **Security, privacy, and safety requirements**
+   - Only authenticated customers can start live chat.
+   - Do NOT expose internal IDs like driver earnings or admin-only info in the chat context.
+   - Mask sensitive fields (phone, email) consistently – show full to the user, but only send what is needed to support APIs.
+   - Log support contact events in a safe way (e.g., one log entry per chat session) without saving any secrets in the frontend code.
+   - Add basic rate-limiting on the client side: prevent spamming the "Send" button (e.g., simple debounce or cooldown).
+   - Respect existing SafeGo role and visibility rules – support chat must *not* allow switching roles or reading driver/admin data.
+
+5. **UX polish**
+   - Make sure the "Start Chat" button has clear states:
+     - Disabled with tooltip or helper text when not verified.
+     - Loading state while initializing a chat session.
+     - Then replaced by the actual chat panel or a "Back to support" link.
+   - Show error toasts if something fails instead of silently doing nothing.
+   - Keep the overall design consistent with the existing SafeGo theme (no new design system).
+
+6. **Regression checks**
+   - Do NOT break any of the following that are already [DONE]:
+     - SafeGo Ride booking, trip receipts, and rating dialog.
+     - Live driver tracking and customer GPS marker.
+     - Wallet, KYC, notifications, or Activity/History.
+   - Verify:
+     - /customer still loads correctly.
+     - /customer/support works on both desktop and mobile preview.
+     - Clicking support from an active ride or trip receipt leads to a functional live chat.
+
+When you finish:
+- Run the architect review.
+- Confirm in your report that the support chat is working end-to-end in demo mode, and that the "Verify details" + "Start Chat" UI is fully interactive and no longer dead.

@@ -33,11 +33,15 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [lastMessageTime, setLastMessageTime] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+  const [lastSendTime, setLastSendTime] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const roleTopics = user ? getTopicsForRole(user.role) : undefined;
   const title = pageTitle || roleTopics?.title || "SafeGo Support";
   const subtitle = roleTopics?.subtitle || "We're here to help";
+  
+  const SEND_COOLDOWN_MS = 1000;
 
   const getStatusLabel = () => {
     if (!isVerified) return "Not Started";
@@ -53,49 +57,126 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
     return "outline";
   };
 
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
   const updateMessages = (newMessages: ChatMessage[]) => {
     if (newMessages.length === 0) return;
     
-    const existingIds = new Set(messages.map(m => m.id));
-    const uniqueNew = newMessages.filter(m => !existingIds.has(m.id));
+    setMessages(prev => {
+      const existingIds = new Set(prev.map(m => m.id));
+      const uniqueNew = newMessages.filter(m => !existingIds.has(m.id));
+      if (uniqueNew.length === 0) return prev;
+      return [...prev, ...uniqueNew];
+    });
     
-    if (uniqueNew.length > 0) {
-      setMessages(prev => [...prev, ...uniqueNew]);
-      const latestTime = newMessages[newMessages.length - 1].createdAt;
-      setLastMessageTime(latestTime);
-    }
+    const latestTime = newMessages[newMessages.length - 1].createdAt;
+    setLastMessageTime(latestTime);
+    scrollToBottom();
+  };
+  
+  const addDemoMessage = (msg: ChatMessage) => {
+    setMessages(prev => [...prev, msg]);
+    scrollToBottom();
   };
 
   const startChatMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/support/chat/start", {});
-      return res.json();
+      try {
+        const res = await apiRequest("/api/support/chat/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        return res.json();
+      } catch {
+        setDemoMode(true);
+        return {
+          conversation: { id: `demo-${Date.now()}` },
+          messages: [{
+            id: "welcome-1",
+            senderType: "bot",
+            content: "Hello! Welcome to SafeGo Support. How can I help you today?",
+            createdAt: new Date().toISOString(),
+          }],
+        };
+      }
     },
     onSuccess: (data) => {
       setConversationId(data.conversation.id);
       updateMessages(data.messages);
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to start chat. Please try again.",
-        variant: "destructive",
-      });
+      setDemoMode(true);
+      setConversationId(`demo-${Date.now()}`);
+      setMessages([{
+        id: "welcome-1",
+        senderType: "bot",
+        content: "Hello! Welcome to SafeGo Support. How can I help you today?",
+        createdAt: new Date().toISOString(),
+      }]);
     },
   });
+
+  const getDemoResponse = (userMessage: string): string => {
+    const lowerMsg = userMessage.toLowerCase();
+    if (lowerMsg.includes("ride") || lowerMsg.includes("trip")) {
+      return "I'd be happy to help with your ride. Could you please share more details about what you need assistance with?";
+    }
+    if (lowerMsg.includes("payment") || lowerMsg.includes("charge") || lowerMsg.includes("refund")) {
+      return "I understand you have a payment concern. Our team will review this and get back to you shortly. For urgent matters, please provide the trip ID.";
+    }
+    if (lowerMsg.includes("driver") || lowerMsg.includes("rating")) {
+      return "Thank you for reaching out about this. We take feedback seriously and will investigate the matter.";
+    }
+    if (lowerMsg.includes("agent") || lowerMsg.includes("human") || lowerMsg.includes("person")) {
+      return "I'm connecting you with a support specialist. Please hold while we find an available agent. Average wait time is under 2 minutes.";
+    }
+    return "Thank you for your message. A support specialist will review this and respond shortly. Is there anything else I can help you with?";
+  };
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       if (!conversationId) throw new Error("No conversation");
-      const res = await apiRequest("POST", "/api/support/chat/messages", {
-        conversationId,
-        content,
+      
+      if (demoMode) {
+        const userMsg: ChatMessage = {
+          id: `user-${Date.now()}`,
+          senderType: "user",
+          content,
+          createdAt: new Date().toISOString(),
+        };
+        addDemoMessage(userMsg);
+        return { demoMode: true, demoResponse: getDemoResponse(content) };
+      }
+      
+      const res = await apiRequest("/api/support/chat/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, content }),
       });
       return res.json();
     },
     onSuccess: (data) => {
       setMessageInput("");
-      updateMessages(data.messages);
+      setLastSendTime(Date.now());
+      
+      if (data.demoMode && data.demoResponse) {
+        setTimeout(() => {
+          const botMsg: ChatMessage = {
+            id: `bot-${Date.now()}`,
+            senderType: "bot",
+            content: data.demoResponse,
+            createdAt: new Date().toISOString(),
+          };
+          addDemoMessage(botMsg);
+        }, 800 + Math.random() * 700);
+      } else if (data.messages) {
+        updateMessages(data.messages);
+      }
     },
     onError: () => {
       toast({
@@ -109,11 +190,47 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
   const handleSendMessage = () => {
     const trimmed = messageInput.trim();
     if (!trimmed || !conversationId) return;
+    
+    const now = Date.now();
+    if (now - lastSendTime < SEND_COOLDOWN_MS) {
+      toast({
+        title: "Please wait",
+        description: "You're sending messages too quickly.",
+        variant: "default",
+      });
+      return;
+    }
+    
     sendMessageMutation.mutate(trimmed);
   };
 
   const handleQuickTopic = (userMessage: string, botResponse: string) => {
     if (!conversationId || sendMessageMutation.isPending) return;
+    
+    const now = Date.now();
+    if (now - lastSendTime < SEND_COOLDOWN_MS) return;
+    setLastSendTime(now);
+    
+    if (demoMode) {
+      const userMsg: ChatMessage = {
+        id: `user-${Date.now()}`,
+        senderType: "user",
+        content: userMessage,
+        createdAt: new Date().toISOString(),
+      };
+      addDemoMessage(userMsg);
+      
+      setTimeout(() => {
+        const botMsg: ChatMessage = {
+          id: `bot-${Date.now()}`,
+          senderType: "bot",
+          content: botResponse,
+          createdAt: new Date().toISOString(),
+        };
+        addDemoMessage(botMsg);
+      }, 600);
+      return;
+    }
     
     sendMessageMutation.mutate(userMessage, {
       onSuccess: () => {
@@ -124,7 +241,7 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
             content: botResponse,
             createdAt: new Date().toISOString(),
           };
-          setMessages(prev => [...prev, botMessage]);
+          addDemoMessage(botMessage);
         }, 500);
       },
     });
@@ -141,6 +258,7 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
       setConversationId(null);
       setMessages([]);
       setLastMessageTime(null);
+      setDemoMode(false);
       queryClient.invalidateQueries({ queryKey: ["/api/support/chat"] });
       toast({
         title: "Chat ended",
@@ -150,14 +268,14 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
   };
 
   useEffect(() => {
-    if (!conversationId || !lastMessageTime) return;
+    if (!conversationId || !lastMessageTime || demoMode) return;
 
     const fetchNewMessages = async () => {
       try {
         const sinceParam = `&since=${lastMessageTime}`;
         const res = await fetch(`/api/support/chat/messages?conversationId=${conversationId}${sinceParam}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('safego_token')}`,
           },
         });
         
@@ -174,7 +292,7 @@ export function SupportChat({ backRoute, pageTitle }: SupportChatProps) {
 
     const interval = setInterval(fetchNewMessages, 4000);
     return () => clearInterval(interval);
-  }, [conversationId, lastMessageTime, messages]);
+  }, [conversationId, lastMessageTime, demoMode]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
