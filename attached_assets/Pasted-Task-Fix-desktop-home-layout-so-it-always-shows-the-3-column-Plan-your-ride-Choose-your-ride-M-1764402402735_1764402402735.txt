@@ -1,0 +1,110 @@
+Task: Fix desktop home layout so it always shows the 3-column “Plan your ride | Choose your ride | Map” screen, while keeping the current multi-step flow on mobile exactly as is.
+
+Follow all SafeGo rules:
+- Do not change any backend logic (pricing, promos, commission, dispatch, routing, KYC, payments).
+- Only change the customer web UI layout and responsive behavior.
+- Re-use existing components – do not fork duplicates of address bars, ride cards, or map logic.
+
+1. Current behavior (what we have now)
+- Route `/customer` shows the “Good night, islam789 – Where are you going?” home screen with:
+  - Pickup capsule
+  - Dropoff capsule
+  - Time selector (Now / For me)
+  - Payment method
+  - “See prices” button
+- Route `/customer/ride` (or `/customer/ride-request`, confirm in code) shows the 3-column layout:
+  - Left: Plan your ride card with pickup/dropoff.
+  - Middle: “Choose your ride” list with SafeGo X / SafeGo Comfort / Comfort XL / XL / Black / Black SUV / WAV.
+  - Right: Map with route A→B and zoom.
+
+We want:
+- Desktop (laptop / large screen) to land directly on the 3-column layout as the “home” experience.
+- Mobile to keep the current 3-step wizard (home → choose ride → choose route).
+
+2. New responsive behavior specification
+
+2.1. Breakpoint
+- Use a single breakpoint, for example:
+  - Desktop: `min-width: 1024px` (or use our existing lg breakpoint if we have Tailwind or similar).
+  - Mobile / tablet: below that.
+
+2.2. Desktop behavior (>= 1024px)
+- When the user visits `/customer`:
+  - Immediately render the 3-column “Plan your ride” experience – the same layout we currently see on `/customer/ride`.
+  - Do NOT show the “Good night, islam789 / See prices” greeting screen at all on desktop.
+- Layout details:
+  - Left column: Plan your ride card with the new capsule address bars (pickup + dropoff) that we already implemented.
+  - Middle column: “Choose your ride” list with the new SafeGo ride cards and 3D car images.
+  - Right column: Map with the active route, zoomed between pickup A and dropoff B.
+  - Keep SafeGo Everyday Saver banner and payment info where they already exist in the 3-column screen.
+- Routing:
+  - Option A (preferred and simplest): On `/customer` detect desktop via a `useIsDesktop` hook or window width, and for desktop simply render the same component that is used by `/customer/ride` (or redirect internally to that component).
+  - Option B: Make the main “RideExperience” component accept a `mode` prop (`"desktop"` or `"mobile"`) and reuse the same logic, but for desktop always show the 3-column view.
+- Address state:
+  - The pickup/dropoff state should be shared with mobile home so that if the user typed addresses on mobile home and then switches orientation, the same values appear on the 3-column layout.
+  - Use a single source of truth (context, global store, or a shared hook) instead of duplicating local state in two components.
+
+2.3. Mobile behavior (< 1024px)
+- Keep the current behavior exactly:
+  1) `/customer` shows greeting: “Good night, islam789 – Where are you going?”
+     - Two capsule address fields:
+       - Pickup (with current location dot / edit icon).
+       - “Where to?” dropoff.
+     - Time selector (Now / For me).
+     - Payment row.
+     - “See prices” button.
+  2) After tapping “See prices”, user goes to the ride list screen:
+     - Only ONE address section visible at top (the new two-line capsule we implemented).
+     - Below that, vertical list of SafeGo rides.
+  3) After tapping “Choose your route”, user goes to the route selection screen:
+     - Map takes main area.
+     - The 3 route buttons (Fastest, route 2, route 3) are fully visible above the “Request ride” button (no cropping on the right side).
+- Important: The desktop changes must not break this mobile flow.
+
+3. Remove duplicated address bars on desktop
+- On desktop, there must NOT be three separate screens with address bars:
+  - No greeting screen with pickup/dropoff on `/customer`.
+  - Only the 3-column layout should show the address capsule in the left “Plan your ride” panel.
+- Implementation:
+  - For desktop, when on `/customer`, skip rendering the greeting UI component entirely.
+  - Instead directly render the 3-column Ride page component, wiring it to the same address state.
+  - Ensure that the Plan card on the left uses the capsule style we defined previously (not big card blocks).
+
+4. Fix the “Choose your route” buttons on mobile
+- On the mobile route selection screen:
+  - Make sure the 3 buttons (Fastest, route 2, route 3) fit fully inside the viewport width with proper spacing.
+  - Use flex with `justify-between` or equal width buttons so that the third button is not cut off on the right.
+  - Keep “Request ride” button sticky at the bottom with full width.
+
+5. Map behavior after “See prices”
+- When user hits “See prices” on mobile:
+  - The intermediate “Plan card over map” floating view should only be visible briefly while we compute routes OR you can fade it out and show the map in the background.
+  - After routes and prices are ready, the user is on the ride list screen; the full-screen map is not needed at this step.
+- When user taps “Choose your route”:
+  - Transition to the route screen.
+  - Map must:
+    - Center and zoom so the user’s pickup and dropoff are both visible.
+    - Show the current location marker (A) clearly.
+    - Highlight the selected route.
+
+6. Code hygiene and safety
+- Do not touch:
+  - Fare calculation logic, promo engine, commission split, driver earnings.
+  - Driver / rider visibility rules we implemented earlier.
+  - Backend APIs or environment config.
+- Limit changes to:
+  - UI layout components in the customer web app.
+  - Routing configuration for `/customer` and `/customer/ride`.
+  - Responsive CSS / breakpoint conditions.
+
+7. Final checks
+- Test matrix:
+  - Desktop browser at full width:
+    - Visit `/customer` → should immediately show the 3-column “Plan your ride | Choose your ride | Map” layout.
+  - Mobile preview (iPhone 15 / Pixel 8):
+    - Step 1: greeting + address + “See prices”.
+    - Step 2: ride list with our new SafeGo ride cards.
+    - Step 3: route selection with 3 fully visible buttons and a clear map.
+  - Confirm there is no screen where address bars appear three times in a row.
+
+Please implement this behavior now, reusing existing components, and then summarize exactly what you changed (files + main components) so we can keep tracking.

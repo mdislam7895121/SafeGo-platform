@@ -3,6 +3,8 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { useIsDesktop } from "@/hooks/use-mobile";
+import RideRequest from "@/pages/customer/ride-request";
 import { 
   Car, Package, UtensilsCrossed, User, Clock, HelpCircle, MapPin, 
   ChevronDown, ChevronRight, Calendar, ShoppingCart, Smartphone, Bus,
@@ -88,6 +90,20 @@ interface SearchResult {
 }
 
 export default function CustomerHome() {
+  const isDesktop = useIsDesktop();
+  
+  // On desktop (≥1024px), render the 3-column RideRequest layout directly
+  // This provides the full "Plan your ride | Choose your ride | Map" experience
+  // Mobile keeps the current multi-step wizard flow with greeting screen
+  if (isDesktop) {
+    return <RideRequest />;
+  }
+
+  // Mobile flow continues below - greeting screen with See Prices button
+  return <CustomerHomeMobile />;
+}
+
+function CustomerHomeMobile() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
