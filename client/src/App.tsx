@@ -323,6 +323,11 @@ function Router() {
           <UnifiedBooking />
         </ProtectedRoute>
       </Route>
+      <Route path="/customer/book">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <UnifiedBooking />
+        </ProtectedRoute>
+      </Route>
       <Route path="/customer/support">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerSupport />
