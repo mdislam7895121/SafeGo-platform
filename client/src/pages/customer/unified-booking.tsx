@@ -51,6 +51,11 @@ type RideStatus =
   | "TRIP_COMPLETED"
   | "TRIP_CANCELLED";
 
+// Explicit tracking phases for Uber-style live tracking
+// EN_ROUTE_TO_PICKUP: Driver is heading to pick up the customer
+// EN_ROUTE_TO_DROPOFF: Customer is in the car, heading to destination
+type TrackingPhase = "EN_ROUTE_TO_PICKUP" | "EN_ROUTE_TO_DROPOFF" | "COMPLETED" | "CANCELLED" | null;
+
 interface DriverInfo {
   name: string;
   rating: number;
@@ -258,6 +263,46 @@ function getManeuverText(maneuver: string): string {
     sharp_left: "Make a sharp left",
   };
   return texts[maneuver] || "Continue";
+}
+
+// Generate a realistic driver starting position 1-3 miles from pickup
+// Uses a random bearing but ensures the position is along a plausible route direction
+function generateDriverStartPosition(
+  pickupLat: number, 
+  pickupLng: number
+): { lat: number; lng: number } {
+  // Random distance between 1 and 3 miles
+  const distanceMiles = 1 + Math.random() * 2;
+  
+  // Random bearing (0-360 degrees)
+  const bearingDeg = Math.random() * 360;
+  
+  // Convert to radians for calculation
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const toDeg = (rad: number) => (rad * 180) / Math.PI;
+  
+  // Earth radius in miles
+  const R = 3959;
+  
+  const lat1 = toRad(pickupLat);
+  const lng1 = toRad(pickupLng);
+  const bearing = toRad(bearingDeg);
+  const d = distanceMiles / R;
+  
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(d) + 
+    Math.cos(lat1) * Math.sin(d) * Math.cos(bearing)
+  );
+  
+  const lng2 = lng1 + Math.atan2(
+    Math.sin(bearing) * Math.sin(d) * Math.cos(lat1),
+    Math.cos(d) - Math.sin(lat1) * Math.sin(lat2)
+  );
+  
+  return {
+    lat: toDeg(lat2),
+    lng: toDeg(lng2),
+  };
 }
 
 function createRotatedDriverIcon(heading: number): L.DivIcon {
@@ -485,6 +530,15 @@ export default function UnifiedBookingPage() {
   const animationFrameRef = useRef<number | null>(null);
   const prevDriverPositionRef = useRef<{ lat: number; lng: number } | null>(null);
   const prevTimestampRef = useRef<number>(Date.now());
+  
+  // Phase-based tracking state for Uber-style live tracking
+  // Separates "going to pickup" from "going to dropoff" with distinct routes
+  const [trackingPhase, setTrackingPhase] = useState<TrackingPhase>(null);
+  const [driverStartPosition, setDriverStartPosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverToPickupRoute, setDriverToPickupRoute] = useState<[number, number][]>([]);
+  const [pickupToDropoffRoute, setPickupToDropoffRoute] = useState<[number, number][]>([]);
+  const [pickupEtaMinutes, setPickupEtaMinutes] = useState<number>(0);
+  const [pickupDistanceMiles, setPickupDistanceMiles] = useState<number>(0);
   
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
@@ -817,11 +871,16 @@ export default function UnifiedBookingPage() {
   ];
 
   const handleRequestRide = useCallback(async () => {
-    if (!canRequestRide) return;
+    if (!canRequestRide || !pickup) return;
     
     // Move to CONFIRMING briefly, then to SEARCHING_DRIVER
     setRideStatus("CONFIRMING");
     setIsRequestingRide(true);
+    
+    // Store the pickup → dropoff route polyline for EN_ROUTE_TO_DROPOFF phase
+    if (activeRoutePoints.length > 0) {
+      setPickupToDropoffRoute(activeRoutePoints);
+    }
     
     // Immediately transition to SEARCHING_DRIVER
     setTimeout(() => {
@@ -830,11 +889,76 @@ export default function UnifiedBookingPage() {
       
       // Simulate driver search (3-5 seconds)
       const searchDuration = 3000 + Math.random() * 2000;
-      searchTimeoutRef.current = setTimeout(() => {
+      searchTimeoutRef.current = setTimeout(async () => {
         // Assign a random driver
         const driver = mockDrivers[Math.floor(Math.random() * mockDrivers.length)];
+        
+        // Generate driver starting position 1-3 miles from pickup (not 20+ miles away)
+        const driverStart = generateDriverStartPosition(pickup.lat, pickup.lng);
+        setDriverStartPosition(driverStart);
+        
+        // Fetch the driver → pickup route using Google Directions API
+        // This creates a separate polyline for the EN_ROUTE_TO_PICKUP phase
+        if (isGoogleMapsReady) {
+          try {
+            const directionsService = new google.maps.DirectionsService();
+            const result = await new Promise<google.maps.DirectionsResult | null>((resolve) => {
+              directionsService.route(
+                {
+                  origin: { lat: driverStart.lat, lng: driverStart.lng },
+                  destination: { lat: pickup.lat, lng: pickup.lng },
+                  travelMode: google.maps.TravelMode.DRIVING,
+                },
+                (result, status) => {
+                  if (status === google.maps.DirectionsStatus.OK && result) {
+                    resolve(result);
+                  } else {
+                    resolve(null);
+                  }
+                }
+              );
+            });
+            
+            if (result && result.routes[0]) {
+              const route = result.routes[0];
+              const polyline = route.overview_polyline;
+              const polylineStr = typeof polyline === "string" ? polyline : "";
+              const driverToPickupPoints = decodePolyline(polylineStr);
+              setDriverToPickupRoute(driverToPickupPoints);
+              
+              // Calculate initial pickup ETA and distance from the route
+              const leg = route.legs[0];
+              const etaMinutes = Math.ceil((leg.duration?.value || 300) / 60);
+              const distMiles = (leg.distance?.value || 1600) / 1609.34;
+              setPickupEtaMinutes(etaMinutes);
+              setPickupDistanceMiles(distMiles);
+              setRemainingMinutes(etaMinutes);
+              setRemainingMiles(distMiles);
+            } else {
+              // Fallback: generate a simple straight-line route if API fails
+              setDriverToPickupRoute([[driverStart.lat, driverStart.lng], [pickup.lat, pickup.lng]]);
+              const straightLineDistance = calculateDistance(driverStart, pickup);
+              setPickupEtaMinutes(Math.ceil(straightLineDistance * 2)); // ~30 mph estimate
+              setPickupDistanceMiles(straightLineDistance);
+              setRemainingMinutes(Math.ceil(straightLineDistance * 2));
+              setRemainingMiles(straightLineDistance);
+            }
+          } catch (error) {
+            console.error("[UnifiedBooking] Failed to fetch driver-to-pickup route:", error);
+            // Fallback route
+            setDriverToPickupRoute([[driverStart.lat, driverStart.lng], [pickup.lat, pickup.lng]]);
+            const straightLineDistance = calculateDistance(driverStart, pickup);
+            setPickupEtaMinutes(Math.ceil(straightLineDistance * 2));
+            setPickupDistanceMiles(straightLineDistance);
+            setRemainingMinutes(Math.ceil(straightLineDistance * 2));
+            setRemainingMiles(straightLineDistance);
+          }
+        }
+        
         setDriverInfo(driver);
         setRideStatus("DRIVER_ASSIGNED");
+        // Set tracking phase to EN_ROUTE_TO_PICKUP (driver heading toward customer)
+        setTrackingPhase("EN_ROUTE_TO_PICKUP");
         
         // Play driver assigned notification sound
         playDriverAssigned();
@@ -845,7 +969,7 @@ export default function UnifiedBookingPage() {
         });
       }, searchDuration);
     }, 500);
-  }, [canRequestRide, toast, mockDrivers, playDriverAssigned]);
+  }, [canRequestRide, pickup, activeRoutePoints, isGoogleMapsReady, toast, mockDrivers, playDriverAssigned]);
 
   // Handle ride cancellation
   const handleCancelRide = useCallback(() => {
@@ -858,10 +982,12 @@ export default function UnifiedBookingPage() {
     if (rideStatus === "SEARCHING_DRIVER") {
       // Cancel before driver assigned - go back to selecting
       setRideStatus("SELECTING");
+      setTrackingPhase(null);
       toast({ title: "Ride cancelled", description: "Your ride request has been cancelled" });
     } else if (rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") {
       // Cancel after driver assigned - show cancelled state
       setRideStatus("TRIP_CANCELLED");
+      setTrackingPhase("CANCELLED");
       toast({ title: "Ride cancelled", description: "Your ride has been cancelled" });
     }
     
@@ -870,6 +996,7 @@ export default function UnifiedBookingPage() {
   }, [rideStatus, toast]);
 
   // Handle starting the trip (debug control)
+  // This transitions from EN_ROUTE_TO_PICKUP to EN_ROUTE_TO_DROPOFF phase
   const handleStartTrip = useCallback(() => {
     if (rideStatus !== "DRIVER_ASSIGNED") return;
     
@@ -878,11 +1005,26 @@ export default function UnifiedBookingPage() {
     setRemainingMiles(activeRoute?.distanceMiles || 90);
     setRideStatus("TRIP_IN_PROGRESS");
     
+    // Switch tracking phase to EN_ROUTE_TO_DROPOFF (customer in car, heading to destination)
+    setTrackingPhase("EN_ROUTE_TO_DROPOFF");
+    
+    // Reset driver position to start of the pickup → dropoff route
+    setDriverPositionIndex(0);
+    if (pickupToDropoffRoute.length > 0) {
+      const startPos = {
+        lat: pickupToDropoffRoute[0][0],
+        lng: pickupToDropoffRoute[0][1],
+      };
+      setDriverPosition(startPos);
+      setInterpolatedPosition(startPos);
+      prevDriverPositionRef.current = startPos;
+    }
+    
     // Play trip started notification sound
     playTripStarted();
     
     toast({ title: "Trip started", description: "You're on your way to your destination" });
-  }, [rideStatus, activeRoute, toast, playTripStarted]);
+  }, [rideStatus, activeRoute, pickupToDropoffRoute, toast, playTripStarted]);
 
   // Handle completing the trip (debug control)
   const handleCompleteTrip = useCallback(() => {
@@ -892,6 +1034,8 @@ export default function UnifiedBookingPage() {
     setRemainingMinutes(0);
     setRemainingMiles(0);
     setRideStatus("TRIP_COMPLETED");
+    // Set tracking phase to COMPLETED
+    setTrackingPhase("COMPLETED");
     
     // Play trip completed notification sound
     playTripCompleted();
@@ -912,10 +1056,20 @@ export default function UnifiedBookingPage() {
     setRemainingMiles(0);
     // Reset driver tracking state
     setDriverPosition(null);
+    setInterpolatedPosition(null);
     setDriverPositionIndex(0);
     setDriverHeading(0);
+    setDriverSpeedMph(0);
+    setNextTurnInstruction(null);
     setIsFollowingDriver(true);
     prevDriverPositionRef.current = null;
+    // Reset phase-based tracking state
+    setTrackingPhase(null);
+    setDriverStartPosition(null);
+    setDriverToPickupRoute([]);
+    setPickupToDropoffRoute([]);
+    setPickupEtaMinutes(0);
+    setPickupDistanceMiles(0);
     
     toast({ title: "Thank you!", description: "We hope to see you again soon" });
   }, [toast]);
@@ -926,10 +1080,20 @@ export default function UnifiedBookingPage() {
     setDriverInfo(null);
     // Reset driver tracking state
     setDriverPosition(null);
+    setInterpolatedPosition(null);
     setDriverPositionIndex(0);
     setDriverHeading(0);
+    setDriverSpeedMph(0);
+    setNextTurnInstruction(null);
     setIsFollowingDriver(true);
     prevDriverPositionRef.current = null;
+    // Reset phase-based tracking state
+    setTrackingPhase(null);
+    setDriverStartPosition(null);
+    setDriverToPickupRoute([]);
+    setPickupToDropoffRoute([]);
+    setPickupEtaMinutes(0);
+    setPickupDistanceMiles(0);
   }, []);
 
   // Convert driverInfo to StatusDriverInfo for RideStatusPanel
@@ -1006,17 +1170,29 @@ export default function UnifiedBookingPage() {
     };
   }, []);
   
-  // Detect next turn in route
+  // Get the active route points based on the current tracking phase
+  // EN_ROUTE_TO_PICKUP uses driverToPickupRoute (driver → pickup)
+  // EN_ROUTE_TO_DROPOFF uses pickupToDropoffRoute (pickup → dropoff)
+  const phaseRoutePoints = useMemo(() => {
+    if (trackingPhase === "EN_ROUTE_TO_PICKUP" && driverToPickupRoute.length > 0) {
+      return driverToPickupRoute;
+    } else if (trackingPhase === "EN_ROUTE_TO_DROPOFF" && pickupToDropoffRoute.length > 0) {
+      return pickupToDropoffRoute;
+    }
+    return [];
+  }, [trackingPhase, driverToPickupRoute, pickupToDropoffRoute]);
+
+  // Detect next turn in route (uses phase-specific route)
   const detectNextTurn = useCallback((fromIndex: number): { text: string; distanceFeet: number; maneuver: string } | null => {
-    if (activeRoutePoints.length < 3 || fromIndex >= activeRoutePoints.length - 2) return null;
+    if (phaseRoutePoints.length < 3 || fromIndex >= phaseRoutePoints.length - 2) return null;
     
-    const lookAhead = Math.min(20, activeRoutePoints.length - fromIndex - 1);
+    const lookAhead = Math.min(20, phaseRoutePoints.length - fromIndex - 1);
     let cumulativeDistance = 0;
     
     for (let i = fromIndex; i < fromIndex + lookAhead - 1; i++) {
-      const p1 = { lat: activeRoutePoints[i][0], lng: activeRoutePoints[i][1] };
-      const p2 = { lat: activeRoutePoints[i + 1][0], lng: activeRoutePoints[i + 1][1] };
-      const p3 = { lat: activeRoutePoints[i + 2][0], lng: activeRoutePoints[i + 2][1] };
+      const p1 = { lat: phaseRoutePoints[i][0], lng: phaseRoutePoints[i][1] };
+      const p2 = { lat: phaseRoutePoints[i + 1][0], lng: phaseRoutePoints[i + 1][1] };
+      const p3 = { lat: phaseRoutePoints[i + 2][0], lng: phaseRoutePoints[i + 2][1] };
       
       const heading1 = calculateBearing(p1, p2);
       const heading2 = calculateBearing(p2, p3);
@@ -1037,39 +1213,41 @@ export default function UnifiedBookingPage() {
     }
     
     return null;
-  }, [activeRoutePoints]);
+  }, [phaseRoutePoints]);
 
-  // Calculate remaining distance from index to target
-  const calculateRemainingDistance = useCallback((fromIndex: number, toIndex: number): number => {
-    if (activeRoutePoints.length < 2 || fromIndex >= toIndex) return 0;
+  // Calculate remaining distance from index to end of current phase route
+  const calculateRemainingDistance = useCallback((fromIndex: number): number => {
+    if (phaseRoutePoints.length < 2 || fromIndex >= phaseRoutePoints.length - 1) return 0;
     
     let distance = 0;
-    for (let i = fromIndex; i < toIndex && i < activeRoutePoints.length - 1; i++) {
-      const from = { lat: activeRoutePoints[i][0], lng: activeRoutePoints[i][1] };
-      const to = { lat: activeRoutePoints[i + 1][0], lng: activeRoutePoints[i + 1][1] };
+    for (let i = fromIndex; i < phaseRoutePoints.length - 1; i++) {
+      const from = { lat: phaseRoutePoints[i][0], lng: phaseRoutePoints[i][1] };
+      const to = { lat: phaseRoutePoints[i + 1][0], lng: phaseRoutePoints[i + 1][1] };
       distance += calculateDistance(from, to);
     }
     return distance;
-  }, [activeRoutePoints]);
+  }, [phaseRoutePoints]);
 
-  // Memoize a unique key for the route to detect actual route changes
-  const routePointsKey = useMemo(() => {
-    if (activeRoutePoints.length === 0) return '';
-    // Use length + first point + middle point + last point for robust uniqueness
-    const first = activeRoutePoints[0];
-    const middle = activeRoutePoints[Math.floor(activeRoutePoints.length / 2)];
-    const last = activeRoutePoints[activeRoutePoints.length - 1];
-    return `${activeRoutePoints.length}:${first[0].toFixed(4)},${first[1].toFixed(4)}:${middle[0].toFixed(4)},${middle[1].toFixed(4)}:${last[0].toFixed(4)},${last[1].toFixed(4)}`;
-  }, [activeRoutePoints]);
+  // Memoize a unique key for the phase route to detect route changes
+  const phaseRouteKey = useMemo(() => {
+    if (phaseRoutePoints.length === 0) return '';
+    const first = phaseRoutePoints[0];
+    const middle = phaseRoutePoints[Math.floor(phaseRoutePoints.length / 2)];
+    const last = phaseRoutePoints[phaseRoutePoints.length - 1];
+    return `${trackingPhase}:${phaseRoutePoints.length}:${first[0].toFixed(4)},${first[1].toFixed(4)}:${middle[0].toFixed(4)},${middle[1].toFixed(4)}:${last[0].toFixed(4)},${last[1].toFixed(4)}`;
+  }, [trackingPhase, phaseRoutePoints]);
   
-  // Track if simulation has been initialized for current route
+  // Track if simulation has been initialized for current phase route
   const simulationInitializedRef = useRef<string>('');
 
-  // Driver position simulation - moves driver along route polyline with smooth animation
+  // Phase-based driver simulation - moves driver along the correct route per phase
+  // EN_ROUTE_TO_PICKUP: Driver moves from starting position TOWARD pickup
+  // EN_ROUTE_TO_DROPOFF: Driver moves from pickup TOWARD dropoff
   useEffect(() => {
-    const isTrackingDriver = rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS";
+    const isTrackingDriver = trackingPhase === "EN_ROUTE_TO_PICKUP" || trackingPhase === "EN_ROUTE_TO_DROPOFF";
     
     if (!isTrackingDriver) {
+      // Not in active tracking phase - clear simulation
       if (driverSimulationRef.current) {
         clearInterval(driverSimulationRef.current);
         driverSimulationRef.current = null;
@@ -1078,24 +1256,30 @@ export default function UnifiedBookingPage() {
         cancelAnimationFrame(animationFrameRef.current);
         animationFrameRef.current = null;
       }
-      setDriverPosition(null);
-      setInterpolatedPosition(null);
-      setDriverPositionIndex(0);
-      setDriverHeading(0);
-      setDriverSpeedMph(0);
-      setNextTurnInstruction(null);
-      prevDriverPositionRef.current = null;
-      prevTimestampRef.current = Date.now();
-      simulationInitializedRef.current = '';
+      // Only reset position if not in a tracked state at all
+      if (!trackingPhase) {
+        setDriverPosition(null);
+        setInterpolatedPosition(null);
+        setDriverPositionIndex(0);
+        setDriverHeading(0);
+        setDriverSpeedMph(0);
+        setNextTurnInstruction(null);
+        prevDriverPositionRef.current = null;
+        prevTimestampRef.current = Date.now();
+        simulationInitializedRef.current = '';
+      }
       return;
     }
 
-    if (activeRoutePoints.length === 0) return;
+    // Need route points to simulate
+    if (phaseRoutePoints.length === 0) return;
 
-    if (driverSimulationRef.current && simulationInitializedRef.current === routePointsKey) {
+    // Skip if already initialized for this exact phase route
+    if (driverSimulationRef.current && simulationInitializedRef.current === phaseRouteKey) {
       return;
     }
 
+    // Clear any existing simulation
     if (driverSimulationRef.current) {
       clearInterval(driverSimulationRef.current);
       driverSimulationRef.current = null;
@@ -1105,24 +1289,28 @@ export default function UnifiedBookingPage() {
       animationFrameRef.current = null;
     }
 
-    const startIndex = Math.max(0, Math.floor(activeRoutePoints.length * 0.1));
-    let currentIndex = startIndex;
+    // Start at beginning of the current phase route
+    // For EN_ROUTE_TO_PICKUP: index 0 = driver's starting position
+    // For EN_ROUTE_TO_DROPOFF: index 0 = pickup location
+    let currentIndex = 0;
     
-    if (simulationInitializedRef.current !== routePointsKey) {
+    // Initialize driver position at start of phase route
+    if (simulationInitializedRef.current !== phaseRouteKey) {
       const initialPosition = {
-        lat: activeRoutePoints[startIndex][0],
-        lng: activeRoutePoints[startIndex][1]
+        lat: phaseRoutePoints[0][0],
+        lng: phaseRoutePoints[0][1]
       };
       
-      setDriverPositionIndex(startIndex);
+      setDriverPositionIndex(0);
       setDriverPosition(initialPosition);
       setInterpolatedPosition(initialPosition);
       prevDriverPositionRef.current = initialPosition;
       prevTimestampRef.current = Date.now();
       
+      // Calculate initial heading toward the next point on the route
       let initialHeading = 0;
-      for (let i = startIndex + 1; i < activeRoutePoints.length; i++) {
-        const candidatePoint = { lat: activeRoutePoints[i][0], lng: activeRoutePoints[i][1] };
+      for (let i = 1; i < phaseRoutePoints.length; i++) {
+        const candidatePoint = { lat: phaseRoutePoints[i][0], lng: phaseRoutePoints[i][1] };
         if (candidatePoint.lat !== initialPosition.lat || candidatePoint.lng !== initialPosition.lng) {
           const bearing = calculateBearing(initialPosition, candidatePoint);
           if (!isNaN(bearing) && isFinite(bearing)) {
@@ -1133,54 +1321,54 @@ export default function UnifiedBookingPage() {
       }
       setDriverHeading(initialHeading);
       
-      const turn = detectNextTurn(startIndex);
+      // Detect first turn instruction
+      const turn = detectNextTurn(0);
       setNextTurnInstruction(turn);
       
-      const endIdx = rideStatus === "DRIVER_ASSIGNED" 
-        ? Math.floor(activeRoutePoints.length * 0.3) 
-        : activeRoutePoints.length - 1;
-      const remainingDist = calculateRemainingDistance(startIndex, endIdx);
+      // Calculate initial remaining distance to end of phase route
+      const remainingDist = calculateRemainingDistance(0);
       setRemainingMiles(remainingDist);
-      setRemainingMinutes(Math.max(1, Math.ceil(remainingDist * 2)));
+      setRemainingMinutes(Math.max(1, Math.ceil(remainingDist * 2))); // ~30 mph estimate
       
-      simulationInitializedRef.current = routePointsKey;
+      simulationInitializedRef.current = phaseRouteKey;
     }
 
-    const capturedRideStatus = rideStatus;
+    const capturedPhase = trackingPhase;
     const GPS_UPDATE_INTERVAL = 3000;
 
+    // Simulation loop - advances driver along current phase route
     driverSimulationRef.current = setInterval(() => {
-      const step = capturedRideStatus === "DRIVER_ASSIGNED" ? 2 : 3;
-      const maxIndex = activeRoutePoints.length - 1;
+      const maxIndex = phaseRoutePoints.length - 1;
+      // Step size varies by phase (slower approach to pickup)
+      const step = capturedPhase === "EN_ROUTE_TO_PICKUP" ? 2 : 3;
       let newIndex = currentIndex + step;
       
-      if (capturedRideStatus === "DRIVER_ASSIGNED") {
-        const pickupStopIndex = Math.min(maxIndex, Math.floor(activeRoutePoints.length * 0.3));
-        if (newIndex >= pickupStopIndex) newIndex = pickupStopIndex;
-      }
-      
+      // Clamp to end of route
       if (newIndex > maxIndex) newIndex = maxIndex;
       
-      if (activeRoutePoints[newIndex]) {
+      if (phaseRoutePoints[newIndex]) {
         const newPosition = {
-          lat: activeRoutePoints[newIndex][0],
-          lng: activeRoutePoints[newIndex][1]
+          lat: phaseRoutePoints[newIndex][0],
+          lng: phaseRoutePoints[newIndex][1]
         };
         
         const now = Date.now();
         const timeDeltaHours = (now - prevTimestampRef.current) / 3600000;
         
+        // Calculate speed from movement
         if (prevDriverPositionRef.current && timeDeltaHours > 0) {
           const distance = calculateDistance(prevDriverPositionRef.current, newPosition);
           const speed = Math.round(distance / timeDeltaHours);
           setDriverSpeedMph(Math.min(speed, 65));
           
+          // Update heading to point in direction of travel
           const bearing = calculateBearing(prevDriverPositionRef.current, newPosition);
           if (!isNaN(bearing) && isFinite(bearing)) {
             setDriverHeading(bearing);
           }
         }
         
+        // Smooth position interpolation animation
         const startPos = prevDriverPositionRef.current || newPosition;
         const startHeading = driverHeading;
         const targetHeading = calculateBearing(startPos, newPosition);
@@ -1191,6 +1379,7 @@ export default function UnifiedBookingPage() {
           const elapsed = timestamp - animationStart;
           const progress = Math.min(elapsed / GPS_UPDATE_INTERVAL, 1);
           
+          // Ease-in-out interpolation
           const easeProgress = progress < 0.5 
             ? 2 * progress * progress 
             : 1 - Math.pow(-2 * progress + 2, 2) / 2;
@@ -1198,6 +1387,7 @@ export default function UnifiedBookingPage() {
           const interpolated = interpolatePosition(startPos, newPosition, easeProgress);
           setInterpolatedPosition(interpolated);
           
+          // Smooth heading rotation
           if (!isNaN(targetHeading) && isFinite(targetHeading)) {
             let diff = ((targetHeading - startHeading + 540) % 360) - 180;
             const smoothHeading = (startHeading + diff * easeProgress + 360) % 360;
@@ -1217,13 +1407,12 @@ export default function UnifiedBookingPage() {
         setDriverPositionIndex(newIndex);
         setDriverPosition(newPosition);
         
+        // Update turn-by-turn instruction
         const turn = detectNextTurn(newIndex);
         setNextTurnInstruction(turn);
         
-        const endIdx = capturedRideStatus === "DRIVER_ASSIGNED" 
-          ? Math.floor(activeRoutePoints.length * 0.3) 
-          : activeRoutePoints.length - 1;
-        const remainingDist = calculateRemainingDistance(newIndex, endIdx);
+        // Update remaining distance and ETA to end of current phase route
+        const remainingDist = calculateRemainingDistance(newIndex);
         setRemainingMiles(remainingDist);
         
         const avgSpeed = driverSpeedMph > 0 ? driverSpeedMph : 25;
@@ -1241,7 +1430,7 @@ export default function UnifiedBookingPage() {
         animationFrameRef.current = null;
       }
     };
-  }, [rideStatus, activeRoutePoints, routePointsKey, detectNextTurn, calculateRemainingDistance, driverHeading, driverSpeedMph]);
+  }, [trackingPhase, phaseRoutePoints, phaseRouteKey, detectNextTurn, calculateRemainingDistance, driverHeading, driverSpeedMph]);
 
   // Handle scroll to map and highlight driver (desktop)
   const handleViewLiveMapDesktop = useCallback(() => {
@@ -1294,44 +1483,38 @@ export default function UnifiedBookingPage() {
     return cachedDriverIconRef.current!;
   }, [driverHeading]);
 
-  // Calculate remaining route polyline based on driver position and ride phase
+  // Calculate remaining route polyline based on driver position and tracking phase
+  // Uses phase-specific routes: driverToPickupRoute or pickupToDropoffRoute
   const remainingRoutePoints = useMemo(() => {
-    if (!driverPosition || activeRoutePoints.length < 2) return null;
+    if (!driverPosition || phaseRoutePoints.length < 2) return null;
     
-    // Clamp driver index to valid range
-    const maxIdx = activeRoutePoints.length - 1;
+    // Clamp driver index to valid range within the phase route
+    const maxIdx = phaseRoutePoints.length - 1;
     const driverIdx = Math.min(Math.max(0, driverPositionIndex), maxIdx);
     
-    if (rideStatus === "DRIVER_ASSIGNED") {
-      // Before pickup: show route ONLY from driver position to pickup location
-      // Pickup is approximately at 30% of the route
-      const pickupIdx = Math.min(maxIdx, Math.floor(activeRoutePoints.length * 0.3));
-      
-      // Clamp start index to not exceed pickup index
-      const startIdx = Math.min(driverIdx, pickupIdx);
-      
-      // Only show segment if there's remaining distance to pickup
-      if (startIdx < pickupIdx) {
-        return activeRoutePoints.slice(startIdx, pickupIdx + 1);
-      }
-      // Driver at or past pickup - show just a point marker (min 2 points for polyline)
-      return null;
-    } else if (rideStatus === "TRIP_IN_PROGRESS") {
-      // After pickup: show route from driver position to dropoff (end of route)
-      // Clamp start index to valid range
+    if (trackingPhase === "EN_ROUTE_TO_PICKUP") {
+      // Driver heading toward pickup - show remaining route to end of driverToPickupRoute
       const startIdx = Math.min(driverIdx, maxIdx);
       
-      // Need at least 2 points for a visible polyline
       if (startIdx < maxIdx) {
-        return activeRoutePoints.slice(startIdx);
+        return phaseRoutePoints.slice(startIdx);
+      }
+      // Driver at pickup
+      return null;
+    } else if (trackingPhase === "EN_ROUTE_TO_DROPOFF") {
+      // Driver heading toward dropoff - show remaining route to end of pickupToDropoffRoute
+      const startIdx = Math.min(driverIdx, maxIdx);
+      
+      if (startIdx < maxIdx) {
+        return phaseRoutePoints.slice(startIdx);
       }
       // Driver at destination
       return null;
     }
     
-    // No tracking during other statuses
+    // No tracking during other phases
     return null;
-  }, [driverPosition, driverPositionIndex, activeRoutePoints, rideStatus]);
+  }, [driverPosition, driverPositionIndex, phaseRoutePoints, trackingPhase]);
 
   return (
     <div className="h-screen flex flex-col bg-muted/30" data-testid="unified-booking-page">
