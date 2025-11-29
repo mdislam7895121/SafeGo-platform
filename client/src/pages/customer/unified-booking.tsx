@@ -26,6 +26,9 @@ import {
   Clock,
   HelpCircle,
   X,
+  Pencil,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -201,6 +204,7 @@ export default function UnifiedBookingPage() {
   const [isLoadingPromos, setIsLoadingPromos] = useState(false);
 
   const [isRequestingRide, setIsRequestingRide] = useState(false);
+  const [showChooseRide, setShowChooseRide] = useState(false);
 
   const { getETA, isUnavailable: checkUnavailable, isLimited: checkLimited } = useCategoryAvailability({
     pickupLat: pickup?.lat ?? null,
@@ -261,11 +265,17 @@ export default function UnifiedBookingPage() {
           setRoutes(parsedRoutes);
           if (parsedRoutes.length > 0) {
             setActiveRouteId(parsedRoutes[0].id);
+            setShowChooseRide(true);
           }
         }
       }
     );
   }, [pickup, dropoff, isGoogleMapsReady]);
+
+  const handleEditLocations = useCallback(() => {
+    setShowChooseRide(false);
+    setIsAddressPanelExpanded(true);
+  }, []);
 
   const handlePickupSelect = useCallback((location: { address: string; lat: number; lng: number }) => {
     setPickup(location);
@@ -658,273 +668,231 @@ export default function UnifiedBookingPage() {
             
             {activeService === "ride" && (
               <>
-                <Card 
-                  className="bg-white dark:bg-card shadow-md border border-border overflow-hidden"
-                  style={{ borderRadius: "16px" }}
-                  data-testid="address-panel"
-                >
-                  <CardContent className="p-0">
+                {/* Choose Ride View - Compact Header with Pickup/Dropoff */}
+                {showChooseRide && pickup && dropoff && activeRoute ? (
+                  <>
+                    {/* Compact Location Header - No Input Bars */}
                     <div 
-                      className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => setIsAddressPanelExpanded(!isAddressPanelExpanded)}
-                      data-testid="address-panel-header"
+                      className="bg-background rounded-xl border border-border p-3 shadow-sm"
+                      data-testid="ride-locations-header"
                     >
-                      <p className="text-sm font-semibold">Book a ride</p>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setIsAddressPanelExpanded(!isAddressPanelExpanded); }}
-                        className="h-8 w-8 rounded-full flex items-center justify-center bg-muted hover:bg-muted/80 transition-colors"
-                        data-testid="button-toggle-panel"
-                      >
-                        {isAddressPanelExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </button>
-                    </div>
-
-                    {!isAddressPanelExpanded && (
-                      <div className="px-4 pb-3 border-t">
-                        <div className="flex items-center gap-3 pt-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="flex flex-col items-center gap-1">
+                            <div className="h-2.5 w-2.5 rounded-full bg-foreground" />
+                            <div className="w-0.5 h-6 bg-border" />
+                            <div className="h-2.5 w-2.5 rounded-sm bg-foreground" />
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <div className="h-2 w-2 rounded-full bg-blue-500" />
-                              <span className="text-sm font-medium truncate">
-                                {pickup ? pickup.address.split(",")[0] : "Set pickup"}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="h-2 w-2 rounded-full bg-red-500" />
-                              <span className="text-sm font-medium truncate">
-                                {dropoff ? dropoff.address.split(",")[0] : "Set dropoff"}
-                              </span>
-                            </div>
+                            <p className="text-sm font-medium truncate" data-testid="text-pickup-summary">
+                              {pickup.address.split(",")[0]}
+                            </p>
+                            <p className="text-sm font-medium truncate mt-1.5" data-testid="text-dropoff-summary">
+                              {dropoff.address.split(",")[0]}
+                            </p>
                           </div>
                         </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 rounded-full flex-shrink-0"
+                          onClick={handleEditLocations}
+                          data-testid="button-edit-locations"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
                       </div>
-                    )}
-
-                    {isAddressPanelExpanded && (
-                      <div className="px-4 pb-4 space-y-3 border-t">
-                        <div 
-                          className={`flex items-center gap-3 p-3 rounded-xl transition-all mt-3 ${
-                            focusedField === "pickup" 
-                              ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-500" 
-                              : "bg-muted/30 hover:bg-muted/50 border border-transparent"
-                          }`}
-                          data-testid="pickup-row"
-                        >
-                          <div className="h-8 w-8 rounded-full flex items-center justify-center bg-blue-100">
-                            <div className="h-3 w-3 rounded-full bg-blue-500" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[0.7rem] font-medium text-muted-foreground uppercase mb-0.5">Pickup</p>
-                            <GooglePlacesInput
-                              value={pickupQuery}
-                              onChange={setPickupQuery}
-                              onLocationSelect={handlePickupSelect}
-                              onCurrentLocation={handleGetCurrentLocation}
-                              isLoadingCurrentLocation={isLocating}
-                              placeholder={isLocating ? "Getting location..." : "Enter pickup location"}
-                              variant="pickup"
-                              showCurrentLocation={true}
-                              hideIcon={true}
-                              onFocus={() => setFocusedField("pickup")}
-                              onBlur={() => setFocusedField(null)}
-                              className="w-full"
-                              inputClassName="border-0 bg-transparent p-0 h-auto text-sm font-medium placeholder:text-muted-foreground/60 focus-visible:ring-0"
-                            />
-                          </div>
-                          <button
-                            onClick={handleSwapAddresses}
-                            disabled={!pickup || !dropoff}
-                            className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
-                              pickup && dropoff
-                                ? "bg-muted hover:bg-muted/80 cursor-pointer" 
-                                : "bg-muted/50 opacity-50 cursor-not-allowed"
-                            }`}
-                            data-testid="button-swap"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-                          </button>
-                        </div>
-
-                        <div 
-                          className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
-                            focusedField === "dropoff" 
-                              ? "bg-red-50 dark:bg-red-900/20 border border-red-500" 
-                              : "bg-muted/30 hover:bg-muted/50 border border-transparent"
-                          }`}
-                          data-testid="dropoff-row"
-                        >
-                          <div className="h-8 w-8 rounded-full flex items-center justify-center bg-red-100">
-                            <div className="h-3 w-3 rounded-full bg-red-500" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[0.7rem] font-medium text-muted-foreground uppercase mb-0.5">Dropoff</p>
-                            <GooglePlacesInput
-                              value={dropoffQuery}
-                              onChange={setDropoffQuery}
-                              onLocationSelect={handleDropoffSelect}
-                              placeholder="Where to?"
-                              variant="dropoff"
-                              showCurrentLocation={false}
-                              hideIcon={true}
-                              onFocus={() => setFocusedField("dropoff")}
-                              onBlur={() => setFocusedField(null)}
-                              className="w-full"
-                              inputClassName="border-0 bg-transparent p-0 h-auto text-sm font-medium placeholder:text-muted-foreground/60 focus-visible:ring-0"
-                            />
-                          </div>
-                          <div className="h-8 w-8" />
-                        </div>
-
-                        {locationError && (
-                          <div className="px-3 py-2 bg-red-50 rounded-lg text-xs text-red-600">
-                            {locationError}
-                          </div>
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t text-xs text-muted-foreground">
+                        <span className="font-medium">{activeRoute.distanceMiles.toFixed(1)} mi</span>
+                        <span>•</span>
+                        <span>{formatDurationMinutes(Math.ceil(activeRoute.durationInTrafficSeconds / 60))}</span>
+                        {routes.length > 1 && (
+                          <>
+                            <span>•</span>
+                            <button 
+                              className="text-primary font-medium hover:underline"
+                              onClick={() => {/* Could add route selector modal */}}
+                            >
+                              {routes.length} routes
+                            </button>
+                          </>
                         )}
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {pickup && dropoff && !activeRoute && (
-                  <div className="flex items-center justify-center py-4">
-                    <Button
-                      onClick={() => {}}
-                      disabled={!pickup || !dropoff}
-                      className="h-12 px-8 rounded-xl text-base font-semibold"
-                      data-testid="button-show-prices"
-                    >
-                      <Car className="h-5 w-5 mr-2" />
-                      Show prices
-                    </Button>
-                  </div>
-                )}
-
-                {activeRoute && appliedPromo && (
-                  <div 
-                    className="px-4 py-3 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
-                    style={{ background: "#E7FCE5" }}
-                    onClick={() => {
-                      setAppliedPromo(null);
-                      toast({ title: "Promo removed" });
-                    }}
-                    data-testid="promo-banner"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                        <Zap className="h-4 w-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-green-800">{appliedPromo.label}</p>
-                        <p className="text-xs text-green-600">
-                          {appliedPromo.discountType === "PERCENT" 
-                            ? `${appliedPromo.discountPercent}% off` 
-                            : `$${appliedPromo.discountFlat} off`}
-                        </p>
-                      </div>
                     </div>
-                    <span className="text-[10px] text-green-600 font-medium">Tap to remove</span>
-                  </div>
-                )}
 
-                {activeRoute && (
-                  <>
-                    <div className="pt-2">
-                      <p className="text-sm font-semibold flex items-center gap-2 mb-3">
-                        <Car className="h-4 w-4" />
-                        Choose your ride
+                    {/* Promo Banner */}
+                    {appliedPromo && (
+                      <div 
+                        className="px-4 py-3 rounded-xl flex items-center justify-between cursor-pointer hover-elevate"
+                        style={{ background: "#E7FCE5" }}
+                        onClick={() => {
+                          setAppliedPromo(null);
+                          toast({ title: "Promo removed" });
+                        }}
+                        data-testid="promo-banner"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                            <Zap className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-green-800">{appliedPromo.label}</p>
+                            <p className="text-xs text-green-600">
+                              {appliedPromo.discountType === "PERCENT" 
+                                ? `${appliedPromo.discountPercent}% off` 
+                                : `$${appliedPromo.discountFlat} off`}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] text-green-600 font-medium">Tap to remove</span>
+                      </div>
+                    )}
+
+                    {/* Choose Your Ride Title */}
+                    <div className="flex items-center justify-between">
+                      <p className="text-base font-semibold">Choose a ride</p>
+                      <p className="text-xs text-muted-foreground">
+                        {VEHICLE_CATEGORY_ORDER.filter(id => !checkUnavailable(id)).length} available
                       </p>
-                      <div className="space-y-2" data-testid="ride-list">
-                        {VEHICLE_CATEGORY_ORDER.map((categoryId: VehicleCategoryId) => {
-                          const catConfig = VEHICLE_CATEGORIES[categoryId];
-                          const isSelected = categoryId === selectedVehicleCategory;
-                          const fareData = calculateFareForCategory(activeRoute, categoryId);
-                          const vehicleImage = getVehicleCategoryImage(categoryId);
-                          const isUnavailable = checkUnavailable(categoryId);
-                          const isLimited = checkLimited(categoryId);
-                          const categoryETA = getETA(categoryId);
-                          const etaMinutes = categoryETA?.etaMinutes ?? (catConfig.etaMinutesOffset + 5);
-                          const hasDiscount = fareData.discountAmount > 0;
-                          
-                          return (
-                            <div
-                              key={categoryId}
-                              role="button"
-                              tabIndex={isUnavailable ? -1 : 0}
-                              onClick={() => !isUnavailable && setSelectedVehicleCategory(categoryId)}
-                              className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
-                                isSelected 
-                                  ? "bg-primary/5 border-2 border-primary" 
-                                  : isUnavailable
-                                    ? "bg-muted/30 border border-border opacity-50 cursor-not-allowed"
-                                    : "bg-background border border-border hover:border-primary/30"
-                              }`}
-                              data-testid={`ride-option-${categoryId}`}
+                    </div>
+
+                    {/* Uber-style Ride Cards - Vertical list mobile, responsive grid desktop */}
+                    <div 
+                      className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                      data-testid="ride-cards-grid"
+                    >
+                      {VEHICLE_CATEGORY_ORDER.map((categoryId: VehicleCategoryId) => {
+                        const catConfig = VEHICLE_CATEGORIES[categoryId];
+                        const isSelected = categoryId === selectedVehicleCategory;
+                        const fareData = calculateFareForCategory(activeRoute, categoryId);
+                        const vehicleImage = getVehicleCategoryImage(categoryId);
+                        const isUnavailable = checkUnavailable(categoryId);
+                        const isLimited = checkLimited(categoryId);
+                        const categoryETA = getETA(categoryId);
+                        const etaMinutes = categoryETA?.etaMinutes ?? (catConfig.etaMinutesOffset + 5);
+                        const hasDiscount = fareData.discountAmount > 0;
+                        
+                        const isSaver = categoryId === "SAFEGO_X";
+                        const isPremium = categoryId.includes("BLACK");
+                        
+                        return (
+                          <div
+                            key={categoryId}
+                            role="button"
+                            tabIndex={isUnavailable ? -1 : 0}
+                            onClick={() => !isUnavailable && setSelectedVehicleCategory(categoryId)}
+                            onKeyDown={(e) => e.key === "Enter" && !isUnavailable && setSelectedVehicleCategory(categoryId)}
+                            className={`relative flex flex-col rounded-2xl cursor-pointer transition-all overflow-hidden ${
+                              isSelected 
+                                ? "ring-2 ring-primary bg-primary/5 shadow-md" 
+                                : isUnavailable
+                                  ? "bg-muted/40 opacity-60 cursor-not-allowed"
+                                  : "bg-background border border-border hover:shadow-md hover:border-primary/30"
+                            }`}
+                            data-testid={`ride-card-${categoryId}`}
+                          >
+                            {/* Tag Badges - Top Right */}
+                            <div className="absolute top-2 right-2 flex gap-1 z-10">
+                              {catConfig.isPopular && !isUnavailable && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-blue-500 text-white border-0 shadow-sm">
+                                  Popular
+                                </Badge>
+                              )}
+                              {isSaver && !isUnavailable && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-green-500 text-white border-0 shadow-sm">
+                                  <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                                  Saver
+                                </Badge>
+                              )}
+                              {isLimited && !isUnavailable && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-amber-500 text-white border-0 shadow-sm">
+                                  Limited
+                                </Badge>
+                              )}
+                              {isPremium && !isUnavailable && (
+                                <Badge className="text-[10px] px-1.5 py-0.5 bg-slate-800 text-white border-0 shadow-sm">
+                                  Premium
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* 3D Car Image Section */}
+                            <div 
+                              className="h-24 w-full flex items-center justify-center p-2 relative"
+                              style={{ 
+                                background: isUnavailable 
+                                  ? "linear-gradient(180deg, #F5F5F5 0%, #E8E8E8 100%)" 
+                                  : "linear-gradient(180deg, #FFFFFF 0%, #F8F8F8 60%, #EFEFEF 100%)" 
+                              }}
                             >
-                              <div 
-                                className="h-14 w-20 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden"
-                                style={{ background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)" }}
-                              >
-                                <img 
-                                  src={vehicleImage} 
-                                  alt={catConfig.displayName}
-                                  className="w-full h-full object-contain"
-                                  style={{ filter: isUnavailable ? "grayscale(1)" : "drop-shadow(0px 3px 8px rgba(0,0,0,0.12))" }}
-                                />
-                              </div>
-                              
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <p className="font-semibold text-sm">{catConfig.displayName}</p>
-                                  {catConfig.isPopular && !isUnavailable && (
-                                    <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-blue-100 text-blue-700 border-0">
-                                      Popular
-                                    </Badge>
-                                  )}
-                                  {isLimited && !isUnavailable && (
-                                    <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 border-0">
-                                      Limited
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-0.5">
-                                    <Users className="h-3 w-3" />
-                                    {catConfig.seatCount}
-                                  </span>
-                                  <span>•</span>
-                                  <span>{isUnavailable ? "No drivers" : `${etaMinutes} min`}</span>
-                                </div>
-                                {hasDiscount && !isUnavailable && (
-                                  <p className="text-[11px] font-medium mt-0.5 text-green-600">
-                                    You save ${fareData.discountAmount.toFixed(2)}
+                              <img 
+                                src={vehicleImage} 
+                                alt={catConfig.displayName}
+                                className="h-full w-auto max-w-full object-contain"
+                                style={{ 
+                                  filter: isUnavailable 
+                                    ? "grayscale(1) opacity(0.5)" 
+                                    : "drop-shadow(0px 8px 16px rgba(0,0,0,0.15)) drop-shadow(0px 2px 4px rgba(0,0,0,0.1))",
+                                  transform: "perspective(800px) rotateY(-5deg) scale(1.1)"
+                                }}
+                              />
+                            </div>
+
+                            {/* Card Content */}
+                            <div className="p-3 flex-1 flex flex-col">
+                              {/* Car Name & ETA */}
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-sm truncate">{catConfig.displayName}</p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {isUnavailable ? "Unavailable" : `${etaMinutes} min away`}
                                   </p>
-                                )}
+                                </div>
+                                {/* Passenger Count */}
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-full">
+                                  <Users className="h-3 w-3" />
+                                  <span>{catConfig.seatCount}</span>
+                                </div>
                               </div>
-                              
-                              <div className="flex-shrink-0 text-right">
+
+                              {/* Price Section */}
+                              <div className="mt-auto pt-2 border-t border-border/50">
                                 {isUnavailable ? (
-                                  <p className="text-xs text-muted-foreground">N/A</p>
+                                  <p className="text-sm text-muted-foreground">No drivers nearby</p>
                                 ) : (
-                                  <>
-                                    <p className="text-base font-bold">${fareData.finalFare.toFixed(2)}</p>
+                                  <div className="flex items-baseline justify-between">
+                                    <div className="flex items-baseline gap-2">
+                                      <p className="text-lg font-bold">${fareData.finalFare.toFixed(2)}</p>
+                                      {hasDiscount && (
+                                        <p className="text-xs text-muted-foreground line-through">
+                                          ${fareData.originalFare.toFixed(2)}
+                                        </p>
+                                      )}
+                                    </div>
                                     {hasDiscount && (
-                                      <p className="text-xs text-muted-foreground line-through">
-                                        ${fareData.originalFare.toFixed(2)}
+                                      <p className="text-[11px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                                        Save ${fareData.discountAmount.toFixed(2)}
                                       </p>
                                     )}
-                                  </>
+                                  </div>
                                 )}
                               </div>
                             </div>
-                          );
-                        })}
-                      </div>
+
+                            {/* Selection Indicator */}
+                            {isSelected && (
+                              <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary" />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
 
+                    {/* Route Selection (if multiple routes) */}
                     {routes.length > 1 && (
-                      <div className="pt-3">
-                        <p className="text-xs text-muted-foreground mb-2 font-medium">Choose route:</p>
-                        <div className="flex gap-2">
+                      <div className="pt-2">
+                        <p className="text-xs text-muted-foreground mb-2 font-medium">Alternative routes:</p>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
                           {routes.map((route, index) => {
                             const etaMin = Math.ceil(route.durationInTrafficSeconds / 60);
                             const isActive = route.id === activeRouteId;
@@ -933,12 +901,12 @@ export default function UnifiedBookingPage() {
                                 key={route.id}
                                 variant={isActive ? "default" : "outline"}
                                 size="sm"
-                                className={`flex-1 text-xs h-10 ${isActive ? "" : "opacity-70"}`}
+                                className={`flex-shrink-0 text-xs h-9 ${isActive ? "" : "opacity-70"}`}
                                 onClick={() => setActiveRouteId(route.id)}
                                 data-testid={`route-button-${route.id}`}
                               >
                                 <RouteIcon className="h-3 w-3 mr-1" />
-                                {index === 0 ? "Fastest" : route.summary || `Route ${index + 1}`}
+                                {index === 0 ? "Fastest" : route.summary || `Alt ${index}`}
                                 <span className="ml-1 opacity-75">({formatDurationMinutes(etaMin)})</span>
                               </Button>
                             );
@@ -946,106 +914,241 @@ export default function UnifiedBookingPage() {
                         </div>
                       </div>
                     )}
+                  </>
+                ) : (
+                  /* Address Input View - When NOT in choose-ride mode */
+                  <>
+                    <Card 
+                      className="bg-white dark:bg-card shadow-md border border-border overflow-hidden"
+                      style={{ borderRadius: "16px" }}
+                      data-testid="address-panel"
+                    >
+                      <CardContent className="p-0">
+                        <div 
+                          className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-muted/30 transition-colors"
+                          onClick={() => setIsAddressPanelExpanded(!isAddressPanelExpanded)}
+                          data-testid="address-panel-header"
+                        >
+                          <p className="text-sm font-semibold">Book a ride</p>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setIsAddressPanelExpanded(!isAddressPanelExpanded); }}
+                            className="h-8 w-8 rounded-full flex items-center justify-center bg-muted hover:bg-muted/80 transition-colors"
+                            data-testid="button-toggle-panel"
+                          >
+                            {isAddressPanelExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </button>
+                        </div>
 
-                    {fareEstimate && (
-                      <Card className="shadow-md rounded-xl overflow-hidden" data-testid="fare-summary-card">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                              <div 
-                                className="h-20 w-28 rounded-xl flex items-center justify-center overflow-hidden p-3"
-                                style={{ background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)" }}
-                              >
-                                <img 
-                                  src={getVehicleCategoryImage(selectedVehicleCategory)} 
-                                  alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                                  className="w-full h-full object-contain"
-                                  style={{ filter: "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))" }}
-                                  data-testid="img-selected-vehicle"
+                        {!isAddressPanelExpanded && (
+                          <div className="px-4 pb-3 border-t">
+                            <div className="flex items-center gap-3 pt-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                                  <span className="text-sm font-medium truncate">
+                                    {pickup ? pickup.address.split(",")[0] : "Set pickup"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="h-2 w-2 rounded-full bg-red-500" />
+                                  <span className="text-sm font-medium truncate">
+                                    {dropoff ? dropoff.address.split(",")[0] : "Set dropoff"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {isAddressPanelExpanded && (
+                          <div className="px-4 pb-4 space-y-3 border-t">
+                            <div 
+                              className={`flex items-center gap-3 p-3 rounded-xl transition-all mt-3 ${
+                                focusedField === "pickup" 
+                                  ? "bg-blue-50 dark:bg-blue-900/20 border border-blue-500" 
+                                  : "bg-muted/30 hover:bg-muted/50 border border-transparent"
+                              }`}
+                              data-testid="pickup-row"
+                            >
+                              <div className="h-8 w-8 rounded-full flex items-center justify-center bg-blue-100">
+                                <div className="h-3 w-3 rounded-full bg-blue-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[0.7rem] font-medium text-muted-foreground uppercase mb-0.5">Pickup</p>
+                                <GooglePlacesInput
+                                  value={pickupQuery}
+                                  onChange={setPickupQuery}
+                                  onLocationSelect={handlePickupSelect}
+                                  onCurrentLocation={handleGetCurrentLocation}
+                                  isLoadingCurrentLocation={isLocating}
+                                  placeholder={isLocating ? "Getting location..." : "Enter pickup location"}
+                                  variant="pickup"
+                                  showCurrentLocation={true}
+                                  hideIcon={true}
+                                  onFocus={() => setFocusedField("pickup")}
+                                  onBlur={() => setFocusedField(null)}
+                                  className="w-full"
+                                  inputClassName="border-0 bg-transparent p-0 h-auto text-sm font-medium placeholder:text-muted-foreground/60 focus-visible:ring-0"
                                 />
                               </div>
-                              <div>
-                                <p className="text-sm font-semibold">
-                                  {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
-                                </p>
-                                <div className="flex items-baseline gap-2 mt-1">
-                                  <p className="text-2xl font-bold" data-testid="text-fare">
-                                    ${fareEstimate.finalFare.toFixed(2)}
-                                  </p>
-                                  {fareEstimate.discountAmount > 0 && (
-                                    <p className="text-sm line-through text-muted-foreground">
-                                      ${fareEstimate.originalFare.toFixed(2)}
-                                    </p>
-                                  )}
-                                </div>
-                                {fareEstimate.discountAmount > 0 && (
-                                  <div className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-green-50 w-fit text-green-600">
-                                    <Zap className="h-3.5 w-3.5" />
-                                    <span className="text-sm font-medium">You save ${fareEstimate.discountAmount.toFixed(2)}</span>
-                                  </div>
-                                )}
+                              <button
+                                onClick={handleSwapAddresses}
+                                disabled={!pickup || !dropoff}
+                                className={`h-8 w-8 rounded-full flex items-center justify-center transition-all ${
+                                  pickup && dropoff
+                                    ? "bg-muted hover:bg-muted/80 cursor-pointer" 
+                                    : "bg-muted/50 opacity-50 cursor-not-allowed"
+                                }`}
+                                data-testid="button-swap"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+                              </button>
+                            </div>
+
+                            <div 
+                              className={`flex items-center gap-3 p-3 rounded-xl transition-all ${
+                                focusedField === "dropoff" 
+                                  ? "bg-red-50 dark:bg-red-900/20 border border-red-500" 
+                                  : "bg-muted/30 hover:bg-muted/50 border border-transparent"
+                              }`}
+                              data-testid="dropoff-row"
+                            >
+                              <div className="h-8 w-8 rounded-full flex items-center justify-center bg-red-100">
+                                <div className="h-3 w-3 rounded-full bg-red-500" />
                               </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[0.7rem] font-medium text-muted-foreground uppercase mb-0.5">Dropoff</p>
+                                <GooglePlacesInput
+                                  value={dropoffQuery}
+                                  onChange={setDropoffQuery}
+                                  onLocationSelect={handleDropoffSelect}
+                                  placeholder="Where to?"
+                                  variant="dropoff"
+                                  showCurrentLocation={false}
+                                  hideIcon={true}
+                                  onFocus={() => setFocusedField("dropoff")}
+                                  onBlur={() => setFocusedField(null)}
+                                  className="w-full"
+                                  inputClassName="border-0 bg-transparent p-0 h-auto text-sm font-medium placeholder:text-muted-foreground/60 focus-visible:ring-0"
+                                />
+                              </div>
+                              <div className="h-8 w-8" />
                             </div>
-                            <div className="text-right text-sm">
-                              <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
-                              <p className="font-semibold" data-testid="text-eta">
-                                ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
-                              </p>
-                              <p className="text-xs mt-0.5 text-muted-foreground">
-                                Pickup in ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
-                              </p>
-                            </div>
+
+                            {locationError && (
+                              <div className="px-3 py-2 bg-red-50 rounded-lg text-xs text-red-600">
+                                {locationError}
+                              </div>
+                            )}
                           </div>
-                          
-                          <div className="mt-3 flex items-center gap-2 flex-wrap">
-                            <Badge variant="secondary" className={`text-xs ${
-                              fareEstimate.trafficLevel === "heavy" 
-                                ? "bg-red-100 text-red-700" 
-                                : "bg-green-100 text-green-700"
-                            }`}>
-                              <Car className="h-3 w-3 mr-1" />
-                              {fareEstimate.trafficLabel}
-                            </Badge>
-                            <Badge variant="secondary" className="text-xs">
-                              <Wallet className="h-3 w-3 mr-1" />
-                              Card/Wallet
-                            </Badge>
-                          </div>
-                          
-                          <div className="mt-4 pt-3 border-t">
-                            <FareDetailsAccordion 
-                              breakdown={{
-                                baseFare: fareEstimate.baseFare,
-                                timeCost: fareEstimate.timeFare,
-                                distanceCost: fareEstimate.distanceFare,
-                                bookingFee: fareEstimate.bookingFee,
-                                taxesAndSurcharges: fareEstimate.taxesAndSurcharges,
-                                minimumFareAdjustment: fareEstimate.minimumFareAdjustment,
-                                subtotal: fareEstimate.originalFare,
-                                discountAmount: fareEstimate.discountAmount,
-                                totalFare: fareEstimate.finalFare,
-                                distanceMiles: parseFloat(fareEstimate.distanceMiles),
-                                durationMinutes: fareEstimate.etaWithTrafficMinutes,
-                                perMileRate: fareEstimate.perMileRate,
-                                perMinuteRate: fareEstimate.perMinuteRate,
-                                promoCode: fareEstimate.promoCode,
-                              }}
-                            />
-                          </div>
-                        </CardContent>
-                      </Card>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {pickup && dropoff && !activeRoute && (
+                      <div className="flex items-center justify-center py-4">
+                        <Button
+                          onClick={() => {}}
+                          disabled={!pickup || !dropoff}
+                          className="h-12 px-8 rounded-xl text-base font-semibold"
+                          data-testid="button-show-prices"
+                        >
+                          <Car className="h-5 w-5 mr-2" />
+                          Show prices
+                        </Button>
+                      </div>
                     )}
                   </>
                 )}
 
-                {!activeRoute && (
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground py-8">
-                    <div className="text-center">
-                      <MapPin className="h-12 w-12 mx-auto mb-3 opacity-40" />
-                      <p className="font-medium">Enter pickup and dropoff</p>
-                      <p className="text-sm mt-1">Set your locations to see ride options</p>
-                    </div>
-                  </div>
+                {/* Fare Summary Card - Shows when vehicle is selected */}
+                {showChooseRide && fareEstimate && (
+                  <Card className="shadow-md rounded-xl overflow-hidden" data-testid="fare-summary-card">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div 
+                            className="h-20 w-28 rounded-xl flex items-center justify-center overflow-hidden p-3"
+                            style={{ background: "linear-gradient(180deg, #FFFFFF 40%, #F2F2F2 100%)" }}
+                          >
+                            <img 
+                              src={getVehicleCategoryImage(selectedVehicleCategory)} 
+                              alt={VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                              className="w-full h-full object-contain"
+                              style={{ filter: "drop-shadow(0px 4px 14px rgba(0,0,0,0.15))" }}
+                              data-testid="img-selected-vehicle"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">
+                              {VEHICLE_CATEGORIES[selectedVehicleCategory].displayName}
+                            </p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                              <p className="text-2xl font-bold" data-testid="text-fare">
+                                ${fareEstimate.finalFare.toFixed(2)}
+                              </p>
+                              {fareEstimate.discountAmount > 0 && (
+                                <p className="text-sm line-through text-muted-foreground">
+                                  ${fareEstimate.originalFare.toFixed(2)}
+                                </p>
+                              )}
+                            </div>
+                            {fareEstimate.discountAmount > 0 && (
+                              <div className="flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full bg-green-50 w-fit text-green-600">
+                                <Zap className="h-3.5 w-3.5" />
+                                <span className="text-sm font-medium">You save ${fareEstimate.discountAmount.toFixed(2)}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right text-sm">
+                          <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
+                          <p className="font-semibold" data-testid="text-eta">
+                            ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
+                          </p>
+                          <p className="text-xs mt-0.5 text-muted-foreground">
+                            Pickup in ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-3 flex items-center gap-2 flex-wrap">
+                        <Badge variant="secondary" className={`text-xs ${
+                          fareEstimate.trafficLevel === "heavy" 
+                            ? "bg-red-100 text-red-700" 
+                            : "bg-green-100 text-green-700"
+                        }`}>
+                          <Car className="h-3 w-3 mr-1" />
+                          {fareEstimate.trafficLabel}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          <Wallet className="h-3 w-3 mr-1" />
+                          Card/Wallet
+                        </Badge>
+                      </div>
+                      
+                      <div className="mt-4 pt-3 border-t">
+                        <FareDetailsAccordion 
+                          breakdown={{
+                            baseFare: fareEstimate.baseFare,
+                            timeCost: fareEstimate.timeFare,
+                            distanceCost: fareEstimate.distanceFare,
+                            bookingFee: fareEstimate.bookingFee,
+                            taxesAndSurcharges: fareEstimate.taxesAndSurcharges,
+                            minimumFareAdjustment: fareEstimate.minimumFareAdjustment,
+                            subtotal: fareEstimate.originalFare,
+                            discountAmount: fareEstimate.discountAmount,
+                            totalFare: fareEstimate.finalFare,
+                            distanceMiles: parseFloat(fareEstimate.distanceMiles),
+                            durationMinutes: fareEstimate.etaWithTrafficMinutes,
+                            perMileRate: fareEstimate.perMileRate,
+                            perMinuteRate: fareEstimate.perMinuteRate,
+                            promoCode: fareEstimate.promoCode,
+                          }}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
               </>
             )}
