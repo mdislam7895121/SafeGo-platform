@@ -84,6 +84,7 @@ import { MobileLiveTracking } from "@/components/ride/MobileLiveTracking";
 import { PostTripRatingDialog } from "@/components/customer/PostTripRatingDialog";
 import { RideChatDrawer } from "@/components/customer/RideChatDrawer";
 import { useRideChat } from "@/hooks/useRideChat";
+import { useTrafficEta, type TrafficCondition } from "@/hooks/useTrafficEta";
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_ORDER,
@@ -598,15 +599,48 @@ export default function UnifiedBookingPage() {
     return driverSpeedMph;
   }, [useSimulation, backendSpeedMph, driverSpeedMph]);
   
-  const effectiveEtaMinutes = useMemo(() => {
-    if (!useSimulation && backendEtaMinutes !== undefined) return backendEtaMinutes;
-    return remainingMinutes;
-  }, [useSimulation, backendEtaMinutes, remainingMinutes]);
-  
   const effectiveRemainingMiles = useMemo(() => {
     if (!useSimulation && backendRemainingMiles !== undefined) return backendRemainingMiles;
     return remainingMiles;
   }, [useSimulation, backendRemainingMiles, remainingMiles]);
+  
+  // Traffic-aware pickup ETA hook
+  // Uses Google Directions API with real-time traffic or falls back to simulation
+  const pickupLocationCoords = useMemo(() => {
+    if (pickupLocation) return { lat: pickupLocation.lat, lng: pickupLocation.lng };
+    return null;
+  }, [pickupLocation]);
+  
+  // Developer test mode: force traffic condition
+  const [forceTrafficCondition, setForceTrafficCondition] = useState<TrafficCondition | undefined>(undefined);
+  
+  const isPickupPhase = rideStatus === "DRIVER_ASSIGNED";
+  const {
+    pickupEtaMinutes: trafficEtaMinutes,
+    distanceMiles: trafficDistanceMiles,
+    speedMph: trafficSpeedMph,
+    trafficCondition,
+    source: etaSource,
+    smoothedEtaMinutes,
+  } = useTrafficEta({
+    rideId: currentRideId || "demo-ride",
+    driverPosition: effectiveDriverPosition,
+    pickupLocation: pickupLocationCoords,
+    enabled: isPickupPhase && (isTrackingActive || useSimulation),
+    demoMode: useSimulation,
+    forceTrafficCondition,
+  });
+  
+  // Effective ETA: Prefer traffic-aware ETA for pickup phase
+  const effectiveEtaMinutes = useMemo(() => {
+    // During pickup phase, use traffic-aware ETA with smoothing
+    if (isPickupPhase && smoothedEtaMinutes !== null) {
+      return smoothedEtaMinutes;
+    }
+    // For trip phase or fallback, use backend ETA
+    if (!useSimulation && backendEtaMinutes !== undefined) return backendEtaMinutes;
+    return remainingMinutes;
+  }, [isPickupPhase, smoothedEtaMinutes, useSimulation, backendEtaMinutes, remainingMinutes]);
   
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
@@ -2830,6 +2864,7 @@ export default function UnifiedBookingPage() {
                               vehicleCategory={selectedVehicleCategory}
                               speedMph={effectiveSpeedMph}
                               nextTurn={nextTurnInstruction}
+                              trafficCondition={trafficCondition}
                               onViewLiveMap={() => {
                                 if (window.innerWidth < 768) {
                                   handleOpenMobileLiveTracking();
@@ -2847,11 +2882,58 @@ export default function UnifiedBookingPage() {
                             {/* Debug control */}
                             {showDebugControls && (
                               <Card className="shadow-md rounded-xl overflow-hidden">
-                                <CardContent className="p-3">
+                                <CardContent className="p-3 space-y-2">
                                   <p className="text-xs text-muted-foreground mb-2">Debug Controls:</p>
-                                  <Button size="sm" onClick={handleStartTrip} data-testid="debug-start-trip">
-                                    Start Trip
-                                  </Button>
+                                  <div className="flex flex-wrap gap-2">
+                                    <Button size="sm" onClick={handleStartTrip} data-testid="debug-start-trip">
+                                      Start Trip
+                                    </Button>
+                                  </div>
+                                  <div className="pt-2 border-t">
+                                    <p className="text-xs text-muted-foreground mb-1">Traffic Simulation:</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      <Button 
+                                        size="sm" 
+                                        variant={forceTrafficCondition === undefined ? "default" : "outline"}
+                                        onClick={() => setForceTrafficCondition(undefined)}
+                                        data-testid="debug-traffic-auto"
+                                      >
+                                        Auto
+                                      </Button>
+                                      <Button 
+                                        size="sm"
+                                        variant={forceTrafficCondition === "light" ? "default" : "outline"}
+                                        className={forceTrafficCondition === "light" ? "bg-green-600 hover:bg-green-700" : ""}
+                                        onClick={() => setForceTrafficCondition("light")}
+                                        data-testid="debug-traffic-light"
+                                      >
+                                        Light
+                                      </Button>
+                                      <Button 
+                                        size="sm"
+                                        variant={forceTrafficCondition === "moderate" ? "default" : "outline"}
+                                        className={forceTrafficCondition === "moderate" ? "bg-yellow-600 hover:bg-yellow-700" : ""}
+                                        onClick={() => setForceTrafficCondition("moderate")}
+                                        data-testid="debug-traffic-moderate"
+                                      >
+                                        Moderate
+                                      </Button>
+                                      <Button 
+                                        size="sm"
+                                        variant={forceTrafficCondition === "heavy" ? "default" : "outline"}
+                                        className={forceTrafficCondition === "heavy" ? "bg-red-600 hover:bg-red-700" : ""}
+                                        onClick={() => setForceTrafficCondition("heavy")}
+                                        data-testid="debug-traffic-heavy"
+                                      >
+                                        Heavy
+                                      </Button>
+                                    </div>
+                                    {etaSource && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Source: {etaSource} | ETA: {smoothedEtaMinutes}min
+                                      </p>
+                                    )}
+                                  </div>
                                 </CardContent>
                               </Card>
                             )}
@@ -3579,6 +3661,7 @@ export default function UnifiedBookingPage() {
           driverHeading={effectiveDriverHeading}
           speedMph={effectiveSpeedMph}
           nextTurn={nextTurnInstruction}
+          trafficCondition={trafficCondition}
           pickupLocation={pickup}
           dropoffLocation={dropoff}
           customerLocation={customerLocation}

@@ -1,0 +1,84 @@
+You are updating the SafeGo Ride customer app.  
+Goal now: make the pickup ETA “Pickup in X min” traffic-aware, similar to Uber, instead of using only static demo timing.
+
+🔒 Global SafeGo rules (do NOT break)
+- Keep all existing SafeGo Ride/Eats/Parcel flows working.
+- Do not remove demo mode: if real traffic API is not configured, we must still work with simulated data.
+- Keep all security rules: no leaking driver exact speed history, no exposing raw coordinates in the UI beyond what is already visible on the map.
+- Keep mobile + desktop layouts unchanged, and keep KYC / auth / protected routes intact.
+
+🎯 Functional requirements for this task
+1. Traffic-aware ETA source
+   - Introduce a single “traffic ETA” provider that can plug into a real routing API (Mapbox Directions, Google Directions, or similar) but still has a safe mock fallback.
+   - Implement it as a reusable function or hook, for example:
+     - `getTrafficAwareEta({ pickupLocation, driverLocation, routePolyline })`
+     - or `useTrafficEta(rideId, pickupLatLng, driverLatLng)`
+   - The function should:
+     - Prefer real routing + traffic when an API key is configured (via environment variable, e.g. `SAFEGO_MAPBOX_TRAFFIC_KEY`).
+     - Fall back to the current simulated ETA logic when the key is missing, on error, or when running in demo mode.
+
+2. Backend / API boundary
+   - Implement traffic calls server-side (in the backend) or behind an internal API route instead of directly calling the external traffic API from the browser.
+   - Expose a simple endpoint like:  
+     - `GET /api/rides/:rideId/traffic-eta`  
+       which returns `{ pickupEtaMinutes, lastUpdatedAt, source: 'traffic' | 'simulated' }`.
+   - Make sure:
+     - Requests are rate-limited (e.g., no more than once every 10–15 seconds per ride).
+     - Input validation is applied (rideId and coordinates).
+     - Errors are logged but do not break the rider UI; when in doubt, fall back to simulated ETA.
+
+3. Integrate into current SafeGo Ride UI
+   - Wherever we currently show pickup ETA on the customer side (e.g. “Pickup in 4 min” under the driver card):
+     - Replace the current static/demo ETA with the value from the new traffic-aware provider.
+     - Ensure that:
+       - The label auto-updates as the driver moves (existing polling / live tracking loop can trigger refresh).
+       - If traffic ETA is temporarily unavailable, we display the simulated ETA but clearly mark it internally as `source: 'simulated'` (no extra label in the UI).
+   - Also update any related ETA fields on:
+     - Mobile live map view
+     - Desktop live ride panel
+   - Do NOT change the visual design (fonts, colors, card layout); only the underlying data source.
+
+4. Live-tracking loop integration
+   - Reuse the existing driver tracking / MobileLiveTracking logic:
+     - On each location update for the driver (or every N seconds), call the ETA endpoint only when:
+       - The ride is in a pre-pickup state (e.g. `ASSIGNED`, `EN_ROUTE_TO_PICKUP`).
+       - The distance has changed meaningfully (e.g. > 100–200 meters) OR time since last ETA > 15 seconds.
+   - Make sure that once the rider is picked up and status moves to `ON_TRIP`, the pickup ETA is no longer shown, and we can later reuse the same provider for “Dropoff ETA” (but DO NOT implement dropoff ETA now).
+
+5. UX parity with Uber-style behaviour
+   - Behavior we want:
+     - When the driver is far and traffic is heavy, ETA increases realistically (e.g. 4 → 6 minutes).
+     - When the driver gets stuck at a traffic signal, ETA doesn’t jump wildly but adjusts smoothly.
+   - To achieve this, add:
+     - A simple smoothing mechanism (e.g., don’t change the displayed ETA by more than 1–2 minutes per update, unless the difference is extreme).
+     - Round to whole minutes for display (no seconds).
+   - Ensure the ETA text stays short on mobile:
+     - Example: “Pickup in 4 min” (not a long descriptive sentence).
+
+6. Safety, privacy, and performance
+   - Do NOT expose:
+     - Exact driver speed in the UI (we already show a speed number in demo; keep or clamp this to safe ranges, but avoid making it a precise speed-trap).
+     - Any raw API keys or internal traffic API URLs.
+   - Keep all keys in environment variables.
+   - Document in code comments which part to configure in production (e.g., where to plug in Mapbox or Google Directions).
+   - Ensure that error cases (network failure, API quota exceeded, invalid route) are gracefully handled with:
+     - Fallback simulated ETA
+     - Optional internal console / log warning
+     - No visible crash or toast spam for the customer.
+
+7. Testing and verification
+   - Add a small internal test mode (for developers only) where:
+     - We can force “simulated traffic heavy” vs “light” using a query flag or local toggle.
+     - This must NOT be exposed as a toggle in the production UI.
+   - Manually verify:
+     - ETA updates when the driver position changes along the route.
+     - ETA behaves realistically when you move the driver marker closer vs farther away.
+     - Mobile and desktop both keep layout and typography exactly as before.
+
+Implementation order
+1) Implement the traffic-aware ETA provider + backend endpoint with env-based real traffic integration and safe fallbacks.  
+2) Wire the customer UI pickup ETA (“Pickup in X min”) to this provider in all active ride views.  
+3) Integrate with the live-tracking loop and verify updates during a simulated ride.  
+4) Run an architect review and only THEN refactor any shared helpers if needed.
+
+Do not start any new feature from the backlog (Eats/Parcel/cart, etc.). Focus solely on traffic-aware pickup ETA for SafeGo Ride, and keep everything else working exactly as now.

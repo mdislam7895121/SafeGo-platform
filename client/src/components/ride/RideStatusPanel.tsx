@@ -26,6 +26,8 @@ import {
 import { getVehicleCategoryImage } from "@/lib/vehicleMedia";
 import { VEHICLE_CATEGORIES, type VehicleCategoryId } from "@shared/vehicleCategories";
 
+export type TrafficCondition = "light" | "moderate" | "heavy";
+
 export interface TurnInstruction {
   text: string;
   distanceFeet: number;
@@ -96,6 +98,7 @@ interface RideStatusPanelProps {
   tripDistanceMiles?: number;
   speedMph?: number;
   nextTurn?: TurnInstruction | null;
+  trafficCondition?: TrafficCondition | null;
   onViewLiveMap?: () => void;
   onCancelRide?: () => void;
   onContactDriver?: () => void;
@@ -140,6 +143,16 @@ function getTurnIcon(maneuver: string) {
   }
 }
 
+function getTrafficIndicator(condition: TrafficCondition | null | undefined) {
+  if (!condition) return null;
+  const configs: Record<TrafficCondition, { label: string; color: string; bgColor: string }> = {
+    light: { label: "Light traffic", color: "text-green-600", bgColor: "bg-green-100" },
+    moderate: { label: "Moderate traffic", color: "text-yellow-600", bgColor: "bg-yellow-100" },
+    heavy: { label: "Heavy traffic", color: "text-red-600", bgColor: "bg-red-100" },
+  };
+  return configs[condition];
+}
+
 export function RideStatusPanel({
   status,
   driver,
@@ -152,6 +165,7 @@ export function RideStatusPanel({
   tripDistanceMiles,
   speedMph,
   nextTurn,
+  trafficCondition,
   onViewLiveMap,
   onCancelRide,
   onContactDriver,
@@ -164,6 +178,7 @@ export function RideStatusPanel({
 }: RideStatusPanelProps) {
   const categoryConfig = VEHICLE_CATEGORIES[vehicleCategory];
   const normalizedStatus = normalizeStatus(status);
+  const trafficIndicator = getTrafficIndicator(trafficCondition);
   
   const formatEtaText = (minutes: number): string => {
     if (minutes <= 1) return "Arriving now";
@@ -288,6 +303,15 @@ export function RideStatusPanel({
                           <p className="font-semibold text-sm" data-testid="text-driver-speed">{speedMph} mph</p>
                         </div>
                       </div>
+                    )}
+                    {normalizedStatus === "DRIVER_ON_THE_WAY" && trafficIndicator && (
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${trafficIndicator.color} ${trafficIndicator.bgColor} border-0`}
+                        data-testid="badge-traffic-condition"
+                      >
+                        {trafficIndicator.label}
+                      </Badge>
                     )}
                   </>
                 )}

@@ -430,4 +430,219 @@ router.post("/distance-matrix", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// Traffic-Aware ETA System
+// Rate limited: once per 15 seconds per ride
+// Provides pickup ETA using Google Directions API with traffic
+// Falls back to simulated ETA when API unavailable
+// ====================================================
+
+// Traffic ETA rate limiting (per rideId, stricter than general rate limit)
+const trafficEtaRateLimits = new Map<string, number>();
+const TRAFFIC_ETA_COOLDOWN_MS = 15000; // 15 seconds between requests per ride
+
+// Simulated traffic conditions for demo/fallback mode
+type TrafficCondition = "light" | "moderate" | "heavy";
+
+function getSimulatedTrafficCondition(): TrafficCondition {
+  // In demo mode, vary traffic based on time of day simulation
+  const hour = new Date().getHours();
+  // Rush hours: 7-9 AM and 5-7 PM
+  if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 19)) {
+    return Math.random() > 0.3 ? "heavy" : "moderate";
+  }
+  // Late night: lighter traffic
+  if (hour >= 22 || hour <= 5) {
+    return Math.random() > 0.7 ? "moderate" : "light";
+  }
+  // Normal hours: mixed
+  const rand = Math.random();
+  if (rand < 0.4) return "light";
+  if (rand < 0.8) return "moderate";
+  return "heavy";
+}
+
+function calculateSimulatedEta(
+  distanceMeters: number,
+  trafficCondition: TrafficCondition
+): { etaMinutes: number; speedMph: number } {
+  // Base speed in meters per minute
+  const baseSpeeds: Record<TrafficCondition, number> = {
+    light: 800, // ~30 mph
+    moderate: 533, // ~20 mph
+    heavy: 267, // ~10 mph
+  };
+  
+  const baseSpeed = baseSpeeds[trafficCondition];
+  // Add some randomness (±15%)
+  const variance = 0.85 + Math.random() * 0.3;
+  const effectiveSpeed = baseSpeed * variance;
+  
+  const etaMinutes = Math.max(1, Math.ceil(distanceMeters / effectiveSpeed));
+  const speedMph = Math.round((effectiveSpeed * 60) / 1609.344);
+  
+  return { etaMinutes, speedMph };
+}
+
+// Haversine distance calculation
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+const trafficEtaSchema = z.object({
+  rideId: z.string().uuid(),
+  driverLat: z.number().min(-90).max(90),
+  driverLng: z.number().min(-180).max(180),
+  pickupLat: z.number().min(-90).max(90),
+  pickupLng: z.number().min(-180).max(180),
+  // Optional: force traffic condition for testing (dev only)
+  forceTrafficCondition: z.enum(["light", "moderate", "heavy"]).optional(),
+});
+
+// ====================================================
+// GET /api/maps/traffic-eta
+// Get traffic-aware ETA for driver to pickup
+// Production: Uses Google Directions API with traffic_model
+// Fallback: Simulated ETA based on distance and time of day
+// ====================================================
+router.get("/traffic-eta", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    
+    // General rate limiting
+    if (!checkRateLimit(userId)) {
+      return res.status(429).json({ error: "Too many requests" });
+    }
+
+    // Parse and validate query parameters
+    const parseResult = trafficEtaSchema.safeParse({
+      rideId: req.query.rideId,
+      driverLat: parseFloat(req.query.driverLat as string),
+      driverLng: parseFloat(req.query.driverLng as string),
+      pickupLat: parseFloat(req.query.pickupLat as string),
+      pickupLng: parseFloat(req.query.pickupLng as string),
+      forceTrafficCondition: req.query.forceTrafficCondition,
+    });
+
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: "Invalid parameters", 
+        details: parseResult.error.errors 
+      });
+    }
+
+    const { rideId, driverLat, driverLng, pickupLat, pickupLng, forceTrafficCondition } = parseResult.data;
+
+    // Per-ride rate limiting (15 second cooldown)
+    const lastRequest = trafficEtaRateLimits.get(rideId);
+    const now = Date.now();
+    if (lastRequest && now - lastRequest < TRAFFIC_ETA_COOLDOWN_MS) {
+      // Return cached response indicator - client should use its cached value
+      return res.status(429).json({ 
+        error: "Rate limited", 
+        retryAfterMs: TRAFFIC_ETA_COOLDOWN_MS - (now - lastRequest),
+        message: "Use cached ETA"
+      });
+    }
+    trafficEtaRateLimits.set(rideId, now);
+
+    // Calculate straight-line distance for fallback
+    const straightLineDistance = haversineDistance(driverLat, driverLng, pickupLat, pickupLng);
+    
+    // Determine traffic condition (can be forced for testing)
+    let trafficCondition: TrafficCondition;
+    if (forceTrafficCondition && process.env.NODE_ENV === "development") {
+      trafficCondition = forceTrafficCondition;
+    } else {
+      trafficCondition = getSimulatedTrafficCondition();
+    }
+
+    // Try Google Directions API if configured
+    if (GOOGLE_MAPS_API_KEY && !forceTrafficCondition) {
+      try {
+        const params = new URLSearchParams({
+          origin: `${driverLat},${driverLng}`,
+          destination: `${pickupLat},${pickupLng}`,
+          mode: "driving",
+          departure_time: "now",
+          traffic_model: "best_guess",
+          key: GOOGLE_MAPS_API_KEY,
+        });
+
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`,
+          { signal: AbortSignal.timeout(5000) } // 5 second timeout
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          if (data.status === "OK" && data.routes?.[0]?.legs?.[0]) {
+            const leg = data.routes[0].legs[0];
+            const distanceMeters = leg.distance?.value || straightLineDistance;
+            const durationSeconds = leg.duration_in_traffic?.value || leg.duration?.value;
+            
+            if (durationSeconds) {
+              const etaMinutes = Math.max(1, Math.ceil(durationSeconds / 60));
+              const speedMph = Math.round((distanceMeters / durationSeconds) * 2.237); // m/s to mph
+              
+              return res.json({
+                pickupEtaMinutes: etaMinutes,
+                distanceMeters,
+                distanceMiles: Math.round((distanceMeters / 1609.344) * 10) / 10,
+                speedMph: Math.min(speedMph, 80), // Cap displayed speed for privacy
+                source: "traffic" as const,
+                lastUpdatedAt: new Date().toISOString(),
+                trafficCondition: durationSeconds > (leg.duration?.value || 0) * 1.2 ? "heavy" : 
+                                  durationSeconds > (leg.duration?.value || 0) * 1.1 ? "moderate" : "light",
+              });
+            }
+          }
+        }
+        // API failed, fall through to simulated
+        console.warn("[Maps] Traffic ETA API failed, using simulated:", response.status);
+      } catch (apiError) {
+        console.warn("[Maps] Traffic ETA API error:", apiError);
+        // Fall through to simulated
+      }
+    }
+
+    // Fallback: Simulated ETA
+    // Use 1.3x straight-line distance to estimate road distance
+    const estimatedRoadDistance = straightLineDistance * 1.3;
+    const { etaMinutes, speedMph } = calculateSimulatedEta(estimatedRoadDistance, trafficCondition);
+
+    res.json({
+      pickupEtaMinutes: etaMinutes,
+      distanceMeters: Math.round(estimatedRoadDistance),
+      distanceMiles: Math.round((estimatedRoadDistance / 1609.344) * 10) / 10,
+      speedMph: Math.min(speedMph, 80), // Cap displayed speed for privacy
+      source: "simulated" as const,
+      lastUpdatedAt: new Date().toISOString(),
+      trafficCondition,
+    });
+  } catch (error) {
+    console.error("[Maps] Traffic ETA error:", error);
+    res.status(500).json({ error: "Failed to calculate ETA" });
+  }
+});
+
+// Clean up old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [rideId, timestamp] of trafficEtaRateLimits.entries()) {
+    if (now - timestamp > TRAFFIC_ETA_COOLDOWN_MS * 10) {
+      trafficEtaRateLimits.delete(rideId);
+    }
+  }
+}, 60000); // Clean every minute
+
 export default router;
