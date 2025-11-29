@@ -695,14 +695,9 @@ export default function UnifiedBookingPage() {
             lng: customerLocation.lng,
           };
           
-          // Only apply if user hasn't started typing in the meantime
-          setPickup(currentPickup => {
-            if (!currentPickup) {
-              setPickupQuery(address);
-              return location;
-            }
-            return currentPickup;
-          });
+          // Set both pickup and query atomically (only if still empty)
+          setPickup(currentPickup => currentPickup || location);
+          setPickupQuery(currentQuery => currentQuery || address);
         }
       } catch (error) {
         // Silently fail - user can still manually enter address
