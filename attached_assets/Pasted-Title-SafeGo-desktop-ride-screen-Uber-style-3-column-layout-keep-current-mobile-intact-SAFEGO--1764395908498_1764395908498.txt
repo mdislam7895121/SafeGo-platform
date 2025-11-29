@@ -1,0 +1,189 @@
+Title: SafeGo desktop ride screen – Uber-style 3-column layout (keep current mobile intact)
+
+SAFEGO GLOBAL RULE REMINDER (do not break):
+- 4 roles exist: customer (rider), driver, restaurant, admin.
+- Rides, food_orders, deliveries share same pricing/commission engine.
+- Do NOT change: fare calculation, surge, promo engine, commission split, driver earnings, payout rules, or dispatch logic.
+- Customer must never see driver earnings or commission. Driver can see full breakdown in driver app only.
+- All changes here are UI-only for the CUSTOMER web ride screen (`/customer/ride`).
+
+GOAL:
+Make the desktop `/customer/ride` screen look structurally like Uber Web:
+- Left: fixed “Plan your ride” / input sidebar.
+- Center: vertical ride list (SafeGo X, SafeGo Comfort etc) in row layout (not cards).
+- Right: full-height map.
+- Mobile view (small screens) must keep the existing C7 carousel + bottom “Request ride” button exactly as it is.
+
+STEP 1 – Identify the current ride request container
+- Find the React page/component used for `/customer/ride` (for example `RideRequestPage`, `RideRequestScreen`, or similar).
+- This component currently stacks:
+  1) Map with big pickup/dropoff card over it,
+  2) Promo banner (“SafeGo Everyday Saver”),
+  3) “Choose your ride” horizontal carousel with SafeGo X / Comfort etc,
+  4) Full-width `Request ride` button.
+- We will refactor ONLY the layout for desktop (min-width: 1024px).
+
+STEP 2 – Introduce a responsive 3-column layout for desktop
+- Wrap the existing content in a top-level layout container, e.g. `<div className="ride-layout">`.
+- For mobile / tablet (< 1024px):
+  - Keep the current stacked layout exactly as today (map + promo + carousel + button).
+- For desktop (>= 1024px):
+  - Use CSS grid or flex to create 3 columns:
+
+    Left column width: 320–340px
+    Center column width: 420–520px
+    Right column width: remaining space (map)
+
+  Example (Tailwind-style idea, adapt to project style):
+
+    .ride-layout-desktop {
+      display: grid;
+      grid-template-columns: 340px 440px minmax(0, 1fr);
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+  - Apply this “desktop” class only at `min-width: 1024px`.
+
+STEP 3 – LEFT COLUMN: Fixed “Plan your ride” sidebar
+- Move the current big card with origin/destination inputs into the LEFT column.
+- Contents:
+  - “Plan your ride” title
+  - Pickup address input
+  - Dropoff address input
+  - Pickup time selector (if present)
+  - For me / For someone else toggle (if present)
+  - Payment summary row
+- Make this sidebar visually similar to Uber’s left panel:
+  - background: #FFFFFF
+  - border-radius: 12px
+  - padding: 20px
+  - border: 1px solid #E5E7EB
+  - small shadow for elevation
+- Make the sidebar sticky so it stays visible while scrolling:
+
+    position: sticky;
+    top: (below main header height, e.g. 72px);
+
+- Promo banner:
+  - On desktop, place the “SafeGo Everyday Saver – 15% off your ride” banner just BELOW the address fields, inside the left column OR directly across the top of the center column (but keep it visually neat and not overlapping the map).
+  - Do NOT remove promo logic; just reposition the banner.
+
+STEP 4 – CENTER COLUMN: Uber-style vertical ride list
+- This column will replace the horizontal carousel for DESKTOP ONLY.
+
+4.1 Data and logic reuse
+- Reuse the same ride options data that powers the C7 cards (SafeGo X, SafeGo Comfort, SafeGo Comfort XL, SafeGo XL, SafeGo Black, SafeGo Black SUV, SafeGo WAV).
+- Reuse the same selection state (`selectedRideType` or equivalent) so that when a user clicks a row in the list, it sets the same selected value as the carousel on mobile.
+- All price, discount, and promo calculations must use the existing fare engine and promo system; do NOT add new business logic.
+
+4.2 Layout of a single ride row (desktop)
+- For each ride option, render a row/box similar to Uber’s list (not big cards):
+
+  Structure:
+  - LEFT: small vehicle 3D image (the new SafeGo 3D images you added in C7).
+  - MIDDLE: text block:
+      * Title: “SafeGo X”, “SafeGo Comfort”, etc (bold, 600).
+      * Subline: short description (e.g. “Affordable rides for up to 4 riders”).
+      * Capacity + ETA line: icons for people + ETA (e.g. “4   •   2 min away”).
+      * If promo applied to this ride: a green text “You save $X.XX”.
+  - RIGHT: price block:
+      * Current price in bold, larger font (e.g. 18–20px).
+      * Old price (if promo applied) in smaller gray with strikethrough.
+      * Optionally show percentage off (e.g. “15% off”).
+
+- Visual styling (desktop):
+
+    Row container:
+      border: 1px solid #E5E7EB;
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: #FFFFFF;
+
+    On hover:
+      box-shadow: 0px 6px 20px rgba(0,0,0,0.06);
+      cursor: pointer;
+
+    Selected state:
+      border-color: #2563EB;   // SafeGo blue
+      outline: 2px solid #2563EB20 (subtle);
+      background: #EFF6FF;
+
+    Price text:
+      current price: #000000, font-weight: 700
+      old price: #9CA3AF, text-decoration: line-through
+
+    Promo text:
+      color: #16A34A (SafeGo green), font-weight: 500, small size.
+
+- Badge system:
+  - If availability is low: show a small “Limited” badge in yellow at the right or under the title.
+  - Default recommended type (SafeGo X) can display a subtle “Popular” badge.
+  - If a promo is applied, you already show “You save $X.XX”; keep that consistent.
+
+4.3 Desktop/mobile behavior
+- Desktop (>= 1024px):
+  - Hide the horizontal car carousel.
+  - Show the vertical list (rows) instead.
+- Mobile:
+  - Keep the current horizontal carousel + detailed card exactly as implemented in C7 (no regression).
+
+STEP 5 – RIGHT COLUMN: Full map panel
+- Move the route map into the RIGHT column.
+- Requirements:
+  - Map should use the remaining width with `min-width: 360px`.
+  - Height: fill the viewport minus top header (e.g. `height: calc(100vh - headerHeight)`).
+  - Always show origin + destination pins and the route polyline.
+  - When the user changes the ride type or addresses, keep current behavior (ETA updates etc.).
+  - No big white pickup/dropoff overlay card covering the map on desktop; all such inputs remain in the left sidebar.
+
+STEP 6 – REQUEST RIDE BUTTON POSITIONING
+- Desktop:
+  - Place the `Request ride` button directly under the CENTER COLUMN (ride list).
+  - Center it horizontally relative to the center column.
+  - Style:
+
+        max-width: 360px;
+        width: 100%;
+        margin: 16px auto 24px;
+        height: 54px;
+        border-radius: 12px;
+        font-size: 18px;
+        font-weight: 600;
+
+- Mobile:
+  - Keep the existing full-width blue button at the bottom of the screen as before.
+
+STEP 7 – ACCESSIBILITY AND RESPONSIVENESS
+- Ensure keyboard tab order on desktop:
+  1) Left sidebar inputs (pickup, dropoff, etc.),
+  2) Ride list rows,
+  3) Request ride button,
+  4) Map interactive controls.
+- All text elements must remain readable on small desktop resolutions (e.g. 1280×720).
+- Verify that resizing the window below 1024px cleanly switches back to the mobile/carousel layout without flicker.
+
+STEP 8 – DO NOT TOUCH BACKEND LOGIC
+- Do NOT modify:
+  - Fare calculation (time, distance, base fare, booking fee, taxes).
+  - Commission split or driver earnings.
+  - Promo engine or discount rules.
+  - Driver availability or matching logic.
+  - Route calculation, ETA calculation, or geocoding.
+
+You are only allowed to refactor the CUSTOMER desktop layout and present the ride options in an Uber-style 3-column layout as described.
+
+STEP 9 – TEST CASES
+- Desktop, wide screen:
+  - Enter pickup + dropoff → Left sidebar updates, center ride list shows updated prices, right map shows route.
+  - Selecting different ride types updates the highlighted row and the summary card, but map and pricing logic still behave exactly as before.
+  - Request ride triggers the same flow as before.
+- Mobile:
+  - Nothing visually broken: same carousel cards, same bottom button, same promo banner.
+- Confirm there is no place in the customer UI that shows driver commission or driver earnings numbers.
+
+Please implement this fully and then take a screenshot of the new desktop layout so we can visually compare it to Uber Web.
