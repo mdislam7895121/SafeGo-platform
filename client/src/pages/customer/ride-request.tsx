@@ -1741,25 +1741,77 @@ export default function RideRequest() {
         )}
         </div>
 
-        {/* [D] REQUEST RIDE BUTTON - Always visible, fixed at bottom, 52-56px height */}
+        {/* [D] MOBILE BOTTOM BAR - 2-step control for Route Explorer
+          * isRouteExplorerOpen is a mobile-only UI state
+          * No business logic is implemented here; only orchestrates layout and route selection based on existing state
+          */}
         <div className="flex-shrink-0 px-4 py-4 bg-background border-t">
-          <Button
-            onClick={handleRequestRide}
-            disabled={!canRequestRide}
-            className="w-full h-14 text-base font-semibold rounded-xl"
-            data-testid="button-request-ride"
-          >
-            {isRequestingRide ? (
-              <>
-                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                Requesting...
-              </>
-            ) : (
-              "Request ride"
-            )}
-          </Button>
+          {/* Step 1: Show "Choose your route" when NOT in Route Explorer and has routes */}
+          {!isRouteExplorerOpen && activeRoute && routes.length > 0 && (
+            <Button
+              onClick={() => setIsRouteExplorerOpen(true)}
+              disabled={!canRequestRide}
+              className="w-full h-14 text-base font-semibold rounded-xl"
+              data-testid="button-choose-route"
+            >
+              <RouteIcon className="h-5 w-5 mr-2" />
+              Choose your route
+            </Button>
+          )}
 
-          {!pickup && !dropoff && (
+          {/* Show Request Ride directly when no routes yet or single route */}
+          {!isRouteExplorerOpen && (!activeRoute || routes.length <= 1) && (
+            <Button
+              onClick={handleRequestRide}
+              disabled={!canRequestRide}
+              className="w-full h-14 text-base font-semibold rounded-xl"
+              data-testid="button-request-ride"
+            >
+              {isRequestingRide ? (
+                <>
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                  Requesting...
+                </>
+              ) : (
+                "Request ride"
+              )}
+            </Button>
+          )}
+
+          {/* Step 2: Route Explorer open - show back + Request ride */}
+          {isRouteExplorerOpen && (
+            <>
+              {/* Top row: instruction + back link */}
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm text-muted-foreground">Choose your favorite route on the map</p>
+                <button
+                  onClick={() => setIsRouteExplorerOpen(false)}
+                  className="text-sm font-medium text-primary hover:underline"
+                  data-testid="button-back-to-details"
+                >
+                  Back to ride details
+                </button>
+              </div>
+              {/* Request ride button */}
+              <Button
+                onClick={handleRequestRide}
+                disabled={!canRequestRide}
+                className="w-full h-14 text-base font-semibold rounded-xl"
+                data-testid="button-request-ride-explorer"
+              >
+                {isRequestingRide ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Requesting...
+                  </>
+                ) : (
+                  "Request ride"
+                )}
+              </Button>
+            </>
+          )}
+
+          {!pickup && !dropoff && !isRouteExplorerOpen && (
             <p className="text-center text-xs text-muted-foreground mt-2">
               Set pickup and dropoff to continue
             </p>
