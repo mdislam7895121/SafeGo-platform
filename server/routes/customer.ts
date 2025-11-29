@@ -186,7 +186,6 @@ router.get("/rides", async (req: AuthRequest, res) => {
           pickupAddress: ride.pickupAddress,
           dropoffAddress: ride.dropoffAddress,
           serviceFare: ride.serviceFare,
-          driverPayout: ride.driverPayout,
           paymentMethod: ride.paymentMethod,
           status: ride.status,
           driver: ride.driver ? {

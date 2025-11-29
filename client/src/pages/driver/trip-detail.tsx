@@ -384,6 +384,19 @@ export default function DriverTripDetail() {
                     {formatCurrency(trip.driverEarnings)}
                   </span>
                 </div>
+
+                <div className="pt-2">
+                  <Link href={`/driver/trips/${tripId}/earnings${serviceType ? `?serviceType=${serviceType}` : ""}`}>
+                    <Button 
+                      variant="outline" 
+                      className="w-full" 
+                      data-testid="button-view-earnings-breakdown"
+                    >
+                      <DollarSign className="h-4 w-4 mr-2" />
+                      View Full Earnings Breakdown
+                    </Button>
+                  </Link>
+                </div>
               </>
             ) : (
               <div className="py-8 text-center text-muted-foreground">

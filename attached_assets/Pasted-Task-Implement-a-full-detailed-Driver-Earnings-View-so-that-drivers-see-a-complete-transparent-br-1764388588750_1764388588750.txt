@@ -1,0 +1,193 @@
+Task: Implement a full, detailed Driver Earnings View so that drivers see a complete, transparent breakdown of each trip. The rider must still never see driver earnings. Admin continues to see full internal breakdown.
+
+Follow all existing SafeGo global rules, existing TLC logic, fare pipeline, commission logic, and do NOT change any numbers or calculations — only expose them clearly to the DRIVER in a dedicated view.
+
+────────────────
+1. Data Model for Driver Earnings View
+────────────────
+
+Create or extend a dedicated server-side DTO / view model for drivers, e.g.:
+
+  DriverTripEarningsView {
+    tripId: string;
+    city: string;
+    serviceType: "RIDE";
+    categoryCode: string;            // e.g., "SAFEGO_BLACK"
+    categoryLabel: string;           // e.g., "SafeGo Black"
+
+    riderPaidTotal: number;          // exact final amount rider paid
+    riderCurrency: string;           // e.g., "USD"
+
+    // Fare components (pre-promo)
+    baseFare: number;                // pickup/base charge
+    distanceFare: number;            // per-mile or per-km
+    timeFare: number;                // per-minute
+    surgeAmount: number;             // extra due to surge, if any
+    bookingFee: number;              // fixed booking/service fee
+    otherServiceFees: number;        // misc service fees if used
+
+    // Regulatory / TLC fees (pass-through)
+    regulatoryFeesTotal: number;     // total TLC/government fees
+    regulatoryBreakdown: {
+      congestion?: number;
+      airportFee?: number;
+      stateSurcharge?: number;
+      hvfSurcharge?: number;
+      tolls?: number;
+      longTripFee?: number;
+      outOfTownFee?: number;
+      other?: number;
+    };
+
+    // Promo and discounts
+    promoCode?: string | null;
+    promoLabel?: string | null;
+    promoDiscountAmount: number;     // how much rider’s price was reduced
+
+    // Platform commission and incentives
+    platformCommissionAmount: number;
+    platformCommissionPercent: number;
+    driverIncentivesAmount: number;  // extra bonuses SafeGo pays the driver
+
+    // Final earnings
+    driverEarningsNet: number;       // final amount the driver earns
+    payoutCurrency: string;          // usually same as riderCurrency
+
+    // Meta info
+    tripDistance: number;
+    tripDurationMinutes: number;
+    tripStartTime: string;
+    tripEndTime: string;
+  }
+
+Rules:
+- Use existing fare pipeline values; do NOT invent new math.
+- Map the current internal fare breakdown into this view without altering the calculations.
+- Ensure riderPaidTotal equals what the rider app shows as total fare.
+- Ensure driverEarningsNet matches existing payout calculations.
+
+────────────────
+2. API for Driver Earnings
+────────────────
+
+1) Identify the existing driver trip detail API (or create one if needed) which is used to show a driver the summary of a completed trip.
+
+2) Make that endpoint return the DriverTripEarningsView described above, for DRIVER-authenticated requests only.
+
+3) This endpoint must NOT be accessible to riders and must not be used by rider clients.
+
+4) Security:
+   - Enforce authentication + authorization for driver.
+   - Verify the requesting driver is actually the assigned driver for that trip.
+   - Do not expose rider PII (payment method details, full name if not needed, card last-4).
+
+────────────────
+3. Driver UI - Earnings Breakdown Screen
+────────────────
+
+Implement a clear, detailed earnings breakdown in the DRIVER app (web/mobile) using the DriverTripEarningsView.
+
+Layout (example):
+
+  [Trip Header]
+    • SafeGo Black
+    • Borough/City (e.g., Manhattan, NYC)
+    • Distance + Duration (e.g., 14.2 mi · 36 min)
+
+  [Section 1: Rider paid]
+    Title: "Rider paid"
+    • Rider paid total: $587.36 (big, bold)
+    • Underline: “This is the total amount charged to the rider for this trip.”
+
+  [Section 2: Fare details (before promo)]
+    Title: "Fare details"
+    • Base fare:          $XX.XX
+    • Distance fare:      $XX.XX
+    • Time fare:          $XX.XX
+    • Surge:              $XX.XX (or “None”)
+    • Booking fee:        $XX.XX
+    • Other service fees: $XX.XX
+
+  [Section 3: Regulatory & TLC fees]
+    Title: "Regulatory & TLC fees (pass-through)"
+    • Congestion fee:     $X.XX
+    • Airport fee:        $X.XX
+    • State surcharge:    $X.XX
+    • Tolls:              $X.XX
+    • Long trip / Out-of-town: $X.XX
+    • Total regulatory:   $XX.XX
+    Footnote: “These amounts go to the government or regulators, not to SafeGo or the driver.”
+
+  [Section 4: Promotion / Discount]
+    Title: "Promotion"
+    • Promo code: SAFEGO15
+    • Rider discount: -$YY.YY
+    Footnote: “This is the discount the rider received. SafeGo covers this cost unless configured otherwise.”
+
+  [Section 5: SafeGo fee]
+    Title: "SafeGo fee"
+    • Platform commission (15%): -$CC.CC
+    • Commission base (for info): $BB.BB
+    Footnote: “This is SafeGo’s commission for providing the platform, insurance, support and operations.”
+
+  [Section 6: Your earnings]
+    Title: "Your earnings"
+    • Your net earnings: $NNN.NN (big, green, bold)
+    • Incentives/bonus:  +$II.II (if any)
+    • Final payout:      $NNN.NN (same as driverEarningsNet)
+
+    Footnote text (plain language): 
+    “You earn this amount after regulatory fees and SafeGo’s commission are applied. This is the amount that will be added to your payout balance.”
+
+Rules:
+- Use very clear labels and small explanatory footnotes so the driver understands every line.
+- Make sure numbers visually sum up correctly:
+  riderPaidTotal = (pre-promo fare + fees) - promoDiscountAmount
+  driverEarningsNet = riderPaidTotal - regulatoryFeesTotal - platformCommissionAmount + incentives
+- All math must match existing backend logic.
+
+────────────────
+4. Rider vs Driver Separation (Do not leak info to rider)
+────────────────
+
+- Confirm that none of these driver-only fields appear in Rider API responses or Rider UI:
+  • driverEarningsNet
+  • platformCommissionAmount
+  • platformCommissionPercent
+  • driverIncentivesAmount
+- The Rider app should only see its own RiderFareView version with totals, taxes, and promo, but no driver/commission breakdown.
+
+────────────────
+5. Admin Panel Clarification (Optional small improvement)
+────────────────
+
+- In the admin fare breakdown view, align naming with the driver view:
+  • “Rider paid total”
+  • “Platform commission”
+  • “Driver net earnings”
+  • “Regulatory / TLC fees”
+- Ensure numbers match what the driver sees, so support can explain any dispute.
+
+────────────────
+6. Tests & Validation
+────────────────
+
+- Add backend tests to verify:
+  • DriverTripEarningsView is correctly populated from the existing fare pipeline.
+  • Rider and driver responses carry consistent riderPaidTotal.
+- Add UI tests / snapshots for driver app:
+  • Earnings breakdown sections render with correct labels and sums.
+- Manual QA:
+  • Pick one sample trip and verify:
+    - Rider sees only “You paid $X” type view.
+    - Driver sees full breakdown and “Your earnings $Y”.
+    - Admin sees full internal breakdown.
+    - All numbers match exactly.
+
+Goal confirmation:
+After this task, every driver can open a trip and see a full, transparent, human-readable explanation of:
+- How much the rider paid,
+- Where each dollar went,
+- How much SafeGo took as fee,
+- How much the driver finally earns,
+without leaking this to riders.

@@ -233,6 +233,8 @@ router.get("/:id", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
+    const isDriverOrAdmin = role === "driver" || role === "admin";
+    
     res.json({
       ride: {
         id: ride.id,
@@ -266,8 +268,10 @@ router.get("/:id", async (req: AuthRequest, res) => {
         durationMinutes: ride.durationMinutes,
         trafficEtaSeconds: ride.trafficEtaSeconds,
         serviceFare: ride.serviceFare,
-        safegoCommission: ride.safegoCommission,
-        driverPayout: ride.driverPayout,
+        ...(isDriverOrAdmin && {
+          safegoCommission: ride.safegoCommission,
+          driverPayout: ride.driverPayout,
+        }),
         tollAmount: ride.tollAmount,
         surgeMultiplier: ride.surgeMultiplier,
         paymentMethod: ride.paymentMethod,

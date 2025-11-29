@@ -1735,4 +1735,377 @@ router.post(
   }
 );
 
+// ============================================
+// DRIVER EARNINGS BREAKDOWN ENDPOINT
+// Returns detailed, transparent fare breakdown for drivers
+// ============================================
+
+import type { 
+  DriverTripEarningsView, 
+  RegulatoryBreakdown 
+} from "../../shared/driverEarningsTypes";
+
+router.get(
+  "/:tripId/earnings",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { tripId } = req.params;
+      const { serviceType } = req.query;
+
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: { 
+          id: true, 
+          isVerified: true, 
+          verificationStatus: true, 
+          isSuspended: true 
+        },
+      });
+
+      if (!driverProfile) {
+        return res.status(403).json({ error: "Driver profile not found" });
+      }
+
+      const driverId = driverProfile.id;
+
+      if (driverProfile.isSuspended) {
+        return res.status(403).json({ error: "Account is suspended" });
+      }
+
+      const isKycApproved = driverProfile.isVerified && 
+        driverProfile.verificationStatus === "approved";
+
+      if (!isKycApproved) {
+        return res.status(403).json({ 
+          error: "Complete verification to view earnings breakdown",
+          kycRequired: true,
+          kycStatus: driverProfile.verificationStatus,
+        });
+      }
+
+      let earningsView: DriverTripEarningsView | null = null;
+
+      if (!serviceType || serviceType === "RIDE") {
+        const ride = await prisma.ride.findFirst({
+          where: { id: tripId, driverId, isDemo: false },
+          include: {
+            receipt: true,
+            customer: {
+              select: { firstName: true },
+            },
+          },
+        });
+
+        if (ride) {
+          const receipt = ride.receipt;
+          const fareBreakdown = receipt?.fareBreakdown as any;
+
+          const regulatoryBreakdown: RegulatoryBreakdown = {};
+          let regulatoryTotal = 0;
+
+          if (fareBreakdown?.regulatoryFeesBreakdown) {
+            for (const fee of fareBreakdown.regulatoryFeesBreakdown) {
+              const amount = Number(fee.amount) || 0;
+              regulatoryTotal += amount;
+              
+              const feeType = (fee.id || fee.name || "").toLowerCase();
+              if (feeType.includes("congestion")) {
+                regulatoryBreakdown.congestion = (regulatoryBreakdown.congestion || 0) + amount;
+              } else if (feeType.includes("airport")) {
+                regulatoryBreakdown.airportFee = (regulatoryBreakdown.airportFee || 0) + amount;
+              } else if (feeType.includes("state") && feeType.includes("surcharge")) {
+                regulatoryBreakdown.stateSurcharge = (regulatoryBreakdown.stateSurcharge || 0) + amount;
+              } else if (feeType.includes("hvf") || feeType.includes("high volume")) {
+                regulatoryBreakdown.hvfSurcharge = (regulatoryBreakdown.hvfSurcharge || 0) + amount;
+              } else if (feeType.includes("black car fund") || feeType.includes("bcf")) {
+                regulatoryBreakdown.blackCarFund = (regulatoryBreakdown.blackCarFund || 0) + amount;
+              } else if (feeType.includes("long trip") || feeType.includes("long_trip")) {
+                regulatoryBreakdown.longTripFee = (regulatoryBreakdown.longTripFee || 0) + amount;
+              } else if (feeType.includes("out of town") || feeType.includes("out_of_town")) {
+                regulatoryBreakdown.outOfTownFee = (regulatoryBreakdown.outOfTownFee || 0) + amount;
+              } else if (feeType.includes("cross borough") || feeType.includes("cross_borough")) {
+                regulatoryBreakdown.crossBoroughFee = (regulatoryBreakdown.crossBoroughFee || 0) + amount;
+              } else if (feeType.includes("accessible") || feeType.includes("wav")) {
+                regulatoryBreakdown.accessibleVehicleFee = (regulatoryBreakdown.accessibleVehicleFee || 0) + amount;
+              } else {
+                regulatoryBreakdown.other = (regulatoryBreakdown.other || 0) + amount;
+              }
+            }
+          }
+
+          if (fareBreakdown?.tollsBreakdown || fareBreakdown?.tollsTotal) {
+            const tollsAmount = Number(fareBreakdown.tollsTotal) || 
+              (fareBreakdown.tollsBreakdown?.reduce((sum: number, t: any) => sum + Number(t.amount || 0), 0) || 0);
+            regulatoryBreakdown.tolls = tollsAmount;
+            regulatoryTotal += tollsAmount;
+          }
+
+          const riderPaidTotal = receipt ? 
+            serializeDecimal(receipt.totalFare) : 
+            serializeDecimal(ride.serviceFare);
+
+          const baseFare = receipt ? 
+            serializeDecimal(receipt.baseFare) : 
+            (fareBreakdown?.baseFare || 0);
+          
+          const distanceFare = receipt ? 
+            serializeDecimal(receipt.distanceFare) : 
+            (fareBreakdown?.distanceFare || 0);
+          
+          const timeFare = receipt ? 
+            serializeDecimal(receipt.timeFare) : 
+            (fareBreakdown?.timeFare || 0);
+
+          const surgeAmount = receipt?.surgeFare ? 
+            serializeDecimal(receipt.surgeFare) : 
+            (fareBreakdown?.surgeAmount || 0);
+
+          const bookingFee = fareBreakdown?.serviceFee || 0;
+          const otherServiceFees = fareBreakdown?.additionalFeesTotal || 0;
+          
+          const tipAmount = receipt?.tipAmount ? 
+            serializeDecimal(receipt.tipAmount) : 0;
+          const tollsAmount = receipt?.tollsFare ? 
+            serializeDecimal(receipt.tollsFare) : 
+            (fareBreakdown?.tollsTotal || 0);
+
+          const promoDiscountAmount = receipt?.discountAmount ? 
+            serializeDecimal(receipt.discountAmount) : 
+            serializeDecimal(ride.discountAmount || 0);
+
+          const platformCommission = serializeDecimal(ride.safegoCommission);
+          const driverEarnings = serializeDecimal(ride.driverPayout);
+
+          const subtotal = baseFare + distanceFare + timeFare + surgeAmount + bookingFee + otherServiceFees;
+          const commissionPercent = subtotal > 0 ? 
+            Math.round((platformCommission / subtotal) * 100) : 15;
+
+          const categoryCode = fareBreakdown?.vehicleCategoryId || "SAFEGO_X";
+          const categoryLabel = fareBreakdown?.vehicleCategoryDisplayName || 
+            categoryCode.replace("SAFEGO_", "SafeGo ").replace(/_/g, " ");
+
+          earningsView = {
+            tripId: ride.id,
+            tripCode: generateTripCode("RIDE", ride.id),
+            city: ride.cityCode || "Unknown",
+            borough: fareBreakdown?.pickupBorough || undefined,
+            serviceType: "RIDE",
+            categoryCode,
+            categoryLabel,
+
+            riderPaidTotal,
+            riderCurrency: receipt?.currency || "USD",
+
+            baseFare,
+            distanceFare,
+            timeFare,
+            surgeAmount,
+            bookingFee,
+            otherServiceFees,
+            tipAmount,
+            tollsAmount,
+            deliveryFee: 0,
+
+            hasRegulatoryFees: regulatoryTotal > 0,
+            regulatoryFeesTotal: regulatoryTotal,
+            regulatoryBreakdown,
+
+            promoCode: fareBreakdown?.promoCode || null,
+            promoLabel: fareBreakdown?.promoCode ? 
+              `Rider discount applied` : null,
+            promoDiscountAmount,
+
+            platformCommissionAmount: platformCommission,
+            platformCommissionPercent: commissionPercent,
+            driverIncentivesAmount: 0,
+
+            driverEarningsNet: driverEarnings,
+            payoutCurrency: receipt?.currency || "USD",
+
+            tripDistance: ride.distanceMiles || receipt?.distanceMiles || 0,
+            tripDistanceUnit: "miles",
+            tripDurationMinutes: ride.durationMinutes || receipt?.durationMinutes || 0,
+            tripStartTime: ride.tripStartedAt?.toISOString() || ride.createdAt.toISOString(),
+            tripEndTime: ride.completedAt?.toISOString() || null,
+
+            pickupAddress: ride.pickupAddress,
+            dropoffAddress: ride.dropoffAddress,
+            customerFirstName: ride.customer?.firstName || undefined,
+            customerRating: ride.customerRating || undefined,
+          };
+        }
+      }
+
+      if (!earningsView && (!serviceType || serviceType === "FOOD")) {
+        const foodOrder = await prisma.foodOrder.findFirst({
+          where: { id: tripId, driverId, isDemo: false },
+          include: {
+            restaurant: { select: { restaurantName: true } },
+            customer: { select: { firstName: true } },
+          },
+        });
+
+        if (foodOrder) {
+          const baseFare = serializeDecimal(foodOrder.serviceFare);
+          const deliveryFee = foodOrder.deliveryFee ? 
+            serializeDecimal(foodOrder.deliveryFee) : 0;
+          const platformCommission = serializeDecimal(foodOrder.safegoCommission);
+          const driverEarnings = serializeDecimal(foodOrder.driverPayout);
+          const discountAmount = foodOrder.discountAmount ? 
+            serializeDecimal(foodOrder.discountAmount) : 0;
+
+          const subtotal = baseFare + deliveryFee;
+          const commissionPercent = subtotal > 0 ? 
+            Math.round((platformCommission / subtotal) * 100) : 15;
+
+          earningsView = {
+            tripId: foodOrder.id,
+            tripCode: foodOrder.orderCode || generateTripCode("FOOD", foodOrder.id),
+            city: foodOrder.cityCode || "Unknown",
+            serviceType: "FOOD",
+            categoryCode: "FOOD_DELIVERY",
+            categoryLabel: "Food Delivery",
+
+            riderPaidTotal: baseFare + deliveryFee - discountAmount,
+            riderCurrency: foodOrder.currency || "USD",
+
+            baseFare,
+            distanceFare: 0,
+            timeFare: 0,
+            surgeAmount: 0,
+            bookingFee: 0,
+            otherServiceFees: 0,
+            tipAmount: 0,
+            tollsAmount: 0,
+            deliveryFee,
+
+            hasRegulatoryFees: false,
+            regulatoryFeesTotal: 0,
+            regulatoryBreakdown: {},
+
+            promoCode: null,
+            promoLabel: null,
+            promoDiscountAmount: discountAmount,
+
+            platformCommissionAmount: platformCommission,
+            platformCommissionPercent: commissionPercent,
+            driverIncentivesAmount: 0,
+
+            driverEarningsNet: driverEarnings,
+            payoutCurrency: foodOrder.currency || "USD",
+
+            tripDistance: foodOrder.distanceMiles || 0,
+            tripDistanceUnit: "miles",
+            tripDurationMinutes: foodOrder.deliveryMinutes || 0,
+            tripStartTime: foodOrder.createdAt.toISOString(),
+            tripEndTime: (foodOrder.deliveredAt || foodOrder.completedAt)?.toISOString() || null,
+
+            pickupAddress: foodOrder.pickupAddress || foodOrder.restaurant.restaurantName,
+            dropoffAddress: foodOrder.deliveryAddress,
+            customerFirstName: foodOrder.customer?.firstName || undefined,
+            customerRating: foodOrder.customerRating || undefined,
+          };
+        }
+      }
+
+      if (!earningsView && (!serviceType || serviceType === "PARCEL")) {
+        const delivery = await prisma.delivery.findFirst({
+          where: { id: tripId, driverId, isDemo: false },
+          include: {
+            customer: { select: { firstName: true } },
+          },
+        });
+
+        if (delivery) {
+          const baseFare = serializeDecimal(delivery.serviceFare);
+          const platformCommission = serializeDecimal(delivery.safegoCommission);
+          const driverEarnings = serializeDecimal(delivery.driverPayout);
+
+          const commissionPercent = baseFare > 0 ? 
+            Math.round((platformCommission / baseFare) * 100) : 15;
+
+          earningsView = {
+            tripId: delivery.id,
+            tripCode: generateTripCode("PARCEL", delivery.id),
+            city: delivery.cityCode || "Unknown",
+            serviceType: "PARCEL",
+            categoryCode: "PARCEL_DELIVERY",
+            categoryLabel: "Parcel Delivery",
+
+            riderPaidTotal: baseFare,
+            riderCurrency: delivery.currency || "USD",
+
+            baseFare,
+            distanceFare: 0,
+            timeFare: 0,
+            surgeAmount: 0,
+            bookingFee: 0,
+            otherServiceFees: 0,
+            tipAmount: 0,
+            tollsAmount: 0,
+            deliveryFee: 0,
+
+            hasRegulatoryFees: false,
+            regulatoryFeesTotal: 0,
+            regulatoryBreakdown: {},
+
+            promoCode: null,
+            promoLabel: null,
+            promoDiscountAmount: 0,
+
+            platformCommissionAmount: platformCommission,
+            platformCommissionPercent: commissionPercent,
+            driverIncentivesAmount: 0,
+
+            driverEarningsNet: driverEarnings,
+            payoutCurrency: delivery.currency || "USD",
+
+            tripDistance: delivery.distanceMiles || 0,
+            tripDistanceUnit: "miles",
+            tripDurationMinutes: delivery.deliveryMinutes || 0,
+            tripStartTime: delivery.createdAt.toISOString(),
+            tripEndTime: delivery.deliveredAt?.toISOString() || null,
+
+            pickupAddress: delivery.pickupAddress,
+            dropoffAddress: delivery.dropoffAddress,
+            customerFirstName: delivery.customer?.firstName || undefined,
+            customerRating: delivery.customerRating || undefined,
+          };
+        }
+      }
+
+      if (!earningsView) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      await logAuditEvent({
+        actorId: userId,
+        actorEmail: "",
+        actorRole: "driver",
+        actionType: "VIEW_EARNINGS_BREAKDOWN",
+        entityType: "trip_earnings",
+        entityId: tripId,
+        description: `Driver viewed earnings breakdown for ${earningsView.tripCode}`,
+        metadata: {
+          serviceType: earningsView.serviceType,
+          tripCode: earningsView.tripCode,
+          driverEarnings: earningsView.driverEarningsNet,
+        },
+      });
+
+      res.json({
+        earnings: earningsView,
+        kycStatus: driverProfile.verificationStatus,
+        kycApproved: true,
+      });
+    } catch (error: any) {
+      console.error("Error fetching earnings breakdown:", error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+);
+
 export default router;
