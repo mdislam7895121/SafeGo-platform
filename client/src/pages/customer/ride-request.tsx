@@ -794,7 +794,11 @@ export default function RideRequest() {
   };
 
   return (
-    <div className="h-screen flex flex-col relative" data-testid="plan-your-ride-page">
+    /* C9-FIX: Changed from flex-col to a grid layout that ensures map is always visible
+     * Mobile: map takes 40% of viewport, bottom content scrolls in remaining 60%
+     * Desktop: map takes more space, bottom content is compact
+     */
+    <div className="h-screen grid grid-rows-[auto_minmax(35vh,1fr)_auto] md:grid-rows-[auto_1fr_auto] relative overflow-hidden" data-testid="plan-your-ride-page">
       <div className="sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b p-4">
         <div className="flex items-center gap-3">
           <Link href="/customer">
@@ -806,7 +810,8 @@ export default function RideRequest() {
         </div>
       </div>
 
-      <div className="flex-1 relative overflow-hidden">
+      {/* C9-FIX: Map section with minimum height guarantee (35vh on mobile) */}
+      <div className="relative overflow-hidden min-h-[35vh] md:min-h-0">
         {isClient && (
           <MapContainer
             center={[mapCenter.lat, mapCenter.lng]}
@@ -960,7 +965,11 @@ export default function RideRequest() {
         </div>
       </div>
 
-      <div className="sticky bottom-0 z-30 bg-background border-t p-4 space-y-4 shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
+      {/* C9-FIX: Bottom panel with max-height constraint and overflow scroll on mobile
+       * This ensures map remains visible while allowing scroll through ride options
+       */}
+      <div className="z-30 bg-background border-t shadow-[0_-4px_12px_rgba(0,0,0,0.1)] max-h-[55vh] md:max-h-[60vh] overflow-y-auto">
+        <div className="p-4 space-y-4">
         {/* Vehicle Category Selector - Horizontal Scroll Carousel */}
         {activeRoute && (
           <div data-testid="vehicle-category-selector">
@@ -1406,6 +1415,7 @@ export default function RideRequest() {
             Set pickup and dropoff to continue
           </p>
         )}
+        </div>
       </div>
     </div>
   );
