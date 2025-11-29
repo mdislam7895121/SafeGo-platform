@@ -979,4 +979,91 @@ router.get("/payment-methods/default", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/customer/ride-options/availability (C5)
+// Get driver availability and ETA per vehicle category
+// ====================================================
+import { driverAvailabilityService } from "../services/driverAvailabilityService";
+import { VEHICLE_CATEGORIES, VehicleCategoryId } from "@shared/vehicleCategories";
+
+const rideAvailabilitySchema = z.object({
+  pickupLat: z.number().optional(),
+  pickupLng: z.number().optional(),
+  useMockData: z.boolean().optional().default(true),
+});
+
+router.get("/ride-options/availability", async (req: AuthRequest, res) => {
+  try {
+    const query = rideAvailabilitySchema.parse({
+      pickupLat: req.query.pickupLat ? parseFloat(req.query.pickupLat as string) : undefined,
+      pickupLng: req.query.pickupLng ? parseFloat(req.query.pickupLng as string) : undefined,
+      useMockData: req.query.useMockData === 'false' ? false : true,
+    });
+
+    const availability = await driverAvailabilityService.getCategoryAvailability(
+      query.pickupLat,
+      query.pickupLng,
+      query.useMockData
+    );
+
+    const categoriesWithDetails = availability.categories.map(cat => ({
+      ...cat,
+      displayName: VEHICLE_CATEGORIES[cat.categoryId].displayName,
+      description: VEHICLE_CATEGORIES[cat.categoryId].shortDescription,
+      seatCount: VEHICLE_CATEGORIES[cat.categoryId].seatCount,
+      iconType: VEHICLE_CATEGORIES[cat.categoryId].iconType,
+      sortOrder: VEHICLE_CATEGORIES[cat.categoryId].sortOrder,
+    }));
+
+    res.json({
+      categories: categoriesWithDetails,
+      totalNearbyDrivers: availability.totalNearbyDrivers,
+      timestamp: availability.timestamp.toISOString(),
+      pickupLocation: availability.pickupLocation,
+    });
+  } catch (error) {
+    console.error("Get ride availability error:", error);
+    res.status(500).json({ error: "Failed to get ride availability" });
+  }
+});
+
+// ====================================================
+// GET /api/customer/ride-options/availability/:categoryId (C5)
+// Get driver availability and ETA for a single category
+// ====================================================
+router.get("/ride-options/availability/:categoryId", async (req: AuthRequest, res) => {
+  try {
+    const { categoryId } = req.params;
+    
+    if (!(categoryId in VEHICLE_CATEGORIES)) {
+      return res.status(400).json({ error: "Invalid vehicle category" });
+    }
+
+    const pickupLat = req.query.pickupLat ? parseFloat(req.query.pickupLat as string) : undefined;
+    const pickupLng = req.query.pickupLng ? parseFloat(req.query.pickupLng as string) : undefined;
+    const useMockData = req.query.useMockData === 'false' ? false : true;
+
+    const availability = await driverAvailabilityService.getSingleCategoryAvailability(
+      categoryId as VehicleCategoryId,
+      pickupLat,
+      pickupLng,
+      useMockData
+    );
+
+    const categoryConfig = VEHICLE_CATEGORIES[categoryId as VehicleCategoryId];
+
+    res.json({
+      ...availability,
+      displayName: categoryConfig.displayName,
+      description: categoryConfig.shortDescription,
+      seatCount: categoryConfig.seatCount,
+      iconType: categoryConfig.iconType,
+      sortOrder: categoryConfig.sortOrder,
+    });
+  } catch (error) {
+    console.error("Get single category availability error:", error);
+    res.status(500).json({ error: "Failed to get category availability" });
+  }
+});
+
 export default router;

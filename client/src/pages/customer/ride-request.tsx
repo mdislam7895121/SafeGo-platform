@@ -35,6 +35,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getVehicleCategoryImage } from "@/lib/vehicleMedia";
 import { FareDetailsAccordion, type FareBreakdownDetails } from "@/components/ride/FareDetailsAccordion";
+import { useCategoryAvailability } from "@/hooks/useCategoryAvailability";
 
 interface LocationData {
   address: string;
@@ -241,6 +242,19 @@ export default function RideRequest() {
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeFetchCompleted, setRouteFetchCompleted] = useState(false);
   const [selectedVehicleCategory, setSelectedVehicleCategory] = useState<VehicleCategoryId>("SAFEGO_X");
+
+  const { 
+    getAvailability, 
+    getETA, 
+    isUnavailable: checkUnavailable, 
+    isLimited: checkLimited,
+    isLoading: isLoadingAvailability 
+  } = useCategoryAvailability({
+    pickupLat: pickup?.lat ?? null,
+    pickupLng: pickup?.lng ?? null,
+    enabled: !!pickup,
+    refreshIntervalMs: 30000,
+  });
 
   const activeRoute = useMemo(() => routes.find(r => r.id === activeRouteId), [routes, activeRouteId]);
   
@@ -833,26 +847,35 @@ export default function RideRequest() {
                 const catConfig = VEHICLE_CATEGORIES[categoryId];
                 const isSelected = categoryId === selectedVehicleCategory;
                 const categoryFare = calculateFareForCategory(activeRoute, categoryId);
-                const etaMinutes = catConfig.etaMinutesOffset + Math.ceil(activeRoute.durationInTrafficSeconds / 60);
                 const vehicleImage = getVehicleCategoryImage(categoryId);
+                const isUnavailable = checkUnavailable(categoryId);
+                const isLimited = checkLimited(categoryId);
+                const availability = getAvailability(categoryId);
+                const categoryETA = getETA(categoryId);
+                const etaText = categoryETA?.etaText ?? `${catConfig.etaMinutesOffset + 5} min`;
+                const etaMinutes = categoryETA?.etaMinutes ?? (catConfig.etaMinutesOffset + 5);
                 
                 return (
                   <Tooltip key={categoryId}>
                     <TooltipTrigger asChild>
                       <Button
                         variant="outline"
+                        disabled={isUnavailable}
                         className={`min-w-[110px] h-auto rounded-xl border-2 p-2.5 flex-shrink-0 snap-start ${
                           isSelected 
                             ? "bg-primary/10 border-primary shadow-sm" 
-                            : "bg-card border-border hover-elevate"
+                            : isUnavailable
+                              ? "bg-muted/50 border-border opacity-60 cursor-not-allowed"
+                              : "bg-card border-border hover-elevate"
                         }`}
-                        onClick={() => setSelectedVehicleCategory(categoryId)}
+                        onClick={() => !isUnavailable && setSelectedVehicleCategory(categoryId)}
                         aria-pressed={isSelected}
-                        aria-label={`${catConfig.displayName}, $${categoryFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaMinutes} minutes ETA${isSelected ? ", selected" : ""}`}
+                        aria-disabled={isUnavailable}
+                        aria-label={`${catConfig.displayName}, ${isUnavailable ? "No drivers nearby" : `$${categoryFare.toFixed(2)}, ${catConfig.seatCount} seats, ${etaText}`}${isSelected ? ", selected" : ""}`}
                         data-testid={`ride-pill-${categoryId}`}
                       >
                         <div className="flex flex-col items-center gap-1">
-                          <div className="h-14 w-20 flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-b from-muted/30 to-muted/60">
+                          <div className={`h-14 w-20 flex items-center justify-center overflow-hidden rounded-lg bg-gradient-to-b from-muted/30 to-muted/60 ${isUnavailable ? "opacity-50" : ""}`}>
                             <img 
                               src={vehicleImage} 
                               alt={catConfig.displayName}
@@ -861,21 +884,34 @@ export default function RideRequest() {
                             />
                           </div>
                           <span className={`text-xs font-semibold text-center leading-tight ${
-                            isSelected ? "text-primary" : ""
+                            isSelected ? "text-primary" : isUnavailable ? "text-muted-foreground" : ""
                           }`}>
                             {catConfig.displayName.replace("SafeGo ", "")}
                           </span>
-                          <span className={`text-sm font-bold ${isSelected ? "text-primary" : ""}`}>
-                            ${categoryFare.toFixed(2)}
-                          </span>
-                          <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
-                            <Users className="h-2.5 w-2.5" />
-                            <span>{catConfig.seatCount}</span>
-                            <span className="mx-0.5">•</span>
-                            <Clock className="h-2.5 w-2.5" />
-                            <span>{etaMinutes} min</span>
-                          </div>
-                          {catConfig.isPopular && (
+                          {isUnavailable ? (
+                            <span className="text-[10px] text-muted-foreground text-center">
+                              No drivers nearby
+                            </span>
+                          ) : (
+                            <>
+                              <span className={`text-sm font-bold ${isSelected ? "text-primary" : ""}`}>
+                                ${categoryFare.toFixed(2)}
+                              </span>
+                              <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                                <Users className="h-2.5 w-2.5" aria-hidden="true" />
+                                <span>{catConfig.seatCount}</span>
+                                <span className="mx-0.5">•</span>
+                                <Clock className="h-2.5 w-2.5" aria-hidden="true" />
+                                <span data-testid={`eta-${categoryId}`}>{etaMinutes} min</span>
+                              </div>
+                            </>
+                          )}
+                          {isLimited && !isUnavailable && (
+                            <Badge variant="outline" className="text-[8px] px-1.5 py-0 border-amber-300 text-amber-600 dark:text-amber-400">
+                              Limited
+                            </Badge>
+                          )}
+                          {catConfig.isPopular && !isUnavailable && !isLimited && (
                             <Badge variant="secondary" className="text-[8px] px-1.5 py-0">
                               Popular
                             </Badge>
@@ -885,7 +921,17 @@ export default function RideRequest() {
                     </TooltipTrigger>
                     <TooltipContent side="top" className="text-xs max-w-[200px]">
                       <p className="font-medium">{catConfig.displayName}</p>
-                      <p className="text-muted-foreground">{catConfig.shortDescription}</p>
+                      <p className="text-muted-foreground">
+                        {isUnavailable 
+                          ? "No drivers available in your area right now" 
+                          : catConfig.shortDescription
+                        }
+                      </p>
+                      {!isUnavailable && (
+                        <p className="text-muted-foreground mt-1">
+                          Pickup in ~{etaMinutes} min
+                        </p>
+                      )}
                     </TooltipContent>
                   </Tooltip>
                 );
@@ -918,8 +964,11 @@ export default function RideRequest() {
                 </div>
                 <div className="text-right text-sm">
                   <p className="text-muted-foreground" data-testid="text-distance">{fareEstimate.distanceMiles} mi</p>
-                  <p className="font-medium" data-testid="text-eta">
-                    ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
+                  <p className="font-medium" data-testid="text-trip-eta">
+                    Trip: ~{formatDurationMinutes(fareEstimate.etaWithTrafficMinutes)}
+                  </p>
+                  <p className="text-xs text-muted-foreground" data-testid="text-pickup-eta">
+                    Pickup: ~{getETA(selectedVehicleCategory)?.etaMinutes ?? 5} min
                   </p>
                 </div>
               </div>
