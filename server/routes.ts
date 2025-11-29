@@ -44,6 +44,7 @@ import marketplaceBalancerRoutes from "./routes/marketplace-balancer"; // AI Mar
 import loyaltyRoutes from "./routes/loyalty"; // SafeGo Loyalty Engine
 import tlcRoutes from "./routes/tlc"; // NYC TLC HVFHV Minimum Pay Enforcement
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
+import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { db } from "./db";
 
 // Public Driver Profile Summary Type (D2 Spec)
@@ -231,6 +232,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
   setupSupportChatWebSocket(httpServer);
+  setupRideChatWebSocket(httpServer);
 
   return httpServer;
 }

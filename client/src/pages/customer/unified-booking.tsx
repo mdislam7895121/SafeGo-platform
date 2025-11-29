@@ -82,6 +82,8 @@ import { FareDetailsAccordion } from "@/components/ride/FareDetailsAccordion";
 import { RideStatusPanel, type DriverInfo as StatusDriverInfo } from "@/components/ride/RideStatusPanel";
 import { MobileLiveTracking } from "@/components/ride/MobileLiveTracking";
 import { PostTripRatingDialog } from "@/components/customer/PostTripRatingDialog";
+import { RideChatDrawer } from "@/components/customer/RideChatDrawer";
+import { useRideChat } from "@/hooks/useRideChat";
 import {
   VEHICLE_CATEGORIES,
   VEHICLE_CATEGORY_ORDER,
@@ -612,6 +614,38 @@ export default function UnifiedBookingPage() {
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
   const [showRatingDialog, setShowRatingDialog] = useState(false);
   const [hasRated, setHasRated] = useState(false);
+  
+  // Chat state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  
+  // Chat WebSocket hook - stays connected even when drawer is closed
+  const isChatActive = (rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && !!demoRideId;
+  
+  const handleNewDriverMessage = useCallback(() => {
+    if (!isChatOpen) {
+      playDriverAssigned();
+      toast({
+        title: "New message",
+        description: `${driverInfo?.name || "Driver"} sent you a message`,
+      });
+    }
+  }, [isChatOpen, driverInfo?.name, playDriverAssigned, toast]);
+  
+  const {
+    messages: chatMessages,
+    isConnected: isChatConnected,
+    isDriverTyping,
+    unreadCount: unreadMessageCount,
+    sendMessage: sendChatMessage,
+    sendTypingIndicator,
+    markAsRead: markChatAsRead,
+    clearUnread: clearChatUnread,
+  } = useRideChat({
+    rideId: demoRideId,
+    isActive: isChatActive,
+    isDrawerOpen: isChatOpen,
+    onNewDriverMessage: handleNewDriverMessage,
+  });
   
   // Developer debug mode (click logo 5 times to enable)
   const [showDebugControls, setShowDebugControls] = useState(false);
@@ -2803,6 +2837,8 @@ export default function UnifiedBookingPage() {
                                   handleViewLiveMapDesktop();
                                 }
                               }}
+                              onMessageDriver={() => setIsChatOpen(true)}
+                              unreadMessageCount={unreadMessageCount}
                               onCancelRide={handleCancelRideWithConfirm}
                               isCancelling={isCancellingRide}
                             />
@@ -2839,6 +2875,8 @@ export default function UnifiedBookingPage() {
                                   handleViewLiveMapDesktop();
                                 }
                               }}
+                              onMessageDriver={() => setIsChatOpen(true)}
+                              unreadMessageCount={unreadMessageCount}
                             />
                             
                             {/* Debug control */}
@@ -3564,6 +3602,29 @@ export default function UnifiedBookingPage() {
         initialFeedback={userFeedback}
         hasAlreadyRated={hasRated}
       />
+
+      {/* Driver-Customer Chat Drawer */}
+      {isChatActive && (
+        <RideChatDrawer
+          driverInfo={driverInfo ? {
+            name: driverInfo.name,
+            avatarInitials: driverInfo.avatarInitials,
+          } : null}
+          isOpen={isChatOpen}
+          onOpenChange={(open) => {
+            setIsChatOpen(open);
+            if (open) {
+              markChatAsRead();
+            }
+          }}
+          messages={chatMessages}
+          isConnected={isChatConnected}
+          isDriverTyping={isDriverTyping}
+          onSendMessage={sendChatMessage}
+          onTyping={sendTypingIndicator}
+          onMarkAsRead={markChatAsRead}
+        />
+      )}
       
     </div>
   );

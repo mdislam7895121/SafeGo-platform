@@ -102,6 +102,7 @@ interface RideStatusPanelProps {
   onRateTrip?: (rating: number) => void;
   isCancelling?: boolean;
   showActions?: boolean;
+  unreadMessageCount?: number;
 }
 
 function formatDuration(minutes: number): string {
@@ -156,6 +157,7 @@ export function RideStatusPanel({
   onRateTrip,
   isCancelling = false,
   showActions = true,
+  unreadMessageCount = 0,
 }: RideStatusPanelProps) {
   const categoryConfig = VEHICLE_CATEGORIES[vehicleCategory];
   const normalizedStatus = normalizeStatus(status);
@@ -392,9 +394,19 @@ export function RideStatusPanel({
                     onClick={onMessageDriver}
                     variant="outline"
                     size="icon"
+                    className="relative"
                     data-testid="button-message-driver"
                   >
                     <MessageCircle className="h-4 w-4" />
+                    {unreadMessageCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-2 -right-2 h-5 min-w-5 p-0 flex items-center justify-center text-xs"
+                        data-testid="badge-unread-messages"
+                      >
+                        {unreadMessageCount > 9 ? "9+" : unreadMessageCount}
+                      </Badge>
+                    )}
                   </Button>
                 )}
                 
