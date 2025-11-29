@@ -1547,17 +1547,17 @@ export default function UnifiedBookingPage() {
   
   const rotatedDriverIcon = useMemo(() => {
     // Always update icon when heading changes to keep arrow direction accurate
-    if (lastHeadingRef.current === null || lastHeadingRef.current !== driverHeading) {
-      lastHeadingRef.current = driverHeading;
-      cachedDriverIconRef.current = createRotatedDriverIcon(driverHeading);
+    if (lastHeadingRef.current === null || lastHeadingRef.current !== effectiveDriverHeading) {
+      lastHeadingRef.current = effectiveDriverHeading;
+      cachedDriverIconRef.current = createRotatedDriverIcon(effectiveDriverHeading);
     }
     return cachedDriverIconRef.current!;
-  }, [driverHeading]);
+  }, [effectiveDriverHeading]);
 
   // Calculate remaining route polyline based on driver position and tracking phase
   // Uses phase-specific routes: driverToPickupRoute or pickupToDropoffRoute
   const remainingRoutePoints = useMemo(() => {
-    if (!driverPosition || phaseRoutePoints.length < 2) return null;
+    if (!effectiveDriverPosition || phaseRoutePoints.length < 2) return null;
     
     // Clamp driver index to valid range within the phase route
     const maxIdx = phaseRoutePoints.length - 1;
@@ -1585,7 +1585,7 @@ export default function UnifiedBookingPage() {
     
     // No tracking during other phases
     return null;
-  }, [driverPosition, driverPositionIndex, phaseRoutePoints, trackingPhase]);
+  }, [effectiveDriverPosition, driverPositionIndex, phaseRoutePoints, trackingPhase]);
 
   return (
     <div className="h-screen flex flex-col bg-muted/30" data-testid="unified-booking-page">
@@ -2996,9 +2996,9 @@ export default function UnifiedBookingPage() {
               <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} routePoints={activeRoutePoints} />
               
               {/* Driver follow behavior when tracking */}
-              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && effectiveDriverPosition && (
                 <MapFollowDriver 
-                  driverPosition={driverPosition}
+                  driverPosition={effectiveDriverPosition}
                   isFollowing={isFollowingDriver}
                   onUserInteraction={() => setIsFollowingDriver(false)}
                 />
@@ -3008,9 +3008,9 @@ export default function UnifiedBookingPage() {
               {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
               
               {/* Driver marker - shows when driver is assigned or trip in progress */}
-              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+              {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && effectiveDriverPosition && (
                 <Marker 
-                  position={[driverPosition.lat, driverPosition.lng]} 
+                  position={[effectiveDriverPosition.lat, effectiveDriverPosition.lng]} 
                   icon={rotatedDriverIcon}
                   zIndexOffset={1000}
                 />
@@ -3055,7 +3055,7 @@ export default function UnifiedBookingPage() {
           )}
           
           {/* Re-center button - shows when user has panned away from driver */}
-          {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && !isFollowingDriver && (
+          {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && effectiveDriverPosition && !isFollowingDriver && (
             <button
               onClick={handleRecenterOnDriver}
               className="absolute top-4 right-4 z-20 bg-background px-3 py-2 rounded-lg shadow-lg border hover-elevate flex items-center gap-2"
@@ -3196,9 +3196,9 @@ export default function UnifiedBookingPage() {
                 <MapBoundsHandler pickupLocation={pickup} dropoffLocation={dropoff} routePoints={activeRoutePoints} />
                 
                 {/* Driver follow behavior when tracking */}
-                {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+                {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && effectiveDriverPosition && (
                   <MapFollowDriver 
-                    driverPosition={driverPosition}
+                    driverPosition={effectiveDriverPosition}
                     isFollowing={isFollowingDriver}
                     onUserInteraction={() => setIsFollowingDriver(false)}
                   />
@@ -3208,9 +3208,9 @@ export default function UnifiedBookingPage() {
                 {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
                 
                 {/* Driver marker - shows when driver is assigned or trip in progress */}
-                {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && (
+                {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && effectiveDriverPosition && (
                   <Marker 
-                    position={[driverPosition.lat, driverPosition.lng]} 
+                    position={[effectiveDriverPosition.lat, effectiveDriverPosition.lng]} 
                     icon={rotatedDriverIcon}
                     zIndexOffset={1000}
                   />
@@ -3265,7 +3265,7 @@ export default function UnifiedBookingPage() {
             )}
             
             {/* Re-center button - shows when user has panned away from driver */}
-            {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverPosition && !isFollowingDriver && (
+            {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && effectiveDriverPosition && !isFollowingDriver && (
               <button
                 onClick={handleRecenterOnDriver}
                 className="absolute top-4 right-4 z-20 bg-background px-3 py-2 rounded-lg shadow-lg border hover-elevate flex items-center gap-2"
@@ -3352,16 +3352,16 @@ export default function UnifiedBookingPage() {
         <MobileLiveTracking
           status={rideStatus}
           driver={statusDriverInfo}
-          pickupEtaMinutes={remainingMinutes || driverInfo?.pickupEtaMinutes || 5}
-          dropoffEtaMinutes={remainingMinutes}
+          pickupEtaMinutes={effectiveEtaMinutes || driverInfo?.pickupEtaMinutes || 5}
+          dropoffEtaMinutes={effectiveEtaMinutes}
           distanceMiles={rideStatus === "DRIVER_ASSIGNED" 
-            ? (remainingMiles || parseFloat(fareEstimate?.distanceMiles || "0") * 0.3)
-            : remainingMiles}
+            ? (effectiveRemainingMiles || parseFloat(fareEstimate?.distanceMiles || "0") * 0.3)
+            : effectiveRemainingMiles}
           vehicleCategory={selectedVehicleCategory}
-          driverPosition={driverPosition}
-          interpolatedPosition={interpolatedPosition}
-          driverHeading={driverHeading}
-          speedMph={driverSpeedMph}
+          driverPosition={effectiveDriverPosition}
+          interpolatedPosition={effectiveDriverPosition}
+          driverHeading={effectiveDriverHeading}
+          speedMph={effectiveSpeedMph}
           nextTurn={nextTurnInstruction}
           pickupLocation={pickup}
           dropoffLocation={dropoff}
