@@ -11,6 +11,7 @@ import { useNotificationSound } from "@/contexts/NotificationSoundContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { SoundToggle } from "@/components/SoundToggle";
+import { useCustomerLocation, createCustomerLocationIcon } from "@/hooks/useCustomerLocation";
 import {
   Car,
   UtensilsCrossed,
@@ -540,6 +541,16 @@ export default function UnifiedBookingPage() {
   const [pickupEtaMinutes, setPickupEtaMinutes] = useState<number>(0);
   const [pickupDistanceMiles, setPickupDistanceMiles] = useState<number>(0);
   
+  // Customer live GPS location tracking (Uber-style blue dot)
+  const { location: customerLocation, isLoading: isCustomerLocationLoading, isPermissionDenied: isLocationPermissionDenied } = useCustomerLocation();
+  const [hasInitialCentered, setHasInitialCentered] = useState(false);
+  
+  // Memoized customer location icon (blue dot with pulse)
+  const customerLocationIcon = useMemo(() => {
+    if (!isClient) return null;
+    return createCustomerLocationIcon();
+  }, [isClient]);
+  
   // Rating and tip state (UI only, no backend)
   const [userRating, setUserRating] = useState<number>(0);
   const [selectedTip, setSelectedTip] = useState<number | null>(null);
@@ -583,8 +594,16 @@ export default function UnifiedBookingPage() {
   const mapCenter = useMemo(() => {
     if (pickup) return { lat: pickup.lat, lng: pickup.lng };
     if (dropoff) return { lat: dropoff.lat, lng: dropoff.lng };
+    if (customerLocation && !hasInitialCentered) return { lat: customerLocation.lat, lng: customerLocation.lng };
     return { lat: 40.7128, lng: -74.006 };
-  }, [pickup, dropoff]);
+  }, [pickup, dropoff, customerLocation, hasInitialCentered]);
+  
+  // Mark initial centering as done once we have a valid center
+  useEffect(() => {
+    if (!hasInitialCentered && (pickup || dropoff || customerLocation)) {
+      setHasInitialCentered(true);
+    }
+  }, [hasInitialCentered, pickup, dropoff, customerLocation]);
 
   const routePolylines = useMemo(() => {
     return routes.map((route) => ({
@@ -2945,6 +2964,15 @@ export default function UnifiedBookingPage() {
                 />
               )}
               
+              {/* Customer location marker - blue GPS dot (Uber-style) */}
+              {customerLocation && customerLocationIcon && (
+                <Marker 
+                  position={[customerLocation.lat, customerLocation.lng]} 
+                  icon={customerLocationIcon}
+                  zIndexOffset={500}
+                />
+              )}
+              
               {routePolylines.map(({ id, points }) => (
                 <Polyline
                   key={id}
@@ -3136,6 +3164,15 @@ export default function UnifiedBookingPage() {
                   />
                 )}
                 
+                {/* Customer location marker - blue GPS dot (Uber-style) */}
+                {customerLocation && customerLocationIcon && (
+                  <Marker 
+                    position={[customerLocation.lat, customerLocation.lng]} 
+                    icon={customerLocationIcon}
+                    zIndexOffset={500}
+                  />
+                )}
+                
                 {routePolylines.map(({ id, points }) => (
                   <Polyline
                     key={id}
@@ -3276,6 +3313,7 @@ export default function UnifiedBookingPage() {
           nextTurn={nextTurnInstruction}
           pickupLocation={pickup}
           dropoffLocation={dropoff}
+          customerLocation={customerLocation}
           routePoints={activeRoutePoints}
           remainingRoutePoints={remainingRoutePoints}
           isFollowingDriver={isFollowingDriver}

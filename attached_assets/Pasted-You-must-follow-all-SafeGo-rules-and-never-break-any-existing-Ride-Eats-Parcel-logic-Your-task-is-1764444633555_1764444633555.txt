@@ -1,0 +1,76 @@
+You must follow all SafeGo rules and never break any existing Ride/Eats/Parcel logic.  
+Your task is focused ONLY on improving the customer-side live map so that the user can see their own real-time location exactly like Uber.
+
+Problem:
+The customer live map does not show the customer’s current GPS location. The map loads but stays centered on a generic bounding box. There is no blue-dot indicator and no real-time movement.
+
+Expected (Uber-style):
+1. On every customer map (home screen, ride screen, and live tracking screen):
+   - Show the customer’s current location as a blue circular marker.
+   - Continuously update location using `navigator.geolocation.watchPosition`.
+   - Smoothly animate movement when the customer changes position.
+   - Recenter only on the first load (not every frame).
+   - Ensure the driver tracking logic remains untouched.
+
+2. Must NOT break:
+   - Ride flow
+   - Driver tracking
+   - Mobile responsiveness
+   - The unified-booking screen structure
+   - Existing routes, icons, or polyline logic
+
+3. Apply this fix ONLY for the customer, NOT the driver.
+
+Implementation requirements:
+
+A. Create a reusable customer location hook:
+   - File suggestion: `client/src/hooks/useCustomerLocation.ts`
+   - Use:
+       - `navigator.geolocation.getCurrentPosition` for initial fetch
+       - `navigator.geolocation.watchPosition` for live tracking
+   - Store:
+       - `lat`, `lng`
+       - `accuracy`
+       - `heading`
+       - `speed`
+       - `timestamp`
+   - Include cleanup for `watchPosition`.
+
+B. Add a blue GPS marker on the map:
+   - Use a circular marker (Uber-style).
+   - Do not replace the driver or route markers.
+   - Marker must update when state changes.
+
+C. Modify customer map views:
+   Files likely affected:
+   - `client/src/pages/customer/unified-booking.tsx`
+   - `client/src/components/map/CustomerMap.tsx` (or equivalent)
+   
+   Add:
+   - Import the new hook.
+   - Add the blue customer marker.
+   - Center the map only on initial load:
+        - If the user just opened the page → center on customer location.
+        - After that → do NOT force recenter to avoid map “jumping”.
+   - If customer location is unavailable, fallback to last known or default center.
+
+D. Permissions handling:
+   - Show non-intrusive prompt if location permission is denied.
+   - Must not break any existing UI.
+
+E. Mobile behavior:
+   - Ensure the blue dot works in mobile Preview.
+   - Ensure it also works inside the “View live map” full screen.
+
+F. Quality/Security:
+   - No API keys in frontend.
+   - Keep all map logic consistent with existing driver tracking.
+
+Deliverables:
+- The complete updated code for:
+   1) The new customer location hook
+   2) All required map file updates
+- Confirm that:
+   - The customer sees their live moving location (blue dot)
+   - Map centers correctly on load
+   - Nothing from ride tracking or UI is broken

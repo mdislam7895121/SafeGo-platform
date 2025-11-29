@@ -82,6 +82,7 @@ interface MobileLiveTrackingProps {
   nextTurn?: TurnInstruction | null;
   pickupLocation: { lat: number; lng: number } | null;
   dropoffLocation: { lat: number; lng: number } | null;
+  customerLocation?: { lat: number; lng: number } | null;
   routePoints: [number, number][];
   remainingRoutePoints: [number, number][] | null;
   isFollowingDriver: boolean;
@@ -91,6 +92,43 @@ interface MobileLiveTrackingProps {
   onUserInteraction: () => void;
   isCancelling?: boolean;
 }
+
+const customerLocationIcon = L.divIcon({
+  className: "customer-location-marker",
+  html: `
+    <div style="
+      position: relative;
+      width: 24px;
+      height: 24px;
+    ">
+      <div style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        background: rgba(66, 133, 244, 0.2);
+        border-radius: 50%;
+        animation: customerPulse 2s ease-out infinite;
+      "></div>
+      <div style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 16px;
+        height: 16px;
+        background: #4285F4;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      "></div>
+    </div>
+  `,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
 
 const pickupIcon = L.divIcon({
   className: "custom-marker",
@@ -281,6 +319,7 @@ export function MobileLiveTracking({
   nextTurn,
   pickupLocation,
   dropoffLocation,
+  customerLocation,
   routePoints,
   remainingRoutePoints,
   isFollowingDriver,
@@ -394,6 +433,15 @@ export function MobileLiveTracking({
                 position={[displayPosition.lat, displayPosition.lng]} 
                 icon={rotatedDriverIcon}
                 zIndexOffset={1000}
+              />
+            )}
+            
+            {/* Customer location marker - blue GPS dot (Uber-style) */}
+            {customerLocation && (
+              <Marker 
+                position={[customerLocation.lat, customerLocation.lng]} 
+                icon={customerLocationIcon}
+                zIndexOffset={500}
               />
             )}
             
