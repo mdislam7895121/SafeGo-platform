@@ -207,10 +207,15 @@ export default function FoodCheckout() {
       });
       return response;
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       clearCart();
       queryClient.invalidateQueries({ queryKey: ["/api/customer/food-orders"] });
-      setLocationPath("/customer/food/orders");
+      const orderId = response?.order?.id || response?.orderId;
+      if (orderId) {
+        setLocationPath(`/customer/food/tracking/${orderId}`);
+      } else {
+        setLocationPath("/customer/food/orders");
+      }
     },
     onError: (error: Error) => {
       toast({

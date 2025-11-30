@@ -23,6 +23,7 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 - **SafeGo Points System**: Gamified loyalty program with three tiers.
 - **Identity Verification System**: Manages country-specific identity documents with AES-256-GCM encryption.
 - **Restaurant Management Systems**: Includes performance insights, review management, media gallery, branding, operational settings, order management, staff management, and promotions.
+- **Food Order Tracking System**: Real-time food order tracking with 8-stage status timeline (placed, accepted, preparing, ready_for_pickup, driver_assigned, driver_arriving, picked_up, on_the_way, delivered), live map with restaurant/driver/delivery markers, driver info card with vehicle details, ETA calculations, and 5-second polling via useLiveFoodTracking hook.
 - **Customer-Facing Dynamic Pricing Display**: Provides real-time pricing transparency with surge multipliers and breakdowns.
 - **Unified Payout System**: Enterprise-grade management for customer payment methods and payout rails by country, service type, actor type, and KYC level, including automatic weekly scheduling and bank verification.
 - **Driver Systems**: Comprehensive driver profile management (multi-vehicle, encrypted KYC, document upload), earnings & payout dashboard, promotions, in-app training, and a Safety Center. Includes Uber-style active trip screen and trip accept/decline flow.

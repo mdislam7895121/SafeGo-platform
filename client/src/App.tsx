@@ -26,6 +26,7 @@ import CustomerDriverProfile from "@/pages/customer/driver-public-profile";
 import FoodRestaurants from "@/pages/customer/food-restaurants";
 import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
 import FoodCheckout from "@/pages/customer/food-checkout";
+import FoodOrderTracking from "@/pages/customer/food-order-tracking";
 import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import CustomerMyReviews from "@/pages/customer/my-reviews";
 import ParcelRequest from "@/pages/customer/parcel-request";
@@ -304,6 +305,11 @@ function Router() {
       <Route path="/customer/food/checkout">
         <ProtectedRoute allowedRoles={["customer"]}>
           <FoodCheckout />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/food/tracking/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <FoodOrderTracking />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/my-reviews">

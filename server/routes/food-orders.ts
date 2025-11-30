@@ -636,4 +636,261 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// GET /api/food-orders/:id/live-tracking
+// Get live tracking data for food order (customer only)
+// ====================================================
+router.get("/:id/live-tracking", async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    const foodOrder = await prisma.foodOrder.findUnique({
+      where: { id },
+      include: {
+        restaurant: {
+          include: {
+            branding: true,
+          },
+        },
+        driver: {
+          include: {
+            vehicles: {
+              where: { isActive: true },
+              take: 1,
+            },
+          },
+        },
+        customer: true,
+      },
+    });
+
+    if (!foodOrder) {
+      return res.status(404).json({ error: "Food order not found" });
+    }
+
+    // Authorization: Only customer who placed order, assigned driver, restaurant, or admin can view
+    if (role === "customer") {
+      const customerProfile = await prisma.customerProfile.findUnique({ where: { userId } });
+      if (foodOrder.customerId !== customerProfile?.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    } else if (role === "driver") {
+      const driverProfile = await prisma.driverProfile.findUnique({ where: { userId } });
+      if (foodOrder.driverId !== driverProfile?.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    } else if (role === "restaurant") {
+      const restaurantProfile = await prisma.restaurantProfile.findUnique({ where: { userId } });
+      if (foodOrder.restaurantId !== restaurantProfile?.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    } else if (role !== "admin") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Get restaurant coordinates from branding or pickup address
+    const restaurantLat = foodOrder.pickupLat || null;
+    const restaurantLng = foodOrder.pickupLng || null;
+
+    // Calculate ETAs based on status and driver location
+    let etaToRestaurantSeconds: number | null = null;
+    let etaToCustomerSeconds: number | null = null;
+    let distanceToRestaurantMeters: number | null = null;
+    let distanceToCustomerMeters: number | null = null;
+
+    const driverLat = foodOrder.driver?.currentLat;
+    const driverLng = foodOrder.driver?.currentLng;
+    const customerLat = foodOrder.deliveryLat;
+    const customerLng = foodOrder.deliveryLng;
+
+    if (driverLat && driverLng) {
+      const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+
+      if (restaurantLat && restaurantLng) {
+        distanceToRestaurantMeters = calculateDistance(driverLat, driverLng, restaurantLat, restaurantLng);
+        etaToRestaurantSeconds = Math.ceil((distanceToRestaurantMeters / 1000) * 120);
+      }
+
+      if (customerLat && customerLng) {
+        distanceToCustomerMeters = calculateDistance(driverLat, driverLng, customerLat, customerLng);
+        etaToCustomerSeconds = Math.ceil((distanceToCustomerMeters / 1000) * 120);
+      }
+    }
+
+    let items: any[] = [];
+    try {
+      if (foodOrder.items) {
+        items = typeof foodOrder.items === "string" ? JSON.parse(foodOrder.items) : foodOrder.items;
+      }
+    } catch {
+      items = [];
+    }
+
+    const activeVehicle = foodOrder.driver?.vehicles?.[0] || null;
+
+    const trackingData = {
+      orderId: foodOrder.id,
+      orderCode: foodOrder.orderCode,
+      status: foodOrder.status,
+      isActive: !["delivered", "cancelled"].includes(foodOrder.status),
+
+      restaurant: {
+        id: foodOrder.restaurant.id,
+        name: foodOrder.restaurant.restaurantName,
+        address: foodOrder.restaurant.address,
+        cuisineType: foodOrder.restaurant.cuisineType,
+        logoUrl: foodOrder.restaurant.branding?.logoUrl || null,
+        location: restaurantLat && restaurantLng ? { lat: restaurantLat, lng: restaurantLng } : null,
+      },
+
+      deliveryLocation: {
+        address: foodOrder.deliveryAddress,
+        lat: foodOrder.deliveryLat,
+        lng: foodOrder.deliveryLng,
+      },
+
+      driver: foodOrder.driver ? {
+        id: foodOrder.driver.id,
+        firstName: foodOrder.driver.firstName,
+        lastName: foodOrder.driver.lastName,
+        rating: foodOrder.driver.averageRating,
+        photoUrl: foodOrder.driver.profilePhotoUrl,
+        vehicle: activeVehicle ? {
+          make: activeVehicle.vehicleMake,
+          model: activeVehicle.vehicleModel,
+          color: activeVehicle.vehicleColor,
+          plate: activeVehicle.licensePlate,
+        } : null,
+      } : null,
+
+      driverLocation: foodOrder.driver ? {
+        lat: foodOrder.driver.currentLat,
+        lng: foodOrder.driver.currentLng,
+        headingDeg: null,
+        speedMps: null,
+        updatedAt: null,
+      } : null,
+
+      // ETAs
+      etaToRestaurantSeconds,
+      etaToCustomerSeconds,
+      distanceToRestaurantMeters,
+      distanceToCustomerMeters,
+
+      // Order details
+      items,
+      itemsCount: foodOrder.itemsCount,
+      subtotal: foodOrder.subtotal?.toString(),
+      deliveryFee: foodOrder.deliveryFee?.toString(),
+      serviceFare: foodOrder.serviceFare.toString(),
+      paymentMethod: foodOrder.paymentMethod,
+
+      // Timestamps
+      timestamps: {
+        placedAt: foodOrder.createdAt.toISOString(),
+        acceptedAt: foodOrder.acceptedAt?.toISOString() || null,
+        preparingAt: foodOrder.preparingAt?.toISOString() || null,
+        readyAt: foodOrder.readyAt?.toISOString() || null,
+        pickedUpAt: foodOrder.pickedUpAt?.toISOString() || null,
+        deliveredAt: foodOrder.deliveredAt?.toISOString() || null,
+        cancelledAt: foodOrder.cancelledAt?.toISOString() || null,
+      },
+
+      // Cancellation info
+      cancellation: foodOrder.status === "cancelled" ? {
+        cancelledBy: foodOrder.whoCancelled,
+        reason: foodOrder.cancellationReason,
+      } : null,
+    };
+
+    res.json(trackingData);
+  } catch (error) {
+    console.error("Get food order live tracking error:", error);
+    res.status(500).json({ error: "Failed to get tracking data" });
+  }
+});
+
+// ====================================================
+// GET /api/food-orders/active
+// Get customer's active food orders (customer only)
+// ====================================================
+router.get("/", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { active } = req.query;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({ where: { userId } });
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const whereClause: any = { customerId: customerProfile.id };
+    
+    if (active === "true") {
+      whereClause.status = {
+        notIn: ["delivered", "cancelled"],
+      };
+    }
+
+    const orders = await prisma.foodOrder.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "desc" },
+      include: {
+        restaurant: {
+          include: {
+            branding: true,
+          },
+        },
+      },
+      take: active === "true" ? 10 : 50,
+    });
+
+    const formattedOrders = orders.map((order) => {
+      let items: any[] = [];
+      try {
+        if (order.items) {
+          items = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+        }
+      } catch {
+        items = [];
+      }
+
+      return {
+        id: order.id,
+        orderCode: order.orderCode,
+        status: order.status,
+        restaurantName: order.restaurant.restaurantName,
+        restaurantLogo: order.restaurant.branding?.logoUrl || null,
+        items,
+        itemsCount: order.itemsCount,
+        serviceFare: order.serviceFare.toString(),
+        deliveryAddress: order.deliveryAddress,
+        createdAt: order.createdAt.toISOString(),
+        isActive: !["delivered", "cancelled"].includes(order.status),
+      };
+    });
+
+    res.json({ orders: formattedOrders });
+  } catch (error) {
+    console.error("Get food orders error:", error);
+    res.status(500).json({ error: "Failed to get food orders" });
+  }
+});
+
 export default router;
