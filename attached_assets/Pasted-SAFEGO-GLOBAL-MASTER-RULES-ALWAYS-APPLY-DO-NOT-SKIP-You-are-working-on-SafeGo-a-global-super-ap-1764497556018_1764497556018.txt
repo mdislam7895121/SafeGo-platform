@@ -1,0 +1,324 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS APPLY, DO NOT SKIP)
+
+You are working on SafeGo, a global super-app.
+
+ROLES (must stay fully separated):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must have:
+- Separate signup & login
+- Country-specific KYC + verification
+- Its own dashboard and navigation
+- Its own permissions & status flows
+Never mix or leak access across roles.
+
+GLOBAL SERVICES (always enabled):
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+COUNTRIES:
+- Bangladesh (BD)
+- United States (US)
+
+COUNTRY-SPECIFIC KYC (summary)
+
+BD Customers:
+- full_name, father_name, date_of_birth
+- phone_number, email (optional)
+- present_address, permanent_address
+- NID_number + NID_front_image_url + NID_back_image_url
+- emergency_contact_name/phone/relation
+- verification_status: pending | approved | rejected
+- is_verified: boolean
+- rejection_reason (nullable)
+
+US Customers:
+- full_name, date_of_birth
+- phone_number, email
+- home_address
+- emergency_contact_name/phone/relation
+- government_id_type, government_id_last4
+- verification_status, is_verified, rejection_reason
+
+BD Drivers:
+- All BD customer fields
+- driver_license_number + front/back images
+- vehicle_type/model/color/plate_number
+- driver_wallet_balance (can be negative)
+- driver_status: offline | online | on_trip
+- is_blocked, verification_status, is_verified, rejection_reason
+
+US Drivers:
+- full_name, date_of_birth
+- phone_number, email, home_address
+- emergency_contact_*
+- government_id_type, government_id_last4
+- driver_license_number + image + expiry
+- ssn_last4 (optional)
+- driver_wallet_balance
+- driver_status
+- is_blocked, verification_status, is_verified, rejection_reason
+
+BD Restaurant Owners:
+- restaurant_owner_name, father_name, date_of_birth
+- phone_number, email
+- present_address, permanent_address
+- NID_number + front/back images
+- emergency_contact_*
+- restaurant_legal_name
+- trade_license_number (optional)
+- verification_status, is_verified, rejection_reason
+
+US Restaurant Owners:
+- restaurant_owner_name, date_of_birth
+- phone_number, email
+- home_address
+- emergency_contact_*
+- government_id_type, government_id_last4
+- restaurant_legal_name
+- EIN_last4 (optional)
+- verification_status, is_verified, rejection_reason
+
+ONBOARDING (all roles):
+- Multi-step: Basic info → Address → ID/KYC upload → Emergency contact
+- Set verification_status="pending", is_verified=false
+- Block core actions until Admin approval.
+
+CORE COLLECTIONS (never remove or rename):
+1) rides
+2) food_orders
+3) deliveries
+
+Each must include:
+- Identity fields (customer_id, driver_id, restaurant_id…)
+- Addresses + geolocation
+- Pricing, fees, commissions
+- Payment method + payment_status
+- Timestamps for each status change
+- Status field with required flow
+- Rating and feedback fields
+
+COMMISSION & PAYOUT RULES:
+1) Ride CASH:
+   - Driver gets full cash.
+   - SafeGo commission → negative driver_wallet_balance.
+2) Food CASH:
+   - Restaurant gets full cash.
+   - SafeGo commission → negative restaurant_wallet_balance.
+3) Online payment:
+   - SafeGo keeps commission automatically.
+4) Admin can view and settle negative balances and mark as paid.
+
+ADMIN PANEL (must remain capable to):
+- View/verify customers, drivers, restaurants
+- Approve/reject KYC with rejection_reason
+- Block/unblock any user or restaurant
+- Update pricing, fees, commissions
+- View driver_wallet_balance & restaurant_wallet_balance
+- Manage payouts & settlements
+- View all rides, food_orders, deliveries
+
+SECURITY RULES:
+- Customers cannot view driver/restaurant KYC or IDs.
+- Drivers cannot view customer KYC or IDs.
+- Restaurants cannot view other restaurants’ data.
+- Users can edit only their own profile.
+- Only Admin can change verification, blocking, pricing, commissions.
+- Customer-facing APIs must NEVER expose NID_number, government_id_last4, ssn_last4, or KYC images.
+
+STATUS FLOWS (do not rename):
+
+Ride:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed
+  or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+  or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_driver / cancelled_by_admin
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered
+  or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+NOTIFICATIONS:
+- Ride, food, parcel status updates
+- Verification approval/rejection
+- Important admin announcements
+
+NON-BREAKING DEVELOPMENT POLICY:
+- Do NOT rename or delete any collections, fields, APIs, routes, screens.
+- Only ADD new fields/components/endpoints.
+- Must not break:
+  - Admin dashboard
+  - Driver management
+  - Customer management
+  - Restaurant management
+  - Parcel management
+  - Wallet & commission settlement
+  - KYC flows
+
+=====================================================================
+TASK: OPTIMIZE SAFEGO EATS CUSTOMER MOBILE LAYOUT (FOOD EXPERIENCE)
+=====================================================================
+
+The new Eats customer UI works, but the MOBILE layouts are still not user-friendly:
+- On a phone, some content is too big and requires too much scrolling.
+- Some images appear huge while text is cut off.
+- Important details (name, rating, cuisine, buttons) are not fully visible without extra scroll.
+- Overall, the mobile view feels cramped and difficult to scan.
+
+Your job is to make the SafeGo Eats CUSTOMER web food experience **clean and comfortable on mobile**, similar to DoorDash, WITHOUT breaking desktop or tablet layouts.
+
+SCOPE:
+- Only touch CUSTOMER Eats web UI:
+  - /customer/food
+  - /customer/food/:restaurant_id
+  - Cart drawer
+  - Checkout page (if needed for spacing)
+- Do NOT change Ride, Parcel, Driver, Restaurant, Admin dashboards or backend schemas.
+
+================================================
+A) MOBILE BREAKPOINT TARGET
+================================================
+1. Use a typical mobile viewport: width ~360–430px.
+2. Optimize layout specifically for:
+   - /customer/food (listing page)
+   - Restaurant detail with menu
+   - Cart drawer / cart summary on mobile
+
+Ensure the design is **mobile-first** but does not hurt tablet/desktop.
+
+================================================
+B) RESTAURANT CARD MOBILE LAYOUT
+================================================
+Problems to fix:
+- Some card images are too tall or cropped badly.
+- Text (restaurant name, cuisine, rating, delivery time) can be pushed too far down.
+- User needs to scroll too much to compare restaurants.
+
+Required fixes:
+1. Redesign the mobile card layout to be more compact:
+   - Use a fixed height for the image (e.g., ~140–160px) with object-fit: cover.
+   - Place name, cuisine, rating, time & fee in a tight, readable block below the image.
+   - Ensure at least 3–4 cards are visible on one full-screen scroll (not only 1 big card).
+
+2. Typography:
+   - Restaurant name: slightly larger, bold.
+   - Cuisine: smaller, lighter.
+   - Icons (clock, delivery, favorites) should be visually balanced but not huge.
+
+3. Spacing:
+   - Reduce excessive padding/margins between cards on mobile.
+   - Keep enough spacing that cards are not stuck together, but no large empty gaps.
+
+4. Overflow:
+   - Ensure no horizontal scrolling for cards on the main vertical list.
+   - Text should wrap neatly or truncate with ellipsis instead of flowing off-screen.
+
+================================================
+C) LIST PAGE LAYOUT /customer/food (MOBILE)
+================================================
+1. Above-the-fold:
+   - Deliver to bar
+   - Search bar
+   - Cuisine chips row
+   - Filter row (Top Rated, Open, Favorites, Filter)
+   All of these must fit neatly on a phone without feeling cramped.
+
+2. Sections:
+   - “Popular Near You”, “Top Rated”, “All Restaurants”
+   - On mobile, reduce vertical gaps between sections.
+   - Ensure section headers stay visible and are not pushed too far apart.
+
+3. Scrolling:
+   - The page must scroll smoothly from top to bottom.
+   - No container should block scroll with overflow:hidden.
+   - If there are horizontal carousels, they must scroll horizontally only, not interfere with vertical scroll.
+
+================================================
+D) RESTAURANT DETAIL PAGE (MOBILE)
+================================================
+1. Banner:
+   - Use a reasonable height (e.g., 180–220px on mobile).
+   - Apply object-fit: cover so image looks clean.
+   - Do not make it so tall that it pushes menu content too far down.
+
+2. Header info:
+   - Show name, rating, cuisine, address/delivery info in a compact block under the banner.
+   - Ensure all key info fits without requiring immediate scroll.
+
+3. Menu & categories:
+   - Category tabs/strip should be horizontally scrollable on mobile.
+   - Ensure category names are readable and not clipped.
+   - Menu item cards should have:
+     - Thumbnail image (fixed small height)
+     - Name + price + description (short)
+     - Add-to-cart button easily tappable.
+
+4. Spacing:
+   - Tighten vertical spacing so more menu items are visible per screen.
+
+================================================
+E) CART DRAWER & CHECKOUT (MOBILE)
+================================================
+1. Cart drawer:
+   - On mobile, ensure the cart drawer height is optimized:
+     - User can see items + subtotal + checkout button without awkward scrolling.
+   - Quantity buttons (+/–) must be at least ~44x44px tappable.
+
+2. Checkout:
+   - Forms and summary must be legible.
+   - Avoid huge blocks of empty space.
+   - Ensure there is no horizontal scroll.
+
+================================================
+F) TOUCH TARGETS & USABILITY
+================================================
+1. All important touch targets (cards, favorite hearts, filters, chips, buttons):
+   - Minimum size ~44x44px.
+   - Visible visual feedback on tap.
+
+2. Make sure nothing critical is hidden under device safe areas (notch, bottom bar).
+
+================================================
+G) RESPONSIVE SAFETY
+================================================
+1. Any CSS/layout changes you add MUST:
+   - Be applied at mobile breakpoints only (e.g., max-width or specific Tailwind classes).
+   - Keep current tablet & desktop layouts intact.
+
+2. Use mobile-specific classes or media queries instead of rewriting the entire layout.
+
+================================================
+H) NON-BREAKING & SECURITY
+================================================
+- Do NOT change any backend schemas, APIs, or collection names.
+- Do NOT affect ride/parcel flows, KYC, wallets, or Admin features.
+- Only adjust:
+   - Eats customer UI components’ layout/styling
+   - Optional minor tweaks in demo data if spacing depends on it.
+
+================================================
+I) FINAL SELF-TEST (REQUIRED)
+================================================
+Before marking complete, you MUST test:
+
+1. /customer/food on a mobile viewport:
+   - Above-the-fold area feels clean.
+   - Multiple restaurant cards visible per screen.
+   - No broken layout, no horizontal scroll.
+   - Scrolling is smooth.
+
+2. One BD-style demo restaurant and one US-style demo restaurant on mobile:
+   - Banner, header info, menu, and add-to-cart all visible and usable.
+   - No elements hidden or clipped.
+
+3. Cart + checkout on mobile:
+   - Easy to read and interact with.
+   - No layout glitches.
+
+Complete all of these adjustments and optimizations, then restart the app.

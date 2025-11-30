@@ -697,27 +697,27 @@ export default function FoodCheckout() {
   if (isEmpty) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-          <div className="flex items-center gap-4">
+        <header className="bg-primary text-primary-foreground p-4 sm:p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
+          <div className="flex items-center gap-3">
             <Link href="/customer/food">
               <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-                <ArrowLeft className="h-6 w-6" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold">Your Cart</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Your Cart</h1>
           </div>
         </header>
 
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           <Card>
-            <CardContent className="p-12 text-center">
-              <ShoppingCart className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold text-lg mb-2">Your cart is empty</h3>
+            <CardContent className="p-8 sm:p-12 text-center">
+              <ShoppingCart className="h-14 w-14 sm:h-16 sm:w-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold text-base sm:text-lg mb-2">Your cart is empty</h3>
               <p className="text-sm text-muted-foreground mb-6">
                 Add items from a restaurant to get started.
               </p>
               <Link href="/customer/food">
-                <Button data-testid="button-browse-restaurants">
+                <Button className="h-11" data-testid="button-browse-restaurants">
                   Browse Restaurants
                 </Button>
               </Link>
@@ -729,30 +729,30 @@ export default function FoodCheckout() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-32">
-      <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background pb-24 sm:pb-28">
+      <header className="bg-primary text-primary-foreground p-4 sm:p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
+        <div className="flex items-center gap-3">
           <Link href={state.restaurant ? `/customer/food/${state.restaurant.id}` : "/customer/food"}>
             <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-              <ArrowLeft className="h-6 w-6" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Checkout</h1>
+            <h1 className="text-xl sm:text-2xl font-bold">Checkout</h1>
             {state.restaurant && (
-              <p className="text-sm opacity-90">{state.restaurant.name}</p>
+              <p className="text-sm opacity-90 truncate max-w-[250px]">{state.restaurant.name}</p>
             )}
           </div>
         </div>
       </header>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {!profileData?.isVerified && (
           <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
             <CardContent className="p-4 flex items-start gap-3">
               <Shield className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-yellow-900 dark:text-yellow-200">
+                <p className="font-medium text-sm text-yellow-900 dark:text-yellow-200">
                   Verification Required
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-300 mb-3">
@@ -776,7 +776,7 @@ export default function FoodCheckout() {
                   <Store className="h-7 w-7 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold" data-testid="text-restaurant-name">
+                  <h3 className="font-semibold text-base truncate" data-testid="text-restaurant-name">
                     {state.restaurant.name}
                   </h3>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -827,7 +827,7 @@ export default function FoodCheckout() {
                     </p>
                   )}
                   {item.modifiers && item.modifiers.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-sm text-muted-foreground mt-1">
                       {item.modifiers.map(m => m.name).join(", ")}
                     </p>
                   )}
@@ -839,21 +839,23 @@ export default function FoodCheckout() {
                       <Button
                         size="icon"
                         variant="outline"
+                        className="h-11 w-11 touch-manipulation"
                         onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                         data-testid={`button-decrement-${item.id}`}
                       >
-                        {item.quantity === 1 ? <Trash2 className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+                        {item.quantity === 1 ? <Trash2 className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
                       </Button>
-                      <span className="w-8 text-center font-semibold" data-testid={`text-quantity-${item.id}`}>
+                      <span className="w-10 text-center font-semibold text-base" data-testid={`text-quantity-${item.id}`}>
                         {item.quantity}
                       </span>
                       <Button
                         size="icon"
                         variant="outline"
+                        className="h-11 w-11 touch-manipulation"
                         onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
                         data-testid={`button-increment-${item.id}`}
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-5 w-5" />
                       </Button>
                     </div>
                   </div>
@@ -960,7 +962,6 @@ export default function FoodCheckout() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Preset tip buttons */}
             <div className="grid grid-cols-4 gap-2">
               {[10, 15, 20].map((percent) => {
                 const amount = Math.round(totals.subtotal * (percent / 100) * 100) / 100;
@@ -976,7 +977,7 @@ export default function FoodCheckout() {
                     data-testid={`button-tip-${percent}`}
                   >
                     <span className="font-semibold">{percent}%</span>
-                    <span className="text-xs opacity-80">${amount.toFixed(2)}</span>
+                    <span className="text-sm opacity-80">${amount.toFixed(2)}</span>
                   </Button>
                 );
               })}
@@ -987,11 +988,10 @@ export default function FoodCheckout() {
                 data-testid="button-tip-custom"
               >
                 <span className="font-semibold">Custom</span>
-                <span className="text-xs opacity-80">Amount</span>
+                <span className="text-sm opacity-80">Amount</span>
               </Button>
             </div>
 
-            {/* Custom tip input */}
             {tipPreset === "custom" && (
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -1010,7 +1010,6 @@ export default function FoodCheckout() {
               </div>
             )}
 
-            {/* No tip option */}
             <Button
               variant="ghost"
               size="sm"
@@ -1127,10 +1126,10 @@ export default function FoodCheckout() {
               <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-yellow-900 dark:text-yellow-200">
-                  Minimum order not met
+                  Below Minimum Order
                 </p>
                 <p className="text-sm text-yellow-800 dark:text-yellow-300">
-                  Add ${(state.restaurant.minOrderAmount - totals.subtotal).toFixed(2)} more to reach the minimum order of ${state.restaurant.minOrderAmount.toFixed(2)}
+                  Add ${(state.restaurant.minOrderAmount - totals.subtotal).toFixed(2)} more to meet the minimum order amount.
                 </p>
               </div>
             </CardContent>
@@ -1138,21 +1137,20 @@ export default function FoodCheckout() {
         )}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50 pb-safe">
         <Button
-          className="w-full"
-          size="lg"
+          className="w-full h-12 text-base"
           onClick={handleReviewOrder}
           disabled={isSubmitting || (!hasMinimumOrder && !!state.restaurant?.minOrderAmount)}
           data-testid="button-review-order"
         >
           {isSubmitting ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               Placing Order...
             </>
           ) : (
-            `Review Order - $${grandTotal.toFixed(2)}`
+            `Place Order • $${grandTotal.toFixed(2)}`
           )}
         </Button>
       </div>
@@ -1199,12 +1197,12 @@ export default function FoodCheckout() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{address.label}</p>
                         {address.isDefault && (
-                          <Badge variant="secondary" className="text-xs">Default</Badge>
+                          <Badge variant="secondary">Default</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-1">{address.address}</p>
                       {address.apartment && (
-                        <p className="text-xs text-muted-foreground">Apt: {address.apartment}</p>
+                        <p className="text-sm text-muted-foreground">Apt: {address.apartment}</p>
                       )}
                     </div>
                     {isGeocodingAddress ? (
@@ -1236,7 +1234,7 @@ export default function FoodCheckout() {
               <div className="text-center py-6 text-muted-foreground">
                 <MapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No saved addresses yet</p>
-                <p className="text-xs">Add addresses for quick checkout</p>
+                <p className="text-sm">Add addresses for quick checkout</p>
               </div>
             )}
 
@@ -1267,11 +1265,11 @@ export default function FoodCheckout() {
           </SheetHeader>
           
           {paymentError && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
+            <div className="mb-4 p-4 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-destructive">Payment Issue</p>
-                <p className="text-xs text-destructive/80">{paymentError}</p>
+                <p className="font-medium text-destructive">Payment Issue</p>
+                <p className="text-sm text-destructive/80">{paymentError}</p>
               </div>
             </div>
           )}
@@ -1323,7 +1321,7 @@ export default function FoodCheckout() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">SafeGo Wallet</p>
-                      <Badge variant="outline" className="text-xs font-mono">
+                      <Badge variant="outline" className="font-mono">
                         ${walletBalance.toFixed(2)}
                       </Badge>
                     </div>
@@ -1369,13 +1367,13 @@ export default function FoodCheckout() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-medium capitalize">{method.brand} •••• {method.last4}</p>
                             {method.isDefault && !expired && (
-                              <Badge variant="secondary" className="text-xs">Default</Badge>
+                              <Badge variant="secondary">Default</Badge>
                             )}
                             {expired && (
-                              <Badge variant="destructive" className="text-xs">Expired</Badge>
+                              <Badge variant="destructive">Expired</Badge>
                             )}
                             {expiringSoon && !expired && (
-                              <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-500">
+                              <Badge variant="outline" className="text-yellow-600 border-yellow-500">
                                 Expiring Soon
                               </Badge>
                             )}

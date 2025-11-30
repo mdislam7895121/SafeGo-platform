@@ -351,9 +351,9 @@ export default function EatsRestaurant() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 sm:pb-24">
-      {/* Cover Photo Header - Responsive height */}
-      <div className="relative h-40 sm:h-48 lg:h-64 bg-muted">
+    <div className="min-h-screen bg-background pb-16 sm:pb-20">
+      {/* Cover Photo Header - Compact mobile height */}
+      <div className="relative h-32 sm:h-44 lg:h-56 bg-muted">
         {branding?.coverPhotoUrl ? (
           <img 
             src={branding.coverPhotoUrl} 
@@ -370,32 +370,32 @@ export default function EatsRestaurant() {
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-3 left-3 sm:top-4 sm:left-4 h-10 w-10 sm:h-9 sm:w-9 bg-background/80 backdrop-blur-sm hover:bg-background touch-manipulation"
+          className="absolute top-2 left-2 sm:top-3 sm:left-3 h-8 w-8 sm:h-9 sm:w-9 bg-background/80 backdrop-blur-sm hover:bg-background touch-manipulation"
           onClick={() => setLocationPath("/customer/food")}
           data-testid="button-back"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
         </Button>
 
         {/* Cart Button - Touch-friendly */}
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-3 right-3 sm:top-4 sm:right-4 h-10 w-10 sm:h-9 sm:w-9 bg-background/80 backdrop-blur-sm hover:bg-background touch-manipulation"
+          className="absolute top-2 right-2 sm:top-3 sm:right-3 h-8 w-8 sm:h-9 sm:w-9 bg-background/80 backdrop-blur-sm hover:bg-background touch-manipulation"
           onClick={() => setIsCartOpen(true)}
           data-testid="button-cart-header"
         >
-          <ShoppingCart className="h-5 w-5" />
+          <ShoppingCart className="h-4 w-4 sm:h-5 sm:w-5" />
           {cartItemCount > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+            <Badge className="absolute -top-0.5 -right-0.5 h-4 w-4 sm:h-5 sm:w-5 p-0 flex items-center justify-center text-[10px] sm:text-xs">
               {cartItemCount}
             </Badge>
           )}
         </Button>
 
-        {/* Logo - Responsive size */}
-        <div className="absolute -bottom-8 sm:-bottom-10 left-3 sm:left-4">
-          <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-xl bg-background shadow-lg overflow-hidden border-4 border-background">
+        {/* Logo - Compact mobile size */}
+        <div className="absolute -bottom-6 sm:-bottom-8 left-2 sm:left-3">
+          <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg bg-background shadow-lg overflow-hidden border-2 sm:border-4 border-background">
             {branding?.logoUrl ? (
               <img 
                 src={branding.logoUrl} 
@@ -404,7 +404,7 @@ export default function EatsRestaurant() {
                 loading="lazy"
               />
             ) : (
-              <div className="h-full w-full bg-primary/10 flex items-center justify-center text-xl sm:text-2xl font-bold text-primary">
+              <div className="h-full w-full bg-primary/10 flex items-center justify-center text-lg sm:text-xl font-bold text-primary">
                 {restaurant.name.charAt(0)}
               </div>
             )}
@@ -412,41 +412,41 @@ export default function EatsRestaurant() {
         </div>
       </div>
 
-      {/* Restaurant Info - Responsive padding */}
-      <div className="pt-12 sm:pt-14 px-3 sm:px-4 pb-3 sm:pb-4">
-        <div className="flex items-start justify-between gap-2">
+      {/* Restaurant Info - Compact mobile layout */}
+      <div className="pt-8 sm:pt-10 px-2 sm:px-3 pb-2 sm:pb-3">
+        <div className="flex items-start justify-between gap-1.5">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-restaurant-name">{restaurant.name}</h1>
-            <p className="text-sm sm:text-base text-muted-foreground truncate" data-testid="text-restaurant-cuisine">{restaurant.cuisineType}</p>
+            <h1 className="text-base sm:text-xl font-bold truncate leading-tight" data-testid="text-restaurant-name">{restaurant.name}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate" data-testid="text-restaurant-cuisine">{restaurant.cuisineType}</p>
           </div>
-          <div className="flex items-center gap-1 bg-muted px-2 py-1 rounded-lg flex-shrink-0" data-testid="rating-badge">
-            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span className="font-semibold text-sm sm:text-base" data-testid="text-restaurant-rating">{restaurant.averageRating.toFixed(1)}</span>
-            <span className="text-xs sm:text-sm text-muted-foreground">({restaurant.totalRatings})</span>
+          <div className="flex items-center gap-0.5 bg-muted px-1.5 py-0.5 rounded flex-shrink-0" data-testid="rating-badge">
+            <Star className="h-3 w-3 sm:h-4 sm:w-4 fill-yellow-400 text-yellow-400" />
+            <span className="font-semibold text-xs sm:text-sm" data-testid="text-restaurant-rating">{restaurant.averageRating.toFixed(1)}</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">({restaurant.totalRatings})</span>
           </div>
         </div>
 
-        {/* Info Row - Responsive */}
-        <div className="flex items-center gap-3 sm:gap-4 mt-2 sm:mt-3 text-xs sm:text-sm text-muted-foreground flex-wrap">
+        {/* Info Row - Compact */}
+        <div className="flex items-center gap-2 sm:gap-3 mt-1.5 text-[10px] sm:text-xs text-muted-foreground flex-wrap">
           {operational && (
-            <div className="flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <div className="flex items-center gap-0.5">
+              <Clock className="h-3 w-3" />
               <span>{operational.preparationTimeMinutes} min</span>
             </div>
           )}
           {restaurant.cityCode && (
-            <div className="flex items-center gap-1">
-              <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <div className="flex items-center gap-0.5">
+              <MapPin className="h-3 w-3" />
               <span>{restaurant.cityCode}</span>
             </div>
           )}
           {!canOrder && (
-            <Badge variant="destructive" className="text-xs">Currently Unavailable</Badge>
+            <Badge variant="destructive" className="text-[10px] py-0">Unavailable</Badge>
           )}
         </div>
 
         {restaurant.description && (
-          <p className="text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-3 line-clamp-2">{restaurant.description}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 line-clamp-2">{restaurant.description}</p>
         )}
       </div>
 
@@ -455,13 +455,13 @@ export default function EatsRestaurant() {
       {/* Desktop Layout: Sidebar + Content */}
       <div className="flex">
         {/* Desktop Sidebar - Category Navigation (hidden on mobile/tablet) */}
-        <aside className="hidden lg:block w-56 xl:w-64 flex-shrink-0 border-r bg-background">
-          <div className="sticky top-0 p-4 space-y-1 max-h-screen overflow-y-auto">
-            <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-2">Menu Categories</h3>
+        <aside className="hidden lg:block w-48 xl:w-56 flex-shrink-0 border-r bg-background">
+          <div className="sticky top-0 p-3 space-y-0.5 max-h-screen overflow-y-auto">
+            <h3 className="text-xs font-semibold text-muted-foreground mb-2 px-2">Categories</h3>
             {menu.map((category) => (
               <button
                 key={category.id}
-                className={`w-full flex items-center justify-between px-3 py-3 min-h-[44px] rounded-lg text-left text-sm transition-colors touch-manipulation ${
+                className={`w-full flex items-center justify-between px-2 py-2 min-h-[40px] rounded-lg text-left text-sm transition-colors touch-manipulation ${
                   activeCategoryId === category.id 
                     ? 'bg-primary text-primary-foreground' 
                     : 'hover:bg-muted text-foreground'
@@ -469,8 +469,8 @@ export default function EatsRestaurant() {
                 onClick={() => scrollToCategory(category.id)}
                 data-testid={`sidebar-category-${category.id}`}
               >
-                <span className="truncate">{category.name}</span>
-                <Badge variant={activeCategoryId === category.id ? "secondary" : "outline"} className="ml-2 flex-shrink-0 text-xs">
+                <span className="truncate text-xs">{category.name}</span>
+                <Badge variant={activeCategoryId === category.id ? "secondary" : "outline"} className="ml-1 flex-shrink-0 text-[10px]">
                   {category.items.length}
                 </Badge>
               </button>
@@ -486,17 +486,18 @@ export default function EatsRestaurant() {
             className="lg:hidden sticky top-0 z-30 bg-background border-b"
           >
             <ScrollArea className="w-full">
-              <div className="flex gap-1.5 p-2 px-3">
+              <div className="flex gap-1 p-1.5 px-2">
                 {menu.map((category) => (
                   <Button
                     key={category.id}
                     variant={activeCategoryId === category.id ? "default" : "ghost"}
-                    className="flex-shrink-0 rounded-full h-9 px-3 text-sm touch-manipulation"
+                    size="sm"
+                    className="flex-shrink-0 rounded-full h-7 px-2 text-[11px] touch-manipulation"
                     onClick={() => scrollToCategory(category.id)}
                     data-testid={`button-category-${category.id}`}
                   >
                     {category.name}
-                    <Badge variant="secondary" className="ml-1.5 h-5 text-xs">
+                    <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">
                       {category.items.length}
                     </Badge>
                   </Button>
@@ -506,14 +507,14 @@ export default function EatsRestaurant() {
             </ScrollArea>
           </div>
 
-          {/* Menu Content - Responsive padding */}
-          <div className="p-3 sm:p-4 lg:p-6 space-y-6 sm:space-y-8">
+          {/* Menu Content - Compact mobile padding */}
+          <div className="p-2 sm:p-3 lg:p-5 space-y-4 sm:space-y-6">
             {menu.length === 0 ? (
-              <div className="text-center py-8 sm:py-12">
-                <Info className="h-10 w-10 sm:h-12 sm:w-12 mx-auto text-muted-foreground/50 mb-4" />
-                <h3 className="font-semibold mb-2 text-sm sm:text-base">Menu coming soon</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  This restaurant is still setting up their menu
+              <div className="text-center py-6 sm:py-10">
+                <Info className="h-8 w-8 sm:h-10 sm:w-10 mx-auto text-muted-foreground/50 mb-3" />
+                <h3 className="font-semibold mb-1.5 text-xs sm:text-sm">Menu coming soon</h3>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">
+                  Setting up menu
                 </p>
               </div>
             ) : (
@@ -521,14 +522,14 @@ export default function EatsRestaurant() {
                 <div
                   key={category.id}
                   ref={(el) => el && categoryRefs.current.set(category.id, el)}
-                  className="scroll-mt-16 lg:scroll-mt-4"
+                  className="scroll-mt-12 lg:scroll-mt-4"
                 >
-                  <h2 className="text-base sm:text-lg font-bold mb-1">{category.name}</h2>
+                  <h2 className="text-sm sm:text-base font-bold mb-0.5">{category.name}</h2>
                   {category.description && (
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">{category.description}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">{category.description}</p>
                   )}
                   
-                  <div className="space-y-2 sm:space-y-3">
+                  <div className="space-y-1.5 sm:space-y-2">
                     {category.items.map((item) => {
                       const quantityInCart = getItemQuantity(item.id);
                       
@@ -540,37 +541,37 @@ export default function EatsRestaurant() {
                           data-testid={`card-menu-item-${item.id}`}
                         >
                           <CardContent className="p-0">
-                            <div className="flex gap-3 sm:gap-4 p-3 sm:p-4">
+                            <div className="flex gap-2 sm:gap-3 p-2 sm:p-3">
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-start gap-1.5 sm:gap-2 flex-wrap">
-                                  <h3 className="font-medium text-sm sm:text-base">{item.name}</h3>
+                                <div className="flex items-start gap-1 flex-wrap">
+                                  <h3 className="font-medium text-xs sm:text-sm leading-tight">{item.name}</h3>
                                   {item.isVegetarian && (
-                                    <Leaf className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 flex-shrink-0" />
+                                    <Leaf className="h-3 w-3 text-green-500 flex-shrink-0" />
                                   )}
                                   {item.isSpicy && (
-                                    <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 flex-shrink-0" />
+                                    <Flame className="h-3 w-3 text-red-500 flex-shrink-0" />
                                   )}
                                 </div>
                                 {item.description && (
-                                  <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-2">
                                     {item.description}
                                   </p>
                                 )}
-                                <div className="flex items-center gap-2 mt-1.5 sm:mt-2">
-                                  <span className="font-semibold text-sm sm:text-base">${item.price.toFixed(2)}</span>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                  <span className="font-semibold text-xs sm:text-sm">${item.price.toFixed(2)}</span>
                                   {item.calories && (
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className="text-[10px] text-muted-foreground">
                                       {item.calories} cal
                                     </span>
                                   )}
                                 </div>
                                 {!item.isAvailable && (
-                                  <Badge variant="secondary" className="mt-2 text-xs">Unavailable</Badge>
+                                  <Badge variant="secondary" className="mt-1 text-[10px] py-0">Unavailable</Badge>
                                 )}
                               </div>
                               
                               <div className="relative flex-shrink-0">
-                                <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-lg bg-muted overflow-hidden">
+                                <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-lg bg-muted overflow-hidden">
                                   {item.imageUrl ? (
                                     <img 
                                       src={item.imageUrl} 
@@ -579,27 +580,27 @@ export default function EatsRestaurant() {
                                       loading="lazy"
                                     />
                                   ) : (
-                                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/50 text-[10px] sm:text-xs">
+                                    <div className="h-full w-full flex items-center justify-center text-muted-foreground/50 text-[9px]">
                                       No image
                                     </div>
                                   )}
                                 </div>
                                 {quantityInCart > 0 && (
-                                  <Badge className="absolute -top-2 -right-2 h-5 w-5 sm:h-6 sm:w-6 p-0 flex items-center justify-center text-xs">
+                                  <Badge className="absolute -top-1.5 -right-1.5 h-4 w-4 sm:h-5 sm:w-5 p-0 flex items-center justify-center text-[10px]">
                                     {quantityInCart}
                                   </Badge>
                                 )}
                                 {item.isAvailable && quantityInCart === 0 && (
                                   <Button
                                     size="icon"
-                                    className="absolute -bottom-1 -right-1 h-10 w-10 rounded-full shadow-lg touch-manipulation"
+                                    className="absolute -bottom-1 -right-1 h-8 w-8 sm:h-9 sm:w-9 rounded-full shadow-lg touch-manipulation"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleAddToCart(item);
                                     }}
                                     data-testid={`button-quick-add-${item.id}`}
                                   >
-                                    <Plus className="h-5 w-5" />
+                                    <Plus className="h-4 w-4" />
                                   </Button>
                                 )}
                               </div>
@@ -616,28 +617,28 @@ export default function EatsRestaurant() {
         </div>
       </div>
 
-      {/* Floating Cart Button - Responsive and touch-friendly */}
+      {/* Floating Cart Button - Compact mobile */}
       {cartItemCount > 0 && (
-        <div className="fixed bottom-4 left-3 right-3 sm:left-4 sm:right-4 z-50 pb-safe">
+        <div className="fixed bottom-3 left-2 right-2 sm:left-3 sm:right-3 z-50 pb-safe">
           <Button
-            className="w-full h-14 shadow-lg gap-2 text-sm sm:text-base touch-manipulation"
+            className="w-full h-11 sm:h-12 shadow-lg gap-1.5 text-xs sm:text-sm touch-manipulation"
             onClick={() => setIsCartOpen(true)}
             data-testid="button-floating-cart"
           >
-            <ShoppingCart className="h-5 w-5 flex-shrink-0" />
-            <span className="truncate">View Cart ({cartItemCount})</span>
+            <ShoppingCart className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Cart ({cartItemCount})</span>
             <span className="ml-auto font-bold flex-shrink-0">${cartTotals.total.toFixed(2)}</span>
           </Button>
         </div>
       )}
 
-      {/* Add to Cart Dialog - Responsive */}
+      {/* Add to Cart Dialog - Compact mobile */}
       <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
-        <DialogContent className="max-w-[calc(100vw-24px)] sm:max-w-md rounded-lg">
+        <DialogContent className="max-w-[calc(100vw-16px)] sm:max-w-md rounded-lg p-4 sm:p-6">
           {selectedItem && (
             <>
               {selectedItem.imageUrl && (
-                <div className="h-32 sm:h-40 -mx-6 -mt-6 mb-4 bg-muted overflow-hidden">
+                <div className="h-28 sm:h-36 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-3 bg-muted overflow-hidden">
                   <img 
                     src={selectedItem.imageUrl} 
                     alt={selectedItem.name}
@@ -647,46 +648,46 @@ export default function EatsRestaurant() {
                 </div>
               )}
               <DialogHeader>
-                <DialogTitle className="text-lg sm:text-xl">{selectedItem.name}</DialogTitle>
+                <DialogTitle className="text-base sm:text-lg">{selectedItem.name}</DialogTitle>
                 {selectedItem.description && (
-                  <DialogDescription className="text-sm">{selectedItem.description}</DialogDescription>
+                  <DialogDescription className="text-xs sm:text-sm">{selectedItem.description}</DialogDescription>
                 )}
               </DialogHeader>
               
-              <div className="space-y-4 py-3 sm:py-4">
+              <div className="space-y-3 py-2 sm:py-3">
                 <div>
-                  <label className="text-sm font-medium">Special Instructions</label>
+                  <label className="text-xs sm:text-sm font-medium">Special Instructions</label>
                   <Textarea
-                    placeholder="Any allergies or special requests?"
+                    placeholder="Allergies or requests?"
                     value={specialInstructions}
                     onChange={(e) => setSpecialInstructions(e.target.value)}
-                    className="mt-1.5 min-h-[80px] text-base"
+                    className="mt-1 min-h-[60px] sm:min-h-[70px] text-sm"
                     data-testid="input-special-instructions"
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-sm sm:text-base">Quantity</span>
-                  <div className="flex items-center gap-2">
+                  <span className="font-medium text-xs sm:text-sm">Quantity</span>
+                  <div className="flex items-center gap-1.5">
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 touch-manipulation"
+                      className="h-9 w-9 sm:h-10 sm:w-10 touch-manipulation"
                       onClick={() => setItemQuantity(Math.max(1, itemQuantity - 1))}
                       disabled={itemQuantity <= 1}
                       data-testid="button-decrease-quantity"
                     >
-                      <Minus className="h-5 w-5" />
+                      <Minus className="h-4 w-4" />
                     </Button>
-                    <span className="w-8 text-center font-semibold text-lg" data-testid="text-item-quantity">{itemQuantity}</span>
+                    <span className="w-6 text-center font-semibold text-sm sm:text-base" data-testid="text-item-quantity">{itemQuantity}</span>
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11 touch-manipulation"
+                      className="h-9 w-9 sm:h-10 sm:w-10 touch-manipulation"
                       onClick={() => setItemQuantity(itemQuantity + 1)}
                       data-testid="button-increase-quantity"
                     >
-                      <Plus className="h-5 w-5" />
+                      <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
@@ -694,7 +695,7 @@ export default function EatsRestaurant() {
 
               <DialogFooter>
                 <Button 
-                  className="w-full h-12 text-base touch-manipulation"
+                  className="w-full h-10 sm:h-11 text-sm touch-manipulation"
                   onClick={confirmAddToCart}
                   data-testid="button-confirm-add-to-cart"
                 >
