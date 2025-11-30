@@ -102,6 +102,8 @@ model CustomerProfile {
   customerLiveChatSessions CustomerLiveChatSession[] @relation("CustomerLiveChatSessions") // Phase 12 Extension
   customerSupportCallbacks CustomerSupportCallback[] @relation("CustomerSupportCallbacks") // Phase 12 Extension
   favoriteRestaurants   FoodRestaurantFavorite[] // Favorite restaurants for quick access
+  savedAddresses        CustomerAddress[]        // Multiple delivery addresses
+  blockedRestaurants    CustomerBlockedRestaurant[] // Restaurants blocked by customer
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -499,6 +501,11 @@ model FoodOrder {
   // Phase 12: Support ticket tracking (additive only)
   supportTicketCount   Int?              @default(0)
   lastSupportStatus    String?           // Latest support ticket status
+  // Refund tracking
+  refundStatus         RefundStatus      @default(none)
+  refundAmount         Decimal?          @db.Decimal(10, 2)
+  refundedAt           DateTime?
+  refundReason         String?           @db.Text
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
   deliveredAt          DateTime?
@@ -532,6 +539,46 @@ model FoodRestaurantFavorite {
   @@index([customerProfileId])
   @@index([restaurantId])
   @@map("food_restaurant_favorites")
+}
+
+// Customer saved delivery addresses with labels
+model CustomerAddress {
+  id                String            @id @default(uuid())
+  customerProfileId String
+  label             AddressLabel      @default(home)
+  customLabel       String?           // For "other" type, user-defined label
+  address           String
+  lat               Float
+  lng               Float
+  placeId           String?
+  apartment         String?           // Apt/Suite/Floor number
+  instructions      String?           // Delivery instructions for this address
+  isDefault         Boolean           @default(false)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  customer          CustomerProfile   @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+
+  @@index([customerProfileId])
+  @@index([isDefault])
+  @@map("customer_addresses")
+}
+
+// Customer blocked restaurants (customer chose to block)
+model CustomerBlockedRestaurant {
+  id                String            @id @default(uuid())
+  customerProfileId String
+  restaurantId      String
+  blockReason       String?           @db.Text
+  blockedAt         DateTime          @default(now())
+  unblockRequestedAt DateTime?
+  unblockRequestReason String?        @db.Text
+  customer          CustomerProfile   @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  restaurant        RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([customerProfileId, restaurantId])
+  @@index([customerProfileId])
+  @@index([restaurantId])
+  @@map("customer_blocked_restaurants")
 }
 
 model Notification {
@@ -626,6 +673,7 @@ model RestaurantProfile {
   earningsTransactions  EarningsTransaction[] // R6: Earnings transactions
   earningsSummaries     EarningsSummary[] // R6: Earnings summaries
   favoritedBy           FoodRestaurantFavorite[] // Customers who favorited this restaurant
+  blockedByCustomers    CustomerBlockedRestaurant[] // Customers who blocked this restaurant
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -2076,6 +2124,21 @@ enum PromotionStatus {
 enum CouponDiscountType {
   percentage
   fixed_amount
+  free_delivery
+}
+
+enum AddressLabel {
+  home
+  work
+  other
+}
+
+enum RefundStatus {
+  none
+  pending
+  processing
+  completed
+  failed
 }
 
 // ====================================================
