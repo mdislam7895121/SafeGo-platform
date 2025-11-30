@@ -26,9 +26,11 @@ import RideDetails from "@/pages/customer/ride-details";
 import RideAssigned from "@/pages/customer/ride-assigned";
 import OrderConfirmation from "@/pages/customer/order-confirmation";
 import CustomerDriverProfile from "@/pages/customer/driver-public-profile";
-import FoodRestaurants from "@/pages/customer/food-restaurants";
-import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
+// OLD FOOD UI - Kept for reference but disconnected from routes
+// import FoodRestaurants from "@/pages/customer/food-restaurants";
+// import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
 import FoodCheckout from "@/pages/customer/food-checkout";
+// NEW DoorDash-style Eats UI - Now the primary customer food experience
 import EatsHome from "@/pages/customer/eats-home";
 import EatsRestaurant from "@/pages/customer/eats-restaurant";
 import FoodOrderTracking from "@/pages/customer/food-order-tracking";
@@ -329,22 +331,23 @@ function Router() {
           <CustomerMyReviews />
         </ProtectedRoute>
       </Route>
+      {/* NEW DoorDash-style Eats UI - Primary customer food experience */}
       <Route path="/customer/food/:id">
         <ProtectedRoute allowedRoles={["customer"]}>
-          <FoodRestaurantDetails />
+          <EatsRestaurant />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/food">
         <ProtectedRoute allowedRoles={["customer"]}>
-          <FoodRestaurants />
+          <EatsHome />
         </ProtectedRoute>
       </Route>
-      {/* New DoorDash-style Eats routes */}
+      {/* Legacy /customer/eats routes - redirect to primary /customer/food */}
       <Route path="/customer/eats/:id">
-        <EatsRestaurant />
+        {({ params }) => <Redirect to={`/customer/food/${params?.id}`} />}
       </Route>
       <Route path="/customer/eats">
-        <EatsHome />
+        <Redirect to="/customer/food" />
       </Route>
       <Route path="/customer/parcel">
         <ProtectedRoute allowedRoles={["customer"]}>
