@@ -133,6 +133,9 @@ import DriverTrustScore from "@/pages/driver/trust-score";
 import DriverTripActive from "@/pages/driver/trip-active";
 import DriverTripRequests from "@/pages/driver/trip-requests";
 import DriverMap from "@/pages/driver/map";
+import DriverFoodDeliveries from "@/pages/driver/food-deliveries";
+import DriverFoodDeliveryActive from "@/pages/driver/food-delivery-active";
+import DriverFoodDeliveryHistory from "@/pages/driver/food-delivery-history";
 
 // Restaurant pages
 import { RestaurantLayout } from "@/components/restaurant/RestaurantLayout";
@@ -678,6 +681,27 @@ function Router() {
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Map">
             <DriverMap />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/food-deliveries">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Food Deliveries">
+            <DriverFoodDeliveries />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/food-delivery/history">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Delivery History">
+            <DriverFoodDeliveryHistory />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/food-delivery/:deliveryId">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Active Delivery">
+            <DriverFoodDeliveryActive />
           </DriverLayout>
         </ProtectedRoute>
       </Route>

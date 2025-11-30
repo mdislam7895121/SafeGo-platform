@@ -37,6 +37,7 @@ import {
   BadgeCheck,
   Gift,
   Navigation,
+  UtensilsCrossed,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -86,6 +87,12 @@ const menuSections: MenuSection[] = [
         title: "Active Trip",
         icon: Navigation,
         href: "/driver/trip/active",
+      },
+      {
+        title: "Food Deliveries",
+        icon: UtensilsCrossed,
+        href: "/driver/food-deliveries",
+        isNew: true,
       },
       {
         title: "Map",
