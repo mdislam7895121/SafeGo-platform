@@ -198,6 +198,32 @@ router.post("/login", async (req, res, next) => {
       return res.status(403).json({ error: "Your account has been blocked. Please contact support." });
     }
 
+    // Check for temporary lockout from too many failed attempts (15-minute window)
+    const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+    const MAX_FAILED_ATTEMPTS = 5;
+
+    if (user.temporaryLockUntil && new Date(user.temporaryLockUntil) > new Date()) {
+      const minutesRemaining = Math.ceil((new Date(user.temporaryLockUntil).getTime() - Date.now()) / 60000);
+      
+      await logAuditEvent({
+        actorId: user.id,
+        actorEmail: user.email,
+        actorRole: user.role,
+        ipAddress: getClientIp(req),
+        actionType: ActionType.LOGIN_FAILED,
+        entityType: EntityType.AUTH,
+        entityId: user.id,
+        description: `Login attempt for temporarily locked account ${user.email}`,
+        success: false,
+      });
+
+      return res.status(429).json({ 
+        error: `Too many failed attempts. Please try again in ${minutesRemaining} minute${minutesRemaining > 1 ? 's' : ''} or lock your account from profile and contact support if this wasn't you.`,
+        code: "TEMPORARY_LOCKOUT",
+        retryAfter: minutesRemaining * 60
+      });
+    }
+
     // For admin users, check if their admin account is active
     if (user.role === 'admin') {
       if (!user.adminProfile) {
@@ -234,6 +260,31 @@ router.post("/login", async (req, res, next) => {
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.passwordHash);
     if (!isValidPassword) {
+      // Track failed login attempts for rate limiting
+      const now = new Date();
+      const fifteenMinutesAgo = new Date(now.getTime() - LOCKOUT_DURATION_MS);
+      
+      // Reset counter if last failure was more than 15 minutes ago
+      const currentAttempts = user.lastFailedLoginAt && user.lastFailedLoginAt > fifteenMinutesAgo
+        ? (user.failedLoginAttempts || 0) + 1
+        : 1;
+
+      // Update failed attempt counter
+      const updateData: any = {
+        failedLoginAttempts: currentAttempts,
+        lastFailedLoginAt: now,
+      };
+
+      // Apply temporary lockout if max attempts exceeded
+      if (currentAttempts >= MAX_FAILED_ATTEMPTS) {
+        updateData.temporaryLockUntil = new Date(now.getTime() + LOCKOUT_DURATION_MS);
+      }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: updateData,
+      });
+
       // Log failed login attempt - invalid password (audit)
       await logAuditEvent({
         actorId: user.id,
@@ -243,11 +294,32 @@ router.post("/login", async (req, res, next) => {
         actionType: ActionType.LOGIN_FAILED,
         entityType: EntityType.AUTH,
         entityId: user.id,
-        description: `Failed login attempt for ${user.email} - invalid password`,
+        description: `Failed login attempt for ${user.email} - invalid password (attempt ${currentAttempts}/${MAX_FAILED_ATTEMPTS})`,
         success: false,
       });
 
+      // Show lockout message if this attempt triggered the lockout
+      if (currentAttempts >= MAX_FAILED_ATTEMPTS) {
+        return res.status(429).json({ 
+          error: "Too many failed attempts. Please try again in 15 minutes or lock your account from profile and contact support if this wasn't you.",
+          code: "TEMPORARY_LOCKOUT",
+          retryAfter: 15 * 60
+        });
+      }
+
       return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    // Successful password verification - reset failed attempt counter
+    if (user.failedLoginAttempts > 0 || user.temporaryLockUntil) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedLoginAttempts: 0,
+          lastFailedLoginAt: null,
+          temporaryLockUntil: null,
+        },
+      });
     }
 
     // For admin users, verify 2FA if enabled

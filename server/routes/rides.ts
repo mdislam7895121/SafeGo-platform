@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { z } from "zod";
-import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { authenticateToken, AuthRequest, requireUnlockedAccount } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 import { promotionBonusService } from "../services/promotionBonusService";
 
@@ -14,8 +14,9 @@ router.use(authenticateToken);
 // ====================================================
 // POST /api/rides
 // Create a new ride request (customer only)
+// Locked accounts cannot request rides
 // ====================================================
-router.post("/", async (req: AuthRequest, res) => {
+router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const role = req.user!.role;

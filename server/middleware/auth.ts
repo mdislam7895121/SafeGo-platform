@@ -125,6 +125,41 @@ export function checkPermission(permission: Permission) {
 }
 
 /**
+ * Middleware to check if a user's account is locked
+ * Used for booking/payment endpoints where locked accounts should be blocked
+ * Returns HTTP 423 (Locked) with error code ACCOUNT_LOCKED
+ */
+export async function requireUnlockedAccount(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { isAccountLocked: true, accountLockedAt: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    if (user.isAccountLocked) {
+      return res.status(423).json({
+        error: "Your account is locked. Go to Profile → Security & Account Lock to unlock.",
+        code: "ACCOUNT_LOCKED",
+        lockedAt: user.accountLockedAt,
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error checking account lock status:", error);
+    return res.status(500).json({ error: "Failed to verify account status" });
+  }
+}
+
+/**
  * Optional authentication - allows requests to proceed even without a valid token
  * If a valid token is provided, req.user will be populated
  * If no token or invalid token, req.user will be undefined and request proceeds

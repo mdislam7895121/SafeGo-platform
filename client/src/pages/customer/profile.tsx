@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { 
   ArrowLeft, User, MapPin, Phone, CreditCard, Shield, 
   Edit, Star, Clock, Home, Briefcase, Heart, Bell, Globe, CheckCircle2, Headphones,
-  X, Save, Loader2, Plus
+  X, Save, Loader2, Plus, Lock, Unlock, ShieldAlert, AlertTriangle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,8 +60,21 @@ export default function CustomerProfile() {
   
   const [showSafetyDialog, setShowSafetyDialog] = useState(false);
   
+  const [showLockAccountDialog, setShowLockAccountDialog] = useState(false);
+  const [lockConfirmText, setLockConfirmText] = useState("");
+  const [lockPassword, setLockPassword] = useState("");
+  
+  const [showUnlockAccountDialog, setShowUnlockAccountDialog] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState("");
+  const [unlockOtp, setUnlockOtp] = useState("");
+  const [unlockStep, setUnlockStep] = useState<"password" | "otp">("password");
+  
   const { data: profileData, isLoading } = useQuery({
     queryKey: ["/api/customer/home"],
+  });
+  
+  const { data: lockStatusData, refetch: refetchLockStatus } = useQuery({
+    queryKey: ["/api/customer/account/lock-status"],
   });
 
   const { data: statsData } = useQuery({
@@ -103,6 +116,137 @@ export default function CustomerProfile() {
       });
     },
   });
+
+  const lockAccountMutation = useMutation({
+    mutationFn: async (data: { password: string; confirmationText: string }) => {
+      const response = await apiRequest("/api/customer/account/lock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer/account/lock-status"] });
+      toast({
+        title: "Account locked",
+        description: "Your account has been locked. You cannot make any bookings until you unlock it.",
+      });
+      setShowLockAccountDialog(false);
+      setLockConfirmText("");
+      setLockPassword("");
+      refetchLockStatus();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Lock failed",
+        description: error.message || "Could not lock your account. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const requestUnlockOtpMutation = useMutation({
+    mutationFn: async (data: { password: string }) => {
+      const response = await apiRequest("/api/customer/account/unlock/request-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return response;
+    },
+    onSuccess: () => {
+      setUnlockStep("otp");
+      toast({
+        title: "Verification code sent",
+        description: "Please check your email or phone for the verification code.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Request failed",
+        description: error.message || "Could not send verification code. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unlockAccountMutation = useMutation({
+    mutationFn: async (data: { password: string; otpCode: string }) => {
+      const response = await apiRequest("/api/customer/account/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/customer/account/lock-status"] });
+      toast({
+        title: "Account unlocked",
+        description: "Your account has been unlocked. You can now make bookings again.",
+      });
+      setShowUnlockAccountDialog(false);
+      setUnlockPassword("");
+      setUnlockOtp("");
+      setUnlockStep("password");
+      refetchLockStatus();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Unlock failed",
+        description: error.message || "Could not unlock your account. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleLockAccount = () => {
+    if (lockConfirmText !== "LOCK") {
+      toast({
+        title: "Confirmation required",
+        description: "Please type LOCK to confirm.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!lockPassword.trim()) {
+      toast({
+        title: "Password required",
+        description: "Please enter your password to confirm.",
+        variant: "destructive",
+      });
+      return;
+    }
+    lockAccountMutation.mutate({ password: lockPassword, confirmationText: lockConfirmText });
+  };
+
+  const handleRequestUnlockOtp = () => {
+    if (!unlockPassword.trim()) {
+      toast({
+        title: "Password required",
+        description: "Please enter your password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    requestUnlockOtpMutation.mutate({ password: unlockPassword });
+  };
+
+  const handleUnlockAccount = () => {
+    if (!unlockOtp.trim()) {
+      toast({
+        title: "Code required",
+        description: "Please enter the verification code.",
+        variant: "destructive",
+      });
+      return;
+    }
+    unlockAccountMutation.mutate({ password: unlockPassword, otpCode: unlockOtp });
+  };
+
+  const isAccountLocked = (lockStatusData as any)?.isAccountLocked === true;
+  const lockedAt = (lockStatusData as any)?.accountLockedAt;
 
   const handleSaveAddress = () => {
     if (!editAddress.trim()) {
@@ -487,6 +631,98 @@ export default function CustomerProfile() {
           </CardContent>
         </Card>
 
+        {/* Security & Account Lock Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5" />
+              Security & Account Lock
+            </CardTitle>
+            <CardDescription>Protect your account with additional security</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Account Lock Status */}
+            <div className={`flex items-center justify-between p-4 rounded-lg ${
+              isAccountLocked 
+                ? 'bg-destructive/10 border border-destructive/30' 
+                : 'bg-muted/50'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
+                  isAccountLocked 
+                    ? 'bg-destructive/20' 
+                    : 'bg-green-100 dark:bg-green-950'
+                }`}>
+                  {isAccountLocked ? (
+                    <Lock className="h-6 w-6 text-destructive" />
+                  ) : (
+                    <Unlock className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-medium mb-1">Account Status</p>
+                  <Badge 
+                    variant={isAccountLocked ? "destructive" : "default"}
+                    data-testid="badge-account-lock-status"
+                  >
+                    {isAccountLocked ? "Locked" : "Active"}
+                  </Badge>
+                  {isAccountLocked && lockedAt && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Locked on {new Date(lockedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {isAccountLocked ? (
+                <Button 
+                  variant="default" 
+                  size="sm" 
+                  onClick={() => setShowUnlockAccountDialog(true)}
+                  data-testid="button-unlock-account"
+                >
+                  <Unlock className="h-4 w-4 mr-2" />
+                  Unlock
+                </Button>
+              ) : (
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={() => setShowLockAccountDialog(true)}
+                  data-testid="button-lock-account"
+                >
+                  <Lock className="h-4 w-4 mr-2" />
+                  Lock
+                </Button>
+              )}
+            </div>
+
+            {isAccountLocked && (
+              <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium mb-1">Account is Locked</p>
+                    <p>You cannot book rides, order food, or request deliveries while your account is locked. To restore access, click "Unlock" and verify your identity.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!isAccountLocked && (
+              <div className="text-sm text-muted-foreground">
+                <p className="flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  Your account is active and secure
+                </p>
+                <p className="mt-2 text-xs">
+                  If you suspect unauthorized access, you can lock your account immediately. You'll need to verify your identity to unlock it.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Preferences Section */}
         <Card>
           <CardHeader>
@@ -813,6 +1049,186 @@ export default function CustomerProfile() {
             <Button onClick={() => setShowSafetyDialog(false)} data-testid="button-close-safety">
               Close
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Lock Account Dialog */}
+      <Dialog open={showLockAccountDialog} onOpenChange={(open) => {
+        setShowLockAccountDialog(open);
+        if (!open) {
+          setLockConfirmText("");
+          setLockPassword("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Lock className="h-5 w-5" /> Lock Your Account
+            </DialogTitle>
+            <DialogDescription>
+              Locking your account will prevent anyone from booking rides, ordering food, or requesting deliveries. You will need to verify your identity to unlock it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium">Warning</p>
+                  <p>This action will immediately lock your account. You won't be able to use SafeGo services until you unlock it.</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="lock-confirm">Type "LOCK" to confirm</Label>
+              <Input
+                id="lock-confirm"
+                value={lockConfirmText}
+                onChange={(e) => setLockConfirmText(e.target.value.toUpperCase())}
+                placeholder="Type LOCK"
+                data-testid="input-lock-confirm"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="lock-password">Enter your password</Label>
+              <Input
+                id="lock-password"
+                type="password"
+                value={lockPassword}
+                onChange={(e) => setLockPassword(e.target.value)}
+                placeholder="Enter your password"
+                data-testid="input-lock-password"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowLockAccountDialog(false);
+                setLockConfirmText("");
+                setLockPassword("");
+              }}
+              data-testid="button-cancel-lock"
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={handleLockAccount}
+              disabled={lockConfirmText !== "LOCK" || !lockPassword.trim() || lockAccountMutation.isPending}
+              data-testid="button-confirm-lock"
+            >
+              {lockAccountMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Lock className="h-4 w-4 mr-2" />
+              )}
+              Lock Account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Unlock Account Dialog */}
+      <Dialog open={showUnlockAccountDialog} onOpenChange={(open) => {
+        setShowUnlockAccountDialog(open);
+        if (!open) {
+          setUnlockPassword("");
+          setUnlockOtp("");
+          setUnlockStep("password");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Unlock className="h-5 w-5" /> Unlock Your Account
+            </DialogTitle>
+            <DialogDescription>
+              {unlockStep === "password" 
+                ? "Enter your password to receive a verification code."
+                : "Enter the verification code sent to your email or phone."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {unlockStep === "password" ? (
+              <div className="space-y-2">
+                <Label htmlFor="unlock-password">Password</Label>
+                <Input
+                  id="unlock-password"
+                  type="password"
+                  value={unlockPassword}
+                  onChange={(e) => setUnlockPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  data-testid="input-unlock-password"
+                />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-3 rounded-lg bg-primary/10 text-sm">
+                  <p>A verification code has been sent to your registered email or phone number.</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="unlock-otp">Verification Code</Label>
+                  <Input
+                    id="unlock-otp"
+                    value={unlockOtp}
+                    onChange={(e) => setUnlockOtp(e.target.value)}
+                    placeholder="Enter 6-digit code"
+                    maxLength={6}
+                    data-testid="input-unlock-otp"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (unlockStep === "otp") {
+                  setUnlockStep("password");
+                  setUnlockOtp("");
+                } else {
+                  setShowUnlockAccountDialog(false);
+                  setUnlockPassword("");
+                  setUnlockOtp("");
+                  setUnlockStep("password");
+                }
+              }}
+              data-testid="button-cancel-unlock"
+            >
+              {unlockStep === "otp" ? "Back" : "Cancel"}
+            </Button>
+            {unlockStep === "password" ? (
+              <Button 
+                onClick={handleRequestUnlockOtp}
+                disabled={!unlockPassword.trim() || requestUnlockOtpMutation.isPending}
+                data-testid="button-request-otp"
+              >
+                {requestUnlockOtpMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : null}
+                Send Code
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleUnlockAccount}
+                disabled={!unlockOtp.trim() || unlockAccountMutation.isPending}
+                data-testid="button-confirm-unlock"
+              >
+                {unlockAccountMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Unlock className="h-4 w-4 mr-2" />
+                )}
+                Unlock Account
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

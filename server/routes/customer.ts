@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { PrismaClient, Prisma } from "@prisma/client";
+import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { validatePromotionForOrder, validateCouponCode } from "../promotions/validationUtils";
@@ -1168,6 +1170,292 @@ router.get("/active-promotions", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Get active promotions error:", error);
     res.status(500).json({ error: "Failed to get promotions" });
+  }
+});
+
+// ====================================================
+// GET /api/customer/account/lock-status
+// Get current account lock status
+// ====================================================
+router.get("/account/lock-status", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        isAccountLocked: true,
+        accountLockedAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({
+      isAccountLocked: user.isAccountLocked,
+      accountLockedAt: user.accountLockedAt,
+    });
+  } catch (error) {
+    console.error("Get account lock status error:", error);
+    res.status(500).json({ error: "Failed to get account status" });
+  }
+});
+
+// ====================================================
+// POST /api/customer/account/lock
+// Lock customer account (user-initiated)
+// Requires password verification and confirmation text "LOCK"
+// ====================================================
+router.post("/account/lock", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { confirmationText, password } = req.body;
+
+    if (confirmationText !== "LOCK") {
+      return res.status(400).json({ 
+        error: "Invalid confirmation. Please type LOCK to confirm.",
+        code: "CONFIRMATION_REQUIRED"
+      });
+    }
+
+    if (!password) {
+      return res.status(400).json({ 
+        error: "Password is required to lock your account.",
+        code: "PASSWORD_REQUIRED"
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isAccountLocked: true, email: true, passwordHash: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      return res.status(401).json({ 
+        error: "Invalid password",
+        code: "INVALID_PASSWORD"
+      });
+    }
+
+    if (user.isAccountLocked) {
+      return res.status(400).json({ 
+        error: "Account is already locked",
+        code: "ALREADY_LOCKED"
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isAccountLocked: true,
+        accountLockedAt: new Date(),
+        failedLoginAttempts: 0,
+        lastFailedLoginAt: null,
+        temporaryLockUntil: null,
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        id: crypto.randomUUID(),
+        userId,
+        type: "account_security",
+        title: "Account Locked",
+        body: "Your SafeGo account has been locked. You can unlock it anytime from your profile.",
+      },
+    });
+
+    res.json({
+      message: "Your account is locked. You can unlock it from your profile at any time.",
+      isAccountLocked: true,
+      accountLockedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("Lock account error:", error);
+    res.status(500).json({ error: "Failed to lock account" });
+  }
+});
+
+// ====================================================
+// POST /api/customer/account/unlock/request-otp
+// Request OTP for unlocking account
+// Requires password verification before sending OTP
+// ====================================================
+router.post("/account/unlock/request-otp", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ 
+        error: "Password is required",
+        code: "PASSWORD_REQUIRED"
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isAccountLocked: true, email: true, passwordHash: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.isAccountLocked) {
+      return res.status(400).json({ 
+        error: "Account is not locked",
+        code: "NOT_LOCKED"
+      });
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      return res.status(401).json({ 
+        error: "Invalid password",
+        code: "INVALID_PASSWORD"
+      });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = await bcrypt.hash(otpCode, 10);
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        unlockOtpHash: otpHash,
+        unlockOtpExpiry: otpExpiry,
+      },
+    });
+
+    console.log(`[Account Unlock] OTP for ${user.email}: ${otpCode} (expires in 10 minutes)`);
+
+    res.json({
+      message: "Verification code sent to your registered email/phone",
+      expiresIn: 600,
+      email: user.email.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
+    });
+  } catch (error) {
+    console.error("Request unlock OTP error:", error);
+    res.status(500).json({ error: "Failed to send verification code" });
+  }
+});
+
+// ====================================================
+// POST /api/customer/account/unlock
+// Unlock customer account with password and OTP verification
+// Requires both password and valid OTP code
+// ====================================================
+router.post("/account/unlock", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { password, otpCode } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ 
+        error: "Password is required",
+        code: "PASSWORD_REQUIRED"
+      });
+    }
+
+    if (!otpCode) {
+      return res.status(400).json({ 
+        error: "Verification code is required",
+        code: "OTP_REQUIRED"
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { 
+        isAccountLocked: true, 
+        passwordHash: true, 
+        email: true,
+        accountLockedAt: true,
+        unlockOtpHash: true,
+        unlockOtpExpiry: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.isAccountLocked) {
+      return res.status(400).json({ 
+        error: "Account is not locked",
+        code: "NOT_LOCKED"
+      });
+    }
+
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      return res.status(401).json({ 
+        error: "Invalid password",
+        code: "INVALID_PASSWORD"
+      });
+    }
+
+    if (!user.unlockOtpHash || !user.unlockOtpExpiry) {
+      return res.status(400).json({ 
+        error: "No verification code was requested. Please request a new code.",
+        code: "OTP_NOT_REQUESTED"
+      });
+    }
+
+    if (new Date() > user.unlockOtpExpiry) {
+      return res.status(400).json({ 
+        error: "Verification code has expired. Please request a new code.",
+        code: "OTP_EXPIRED"
+      });
+    }
+
+    const isValidOtp = await bcrypt.compare(otpCode, user.unlockOtpHash);
+    if (!isValidOtp) {
+      return res.status(401).json({ 
+        error: "Invalid verification code",
+        code: "INVALID_OTP"
+      });
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isAccountLocked: false,
+        accountLockedAt: null,
+        failedLoginAttempts: 0,
+        lastFailedLoginAt: null,
+        temporaryLockUntil: null,
+        unlockOtpHash: null,
+        unlockOtpExpiry: null,
+      },
+    });
+
+    await prisma.notification.create({
+      data: {
+        id: crypto.randomUUID(),
+        userId,
+        type: "account_security",
+        title: "Account Unlocked",
+        body: "Your SafeGo account is now active again. Welcome back!",
+      },
+    });
+
+    res.json({
+      message: "Your account is active again.",
+      isAccountLocked: false,
+    });
+  } catch (error) {
+    console.error("Unlock account error:", error);
+    res.status(500).json({ error: "Failed to unlock account" });
   }
 });
 

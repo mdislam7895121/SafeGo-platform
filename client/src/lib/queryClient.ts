@@ -3,19 +3,35 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 class ApiError extends Error {
   status: number;
   statusText: string;
+  code?: string;
 
-  constructor(status: number, statusText: string, message: string) {
+  constructor(status: number, statusText: string, message: string, code?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.statusText = statusText;
+    this.code = code;
   }
 }
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    const error = new ApiError(res.status, res.statusText, `${res.status}: ${text}`);
+    
+    let code: string | undefined;
+    try {
+      const errorData = JSON.parse(text);
+      code = errorData.code;
+      
+      if (code === "ACCOUNT_LOCKED") {
+        window.dispatchEvent(new CustomEvent("safego:account-locked", {
+          detail: { message: errorData.error || "Your account is locked" }
+        }));
+      }
+    } catch {
+    }
+    
+    const error = new ApiError(res.status, res.statusText, `${res.status}: ${text}`, code);
     throw error;
   }
 }

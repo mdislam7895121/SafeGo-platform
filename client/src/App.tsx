@@ -1,4 +1,5 @@
-import { Switch, Route, Redirect } from "wouter";
+import { useEffect } from "react";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,6 +9,7 @@ import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationSoundProvider } from "@/contexts/NotificationSoundContext";
 import { EatsCartProvider } from "@/contexts/EatsCartContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useToast } from "@/hooks/use-toast";
 
 // Auth pages
 import Login from "@/pages/login";
@@ -1693,6 +1695,33 @@ function Router() {
   );
 }
 
+function AccountLockedHandler() {
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const handleAccountLocked = (event: CustomEvent<{ message: string }>) => {
+      toast({
+        title: "Account Locked",
+        description: event.detail.message || "Your account is locked. Please go to your profile to unlock it.",
+        variant: "destructive",
+      });
+      
+      if (user?.role === "customer") {
+        setLocation("/customer/profile");
+      }
+    };
+
+    window.addEventListener("safego:account-locked", handleAccountLocked as EventListener);
+    return () => {
+      window.removeEventListener("safego:account-locked", handleAccountLocked as EventListener);
+    };
+  }, [toast, setLocation, user]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -1702,6 +1731,7 @@ export default function App() {
             <EatsCartProvider>
               <TooltipProvider>
                 <Toaster />
+                <AccountLockedHandler />
                 <Router />
               </TooltipProvider>
             </EatsCartProvider>

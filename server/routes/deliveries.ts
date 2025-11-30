@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { authenticateToken, AuthRequest, requireUnlockedAccount } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 import { promotionBonusService } from "../services/promotionBonusService";
 
@@ -13,8 +13,9 @@ router.use(authenticateToken);
 // ====================================================
 // POST /api/deliveries
 // Create a new parcel delivery request (customer only)
+// Locked accounts cannot request parcel deliveries
 // ====================================================
-router.post("/", async (req: AuthRequest, res) => {
+router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const role = req.user!.role;

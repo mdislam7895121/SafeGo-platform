@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { prisma } from "../db";
-import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { authenticateToken, AuthRequest, requireUnlockedAccount } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 import {
   createEarningsTransaction,
@@ -17,8 +17,9 @@ router.use(authenticateToken);
 // ====================================================
 // POST /api/food-orders
 // Create a new food order (customer only)
+// Locked accounts cannot place food orders
 // ====================================================
-router.post("/", async (req: AuthRequest, res) => {
+router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const role = req.user!.role;
