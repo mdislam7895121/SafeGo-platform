@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Star, MapPin, Heart, Clock, Filter, Search, ChevronRight } from "lucide-react";
+import { Star, MapPin, Heart, Clock, Filter, Search, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Restaurant {
   id: string;
@@ -61,31 +62,55 @@ export function CustomerEatsHome() {
   const [favoritesOnly, setFavoritesOnly] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const { toast } = useToast();
+  const { user, token } = useAuth();
+  
+  const isLoggedIn = !!user && !!token && user.role === "customer";
 
-  const queryParams = new URLSearchParams({ sortBy });
-  if (cuisineType !== "all") {
-    queryParams.set("cuisineType", cuisineType);
-  }
-  if (openNow) {
-    queryParams.set("openNow", "true");
-  }
-  if (favoritesOnly) {
-    queryParams.set("favoritesOnly", "true");
-  }
+  const buildQueryParams = () => {
+    const params = new URLSearchParams({ sortBy });
+    if (cuisineType !== "all") {
+      params.set("cuisineType", cuisineType);
+    }
+    if (openNow) {
+      params.set("openNow", "true");
+    }
+    if (favoritesOnly && isLoggedIn) {
+      params.set("favoritesOnly", "true");
+    }
+    return params;
+  };
 
-  const { data, isLoading, error } = useQuery<RestaurantsResponse>({
-    queryKey: ['/api/customer/food/restaurants', sortBy, cuisineType, openNow, favoritesOnly],
+  const { data, isLoading, error, refetch } = useQuery<RestaurantsResponse>({
+    queryKey: ['/api/eats/restaurants', sortBy, cuisineType, openNow, favoritesOnly, isLoggedIn, searchQuery],
     queryFn: async () => {
-      const res = await fetch(`/api/customer/food/restaurants?${queryParams.toString()}`, {
-        credentials: 'include',
-      });
+      const queryParams = buildQueryParams();
+      
+      if (isLoggedIn) {
+        try {
+          const authRes = await fetch('/api/customer/food/restaurants?' + queryParams.toString(), {
+            credentials: 'include',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+          });
+          if (authRes.ok) {
+            return await authRes.json();
+          }
+        } catch {
+        }
+      }
+      
+      if (searchQuery) {
+        queryParams.set("search", searchQuery);
+      }
+      const res = await fetch(`/api/eats/restaurants?${queryParams.toString()}`);
       if (!res.ok) {
         const errData = await res.json();
         throw errData;
       }
       return res.json();
     },
-    retry: 1,
+    retry: 2,
   });
 
   const toggleFavorite = useMutation({
@@ -94,7 +119,7 @@ export function CustomerEatsHome() {
       return apiRequest(`/api/customer/food/restaurants/${restaurantId}/favorite`, { method });
     },
     onSuccess: (_data, { isFavorite }) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/customer/food/restaurants'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/eats/restaurants'] });
       toast({
         title: isFavorite ? "Removed from favorites" : "Added to favorites",
         description: isFavorite 
@@ -121,28 +146,27 @@ export function CustomerEatsHome() {
     : restaurants;
 
   if (error) {
-    const errorMessage = (error as any)?.message || "Failed to load restaurants";
-    const requiresVerification = (error as any)?.requiresVerification;
+    const errorMessage = (error as any)?.error || (error as any)?.message || "Failed to load restaurants";
 
     return (
       <div className="flex-1 p-4">
-        <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
-          <CardContent className="p-6">
-            <h3 className="font-semibold text-yellow-900 dark:text-yellow-200">
-              {requiresVerification ? "Verification Required" : "Error"}
+        <Card className="border-destructive/50 bg-destructive/10">
+          <CardContent className="p-6 text-center">
+            <h3 className="font-semibold text-destructive mb-2">
+              Unable to Load Restaurants
             </h3>
-            <p className="text-sm text-yellow-800 dark:text-yellow-300 mt-2">
-              {requiresVerification
-                ? "You must complete KYC verification to order food."
-                : errorMessage}
+            <p className="text-sm text-muted-foreground mb-4">
+              {errorMessage}
             </p>
-            {requiresVerification && (
-              <Link href="/customer/kyc">
-                <Button variant="outline" size="sm" className="mt-3" data-testid="button-complete-kyc">
-                  Complete Verification
-                </Button>
-              </Link>
-            )}
+            <Button 
+              variant="outline" 
+              onClick={() => refetch()}
+              className="gap-2"
+              data-testid="button-retry-restaurants"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -201,18 +225,20 @@ export function CustomerEatsHome() {
             </Label>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch
-              id="favorites-inline"
-              checked={favoritesOnly}
-              onCheckedChange={setFavoritesOnly}
-              data-testid="switch-favorites"
-            />
-            <Label htmlFor="favorites-inline" className="flex items-center gap-1 cursor-pointer text-sm">
-              <Heart className="h-3 w-3" />
-              Favorites
-            </Label>
-          </div>
+          {isLoggedIn && (
+            <div className="flex items-center gap-2">
+              <Switch
+                id="favorites-inline"
+                checked={favoritesOnly}
+                onCheckedChange={setFavoritesOnly}
+                data-testid="switch-favorites"
+              />
+              <Label htmlFor="favorites-inline" className="flex items-center gap-1 cursor-pointer text-sm">
+                <Heart className="h-3 w-3" />
+                Favorites
+              </Label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -234,15 +260,25 @@ export function CustomerEatsHome() {
           ))
         ) : filteredRestaurants.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground">No restaurants found</p>
-            {searchQuery && (
+            <p className="text-muted-foreground text-lg mb-2">
+              No restaurants available in your area yet
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              We're working on bringing more restaurants to you soon!
+            </p>
+            {(searchQuery || cuisineType !== "all" || openNow) && (
               <Button 
-                variant="ghost" 
-                onClick={() => setSearchQuery("")}
-                className="mt-2"
-                data-testid="button-clear-search"
+                variant="outline" 
+                onClick={() => {
+                  setSearchQuery("");
+                  setCuisineType("all");
+                  setOpenNow(false);
+                }}
+                className="gap-2"
+                data-testid="button-clear-filters"
               >
-                Clear search
+                <RefreshCw className="h-4 w-4" />
+                Clear Filters
               </Button>
             )}
           </div>
@@ -283,24 +319,26 @@ export function CustomerEatsHome() {
                           </h3>
                           <p className="text-sm text-muted-foreground">{restaurant.cuisineType}</p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="flex-shrink-0 h-8 w-8"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleFavorite.mutate({ 
-                              restaurantId: restaurant.id, 
-                              isFavorite: restaurant.isFavorite 
-                            });
-                          }}
-                          data-testid={`button-favorite-${restaurant.id}`}
-                        >
-                          <Heart 
-                            className={`h-4 w-4 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} 
-                          />
-                        </Button>
+                        {isLoggedIn && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="flex-shrink-0 h-8 w-8"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleFavorite.mutate({ 
+                                restaurantId: restaurant.id, 
+                                isFavorite: restaurant.isFavorite 
+                              });
+                            }}
+                            data-testid={`button-favorite-${restaurant.id}`}
+                          >
+                            <Heart 
+                              className={`h-4 w-4 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} 
+                            />
+                          </Button>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3 mt-2 text-sm">

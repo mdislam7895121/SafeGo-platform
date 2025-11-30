@@ -43,6 +43,7 @@ import promosRoutes from "./routes/promos"; // Promotion Engine
 import marketplaceBalancerRoutes from "./routes/marketplace-balancer"; // AI Marketplace Balancer
 import loyaltyRoutes from "./routes/loyalty"; // SafeGo Loyalty Engine
 import tlcRoutes from "./routes/tlc"; // NYC TLC HVFHV Minimum Pay Enforcement
+import eatsRoutes from "./routes/eats"; // Public Eats endpoint for restaurant browsing
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -68,6 +69,9 @@ type DriverPublicProfile = {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Public routes (no authentication required)
+  // Public Eats endpoint for restaurant browsing (no auth required)
+  app.use("/api/eats", eatsRoutes);
+  
   // D2: Public Driver Profile endpoint - uses driver_profile_id
   app.get("/api/driver/public-profile/:driver_profile_id", async (req, res) => {
     try {
