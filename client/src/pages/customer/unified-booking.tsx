@@ -43,6 +43,7 @@ import {
   MessageCircle,
   CheckCircle2,
   AlertCircle,
+  LogOut,
 } from "lucide-react";
 
 type RideStatus = 
@@ -477,7 +478,7 @@ function formatDurationMinutes(mins: number): string {
 
 export default function UnifiedBookingPage() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { isReady: isGoogleMapsReady } = useGoogleMaps();
   const { getItemCount, state: eatsCartState } = useEatsCart();
   const eatsCartItemCount = getItemCount();
@@ -2017,6 +2018,14 @@ export default function UnifiedBookingPage() {
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                   </div>
+                  <DropdownMenuItem 
+                    onSelect={() => logout()}
+                    className="text-destructive focus:text-destructive"
+                    data-testid="menu-logout"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -2062,6 +2071,16 @@ export default function UnifiedBookingPage() {
                   Help
                 </Button>
               </Link>
+              <div className="border-t my-2" />
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10" 
+                onClick={() => { setIsMobileMenuOpen(false); logout(); }}
+                data-testid="mobile-menu-logout"
+              >
+                <LogOut className="h-5 w-5" />
+                Logout
+              </Button>
             </div>
           </div>
         )}

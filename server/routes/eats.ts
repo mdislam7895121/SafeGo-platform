@@ -162,6 +162,59 @@ router.get("/restaurants/:id", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/restaurants/:id/branding", async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended) {
+      return res.status(404).json({ error: "Restaurant not available" });
+    }
+
+    const branding = await prisma.restaurantBranding.findUnique({
+      where: { restaurantId: id },
+    });
+
+    const media = await prisma.restaurantMedia.findMany({
+      where: { restaurantId: id },
+      orderBy: { displayOrder: 'asc' },
+    });
+
+    res.json({
+      branding: branding ? {
+        logoUrl: branding.logoUrl,
+        coverPhotoUrl: branding.coverPhotoUrl,
+        primaryColor: branding.primaryColor,
+        secondaryColor: branding.secondaryColor,
+        themeMode: branding.themeMode,
+      } : {
+        logoUrl: null,
+        coverPhotoUrl: null,
+        primaryColor: null,
+        secondaryColor: null,
+        themeMode: 'light',
+      },
+      media: media.map(m => ({
+        id: m.id,
+        url: m.fileUrl || '',
+        type: m.fileType || 'image',
+        category: m.category,
+        displayOrder: m.displayOrder,
+      })),
+    });
+  } catch (error) {
+    console.error("[Public Eats] Get restaurant branding error:", error);
+    res.status(500).json({ error: "Failed to fetch restaurant branding" });
+  }
+});
+
 router.get("/restaurants/:id/menu", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;

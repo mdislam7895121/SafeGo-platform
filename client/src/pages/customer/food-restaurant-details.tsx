@@ -2,6 +2,7 @@ import { Link, useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Minus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle, Info, Tag, ShoppingCart } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -177,6 +178,9 @@ export default function FoodRestaurantDetails() {
   const [pendingItem, setPendingItem] = useState<MenuItem | null>(null);
   
   const { toast } = useToast();
+  const { user, token } = useAuth();
+  const isLoggedIn = !!user && !!token && user.role === "customer";
+  
   const { 
     addItem, 
     getItemCount, 
@@ -188,17 +192,80 @@ export default function FoodRestaurantDetails() {
   } = useEatsCart();
 
   const { data: restaurantData, isLoading: restaurantLoading, error: restaurantError } = useQuery<RestaurantResponse>({
-    queryKey: [`/api/customer/food/restaurants/${id}`],
+    queryKey: [`/api/eats/restaurants/${id}`, isLoggedIn],
+    queryFn: async () => {
+      if (isLoggedIn && token) {
+        const authRes = await fetch(`/api/customer/food/restaurants/${id}`, {
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (authRes.ok) {
+          const data = await authRes.json();
+          return data;
+        } else if (authRes.status !== 401 && authRes.status !== 403) {
+          const errData = await authRes.json().catch(() => ({ error: 'Failed to fetch' }));
+          throw new Error(errData.error || 'Failed to fetch restaurant');
+        }
+      }
+      const res = await fetch(`/api/eats/restaurants/${id}`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Failed to fetch' }));
+        throw new Error(errData.error || 'Failed to fetch restaurant');
+      }
+      return await res.json();
+    },
     retry: 1,
   });
 
   const { data: menuData, isLoading: menuLoading, error: menuError } = useQuery<MenuResponse>({
-    queryKey: [`/api/customer/food/restaurants/${id}/menu`],
+    queryKey: [`/api/eats/restaurants/${id}/menu`, isLoggedIn],
+    queryFn: async () => {
+      if (isLoggedIn && token) {
+        const authRes = await fetch(`/api/customer/food/restaurants/${id}/menu`, {
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (authRes.ok) {
+          const data = await authRes.json();
+          return data;
+        } else if (authRes.status !== 401 && authRes.status !== 403) {
+          const errData = await authRes.json().catch(() => ({ error: 'Failed to fetch' }));
+          throw new Error(errData.error || 'Failed to fetch menu');
+        }
+      }
+      const res = await fetch(`/api/eats/restaurants/${id}/menu`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Failed to fetch' }));
+        throw new Error(errData.error || 'Failed to fetch menu');
+      }
+      return await res.json();
+    },
     retry: 1,
   });
 
   const { data: brandingData, isLoading: brandingLoading } = useQuery<BrandingResponse>({
-    queryKey: [`/api/customer/food/restaurants/${id}/branding`],
+    queryKey: [`/api/eats/restaurants/${id}/branding`, isLoggedIn],
+    queryFn: async () => {
+      if (isLoggedIn && token) {
+        const authRes = await fetch(`/api/customer/food/restaurants/${id}/branding`, {
+          credentials: 'include',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (authRes.ok) {
+          const data = await authRes.json();
+          return data;
+        } else if (authRes.status !== 401 && authRes.status !== 403) {
+          const errData = await authRes.json().catch(() => ({ error: 'Failed to fetch' }));
+          throw new Error(errData.error || 'Failed to fetch branding');
+        }
+      }
+      const res = await fetch(`/api/eats/restaurants/${id}/branding`);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: 'Failed to fetch' }));
+        throw new Error(errData.error || 'Failed to fetch branding');
+      }
+      return await res.json();
+    },
     retry: 1,
   });
 
