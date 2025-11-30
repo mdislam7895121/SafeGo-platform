@@ -48,8 +48,7 @@ export default function FoodOrdersHistory() {
   // Reorder mutation
   const reorderMutation = useMutation({
     mutationFn: async (orderId: string) => {
-      const response = await apiRequest("GET", `/api/customer/food/orders/${orderId}/reorder`);
-      return response.json();
+      return apiRequest(`/api/customer/food/orders/${orderId}/reorder`, { method: 'GET' });
     },
     onSuccess: (data) => {
       if (data.items && data.restaurant) {

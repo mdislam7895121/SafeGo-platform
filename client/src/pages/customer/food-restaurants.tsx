@@ -91,7 +91,7 @@ export default function FoodRestaurants() {
   const toggleFavorite = useMutation({
     mutationFn: async ({ restaurantId, isFavorite }: { restaurantId: string; isFavorite: boolean }) => {
       const method = isFavorite ? 'DELETE' : 'POST';
-      return apiRequest(method, `/api/customer/food/restaurants/${restaurantId}/favorite`);
+      return apiRequest(`/api/customer/food/restaurants/${restaurantId}/favorite`, { method });
     },
     onSuccess: (_data, { isFavorite }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/customer/food/restaurants'] });
