@@ -165,14 +165,88 @@ export default function EatsHome() {
     }
   };
 
-  const RestaurantCard = ({ restaurant }: { restaurant: Restaurant }) => (
+  // Mobile Card: Full-width VERTICAL layout with large stacked image (≤640px)
+  // Approved Second Design: Big image on top, Name + Rating + Open badge below
+  const MobileRestaurantCard = ({ restaurant }: { restaurant: Restaurant }) => (
+    <Link href={`/customer/food/${restaurant.id}`}>
+      <Card 
+        className="overflow-hidden hover-elevate cursor-pointer transition-all group touch-manipulation"
+        data-testid={`card-restaurant-mobile-${restaurant.id}`}
+      >
+        {/* Large Image Section - Aspect ratio ~1.6:1 with object-fit cover */}
+        <div className="relative">
+          <div className="h-48 bg-muted relative overflow-hidden">
+            <img 
+              src={restaurant.coverPhotoUrl || restaurant.logoUrl || DEFAULT_RESTAURANT_IMAGE} 
+              alt={restaurant.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+              onError={handleImageError}
+            />
+            {!restaurant.isOpen && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                <Badge variant="secondary" className="text-sm font-semibold">Currently Closed</Badge>
+              </div>
+            )}
+          </div>
+          {isLoggedIn && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-3 right-3 h-11 w-11 bg-background/80 backdrop-blur-sm hover:bg-background touch-manipulation"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFavorite.mutate({ restaurantId: restaurant.id, isFavorite: restaurant.isFavorite });
+              }}
+              data-testid={`button-favorite-${restaurant.id}`}
+            >
+              <Heart className={`h-5 w-5 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+            </Button>
+          )}
+          {restaurant.deliveryFee === 0 && (
+            <Badge className="absolute top-3 left-3 bg-green-600 text-sm font-semibold">Free Delivery</Badge>
+          )}
+        </div>
+        {/* Content Section with proper spacing */}
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-lg truncate" data-testid={`text-restaurant-name-${restaurant.id}`}>
+                {restaurant.name}
+              </h3>
+              <p className="text-sm text-muted-foreground truncate">{restaurant.cuisineType}</p>
+            </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0 bg-muted/50 rounded-md px-2.5 py-1">
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              <span className="font-medium text-sm">{restaurant.averageRating.toFixed(1)}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-3 text-sm text-muted-foreground">
+            {restaurant.isOpen && (
+              <Badge variant="outline" className="border-green-500 text-green-600 text-sm font-semibold">Open</Badge>
+            )}
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>{restaurant.deliveryTime || '25-35'} min</span>
+            </div>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{restaurant.deliveryFee ? `$${restaurant.deliveryFee.toFixed(2)} delivery` : 'Free delivery'}</span>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+
+  // Desktop Card: Vertical layout with stacked image (≥1024px) - UNCHANGED from original
+  const DesktopRestaurantCard = ({ restaurant }: { restaurant: Restaurant }) => (
     <Link href={`/customer/food/${restaurant.id}`}>
       <Card 
         className="overflow-hidden hover-elevate cursor-pointer transition-all group touch-manipulation"
         data-testid={`card-restaurant-${restaurant.id}`}
       >
         <div className="relative">
-          <div className="h-36 sm:h-44 bg-muted relative overflow-hidden">
+          <div className="h-44 bg-muted relative overflow-hidden">
             <img 
               src={restaurant.coverPhotoUrl || restaurant.logoUrl || DEFAULT_RESTAURANT_IMAGE} 
               alt={restaurant.name}
@@ -190,7 +264,7 @@ export default function EatsHome() {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 h-11 w-11 bg-background/80 backdrop-blur-sm hover:bg-background touch-manipulation"
+              className="absolute top-2 right-2 h-9 w-9 bg-background/80 backdrop-blur-sm hover:bg-background"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -198,17 +272,17 @@ export default function EatsHome() {
               }}
               data-testid={`button-favorite-${restaurant.id}`}
             >
-              <Heart className={`h-5 w-5 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+              <Heart className={`h-4 w-4 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
             </Button>
           )}
           {restaurant.deliveryFee === 0 && (
             <Badge className="absolute top-2 left-2 bg-green-600">Free Delivery</Badge>
           )}
         </div>
-        <CardContent className="p-3 sm:p-4">
+        <CardContent className="p-4">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-base sm:text-lg truncate" data-testid={`text-restaurant-name-${restaurant.id}`}>
+              <h3 className="font-semibold text-lg truncate" data-testid={`text-restaurant-name-${restaurant.id}`}>
                 {restaurant.name}
               </h3>
               <p className="text-sm text-muted-foreground truncate">{restaurant.cuisineType}</p>
@@ -231,10 +305,28 @@ export default function EatsHome() {
     </Link>
   );
 
-  const RestaurantSkeleton = () => (
+  // Mobile Skeleton: Full-width vertical layout matching MobileRestaurantCard
+  const MobileRestaurantSkeleton = () => (
     <Card className="overflow-hidden">
-      <Skeleton className="h-36 sm:h-44 rounded-none" />
-      <CardContent className="p-3 sm:p-4 space-y-2">
+      <Skeleton className="h-48 rounded-none" />
+      <CardContent className="p-4 space-y-3">
+        <div className="flex justify-between gap-3">
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+          <Skeleton className="h-8 w-16 rounded-md" />
+        </div>
+        <Skeleton className="h-4 w-2/3" />
+      </CardContent>
+    </Card>
+  );
+
+  // Desktop Skeleton: Vertical layout (≥1024px only) - UNCHANGED from original
+  const DesktopRestaurantSkeleton = () => (
+    <Card className="overflow-hidden">
+      <Skeleton className="h-44 rounded-none" />
+      <CardContent className="p-4 space-y-2">
         <Skeleton className="h-5 w-3/4" />
         <Skeleton className="h-4 w-1/2" />
         <Skeleton className="h-4 w-2/3" />
@@ -422,9 +514,16 @@ export default function EatsHome() {
           {isLoading && (
             <div className="space-y-4">
               <Skeleton className="h-6 w-44" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+              {/* Mobile + Tablet Loading (≤1023px): Vertical cards */}
+              <div className="flex flex-col gap-4 lg:hidden">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <MobileRestaurantSkeleton key={i} />
+                ))}
+              </div>
+              {/* Desktop Loading (≥1024px): Grid layout - UNCHANGED */}
+              <div className="hidden lg:grid lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {Array.from({ length: 8 }).map((_, i) => (
-                  <RestaurantSkeleton key={i} />
+                  <DesktopRestaurantSkeleton key={i} />
                 ))}
               </div>
             </div>
@@ -456,7 +555,7 @@ export default function EatsHome() {
             </div>
           )}
 
-          {/* Restaurant Content - Vertical Large Cards Only */}
+          {/* Restaurant Content - Responsive Layouts */}
           {!isLoading && restaurants.length > 0 && (
             <section>
               <h2 className="text-base sm:text-lg font-bold mb-3 sm:mb-4 flex items-center gap-2">
@@ -480,9 +579,19 @@ export default function EatsHome() {
                   ({restaurants.length})
                 </span>
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
+              
+              {/* Mobile + Tablet Layout (≤1023px): Full-width vertical cards with 16px spacing */}
+              {/* Using approved Second Design for mobile and tablet views */}
+              <div className="flex flex-col gap-4 lg:hidden">
                 {restaurants.map((restaurant) => (
-                  <RestaurantCard key={restaurant.id} restaurant={restaurant} />
+                  <MobileRestaurantCard key={restaurant.id} restaurant={restaurant} />
+                ))}
+              </div>
+              
+              {/* Desktop Layout (≥1024px): Grid - UNCHANGED from original */}
+              <div className="hidden lg:grid lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                {restaurants.map((restaurant) => (
+                  <DesktopRestaurantCard key={restaurant.id} restaurant={restaurant} />
                 ))}
               </div>
             </section>
