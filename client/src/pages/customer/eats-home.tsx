@@ -183,9 +183,9 @@ export default function EatsHome() {
       >
         <div className="relative">
           <div className={`${featured ? 'h-32 sm:h-36' : 'h-28 sm:h-32'} bg-muted relative overflow-hidden`}>
-            {restaurant.logoUrl ? (
+            {(restaurant.coverPhotoUrl || restaurant.logoUrl) ? (
               <img 
-                src={restaurant.logoUrl} 
+                src={restaurant.coverPhotoUrl || restaurant.logoUrl || ''} 
                 alt={restaurant.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 loading="lazy"

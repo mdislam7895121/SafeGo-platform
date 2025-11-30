@@ -373,6 +373,7 @@ router.get("/restaurants", async (req: Request, res: Response) => {
         branding: {
           select: {
             logoUrl: true,
+            coverPhotoUrl: true,
           },
         },
         hours: true,
@@ -416,6 +417,7 @@ router.get("/restaurants", async (req: Request, res: Response) => {
       averageRating: restaurant.averageRating || 0,
       totalRatings: restaurant.totalRatings || 0,
       logoUrl: restaurant.branding?.logoUrl || null,
+      coverPhotoUrl: restaurant.branding?.coverPhotoUrl || null,
       isOpen: isRestaurantOpen(restaurant.hours),
       isFavorite: false,
     }));
