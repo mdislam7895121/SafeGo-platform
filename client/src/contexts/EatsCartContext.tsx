@@ -34,6 +34,7 @@ export interface DeliveryAddress {
   lat: number;
   lng: number;
   placeId?: string;
+  label?: string;
 }
 
 export interface CartTotals {
