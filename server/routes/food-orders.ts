@@ -169,33 +169,39 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
 
     // Use transaction to ensure atomic order creation and stock decrement
     const orderId = crypto.randomUUID();
+    const stockConflicts: string[] = [];
     
     const foodOrder = await prisma.$transaction(async (tx) => {
-      // First, decrement stock atomically for items with stock tracking
+      // Atomically decrement stock with WHERE guard to prevent overselling
       for (const orderItem of orderItems) {
         const menuItem = menuItemMap.get(orderItem.menuItemId);
         if (menuItem?.stockTrackingEnabled && menuItem.stockQuantity !== null) {
           const requestedQty = orderItem.quantity || 1;
           
-          // Re-validate stock within transaction to prevent overselling
-          const currentItem = await tx.menuItem.findUnique({
-            where: { id: orderItem.menuItemId },
-            select: { stockQuantity: true, name: true },
-          });
-          
-          if (currentItem?.stockQuantity !== null && currentItem.stockQuantity < requestedQty) {
-            throw new Error(`STOCK_CONFLICT:${currentItem.name || orderItem.menuItemId} stock changed during order. Please refresh and try again.`);
-          }
-          
-          await tx.menuItem.update({
-            where: { id: orderItem.menuItemId },
+          // Atomic update with WHERE guard: only updates if stock >= requested
+          const updateResult = await tx.menuItem.updateMany({
+            where: { 
+              id: orderItem.menuItemId,
+              stockTrackingEnabled: true,
+              stockQuantity: { gte: requestedQty },
+            },
             data: {
               stockQuantity: {
                 decrement: requestedQty,
               },
             },
           });
+          
+          // If no rows updated, stock was insufficient
+          if (updateResult.count === 0) {
+            stockConflicts.push(menuItem.name || orderItem.menuItemId);
+          }
         }
+      }
+      
+      // If any stock conflicts, throw to rollback transaction
+      if (stockConflicts.length > 0) {
+        throw new Error(`STOCK_CONFLICT:${stockConflicts.join(", ")}`);
       }
 
       // Create food order
@@ -275,8 +281,19 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
         createdAt: foodOrder.createdAt,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create food order error:", error);
+    
+    // Handle stock conflict errors with proper 409 status
+    if (error.message?.startsWith("STOCK_CONFLICT:")) {
+      const conflictItems = error.message.replace("STOCK_CONFLICT:", "");
+      return res.status(409).json({
+        error: "STOCK_CONFLICT",
+        message: `Stock changed during order placement. Items affected: ${conflictItems}. Please refresh and try again.`,
+        conflictItems: conflictItems.split(", "),
+      });
+    }
+    
     res.status(500).json({ error: "Failed to create food order" });
   }
 });
@@ -307,45 +324,52 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
       return res.status(404).json({ error: "Customer profile not found" });
     }
 
-    // Use transaction to ensure atomic cancellation and prevent double refunds
-    const result = await prisma.$transaction(async (tx) => {
-      // Find and lock the order within transaction
-      const foodOrder = await tx.foodOrder.findUnique({
-        where: { id },
-        include: {
-          restaurant: true,
-        },
+    // First, find the order to check ownership and get details for refund calculation
+    const foodOrder = await prisma.foodOrder.findUnique({
+      where: { id },
+      include: { restaurant: true },
+    });
+
+    if (!foodOrder) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Verify ownership
+    if (foodOrder.customerId !== customerProfile.id) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Check if order can be cancelled
+    const cancellableStatuses = ["placed", "accepted", "preparing"];
+    if (!cancellableStatuses.includes(foodOrder.status)) {
+      return res.status(400).json({ 
+        error: "ORDER_NOT_CANCELLABLE",
+        message: "This order cannot be cancelled. Orders can only be cancelled before food preparation is complete.",
+        currentStatus: foodOrder.status,
       });
+    }
 
-      if (!foodOrder) {
-        throw new Error("ORDER_NOT_FOUND");
-      }
+    // Calculate refund amount based on order status
+    let refundPercentage = 100;
+    let refundReason = "Customer requested cancellation";
 
-      // Verify ownership
-      if (foodOrder.customerId !== customerProfile.id) {
-        throw new Error("ACCESS_DENIED");
-      }
+    if (foodOrder.status === "preparing") {
+      refundPercentage = 80;
+      refundReason = "Partial refund - order was already being prepared";
+    }
 
-      // Check if order can be cancelled (idempotency check)
-      const cancellableStatuses = ["placed", "accepted", "preparing"];
-      if (!cancellableStatuses.includes(foodOrder.status)) {
-        throw new Error(`ORDER_NOT_CANCELLABLE:${foodOrder.status}`);
-      }
+    const refundAmount = (Number(foodOrder.serviceFare) * refundPercentage) / 100;
 
-      // Calculate refund amount based on order status
-      let refundPercentage = 100;
-      let refundReason = "Customer requested cancellation";
-
-      if (foodOrder.status === "preparing") {
-        refundPercentage = 80;
-        refundReason = "Partial refund - order was already being prepared";
-      }
-
-      const refundAmount = (Number(foodOrder.serviceFare) * refundPercentage) / 100;
-
-      // Update order status to cancelled atomically
-      const updatedOrder = await tx.foodOrder.update({
-        where: { id },
+    // Use transaction with conditional update to prevent double cancellation
+    const result = await prisma.$transaction(async (tx) => {
+      // Atomic conditional update: only updates if status is still cancellable
+      // This prevents double cancellation from concurrent requests
+      const updateResult = await tx.foodOrder.updateMany({
+        where: { 
+          id,
+          customerId: customerProfile.id,
+          status: { in: cancellableStatuses },
+        },
         data: {
           status: "cancelled",
           cancelledAt: new Date(),
@@ -357,13 +381,16 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
           updatedAt: new Date(),
         },
       });
+      
+      // If no rows updated, order was already cancelled by concurrent request
+      if (updateResult.count === 0) {
+        throw new Error("ALREADY_CANCELLED");
+      }
 
       // Restore stock for cancelled items - only for items that have stock tracking
       const orderItems = foodOrder.items ? JSON.parse(foodOrder.items) : [];
       for (const item of orderItems) {
         if (item.menuItemId && (item.quantity || 1) > 0) {
-          // Only increment stock for items that have stock tracking enabled
-          // Use updateMany with condition to avoid errors
           await tx.menuItem.updateMany({
             where: { 
               id: item.menuItemId,
@@ -379,6 +406,11 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
         }
       }
 
+      // Fetch the updated order for response
+      const updatedOrder = await tx.foodOrder.findUnique({
+        where: { id },
+      });
+
       return {
         updatedOrder,
         refundAmount,
@@ -389,25 +421,46 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
     });
 
     // Process wallet refund outside transaction if payment was online
-    if (result.paymentMethod === "online") {
+    // Note: This code only executes if transaction succeeded (ALREADY_CANCELLED throws to catch block)
+    if (result.paymentMethod === "online" && result.updatedOrder?.refundStatus === "pending") {
       try {
-        await walletService.processRefund(
-          customerProfile.id,
-          result.refundAmount,
-          `Refund for cancelled order #${id.slice(-8)}`,
-          id
-        );
+        // Atomically update refund status to "processing" to prevent double refund
+        const refundGuard = await prisma.foodOrder.updateMany({
+          where: { 
+            id, 
+            refundStatus: "pending",
+          },
+          data: {
+            refundStatus: "processing",
+          },
+        });
+        
+        // Only process refund if we successfully claimed the pending status
+        if (refundGuard.count === 1) {
+          await walletService.processRefund(
+            customerProfile.id,
+            result.refundAmount,
+            `Refund for cancelled order #${id.slice(-8)}`,
+            id
+          );
 
+          await prisma.foodOrder.update({
+            where: { id },
+            data: {
+              refundStatus: "completed",
+              refundedAt: new Date(),
+            },
+          });
+        }
+      } catch (refundError) {
+        console.error("Refund processing error:", refundError);
+        // Revert to pending for manual processing
         await prisma.foodOrder.update({
           where: { id },
           data: {
-            refundStatus: "completed",
-            refundedAt: new Date(),
+            refundStatus: "pending",
           },
-        });
-      } catch (refundError) {
-        console.error("Refund processing error:", refundError);
-        // Keep refund status as pending for manual processing
+        }).catch(() => {}); // Ignore if this fails
       }
     }
 
@@ -455,19 +508,11 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
   } catch (error: any) {
     console.error("Cancel food order error:", error);
     
-    // Handle specific error types
-    if (error.message === "ORDER_NOT_FOUND") {
-      return res.status(404).json({ error: "Order not found" });
-    }
-    if (error.message === "ACCESS_DENIED") {
-      return res.status(403).json({ error: "Access denied" });
-    }
-    if (error.message?.startsWith("ORDER_NOT_CANCELLABLE:")) {
-      const currentStatus = error.message.split(":")[1];
-      return res.status(400).json({ 
-        error: "ORDER_NOT_CANCELLABLE",
-        message: "This order cannot be cancelled. Orders can only be cancelled before food preparation is complete.",
-        currentStatus,
+    // Handle double-cancellation attempt (concurrent request already cancelled)
+    if (error.message === "ALREADY_CANCELLED") {
+      return res.status(409).json({ 
+        error: "ALREADY_CANCELLED",
+        message: "This order has already been cancelled.",
       });
     }
     
