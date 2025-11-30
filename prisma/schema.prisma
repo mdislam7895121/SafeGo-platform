@@ -981,6 +981,11 @@ model User {
   countryCode       String
   isBlocked         Boolean            @default(false)
   isDemo            Boolean            @default(false)
+  isAccountLocked   Boolean            @default(false)
+  accountLockedAt   DateTime?
+  failedLoginAttempts Int              @default(0)
+  lastFailedLoginAt DateTime?
+  temporaryLockUntil DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   adminProfile      AdminProfile?
@@ -998,6 +1003,7 @@ model User {
   driverTicketStatusChanges DriverSupportStatusHistory[] @relation("DriverTicketStatusChanges")
 
   @@index([isDemo])
+  @@index([isAccountLocked])
   @@map("users")
 }
 
