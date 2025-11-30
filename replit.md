@@ -16,6 +16,7 @@ The frontend uses React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS 3, TanSt
 The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with PostgreSQL 14+, utilizing a Generic Service Layer with Role Adapters. Core functionalities include:
 - **Admin Capabilities**: Interactive panel for dashboards, document management, wallet settlement, and global analytics.
 - **Security & Compliance**: Implements HTTP security headers, rate limiting, 2FA, device/session security, multi-channel alerts, tamper-proof audit logs, secure audit routes, and AES-256-GCM field encryption.
+- **Customer Account Lockout System**: User-initiated account lock with "LOCK" confirmation + password verification. Unlock requires password + OTP verification (bcrypt-hashed OTP stored with 10-minute expiry). Rate limiting blocks login after 5 failed attempts for 15 minutes. Locked accounts are blocked from all booking endpoints (rides, food, parcels) via requireUnlockedAccount middleware. Global ACCOUNT_LOCKED error handler on frontend redirects to profile page.
 - **Wallet & Earnings System**: Manages earnings, commissions, negative balances, and automated/manual payouts.
 - **Tax & Fees System**: Supports multi-country tax management with city-level overrides.
 - **Multi-Role Multi-Channel Support Center**: AI-first chat with 4-role support and a two-tier escalation system.
