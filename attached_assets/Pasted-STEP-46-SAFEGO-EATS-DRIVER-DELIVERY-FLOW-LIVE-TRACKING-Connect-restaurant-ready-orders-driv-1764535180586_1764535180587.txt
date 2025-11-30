@@ -1,0 +1,522 @@
+STEP 46 – SAFEGO EATS DRIVER DELIVERY FLOW & LIVE TRACKING  
+(Connect restaurant-ready orders → driver pickup → customer delivery)
+
+You must follow ALL SafeGo Master Rules exactly.  
+All changes MUST be additive and backward-compatible.  
+Do NOT rename or remove any existing fields, APIs, or routes.
+
+====================================================
+SAFEGO MASTER RULES (ALWAYS ACTIVE – DO NOT BREAK)
+====================================================
+
+ROLES (4 distinct roles, no mixed access):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must have:
+- Its own signup & onboarding flow.
+- Country-specific KYC requirements.
+- Separate dashboard.
+- Separate permissions.
+- Separate status flows.
+
+SERVICES (3 core services that must always work):
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+COUNTRY-SPECIFIC KYC (MANDATORY):
+
+Bangladesh (BD) – for all roles (with type-specific refinements already existing):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status ("pending" | "approved" | "rejected")
+- is_verified (boolean)
+
+United States (US):
+
+All users:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+Drivers in US (extra mandatory):
+- driver_license_number
+- driver_license_image
+- driver_license_expiry
+- ssn_last4 (optional)
+- driver_background_check_status
+
+ADMIN PANEL – REQUIRED CAPABILITIES:
+Admin must be able to:
+- View and verify customers, drivers, restaurants (BD + US).
+- Approve/reject KYC with rejection_reason.
+- Configure pricing, fees, and commissions for rides, food_orders, deliveries.
+- Block/unblock any user with blocked_reason and blocked_at.
+- Manage payouts and settlements.
+- View driver_negative_balance and restaurant_negative_balance.
+- Mark balances as settled with audit logs.
+- View audit logs for verification, blocking, pricing, payouts, critical status overrides.
+
+CORE COLLECTIONS (MUST EXIST, CANNOT BE RENAMED):
+1) rides
+2) food_orders
+3) deliveries
+
+Each collection must include:
+- Identity fields:
+  - customer_id
+  - driver_id (where applicable)
+  - restaurant_id (for food_orders)
+  - admin_id (for admin overrides)
+- Address & geolocation:
+  - pickup_address / dropoff_address
+  - restaurant_address / delivery_address
+  - latitude / longitude
+- Financials:
+  - base_price
+  - distance_fee (if applicable)
+  - service_fee
+  - platform_commission_amount
+  - driver_earnings_amount (rides + deliveries)
+  - restaurant_earnings_amount (food_orders)
+  - total_amount_charged_to_customer
+  - payment_method (cash, card, wallet, etc.)
+  - payment_status (pending, paid, refunded, failed)
+- Timestamps:
+  - created_at
+  - updated_at
+  - accepted_at
+  - completed_at
+  - cancelled_at (if cancelled)
+- Status:
+  - must follow the approved lifecycle for each service.
+- Ratings / feedback:
+  - customer_rating, customer_feedback
+  - driver_rating, restaurant_rating
+  - internal_tags.
+
+COMMISSION & PAYOUT RULES (MUST REMAIN TRUE):
+
+1) Ride – CASH:
+   - Driver receives full cash from customer.
+   - SafeGo commission becomes driver_negative_balance in driver_wallet_balance.
+   - Driver must settle with SafeGo periodically (e.g. weekly).
+
+2) Food order – CASH:
+   - Restaurant receives all cash.
+   - SafeGo commission becomes restaurant_negative_balance in restaurant_wallet_balance.
+   - Restaurant must settle later.
+
+3) ONLINE payments (any service):
+   - SafeGo receives the full charge.
+   - SafeGo keeps platform_commission_amount automatically.
+   - Payouts to drivers/restaurants are net of commissions and fees.
+
+4) Admin can settle negative balances and adjust wallets, but all adjustments must be logged (who, when, why).
+
+SECURITY & PRIVACY RULES:
+
+- Customers cannot view driver or restaurant documents (NID, license, etc.).
+- Drivers cannot view customer KYC/government IDs.
+- Restaurants cannot view other restaurants’ data or balances.
+- Only Admin can:
+  - see full KYC details,
+  - change verification_status and is_verified,
+  - modify pricing/commission rules,
+  - block/unblock accounts.
+- Users can update only their own non-admin profile fields.
+- Sensitive numbers (government_id_last4, ssn_last4, etc.) must be masked and never fully logged or displayed.
+
+STATUS FLOWS (CANNOT BE BROKEN):
+
+rides.status:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed  
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+food_orders.status:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered  
+or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+deliveries.status:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered  
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+ONBOARDING:
+
+- Multi-step per role:
+  - basic info
+  - address (country-aware)
+  - KYC uploads (BD vs US fields)
+  - emergency contact.
+- After onboarding:
+  - verification_status = "pending"
+  - is_verified = false
+- Until approved by Admin:
+  - Drivers cannot accept rides or deliveries.
+  - Restaurants cannot go live or receive food orders.
+  - Customers may be limited according to business rules.
+
+NOTIFICATIONS (MUST REMAIN):
+
+- New ride alerts to drivers.
+- New food orders to restaurants.
+- Parcel updates to relevant parties.
+- Verification approval/rejection notices.
+- Important admin notifications (e.g., high negative balances, major incidents).
+
+IMPLEMENTATION RULES:
+
+- All changes must be ADD-ONLY and backward-compatible.
+- Do NOT rename or remove fields, DB tables, APIs, or routes.
+- Extend through new optional fields/endpoints/components.
+- If there is any doubt that a change might break existing behavior, choose a safer additive alternative.
+
+SECURITY ROADMAP FOCUS FOR STEP 46:
+
+- Driver assignment and access limited to verified drivers (is_verified = true, not blocked).
+- Drivers should only see necessary customer/restaurant data for the active delivery.
+- All driver actions that change order status must be validated and logged (who, when, from which device).
+
+====================================================
+STEP 46 – GOAL (SAFEGO EATS DRIVER DELIVERY FLOW)
+====================================================
+
+We already have:
+
+- Customer food ordering working (Step 44).
+- Restaurant order management + kitchen flow up to ready_for_pickup (Step 45).
+- Customer tracking UI showing early statuses.
+
+Now, in Step 46 we must:
+
+1) Connect food_orders to DRIVERS and the deliveries/ride engine:
+   - From restaurant `ready_for_pickup` state, create a delivery task for drivers.
+   - Allow drivers to accept food delivery jobs via the Driver app.
+
+2) Implement driver-side status flow that continues the food_orders lifecycle:
+   - ready_for_pickup → picked_up → on_the_way → delivered
+
+3) Provide live tracking for customers and restaurants:
+   - Show driver location and ETA on a map.
+   - Update statuses in real time.
+
+4) Respect all commission, wallet, and KYC rules for BD and US.
+
+5) Include DEMO mode and configuration so this works without real fleets.
+
+====================================================
+PHASE 1 – DATA MODEL EXTENSIONS (ADD-ONLY)
+====================================================
+
+Extend **food_orders** (ADD new nullable fields only):
+
+- driver_id (nullable) – link to assigned driver (for real deliveries).
+- delivery_id (nullable) – optional link to a record in the deliveries collection if the system uses a unified delivery engine.
+- pickup_at (timestamp, nullable) – when driver actually picked up the order from restaurant.
+- delivered_at (timestamp, nullable) – when order delivered to customer.
+- driver_assignment_status (string enum):
+  - "none" | "searching_driver" | "driver_assigned" | "driver_rejected" | "no_driver_found"
+- driver_eta_minutes (nullable, integer).
+- driver_last_location_lat (nullable, float).
+- driver_last_location_lng (nullable, float).
+- delivery_notes_for_driver (text, nullable) – restaurant/customer instructions.
+
+Extend **deliveries** collection ADD-ONLY:
+
+- food_order_id (nullable) – link back from deliveries to food_orders when this delivery is for Eats.
+- service_type (string) – e.g., "ride" | "food" | "parcel".
+- country_code (BD/US).
+
+All new fields must be optional and default-safe for existing records.
+
+====================================================
+PHASE 2 – DISPATCH LOGIC FROM RESTAURANT READY STATE
+====================================================
+
+Trigger:
+
+- When restaurant sets food_orders.status → ready_for_pickup (from Step 45),
+  and delivery_type is "delivery" (vs pickup).
+
+Create or update:
+
+1) Set driver_assignment_status → "searching_driver".
+2) Option A (recommended for reuse):
+   - Create a new `deliveries` record with service_type="food":
+     - link food_order_id
+     - set pickup_address = restaurant_address
+     - dropoff_address = customer delivery_address
+     - copy relevant geo-coordinates
+3) Use existing driver matching engine (if any) or a simplified version:
+
+Driver search constraints:
+- Only is_verified = true drivers.
+- Not blocked.
+- Within configurable radius from restaurant (configurable per country and per city).
+- With delivery_enabled = true.
+
+Demo mode:
+- If no real driver engine exists, implement a simulation that:
+  - picks a demo driver from a seed list for BD and US.
+  - sets driver_assignment_status → "driver_assigned"
+  - attaches demo driver_id.
+  - auto-advances statuses for demo orders based on timers.
+
+Status updates during assignment:
+- food_orders.status remains ready_for_pickup.
+- driver_assignment_status reflects driver search progress.
+
+Notifications:
+- Send new delivery request notification to candidate drivers.
+- Notify restaurant when driver is assigned or search fails.
+- Notify customer when driver is assigned/ETA known.
+
+====================================================
+PHASE 3 – DRIVER APP: FOOD DELIVERY WORKFLOW
+====================================================
+
+Extend Driver app with a “Deliveries/Food” section (ADD-ONLY):
+
+Screens:
+1) DriverDeliveriesInboxScreen
+   - Shows:
+     - New requests (incoming food deliveries).
+     - Active deliveries.
+     - Completed deliveries (history).
+
+2) DriverDeliveryRequestDetailScreen
+   - For a specific food delivery request.
+
+3) DriverActiveDeliveryScreen
+   - For an accepted food delivery until completion.
+
+Driver actions:
+
+For a **new food delivery request** (driver_assignment_status = "searching_driver"):
+
+- Accept:
+  - Set driver_id = this driver.
+  - Set driver_assignment_status → "driver_assigned".
+  - Create/update deliveries record with driver_id.
+  - Update notification to restaurant and customer.
+
+- Reject:
+  - Mark driver as rejected for this request.
+  - Continue searching other drivers.
+  - If no drivers accept within timeout → set driver_assignment_status → "no_driver_found" and notify customer + restaurant.
+
+For an **accepted delivery**:
+
+Status transitions on the DRIVER side, which must update food_orders.status:
+
+1) When driver reaches restaurant and collects the food:
+   - Driver taps "Picked up order".
+   - Updates:
+     - food_orders.status → picked_up
+     - pickup_at timestamp
+     - deliveries.status → picked_up
+
+2) When driver departs to customer:
+   - Optionally auto or same as picked_up; the important state is:
+
+3) When driver is on the way:
+   - food_orders.status → on_the_way
+   - deliveries.status → on_the_way
+
+4) When delivery is completed:
+   - Driver taps "Delivered to customer".
+   - Updates:
+     - food_orders.status → delivered
+     - delivered_at timestamp
+     - deliveries.status → delivered
+
+All transitions must respect rules:
+- No skipping from ready_for_pickup directly to delivered.
+- No status regressions.
+
+Payment handling:
+- If payment_method = "cash":
+  - Customer pays driver or restaurant depending on the model already defined.
+  - Do NOT change commission rules; just use them to update driver/restaurant balances as needed.
+- If payment_method = "online":
+  - Show read-only indicator: "Paid online – no cash handling".
+
+====================================================
+PHASE 4 – LIVE LOCATION & ETA UPDATES
+====================================================
+
+Enable driver to share location for active food deliveries:
+
+Driver app:
+- Periodically (configurable interval), for active deliveries:
+  - Send current GPS coordinates.
+Backend:
+- Update food_orders.driver_last_location_lat / lng.
+- Optionally update deliveries.location.
+
+Customer app:
+- On Eats order tracking screen:
+  - Show a small map with driver’s current location, restaurant, and dropoff marker (for on_the_way state).
+  - Show ETA based on driver_eta_minutes.
+
+Restaurant app:
+- On restaurant order detail for that order:
+  - Show that driver is:
+    - "Driver assigned"
+    - "Driver picked up order"
+    - "Driver on the way"
+  - Optionally show ETA and simple icon-level location (no more detail than needed).
+
+Security:
+- Only the customer involved in that food_order and the restaurant of that food_order may view this live driver location.  
+- Do NOT expose driver exact coordinates in any public list.
+
+====================================================
+PHASE 5 – ADMIN OVERSIGHT FOR FOOD DELIVERIES
+====================================================
+
+Extend Admin panel ADD-ONLY:
+
+Screen: AdminFoodDeliveriesMonitorScreen
+
+Features:
+- Filter by:
+  - country (BD/US)
+  - status (searching_driver, driver_assigned, picked_up, on_the_way, delivered, cancelled_*)
+  - restaurant
+  - driver
+- For each record show:
+  - food_order_id
+  - delivery_id (if used)
+  - restaurant name
+  - driver name (or ID)
+  - customer first name (masked)
+  - payment_method
+  - total_amount_charged_to_customer
+  - driver_earnings_amount
+  - platform_commission_amount.
+
+Admin actions (limited, with audit):
+- Force-complete a delivery in exceptional cases.
+- Force-cancel a delivery:
+  - Set deliveries.status and food_orders.status → cancelled_by_admin.
+  - Require cancellation_reason.
+  - Trigger notification to all parties.
+
+Do NOT:
+- Change commission in this screen.
+- Modify wallets directly here (that remains in payout/settlement screens).
+
+====================================================
+PHASE 6 – DEMO MODE & CONFIGURATION (REQUIRED)
+====================================================
+
+You must implement a DEMO-ready configuration.
+
+Config options:
+- enableFoodDeliveryDemo = true/false.
+- demoDrivers:
+  - Example: a list of demo drivers with:
+    - id, name, country (BD/US), base_location_lat/lng.
+- driverSearchRadiusKmDefault.
+- driverAutoAdvanceDemo:
+  - If true, demo deliveries auto-advance statuses:
+    - driver_assigned → picked_up → on_the_way → delivered with time delays.
+
+Demo behavior:
+- When in demo mode and no real drivers are online:
+  - System uses demoDrivers to simulate assignment & movement.
+  - Customer and restaurant still see full tracking as if a real driver was on the way.
+- Demo orders must be marked using existing is_demo_order or a similar flag so they can be distinguished from real orders.
+
+All demo settings must be safe:
+- Disabling demo mode must not break real data.
+- Real orders must never be auto-completed purely via demo logic.
+
+====================================================
+PHASE 7 – VALIDATION & LOGGING
+====================================================
+
+For every driver status change:
+- Validate:
+  - Actor is an authenticated Driver.
+  - Driver is the one assigned to this food_order/delivery.
+  - Transition is allowed from the current status.
+- Log:
+  - previous_status
+  - new_status
+  - actor_id
+  - timestamp
+  - optional device info (if available).
+
+For location updates:
+- Apply rate limiting to avoid excessive writes.
+- Sanitize inputs.
+
+====================================================
+PHASE 8 – IMPLEMENTATION SCOPE & NON-BREAKING GUARANTEE
+====================================================
+
+You may ADD or EXTEND the following (no removals/renames):
+
+Backend:
+- Extend food_orders fields (driver_id, delivery_id, etc.) as nullable.
+- Extend deliveries with food_order_id, service_type.
+- New/additional endpoints:
+  - api/driver/food-deliveries/inbox
+  - api/driver/food-deliveries/action (accept, reject, picked_up, on_the_way, delivered)
+  - api/driver/food-deliveries/location-update
+  - api/admin/food-deliveries/monitor
+  - api/admin/food-deliveries/override (limited actions)
+- All endpoints must enforce role-based access control.
+
+Driver app:
+- screens/DriverDeliveriesInboxScreen.*
+- screens/DriverDeliveryRequestDetailScreen.*
+- screens/DriverActiveDeliveryScreen.*
+
+Customer app:
+- Extend EatsOrderTrackingScreen.* to display:
+  - driver name (first name or alias)
+  - driver status
+  - live map (if possible)
+  - ETA.
+
+Restaurant app:
+- Extend RestaurantOrderDetailScreen.* to show driver assignment & status.
+
+Admin app:
+- screens/AdminFoodDeliveriesMonitorScreen.*
+
+Do NOT:
+- Break existing ride or parcel flows.
+- Change core ride/parcel status transitions.
+
+====================================================
+FINAL REQUIREMENT FOR STEP 46
+====================================================
+
+Deliver Step 46 as a complete, demo-ready, customizable SafeGo Eats Driver Delivery system that:
+
+- Connects restaurant `ready_for_pickup` orders to drivers (real or demo).
+- Allows drivers to accept, pick up, and deliver food orders with proper statuses:
+  ready_for_pickup → picked_up → on_the_way → delivered.
+- Provides live tracking and ETA to customers and restaurants.
+- Gives Admin full oversight without changing commission or KYC logic.
+- Works correctly in both BD and US, respecting all KYC and verification rules.
+- Is fully backward-compatible with all existing SafeGo services, collections, and rules.

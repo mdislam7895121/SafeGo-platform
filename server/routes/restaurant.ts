@@ -13,6 +13,7 @@ import {
   createStaffMember,
   canManageStaff,
 } from "../staff/staffUtils";
+import { dispatchFoodDelivery } from "../services/foodDeliveryDispatchService";
 
 const router = Router();
 
@@ -1479,12 +1480,28 @@ router.post("/orders/:id/status", requireKYCCompletion, async (req: AuthRequest,
       countryCode: restaurantProfile.countryCode || undefined,
     });
 
+    // Step 46: Dispatch driver when order is ready for pickup (delivery orders only)
+    let dispatchResult = null;
+    if (status === "ready_for_pickup" && order.orderType === "delivery") {
+      try {
+        dispatchResult = await dispatchFoodDelivery(id);
+        if (!dispatchResult.success) {
+          console.error(`[FoodDeliveryDispatch] Failed to dispatch order ${id}:`, dispatchResult.error);
+        } else {
+          console.log(`[FoodDeliveryDispatch] Order ${id} dispatched successfully, deliveryId: ${dispatchResult.deliveryId}`);
+        }
+      } catch (dispatchError) {
+        console.error(`[FoodDeliveryDispatch] Error dispatching order ${id}:`, dispatchError);
+      }
+    }
+
     res.json({
       message: "Order status updated successfully",
       order: {
         ...updatedOrder,
         items: typeof updatedOrder.items === 'string' ? JSON.parse(updatedOrder.items) : updatedOrder.items,
       },
+      dispatch: dispatchResult,
     });
   } catch (error) {
     console.error("Update order status error:", error);

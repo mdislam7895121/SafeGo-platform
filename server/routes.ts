@@ -11,6 +11,7 @@ import driverPerformanceRoutes from "./routes/driver-performance"; // D18: Drive
 import driverIncentivesRoutes from "./routes/driver-incentives"; // D19: Driver Incentives & Milestones Center
 import driverSafetyRoutes from "./routes/driver-safety"; // D20: Driver Safety Center & Incident Reporting
 import driverTrustScoreRoutes from "./routes/driver-trust-score"; // D21: Driver Trust Score System
+import driverFoodDeliveryRoutes from "./routes/driver-food-delivery"; // Step 46: Driver Food Delivery Flow
 import customerRoutes from "./routes/customer";
 import customerFoodRoutes from "./routes/customer-food";
 import customerSupportRoutes from "./routes/customer-support"; // Phase 12
@@ -201,6 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/driver/incentives", driverIncentivesRoutes); // D19: Driver Incentives & Milestones Center
   app.use("/api/driver/safety", driverSafetyRoutes); // D20: Driver Safety Center & Incident Reporting
   app.use("/api/driver/trust-score", driverTrustScoreRoutes); // D21: Driver Trust Score System
+  app.use("/api/driver/food-delivery", driverFoodDeliveryRoutes); // Step 46: Driver Food Delivery Flow
   app.use("/api/customer", customerRoutes);
   app.use("/api/customer", customerSupportRoutes); // Phase 12
   app.use("/api/customer/food", customerFoodRoutes);

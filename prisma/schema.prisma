@@ -33,6 +33,20 @@ enum DocumentStatus {
   NEEDS_UPDATE
 }
 
+enum DriverAssignmentStatus {
+  none
+  searching_driver
+  driver_assigned
+  driver_rejected
+  no_driver_found
+}
+
+enum DeliveryServiceType {
+  ride
+  food
+  parcel
+}
+
 model AdminProfile {
   id                           String    @id @default(uuid())
   userId                       String    @unique
@@ -132,13 +146,30 @@ model Delivery {
   // Phase 12: Support ticket tracking (additive only)
   supportTicketCount Int?           @default(0)
   lastSupportStatus  String?        // Latest support ticket status
+  // Step 46: Driver Delivery Flow fields (additive only)
+  serviceType      DeliveryServiceType @default(parcel)  // ride | food | parcel
+  countryCode      String?             // BD | US
+  restaurantId     String?             // For food deliveries, link to restaurant
+  // Step 46: Driver tracking fields
+  driverEtaMinutes      Int?          // Estimated minutes until driver arrives
+  driverLastLocationLat Float?        // Driver's last known latitude
+  driverLastLocationLng Float?        // Driver's last known longitude
+  driverLocationUpdatedAt DateTime?   // When driver location was last updated
+  acceptedAt       DateTime?           // When driver accepted
+  pickedUpAt       DateTime?           // When driver picked up
   createdAt        DateTime         @default(now())
   updatedAt        DateTime
   deliveredAt      DateTime?
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   driver           DriverProfile?   @relation(fields: [driverId], references: [id])
+  restaurant       RestaurantProfile? @relation(fields: [restaurantId], references: [id]) // Step 46: For food deliveries
+  foodOrder        FoodOrder?       // Step 46: Link back from food order
 
   @@index([isDemo])
+  @@index([serviceType])  // Step 46: Index for service type queries
+  @@index([status])       // Step 46: Index for status queries
+  @@index([driverId])     // Step 46: Index for driver queries
+  @@index([restaurantId]) // Step 46: Index for restaurant queries
   @@map("deliveries")
 }
 
@@ -499,6 +530,14 @@ model FoodOrder {
   restaurantPrepMinutes     Int?              // Estimated preparation time in minutes
   customerStatusMessage     String?           // Customer-visible status message
   restaurantSeenAt          DateTime?         // When restaurant first viewed order
+  // Step 46: Driver Delivery Flow fields (additive only)
+  deliveryId                String?           @unique   // Link to deliveries record
+  driverAssignmentStatus    DriverAssignmentStatus @default(none)
+  driverEtaMinutes          Int?              // Estimated minutes until driver arrives
+  driverLastLocationLat     Float?            // Driver's last known latitude
+  driverLastLocationLng     Float?            // Driver's last known longitude
+  driverLocationUpdatedAt   DateTime?         // When driver location was last updated
+  deliveryNotesForDriver    String?           @db.Text  // Instructions for driver from restaurant/customer
   // Phase 7: Promotion & Coupon tracking (additive only)
   appliedPromotionId   String?
   appliedCouponCode    String?
@@ -519,6 +558,7 @@ model FoodOrder {
   driver               DriverProfile?    @relation(fields: [driverId], references: [id])
   restaurant           RestaurantProfile @relation(fields: [restaurantId], references: [id])
   appliedPromotion     Promotion?        @relation(fields: [appliedPromotionId], references: [id])
+  delivery             Delivery?         @relation(fields: [deliveryId], references: [id]) // Step 46: Link to delivery record
   review               Review?           // Phase 8: One review per order
   earningsTransaction  EarningsTransaction? // R6: Earnings tracking
 
@@ -528,6 +568,8 @@ model FoodOrder {
   @@index([status])
   @@index([isDemo])
   @@index([appliedPromotionId])
+  @@index([driverAssignmentStatus]) // Step 46: Index for driver assignment queries
+  @@index([driverId])               // Step 46: Index for driver queries
   @@map("food_orders")
 }
 
@@ -658,6 +700,7 @@ model RestaurantProfile {
   securityNotes         String?
   driverComplaints      DriverComplaint[]
   foodOrders            FoodOrder[]
+  deliveries            Delivery[]        // Step 46: Food deliveries linked to restaurant
   menuCategories        MenuCategory[]
   menuItems             MenuItem[]
   promotions            Promotion[]      // Phase 7: Restaurant promotions
