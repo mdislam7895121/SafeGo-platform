@@ -30,6 +30,9 @@ app.use(express.urlencoded({ extended: false }));
 // Serve uploaded files statically
 app.use("/uploads", express.static("uploads"));
 
+// Serve attached assets (demo images, stock photos) statically
+app.use("/attached_assets", express.static("attached_assets"));
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
