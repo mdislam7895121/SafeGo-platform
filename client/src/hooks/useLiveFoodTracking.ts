@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import type { FoodOrderStatus } from "@shared/foodOrderStatus";
+import { useFoodOrderNotifications } from "./use-food-order-notifications";
 
 export interface DriverLocation {
   lat: number | null;
@@ -91,6 +92,7 @@ export interface UseLiveFoodTrackingResult {
   remainingDistanceMiles: number;
   isDeliveryPhase: boolean;
   isOrderPickedUp: boolean;
+  wsConnected: boolean;
 }
 
 interface UseLiveFoodTrackingOptions {
@@ -129,6 +131,19 @@ export function useLiveFoodTracking({
   const previousStatusRef = useRef<FoodOrderStatus | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const fetchTrackingDataRef = useRef<(() => Promise<void>) | null>(null);
+
+  const handleWebSocketStatusUpdate = useCallback((update: { status: string }) => {
+    if (fetchTrackingDataRef.current) {
+      fetchTrackingDataRef.current();
+    }
+  }, []);
+
+  const { isConnected: wsConnected } = useFoodOrderNotifications({
+    orderId: orderId || undefined,
+    enabled: enabled && !!orderId,
+    onStatusUpdate: handleWebSocketStatusUpdate,
+  });
 
   const fetchTrackingData = useCallback(async () => {
     if (!orderId) return;
@@ -160,6 +175,10 @@ export function useLiveFoodTracking({
   const refetch = useCallback(async () => {
     setIsLoading(true);
     await fetchTrackingData();
+  }, [fetchTrackingData]);
+
+  useEffect(() => {
+    fetchTrackingDataRef.current = fetchTrackingData;
   }, [fetchTrackingData]);
 
   useEffect(() => {
@@ -239,6 +258,7 @@ export function useLiveFoodTracking({
     remainingDistanceMiles,
     isDeliveryPhase,
     isOrderPickedUp,
+    wsConnected,
   };
 }
 

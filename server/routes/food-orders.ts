@@ -7,6 +7,7 @@ import {
   updateEarningsTransactionStatus,
 } from "../services/earningsCommissionService";
 import { promotionBonusService } from "../services/promotionBonusService";
+import { broadcastOrderUpdate, broadcastToUser } from "../websocket/foodOrderNotificationsWs";
 import crypto from "crypto";
 
 const router = Router();
@@ -898,6 +899,49 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
           body: message.body,
         },
       });
+
+      broadcastToUser(customerUser.id, {
+        type: "food_order_update",
+        orderId: id,
+        title: message.title,
+        body: message.body,
+        status,
+      });
+    }
+
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: foodOrder.restaurantId },
+      select: { restaurantName: true, userId: true },
+    });
+
+    broadcastOrderUpdate(id, status, {
+      restaurantName: restaurant?.restaurantName || undefined,
+    });
+
+    if (restaurant?.userId) {
+      broadcastToUser(restaurant.userId, {
+        type: "food_order_update",
+        orderId: id,
+        title: "Order Status Updated",
+        body: `Order status changed to: ${status}`,
+        status,
+      });
+    }
+
+    if (foodOrder.driverId) {
+      const driver = await prisma.driverProfile.findUnique({
+        where: { id: foodOrder.driverId },
+        select: { userId: true },
+      });
+      if (driver?.userId) {
+        broadcastToUser(driver.userId, {
+          type: "food_order_update",
+          orderId: id,
+          title: "Delivery Status Updated",
+          body: `Order status changed to: ${status}`,
+          status,
+        });
+      }
     }
 
     res.json({
