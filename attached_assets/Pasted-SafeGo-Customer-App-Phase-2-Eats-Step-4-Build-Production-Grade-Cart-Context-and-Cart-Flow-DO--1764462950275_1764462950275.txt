@@ -1,0 +1,201 @@
+SafeGo – Customer App – Phase 2 (Eats)
+Step 4: Build Production-Grade Cart Context and Cart Flow
+DO NOT BREAK existing Ride or Parcel features
+
+You are upgrading the SafeGo web app. Follow all existing SafeGo global rules and keep the four roles and security model intact:
+
+• Roles: Customer, Driver, Restaurant, Admin.
+• Modules: Ride, Eats, Parcel – sharing common Auth, Wallet, Profile, and Support.
+• Collections: rides, food_orders, deliveries (plus users, drivers, restaurants, payouts, transactions, support_tickets, promos).
+• KYC: US rules already implemented for customer and driver; NEVER bypass verification checks.
+• Security: Respect visibility rules so a customer can only see their own orders and not any driver/restaurant earnings or private data.
+• Status engine: Do not modify the global status flows – only integrate with them where needed.
+
+For this task you will ONLY work on the **SafeGo Eats – Customer side** cart system:
+Cart Context, Add to Cart, Update/Remove, Cart UI, and checkout handoff.
+Keep the work self-contained and non-breaking.
+
+--------------------------------
+1. Current State (assume)
+--------------------------------
+• Restaurant browse/search, restaurant details, and menu display are DONE.
+• Surge pricing display is DONE.
+• food-order.tsx and some raw JSON based inputs exist but they are NOT a real cart.
+• Order history and status tracking exist separately.
+• Shared components (Header, Tabs, Auth, Wallet, Support, Map, Notifications, etc.) are already working.
+You must REUSE existing components where possible and avoid duplicating logic.
+
+--------------------------------
+2. Goal of this step
+--------------------------------
+Create a full, reusable **CartContext** for SafeGo Eats and wire it into the UI so that:
+• A customer can:
+  – add one or more menu items to a cart,
+  – see quantity and subtotal,
+  – update quantities,
+  – remove items,
+  – clear cart,
+  – continue browsing while cart persists,
+  – proceed to checkout using existing order/confirmation flow.
+• Cart must survive route changes within the customer area (Home, Activity, Wallet, Profile).
+• Cart must be ready to plug into a future backend (food_orders collection) without large refactors.
+
+Do NOT implement:
+• Payment gateway logic (already handled globally).
+• Restaurant or driver dashboards.
+• Admin changes.
+
+--------------------------------
+3. Cart Data Model & Context
+--------------------------------
+Create a dedicated CartContext (for Eats only) with a provider, hook, and TypeScript types.
+
+Requirements:
+• Types:
+  – CartItem: { id, restaurantId, name, basePrice, surgeMultiplier?, options?, quantity, imageUrl?, notes?, maxQuantity? }
+  – CartState: { items: CartItem[], restaurantId | null, subtotal: number, itemCount: number }
+• Business rules:
+  – Cart must only contain items from a single restaurant at a time.
+    • If user adds an item from a different restaurant, show a confirmation dialog:
+      “Your cart has items from another restaurant. Start a new order?” with Cancel / Start New Order.
+  – Subtotal = sum(price * quantity) with surgeMultiplier and any existing restaurant pricing rules reused from menu.
+  – Prevent quantity < 1 and quantity > maxQuantity (if defined).
+
+Context API:
+• addItem(menuItem, quantity = 1)
+• updateQuantity(itemId, quantity)
+• removeItem(itemId)
+• clearCart()
+• getCartSummary() – returns { itemCount, subtotal }
+• syncFromStorage() / persistToStorage() – for optional localStorage persistence between sessions.
+
+Implementation notes:
+• Put the context in a shared path used by the Eats screens only (for example `contexts/EatsCartContext.tsx` or similar, following existing project layout).
+• Implement a `useEatsCart()` hook.
+• If the app already has a global provider tree, wrap the relevant level with `EatsCartProvider`.
+• Use TypeScript with strict types; no `any`.
+
+--------------------------------
+4. Cart UI and UX
+--------------------------------
+Update the SafeGo Eats customer UI so the cart is visible and usable from all relevant screens:
+
+A. Menu page (restaurant details)
+• Add “Add to Cart” buttons:
+  – For simple items: a primary “Add” button.
+  – For items that already exist in cart: show the current quantity and plus/minus controls.
+• On “Add to Cart”:
+  – Call CartContext.addItem.
+  – Show a non-blocking toast: “Added to cart – {itemCount} item(s) total”.
+  – Update a mini cart badge in the header or bottom bar with the current item count and subtotal.
+
+B. Global cart access
+• Implement a CartDrawer or CartPage (reuse existing design framework: same spacing, fonts, colors).
+• It must show:
+  – Restaurant name.
+  – List of CartItem entries with:
+    • image/icon,
+    • name,
+    • selected options (if available),
+    • unit price,
+    • quantity +/- buttons,
+    • line total,
+    • remove icon.
+  – Subtotal row.
+  – Tax & fees placeholder row (connect to existing fee engine later; for now label clearly as “Estimated”).
+  – “Proceed to checkout” button.
+  – “Clear cart” button (with confirmation).
+
+C. Empty states
+• If cart is empty:
+  – Show an illustration or icon with message like:
+    “Your cart is empty. Browse restaurants to start an order.”
+  – Provide a “Browse restaurants” CTA that routes back to the restaurant list.
+
+D. Integration with existing order/confirmation flow
+• On “Proceed to checkout”:
+  – Validate the cart:
+    • cart is not empty,
+    • restaurantId is set,
+    • quantities are valid,
+    • user is authenticated and KYC status is valid (reuse existing checks).
+  – Create a local “pending order” object compatible with the existing food order confirmation page.
+  – Navigate to the existing Eats order confirmation / review page, passing this object via state, route params, or context – whichever pattern is already used in the app.
+  – DO NOT call any external API yet if the rest of the backend is still demo; just wire up the flow so the screens work end-to-end.
+
+--------------------------------
+5. Validation, Security & Compliance
+--------------------------------
+• NEVER expose driver or restaurant private data in any cart or checkout UI.
+• Respect KYC:
+  – If user is not verified or has a restricted status, prevent checkout and show a clear error referencing the KYC section in Profile.
+• Input validation:
+  – Use Zod or the existing validation library where appropriate.
+  – Validate numbers (quantity, price) before calculations.
+• Prevent:
+  – negative totals,
+  – NaN values,
+  – overflow or unrealistic quantities (e.g., > 99 items per line).
+• Ensure that cart logic only runs inside authenticated customer routes (do not leak context into driver/restaurant/admin layouts).
+
+--------------------------------
+6. Performance & UX Requirements
+--------------------------------
+• Keep the cart operations instant – all updates client-side.
+• Avoid unnecessary re-renders by memoizing derived values where needed.
+• Support both desktop and mobile layouts:
+  – On desktop: CartDrawer can be right-side panel.
+  – On mobile: Consider full-screen sheet or bottom drawer following existing patterns.
+• Use existing theme context and dark mode; no new color constants outside the design system.
+
+--------------------------------
+7. Tests and Manual QA
+--------------------------------
+Add or update tests (unit/integration) where the project already uses them. At minimum:
+
+• Unit tests for CartContext:
+  – add item,
+  – merge quantities,
+  – switch restaurant with confirmation,
+  – update quantity,
+  – remove item,
+  – clearCart,
+  – subtotal calculation with surge.
+• Manual test checklist (desktop + mobile):
+  – Add multiple items from same restaurant.
+  – Try adding from different restaurant and confirm behavior.
+  – Adjust quantities and verify subtotal.
+  – Remove items and verify empty state.
+  – Navigate between Home, Activity, Wallet, Profile and back to Eats – cart should persist.
+  – Proceed to checkout as:
+    • verified user,
+    • non-verified user (ensure proper error and redirect to KYC).
+  – Confirm that Ride and Parcel flows are unaffected.
+
+--------------------------------
+8. Non-Regression & Safety
+--------------------------------
+• DO NOT:
+  – touch the ride booking, live tracking, driver ETA, or trip receipt logic.
+  – touch the parcel request forms beyond reusing components.
+  – break any existing routes or links for /customer, /customer/profile, /customer/support, or driver/admin dashboards.
+• If you must refactor a shared component, keep it backwards compatible and run the architect review.
+
+--------------------------------
+9. Completion Criteria
+--------------------------------
+This task is COMPLETE when:
+
+1) CartContext and useEatsCart are implemented with the API above.
+2) Menu pages use the new cart functions and show correct toast + badges.
+3) CartDrawer/Page works on desktop and mobile with full add/update/remove/clear behavior.
+4) Checkout button hands off a validated cart to the existing Eats confirmation/review flow and enforces KYC rules.
+5) All manual tests pass and there are no console errors.
+6) Ride and Parcel behavior is unchanged and architect review passes.
+
+After you finish, run the architect review and give me a clear summary:
+• What files were added/changed.
+• How to test the cart end-to-end as a customer.
+• Any trade-offs or TODOs for the next Eats steps.
+
+Begin implementing Step 4 now.
