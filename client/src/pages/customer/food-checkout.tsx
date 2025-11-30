@@ -1052,7 +1052,7 @@ export default function FoodCheckout() {
             {state.promoCode && (
               <div className="mt-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="gap-1" data-testid="badge-promo-applied">
+                  <Badge variant="secondary" className="gap-1 text-sm" data-testid="badge-promo-applied">
                     {state.promoCode}
                   </Badge>
                   <Button
@@ -1197,7 +1197,7 @@ export default function FoodCheckout() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{address.label}</p>
                         {address.isDefault && (
-                          <Badge variant="secondary">Default</Badge>
+                          <Badge variant="secondary" className="text-sm">Default</Badge>
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground line-clamp-1">{address.address}</p>
@@ -1321,7 +1321,7 @@ export default function FoodCheckout() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       <p className="font-medium">SafeGo Wallet</p>
-                      <Badge variant="outline" className="font-mono">
+                      <Badge variant="outline" className="font-mono text-sm">
                         ${walletBalance.toFixed(2)}
                       </Badge>
                     </div>
@@ -1367,13 +1367,13 @@ export default function FoodCheckout() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-medium capitalize">{method.brand} •••• {method.last4}</p>
                             {method.isDefault && !expired && (
-                              <Badge variant="secondary">Default</Badge>
+                              <Badge variant="secondary" className="text-sm">Default</Badge>
                             )}
                             {expired && (
-                              <Badge variant="destructive">Expired</Badge>
+                              <Badge variant="destructive" className="text-sm">Expired</Badge>
                             )}
                             {expiringSoon && !expired && (
-                              <Badge variant="outline" className="text-yellow-600 border-yellow-500">
+                              <Badge variant="outline" className="text-yellow-600 border-yellow-500 text-sm">
                                 Expiring Soon
                               </Badge>
                             )}
