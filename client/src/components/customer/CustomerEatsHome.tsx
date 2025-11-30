@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Star, MapPin, Heart, Clock, Filter, Search, ChevronRight, RefreshCw, UtensilsCrossed } from "lucide-react";
+import { Clock, Filter, Search, RefreshCw, UtensilsCrossed, Heart } from "lucide-react";
 import { CustomerHomeButton } from "./EatsNavigation";
+import { RestaurantListMobile } from "./RestaurantListMobile";
+import { RestaurantGridDesktop } from "./RestaurantGridDesktop";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -20,18 +19,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-
-interface Restaurant {
-  id: string;
-  name: string;
-  cuisineType: string;
-  cityCode: string;
-  averageRating: number;
-  totalRatings: number;
-  logoUrl: string | null;
-  isOpen: boolean;
-  isFavorite: boolean;
-}
+import type { Restaurant } from "./RestaurantCardVariants";
 
 interface RestaurantsResponse {
   restaurants: Restaurant[];
@@ -61,6 +49,7 @@ export function CustomerEatsHome() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const { toast } = useToast();
   const { user, token } = useAuth();
+  const isMobile = useIsMobile();
   
   const isLoggedIn = !!user && !!token && user.role === "customer";
 
@@ -238,129 +227,37 @@ export function CustomerEatsHome() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="overflow-hidden">
-              <CardContent className="p-4">
-                <div className="flex gap-4">
-                  <Skeleton className="h-20 w-20 rounded-lg flex-shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-5 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-4 w-1/3" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))
-        ) : filteredRestaurants.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg mb-2">
-              No restaurants available in your area yet
-            </p>
-            <p className="text-sm text-muted-foreground mb-4">
-              We're working on bringing more restaurants to you soon!
-            </p>
-            {(searchQuery || cuisineType !== "all" || openNow) && (
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  setSearchQuery("");
-                  setCuisineType("all");
-                  setOpenNow(false);
-                }}
-                className="gap-2"
-                data-testid="button-clear-filters"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Clear Filters
-              </Button>
-            )}
-          </div>
+      <div className="flex-1 overflow-y-auto">
+        {isMobile ? (
+          <RestaurantListMobile
+            restaurants={filteredRestaurants}
+            isLoading={isLoading}
+            isLoggedIn={isLoggedIn}
+            onToggleFavorite={(restaurantId, isFavorite) => 
+              toggleFavorite.mutate({ restaurantId, isFavorite })
+            }
+            onClearFilters={() => {
+              setSearchQuery("");
+              setCuisineType("all");
+              setOpenNow(false);
+            }}
+            hasActiveFilters={!!searchQuery || cuisineType !== "all" || openNow}
+          />
         ) : (
-          filteredRestaurants.map((restaurant) => (
-            <Link 
-              key={restaurant.id} 
-              href={`/customer/food/${restaurant.id}`}
-            >
-              <Card 
-                className="overflow-hidden hover-elevate cursor-pointer transition-all"
-                data-testid={`card-restaurant-${restaurant.id}`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex gap-4">
-                    <div 
-                      className="h-20 w-20 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold text-xl bg-primary"
-                    >
-                      {restaurant.logoUrl ? (
-                        <img 
-                          src={restaurant.logoUrl} 
-                          alt={restaurant.name}
-                          className="h-full w-full object-cover rounded-lg"
-                        />
-                      ) : (
-                        restaurant.name.charAt(0).toUpperCase()
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="font-semibold text-base truncate" data-testid={`text-restaurant-name-${restaurant.id}`}>
-                            {restaurant.name}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">{restaurant.cuisineType}</p>
-                        </div>
-                        {isLoggedIn && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="flex-shrink-0 h-8 w-8"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              toggleFavorite.mutate({ 
-                                restaurantId: restaurant.id, 
-                                isFavorite: restaurant.isFavorite 
-                              });
-                            }}
-                            data-testid={`button-favorite-${restaurant.id}`}
-                          >
-                            <Heart 
-                              className={`h-4 w-4 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} 
-                            />
-                          </Button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-3 mt-2 text-sm">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                          <span className="font-medium">{restaurant.averageRating.toFixed(1)}</span>
-                          <span className="text-muted-foreground">({restaurant.totalRatings})</span>
-                        </div>
-                        
-                        <Badge 
-                          variant={restaurant.isOpen ? "default" : "secondary"}
-                          className="text-xs"
-                        >
-                          {restaurant.isOpen ? "Open" : "Closed"}
-                        </Badge>
-                      </div>
-
-                      <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        <span className="truncate">{restaurant.cityCode}</span>
-                      </div>
-                    </div>
-
-                    <ChevronRight className="h-5 w-5 text-muted-foreground self-center flex-shrink-0" />
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))
+          <RestaurantGridDesktop
+            restaurants={filteredRestaurants}
+            isLoading={isLoading}
+            isLoggedIn={isLoggedIn}
+            onToggleFavorite={(restaurantId, isFavorite) => 
+              toggleFavorite.mutate({ restaurantId, isFavorite })
+            }
+            onClearFilters={() => {
+              setSearchQuery("");
+              setCuisineType("all");
+              setOpenNow(false);
+            }}
+            hasActiveFilters={!!searchQuery || cuisineType !== "all" || openNow}
+          />
         )}
       </div>
     </div>
