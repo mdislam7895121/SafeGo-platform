@@ -59,22 +59,31 @@ router.get("/restaurants", async (req: AuthRequest, res) => {
     };
 
     // Apply jurisdiction filter: match customer's country AND user not blocked
-    whereConditions.user = {
-      countryCode: customerCountryCode,
-      isBlocked: false,
-    };
-
-    // City-level jurisdiction filter:
-    // - If customer has a cityCode, show: restaurants in their city OR nationwide restaurants (cityCode = null)
-    // - If customer has no cityCode, show only nationwide restaurants (cityCode = null)
-    if (customerCityCode) {
-      whereConditions.OR = [
-        { cityCode: customerCityCode }, // Restaurants in customer's city
-        { cityCode: null },              // Nationwide restaurants
-      ];
-    } else {
-      whereConditions.cityCode = null; // Only nationwide restaurants
-    }
+    // Demo restaurants bypass country filtering to ensure they're always visible
+    whereConditions.OR = [
+      {
+        user: {
+          countryCode: customerCountryCode,
+          isBlocked: false,
+        },
+        // City-level filter for non-demo restaurants
+        ...(customerCityCode ? {
+          OR: [
+            { cityCode: customerCityCode },
+            { cityCode: null },
+          ],
+        } : {
+          cityCode: null,
+        }),
+      },
+      {
+        // Demo restaurants bypass country and city filtering
+        isDemo: true,
+        user: {
+          isBlocked: false,
+        },
+      },
+    ];
 
     // Optional cuisine filter
     if (cuisineType) {
@@ -229,23 +238,24 @@ router.get("/restaurants/:id", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Restaurant not available" });
     }
 
-    // Verify jurisdiction match (country level)
-    if (restaurant.user.countryCode !== customerProfile.user.countryCode) {
-      return res.status(403).json({ error: "Restaurant not available in your country" });
-    }
+    // Demo restaurants bypass jurisdiction checks
+    if (!restaurant.isDemo) {
+      // Verify jurisdiction match (country level)
+      if (restaurant.user.countryCode !== customerProfile.user.countryCode) {
+        return res.status(403).json({ error: "Restaurant not available in your country" });
+      }
 
-    // Verify jurisdiction match (city level)
-    const customerCityCode = customerProfile.cityCode;
-    const restaurantCityCode = restaurant.cityCode;
+      // Verify jurisdiction match (city level)
+      const customerCityCode = customerProfile.cityCode;
+      const restaurantCityCode = restaurant.cityCode;
 
-    // If restaurant has a specific cityCode, customer must be in that city
-    if (restaurantCityCode) {
-      if (!customerCityCode || customerCityCode !== restaurantCityCode) {
-        return res.status(403).json({ error: "Restaurant not available in your city" });
+      // If restaurant has a specific cityCode, customer must be in that city
+      if (restaurantCityCode) {
+        if (!customerCityCode || customerCityCode !== restaurantCityCode) {
+          return res.status(403).json({ error: "Restaurant not available in your city" });
+        }
       }
     }
-    // If restaurant is nationwide (cityCode = null) but customer has a city, that's OK
-    // If customer has no city, they can only access nationwide restaurants (already handled)
 
     // Format response (customer-facing only)
     res.json({
@@ -321,22 +331,24 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Restaurant not available" });
     }
 
-    // Verify jurisdiction match (country level)
-    if (restaurant.user.countryCode !== customerProfile.user.countryCode) {
-      return res.status(403).json({ error: "Restaurant not available in your country" });
-    }
+    // Demo restaurants bypass jurisdiction checks
+    if (!restaurant.isDemo) {
+      // Verify jurisdiction match (country level)
+      if (restaurant.user.countryCode !== customerProfile.user.countryCode) {
+        return res.status(403).json({ error: "Restaurant not available in your country" });
+      }
 
-    // Verify jurisdiction match (city level) - allow nationwide restaurants (cityCode = null)
-    const customerCityCode = customerProfile.cityCode;
-    const restaurantCityCode = restaurant.cityCode;
+      // Verify jurisdiction match (city level) - allow nationwide restaurants (cityCode = null)
+      const customerCityCode = customerProfile.cityCode;
+      const restaurantCityCode = restaurant.cityCode;
 
-    // If restaurant has a specific cityCode, customer must be in that city
-    if (restaurantCityCode) {
-      if (!customerCityCode || customerCityCode !== restaurantCityCode) {
-        return res.status(403).json({ error: "Restaurant not available in your city" });
+      // If restaurant has a specific cityCode, customer must be in that city
+      if (restaurantCityCode) {
+        if (!customerCityCode || customerCityCode !== restaurantCityCode) {
+          return res.status(403).json({ error: "Restaurant not available in your city" });
+        }
       }
     }
-    // If restaurant is nationwide (cityCode = null), customer from any city can access it
 
     // Get menu categories with items
     const categories = await prisma.menuCategory.findMany({
