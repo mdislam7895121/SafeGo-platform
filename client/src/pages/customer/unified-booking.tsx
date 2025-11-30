@@ -93,6 +93,9 @@ import {
 import { getVehicleCategoryImage } from "@/lib/vehicleMedia";
 import { useCategoryAvailability } from "@/hooks/useCategoryAvailability";
 import { apiRequest } from "@/lib/queryClient";
+import { CustomerEatsHome } from "@/components/customer/CustomerEatsHome";
+import { useEatsCart } from "@/contexts/EatsCartContext";
+import { ShoppingCart } from "lucide-react";
 
 type ServiceType = "ride" | "eats" | "parcel";
 
@@ -476,6 +479,8 @@ export default function UnifiedBookingPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   const { isReady: isGoogleMapsReady } = useGoogleMaps();
+  const { getItemCount, state: eatsCartState } = useEatsCart();
+  const eatsCartItemCount = getItemCount();
   const { playDriverAssigned, playTripStarted, playTripCompleted } = useNotificationSound();
   const [, setLocationRoute] = useLocation();
   const [isClient, setIsClient] = useState(false);
@@ -1928,6 +1933,28 @@ export default function UnifiedBookingPage() {
               {/* Sound Toggle */}
               <SoundToggle />
 
+              {/* Eats Cart Button - Only visible in Eats mode */}
+              {activeService === "eats" && (
+                <Link href="/customer/food/checkout">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="relative"
+                    data-testid="button-eats-cart"
+                  >
+                    <ShoppingCart className="h-5 w-5" />
+                    {eatsCartItemCount > 0 && (
+                      <Badge 
+                        className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center text-xs"
+                        data-testid="badge-cart-count"
+                      >
+                        {eatsCartItemCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </Link>
+              )}
+
               {/* Profile Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -3253,14 +3280,7 @@ export default function UnifiedBookingPage() {
             )}
 
             {activeService === "eats" && (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground py-12">
-                <div className="text-center">
-                  <UtensilsCrossed className="h-16 w-16 mx-auto mb-4 opacity-40" />
-                  <p className="text-lg font-medium">SafeGo Eats</p>
-                  <p className="text-sm mt-2">Order from nearby restaurants</p>
-                  <p className="text-xs mt-4 text-muted-foreground/60">Coming soon...</p>
-                </div>
-              </div>
+              <CustomerEatsHome />
             )}
 
             {activeService === "parcel" && (
