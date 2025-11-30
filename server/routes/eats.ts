@@ -572,6 +572,18 @@ router.get("/restaurants/:id/menu", async (req: Request, res: Response) => {
           orderBy: {
             displayOrder: 'asc',
           },
+          include: {
+            optionGroups: {
+              where: { isDemo: false },
+              include: {
+                options: {
+                  where: { isActive: true },
+                  orderBy: { createdAt: 'asc' },
+                },
+              },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
         },
       },
       orderBy: {
@@ -590,6 +602,12 @@ router.get("/restaurants/:id/menu", async (req: Request, res: Response) => {
         price: parseFloat(item.basePrice.toString()),
         imageUrl: item.itemImageUrl,
         isAvailable: item.availabilityStatus === 'available',
+        isVegetarian: item.isVegetarian,
+        isSpicy: item.isSpicy,
+        calories: item.calories,
+        hasVariants: item.hasVariants || item.optionGroups.some(g => ['variant', 'size'].includes(g.type)),
+        hasAddOns: item.hasAddOns || item.optionGroups.some(g => !['variant', 'size'].includes(g.type)),
+        optionGroupsCount: item.optionGroups.length,
       })),
     }));
 
@@ -603,6 +621,129 @@ router.get("/restaurants/:id/menu", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("[Public Eats] Get restaurant menu error:", error);
     res.status(500).json({ error: "Failed to fetch restaurant menu" });
+  }
+});
+
+// Step 44: Get menu item detail with variants, add-ons, and upsells
+router.get("/restaurants/:restaurantId/items/:itemId", async (req: Request, res: Response) => {
+  try {
+    const { restaurantId, itemId } = req.params;
+
+    // Verify restaurant is available
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: restaurantId },
+      include: {
+        user: { select: { isBlocked: true } },
+      },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended ||
+        restaurant.verificationStatus !== "approved" || restaurant.user?.isBlocked) {
+      return res.status(404).json({ error: "Restaurant not available" });
+    }
+
+    // Fetch item with option groups, options, and upsell links
+    const item = await prisma.menuItem.findFirst({
+      where: {
+        id: itemId,
+        restaurantId,
+        isArchived: false,
+        availabilityStatus: 'available',
+      },
+      include: {
+        optionGroups: {
+          where: { isDemo: false },
+          include: {
+            options: {
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        upsellLinksFrom: {
+          where: { isActive: true },
+          include: {
+            toMenuItem: {
+              select: {
+                id: true,
+                name: true,
+                basePrice: true,
+                itemImageUrl: true,
+                shortDescription: true,
+                availabilityStatus: true,
+                isArchived: true,
+              },
+            },
+          },
+          orderBy: { priority: 'desc' },
+          take: 6,
+        },
+      },
+    });
+
+    if (!item) {
+      return res.status(404).json({ error: "Menu item not found" });
+    }
+
+    // Format option groups
+    const optionGroups = item.optionGroups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      type: group.type as string,
+      isRequired: group.isRequired,
+      minSelect: group.minSelect,
+      maxSelect: group.maxSelect,
+      options: group.options.map((opt) => ({
+        id: opt.id,
+        label: opt.label,
+        priceDelta: parseFloat(opt.priceDelta.toString()),
+        isDefault: opt.isDefault,
+        isActive: opt.isActive,
+      })),
+    }));
+
+    // Format upsell items (filter out unavailable items)
+    const upsellItems = item.upsellLinksFrom
+      .filter((link) => 
+        link.toMenuItem.availabilityStatus === 'available' && 
+        !link.toMenuItem.isArchived
+      )
+      .map((link) => ({
+        id: link.toMenuItem.id,
+        name: link.toMenuItem.name,
+        price: parseFloat(link.toMenuItem.basePrice.toString()),
+        imageUrl: link.toMenuItem.itemImageUrl,
+        shortDescription: link.toMenuItem.shortDescription,
+      }));
+
+    res.json({
+      id: item.id,
+      restaurantId: item.restaurantId,
+      name: item.name,
+      shortDescription: item.shortDescription,
+      longDescription: item.longDescription,
+      basePrice: parseFloat(item.basePrice.toString()),
+      currency: item.currency,
+      imageUrl: item.itemImageUrl,
+      isVegetarian: item.isVegetarian,
+      isVegan: item.isVegan,
+      isHalal: item.isHalal,
+      isSpicy: item.isSpicy,
+      calories: item.calories,
+      preparationTimeMinutes: item.preparationTimeMinutes,
+      hasVariants: item.hasVariants || optionGroups.some(g => ['variant', 'size'].includes(g.type)),
+      hasAddOns: item.hasAddOns || optionGroups.some(g => !['variant', 'size'].includes(g.type)),
+      optionGroups,
+      upsellItems,
+    });
+  } catch (error) {
+    console.error("[Public Eats] Get item detail error:", error);
+    res.status(500).json({ error: "Failed to fetch item details" });
   }
 });
 

@@ -8,6 +8,7 @@ import {
   AlertCircle,
   Search,
   Sparkles,
+  Settings2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -782,6 +783,46 @@ export default function EditMenuItem() {
                   Spicy
                 </label>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Step 44: Variants & Add-ons Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                Variants & Add-ons
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">Has Variants</p>
+                  <p className="text-sm text-muted-foreground">e.g., Size (Small, Medium, Large)</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {itemData?.item?.hasVariants && (
+                    <Badge variant="secondary">Active</Badge>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">Has Add-ons</p>
+                  <p className="text-sm text-muted-foreground">e.g., Extra toppings, Sides</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {itemData?.item?.hasAddOns && (
+                    <Badge variant="secondary">Active</Badge>
+                  )}
+                </div>
+              </div>
+              <Link href={`/restaurant/menu-item-options/${itemId}`}>
+                <Button variant="outline" className="w-full" data-testid="button-configure-options">
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Configure Variants & Add-ons
+                </Button>
+              </Link>
             </CardContent>
           </Card>
         </div>

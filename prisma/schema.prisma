@@ -674,6 +674,7 @@ model RestaurantProfile {
   earningsSummaries     EarningsSummary[] // R6: Earnings summaries
   favoritedBy           FoodRestaurantFavorite[] // Customers who favorited this restaurant
   blockedByCustomers    CustomerBlockedRestaurant[] // Customers who blocked this restaurant
+  upsellGroups          MenuItemUpsellGroup[] // Step 44: Upsell groups for menu item recommendations
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
@@ -806,6 +807,11 @@ model MenuItem {
   stockTrackingEnabled   Boolean             @default(false)
   stockQuantity          Int?                // null means unlimited stock
   lowStockThreshold      Int?                @default(5) // warn when stock drops below this
+  // Step 44: Variants, Add-ons, and Upsell support (additive only)
+  hasVariants            Boolean             @default(false) // True if item has variant options
+  hasAddOns              Boolean             @default(false) // True if item has add-on options
+  defaultVariantOptionId String?             // Default selected variant option ID
+  upsellGroupId          String?             // Reference to upsell group for recommendations
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
   restaurant             RestaurantProfile   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -813,6 +819,9 @@ model MenuItem {
   mainCategory           Category?           @relation("MenuItemMainCategory", fields: [mainCategoryId], references: [id], onDelete: SetNull)
   subCategoryLinks       MenuItemCategory[]
   optionGroups           MenuOptionGroup[]
+  upsellGroup            MenuItemUpsellGroup? @relation(fields: [upsellGroupId], references: [id], onDelete: SetNull)
+  upsellLinksFrom        MenuItemUpsellLink[] @relation("UpsellFromItem")
+  upsellLinksTo          MenuItemUpsellLink[] @relation("UpsellToItem")
 
   @@index([restaurantId])
   @@index([categoryId])
@@ -822,6 +831,7 @@ model MenuItem {
   @@index([isFeatured])
   @@index([isArchived])
   @@index([isDemo])
+  @@index([upsellGroupId])
   @@map("menu_items")
 }
 
@@ -862,6 +872,48 @@ model MenuOption {
   @@index([isActive])
   @@index([isDemo])
   @@map("menu_options")
+}
+
+// Step 44: Upsell Groups for menu item recommendations
+model MenuItemUpsellGroup {
+  id            String       @id @default(uuid())
+  restaurantId  String
+  name          String       // e.g., "Popular add-ons", "Recommended sides"
+  description   String?
+  isActive      Boolean      @default(true)
+  isDemo        Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  restaurant    RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  menuItems     MenuItem[]   // Items that use this upsell group
+  upsellLinks   MenuItemUpsellLink[]
+
+  @@index([restaurantId])
+  @@index([isActive])
+  @@index([isDemo])
+  @@map("menu_item_upsell_groups")
+}
+
+// Step 44: Upsell Links - many-to-many relationship between items for recommendations
+model MenuItemUpsellLink {
+  id              String       @id @default(uuid())
+  upsellGroupId   String
+  fromMenuItemId  String       // The item being viewed
+  toMenuItemId    String       // The recommended item to upsell
+  priority        Int          @default(0) // Higher priority = shown first
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  upsellGroup     MenuItemUpsellGroup @relation(fields: [upsellGroupId], references: [id], onDelete: Cascade)
+  fromMenuItem    MenuItem     @relation("UpsellFromItem", fields: [fromMenuItemId], references: [id], onDelete: Cascade)
+  toMenuItem      MenuItem     @relation("UpsellToItem", fields: [toMenuItemId], references: [id], onDelete: Cascade)
+
+  @@unique([upsellGroupId, fromMenuItemId, toMenuItemId])
+  @@index([upsellGroupId])
+  @@index([fromMenuItemId])
+  @@index([toMenuItemId])
+  @@index([priority])
+  @@map("menu_item_upsell_links")
 }
 
 model Ride {

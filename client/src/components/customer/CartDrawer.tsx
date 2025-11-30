@@ -135,9 +135,26 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                       <div className="flex items-start justify-between gap-1">
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate" data-testid={`text-item-name-${item.id}`}>{item.name}</p>
+                          {/* Step 44: Display modifiers (variants/add-ons) */}
+                          {item.modifiers && item.modifiers.length > 0 && (
+                            <div className="mt-0.5 space-y-0.5" data-testid={`modifiers-${item.id}`}>
+                              {item.modifiers.map((mod, idx) => (
+                                <p 
+                                  key={`${mod.id}-${idx}`} 
+                                  className="text-xs text-muted-foreground flex items-center gap-1"
+                                  data-testid={`modifier-${item.id}-${idx}`}
+                                >
+                                  <span className="truncate">{mod.name}</span>
+                                  {mod.price > 0 && (
+                                    <span className="flex-shrink-0">+${mod.price.toFixed(2)}</span>
+                                  )}
+                                </p>
+                              ))}
+                            </div>
+                          )}
                           {item.specialInstructions && (
-                            <p className="text-sm text-muted-foreground truncate" data-testid={`text-item-instructions-${item.id}`}>
-                              Note: {item.specialInstructions}
+                            <p className="text-xs text-muted-foreground truncate italic mt-0.5" data-testid={`text-item-instructions-${item.id}`}>
+                              "{item.specialInstructions}"
                             </p>
                           )}
                         </div>

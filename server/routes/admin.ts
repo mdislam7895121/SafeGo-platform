@@ -3196,6 +3196,14 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
           },
           orderBy: { createdAt: "desc" },
         },
+        menuItems: {
+          select: {
+            id: true,
+            hasVariants: true,
+            hasAddOns: true,
+            availabilityStatus: true,
+          },
+        },
       },
     });
 
@@ -3215,6 +3223,17 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
       (sum, order) => sum + Number(order.safegoCommission),
       0
     );
+
+    // Step 44: Calculate menu stats for admin oversight
+    const menuItems = restaurant.menuItems || [];
+    const menuStats = {
+      totalItems: menuItems.length,
+      availableItems: menuItems.filter(i => i.availabilityStatus === "available").length,
+      unavailableItems: menuItems.filter(i => i.availabilityStatus === "unavailable").length,
+      outOfStockItems: menuItems.filter(i => i.availabilityStatus === "out_of_stock").length,
+      itemsWithVariants: menuItems.filter(i => i.hasVariants).length,
+      itemsWithAddOns: menuItems.filter(i => i.hasAddOns).length,
+    };
 
     const formattedRestaurant = {
       id: restaurant.id,
@@ -3238,6 +3257,7 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
       totalCommission,
       recentOrders: restaurant.foodOrders,
       complaints: restaurant.complaints,
+      menuStats,
       createdAt: restaurant.createdAt,
       accountCreated: restaurant.user.createdAt,
     };

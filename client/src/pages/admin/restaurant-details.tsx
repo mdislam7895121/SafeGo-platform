@@ -19,6 +19,15 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
+interface MenuStats {
+  totalItems: number;
+  availableItems: number;
+  unavailableItems: number;
+  outOfStockItems: number;
+  itemsWithVariants: number;
+  itemsWithAddOns: number;
+}
+
 interface RestaurantDetails {
   id: string;
   userId: string;
@@ -41,6 +50,7 @@ interface RestaurantDetails {
   totalCommission: number;
   recentOrders: any[];
   complaints: any[];
+  menuStats?: MenuStats;
   createdAt: string;
   accountCreated: string;
 }
@@ -246,6 +256,52 @@ export default function RestaurantDetails() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Step 44: Menu Overview - Admin Oversight */}
+        {restaurant.menuStats && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ShoppingBag className="h-5 w-5" />
+                Menu Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Items</p>
+                  <p className="text-2xl font-bold" data-testid="text-menu-total">
+                    {restaurant.menuStats.totalItems}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Available</p>
+                  <p className="text-2xl font-bold text-green-600" data-testid="text-menu-available">
+                    {restaurant.menuStats.availableItems}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Unavailable</p>
+                  <p className="text-2xl font-bold text-muted-foreground" data-testid="text-menu-unavailable">
+                    {restaurant.menuStats.unavailableItems + restaurant.menuStats.outOfStockItems}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">With Variants</p>
+                  <p className="text-2xl font-bold" data-testid="text-menu-variants">
+                    {restaurant.menuStats.itemsWithVariants}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">With Add-ons</p>
+                  <p className="text-2xl font-bold" data-testid="text-menu-addons">
+                    {restaurant.menuStats.itemsWithAddOns}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Wallet Info */}
         <Card>

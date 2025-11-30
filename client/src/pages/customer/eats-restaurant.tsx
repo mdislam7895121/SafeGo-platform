@@ -39,6 +39,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEatsCart, type RestaurantInfo } from "@/contexts/EatsCartContext";
 import { useToast } from "@/hooks/use-toast";
 import CartDrawer from "@/components/customer/CartDrawer";
+import ItemDetailModal, { 
+  type MenuItemDetail, 
+  type MenuItemOptionGroup 
+} from "@/components/customer/ItemDetailModal";
 
 interface MenuItem {
   id: string;
@@ -50,6 +54,9 @@ interface MenuItem {
   isVegetarian?: boolean;
   isSpicy?: boolean;
   calories?: number;
+  hasVariants?: boolean;
+  hasAddOns?: boolean;
+  optionGroupsCount?: number;
 }
 
 interface MenuCategory {
@@ -157,6 +164,9 @@ export default function EatsRestaurant() {
   const [showDifferentRestaurantDialog, setShowDifferentRestaurantDialog] = useState(false);
   const [pendingItem, setPendingItem] = useState<MenuItem | null>(null);
   const [moreInfoOpen, setMoreInfoOpen] = useState(false);
+  const [isItemDetailOpen, setIsItemDetailOpen] = useState(false);
+  const [itemDetailData, setItemDetailData] = useState<MenuItemDetail | null>(null);
+  const [isLoadingItemDetail, setIsLoadingItemDetail] = useState(false);
 
   const categoryRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const categoryNavRef = useRef<HTMLDivElement>(null);
@@ -335,6 +345,127 @@ export default function EatsRestaurant() {
 
     setShowDifferentRestaurantDialog(false);
     setPendingItem(null);
+  };
+
+  // Step 44: Open item detail modal with variants/add-ons
+  const handleOpenItemDetail = async (item: MenuItem) => {
+    if (!item.isAvailable) return;
+    
+    // If item has no variants/add-ons, use quick add
+    if (!item.hasVariants && !item.hasAddOns && (!item.optionGroupsCount || item.optionGroupsCount === 0)) {
+      handleAddToCart(item);
+      return;
+    }
+
+    // Fetch full item details with variants/add-ons
+    setIsLoadingItemDetail(true);
+    try {
+      const res = await fetch(`/api/eats/restaurants/${id}/items/${item.id}`);
+      if (!res.ok) throw new Error('Failed to fetch item details');
+      const data = await res.json();
+      setItemDetailData(data);
+      setIsItemDetailOpen(true);
+    } catch (error) {
+      console.error('Error fetching item details:', error);
+      // Fallback to quick add
+      handleAddToCart(item);
+    } finally {
+      setIsLoadingItemDetail(false);
+    }
+  };
+
+  // Step 44: Handle add to cart from item detail modal
+  const handleAddFromItemDetail = (
+    item: MenuItemDetail,
+    quantity: number,
+    selectedOptions: Array<{
+      groupId: string;
+      groupName: string;
+      optionId: string;
+      optionLabel: string;
+      priceDelta: number;
+      quantity: number;
+    }>,
+    instructions: string,
+    totalPrice: number
+  ) => {
+    if (!restaurant) return;
+
+    // Check for different restaurant
+    if (isFromDifferentRestaurant(id)) {
+      // For now, show the dialog - later can enhance to pass options
+      setPendingItem({
+        id: item.id,
+        name: item.name,
+        description: item.shortDescription || '',
+        price: item.basePrice,
+        imageUrl: item.imageUrl || null,
+        isAvailable: true,
+      });
+      setShowDifferentRestaurantDialog(true);
+      return;
+    }
+
+    const restaurantInfo: RestaurantInfo = {
+      id: id,
+      name: restaurant.name,
+      cuisineType: restaurant.cuisineType,
+      logoUrl: branding?.logoUrl || null,
+      deliveryFee: 2.99,
+      minOrderAmount: operational?.minOrderAmount ?? 0,
+      estimatedDeliveryMinutes: operational?.preparationTimeMinutes ?? 30,
+    };
+
+    // Convert selected options to modifiers for cart
+    const modifiers = selectedOptions.map((opt) => ({
+      id: opt.optionId,
+      name: `${opt.groupName}: ${opt.optionLabel}${opt.quantity > 1 ? ` x${opt.quantity}` : ''}`,
+      price: opt.priceDelta * opt.quantity,
+    }));
+
+    const result = addItem(
+      {
+        menuItemId: item.id,
+        name: item.name,
+        description: item.shortDescription || item.longDescription || '',
+        price: totalPrice / quantity, // Unit price including options
+        quantity: quantity,
+        imageUrl: item.imageUrl,
+        specialInstructions: instructions || undefined,
+        modifiers: modifiers.length > 0 ? modifiers : undefined,
+      },
+      restaurantInfo
+    );
+
+    if (result.success) {
+      toast({
+        title: "Added to cart",
+        description: `${quantity}x ${item.name}${modifiers.length > 0 ? ' with options' : ''}`,
+        duration: 2000,
+      });
+    }
+  };
+
+  // Step 44: Handle upsell item click - open its detail
+  const handleUpsellItemClick = async (itemId: string) => {
+    setIsItemDetailOpen(false);
+    setIsLoadingItemDetail(true);
+    try {
+      const res = await fetch(`/api/eats/restaurants/${id}/items/${itemId}`);
+      if (!res.ok) throw new Error('Failed to fetch item details');
+      const data = await res.json();
+      setItemDetailData(data);
+      setIsItemDetailOpen(true);
+    } catch (error) {
+      console.error('Error fetching upsell item:', error);
+      toast({
+        title: "Error",
+        description: "Could not load item details",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingItemDetail(false);
+    }
   };
 
   const isLoading = restaurantLoading || menuLoading;
@@ -647,7 +778,7 @@ export default function EatsRestaurant() {
                         <Card 
                           key={item.id} 
                           className={`overflow-hidden touch-manipulation ${!item.isAvailable ? 'opacity-50' : 'hover-elevate cursor-pointer'}`}
-                          onClick={() => item.isAvailable && handleAddToCart(item)}
+                          onClick={() => item.isAvailable && handleOpenItemDetail(item)}
                           data-testid={`card-menu-item-${item.id}`}
                         >
                           <CardContent className="p-0">
@@ -706,7 +837,7 @@ export default function EatsRestaurant() {
                                     className="absolute -bottom-1 -right-1 h-8 w-8 sm:h-9 sm:w-9 rounded-full shadow-lg touch-manipulation"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleAddToCart(item);
+                                      handleOpenItemDetail(item);
                                     }}
                                     data-testid={`button-quick-add-${item.id}`}
                                   >
@@ -838,6 +969,18 @@ export default function EatsRestaurant() {
 
       {/* Cart Drawer */}
       <CartDrawer open={isCartOpen} onOpenChange={setIsCartOpen} />
+
+      {/* Step 44: Item Detail Modal with variants/add-ons */}
+      <ItemDetailModal
+        item={itemDetailData}
+        isOpen={isItemDetailOpen}
+        onClose={() => {
+          setIsItemDetailOpen(false);
+          setItemDetailData(null);
+        }}
+        onAddToCart={handleAddFromItemDetail}
+        onUpsellItemClick={handleUpsellItemClick}
+      />
     </div>
   );
 }

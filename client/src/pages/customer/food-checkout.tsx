@@ -826,10 +826,21 @@ export default function FoodCheckout() {
                       {item.description}
                     </p>
                   )}
+                  {/* Step 44: Display modifiers (variants/add-ons) with prices */}
                   {item.modifiers && item.modifiers.length > 0 && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {item.modifiers.map(m => m.name).join(", ")}
-                    </p>
+                    <div className="mt-1 space-y-0.5" data-testid={`modifiers-${item.id}`}>
+                      {item.modifiers.map((mod, idx) => (
+                        <p 
+                          key={`${mod.id}-${idx}`}
+                          className="text-sm text-muted-foreground flex items-center gap-1"
+                        >
+                          <span>{mod.name}</span>
+                          {mod.price > 0 && (
+                            <span className="text-xs">(+${mod.price.toFixed(2)})</span>
+                          )}
+                        </p>
+                      ))}
+                    </div>
                   )}
                   <div className="flex items-center justify-between mt-2">
                     <span className="font-semibold" data-testid={`text-item-total-${item.id}`}>
