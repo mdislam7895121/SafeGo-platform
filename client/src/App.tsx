@@ -42,6 +42,7 @@ import CustomerNotifications from "@/pages/customer/notifications";
 import TripReceipt from "@/pages/customer/trip-receipt";
 import CustomerProfileSettings from "@/pages/customer/profile-settings";
 import CustomerPaymentMethods from "@/pages/customer/payment-methods";
+import CustomerDeliveryAddresses from "@/pages/customer/delivery-addresses";
 import CustomerSupportHub from "@/pages/customer-app/support-hub";
 import CustomerSupportHelp from "@/pages/customer-app/support-help";
 import CustomerSupportArticle from "@/pages/customer-app/support-article";
@@ -377,6 +378,11 @@ function Router() {
       <Route path="/customer/payment-methods">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerPaymentMethods />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/delivery-addresses">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerDeliveryAddresses />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/rides/:id">

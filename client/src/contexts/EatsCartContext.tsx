@@ -53,6 +53,7 @@ export interface EatsCartState {
   deliveryAddress: DeliveryAddress | null;
   promoCode: string | null;
   promoDiscount: number;
+  promoFreeDelivery: boolean;
   paymentMethod: string | null;
   specialInstructions: string;
   isLoading: boolean;
@@ -66,7 +67,7 @@ type EatsCartAction =
   | { type: "UPDATE_QUANTITY"; itemId: string; quantity: number }
   | { type: "UPDATE_ITEM_INSTRUCTIONS"; itemId: string; instructions: string }
   | { type: "SET_DELIVERY_ADDRESS"; address: DeliveryAddress }
-  | { type: "SET_PROMO"; code: string; discount: number }
+  | { type: "SET_PROMO"; code: string; discount: number; isFreeDelivery?: boolean }
   | { type: "CLEAR_PROMO" }
   | { type: "SET_PAYMENT_METHOD"; method: string }
   | { type: "SET_SPECIAL_INSTRUCTIONS"; instructions: string }
@@ -84,6 +85,7 @@ const initialState: EatsCartState = {
   deliveryAddress: null,
   promoCode: null,
   promoDiscount: 0,
+  promoFreeDelivery: false,
   paymentMethod: null,
   specialInstructions: "",
   isLoading: false,
@@ -162,10 +164,16 @@ function eatsCartReducer(state: EatsCartState, action: EatsCartAction): EatsCart
       return { ...state, deliveryAddress: action.address, error: null };
 
     case "SET_PROMO":
-      return { ...state, promoCode: action.code, promoDiscount: action.discount, error: null };
+      return { 
+        ...state, 
+        promoCode: action.code, 
+        promoDiscount: action.discount, 
+        promoFreeDelivery: action.isFreeDelivery ?? false,
+        error: null 
+      };
 
     case "CLEAR_PROMO":
-      return { ...state, promoCode: null, promoDiscount: 0, error: null };
+      return { ...state, promoCode: null, promoDiscount: 0, promoFreeDelivery: false, error: null };
 
     case "SET_PAYMENT_METHOD":
       return { ...state, paymentMethod: action.method, error: null };
@@ -227,7 +235,7 @@ interface EatsCartContextType {
   updateQuantity: (itemId: string, quantity: number) => void;
   updateItemInstructions: (itemId: string, instructions: string) => void;
   setDeliveryAddress: (address: DeliveryAddress) => void;
-  setPromoCode: (code: string, discount: number) => void;
+  setPromoCode: (code: string, discount: number, isFreeDelivery?: boolean) => void;
   clearPromo: () => void;
   setPaymentMethod: (method: string) => void;
   setSpecialInstructions: (instructions: string) => void;
@@ -333,8 +341,8 @@ export function EatsCartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_DELIVERY_ADDRESS", address });
   }, []);
 
-  const setPromoCode = useCallback((code: string, discount: number) => {
-    dispatch({ type: "SET_PROMO", code, discount });
+  const setPromoCode = useCallback((code: string, discount: number, isFreeDelivery?: boolean) => {
+    dispatch({ type: "SET_PROMO", code, discount, isFreeDelivery });
   }, []);
 
   const clearPromo = useCallback(() => {
@@ -386,7 +394,8 @@ export function EatsCartProvider({ children }: { children: ReactNode }) {
       return total + (item.price + modifiersTotal) * item.quantity;
     }, 0);
 
-    const deliveryFee = state.restaurant?.deliveryFee ?? 0;
+    const baseDeliveryFee = state.restaurant?.deliveryFee ?? 0;
+    const deliveryFee = state.promoFreeDelivery ? 0 : baseDeliveryFee;
     const serviceFee = subtotal > 0 ? subtotal * SERVICE_FEE_RATE : 0;
     const tax = subtotal > 0 ? subtotal * TAX_RATE : 0;
     const discount = state.promoDiscount;
@@ -402,7 +411,7 @@ export function EatsCartProvider({ children }: { children: ReactNode }) {
       total: Math.round(total * 100) / 100,
       itemCount,
     };
-  }, [state.items, state.restaurant?.deliveryFee, state.promoDiscount, getItemCount]);
+  }, [state.items, state.restaurant?.deliveryFee, state.promoDiscount, state.promoFreeDelivery, getItemCount]);
 
   const isFromDifferentRestaurant = useCallback((restaurantId: string): boolean => {
     return state.restaurant !== null && state.restaurant.id !== restaurantId && state.items.length > 0;

@@ -402,18 +402,19 @@ export default function CustomerProfile() {
             </Card>
           </Link>
 
-          <Card 
-            className="hover-elevate active-elevate-2 cursor-pointer" 
-            onClick={scrollToSavedPlaces}
-            data-testid="card-saved-places"
-          >
-            <CardContent className="p-4 text-center">
-              <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center mx-auto mb-2">
-                <MapPin className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <p className="text-sm font-medium">Places</p>
-            </CardContent>
-          </Card>
+          <Link href="/customer/delivery-addresses">
+            <Card 
+              className="hover-elevate active-elevate-2 cursor-pointer" 
+              data-testid="card-saved-places"
+            >
+              <CardContent className="p-4 text-center">
+                <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center mx-auto mb-2">
+                  <MapPin className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <p className="text-sm font-medium">Addresses</p>
+              </CardContent>
+            </Card>
+          </Link>
 
           <Card 
             className="hover-elevate active-elevate-2 cursor-pointer" 

@@ -133,20 +133,29 @@ router.post("/validate", async (req, res) => {
 
     // Calculate discount
     let discountAmount = 0;
+    let isFreeDelivery = false;
+    let discountMessage = "";
+    
     if (coupon.discountType === "percentage") {
       const percentage = parseFloat(coupon.discountPercentage?.toString() || "0");
       discountAmount = (subtotal * percentage) / 100;
+      discountMessage = `${percentage}% off applied`;
     } else if (coupon.discountType === "fixed_amount") {
       discountAmount = parseFloat(coupon.discountValue?.toString() || "0");
+      discountMessage = `${currency} ${discountAmount.toFixed(2)} off applied`;
+    } else if (coupon.discountType === "free_delivery") {
+      isFreeDelivery = true;
+      discountAmount = 0;
+      discountMessage = "Free delivery applied";
     }
 
-    // Apply max discount cap if specified
-    if (coupon.maxDiscountCap && discountAmount > parseFloat(coupon.maxDiscountCap.toString())) {
+    // Apply max discount cap if specified (not applicable for free_delivery)
+    if (!isFreeDelivery && coupon.maxDiscountCap && discountAmount > parseFloat(coupon.maxDiscountCap.toString())) {
       discountAmount = parseFloat(coupon.maxDiscountCap.toString());
     }
 
-    // Ensure discount doesn't exceed subtotal
-    if (discountAmount > subtotal) {
+    // Ensure discount doesn't exceed subtotal (not applicable for free_delivery)
+    if (!isFreeDelivery && discountAmount > subtotal) {
       discountAmount = subtotal;
     }
 
@@ -157,9 +166,10 @@ router.post("/validate", async (req, res) => {
       valid: true,
       discountAmount: parseFloat(discountAmount.toFixed(2)),
       newTotal: parseFloat(newTotal.toFixed(2)),
+      isFreeDelivery,
       appliedPromotionId: coupon.promotionId,
       couponId: coupon.id,
-      messages: [`Coupon applied: ${currency} ${discountAmount.toFixed(2)} off`],
+      messages: [discountMessage],
     });
   } catch (error: any) {
     console.error("Coupon validation error:", error);

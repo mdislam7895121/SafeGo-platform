@@ -73,6 +73,86 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Restaurant is not verified" });
     }
 
+    // Stock validation - check if all items have sufficient stock
+    const orderItems = Array.isArray(items) ? items : JSON.parse(items);
+    const menuItemIds = orderItems.map((item: { menuItemId: string }) => item.menuItemId);
+    
+    const menuItems = await prisma.menuItem.findMany({
+      where: { 
+        id: { in: menuItemIds },
+        restaurantId,
+      },
+      select: {
+        id: true,
+        name: true,
+        stockTrackingEnabled: true,
+        stockQuantity: true,
+        availabilityStatus: true,
+      },
+    });
+
+    // Create a map for quick lookup
+    const menuItemMap = new Map(menuItems.map(item => [item.id, item]));
+
+    // Check stock for each item
+    const outOfStockItems: string[] = [];
+    const insufficientStockItems: { name: string; available: number; requested: number }[] = [];
+
+    for (const orderItem of orderItems) {
+      const menuItem = menuItemMap.get(orderItem.menuItemId);
+      
+      if (!menuItem) {
+        return res.status(400).json({ 
+          error: `Menu item not found: ${orderItem.menuItemId}` 
+        });
+      }
+
+      // Check if item is unavailable
+      if (menuItem.availabilityStatus !== "available") {
+        outOfStockItems.push(menuItem.name);
+        continue;
+      }
+
+      // Check stock if tracking is enabled
+      if (menuItem.stockTrackingEnabled && menuItem.stockQuantity !== null) {
+        const requestedQty = orderItem.quantity || 1;
+        if (menuItem.stockQuantity < requestedQty) {
+          if (menuItem.stockQuantity === 0) {
+            outOfStockItems.push(menuItem.name);
+          } else {
+            insufficientStockItems.push({
+              name: menuItem.name,
+              available: menuItem.stockQuantity,
+              requested: requestedQty,
+            });
+          }
+        }
+      }
+    }
+
+    // Return stock errors if any
+    if (outOfStockItems.length > 0 || insufficientStockItems.length > 0) {
+      const errorMessages: string[] = [];
+      
+      if (outOfStockItems.length > 0) {
+        errorMessages.push(`Out of stock: ${outOfStockItems.join(", ")}`);
+      }
+      
+      if (insufficientStockItems.length > 0) {
+        const insufficientMsgs = insufficientStockItems.map(
+          item => `${item.name} (only ${item.available} available, requested ${item.requested})`
+        );
+        errorMessages.push(`Insufficient stock: ${insufficientMsgs.join(", ")}`);
+      }
+
+      return res.status(400).json({
+        error: "STOCK_ERROR",
+        message: errorMessages.join(". "),
+        outOfStockItems,
+        insufficientStockItems,
+      });
+    }
+
     // Calculate commission (15% for restaurant, 5% for driver delivery = 20% total)
     // Total fare = 100%
     // SafeGo commission = 20% (15% from restaurant + 5% from delivery)
@@ -87,25 +167,59 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
     const deliveryPayout = fare * deliveryFeeRate; // $5 on $100
     const restaurantPayout = fare - safegoCommission - deliveryPayout; // $75 on $100 ($100 - $20 - $5)
 
-    // Create food order
-    const foodOrder = await prisma.foodOrder.create({
-      data: {
-        id: crypto.randomUUID(),
-        customerId: customerProfile.id,
-        restaurantId,
-        deliveryAddress,
-        deliveryLat: parseFloat(deliveryLat.toString()),
-        deliveryLng: parseFloat(deliveryLng.toString()),
-        items: JSON.stringify(items),
-        serviceFare: parseFloat(serviceFare),
-        safegoCommission,
-        restaurantPayout,
-        driverPayout: deliveryPayout, // Required field for driver delivery fee
-        deliveryPayout, // Alias for compatibility
-        paymentMethod,
-        status: "placed",
-        updatedAt: new Date(),
-      },
+    // Use transaction to ensure atomic order creation and stock decrement
+    const orderId = crypto.randomUUID();
+    
+    const foodOrder = await prisma.$transaction(async (tx) => {
+      // First, decrement stock atomically for items with stock tracking
+      for (const orderItem of orderItems) {
+        const menuItem = menuItemMap.get(orderItem.menuItemId);
+        if (menuItem?.stockTrackingEnabled && menuItem.stockQuantity !== null) {
+          const requestedQty = orderItem.quantity || 1;
+          
+          // Re-validate stock within transaction to prevent overselling
+          const currentItem = await tx.menuItem.findUnique({
+            where: { id: orderItem.menuItemId },
+            select: { stockQuantity: true, name: true },
+          });
+          
+          if (currentItem?.stockQuantity !== null && currentItem.stockQuantity < requestedQty) {
+            throw new Error(`STOCK_CONFLICT:${currentItem.name || orderItem.menuItemId} stock changed during order. Please refresh and try again.`);
+          }
+          
+          await tx.menuItem.update({
+            where: { id: orderItem.menuItemId },
+            data: {
+              stockQuantity: {
+                decrement: requestedQty,
+              },
+            },
+          });
+        }
+      }
+
+      // Create food order
+      const newOrder = await tx.foodOrder.create({
+        data: {
+          id: orderId,
+          customerId: customerProfile.id,
+          restaurantId,
+          deliveryAddress,
+          deliveryLat: parseFloat(deliveryLat.toString()),
+          deliveryLng: parseFloat(deliveryLng.toString()),
+          items: JSON.stringify(orderItems),
+          serviceFare: parseFloat(serviceFare),
+          safegoCommission,
+          restaurantPayout,
+          driverPayout: deliveryPayout,
+          deliveryPayout,
+          paymentMethod,
+          status: "placed",
+          updatedAt: new Date(),
+        },
+      });
+
+      return newOrder;
     });
 
     // R6: Create earnings transaction for commission tracking
@@ -164,6 +278,200 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Create food order error:", error);
     res.status(500).json({ error: "Failed to create food order" });
+  }
+});
+
+// ====================================================
+// POST /api/food-orders/:id/cancel
+// Cancel a food order with automatic refund
+// Customer can only cancel before food is picked up
+// Uses transaction for atomicity and prevents double refunds
+// ====================================================
+router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { reason } = req.body;
+
+    // Only customers can cancel through this endpoint
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can cancel orders through this endpoint" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Use transaction to ensure atomic cancellation and prevent double refunds
+    const result = await prisma.$transaction(async (tx) => {
+      // Find and lock the order within transaction
+      const foodOrder = await tx.foodOrder.findUnique({
+        where: { id },
+        include: {
+          restaurant: true,
+        },
+      });
+
+      if (!foodOrder) {
+        throw new Error("ORDER_NOT_FOUND");
+      }
+
+      // Verify ownership
+      if (foodOrder.customerId !== customerProfile.id) {
+        throw new Error("ACCESS_DENIED");
+      }
+
+      // Check if order can be cancelled (idempotency check)
+      const cancellableStatuses = ["placed", "accepted", "preparing"];
+      if (!cancellableStatuses.includes(foodOrder.status)) {
+        throw new Error(`ORDER_NOT_CANCELLABLE:${foodOrder.status}`);
+      }
+
+      // Calculate refund amount based on order status
+      let refundPercentage = 100;
+      let refundReason = "Customer requested cancellation";
+
+      if (foodOrder.status === "preparing") {
+        refundPercentage = 80;
+        refundReason = "Partial refund - order was already being prepared";
+      }
+
+      const refundAmount = (Number(foodOrder.serviceFare) * refundPercentage) / 100;
+
+      // Update order status to cancelled atomically
+      const updatedOrder = await tx.foodOrder.update({
+        where: { id },
+        data: {
+          status: "cancelled",
+          cancelledAt: new Date(),
+          whoCancelled: "customer",
+          cancellationReason: reason || "Customer cancelled order",
+          refundStatus: foodOrder.paymentMethod === "online" ? "pending" : "not_applicable",
+          refundAmount,
+          refundReason: foodOrder.paymentMethod === "online" ? refundReason : "Cash order - no refund needed",
+          updatedAt: new Date(),
+        },
+      });
+
+      // Restore stock for cancelled items - only for items that have stock tracking
+      const orderItems = foodOrder.items ? JSON.parse(foodOrder.items) : [];
+      for (const item of orderItems) {
+        if (item.menuItemId && (item.quantity || 1) > 0) {
+          // Only increment stock for items that have stock tracking enabled
+          // Use updateMany with condition to avoid errors
+          await tx.menuItem.updateMany({
+            where: { 
+              id: item.menuItemId,
+              stockTrackingEnabled: true,
+              stockQuantity: { not: null },
+            },
+            data: {
+              stockQuantity: {
+                increment: item.quantity || 1,
+              },
+            },
+          });
+        }
+      }
+
+      return {
+        updatedOrder,
+        refundAmount,
+        refundPercentage,
+        paymentMethod: foodOrder.paymentMethod,
+        restaurantId: foodOrder.restaurantId,
+      };
+    });
+
+    // Process wallet refund outside transaction if payment was online
+    if (result.paymentMethod === "online") {
+      try {
+        await walletService.processRefund(
+          customerProfile.id,
+          result.refundAmount,
+          `Refund for cancelled order #${id.slice(-8)}`,
+          id
+        );
+
+        await prisma.foodOrder.update({
+          where: { id },
+          data: {
+            refundStatus: "completed",
+            refundedAt: new Date(),
+          },
+        });
+      } catch (refundError) {
+        console.error("Refund processing error:", refundError);
+        // Keep refund status as pending for manual processing
+      }
+    }
+
+    // Notify restaurant about cancellation
+    const restaurantUser = await prisma.user.findFirst({
+      where: { restaurantProfile: { id: result.restaurantId } },
+    });
+
+    if (restaurantUser) {
+      await prisma.notification.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId: restaurantUser.id,
+          type: "food_order_update",
+          title: "Order Cancelled",
+          body: `Order #${id.slice(-8)} has been cancelled by the customer.${reason ? ` Reason: ${reason}` : ""}`,
+        },
+      });
+    }
+
+    // Notify customer
+    await prisma.notification.create({
+      data: {
+        id: crypto.randomUUID(),
+        userId,
+        type: "food_order_update",
+        title: "Order Cancelled",
+        body: result.refundPercentage === 100 
+          ? `Your order has been cancelled. A full refund of $${result.refundAmount.toFixed(2)} will be processed.`
+          : `Your order has been cancelled. A ${result.refundPercentage}% refund of $${result.refundAmount.toFixed(2)} will be processed.`,
+      },
+    });
+
+    res.json({
+      message: "Order cancelled successfully",
+      order: {
+        id: result.updatedOrder.id,
+        status: result.updatedOrder.status,
+        cancelledAt: result.updatedOrder.cancelledAt,
+        refundStatus: result.updatedOrder.refundStatus,
+        refundAmount: result.refundAmount,
+        refundPercentage: result.refundPercentage,
+      },
+    });
+  } catch (error: any) {
+    console.error("Cancel food order error:", error);
+    
+    // Handle specific error types
+    if (error.message === "ORDER_NOT_FOUND") {
+      return res.status(404).json({ error: "Order not found" });
+    }
+    if (error.message === "ACCESS_DENIED") {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    if (error.message?.startsWith("ORDER_NOT_CANCELLABLE:")) {
+      const currentStatus = error.message.split(":")[1];
+      return res.status(400).json({ 
+        error: "ORDER_NOT_CANCELLABLE",
+        message: "This order cannot be cancelled. Orders can only be cancelled before food preparation is complete.",
+        currentStatus,
+      });
+    }
+    
+    res.status(500).json({ error: "Failed to cancel order" });
   }
 });
 

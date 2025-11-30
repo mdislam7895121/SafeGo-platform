@@ -695,4 +695,284 @@ router.get("/orders/:id/reorder", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// CUSTOMER DELIVERY ADDRESSES - CRUD
+// Multiple labeled addresses (Home, Work, Other)
+// ====================================================
+
+// GET /api/customer/food/addresses - List all saved addresses
+router.get("/addresses", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can access addresses" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const addresses = await prisma.customerAddress.findMany({
+      where: { customerProfileId: customerProfile.id },
+      orderBy: [
+        { isDefault: 'desc' }, // Default address first
+        { createdAt: 'desc' },
+      ],
+    });
+
+    res.json({ addresses });
+  } catch (error) {
+    console.error("[Customer Food] Get addresses error:", error);
+    res.status(500).json({ error: "Failed to fetch addresses" });
+  }
+});
+
+// POST /api/customer/food/addresses - Create a new address
+router.post("/addresses", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can add addresses" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const { label, customLabel, address, lat, lng, placeId, apartment, instructions, isDefault } = req.body;
+
+    // Validate required fields
+    if (!label || !address || lat === undefined || lng === undefined) {
+      return res.status(400).json({ error: "Label, address, latitude and longitude are required" });
+    }
+
+    // Validate label
+    if (!['home', 'work', 'other'].includes(label)) {
+      return res.status(400).json({ error: "Label must be home, work, or other" });
+    }
+
+    // If setting as default, unset other defaults
+    if (isDefault) {
+      await prisma.customerAddress.updateMany({
+        where: { 
+          customerProfileId: customerProfile.id,
+          isDefault: true,
+        },
+        data: { isDefault: false },
+      });
+    }
+
+    // Check if this is the first address (auto-set as default)
+    const existingAddressCount = await prisma.customerAddress.count({
+      where: { customerProfileId: customerProfile.id },
+    });
+
+    const newAddress = await prisma.customerAddress.create({
+      data: {
+        customerProfileId: customerProfile.id,
+        label,
+        customLabel: label === 'other' ? customLabel : null,
+        address,
+        lat,
+        lng,
+        placeId,
+        apartment,
+        instructions,
+        isDefault: existingAddressCount === 0 ? true : Boolean(isDefault),
+      },
+    });
+
+    res.status(201).json({ address: newAddress });
+  } catch (error) {
+    console.error("[Customer Food] Create address error:", error);
+    res.status(500).json({ error: "Failed to create address" });
+  }
+});
+
+// PATCH /api/customer/food/addresses/:id - Update an address
+router.patch("/addresses/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { id } = req.params;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can update addresses" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify address belongs to customer
+    const existingAddress = await prisma.customerAddress.findUnique({
+      where: { id },
+    });
+
+    if (!existingAddress || existingAddress.customerProfileId !== customerProfile.id) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
+    const { label, customLabel, address, lat, lng, placeId, apartment, instructions, isDefault } = req.body;
+
+    // Validate label if provided
+    if (label && !['home', 'work', 'other'].includes(label)) {
+      return res.status(400).json({ error: "Label must be home, work, or other" });
+    }
+
+    // If setting as default, unset other defaults
+    if (isDefault && !existingAddress.isDefault) {
+      await prisma.customerAddress.updateMany({
+        where: { 
+          customerProfileId: customerProfile.id,
+          isDefault: true,
+          id: { not: id },
+        },
+        data: { isDefault: false },
+      });
+    }
+
+    const updatedAddress = await prisma.customerAddress.update({
+      where: { id },
+      data: {
+        ...(label && { label }),
+        ...(label === 'other' && { customLabel }),
+        ...(label !== 'other' && { customLabel: null }),
+        ...(address && { address }),
+        ...(lat !== undefined && { lat }),
+        ...(lng !== undefined && { lng }),
+        ...(placeId !== undefined && { placeId }),
+        ...(apartment !== undefined && { apartment }),
+        ...(instructions !== undefined && { instructions }),
+        ...(isDefault !== undefined && { isDefault }),
+      },
+    });
+
+    res.json({ address: updatedAddress });
+  } catch (error) {
+    console.error("[Customer Food] Update address error:", error);
+    res.status(500).json({ error: "Failed to update address" });
+  }
+});
+
+// DELETE /api/customer/food/addresses/:id - Delete an address
+router.delete("/addresses/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { id } = req.params;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can delete addresses" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify address belongs to customer
+    const existingAddress = await prisma.customerAddress.findUnique({
+      where: { id },
+    });
+
+    if (!existingAddress || existingAddress.customerProfileId !== customerProfile.id) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
+    await prisma.customerAddress.delete({
+      where: { id },
+    });
+
+    // If deleted address was default, set another as default
+    if (existingAddress.isDefault) {
+      const nextAddress = await prisma.customerAddress.findFirst({
+        where: { customerProfileId: customerProfile.id },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (nextAddress) {
+        await prisma.customerAddress.update({
+          where: { id: nextAddress.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[Customer Food] Delete address error:", error);
+    res.status(500).json({ error: "Failed to delete address" });
+  }
+});
+
+// PATCH /api/customer/food/addresses/:id/set-default - Set address as default
+router.patch("/addresses/:id/set-default", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { id } = req.params;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can modify addresses" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify address belongs to customer
+    const existingAddress = await prisma.customerAddress.findUnique({
+      where: { id },
+    });
+
+    if (!existingAddress || existingAddress.customerProfileId !== customerProfile.id) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
+    // Unset all other defaults
+    await prisma.customerAddress.updateMany({
+      where: { 
+        customerProfileId: customerProfile.id,
+        isDefault: true,
+      },
+      data: { isDefault: false },
+    });
+
+    // Set this one as default
+    const updatedAddress = await prisma.customerAddress.update({
+      where: { id },
+      data: { isDefault: true },
+    });
+
+    res.json({ address: updatedAddress });
+  } catch (error) {
+    console.error("[Customer Food] Set default address error:", error);
+    res.status(500).json({ error: "Failed to set default address" });
+  }
+});
+
 export default router;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   ArrowLeft,
   Clock,
@@ -27,7 +40,9 @@ import {
   Store,
   Loader2,
   RefreshCw,
+  Ban,
 } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLiveFoodTracking } from "@/hooks/useLiveFoodTracking";
 import { 
   FOOD_ORDER_STATUS_INFO, 
@@ -178,6 +193,41 @@ export default function FoodOrderTracking() {
   const [, setLocationPath] = useLocation();
   const { toast } = useToast();
   const [showFullTimeline, setShowFullTimeline] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+
+  const cancelOrderMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const response = await apiRequest(`/api/food-orders/${id}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      return response;
+    },
+    onSuccess: (response: any) => {
+      setShowCancelDialog(false);
+      setCancelReason("");
+      queryClient.invalidateQueries({ queryKey: ["/api/food-orders", id] });
+      toast({
+        title: "Order Cancelled",
+        description: response.order?.refundAmount 
+          ? `Your order has been cancelled. A refund of $${response.order.refundAmount.toFixed(2)} will be processed.`
+          : "Your order has been cancelled.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Cancellation Failed",
+        description: error.message || "Could not cancel your order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isCancellable = (status: string) => {
+    return ["placed", "accepted", "preparing"].includes(status);
+  };
 
   const {
     data,
@@ -598,6 +648,84 @@ export default function FoodOrderTracking() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Cancel Order Button - only for cancellable orders */}
+        {isCancellable(data.status) && (
+          <Card className="border-orange-200 dark:border-orange-900">
+            <CardContent className="p-4">
+              <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    data-testid="button-cancel-order"
+                  >
+                    <Ban className="h-4 w-4 mr-2" />
+                    Cancel Order
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel Your Order?</AlertDialogTitle>
+                    <AlertDialogDescription asChild>
+                      <div className="space-y-3">
+                        <p>
+                          {data.status === "preparing" 
+                            ? "Since the restaurant has started preparing your order, you'll receive an 80% refund."
+                            : "You'll receive a full refund for this cancellation."}
+                        </p>
+                        <div>
+                          <label className="text-sm font-medium">Reason (optional)</label>
+                          <Textarea
+                            placeholder="Tell us why you're cancelling..."
+                            value={cancelReason}
+                            onChange={(e) => setCancelReason(e.target.value)}
+                            className="mt-1"
+                            disabled={cancelOrderMutation.isPending}
+                            data-testid="input-cancel-reason"
+                          />
+                        </div>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel 
+                      disabled={cancelOrderMutation.isPending}
+                      data-testid="button-cancel-dialog-close"
+                    >
+                      Keep Order
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (!cancelOrderMutation.isPending) {
+                          cancelOrderMutation.mutate(cancelReason);
+                        }
+                      }}
+                      disabled={cancelOrderMutation.isPending}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      data-testid="button-confirm-cancel"
+                    >
+                      {cancelOrderMutation.isPending ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Cancelling...
+                        </>
+                      ) : (
+                        "Yes, Cancel Order"
+                      )}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                {data.status === "preparing" 
+                  ? "An 80% refund will be issued as preparation has started"
+                  : "A full refund will be issued"}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Cancellation Info */}
         {data.cancellation && (

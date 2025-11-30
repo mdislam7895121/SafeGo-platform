@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/sheet";
 import { useEatsCart } from "@/contexts/EatsCartContext";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { GooglePlacesInput } from "@/components/rider/GooglePlacesInput";
 import { ensureGoogleMapsLoaded } from "@/hooks/useGoogleMaps";
@@ -134,11 +134,30 @@ function isCardExpiringSoon(expMonth: number, expYear: number): boolean {
 
 interface SavedAddress {
   id: string;
-  type: "home" | "work" | "saved";
+  type: "home" | "work" | "saved" | "other";
   label: string;
   address: string;
   lat?: number;
   lng?: number;
+  apartment?: string | null;
+  instructions?: string | null;
+  isDefault?: boolean;
+}
+
+interface CustomerAddressResponse {
+  id: string;
+  customerProfileId: string;
+  label: "home" | "work" | "other";
+  customLabel: string | null;
+  address: string;
+  lat: number;
+  lng: number;
+  placeId: string | null;
+  apartment: string | null;
+  instructions: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const cardBrandIcons: Record<string, any> = {
@@ -169,6 +188,8 @@ export default function FoodCheckout() {
     setSpecialInstructions,
     setPaymentMethod,
     setDeliveryAddress,
+    setPromoCode,
+    clearPromo,
     clearCart,
     getTotals,
     isEmpty,
@@ -216,33 +237,70 @@ export default function FoodCheckout() {
     retry: false,
   });
 
+  const { data: savedAddressesData } = useQuery<{ addresses: CustomerAddressResponse[] }>({
+    queryKey: ["/api/customer/food/addresses"],
+  });
+
   const walletBalance = walletData?.balance ?? 0;
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
   const savedAddresses = useMemo((): SavedAddress[] => {
-    if (!profileData) return [];
     const addresses: SavedAddress[] = [];
     
-    if (profileData.homeAddress || profileData.presentAddress) {
-      addresses.push({
-        id: "home",
-        type: "home",
-        label: "Home",
-        address: profileData.homeAddress || profileData.presentAddress || "",
+    if (savedAddressesData?.addresses?.length) {
+      savedAddressesData.addresses.forEach(addr => {
+        const displayLabel = addr.label === 'other' && addr.customLabel 
+          ? addr.customLabel 
+          : addr.label.charAt(0).toUpperCase() + addr.label.slice(1);
+        
+        addresses.push({
+          id: addr.id,
+          type: addr.label,
+          label: displayLabel,
+          address: addr.address,
+          lat: addr.lat,
+          lng: addr.lng,
+          apartment: addr.apartment,
+          instructions: addr.instructions,
+          isDefault: addr.isDefault,
+        });
       });
-    }
-    
-    if (profileData.workAddress) {
-      addresses.push({
-        id: "work",
-        type: "work",
-        label: "Work",
-        address: profileData.workAddress,
-      });
+    } else if (profileData) {
+      if (profileData.homeAddress || profileData.presentAddress) {
+        addresses.push({
+          id: "home",
+          type: "home",
+          label: "Home",
+          address: profileData.homeAddress || profileData.presentAddress || "",
+        });
+      }
+      
+      if (profileData.workAddress) {
+        addresses.push({
+          id: "work",
+          type: "work",
+          label: "Work",
+          address: profileData.workAddress,
+        });
+      }
     }
     
     return addresses;
-  }, [profileData]);
+  }, [profileData, savedAddressesData]);
+
+  useEffect(() => {
+    if (!state.deliveryAddress && savedAddresses.length > 0) {
+      const defaultAddr = savedAddresses.find(a => a.isDefault) || savedAddresses[0];
+      if (defaultAddr.lat && defaultAddr.lng) {
+        setDeliveryAddress({
+          address: defaultAddr.address,
+          lat: defaultAddr.lat,
+          lng: defaultAddr.lng,
+          label: defaultAddr.label,
+        });
+      }
+    }
+  }, [savedAddresses, state.deliveryAddress, setDeliveryAddress]);
 
   const paymentMethods = paymentMethodsData?.paymentMethods || [];
   const defaultPaymentMethod = paymentMethods.find(pm => pm.isDefault) || paymentMethods[0];
@@ -290,6 +348,46 @@ export default function FoodCheckout() {
       });
     },
   });
+
+  const validatePromoMutation = useMutation({
+    mutationFn: async (promoCode: string) => {
+      const response = await apiRequest("/api/coupons/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurantId: state.restaurant?.id,
+          customerId: profileData?.id,
+          subtotal: totals.subtotal,
+          couponCode: promoCode,
+          currency: "USD",
+        }),
+      });
+      return response;
+    },
+    onSuccess: (response: any) => {
+      if (response.valid) {
+        setPromoCode(promoInput, response.discountAmount, response.isFreeDelivery);
+        setPromoInput("");
+        toast({
+          title: "Promo Applied",
+          description: response.messages?.[0] || `You saved $${response.discountAmount.toFixed(2)}!`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      const message = error.message || "Invalid promo code";
+      toast({
+        title: "Invalid Promo",
+        description: message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleApplyPromo = () => {
+    if (!promoInput.trim()) return;
+    validatePromoMutation.mutate(promoInput.trim().toUpperCase());
+  };
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -945,18 +1043,32 @@ export default function FoodCheckout() {
               />
               <Button 
                 variant="outline"
-                disabled={!promoInput.trim()}
+                disabled={!promoInput.trim() || validatePromoMutation.isPending}
+                onClick={handleApplyPromo}
                 data-testid="button-apply-promo"
               >
-                Apply
+                {validatePromoMutation.isPending ? "Applying..." : "Apply"}
               </Button>
             </div>
             {state.promoCode && (
               <div className="mt-2 flex items-center justify-between">
-                <Badge variant="secondary" className="gap-1">
-                  {state.promoCode}
-                </Badge>
-                <span className="text-sm text-green-600">-${state.promoDiscount.toFixed(2)}</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="gap-1" data-testid="badge-promo-applied">
+                    {state.promoCode}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => clearPromo()}
+                    className="h-6 px-2 text-muted-foreground hover:text-destructive"
+                    data-testid="button-remove-promo"
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+                <span className="text-sm text-green-600" data-testid="text-promo-savings">
+                  {state.promoFreeDelivery ? "Free Delivery!" : `-$${state.promoDiscount.toFixed(2)}`}
+                </span>
               </div>
             )}
           </CardContent>
@@ -1071,17 +1183,29 @@ export default function FoodCheckout() {
                     <div className={`h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 ${
                       address.type === "home" 
                         ? "bg-blue-100 dark:bg-blue-950" 
-                        : "bg-green-100 dark:bg-green-950"
+                        : address.type === "work"
+                        ? "bg-green-100 dark:bg-green-950"
+                        : "bg-purple-100 dark:bg-purple-950"
                     }`}>
                       {address.type === "home" ? (
                         <Home className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      ) : (
+                      ) : address.type === "work" ? (
                         <Briefcase className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      ) : (
+                        <MapPin className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium">{address.label}</p>
-                      <p className="text-sm text-muted-foreground line-clamp-2">{address.address}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{address.label}</p>
+                        {address.isDefault && (
+                          <Badge variant="secondary" className="text-xs">Default</Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-1">{address.address}</p>
+                      {address.apartment && (
+                        <p className="text-xs text-muted-foreground">Apt: {address.apartment}</p>
+                      )}
                     </div>
                     {isGeocodingAddress ? (
                       <Loader2 className="h-5 w-5 text-muted-foreground flex-shrink-0 animate-spin" />
@@ -1112,9 +1236,23 @@ export default function FoodCheckout() {
               <div className="text-center py-6 text-muted-foreground">
                 <MapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
                 <p className="text-sm">No saved addresses yet</p>
-                <p className="text-xs">Add addresses in your profile for quick checkout</p>
+                <p className="text-xs">Add addresses for quick checkout</p>
               </div>
             )}
+
+            <div className="pt-4 border-t">
+              <Link href="/customer/delivery-addresses">
+                <Button 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={() => setShowAddressSheet(false)}
+                  data-testid="button-manage-addresses"
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Manage Saved Addresses
+                </Button>
+              </Link>
+            </div>
           </div>
         </SheetContent>
       </Sheet>
