@@ -3,6 +3,7 @@ import { Link, useParams, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
+import { CustomerHomeButton, BackToRestaurantsButton } from "@/components/customer/EatsNavigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -313,13 +314,20 @@ export default function FoodOrderTracking() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-          <div className="flex items-center gap-4">
-            <Link href="/customer/food">
-              <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
-            </Link>
-            <Skeleton className="h-8 w-48 bg-primary-foreground/20" />
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Link href="/customer/food/orders">
+                <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
+                  <ArrowLeft className="h-6 w-6" />
+                </Button>
+              </Link>
+              <Skeleton className="h-8 w-48 bg-primary-foreground/20" />
+            </div>
+            <CustomerHomeButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
           </div>
         </header>
         <div className="p-6 space-y-6">
@@ -334,13 +342,20 @@ export default function FoodOrderTracking() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-          <div className="flex items-center gap-4">
-            <Link href="/customer/food">
-              <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">Order Tracking</h1>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Link href="/customer/food/orders">
+                <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
+                  <ArrowLeft className="h-6 w-6" />
+                </Button>
+              </Link>
+              <h1 className="text-2xl font-bold">Order Tracking</h1>
+            </div>
+            <CustomerHomeButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
           </div>
         </header>
         <div className="p-6">
@@ -368,7 +383,7 @@ export default function FoodOrderTracking() {
       <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/customer/food">
+            <Link href="/customer/food/orders">
               <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
                 <ArrowLeft className="h-6 w-6" />
               </Button>
@@ -378,15 +393,22 @@ export default function FoodOrderTracking() {
               <p className="text-sm opacity-90">{data.restaurant.name}</p>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-primary-foreground" 
-            onClick={() => refetch()}
-            data-testid="button-refresh"
-          >
-            <RefreshCw className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-primary-foreground" 
+              onClick={() => refetch()}
+              data-testid="button-refresh"
+            >
+              <RefreshCw className={`h-5 w-5 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
+            <CustomerHomeButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
+          </div>
         </div>
       </header>
 

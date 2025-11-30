@@ -1,8 +1,9 @@
 import { Link, useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Minus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle, Info, Tag, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Minus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle, Info, Tag, ShoppingCart, Home } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { CustomerHomeButton, BackToRestaurantsButton } from "@/components/customer/EatsNavigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -469,13 +470,20 @@ export default function FoodRestaurantDetails() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-          <div className="flex items-center gap-4">
-            <Link href="/customer/food">
-              <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold">Restaurant</h1>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <BackToRestaurantsButton 
+                variant="ghost" 
+                size="sm" 
+                className="text-primary-foreground"
+              />
+              <h1 className="text-2xl font-bold">Restaurant</h1>
+            </div>
+            <CustomerHomeButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
           </div>
         </header>
 
@@ -506,18 +514,18 @@ export default function FoodRestaurantDetails() {
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent" />
           
-          {/* Back button overlay */}
-          <div className="absolute top-4 left-4">
-            <Link href="/customer/food">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-white bg-black/30 hover:bg-black/50"
-                data-testid="button-back"
-              >
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
-            </Link>
+          {/* Navigation buttons overlay */}
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+            <BackToRestaurantsButton 
+              variant="ghost" 
+              size="sm"
+              className="text-white bg-black/30 hover:bg-black/50"
+            />
+            <CustomerHomeButton 
+              variant="ghost" 
+              size="sm"
+              className="text-white bg-black/30 hover:bg-black/50"
+            />
           </div>
 
           {/* Logo overlay */}
@@ -543,11 +551,11 @@ export default function FoodRestaurantDetails() {
           style={headerStyle}
         >
           <div className="flex items-center gap-4">
-            <Link href="/customer/food">
-              <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
-            </Link>
+            <BackToRestaurantsButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
             <div className="flex-1 flex items-center gap-3">
               {branding?.logoUrl && (
                 <div className="h-12 w-12 rounded-lg overflow-hidden border-2 border-primary-foreground/20">
@@ -570,6 +578,11 @@ export default function FoodRestaurantDetails() {
                 </div>
               )}
             </div>
+            <CustomerHomeButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
           </div>
         </header>
       )}

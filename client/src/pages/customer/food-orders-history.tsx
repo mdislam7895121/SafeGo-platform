@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Store,
 } from "lucide-react";
+import { CustomerHomeButton, BackToRestaurantsButton } from "@/components/customer/EatsNavigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -326,16 +327,23 @@ export default function FoodOrdersHistory() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-        <div className="flex items-center gap-4">
-          <Link href="/customer/home">
-            <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-              <ArrowLeft className="h-6 w-6" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Order History</h1>
-            <p className="text-sm opacity-90">{orders.length} orders</p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <BackToRestaurantsButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
+            <div>
+              <h1 className="text-2xl font-bold">Order History</h1>
+              <p className="text-sm opacity-90">{orders.length} orders</p>
+            </div>
           </div>
+          <CustomerHomeButton 
+            variant="ghost" 
+            size="sm" 
+            className="text-primary-foreground"
+          />
         </div>
       </header>
 

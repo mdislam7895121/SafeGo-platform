@@ -5,6 +5,7 @@ import {
   AlertCircle, Store, Clock, CheckCircle, Shield, Home, Briefcase, ChevronRight,
   Loader2, X, DollarSign, Heart
 } from "lucide-react";
+import { CustomerHomeButton, BackToRestaurantsButton } from "@/components/customer/EatsNavigation";
 import { SiVisa, SiMastercard, SiAmericanexpress } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -698,13 +699,20 @@ export default function FoodCheckout() {
     return (
       <div className="min-h-screen bg-background pb-20">
         <header className="bg-primary text-primary-foreground p-4 sm:p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <Link href="/customer/food">
-              <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <h1 className="text-xl sm:text-2xl font-bold">Your Cart</h1>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <BackToRestaurantsButton 
+                variant="ghost" 
+                size="sm" 
+                className="text-primary-foreground"
+              />
+              <h1 className="text-xl sm:text-2xl font-bold">Your Cart</h1>
+            </div>
+            <CustomerHomeButton 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary-foreground"
+            />
           </div>
         </header>
 
@@ -731,18 +739,25 @@ export default function FoodCheckout() {
   return (
     <div className="min-h-screen bg-background pb-24 sm:pb-28">
       <header className="bg-primary text-primary-foreground p-4 sm:p-6 rounded-b-3xl shadow-lg sticky top-0 z-10">
-        <div className="flex items-center gap-3">
-          <Link href={state.restaurant ? `/customer/food/${state.restaurant.id}` : "/customer/food"}>
-            <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold">Checkout</h1>
-            {state.restaurant && (
-              <p className="text-sm opacity-90 truncate max-w-[250px]">{state.restaurant.name}</p>
-            )}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link href={state.restaurant ? `/customer/food/${state.restaurant.id}` : "/customer/food"}>
+              <Button variant="ghost" size="icon" className="text-primary-foreground" data-testid="button-back">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold">Checkout</h1>
+              {state.restaurant && (
+                <p className="text-sm opacity-90 truncate max-w-[250px]">{state.restaurant.name}</p>
+              )}
+            </div>
           </div>
+          <CustomerHomeButton 
+            variant="ghost" 
+            size="sm" 
+            className="text-primary-foreground"
+          />
         </div>
       </header>
 
