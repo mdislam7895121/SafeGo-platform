@@ -55,14 +55,16 @@ router.get("/:id/pricing", authenticateToken, async (req: AuthRequest, res) => {
     // City/Country matching for location-based pricing
     if (customer.user.countryCode !== restaurant.user.countryCode) {
       return res.status(403).json({
-        error: "location_mismatch",
+        error: "country_mismatch",
         message: "Restaurant not available in your country",
       });
     }
 
-    if (customer.cityCode && restaurant.cityCode && customer.cityCode !== restaurant.cityCode) {
+    // City matching: allow if restaurant is nationwide (null) or customer is in same city
+    const cityMatch = !restaurant.cityCode || restaurant.cityCode === customer.cityCode;
+    if (!cityMatch) {
       return res.status(403).json({
-        error: "location_mismatch",
+        error: "city_mismatch",
         message: "Restaurant not available in your city",
       });
     }
@@ -81,13 +83,13 @@ router.get("/:id/pricing", authenticateToken, async (req: AuthRequest, res) => {
     const todayHours = await prisma.restaurantHours.findFirst({
       where: {
         restaurantId,
-        dayOfWeek: currentDayOfWeek,
+        dayOfWeek: currentDayOfWeek as any,
       },
     });
 
     // Calculate real-time open status
     let isOpen = false;
-    if (todayHours && !todayHours.isClosed && !operational?.isClosed) {
+    if (todayHours && !todayHours.isClosed && !operational?.isTemporarilyClosed) {
       const { openTime1, closeTime1, openTime2, closeTime2 } = todayHours;
       
       // Check if within first shift
@@ -114,13 +116,13 @@ router.get("/:id/pricing", authenticateToken, async (req: AuthRequest, res) => {
     let surgeMultiplier = 1.0;
     let surgeReason = null;
 
-    if (surgeSettings?.isEnabled && isOpen) {
+    if (surgeSettings?.surgeEnabled && isOpen) {
       // Check time-based surge (peak hours)
       const peakHours = (surgeSettings.peakHours as string[]) || [];
       const currentHour = now.getHours();
       
       if (peakHours.includes(String(currentHour))) {
-        surgeMultiplier = Math.max(surgeMultiplier, Number(surgeSettings.peakHoursMultiplier) || 1.0);
+        surgeMultiplier = Math.max(surgeMultiplier, Number(surgeSettings.surgeMultiplier) || 1.0);
         surgeReason = "peak_hours";
       }
 
@@ -137,8 +139,14 @@ router.get("/:id/pricing", authenticateToken, async (req: AuthRequest, res) => {
 
     // Check throttling status (high demand indicator)
     let isThrottled = false;
-    if (operational?.maxConcurrentOrders && operational.activeOrderCount) {
-      const utilizationRate = operational.activeOrderCount / operational.maxConcurrentOrders;
+    if (operational?.maxConcurrentOrders) {
+      const activeOrderCount = await prisma.foodOrder.count({
+        where: {
+          restaurantId,
+          status: { in: ["placed", "confirmed", "preparing", "ready_for_pickup"] },
+        },
+      });
+      const utilizationRate = activeOrderCount / operational.maxConcurrentOrders;
       isThrottled = utilizationRate >= 0.8; // 80% capacity = throttled
     }
 
@@ -268,11 +276,14 @@ router.get("/:id/pricing", authenticateToken, async (req: AuthRequest, res) => {
     // Audit log for pricing view
     await prisma.auditLog.create({
       data: {
-        adminId: null, // Customer action
-        action: "pricing_view",
-        targetType: "restaurant_pricing",
-        targetId: restaurantId,
-        details: {
+        actorId: customer.id,
+        actorEmail: customer.user.email,
+        actorRole: "customer",
+        actionType: "PRICING_VIEW",
+        entityType: "restaurant_pricing",
+        entityId: restaurantId,
+        description: `Customer viewed pricing for restaurant ${restaurantId}`,
+        metadata: {
           customerId: customer.id,
           surgeMultiplier,
           bestDiscountPercent,
@@ -280,7 +291,7 @@ router.get("/:id/pricing", authenticateToken, async (req: AuthRequest, res) => {
           isThrottled,
         },
         ipAddress: req.ip || null,
-        userAgent: req.get("User-Agent") || null,
+        success: true,
       },
     });
 

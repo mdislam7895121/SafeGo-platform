@@ -82,13 +82,17 @@ router.get("/:id/status", authenticateToken, async (req: AuthRequest, res) => {
     }
 
     // Get customer profile with KYC and location verification
-    const customer = await prisma.customer.findUnique({
+    const customer = await prisma.customerProfile.findUnique({
       where: { userId },
       select: {
         id: true,
         isVerified: true,
         cityCode: true,
-        countryCode: true,
+        user: {
+          select: {
+            countryCode: true,
+          },
+        },
       },
     });
 
@@ -116,11 +120,22 @@ router.get("/:id/status", authenticateToken, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Restaurant not found" });
     }
 
-    // Enforce country/city matching - hide restaurants in different cities
-    if (customer.countryCode !== restaurant.countryCode || customer.cityCode !== restaurant.cityCode) {
+    // Enforce country/city matching - hide restaurants in different countries
+    // Restaurants with cityCode = null are nationwide and accessible to all customers in that country
+    const customerCountryCode = customer.user?.countryCode;
+    if (customerCountryCode !== restaurant.countryCode) {
       return res.status(403).json({ 
-        error: "Restaurant not available in your area",
-        reason: "location_mismatch" 
+        error: "Restaurant not available in your country",
+        reason: "country_mismatch" 
+      });
+    }
+    
+    // City matching: allow if restaurant is nationwide (null) or customer is in same city
+    const cityMatch = !restaurant.cityCode || restaurant.cityCode === customer.cityCode;
+    if (!cityMatch) {
+      return res.status(403).json({ 
+        error: "Restaurant not available in your city",
+        reason: "city_mismatch" 
       });
     }
 
@@ -151,7 +166,7 @@ router.get("/:id/status", authenticateToken, async (req: AuthRequest, res) => {
     const { isOpen, todayHours } = isRestaurantOpen(hours, currentTime);
 
     // Check if temporarily closed (admin/owner override)
-    const isTemporarilyClosed = operational?.temporarilyClosed || false;
+    const isTemporarilyClosed = operational?.isTemporarilyClosed || false;
     const temporaryCloseReason = operational?.temporaryCloseReason || null;
 
     // Count active orders for throttling check
