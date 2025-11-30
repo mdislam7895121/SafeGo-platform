@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useParams, useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ import {
   Loader2,
   RefreshCw,
   Ban,
+  Receipt,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLiveFoodTracking } from "@/hooks/useLiveFoodTracking";
@@ -52,6 +53,7 @@ import {
   type FoodOrderStatus 
 } from "@shared/foodOrderStatus";
 import { useToast } from "@/hooks/use-toast";
+import { ReviewSubmissionDialog } from "@/components/customer/ReviewSubmissionDialog";
 
 const STATUS_ICON_MAP: Record<string, typeof Clock> = {
   ClipboardCheck,
@@ -195,6 +197,8 @@ export default function FoodOrderTracking() {
   const [showFullTimeline, setShowFullTimeline] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [reviewPromptDismissed, setReviewPromptDismissed] = useState(false);
 
   const cancelOrderMutation = useMutation({
     mutationFn: async (reason: string) => {
@@ -749,6 +753,68 @@ export default function FoodOrderTracking() {
           </Card>
         )}
 
+        {/* Review Prompt - Show when order is delivered and not yet reviewed */}
+        {data.status === "delivered" && !data.hasReview && !reviewPromptDismissed && (
+          <Card className="border-primary bg-primary/5">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Star className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg">How was your order?</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Share your experience with {data.restaurant.name} to help others
+                  </p>
+                  <div className="flex gap-3 mt-4">
+                    <Button 
+                      onClick={() => setShowReviewDialog(true)}
+                      data-testid="button-leave-review"
+                    >
+                      <Star className="h-4 w-4 mr-2" />
+                      Leave a Review
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      onClick={() => setReviewPromptDismissed(true)}
+                      data-testid="button-dismiss-review-prompt"
+                    >
+                      Maybe Later
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Quick Actions for Delivered Orders */}
+        {data.status === "delivered" && (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex gap-3">
+                <Link href={`/customer/food-orders/${id}/receipt`} className="flex-1">
+                  <Button variant="outline" className="w-full" data-testid="button-view-receipt">
+                    <Receipt className="h-4 w-4 mr-2" />
+                    View Receipt
+                  </Button>
+                </Link>
+                {!data.hasReview && (
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => setShowReviewDialog(true)}
+                    data-testid="button-rate-order"
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    Rate Order
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Help Section */}
         <Card>
           <CardHeader className="pb-2">
@@ -803,6 +869,18 @@ export default function FoodOrderTracking() {
           100% { transform: scale(1); opacity: 0.7; }
         }
       `}</style>
+
+      {/* Review Submission Dialog */}
+      <ReviewSubmissionDialog
+        open={showReviewDialog}
+        onOpenChange={setShowReviewDialog}
+        orderId={id || ""}
+        restaurantName={data?.restaurant.name || "Restaurant"}
+        onSuccess={() => {
+          refetch();
+          setReviewPromptDismissed(true);
+        }}
+      />
     </div>
   );
 }

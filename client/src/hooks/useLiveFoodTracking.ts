@@ -76,6 +76,7 @@ export interface FoodTrackingData {
     cancelledBy: string | null;
     reason: string | null;
   } | null;
+  hasReview: boolean;
 }
 
 export interface UseLiveFoodTrackingResult {

@@ -726,7 +726,10 @@ router.get("/reviews/my", async (req: AuthRequest, res) => {
         reviewText: review.reviewText,
         images: review.images,
         isHidden: review.isHidden,
+        adminFlagged: review.adminFlagged,
         createdAt: review.createdAt,
+        restaurantReplyText: review.restaurantReplyText,
+        restaurantRepliedAt: review.restaurantRepliedAt,
       })),
     });
   } catch (error: any) {

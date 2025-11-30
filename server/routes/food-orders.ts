@@ -1091,6 +1091,15 @@ router.get("/:id/live-tracking", async (req: AuthRequest, res) => {
       items = [];
     }
 
+    // Check if customer has already reviewed this order
+    const existingReview = await prisma.review.findFirst({
+      where: {
+        orderId: foodOrder.id,
+        customerId: foodOrder.customerId,
+      },
+      select: { id: true },
+    });
+
     const activeVehicle = foodOrder.driver?.vehicles?.[0] || null;
 
     const trackingData = {
@@ -1166,6 +1175,9 @@ router.get("/:id/live-tracking", async (req: AuthRequest, res) => {
         cancelledBy: foodOrder.whoCancelled,
         reason: foodOrder.cancellationReason,
       } : null,
+
+      // Review status
+      hasReview: !!existingReview,
     };
 
     res.json(trackingData);
