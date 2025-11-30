@@ -291,7 +291,8 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
       include: {
         menuItems: {
           where: {
-            isActive: true,
+            availabilityStatus: 'available',
+            isArchived: false,
           },
           orderBy: {
             displayOrder: 'asc',
@@ -304,17 +305,17 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
     });
 
     // Format response (customer-facing only)
-    const formattedCategories = categories.map((category: typeof categories[0]) => ({
+    const formattedCategories = categories.map((category) => ({
       id: category.id,
       name: category.name,
       description: category.description || '',
-      items: category.menuItems.map((item: typeof category.menuItems[0]) => ({
+      items: category.menuItems.map((item) => ({
         id: item.id,
         name: item.name,
-        description: item.description || '',
-        price: parseFloat(item.price.toString()), // Convert Decimal to number
-        imageUrl: item.imageUrl,
-        isAvailable: item.isAvailable,
+        description: item.shortDescription || item.longDescription || '',
+        price: parseFloat(item.basePrice.toString()),
+        imageUrl: item.itemImageUrl,
+        isAvailable: item.availabilityStatus === 'available',
       })),
     }));
 
