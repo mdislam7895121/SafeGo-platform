@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Navigation,
   Crosshair,
-  Layers,
   MapPin,
   Car,
   UtensilsCrossed,
@@ -18,10 +17,23 @@ import {
   Route,
   Clock,
   Signal,
+  SignalHigh,
+  SignalMedium,
+  SignalLow,
+  SignalZero,
+  Power,
+  History,
+  DollarSign,
+  ShieldAlert,
+  Plus,
+  Minus,
+  Menu,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,13 +42,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { useToast } from "@/hooks/use-toast";
 import { SafeGoMap, type ActiveLeg, type MapLocation } from "@/components/maps/SafeGoMap";
 import { useDriverNavigation } from "@/hooks/useDriverNavigation";
+import { useDriverAvailability } from "@/hooks/useDriverAvailability";
+import { IncomingTripRequest, type TripRequest } from "@/components/driver/IncomingTripRequest";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   NavigationProvider,
   NAVIGATION_PROVIDERS,
-  isExternalProvider,
 } from "@/lib/navigationProviders";
 
 interface ActiveTrip {
@@ -98,19 +119,45 @@ function triggerHapticFeedback(type: "light" | "medium" | "heavy" = "medium") {
   }
 }
 
+function GpsSignalIcon({ strength }: { strength: "strong" | "medium" | "weak" | "none" }) {
+  switch (strength) {
+    case "strong":
+      return <SignalHigh className="h-5 w-5 text-green-500" />;
+    case "medium":
+      return <SignalMedium className="h-5 w-5 text-yellow-500" />;
+    case "weak":
+      return <SignalLow className="h-5 w-5 text-orange-500" />;
+    default:
+      return <SignalZero className="h-5 w-5 text-gray-400" />;
+  }
+}
+
 export default function DriverMapPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
   const tripIdFromUrl = new URLSearchParams(searchParams).get("tripId");
   
-  const [driverPosition, setDriverPosition] = useState<MapLocation | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [liveDistance, setLiveDistance] = useState<number | null>(null);
   const [liveEta, setLiveEta] = useState<number | null>(null);
   const [showTripPanel, setShowTripPanel] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [autoFollowEnabled, setAutoFollowEnabled] = useState(true);
+  const [showSosSheet, setShowSosSheet] = useState(false);
+  const [incomingRequest, setIncomingRequest] = useState<TripRequest | null>(null);
+
+  const {
+    isOnline,
+    isUpdatingStatus,
+    isLoading: isLoadingAvailability,
+    isVerified,
+    hasVehicle,
+    toggleOnlineStatus,
+    driverLocation,
+    gpsStatus,
+    profile,
+  } = useDriverAvailability();
 
   const { data: activeTripData, isLoading, error } = useQuery<{
     activeTrip: ActiveTrip | null;
@@ -120,20 +167,91 @@ export default function DriverMapPage() {
     refetchInterval: 5000,
   });
 
+  const { data: pendingRequestsData, refetch: refetchPendingRequests } = useQuery<{
+    pendingRequests: TripRequest[];
+  }>({
+    queryKey: ["/api/driver/pending-requests"],
+    refetchInterval: 3000,
+    enabled: isOnline && !activeTripData?.hasActiveTrip,
+  });
+
+  const { data: notificationsData } = useQuery<{ notifications: any[] }>({
+    queryKey: ["/api/driver/notifications"],
+    refetchInterval: 30000,
+  });
+
+  const acceptTripMutation = useMutation({
+    mutationFn: async ({ tripId, serviceType }: { tripId: string; serviceType: string }) => {
+      if (serviceType === "FOOD") {
+        return apiRequest("/api/driver/food-delivery/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deliveryId: tripId }),
+        });
+      }
+      return apiRequest(`/api/driver/rides/${tripId}/accept`, { method: "POST" });
+    },
+    onSuccess: (_, { serviceType }) => {
+      toast({ title: "Trip accepted", description: "Navigate to pickup location" });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/trips/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/pending-requests"] });
+      setIncomingRequest(null);
+      if (serviceType === "FOOD") {
+        setLocation("/driver/food-delivery-active");
+      } else {
+        setLocation("/driver/trip-active");
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to accept", description: error.message, variant: "destructive" });
+      setIncomingRequest(null);
+    },
+  });
+
+  const declineTripMutation = useMutation({
+    mutationFn: async ({ tripId, serviceType, reason }: { tripId: string; serviceType: string; reason?: string }) => {
+      if (serviceType === "FOOD") {
+        return apiRequest("/api/driver/food-delivery/reject", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deliveryId: tripId, reason }),
+        });
+      }
+      return apiRequest(`/api/driver/rides/${tripId}/decline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Request declined" });
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/pending-requests"] });
+      setIncomingRequest(null);
+    },
+    onError: () => {
+      setIncomingRequest(null);
+    },
+  });
+
+  useEffect(() => {
+    const requests = pendingRequestsData?.pendingRequests;
+    if (requests && requests.length > 0 && !incomingRequest && !activeTripData?.hasActiveTrip) {
+      setIncomingRequest(requests[0]);
+    }
+  }, [pendingRequestsData, incomingRequest, activeTripData?.hasActiveTrip]);
+
   const activeTrip = activeTripData?.activeTrip;
+
+  const driverPosition: MapLocation | null = driverLocation 
+    ? { lat: driverLocation.lat, lng: driverLocation.lng, heading: driverLocation.heading ?? undefined }
+    : null;
 
   const {
     preferences,
     providers,
     currentProvider,
-    showTraffic,
-    autoRecalculate,
     setPreference,
     openInExternalMap,
-    toggleTrafficLayer,
-    logNavigationEvent,
-    isHeadingToPickup,
-    targetCoordinates,
   } = useDriverNavigation({
     activeTrip: activeTrip
       ? {
@@ -151,33 +269,12 @@ export default function DriverMapPage() {
   });
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGpsError("Geolocation is not supported by your browser");
-      return;
+    if (gpsStatus.error) {
+      setGpsError(gpsStatus.error);
+    } else {
+      setGpsError(null);
     }
-
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        setDriverPosition({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          heading: position.coords.heading ?? undefined,
-        });
-        setGpsError(null);
-      },
-      (err) => {
-        console.warn("GPS error:", err.message);
-        setGpsError(err.message);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 15000,
-      }
-    );
-
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+  }, [gpsStatus.error]);
 
   const handleDistanceCalculated = useCallback(
     (distanceKm: number, etaMinutes: number) => {
@@ -214,6 +311,19 @@ export default function DriverMapPage() {
     },
     [activeTrip, setPreference, openInExternalMap, toast]
   );
+
+  const handleAcceptTrip = useCallback((tripId: string, serviceType: string) => {
+    acceptTripMutation.mutate({ tripId, serviceType });
+  }, [acceptTripMutation]);
+
+  const handleDeclineTrip = useCallback((tripId: string, serviceType: string, reason?: string) => {
+    declineTripMutation.mutate({ tripId, serviceType, reason });
+  }, [declineTripMutation]);
+
+  const handleExpireTrip = useCallback((tripId: string) => {
+    setIncomingRequest(null);
+    queryClient.invalidateQueries({ queryKey: ["/api/driver/pending-requests"] });
+  }, []);
 
   const getActiveLeg = (): ActiveLeg => {
     if (!activeTrip) return "to_pickup";
@@ -258,6 +368,8 @@ export default function DriverMapPage() {
     return { lat: 40.7128, lng: -74.006 };
   }, [driverPosition, pickupLocation]);
 
+  const unreadNotifications = notificationsData?.notifications?.filter((n: any) => !n.isRead).length ?? 0;
+
   if (isLoading && !activeTripData) {
     return (
       <div className="flex items-center justify-center min-h-[80vh]">
@@ -292,9 +404,59 @@ export default function DriverMapPage() {
           className="h-full w-full"
         />
 
+        <div
+          className="absolute top-4 left-4 right-4 z-[1000]"
+          data-testid="driver-status-card"
+        >
+          <Card className="shadow-lg bg-background/95 backdrop-blur-sm border-2 border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex-shrink-0">
+                    <GpsSignalIcon strength={gpsStatus.signalStrength} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 
+                        className="font-semibold text-base truncate"
+                        data-testid="text-driver-status"
+                      >
+                        {isOnline ? "You're Online" : "You're Offline"}
+                      </h3>
+                      {isOnline && (
+                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {isOnline 
+                        ? activeTrip 
+                          ? "Trip in progress" 
+                          : "Waiting for trip requests..."
+                        : "Go online to start getting trips"
+                      }
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {isVerified && hasVehicle && (
+                    <Switch
+                      checked={isOnline}
+                      onCheckedChange={toggleOnlineStatus}
+                      disabled={isUpdatingStatus}
+                      className={`${isOnline ? "data-[state=checked]:bg-green-500" : ""}`}
+                      data-testid="switch-online-status"
+                    />
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {gpsError && (
           <div
-            className="absolute top-20 left-3 right-3 z-[1000]"
+            className="absolute top-28 left-4 right-4 z-[1000]"
             data-testid="gps-error-banner"
           >
             <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
@@ -313,7 +475,121 @@ export default function DriverMapPage() {
           </div>
         )}
 
-        <div className="absolute bottom-4 right-4 z-[1000] flex flex-col gap-2">
+        <div className="absolute top-4 right-4 z-[1001] flex flex-col gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-12 w-12 rounded-full shadow-lg relative"
+                data-testid="button-notifications"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
+                    {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {notificationsData?.notifications?.slice(0, 5).map((notif: any) => (
+                <DropdownMenuItem key={notif.id} className="flex flex-col items-start gap-1">
+                  <span className="font-medium text-sm">{notif.title}</span>
+                  <span className="text-xs text-muted-foreground truncate w-full">{notif.message}</span>
+                </DropdownMenuItem>
+              )) ?? (
+                <DropdownMenuItem disabled>No notifications</DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setLocation("/driver/account/notifications")}>
+                View all notifications
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="absolute bottom-32 right-4 z-[1000] flex flex-col gap-2">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-12 w-12 rounded-full shadow-lg"
+            onClick={() => setLocation("/driver/trips")}
+            data-testid="button-history"
+          >
+            <History className="h-5 w-5" />
+          </Button>
+
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-12 w-12 rounded-full shadow-lg"
+            onClick={() => setLocation("/driver/earnings")}
+            data-testid="button-earnings"
+          >
+            <DollarSign className="h-5 w-5" />
+          </Button>
+
+          <Sheet open={showSosSheet} onOpenChange={setShowSosSheet}>
+            <SheetTrigger asChild>
+              <Button
+                size="icon"
+                variant="destructive"
+                className="h-12 w-12 rounded-full shadow-lg"
+                data-testid="button-sos"
+              >
+                <ShieldAlert className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-2xl">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-red-500" />
+                  Emergency SOS
+                </SheetTitle>
+              </SheetHeader>
+              <div className="py-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  If you're in danger, use these emergency options:
+                </p>
+                <Button 
+                  variant="destructive" 
+                  className="w-full h-14 text-lg"
+                  onClick={() => {
+                    window.location.href = "tel:911";
+                  }}
+                  data-testid="button-call-911"
+                >
+                  Call 911
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setLocation("/driver/safety-emergency");
+                    setShowSosSheet(false);
+                  }}
+                  data-testid="button-safety-center"
+                >
+                  Go to Safety Center
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setLocation("/driver/safety-report");
+                    setShowSosSheet(false);
+                  }}
+                  data-testid="button-report-incident"
+                >
+                  Report Safety Incident
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+
           <Button
             size="icon"
             variant="secondary"
@@ -364,22 +640,39 @@ export default function DriverMapPage() {
           </DropdownMenu>
         </div>
 
-        {!activeTrip && (
-          <div
-            className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000]"
-            data-testid="no-active-trip-banner"
-          >
-            <Card className="bg-background/95 backdrop-blur-sm shadow-lg">
-              <CardContent className="p-4 text-center space-y-2">
-                <div className="flex items-center justify-center gap-2">
-                  <Signal className="h-5 w-5 text-green-500 animate-pulse" />
-                  <span className="font-semibold">You're Online</span>
+        <div
+          className="absolute bottom-4 left-4 z-[1000]"
+          data-testid="map-legend"
+        >
+          <Card className="bg-background/95 backdrop-blur-sm shadow-lg">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-green-500 ring-2 ring-green-200 dark:ring-green-800" />
+                  <span className="text-muted-foreground">You</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Waiting for trip requests...
-                </p>
-              </CardContent>
-            </Card>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-blue-500 ring-2 ring-blue-200 dark:ring-blue-800" />
+                  <span className="text-muted-foreground">Pickup</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 rounded-full bg-red-500 ring-2 ring-red-200 dark:ring-red-800" />
+                  <span className="text-muted-foreground">Dropoff</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {!activeTrip && isOnline && !incomingRequest && (
+          <div
+            className="absolute top-28 left-1/2 -translate-x-1/2 z-[999]"
+            data-testid="waiting-for-trips-banner"
+          >
+            <Badge variant="secondary" className="px-4 py-2 text-sm shadow-md">
+              <Signal className="h-4 w-4 mr-2 animate-pulse text-green-500" />
+              Waiting for trip requests...
+            </Badge>
           </div>
         )}
       </div>
@@ -503,6 +796,16 @@ export default function DriverMapPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {incomingRequest && (
+        <IncomingTripRequest
+          request={incomingRequest}
+          onAccept={handleAcceptTrip}
+          onDecline={handleDeclineTrip}
+          onExpire={handleExpireTrip}
+          countdownSeconds={15}
+        />
+      )}
     </div>
   );
 }

@@ -27,9 +27,9 @@ async function getDriverProfile(userId: string) {
   });
 }
 
-async function getDriverWallet(driverProfileId: string) {
+async function getDriverWallet(driverId: string) {
   return prisma.driverWallet.findUnique({
-    where: { driverProfileId },
+    where: { driverId },
   });
 }
 
@@ -77,7 +77,6 @@ router.get("/pending", async (req: AuthRequest, res) => {
             id: true,
             restaurantName: true,
             address: true,
-            phoneNumber: true,
           },
         },
       },
@@ -102,7 +101,6 @@ router.get("/pending", async (req: AuthRequest, res) => {
             id: delivery.restaurant.id,
             name: delivery.restaurant.restaurantName,
             address: delivery.restaurant.address,
-            phone: delivery.restaurant.phoneNumber,
           } : null,
           pickupAddress: delivery.pickupAddress,
           pickupLat: delivery.pickupLat,
@@ -169,7 +167,6 @@ router.get("/active", async (req: AuthRequest, res) => {
             id: true,
             restaurantName: true,
             address: true,
-            phoneNumber: true,
           },
         },
         foodOrder: {
@@ -196,7 +193,6 @@ router.get("/active", async (req: AuthRequest, res) => {
           id: delivery.restaurant.id,
           name: delivery.restaurant.restaurantName,
           address: delivery.restaurant.address,
-          phone: delivery.restaurant.phoneNumber,
         } : null,
         pickupAddress: delivery.pickupAddress,
         pickupLat: delivery.pickupLat,
@@ -573,7 +569,6 @@ router.get("/:deliveryId", async (req: AuthRequest, res) => {
             id: true,
             restaurantName: true,
             address: true,
-            phoneNumber: true,
           },
         },
         foodOrder: {
@@ -607,7 +602,6 @@ router.get("/:deliveryId", async (req: AuthRequest, res) => {
         id: delivery.restaurant.id,
         name: delivery.restaurant.restaurantName,
         address: delivery.restaurant.address,
-        phone: delivery.restaurant.phoneNumber,
       } : null,
       pickupAddress: delivery.pickupAddress,
       pickupLat: delivery.pickupLat,
