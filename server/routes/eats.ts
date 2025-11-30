@@ -7,6 +7,7 @@ import { DayOfWeek } from "@prisma/client";
 const router = Router();
 
 // Demo restaurant data for seeding
+// Using local stock images for better reliability
 const DEMO_RESTAURANTS = [
   // Bangladesh restaurants
   {
@@ -16,8 +17,8 @@ const DEMO_RESTAURANTS = [
     cuisineType: "Indian",
     description: "Authentic Hyderabadi biryani and traditional Bengali cuisine. Our recipes have been passed down for generations.",
     address: "123 Gulshan Avenue, Dhaka 1212",
-    coverPhotoUrl: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=1200&h=400&fit=crop",
-    logoUrl: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=200&h=200&fit=crop",
+    coverPhotoUrl: "/attached_assets/stock_images/indian_biryani_resta_ff5f6183.jpg",
+    logoUrl: "/attached_assets/stock_images/indian_restaurant_lo_e339b808.jpg",
     averageRating: 4.7,
     totalRatings: 328,
     menuCategories: [
@@ -56,8 +57,8 @@ const DEMO_RESTAURANTS = [
     cuisineType: "Bengali",
     description: "Traditional Bengali home cooking with a modern twist. Fresh river fish and authentic flavors.",
     address: "45 Dhanmondi Road 27, Dhaka 1205",
-    coverPhotoUrl: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&h=400&fit=crop",
-    logoUrl: "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=200&h=200&fit=crop",
+    coverPhotoUrl: "/attached_assets/stock_images/indian_curry_restaur_90b44af3.jpg",
+    logoUrl: "/attached_assets/stock_images/butter_chicken_cream_4571bd1c.jpg",
     averageRating: 4.5,
     totalRatings: 215,
     menuCategories: [
@@ -97,8 +98,8 @@ const DEMO_RESTAURANTS = [
     cuisineType: "American",
     description: "Gourmet burgers and craft beers in the heart of NYC. Premium Angus beef and fresh ingredients daily.",
     address: "789 Broadway, New York, NY 10003",
-    coverPhotoUrl: "https://images.unsplash.com/photo-1550547660-d9450f859349?w=1200&h=400&fit=crop",
-    logoUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop",
+    coverPhotoUrl: "/attached_assets/stock_images/american_burger_rest_1ff44af7.jpg",
+    logoUrl: "/attached_assets/stock_images/burger_restaurant_lo_b31136ce.jpg",
     averageRating: 4.6,
     totalRatings: 892,
     menuCategories: [
@@ -138,8 +139,8 @@ const DEMO_RESTAURANTS = [
     cuisineType: "Italian",
     description: "Authentic Neapolitan pizza baked in our wood-fired oven. Family recipes from Naples since 1985.",
     address: "234 Mulberry Street, New York, NY 10012",
-    coverPhotoUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=1200&h=400&fit=crop",
-    logoUrl: "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?w=200&h=200&fit=crop",
+    coverPhotoUrl: "/attached_assets/stock_images/italian_pizzeria_res_da132bc0.jpg",
+    logoUrl: "/attached_assets/stock_images/pizza_restaurant_log_4ebe32ac.jpg",
     averageRating: 4.8,
     totalRatings: 1247,
     menuCategories: [
