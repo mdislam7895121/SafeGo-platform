@@ -92,21 +92,8 @@ export default function EatsHome() {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [demoSeeded, setDemoSeeded] = useState(false);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Seed demo data on first load
-  useEffect(() => {
-    if (!demoSeeded) {
-      fetch("/api/eats/seed-demo", { method: "POST" })
-        .then(() => {
-          setDemoSeeded(true);
-          queryClient.invalidateQueries({ queryKey: ['/api/eats/restaurants'] });
-        })
-        .catch(() => setDemoSeeded(true));
-    }
-  }, [demoSeeded]);
 
   const buildQueryParams = () => {
     const params = new URLSearchParams({ sortBy });
