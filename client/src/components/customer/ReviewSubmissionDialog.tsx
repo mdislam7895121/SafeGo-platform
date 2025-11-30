@@ -99,11 +99,17 @@ export function ReviewSubmissionDialog({
     setIsSubmitting(true);
 
     try {
-      await apiRequest("POST", "/api/customer/reviews", {
-        orderId,
-        rating,
-        reviewText: reviewText.trim() || undefined,
-        images: images.length > 0 ? images : undefined,
+      await apiRequest("/api/customer/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          orderId,
+          rating,
+          reviewText: reviewText.trim() || undefined,
+          images: images.length > 0 ? images : undefined,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
       toast({

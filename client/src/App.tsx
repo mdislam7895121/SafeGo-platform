@@ -19,6 +19,7 @@ import CustomerRegister from "@/pages/customer-register";
 // Customer pages
 // NOTE: CustomerHome and RideRequest are LEGACY - now using UnifiedBooking
 import CustomerProfile from "@/pages/customer/profile";
+import BlockedRestaurants from "@/pages/customer/blocked-restaurants";
 import CustomerKYC from "@/pages/customer/kyc";
 import CustomerActivity from "@/pages/customer/activity";
 import RideDetails from "@/pages/customer/ride-details";
@@ -29,6 +30,7 @@ import FoodRestaurants from "@/pages/customer/food-restaurants";
 import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
 import FoodCheckout from "@/pages/customer/food-checkout";
 import FoodOrderTracking from "@/pages/customer/food-order-tracking";
+import FoodOrderReceipt from "@/pages/customer/food-order-receipt";
 import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import CustomerMyReviews from "@/pages/customer/my-reviews";
 import ParcelRequest from "@/pages/customer/parcel-request";
@@ -315,6 +317,11 @@ function Router() {
           <FoodOrderTracking />
         </ProtectedRoute>
       </Route>
+      <Route path="/customer/food-orders/:id/receipt">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <FoodOrderReceipt />
+        </ProtectedRoute>
+      </Route>
       <Route path="/customer/my-reviews">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerMyReviews />
@@ -373,6 +380,11 @@ function Router() {
       <Route path="/customer/profile/settings">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerProfileSettings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/blocked-restaurants">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <BlockedRestaurants />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/payment-methods">

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Star, UtensilsCrossed, Calendar, CheckCircle, RotateCcw, Loader2 } from "lucide-react";
+import { ArrowLeft, Star, UtensilsCrossed, Calendar, CheckCircle, RotateCcw, Loader2, Receipt } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -171,10 +171,18 @@ export default function FoodOrdersHistory() {
                   <div>{order.deliveryAddress}</div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Link href={`/customer/food-orders/${order.id}/receipt`}>
+                    <Button
+                      variant="outline"
+                      data-testid={`button-receipt-${order.id}`}
+                    >
+                      <Receipt className="h-4 w-4 mr-2" />
+                      Receipt
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
-                    className="flex-1"
                     onClick={() => reorderMutation.mutate(order.id)}
                     disabled={reorderMutation.isPending}
                     data-testid={`button-reorder-${order.id}`}
@@ -194,7 +202,6 @@ export default function FoodOrdersHistory() {
                   ) : (
                     <Button
                       variant="outline"
-                      className="flex-1"
                       onClick={() => setSelectedOrderForReview(order)}
                       data-testid={`button-leave-review-${order.id}`}
                     >

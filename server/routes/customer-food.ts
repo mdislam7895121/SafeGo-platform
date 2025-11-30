@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { prisma } from "../db";
 import { authenticateToken, type AuthRequest } from "../middleware/auth";
 
@@ -972,6 +973,175 @@ router.patch("/addresses/:id/set-default", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("[Customer Food] Set default address error:", error);
     res.status(500).json({ error: "Failed to set default address" });
+  }
+});
+
+// ====================================================
+// BLOCKED RESTAURANTS MANAGEMENT
+// ====================================================
+
+// GET /api/customer/food/blocked-restaurants - List blocked restaurants
+router.get("/blocked-restaurants", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can view blocked restaurants" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    const blockedRestaurants = await prisma.customerBlockedRestaurant.findMany({
+      where: { customerProfileId: customerProfile.id },
+      include: {
+        restaurant: {
+          select: {
+            id: true,
+            restaurantName: true,
+            cuisineType: true,
+            averageRating: true,
+            branding: {
+              select: {
+                logoUrl: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      blockedRestaurants: blockedRestaurants.map(br => ({
+        id: br.id,
+        restaurantId: br.restaurant.id,
+        restaurantName: br.restaurant.restaurantName,
+        cuisineType: br.restaurant.cuisineType,
+        averageRating: br.restaurant.averageRating,
+        logoUrl: br.restaurant.branding?.logoUrl,
+        reason: br.reason,
+        blockedAt: br.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("[Customer Food] List blocked restaurants error:", error);
+    res.status(500).json({ error: "Failed to list blocked restaurants" });
+  }
+});
+
+// POST /api/customer/food/blocked-restaurants - Block a restaurant
+router.post("/blocked-restaurants", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { restaurantId, reason } = req.body;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can block restaurants" });
+    }
+
+    if (!restaurantId) {
+      return res.status(400).json({ error: "Restaurant ID is required" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Check if restaurant exists
+    const restaurant = await prisma.restaurantProfile.findUnique({
+      where: { id: restaurantId },
+    });
+
+    if (!restaurant) {
+      return res.status(404).json({ error: "Restaurant not found" });
+    }
+
+    // Check if already blocked
+    const existingBlock = await prisma.customerBlockedRestaurant.findFirst({
+      where: {
+        customerProfileId: customerProfile.id,
+        restaurantProfileId: restaurantId,
+      },
+    });
+
+    if (existingBlock) {
+      return res.status(400).json({ error: "Restaurant is already blocked" });
+    }
+
+    // Create block record
+    const blockedRestaurant = await prisma.customerBlockedRestaurant.create({
+      data: {
+        id: randomUUID(),
+        customerProfileId: customerProfile.id,
+        restaurantProfileId: restaurantId,
+        reason: reason || null,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      blockedRestaurant: {
+        id: blockedRestaurant.id,
+        restaurantId,
+        restaurantName: restaurant.restaurantName,
+        reason: blockedRestaurant.reason,
+        blockedAt: blockedRestaurant.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("[Customer Food] Block restaurant error:", error);
+    res.status(500).json({ error: "Failed to block restaurant" });
+  }
+});
+
+// DELETE /api/customer/food/blocked-restaurants/:id - Unblock a restaurant
+router.delete("/blocked-restaurants/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { id } = req.params;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can unblock restaurants" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify block record exists and belongs to customer
+    const blockedRestaurant = await prisma.customerBlockedRestaurant.findUnique({
+      where: { id },
+    });
+
+    if (!blockedRestaurant || blockedRestaurant.customerProfileId !== customerProfile.id) {
+      return res.status(404).json({ error: "Blocked restaurant not found" });
+    }
+
+    await prisma.customerBlockedRestaurant.delete({
+      where: { id },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("[Customer Food] Unblock restaurant error:", error);
+    res.status(500).json({ error: "Failed to unblock restaurant" });
   }
 });
 
