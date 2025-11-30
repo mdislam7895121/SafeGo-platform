@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Star, MapPin, Heart, Clock, Filter, Search, ChevronRight, RefreshCw } from "lucide-react";
@@ -85,18 +85,19 @@ export function CustomerEatsHome() {
     queryFn: async () => {
       const queryParams = buildQueryParams();
       
-      if (isLoggedIn) {
-        try {
-          const authRes = await fetch('/api/customer/food/restaurants?' + queryParams.toString(), {
-            credentials: 'include',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-          });
-          if (authRes.ok) {
-            return await authRes.json();
-          }
-        } catch {
+      if (isLoggedIn && token) {
+        const authRes = await fetch('/api/customer/food/restaurants?' + queryParams.toString(), {
+          credentials: 'include',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        if (authRes.ok) {
+          const data = await authRes.json();
+          return data;
+        } else if (authRes.status !== 401 && authRes.status !== 403) {
+          const errData = await authRes.json().catch(() => ({ error: 'Failed to fetch' }));
+          throw new Error(errData.error || 'Failed to fetch restaurants');
         }
       }
       
@@ -105,10 +106,10 @@ export function CustomerEatsHome() {
       }
       const res = await fetch(`/api/eats/restaurants?${queryParams.toString()}`);
       if (!res.ok) {
-        const errData = await res.json();
-        throw errData;
+        const errData = await res.json().catch(() => ({ error: 'Failed to fetch' }));
+        throw new Error(errData.error || 'Failed to fetch restaurants');
       }
-      return res.json();
+      return await res.json();
     },
     retry: 2,
   });
@@ -145,33 +146,23 @@ export function CustomerEatsHome() {
       )
     : restaurants;
 
-  if (error) {
-    const errorMessage = (error as any)?.error || (error as any)?.message || "Failed to load restaurants";
-
-    return (
-      <div className="flex-1 p-4">
-        <Card className="border-destructive/50 bg-destructive/10">
-          <CardContent className="p-6 text-center">
-            <h3 className="font-semibold text-destructive mb-2">
-              Unable to Load Restaurants
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              {errorMessage}
-            </p>
-            <Button 
-              variant="outline" 
-              onClick={() => refetch()}
-              className="gap-2"
-              data-testid="button-retry-restaurants"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const lastErrorRef = useRef<string | null>(null);
+  
+  useEffect(() => {
+    if (error && !isLoading) {
+      const errorMessage = (error as Error)?.message || "Failed to load restaurants";
+      if (lastErrorRef.current !== errorMessage) {
+        lastErrorRef.current = errorMessage;
+        toast({
+          title: "Unable to Load Restaurants",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+    } else {
+      lastErrorRef.current = null;
+    }
+  }, [error, isLoading, toast]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">

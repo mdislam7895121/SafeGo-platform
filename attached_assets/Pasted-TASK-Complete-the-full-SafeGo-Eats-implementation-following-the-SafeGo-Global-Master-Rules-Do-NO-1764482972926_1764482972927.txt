@@ -1,0 +1,117 @@
+TASK: Complete the full SafeGo Eats implementation following the SafeGo Global Master Rules.  
+Do NOT skip any step. Do NOT partially complete.  
+Finish everything in one full pass.
+
+Your responsibilities:
+
+===========================================================
+1) FIX CUSTOMER → EATS RESTAURANT LIST
+===========================================================
+Create or update the customer-side query (getEatsRestaurants):
+
+Filters:
+- is_verified = true
+- verification_status = "approved"
+- is_blocked = false
+- is_open = true
+- country_code = authenticated_customer.country_code
+- (optional) city_name = authenticated_customer.city_name
+
+Return only safe fields:
+restaurant_id, restaurant_name, cuisine_type, avg_rating, rating_count,
+min_order_amount, delivery_fee_base, preparation_time_min,
+logo_image_url/cover_image_url, city_name.
+
+UI rules:
+- Show skeleton on loading.
+- Show list when restaurants exist.
+- Show friendly empty state (no error box).
+- On query failure → toast only.
+
+===========================================================
+2) FIX RESTAURANT DETAIL SCREEN (/customer/food/:id)
+===========================================================
+Create getRestaurantDetails:
+
+Filters:
+- restaurant_id = param.restaurant_id
+- is_verified = true
+- is_blocked = false
+
+Bind:
+- Title → restaurant_name
+- Subtitle → cuisine_type or city_name
+- Rating → avg_rating & rating_count
+- Address → address fields
+- Status:
+  - is_open = true → “Open now”
+  - else → “Closed”
+- Pricing:
+  - Show min_order_amount & delivery_fee_base
+  - Hide section if missing
+
+If no restaurant:
+- Show fallback + Back button.
+
+No sensitive fields may be returned.
+
+===========================================================
+3) FIX MENU CATEGORIES + MENU ITEMS
+===========================================================
+Use/add collections:
+
+menu_categories:
+- category_id, restaurant_id, name, sort_order, is_active
+
+menu_items:
+- item_id, restaurant_id, category_id,
+  name, description, base_price, currency_code,
+  image_url, is_available, sort_order
+
+Queries:
+- getMenuCategories: restaurant_id = param.restaurant_id AND is_active = true
+- getMenuItems: restaurant_id = param.restaurant_id AND is_available = true
+
+UI:
+- Group menu items by category
+- If empty → “No menu yet”
+- On query failure → toast (do not break screen)
+
+===========================================================
+4) RESTAURANT OWNER MENU MANAGEMENT
+===========================================================
+Restaurant role may:
+- Create/rename/reorder categories
+- Add/edit/delete items
+- Toggle is_available
+
+Restaurant cannot access other restaurants.
+
+===========================================================
+5) ADD CUSTOMER LOGOUT BUTTON
+===========================================================
+Add a logout button inside the customer profile menu or drawer.
+
+Must:
+- Call auth.logout()
+- Clear session + customer_id
+- Redirect to login/landing
+
+Do NOT change driver/restaurant/admin logout flows.
+
+===========================================================
+6) APPLY SECURITY PHASES
+===========================================================
+Phase 1 — Field-level minimization  
+Phase 2 — Role-based access  
+Phase 3 — Audit logs:
+- Admin approval/rejection
+- Menu changes
+- Customer login/logout
+
+===========================================================
+7) NON-BREAKING REQUIREMENTS
+===========================================================
+- Do NOT rename or delete any existing collection, field, route, or screen.
+- Only add missing fields/components.
+- Preserve all existing SafeGo modules exactly.
