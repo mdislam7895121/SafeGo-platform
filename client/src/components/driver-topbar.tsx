@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Globe, ChevronDown, Check, ExternalLink, DollarSign, Car, Gift, MessageSquare, Shield, Megaphone } from "lucide-react";
+import { Bell, Globe, ChevronDown, Check, ExternalLink, Settings, DollarSign, Car, Gift, MessageSquare, Shield, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
