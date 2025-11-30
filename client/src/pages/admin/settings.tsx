@@ -571,11 +571,42 @@ export default function AdminSettings() {
 
         {/* Commission Tab */}
         <TabsContent value="commission" className="space-y-4">
+          {/* SafeGo Official Commission Rates - Read Only Info Card */}
+          <Card className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <SettingsIcon className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                SafeGo Official Commission Rates (System Defaults)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-3">
+                These are the official commission rates applied when no admin override is set:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-blue-700 dark:text-blue-300">Bangladesh (BD)</h4>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li data-testid="text-bd-restaurant-commission">Restaurant: <span className="font-medium text-foreground">12%</span></li>
+                    <li data-testid="text-bd-driver-commission">Driver: <span className="font-medium text-foreground">10%</span></li>
+                  </ul>
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-semibold text-blue-700 dark:text-blue-300">United States (US)</h4>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li data-testid="text-us-restaurant-commission">Restaurant: <span className="font-medium text-foreground">15%</span></li>
+                    <li data-testid="text-us-driver-commission">Driver: <span className="font-medium text-foreground">10%</span></li>
+                  </ul>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Commission Settings</CardTitle>
               <CardDescription>
-                Configure default commission rates and country-specific overrides
+                Configure default commission rates and country-specific overrides. Values set here override the official rates above.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
