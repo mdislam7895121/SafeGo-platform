@@ -637,6 +637,27 @@ router.get("/food-orders", async (req: AuthRequest, res) => {
           select: {
             id: true,
             restaurantName: true,
+            address: true,
+            cuisineType: true,
+          },
+        },
+        driver: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            profilePhotoUrl: true,
+            vehicles: {
+              where: { isActive: true },
+              take: 1,
+              select: {
+                make: true,
+                vehicleModel: true,
+                color: true,
+                licensePlate: true,
+                vehiclePlate: true,
+              },
+            },
           },
         },
         review: {
@@ -650,20 +671,69 @@ router.get("/food-orders", async (req: AuthRequest, res) => {
       },
     });
 
+    // Get branding for all restaurants
+    const restaurantIds = Array.from(new Set(orders.map((o: any) => o.restaurantId)));
+    const brandings = await prisma.restaurantBranding.findMany({
+      where: { restaurantId: { in: restaurantIds } },
+      select: { restaurantId: true, logoUrl: true },
+    });
+    const brandingMap = new Map(brandings.map((b: any) => [b.restaurantId, b.logoUrl]));
+
     res.json({
-      orders: orders.map((order: any) => ({
-        id: order.id,
-        restaurantId: order.restaurantId,
-        restaurantName: order.restaurant.restaurantName,
-        deliveryAddress: order.deliveryAddress,
-        items: order.items,
-        serviceFare: Number(order.serviceFare),
-        status: order.status,
-        paymentMethod: order.paymentMethod,
-        createdAt: order.createdAt,
-        deliveredAt: order.deliveredAt,
-        hasReview: !!order.review,
-      })),
+      orders: orders.map((order: any) => {
+        let items: any[] = [];
+        try {
+          if (order.items) {
+            items = typeof order.items === "string" ? JSON.parse(order.items) : order.items;
+          }
+        } catch {
+          items = [];
+        }
+
+        const activeVehicle = order.driver?.vehicles?.[0] || null;
+
+        return {
+          id: order.id,
+          orderCode: order.orderCode,
+          restaurantId: order.restaurantId,
+          restaurantName: order.restaurant.restaurantName,
+          restaurantAddress: order.restaurant.address,
+          restaurantCuisine: order.restaurant.cuisineType,
+          restaurantLogo: brandingMap.get(order.restaurantId) || null,
+          deliveryAddress: order.deliveryAddress,
+          items,
+          itemsCount: order.itemsCount || items.length,
+          subtotal: order.subtotal ? Number(order.subtotal) : null,
+          deliveryFee: order.deliveryFee ? Number(order.deliveryFee) : null,
+          serviceFare: Number(order.serviceFare),
+          taxAmount: order.totalTaxAmount ? Number(order.totalTaxAmount) : null,
+          tipAmount: order.tipAmount ? Number(order.tipAmount) : null,
+          discountAmount: order.discountAmount ? Number(order.discountAmount) : null,
+          promoCode: order.appliedCouponCode,
+          status: order.status,
+          paymentMethod: order.paymentMethod,
+          createdAt: order.createdAt,
+          acceptedAt: order.acceptedAt,
+          preparingAt: order.preparingAt,
+          readyAt: order.readyAt,
+          pickedUpAt: order.pickedUpAt,
+          deliveredAt: order.deliveredAt,
+          cancelledAt: order.cancelledAt,
+          hasReview: !!order.review,
+          driver: order.driver ? {
+            id: order.driver.id,
+            firstName: order.driver.firstName,
+            lastName: order.driver.lastName,
+            photoUrl: order.driver.profilePhotoUrl,
+            vehicle: activeVehicle ? {
+              make: activeVehicle.make || activeVehicle.vehicleModel,
+              model: activeVehicle.vehicleModel,
+              color: activeVehicle.color,
+              plate: activeVehicle.licensePlate || activeVehicle.vehiclePlate,
+            } : null,
+          } : null,
+        };
+      }),
       total: orders.length,
     });
   } catch (error: any) {

@@ -523,7 +523,7 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
 
 // ====================================================
 // GET /api/food-orders/:id
-// Get food order details
+// Get food order details (enhanced for receipt page)
 // ====================================================
 router.get("/:id", async (req: AuthRequest, res) => {
   try {
@@ -550,6 +550,11 @@ router.get("/:id", async (req: AuthRequest, res) => {
                 email: true,
               },
             },
+            branding: {
+              select: {
+                logoUrl: true,
+              },
+            },
           },
         },
         driver: {
@@ -562,7 +567,19 @@ router.get("/:id", async (req: AuthRequest, res) => {
             vehicles: {
               where: { isActive: true },
               take: 1,
+              select: {
+                make: true,
+                vehicleModel: true,
+                color: true,
+                licensePlate: true,
+                vehiclePlate: true,
+              },
             },
+          },
+        },
+        review: {
+          select: {
+            id: true,
           },
         },
       },
@@ -592,38 +609,65 @@ router.get("/:id", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
+    // Parse items
+    let items: any[] = [];
+    try {
+      if (foodOrder.items) {
+        items = typeof foodOrder.items === "string" ? JSON.parse(foodOrder.items) : foodOrder.items;
+      }
+    } catch {
+      items = [];
+    }
+
+    // Get active vehicle
+    const activeVehicle = foodOrder.driver?.vehicles?.[0] || null;
+
     res.json({
       order: {
         id: foodOrder.id,
+        orderCode: foodOrder.orderCode,
+        restaurantId: foodOrder.restaurantId,
+        restaurantName: foodOrder.restaurant.restaurantName,
+        restaurantAddress: foodOrder.restaurant.address,
+        restaurantCuisine: foodOrder.restaurant.cuisineType,
+        restaurantLogo: foodOrder.restaurant.branding?.logoUrl || null,
         customer: {
           email: foodOrder.customer.user.email,
         },
-        restaurant: {
-          email: foodOrder.restaurant.user.email,
-          name: foodOrder.restaurant.restaurantName,
-          address: foodOrder.restaurant.address,
-        },
         driver: foodOrder.driver ? {
-          id: foodOrder.driver.id, // driver_profile_id for public profile lookup
-          email: foodOrder.driver.user.email,
-          vehicle: foodOrder.driver.vehicles[0] || null,
+          id: foodOrder.driver.id,
+          firstName: foodOrder.driver.firstName,
+          lastName: foodOrder.driver.lastName,
+          photoUrl: foodOrder.driver.profilePhotoUrl,
+          vehicle: activeVehicle ? {
+            make: activeVehicle.make || activeVehicle.vehicleModel,
+            model: activeVehicle.vehicleModel,
+            color: activeVehicle.color,
+            plate: activeVehicle.licensePlate || activeVehicle.vehiclePlate,
+          } : null,
         } : null,
         deliveryAddress: foodOrder.deliveryAddress,
         deliveryLat: foodOrder.deliveryLat,
         deliveryLng: foodOrder.deliveryLng,
-        items: foodOrder.items ? JSON.parse(foodOrder.items) : [],
-        serviceFare: foodOrder.serviceFare,
-        safegoCommission: foodOrder.safegoCommission,
-        restaurantPayout: foodOrder.restaurantPayout,
-        deliveryPayout: foodOrder.deliveryPayout,
+        items,
+        itemsCount: foodOrder.itemsCount || items.length,
+        subtotal: foodOrder.subtotal ? Number(foodOrder.subtotal) : null,
+        deliveryFee: foodOrder.deliveryFee ? Number(foodOrder.deliveryFee) : null,
+        serviceFare: Number(foodOrder.serviceFare),
+        taxAmount: foodOrder.totalTaxAmount ? Number(foodOrder.totalTaxAmount) : null,
+        tipAmount: foodOrder.tipAmount ? Number(foodOrder.tipAmount) : null,
+        discountAmount: foodOrder.discountAmount ? Number(foodOrder.discountAmount) : null,
+        promoCode: foodOrder.appliedCouponCode,
         paymentMethod: foodOrder.paymentMethod,
         status: foodOrder.status,
-        customerRating: foodOrder.customerRating,
-        customerFeedback: foodOrder.customerFeedback,
-        restaurantRating: foodOrder.restaurantRating,
-        restaurantFeedback: foodOrder.restaurantFeedback,
         createdAt: foodOrder.createdAt,
-        completedAt: foodOrder.completedAt,
+        acceptedAt: foodOrder.acceptedAt,
+        preparingAt: foodOrder.preparingAt,
+        readyAt: foodOrder.readyAt,
+        pickedUpAt: foodOrder.pickedUpAt,
+        deliveredAt: foodOrder.deliveredAt,
+        cancelledAt: foodOrder.cancelledAt,
+        hasReview: !!foodOrder.review,
       },
     });
   } catch (error) {

@@ -1,0 +1,124 @@
+You are the lead engineer of the SafeGo project. Follow ALL existing SafeGo rules and do NOT break the working Ride or Parcel flows.
+
+====================
+SECTION A – CONTEXT
+====================
+- Route `/customer` exists with a top service toggle: Ride / Eats / Parcel.
+- When the user selects **Eats**, the screen only shows a placeholder:
+  - Title: "SafeGo Eats"
+  - Subtitle: "Order from nearby restaurants"
+  - Text: "Coming soon..."
+- However, the SafeGo Eats implementation is already present and tested:
+  - Restaurant list & restaurant details (e.g. `food-restaurants.tsx`, `food-restaurant-details.tsx`).
+  - Menu & item selection with "Add to Cart" buttons.
+  - Cart context + checkout (quantities, remove, address, payment, tip).
+  - Order placement using `food_orders`.
+  - Order tracking page with status timeline, map & ETA.
+  - Activity / history shows food orders.
+- Goal: CONNECT this existing Eats implementation to the `/customer` home so that the user can actually browse restaurants and place orders from the Eats tab, instead of seeing "Coming soon…".
+
+====================
+SECTION B – GLOBAL SAFEG0 RULES (SUMMARY)
+====================
+Apply these while changing code:
+1. Roles: customer, driver, restaurant, admin – do not break role-based routing or visibility.
+2. Shared collections: `rides`, `food_orders`, `deliveries`, `users`, `drivers`, `restaurants`, `payouts`, `disputes`, `notifications`.
+3. Status flows:
+   - Eats: PLACED → ACCEPTED_BY_RESTAURANT → PREPARING → READY_FOR_PICKUP → PICKED_UP → NEARBY → DELIVERED → CANCELLED.
+4. Security:
+   - All customer Eats pages behind Auth / ProtectedRoute.
+   - All API calls use `apiRequest` wrapper.
+   - Use existing Zod/input validation patterns.
+   - Do not leak other users’ data or internal fields.
+5. KYC:
+   - Browsing restaurants allowed without full KYC.
+   - Placing a food order requires KYC = verified, otherwise show clear message and link to KYC screen.
+6. Navigation:
+   - Bottom tabs (Home, Activity, Wallet, Profile) must continue to work for Ride, Eats, Parcel.
+   - Top account menu (Profile, Wallet, Home, Activity, Help, Logout) must keep working in all modes.
+
+====================
+SECTION C – IMPLEMENTATION TASKS
+====================
+
+1. Find the placeholder for "SafeGo Eats – Coming soon…"
+- Locate the file that renders the customer booking layout and the service toggle for Ride/Eats/Parcel. This is likely named something like:
+  - `unified-booking.tsx`, `customer-booking.tsx`, or the page component for `/customer`.
+- Inside this file there will be logic similar to:
+  - `if (serviceType === 'ride') { ... }`
+  - `if (serviceType === 'eats') { return <ComingSoon ... /> }`
+  - `if (serviceType === 'parcel') { ... }`
+- Replace the Eats branch so it no longer renders the placeholder.
+
+2. Create or reuse a proper Eats home component
+- If a suitable component already exists (for example `FoodHome`, `EatsHome`, or a restaurant-list screen), reuse it.
+- If not, create a small wrapper component (for example `CustomerEatsHome`) that:
+  - Fetches and displays the restaurant list (using the existing restaurant list logic, NOT new mock data).
+  - Shows cuisine filters and favorites entry if those features are implemented.
+  - Provides a visible entry to the cart (cart badge/button) that opens the existing checkout/cart screen.
+
+3. Wire the Eats tab to the real Eats flow
+- When the customer is on `/customer` and selects **Eats**:
+  - Show the new `CustomerEatsHome` instead of the "Coming soon" placeholder.
+  - Clicking a restaurant card should navigate to the existing restaurant details page (the one that already shows menu items and “Add to Cart” buttons).
+- Ensure that:
+  - Back navigation (in-app back + browser back) returns from restaurant details to the Eats home restaurant list.
+  - The Ride and Parcel layouts are not changed.
+
+4. Cart + checkout integration
+- Ensure the existing `CartContext` is used from the Eats home and details pages:
+  - Adding an item via “Add to Cart” updates the cart and shows the toast.
+  - Adding from a different restaurant triggers the confirmation dialog that clears the old cart and adds the new item.
+- Provide a clear way to open the cart/checkout from the Eats UI:
+  - Either a “View Cart” button or an icon in the header that routes to the combined checkout page you already implemented.
+- At checkout:
+  - Customer can adjust quantities and remove items.
+  - Delivery address selection uses the same address/geo validation as before.
+  - Payment method selection uses the existing payment/wallet method.
+  - Tip field works if it was already implemented.
+- Enforce KYC requirement before allowing “Place order”.
+
+5. Order placement and tracking
+- Confirm that pressing “Place order” from the Eats checkout:
+  - Creates a `food_orders` entry using the existing model and status enum.
+  - Redirects the user to the real-time food order tracking page you implemented (status timeline + map + ETA).
+- Confirm that Activity / History shows the new order and can open its details.
+
+6. Cleanup and UI polish
+- Remove or retire the placeholder “Coming soon…” component so it is not reachable in the customer flow.
+- Make sure the header (logo, service toggle, audio, notifications, profile avatar) still renders exactly as before on `/customer`.
+- Do NOT break the Ride or Parcel flows.
+
+====================
+SECTION D – QA CHECKLIST (MUST RUN & FIX)
+====================
+After your changes, manually test and fix any issues until all of these pass:
+
+1) Navigation:
+- `/customer` opens in Ride mode as before.
+- Switching to Eats shows restaurant list instead of “Coming soon”.
+- Switching back to Ride shows the ride booking UI correctly.
+
+2) Restaurant → cart → checkout:
+- From Eats home:
+  - Open a restaurant, add items, see cart badge update.
+  - Switch restaurants, see confirmation dialog and correct cart behavior.
+  - Open checkout, adjust quantities, set address & payment & tip.
+  - Place order (with KYC verified) with no console errors.
+
+3) Tracking & history:
+- After placing an order, you see the real-time tracking page with:
+  - Status timeline based on the Eats status enum.
+  - Live map and ETA.
+- Activity / History lists this order; opening it shows correct details.
+
+4) Auth & logout:
+- If logged out, trying to access any Eats checkout or tracking route redirects to login (ProtectedRoute).
+- Logging out via the top menu logs the user out from all customer services and prevents re-opening `/customer` until login.
+
+Finally, update your Agent report with:
+- The file(s) you changed.
+- How to test the customer Eats flow from `/customer` step by step.
+- Any remaining limitations or TODOs.
+
+Start implementing these changes now and stop only when the Eats tab on `/customer` is fully functional and no longer shows the "Coming soon" placeholder.
