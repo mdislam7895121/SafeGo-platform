@@ -197,6 +197,7 @@ import StaffManagement from "@/pages/restaurant/staff";
 import StaffActivity from "@/pages/restaurant/staff-activity";
 
 // Admin pages
+import { AdminLayout } from "@/layouts/AdminLayout";
 import AdminHome from "@/pages/admin/home";
 import AdminKYC from "@/pages/admin/kyc";
 import AdminDocumentCenter from "@/pages/admin/documents";
@@ -1494,268 +1495,374 @@ function Router() {
       {/* Admin routes */}
       <Route path="/admin">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminHome />
+          <AdminLayout pageTitle="Dashboard">
+            <AdminHome />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/users">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminUsers />
+          <AdminLayout pageTitle="Users">
+            <AdminUsers />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/kyc">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminKYC />
+          <AdminLayout pageTitle="KYC Approvals">
+            <AdminKYC />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/documents">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminDocumentCenter />
+          <AdminLayout pageTitle="Document Center">
+            <AdminDocumentCenter />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/drivers">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminDrivers />
+          <AdminLayout pageTitle="Drivers">
+            <AdminDrivers />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/drivers/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminDriverDetails />
+          <AdminLayout pageTitle="Driver Details">
+            <AdminDriverDetails />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/customers">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminCustomers />
+          <AdminLayout pageTitle="Customers">
+            <AdminCustomers />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/customers/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminCustomerDetails />
+          <AdminLayout pageTitle="Customer Details">
+            <AdminCustomerDetails />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/restaurants">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminRestaurants />
+          <AdminLayout pageTitle="Restaurants">
+            <AdminRestaurants />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/restaurants/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminRestaurantDetails />
+          <AdminLayout pageTitle="Restaurant Details">
+            <AdminRestaurantDetails />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/restaurants/:id/settings">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminRestaurantSettings />
+          <AdminLayout pageTitle="Restaurant Settings">
+            <AdminRestaurantSettings />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/complaints">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminComplaints />
+          <AdminLayout pageTitle="Complaints">
+            <AdminComplaints />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/complaints/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminComplaintDetails />
+          <AdminLayout pageTitle="Complaint Details">
+            <AdminComplaintDetails />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/settlement">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSettlement />
+          <AdminLayout pageTitle="Settlement">
+            <AdminSettlement />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/parcels/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminParcelDetails />
+          <AdminLayout pageTitle="Parcel Details">
+            <AdminParcelDetails />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/parcels">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminParcels />
+          <AdminLayout pageTitle="Parcels">
+            <AdminParcels />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/activity-log">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminActivityLog />
+          <AdminLayout pageTitle="Activity Log">
+            <AdminActivityLog />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/notifications">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminNotifications />
+          <AdminLayout pageTitle="Notifications">
+            <AdminNotifications />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/settings">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSettings />
+          <AdminLayout pageTitle="Settings">
+            <AdminSettings />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/referral-settings/:id/edit">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminReferralSettingsEdit />
+          <AdminLayout pageTitle="Edit Referral Settings">
+            <AdminReferralSettingsEdit />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/referral-settings">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminReferralSettings />
+          <AdminLayout pageTitle="Referral Settings">
+            <AdminReferralSettings />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/opportunity-bonuses/:id/edit">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminOpportunityBonusesEdit />
+          <AdminLayout pageTitle="Edit Opportunity Bonus">
+            <AdminOpportunityBonusesEdit />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/opportunity-bonuses">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminOpportunityBonuses />
+          <AdminLayout pageTitle="Opportunity Bonuses">
+            <AdminOpportunityBonuses />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/driver-promotions">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminDriverPromotions />
+          <AdminLayout pageTitle="Driver Promotions">
+            <AdminDriverPromotions />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/ride-promotions">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminRidePromotions />
+          <AdminLayout pageTitle="Ride Promotions">
+            <AdminRidePromotions />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/reviews">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminReviews />
+          <AdminLayout pageTitle="Reviews">
+            <AdminReviews />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/media">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminMedia />
+          <AdminLayout pageTitle="Media">
+            <AdminMedia />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-chat">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportChat />
+          <AdminLayout pageTitle="Support Chat">
+            <AdminSupportChat />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support/:ticketId">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportTicketDetail />
+          <AdminLayout pageTitle="Support Ticket">
+            <AdminSupportTicketDetail />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportCenter />
+          <AdminLayout pageTitle="Support Center">
+            <AdminSupportCenter />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/wallets/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminWalletDetails />
+          <AdminLayout pageTitle="Wallet Details">
+            <AdminWalletDetails />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/wallets">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminWallets />
+          <AdminLayout pageTitle="Wallets">
+            <AdminWallets />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts/requests">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminPayoutsRequests />
+          <AdminLayout pageTitle="Payout Requests">
+            <AdminPayoutsRequests />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts/schedule">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminPayoutsSchedule />
+          <AdminLayout pageTitle="Payout Schedule">
+            <AdminPayoutsSchedule />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts/manual">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminPayoutsManual />
+          <AdminLayout pageTitle="Manual Payouts">
+            <AdminPayoutsManual />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts/reports">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminPayoutsReports />
+          <AdminLayout pageTitle="Payout Reports">
+            <AdminPayoutsReports />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts/restaurants">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminRestaurantPayouts />
+          <AdminLayout pageTitle="Restaurant Payouts">
+            <AdminRestaurantPayouts />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/payouts">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminPayouts />
+          <AdminLayout pageTitle="Payouts">
+            <AdminPayouts />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/earnings">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminEarnings />
+          <AdminLayout pageTitle="Earnings">
+            <AdminEarnings />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/analytics">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminAnalytics />
+          <AdminLayout pageTitle="Analytics">
+            <AdminAnalytics />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/performance">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminPerformance />
+          <AdminLayout pageTitle="Performance">
+            <AdminPerformance />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/monitoring">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminMonitoring />
+          <AdminLayout pageTitle="Monitoring">
+            <AdminMonitoring />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/security-center">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSecurityCenter />
+          <AdminLayout pageTitle="Security Center">
+            <AdminSecurityCenter />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/driver-support">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminDriverSupportCenter />
+          <AdminLayout pageTitle="Driver Support">
+            <AdminDriverSupportCenter />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       {/* Admin Support Center Routes */}
       <Route path="/admin/support-portal/tickets/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportTicketDetail2 />
+          <AdminLayout pageTitle="Support Ticket">
+            <AdminSupportTicketDetail2 />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal/tickets">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportTickets />
+          <AdminLayout pageTitle="Support Tickets">
+            <AdminSupportTickets />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal/live-chat">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportLiveChat />
+          <AdminLayout pageTitle="Live Chat">
+            <AdminSupportLiveChat />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal/phone">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportPhone />
+          <AdminLayout pageTitle="Phone Support">
+            <AdminSupportPhone />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal/articles/:id">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportArticle />
+          <AdminLayout pageTitle="Article">
+            <AdminSupportArticle />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal/help">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportHelp />
+          <AdminLayout pageTitle="Help Center">
+            <AdminSupportHelp />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal/contact">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportContact />
+          <AdminLayout pageTitle="Contact Support">
+            <AdminSupportContact />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal/status">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportStatus />
+          <AdminLayout pageTitle="System Status">
+            <AdminSupportStatus />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
       <Route path="/admin/support-portal">
         <ProtectedRoute allowedRoles={["admin"]}>
-          <AdminSupportHub />
+          <AdminLayout pageTitle="Support Portal">
+            <AdminSupportHub />
+          </AdminLayout>
         </ProtectedRoute>
       </Route>
 
