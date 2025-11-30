@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { Car, DollarSign, TrendingUp, Settings, User, Wallet, MessageCircle, Power, MapPin, Navigation, Radio } from "lucide-react";
+import { Car, DollarSign, TrendingUp, Settings, User, Wallet, MessageCircle, Power, MapPin, Navigation, Radio, UtensilsCrossed, ChevronRight, Package } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,18 @@ export default function DriverHome() {
     queryKey: ["/api/driver/pending-requests"],
     refetchInterval: 3000,
     enabled: !!(driverData as any)?.vehicle?.isOnline && !(activeRideData as any)?.activeRide,
+  });
+
+  const { data: pendingFoodDeliveries } = useQuery({
+    queryKey: ["/api/driver/food-delivery/pending"],
+    refetchInterval: 5000,
+    enabled: !!(driverData as any)?.vehicle?.isOnline,
+  });
+
+  const { data: activeFoodDeliveries } = useQuery({
+    queryKey: ["/api/driver/food-delivery/active"],
+    refetchInterval: 3000,
+    enabled: !!(driverData as any)?.vehicle?.isOnline,
   });
 
   // Toggle online/offline status mutation
@@ -215,6 +227,71 @@ export default function DriverHome() {
                 <Button className="w-full mt-3" data-testid="button-view-active-ride">
                   <Navigation className="h-4 w-4 mr-2" />
                   View Active Ride
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Food Deliveries Summary Card */}
+        {profile?.isVerified && vehicle?.isOnline && (
+          <Card className="border-2 border-orange-500 bg-orange-50 dark:bg-orange-950/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+                Food Deliveries
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-background rounded-lg p-3 border">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Package className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-medium">Pending</span>
+                  </div>
+                  <p className="text-2xl font-bold" data-testid="text-pending-food-count">
+                    {(pendingFoodDeliveries as any)?.count || 0}
+                  </p>
+                </div>
+                <div className="bg-background rounded-lg p-3 border">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Navigation className="h-4 w-4 text-blue-500" />
+                    <span className="text-sm font-medium">Active</span>
+                  </div>
+                  <p className="text-2xl font-bold" data-testid="text-active-food-count">
+                    {(activeFoodDeliveries as any)?.count || 0}
+                  </p>
+                </div>
+              </div>
+
+              {/* Active Food Delivery Quick View */}
+              {(activeFoodDeliveries as any)?.deliveries?.length > 0 && (
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                      Active Delivery
+                    </span>
+                    <Badge className="bg-blue-500">
+                      {(activeFoodDeliveries as any).deliveries[0].status.replace(/_/g, " ")}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground line-clamp-1">
+                    {(activeFoodDeliveries as any).deliveries[0].restaurant?.name || "Restaurant"}
+                  </p>
+                  <Link href={`/driver/food-delivery/${(activeFoodDeliveries as any).deliveries[0].id}`}>
+                    <Button size="sm" className="w-full mt-2" data-testid="button-view-active-food-delivery">
+                      View Delivery
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </Link>
+                </div>
+              )}
+
+              <Link href="/driver/food-deliveries">
+                <Button variant="outline" className="w-full" data-testid="button-go-to-food-deliveries">
+                  <UtensilsCrossed className="h-4 w-4 mr-2" />
+                  Go to Delivery Inbox
+                  <ChevronRight className="h-4 w-4 ml-auto" />
                 </Button>
               </Link>
             </CardContent>

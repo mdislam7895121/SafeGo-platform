@@ -66,11 +66,25 @@ interface FoodDelivery {
   pickedUpAt: string | null;
   deliveredAt: string | null;
   deliveryNotesForDriver?: string | null;
+  paymentMethod?: string;
+  isCashDelivery?: boolean;
+  canAccept?: boolean;
+  cashBlockedReason?: string | null;
+}
+
+interface DriverStatus {
+  isVerified: boolean;
+  isSuspended: boolean;
+  negativeBalance: number;
+  isCashBlocked: boolean;
+  cashBlockingThreshold: number;
+  countryCode: string;
 }
 
 interface PendingDeliveriesResponse {
   deliveries: FoodDelivery[];
   count: number;
+  driverStatus?: DriverStatus;
 }
 
 interface ActiveDeliveriesResponse {
@@ -103,6 +117,9 @@ export default function DriverFoodDeliveries() {
     type: "accept" | "reject";
     deliveryId: string;
     restaurantName: string;
+    canAccept?: boolean;
+    isCashDelivery?: boolean;
+    cashBlockedReason?: string | null;
   } | null>(null);
 
   const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useQuery<PendingDeliveriesResponse>({
@@ -169,8 +186,8 @@ export default function DriverFoodDeliveries() {
     },
   });
 
-  const handleAccept = (deliveryId: string, restaurantName: string) => {
-    setConfirmDialog({ open: true, type: "accept", deliveryId, restaurantName });
+  const handleAccept = (deliveryId: string, restaurantName: string, canAccept: boolean = true, isCashDelivery: boolean = false, cashBlockedReason: string | null = null) => {
+    setConfirmDialog({ open: true, type: "accept", deliveryId, restaurantName, canAccept, isCashDelivery, cashBlockedReason });
   };
 
   const handleReject = (deliveryId: string, restaurantName: string) => {
@@ -181,6 +198,15 @@ export default function DriverFoodDeliveries() {
     if (!confirmDialog) return;
     
     if (confirmDialog.type === "accept") {
+      if (confirmDialog.isCashDelivery && confirmDialog.canAccept === false) {
+        toast({
+          title: "Cannot Accept Cash Delivery",
+          description: confirmDialog.cashBlockedReason || "Please settle your negative balance first.",
+          variant: "destructive",
+        });
+        setConfirmDialog(null);
+        return;
+      }
       acceptMutation.mutate(confirmDialog.deliveryId);
     } else {
       rejectMutation.mutate(confirmDialog.deliveryId);
@@ -188,126 +214,152 @@ export default function DriverFoodDeliveries() {
     setConfirmDialog(null);
   };
 
-  const renderDeliveryCard = (delivery: FoodDelivery, showActions: boolean = false, isActive: boolean = false) => (
-    <Card 
-      key={delivery.id} 
-      className="hover-elevate cursor-pointer"
-      data-testid={`card-delivery-${delivery.id}`}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 space-y-3">
-            <div className="flex items-center gap-2">
-              <Store className="h-4 w-4 text-orange-500" />
-              <span className="font-medium" data-testid={`text-restaurant-${delivery.id}`}>
-                {delivery.restaurant?.name || "Restaurant"}
-              </span>
-              {delivery.orderCode && (
-                <Badge variant="outline" className="text-xs">
-                  #{delivery.orderCode}
+  const renderDeliveryCard = (delivery: FoodDelivery, showActions: boolean = false, isActive: boolean = false) => {
+    const isCashDelivery = delivery.isCashDelivery || delivery.paymentMethod?.toLowerCase() === "cash";
+    const canAccept = delivery.canAccept !== false;
+
+    return (
+      <Card 
+        key={delivery.id} 
+        className={`hover-elevate cursor-pointer ${!canAccept && isCashDelivery ? "border-red-200 dark:border-red-900 opacity-75" : ""}`}
+        data-testid={`card-delivery-${delivery.id}`}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Store className="h-4 w-4 text-orange-500" />
+                <span className="font-medium" data-testid={`text-restaurant-${delivery.id}`}>
+                  {delivery.restaurant?.name || "Restaurant"}
+                </span>
+                {delivery.orderCode && (
+                  <Badge variant="outline" className="text-xs">
+                    #{delivery.orderCode}
+                  </Badge>
+                )}
+                <Badge 
+                  variant={isCashDelivery ? "destructive" : "secondary"}
+                  className={`text-xs ${isCashDelivery ? "bg-amber-500 hover:bg-amber-600" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                  data-testid={`badge-payment-${delivery.id}`}
+                >
+                  {isCashDelivery ? "CASH" : "ONLINE"}
                 </Badge>
-              )}
-            </div>
+              </div>
 
-            <div className="space-y-1.5 text-sm text-muted-foreground">
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                <span className="line-clamp-1" data-testid={`text-pickup-${delivery.id}`}>
-                  {delivery.pickupAddress || delivery.restaurant?.address}
-                </span>
+              <div className="space-y-1.5 text-sm text-muted-foreground">
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                  <span className="line-clamp-1" data-testid={`text-pickup-${delivery.id}`}>
+                    {delivery.pickupAddress || delivery.restaurant?.address}
+                  </span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Navigation className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <span className="line-clamp-1" data-testid={`text-dropoff-${delivery.id}`}>
+                    {delivery.dropoffAddress}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-start gap-2">
-                <Navigation className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-                <span className="line-clamp-1" data-testid={`text-dropoff-${delivery.id}`}>
-                  {delivery.dropoffAddress}
-                </span>
-              </div>
-            </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-1">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                <span className="font-semibold text-green-600" data-testid={`text-payout-${delivery.id}`}>
-                  ${delivery.estimatedPayout.toFixed(2)}
-                </span>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-1">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <span className="font-semibold text-green-600" data-testid={`text-payout-${delivery.id}`}>
+                    ${delivery.estimatedPayout.toFixed(2)}
+                  </span>
+                </div>
+                {delivery.createdAt && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{format(new Date(delivery.createdAt), "h:mm a")}</span>
+                  </div>
+                )}
               </div>
-              {delivery.createdAt && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  <span>{format(new Date(delivery.createdAt), "h:mm a")}</span>
+
+              {!canAccept && isCashDelivery && delivery.cashBlockedReason && (
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md p-2 text-xs text-red-700 dark:text-red-400" data-testid={`text-cash-blocked-${delivery.id}`}>
+                  {delivery.cashBlockedReason}
                 </div>
               )}
             </div>
+
+            {isActive && (
+              <Badge 
+                variant={delivery.status === "accepted" ? "default" : delivery.status === "picked_up" ? "secondary" : "outline"}
+                data-testid={`badge-status-${delivery.id}`}
+              >
+                {delivery.status === "accepted" ? "Go to Restaurant" :
+                 delivery.status === "picked_up" ? "Picked Up" :
+                 delivery.status === "on_the_way" ? "On the Way" : delivery.status}
+              </Badge>
+            )}
           </div>
+
+          {showActions && (
+            <div className="flex gap-2 mt-4 pt-3 border-t">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleReject(delivery.id, delivery.restaurant?.name || "Restaurant");
+                }}
+                disabled={rejectMutation.isPending}
+                data-testid={`button-reject-${delivery.id}`}
+              >
+                {rejectMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </>
+                )}
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!canAccept && isCashDelivery) {
+                    toast({
+                      title: "Cannot Accept Cash Delivery",
+                      description: delivery.cashBlockedReason || "Please settle your negative balance first.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  handleAccept(delivery.id, delivery.restaurant?.name || "Restaurant", canAccept, isCashDelivery, delivery.cashBlockedReason);
+                }}
+                disabled={acceptMutation.isPending || (!canAccept && isCashDelivery)}
+                data-testid={`button-accept-${delivery.id}`}
+              >
+                {acceptMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Accept
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
 
           {isActive && (
-            <Badge 
-              variant={delivery.status === "accepted" ? "default" : delivery.status === "picked_up" ? "secondary" : "outline"}
-              data-testid={`badge-status-${delivery.id}`}
-            >
-              {delivery.status === "accepted" ? "Go to Restaurant" :
-               delivery.status === "picked_up" ? "Picked Up" :
-               delivery.status === "on_the_way" ? "On the Way" : delivery.status}
-            </Badge>
+            <div className="mt-4 pt-3 border-t">
+              <Link href={`/driver/food-delivery/${delivery.id}`}>
+                <Button className="w-full" data-testid={`button-view-delivery-${delivery.id}`}>
+                  <UtensilsCrossed className="h-4 w-4 mr-2" />
+                  View Delivery Details
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
+            </div>
           )}
-        </div>
-
-        {showActions && (
-          <div className="flex gap-2 mt-4 pt-3 border-t">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleReject(delivery.id, delivery.restaurant?.name || "Restaurant");
-              }}
-              disabled={rejectMutation.isPending}
-              data-testid={`button-reject-${delivery.id}`}
-            >
-              {rejectMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Reject
-                </>
-              )}
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleAccept(delivery.id, delivery.restaurant?.name || "Restaurant");
-              }}
-              disabled={acceptMutation.isPending}
-              data-testid={`button-accept-${delivery.id}`}
-            >
-              {acceptMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Accept
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {isActive && (
-          <div className="mt-4 pt-3 border-t">
-            <Link href={`/driver/food-delivery/${delivery.id}`}>
-              <Button className="w-full" data-testid={`button-view-delivery-${delivery.id}`}>
-                <UtensilsCrossed className="h-4 w-4 mr-2" />
-                View Delivery Details
-                <ChevronRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   const renderSkeleton = () => (
     <div className="space-y-3">
@@ -376,6 +428,24 @@ export default function DriverFoodDeliveries() {
       </div>
 
       <div className="p-4 space-y-4">
+        {pendingData?.driverStatus?.isCashBlocked && (
+          <div 
+            className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-start gap-3"
+            data-testid="banner-cash-blocked"
+          >
+            <DollarSign className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-400">Cash Deliveries Restricted</p>
+              <p className="text-sm text-amber-700 dark:text-amber-500 mt-1">
+                Your negative balance ({pendingData.driverStatus.countryCode === "BD" ? "৳" : "$"}
+                {pendingData.driverStatus.negativeBalance.toFixed(2)}) exceeds the threshold of{" "}
+                {pendingData.driverStatus.countryCode === "BD" ? "৳" : "$"}
+                {pendingData.driverStatus.cashBlockingThreshold}. You can only accept online payment deliveries until your balance is settled.
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeTab === "new" && (
           <>
             {pendingLoading ? (

@@ -8,6 +8,11 @@ import {
   updateDriverLocation,
   updateDeliveryStatus,
 } from "../services/foodDeliveryDispatchService";
+import { 
+  driverDeliveryConfig, 
+  isDriverBlockedForCashDeliveries,
+  getCashBlockingThreshold,
+} from "../config/driverDeliveryConfig";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -22,6 +27,12 @@ async function getDriverProfile(userId: string) {
   });
 }
 
+async function getDriverWallet(driverProfileId: string) {
+  return prisma.driverWallet.findUnique({
+    where: { driverProfileId },
+  });
+}
+
 router.get("/pending", async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
@@ -32,15 +43,27 @@ router.get("/pending", async (req: AuthRequest, res) => {
     }
 
     if (!driverProfile.isVerified || driverProfile.isSuspended) {
-      return res.status(403).json({ error: "Driver not eligible for deliveries" });
+      return res.status(403).json({ 
+        error: "Driver not eligible for deliveries",
+        reason: driverProfile.isSuspended ? "blocked" : "not_verified",
+        message: driverProfile.isSuspended 
+          ? "Please contact support; your account is currently blocked."
+          : "Your account must be verified to receive delivery orders."
+      });
     }
+
+    const driverWallet = await getDriverWallet(driverProfile.id);
+    const negativeBalance = parseFloat(driverWallet?.negativeBalance?.toString() || "0");
+    const countryCode = driverProfile.user.countryCode || "US";
+    const isCashBlocked = isDriverBlockedForCashDeliveries(negativeBalance, countryCode);
+    const cashBlockingThreshold = getCashBlockingThreshold(countryCode);
 
     const pendingDeliveries = await prisma.delivery.findMany({
       where: {
         driverId: null,
         status: "searching_driver",
         serviceType: "food",
-        countryCode: driverProfile.user.countryCode || undefined,
+        countryCode: countryCode,
       },
       include: {
         customer: {
@@ -59,7 +82,7 @@ router.get("/pending", async (req: AuthRequest, res) => {
         },
       },
       orderBy: { createdAt: "desc" },
-      take: 10,
+      take: driverDeliveryConfig.maxPendingDeliveriesShown,
     });
 
     const deliveriesWithOrders = await Promise.all(
@@ -67,6 +90,9 @@ router.get("/pending", async (req: AuthRequest, res) => {
         const foodOrder = await prisma.foodOrder.findFirst({
           where: { deliveryId: delivery.id },
         });
+
+        const paymentMethod = delivery.paymentMethod || "online";
+        const isCashDelivery = paymentMethod.toLowerCase() === "cash";
 
         return {
           id: delivery.id,
@@ -87,6 +113,12 @@ router.get("/pending", async (req: AuthRequest, res) => {
           estimatedPayout: parseFloat(delivery.driverPayout?.toString() || "0"),
           customerName: delivery.customer?.fullName || "Customer",
           createdAt: delivery.createdAt,
+          paymentMethod,
+          isCashDelivery,
+          canAccept: !isCashDelivery || !isCashBlocked,
+          cashBlockedReason: isCashDelivery && isCashBlocked 
+            ? `You cannot accept cash deliveries until your balance is settled. Your negative balance (${countryCode === "BD" ? "৳" : "$"}${negativeBalance.toFixed(2)}) exceeds the threshold of ${countryCode === "BD" ? "৳" : "$"}${cashBlockingThreshold}.`
+            : null,
         };
       })
     );
@@ -94,6 +126,14 @@ router.get("/pending", async (req: AuthRequest, res) => {
     res.json({
       deliveries: deliveriesWithOrders,
       count: deliveriesWithOrders.length,
+      driverStatus: {
+        isVerified: driverProfile.isVerified,
+        isSuspended: driverProfile.isSuspended,
+        negativeBalance,
+        isCashBlocked,
+        cashBlockingThreshold,
+        countryCode,
+      },
     });
   } catch (error) {
     console.error("[Driver Food Delivery] Error fetching pending deliveries:", error);
@@ -143,33 +183,42 @@ router.get("/active", async (req: AuthRequest, res) => {
       orderBy: { acceptedAt: "desc" },
     });
 
-    const deliveriesWithOrders = activeDeliveries.map((delivery) => ({
-      id: delivery.id,
-      orderId: delivery.foodOrder?.id || null,
-      orderCode: delivery.foodOrder?.orderCode || null,
-      status: delivery.status,
-      restaurant: delivery.restaurant ? {
-        id: delivery.restaurant.id,
-        name: delivery.restaurant.restaurantName,
-        address: delivery.restaurant.address,
-        phone: delivery.restaurant.phoneNumber,
-      } : null,
-      pickupAddress: delivery.pickupAddress,
-      pickupLat: delivery.pickupLat,
-      pickupLng: delivery.pickupLng,
-      dropoffAddress: delivery.dropoffAddress,
-      dropoffLat: delivery.dropoffLat,
-      dropoffLng: delivery.dropoffLng,
-      estimatedPayout: parseFloat(delivery.driverPayout?.toString() || "0"),
-      customer: delivery.customer ? {
-        id: delivery.customer.id,
-        name: delivery.customer.fullName || "Customer",
-        phone: delivery.customer.phoneNumber,
-      } : null,
-      acceptedAt: delivery.acceptedAt,
-      pickedUpAt: delivery.pickedUpAt,
-      deliveryNotesForDriver: delivery.foodOrder?.deliveryNotesForDriver || null,
-    }));
+    const deliveriesWithOrders = activeDeliveries.map((delivery) => {
+      const paymentMethod = delivery.paymentMethod || "online";
+      const isCashDelivery = paymentMethod.toLowerCase() === "cash";
+
+      return {
+        id: delivery.id,
+        orderId: delivery.foodOrder?.id || null,
+        orderCode: delivery.foodOrder?.orderCode || null,
+        status: delivery.status,
+        restaurant: delivery.restaurant ? {
+          id: delivery.restaurant.id,
+          name: delivery.restaurant.restaurantName,
+          address: delivery.restaurant.address,
+          phone: delivery.restaurant.phoneNumber,
+        } : null,
+        pickupAddress: delivery.pickupAddress,
+        pickupLat: delivery.pickupLat,
+        pickupLng: delivery.pickupLng,
+        dropoffAddress: delivery.dropoffAddress,
+        dropoffLat: delivery.dropoffLat,
+        dropoffLng: delivery.dropoffLng,
+        estimatedPayout: parseFloat(delivery.driverPayout?.toString() || "0"),
+        customer: delivery.customer ? {
+          id: delivery.customer.id,
+          name: delivery.customer.fullName || "Customer",
+          phone: delivery.customer.phoneNumber,
+        } : null,
+        acceptedAt: delivery.acceptedAt,
+        pickedUpAt: delivery.pickedUpAt,
+        deliveryNotesForDriver: delivery.foodOrder?.deliveryNotesForDriver || null,
+        paymentMethod,
+        isCashDelivery,
+        canAccept: true,
+        cashBlockedReason: null,
+      };
+    });
 
     res.json({
       deliveries: deliveriesWithOrders,
@@ -207,6 +256,35 @@ router.post("/accept", async (req: AuthRequest, res) => {
     }
 
     const { deliveryId } = validation.data;
+
+    const delivery = await prisma.delivery.findUnique({
+      where: { id: deliveryId },
+    });
+
+    if (!delivery) {
+      return res.status(404).json({ error: "Delivery not found" });
+    }
+
+    const paymentMethod = delivery.paymentMethod || "online";
+    const isCashDelivery = paymentMethod.toLowerCase() === "cash";
+
+    if (isCashDelivery) {
+      const driverWallet = await getDriverWallet(driverProfile.id);
+      const negativeBalance = parseFloat(driverWallet?.negativeBalance?.toString() || "0");
+      const countryCode = driverProfile.user.countryCode || "US";
+      const isCashBlocked = isDriverBlockedForCashDeliveries(negativeBalance, countryCode);
+
+      if (isCashBlocked) {
+        const threshold = getCashBlockingThreshold(countryCode);
+        return res.status(403).json({
+          error: "Cash deliveries blocked",
+          message: `You cannot accept cash deliveries. Your negative balance (${countryCode === "BD" ? "৳" : "$"}${negativeBalance.toFixed(2)}) exceeds the threshold of ${countryCode === "BD" ? "৳" : "$"}${threshold}. Please settle your balance first.`,
+          isCashBlocked: true,
+          negativeBalance,
+          threshold,
+        });
+      }
+    }
 
     const result = await handleDriverAccept(deliveryId, driverProfile.id);
 
@@ -435,18 +513,25 @@ router.get("/history", async (req: AuthRequest, res) => {
       }),
     ]);
 
-    const deliveriesWithOrders = deliveries.map((delivery) => ({
-      id: delivery.id,
-      orderId: delivery.foodOrder?.id || null,
-      orderCode: delivery.foodOrder?.orderCode || null,
-      status: delivery.status,
-      restaurantName: delivery.restaurant?.restaurantName || null,
-      pickupAddress: delivery.pickupAddress,
-      dropoffAddress: delivery.dropoffAddress,
-      earnings: parseFloat(delivery.driverPayout?.toString() || "0"),
-      deliveredAt: delivery.deliveredAt,
-      acceptedAt: delivery.acceptedAt,
-    }));
+    const deliveriesWithOrders = deliveries.map((delivery) => {
+      const paymentMethod = delivery.paymentMethod || "online";
+      const isCashDelivery = paymentMethod.toLowerCase() === "cash";
+
+      return {
+        id: delivery.id,
+        orderId: delivery.foodOrder?.id || null,
+        orderCode: delivery.foodOrder?.orderCode || null,
+        status: delivery.status,
+        restaurantName: delivery.restaurant?.restaurantName || null,
+        pickupAddress: delivery.pickupAddress,
+        dropoffAddress: delivery.dropoffAddress,
+        earnings: parseFloat(delivery.driverPayout?.toString() || "0"),
+        deliveredAt: delivery.deliveredAt,
+        acceptedAt: delivery.acceptedAt,
+        paymentMethod,
+        isCashDelivery,
+      };
+    });
 
     res.json({
       deliveries: deliveriesWithOrders,
@@ -510,6 +595,9 @@ router.get("/:deliveryId", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Not authorized to view this delivery" });
     }
 
+    const paymentMethod = delivery.paymentMethod || "online";
+    const isCashDelivery = paymentMethod.toLowerCase() === "cash";
+
     res.json({
       id: delivery.id,
       orderId: delivery.foodOrder?.id || null,
@@ -542,6 +630,8 @@ router.get("/:deliveryId", async (req: AuthRequest, res) => {
           ? JSON.parse(delivery.foodOrder.items) 
           : delivery.foodOrder.items
       ) : [],
+      paymentMethod,
+      isCashDelivery,
     });
   } catch (error) {
     console.error("[Driver Food Delivery] Error fetching delivery:", error);
