@@ -132,6 +132,7 @@ import DriverSafetyEmergency from "@/pages/driver/safety-emergency";
 import DriverTrustScore from "@/pages/driver/trust-score";
 import DriverTripActive from "@/pages/driver/trip-active";
 import DriverTripRequests from "@/pages/driver/trip-requests";
+import DriverRideRequestDetail from "@/pages/driver/ride-request-detail";
 import DriverMap from "@/pages/driver/map";
 import DriverFoodDeliveries from "@/pages/driver/food-deliveries";
 import DriverFoodDeliveryActive from "@/pages/driver/food-delivery-active";
@@ -675,6 +676,11 @@ function Router() {
       <Route path="/driver/trip-requests">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverTripRequests />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/ride-request/:id">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverRideRequestDetail />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/map">

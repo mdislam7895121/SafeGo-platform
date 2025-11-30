@@ -1327,6 +1327,123 @@ router.get(
   }
 );
 
+// Step 48: Get single ride request details for driver
+router.get(
+  "/requests/:requestId",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { requestId } = req.params;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        include: { 
+          user: { select: { countryCode: true } },
+        },
+      });
+      
+      if (!driverProfile) {
+        return res.status(404).json({ error: "Driver profile not found" });
+      }
+      
+      if (!driverProfile.isVerified) {
+        return res.status(403).json({ error: "Driver must be verified" });
+      }
+      
+      // Try to find the ride
+      const ride = await prisma.ride.findUnique({
+        where: { id: requestId },
+        include: {
+          customer: {
+            include: {
+              user: { select: { email: true } },
+            },
+          },
+        },
+      });
+      
+      if (!ride) {
+        return res.status(404).json({ error: "Ride request not found" });
+      }
+      
+      if (ride.status !== "requested" && ride.status !== "searching_driver") {
+        return res.status(400).json({ error: "Ride no longer available" });
+      }
+      
+      // Get driver wallet for negative balance check
+      const wallet = await prisma.driverWallet.findUnique({
+        where: { driverId: driverProfile.id },
+      });
+      
+      // Convert negative balance to positive outstanding amount for threshold check
+      const rawNegativeBalance = wallet ? serializeDecimal(wallet.negativeBalance) : 0;
+      const outstandingBalance = Math.abs(rawNegativeBalance);
+      const countryCode = driverProfile.user?.countryCode || 'US';
+      
+      // Import config for threshold check
+      const { shouldBlockCashRides } = await import('../config/driverRideConfig');
+      const isCashBlocked = shouldBlockCashRides(outstandingBalance, countryCode);
+      const isCashPayment = ride.paymentMethod === 'cash';
+      
+      // Get customer rating
+      const customerReviews = await prisma.review.findMany({
+        where: {
+          entityId: ride.customerId,
+          entityType: 'customer',
+        },
+        select: { rating: true },
+      });
+      
+      const customerRating = customerReviews.length > 0
+        ? customerReviews.reduce((sum, r) => sum + Number(r.rating), 0) / customerReviews.length
+        : null;
+      
+      // Get customer total rides
+      const customerRidesCount = await prisma.ride.count({
+        where: { customerId: ride.customerId, status: 'completed' },
+      });
+      
+      const requestDetails = {
+        id: ride.id,
+        serviceType: "RIDE" as const,
+        pickupAddress: ride.pickupAddress,
+        pickupLat: ride.pickupLat,
+        pickupLng: ride.pickupLng,
+        dropoffAddress: ride.dropoffAddress,
+        dropoffLat: ride.dropoffLat,
+        dropoffLng: ride.dropoffLng,
+        estimatedDistanceKm: ride.estimatedDistanceKm || 0,
+        estimatedDurationMinutes: ride.estimatedDurationMinutes || 0,
+        totalFare: serializeDecimal(ride.serviceFare),
+        driverPayout: serializeDecimal(ride.driverPayout),
+        platformCommission: serializeDecimal(ride.safegoCommission),
+        paymentMethod: ride.paymentMethod as "cash" | "card" | "wallet",
+        rideType: ride.rideType || "Standard",
+        customer: {
+          firstName: ride.customer?.user?.email?.split("@")[0] || "Customer",
+          rating: customerRating,
+          phone: null, // Never expose phone until ride is accepted
+          totalRides: customerRidesCount,
+        },
+        safetyNotes: null,
+        expiresAt: new Date(ride.createdAt.getTime() + 60000).toISOString(),
+        createdAt: ride.createdAt.toISOString(),
+        cashBlocked: isCashBlocked && isCashPayment,
+        cashBlockReason: isCashBlocked && isCashPayment
+          ? `Your outstanding balance exceeds the threshold. Please clear your balance to accept cash rides.`
+          : null,
+      };
+      
+      res.json({ request: requestDetails });
+    } catch (error: any) {
+      console.error("Error fetching request details:", error);
+      res.status(500).json({ error: "Failed to fetch request details" });
+    }
+  }
+);
+
 const acceptRequestSchema = z.object({
   serviceType: z.enum(["RIDE", "FOOD", "PARCEL"]),
   driverLat: z.number().optional(),
@@ -1398,6 +1515,31 @@ router.post(
         
         if (ride.driverId) {
           return res.status(409).json({ error: "Ride already accepted by another driver" });
+        }
+        
+        // Step 48: Enforce cash ride blocking on backend
+        if (ride.paymentMethod === 'cash') {
+          const wallet = await prisma.driverWallet.findUnique({
+            where: { driverId: driverProfile.id },
+          });
+          // Convert negative balance to positive outstanding amount for threshold check
+          const rawNegativeBalance = wallet ? parseFloat(wallet.negativeBalance.toString()) : 0;
+          const outstandingBalance = Math.abs(rawNegativeBalance);
+          
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { countryCode: true },
+          });
+          const countryCode = user?.countryCode || 'US';
+          
+          const { shouldBlockCashRides } = await import('../config/driverRideConfig');
+          if (shouldBlockCashRides(outstandingBalance, countryCode)) {
+            return res.status(403).json({ 
+              error: "Cash rides blocked",
+              reason: "Your outstanding balance exceeds the threshold. Please clear your balance to accept cash rides.",
+              cashBlocked: true
+            });
+          }
         }
         
         result = await prisma.ride.update({
