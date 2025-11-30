@@ -84,10 +84,13 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
     const countryCode = customerProfile.user.countryCode;
     const cityCode = customerProfile.cityCode || null;
 
-    // Calculate commission using Prisma Decimal (20% for now - can be made configurable later)
-    const commissionRate = 0.20;
+    // Calculate commission using SafeGo official commission config (country-specific driver rates)
+    // BD: 10% driver commission, US: 10% driver commission
+    const { calculateDriverCommission } = await import('../config/commissionConfig');
+    const commissionResult = calculateDriverCommission(fareNumber, (countryCode || 'US') as 'BD' | 'US');
+    
     const serviceFareDecimal = new Prisma.Decimal(fareNumber);
-    const safegoCommission = serviceFareDecimal.mul(commissionRate);
+    const safegoCommission = new Prisma.Decimal(commissionResult.platformCommissionAmount);
     const driverPayout = serviceFareDecimal.sub(safegoCommission);
 
     // Validate and parse lat/lng - handle undefined, null, and zero correctly
