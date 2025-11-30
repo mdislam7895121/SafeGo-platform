@@ -448,6 +448,43 @@ router.post("/login", async (req, res, next) => {
 });
 
 // ====================================================
+// POST /api/auth/logout
+// Log user logout event for audit trail (Security Phase 3)
+// ====================================================
+router.post("/logout", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    const role = req.user?.role;
+    
+    // Get user details for audit log
+    const user = userId ? await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, role: true },
+    }) : null;
+    
+    // Log customer logout event (Security Phase 3 audit requirement)
+    await logAuditEvent({
+      actorId: userId,
+      actorEmail: user?.email || 'unknown',
+      actorRole: role || 'unknown',
+      ipAddress: getClientIp(req),
+      actionType: ActionType.LOGOUT,
+      entityType: EntityType.AUTH,
+      entityId: userId,
+      description: `User ${user?.email || 'unknown'} (${role || 'unknown'}) logged out`,
+      metadata: { role, logoutType: 'user_initiated' },
+      success: true,
+    });
+    
+    res.json({ message: "Logout recorded successfully" });
+  } catch (error) {
+    console.error("Logout audit error:", error);
+    // Still return success - don't block logout even if audit fails
+    res.json({ message: "Logout recorded" });
+  }
+});
+
+// ====================================================
 // GET /api/auth/me
 // Get current authenticated user with capabilities
 // ====================================================

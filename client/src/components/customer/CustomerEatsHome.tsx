@@ -24,13 +24,10 @@ interface Restaurant {
   id: string;
   name: string;
   cuisineType: string;
-  description: string;
-  address: string;
   cityCode: string;
   averageRating: number;
   totalRatings: number;
   logoUrl: string | null;
-  primaryColor: string | null;
   isOpen: boolean;
   isFavorite: boolean;
 }
@@ -286,10 +283,7 @@ export function CustomerEatsHome() {
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     <div 
-                      className="h-20 w-20 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold text-xl"
-                      style={{ 
-                        backgroundColor: restaurant.primaryColor || '#6366f1',
-                      }}
+                      className="h-20 w-20 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold text-xl bg-primary"
                     >
                       {restaurant.logoUrl ? (
                         <img 
@@ -349,7 +343,7 @@ export function CustomerEatsHome() {
 
                       <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
                         <MapPin className="h-3 w-3" />
-                        <span className="truncate">{restaurant.address}</span>
+                        <span className="truncate">{restaurant.cityCode}</span>
                       </div>
                     </div>
 

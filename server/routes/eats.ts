@@ -9,13 +9,15 @@ router.get("/restaurants", async (req: Request, res: Response) => {
     const sortBy = req.query.sortBy as string | undefined;
     const openNow = req.query.openNow === 'true';
     const search = req.query.search as string | undefined;
-    const customerLat = req.query.customer_lat ? parseFloat(req.query.customer_lat as string) : undefined;
-    const customerLng = req.query.customer_lng ? parseFloat(req.query.customer_lng as string) : undefined;
 
     const whereConditions: any = {
       isVerified: true,
       isActive: true,
       isSuspended: false,
+      verificationStatus: "approved",
+      user: {
+        isBlocked: false,
+      },
     };
 
     if (cuisineType && cuisineType !== 'all') {
@@ -23,20 +25,28 @@ router.get("/restaurants", async (req: Request, res: Response) => {
     }
 
     if (search) {
-      whereConditions.OR = [
-        { restaurantName: { contains: search, mode: 'insensitive' } },
-        { cuisineType: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } },
+      whereConditions.AND = [
+        {
+          OR: [
+            { restaurantName: { contains: search, mode: 'insensitive' } },
+            { cuisineType: { contains: search, mode: 'insensitive' } },
+          ],
+        },
       ];
     }
 
     const restaurants = await prisma.restaurantProfile.findMany({
       where: whereConditions,
-      include: {
+      select: {
+        id: true,
+        restaurantName: true,
+        cuisineType: true,
+        averageRating: true,
+        totalRatings: true,
+        cityCode: true,
         branding: {
           select: {
             logoUrl: true,
-            primaryColor: true,
           },
         },
         hours: true,
@@ -75,22 +85,12 @@ router.get("/restaurants", async (req: Request, res: Response) => {
     let formattedRestaurants = restaurants.map((restaurant) => ({
       id: restaurant.id,
       name: restaurant.restaurantName,
-      displayName: restaurant.restaurantName,
-      cuisineType: restaurant.cuisineType || 'Not specified',
-      description: restaurant.description || '',
-      address: restaurant.address,
+      cuisineType: restaurant.cuisineType || 'Various',
       cityCode: restaurant.cityCode || 'Nationwide',
       averageRating: restaurant.averageRating || 0,
-      ratingAverage: restaurant.averageRating || 0,
       totalRatings: restaurant.totalRatings || 0,
-      ratingCount: restaurant.totalRatings || 0,
       logoUrl: restaurant.branding?.logoUrl || null,
-      logoImageUrl: restaurant.branding?.logoUrl || null,
-      primaryColor: restaurant.branding?.primaryColor || null,
       isOpen: isRestaurantOpen(restaurant.hours),
-      minOrderAmount: 0,
-      deliveryFee: 2.99,
-      estimatedDeliveryTimeMin: 30,
       isFavorite: false,
     }));
 
@@ -115,15 +115,9 @@ router.get("/restaurants/:id", async (req: Request, res: Response) => {
     const restaurant = await prisma.restaurantProfile.findUnique({
       where: { id },
       include: {
-        branding: {
-          select: {
-            logoUrl: true,
-            coverPhotoUrl: true,
-            primaryColor: true,
-            secondaryColor: true,
-          },
+        user: {
+          select: { isBlocked: true },
         },
-        hours: true,
       },
     });
 
@@ -131,7 +125,8 @@ router.get("/restaurants/:id", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Restaurant not found" });
     }
 
-    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended) {
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended || 
+        restaurant.verificationStatus !== "approved" || restaurant.user?.isBlocked) {
       return res.status(404).json({ error: "Restaurant not available" });
     }
 
@@ -139,21 +134,12 @@ router.get("/restaurants/:id", async (req: Request, res: Response) => {
       restaurant: {
         id: restaurant.id,
         name: restaurant.restaurantName,
-        displayName: restaurant.restaurantName,
-        cuisineType: restaurant.cuisineType || 'Not specified',
+        cuisineType: restaurant.cuisineType || 'Various',
         description: restaurant.description || '',
         address: restaurant.address,
         cityCode: restaurant.cityCode || 'Nationwide',
         averageRating: restaurant.averageRating || 0,
-        ratingAverage: restaurant.averageRating || 0,
         totalRatings: restaurant.totalRatings || 0,
-        ratingCount: restaurant.totalRatings || 0,
-        logoUrl: restaurant.branding?.logoUrl || null,
-        coverPhotoUrl: restaurant.branding?.coverPhotoUrl || null,
-        primaryColor: restaurant.branding?.primaryColor || null,
-        minOrderAmount: 0,
-        deliveryFee: 2.99,
-        estimatedDeliveryTimeMin: 30,
       },
     });
   } catch (error) {
@@ -168,13 +154,19 @@ router.get("/restaurants/:id/branding", async (req: Request, res: Response) => {
 
     const restaurant = await prisma.restaurantProfile.findUnique({
       where: { id },
+      include: {
+        user: {
+          select: { isBlocked: true },
+        },
+      },
     });
 
     if (!restaurant) {
       return res.status(404).json({ error: "Restaurant not found" });
     }
 
-    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended) {
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended || 
+        restaurant.verificationStatus !== "approved" || restaurant.user?.isBlocked) {
       return res.status(404).json({ error: "Restaurant not available" });
     }
 
@@ -221,13 +213,19 @@ router.get("/restaurants/:id/menu", async (req: Request, res: Response) => {
 
     const restaurant = await prisma.restaurantProfile.findUnique({
       where: { id },
+      include: {
+        user: {
+          select: { isBlocked: true },
+        },
+      },
     });
 
     if (!restaurant) {
       return res.status(404).json({ error: "Restaurant not found" });
     }
 
-    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended) {
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended || 
+        restaurant.verificationStatus !== "approved" || restaurant.user?.isBlocked) {
       return res.status(404).json({ error: "Restaurant not available" });
     }
 

@@ -14,7 +14,7 @@ interface AuthContextType {
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, role: string, countryCode: string) => Promise<void>;
-  logout: () => void;
+  logout: () => void; // Fires async audit request internally but returns immediately
   isLoading: boolean;
 }
 
@@ -86,6 +86,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Send logout audit request to backend (fire-and-forget, don't block logout)
+    if (token && user) {
+      fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        credentials: "include",
+      }).catch(() => {
+        // Silent failure - don't block logout even if audit fails
+      });
+    }
+    
     setToken(null);
     setUser(null);
     

@@ -55,11 +55,13 @@ router.get("/restaurants", async (req: AuthRequest, res) => {
       isVerified: true,
       isActive: true,
       isSuspended: false,
+      verificationStatus: "approved",
     };
 
-    // Apply jurisdiction filter: match customer's country
+    // Apply jurisdiction filter: match customer's country AND user not blocked
     whereConditions.user = {
       countryCode: customerCountryCode,
+      isBlocked: false,
     };
 
     // City-level jurisdiction filter:
@@ -144,18 +146,15 @@ router.get("/restaurants", async (req: AuthRequest, res) => {
       return false;
     };
 
-    // Format response (customer-facing only, no internal fields)
+    // Format response (customer-facing only - display-safe fields only)
     let formattedRestaurants = restaurants.map((restaurant) => ({
       id: restaurant.id,
       name: restaurant.restaurantName,
-      cuisineType: restaurant.cuisineType || 'Not specified',
-      description: restaurant.description || '',
-      address: restaurant.address,
+      cuisineType: restaurant.cuisineType || 'Various',
       cityCode: restaurant.cityCode || 'Nationwide',
       averageRating: restaurant.averageRating || 0,
       totalRatings: restaurant.totalRatings || 0,
       logoUrl: restaurant.branding?.logoUrl || null,
-      primaryColor: restaurant.branding?.primaryColor || null,
       isOpen: isRestaurantOpen(restaurant.hours),
       isFavorite: restaurant.favoritedBy.length > 0,
     }));
@@ -214,6 +213,7 @@ router.get("/restaurants/:id", async (req: AuthRequest, res) => {
         user: {
           select: {
             countryCode: true,
+            isBlocked: true,
           },
         },
       },
@@ -224,7 +224,8 @@ router.get("/restaurants/:id", async (req: AuthRequest, res) => {
     }
 
     // Verify restaurant is available for this customer
-    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended) {
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended ||
+        restaurant.verificationStatus !== "approved" || restaurant.user.isBlocked) {
       return res.status(404).json({ error: "Restaurant not available" });
     }
 
@@ -297,13 +298,14 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
       });
     }
 
-    // Get restaurant
+    // Get restaurant with user block status
     const restaurant = await prisma.restaurantProfile.findUnique({
       where: { id },
       include: {
         user: {
           select: {
             countryCode: true,
+            isBlocked: true,
           },
         },
       },
@@ -313,8 +315,9 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
       return res.status(404).json({ error: "Restaurant not found" });
     }
 
-    // Verify restaurant is available
-    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended) {
+    // Verify restaurant is available (including verificationStatus and user block status)
+    if (!restaurant.isVerified || !restaurant.isActive || restaurant.isSuspended ||
+        restaurant.verificationStatus !== "approved" || restaurant.user.isBlocked) {
       return res.status(404).json({ error: "Restaurant not available" });
     }
 
@@ -323,7 +326,7 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Restaurant not available in your country" });
     }
 
-    // Verify jurisdiction match (city level)
+    // Verify jurisdiction match (city level) - allow nationwide restaurants (cityCode = null)
     const customerCityCode = customerProfile.cityCode;
     const restaurantCityCode = restaurant.cityCode;
 
@@ -333,8 +336,7 @@ router.get("/restaurants/:id/menu", async (req: AuthRequest, res) => {
         return res.status(403).json({ error: "Restaurant not available in your city" });
       }
     }
-    // If restaurant is nationwide (cityCode = null) but customer has a city, that's OK
-    // If customer has no city, they can only access nationwide restaurants (already handled)
+    // If restaurant is nationwide (cityCode = null), customer from any city can access it
 
     // Get menu categories with items
     const categories = await prisma.menuCategory.findMany({
