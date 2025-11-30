@@ -154,19 +154,24 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
       });
     }
 
-    // Calculate commission (15% for restaurant, 5% for driver delivery = 20% total)
-    // Total fare = 100%
-    // SafeGo commission = 20% (15% from restaurant + 5% from delivery)
-    // Restaurant gets = 80% of fare minus delivery fee (5%)
-    // Driver delivery fee = 5% of fare
+    // Calculate commission using SafeGo official commission config
+    // Commission rates: BD (12% restaurant), US (15% restaurant)
+    // Driver delivery fee remains 5% of fare for delivery payout
     const fare = parseFloat(serviceFare);
-    const totalCommissionRate = 0.20; // 20% total to SafeGo
-    const restaurantCommissionRate = 0.15; // 15% from restaurant
-    const deliveryFeeRate = 0.05; // 5% delivery fee
+    const countryCode = (restaurant.countryCode || 'US') as 'BD' | 'US';
     
-    const safegoCommission = fare * totalCommissionRate; // $20 on $100
-    const deliveryPayout = fare * deliveryFeeRate; // $5 on $100
-    const restaurantPayout = fare - safegoCommission - deliveryPayout; // $75 on $100 ($100 - $20 - $5)
+    // Import and use commission config for country-specific rates
+    const { calculateRestaurantCommission } = await import('../config/commissionConfig');
+    const commissionResult = calculateRestaurantCommission(fare, countryCode);
+    
+    // Platform takes restaurant commission, driver gets delivery fee (5% of fare)
+    const deliveryFeeRate = 0.05; // 5% delivery fee to driver
+    const deliveryPayout = fare * deliveryFeeRate;
+    
+    // SafeGo commission = restaurant commission only (BD: 12%, US: 15%)
+    const safegoCommission = commissionResult.platformCommissionAmount;
+    // Restaurant payout = fare minus commission minus delivery fee
+    const restaurantPayout = fare - safegoCommission - deliveryPayout;
 
     // Use transaction to ensure atomic order creation and stock decrement
     const orderId = randomUUID();

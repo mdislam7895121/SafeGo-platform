@@ -55,9 +55,12 @@ export async function calculateCommission(
     });
 
     if (!globalRule) {
-      // Step 44B: Safe fallback - use default 15% commission rate if no rule configured
-      console.warn('[CommissionService] No commission rule found, using default 15% rate');
-      const defaultCommissionRate = 15;
+      // Step 44B + Commission Config: Safe fallback using SafeGo official commission rates
+      const { getRestaurantCommissionRate } = await import('../config/commissionConfig');
+      const countryCode = (orderData.countryCode || 'US') as 'BD' | 'US';
+      const defaultCommissionRate = getRestaurantCommissionRate(countryCode);
+      console.warn(`[CommissionService] No commission rule found, using country ${countryCode} rate: ${defaultCommissionRate}%`);
+      
       const baseCommissionAmount = new Decimal(
         (serviceFareNum * defaultCommissionRate) / 100
       );
