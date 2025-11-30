@@ -314,11 +314,13 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
           {/* Profile Dropdown */}
           <DropdownMenu open={profileOpen} onOpenChange={setProfileOpen}>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="gap-2" 
+              <button 
+                type="button"
+                className="flex items-center gap-2 rounded-md px-3 py-2 hover-elevate active-elevate-2 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-ring" 
                 data-testid="button-profile-avatar"
                 aria-label="Open profile menu"
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
               >
                 <Avatar className="h-8 w-8 border-2 border-border">
                   <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
@@ -327,7 +329,7 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
                 </Avatar>
                 <span className="hidden md:inline-block text-sm">{driverName}</span>
                 <ChevronDown className="h-4 w-4 hidden md:block" />
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
