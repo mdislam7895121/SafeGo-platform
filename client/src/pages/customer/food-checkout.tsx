@@ -24,6 +24,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -96,6 +106,32 @@ interface PaymentMethodsResponse {
   paymentMethods: PaymentMethod[];
 }
 
+interface WalletBalance {
+  balance: number;
+  currency: string;
+}
+
+function isCardExpired(expMonth: number, expYear: number): boolean {
+  const now = new Date();
+  const currentYear = now.getFullYear() % 100;
+  const currentMonth = now.getMonth() + 1;
+  
+  if (expYear < currentYear) return true;
+  if (expYear === currentYear && expMonth < currentMonth) return true;
+  return false;
+}
+
+function isCardExpiringSoon(expMonth: number, expYear: number): boolean {
+  const now = new Date();
+  const currentYear = now.getFullYear() % 100;
+  const currentMonth = now.getMonth() + 1;
+  
+  if (expYear === currentYear && expMonth === currentMonth) return true;
+  if (expYear === currentYear && expMonth === currentMonth + 1) return true;
+  if (currentMonth === 12 && expYear === currentYear + 1 && expMonth === 1) return true;
+  return false;
+}
+
 interface SavedAddress {
   id: string;
   type: "home" | "work" | "saved";
@@ -157,6 +193,14 @@ export default function FoodCheckout() {
     queryKey: ["/api/customer/payment-methods"],
   });
 
+  const { data: walletData } = useQuery<WalletBalance>({
+    queryKey: ["/api/customer/wallet/balance"],
+    retry: false,
+  });
+
+  const walletBalance = walletData?.balance ?? 0;
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
   const savedAddresses = useMemo((): SavedAddress[] => {
     if (!profileData) return [];
     const addresses: SavedAddress[] = [];
@@ -199,6 +243,7 @@ export default function FoodCheckout() {
       items: any[];
       serviceFare: number;
       paymentMethod: string;
+      paymentMethodId?: string | null;
     }) => {
       const response = await apiRequest("/api/food-orders", {
         method: "POST",
@@ -315,7 +360,39 @@ export default function FoodCheckout() {
     setShowPaymentSheet(false);
   };
 
+  const validatePaymentMethod = (): { valid: boolean; error?: string } => {
+    const paymentMethodToUse = state.paymentMethod || defaultPaymentMethod?.id || "cash";
+    
+    if (paymentMethodToUse === "cash") {
+      return { valid: true };
+    }
+    
+    if (paymentMethodToUse === "wallet") {
+      if (walletBalance < totals.total) {
+        return { 
+          valid: false, 
+          error: `Insufficient wallet balance. You have $${walletBalance.toFixed(2)} but need $${totals.total.toFixed(2)}.` 
+        };
+      }
+      return { valid: true };
+    }
+    
+    const selectedCard = paymentMethods.find(pm => pm.id === paymentMethodToUse);
+    if (selectedCard) {
+      if (isCardExpired(selectedCard.expMonth, selectedCard.expYear)) {
+        return { 
+          valid: false, 
+          error: `Your ${selectedCard.brand} card ending in ${selectedCard.last4} has expired. Please select a different payment method.` 
+        };
+      }
+    }
+    
+    return { valid: true };
+  };
+
   const validateOrder = (): boolean => {
+    setPaymentError(null);
+    
     if (!profileData?.isVerified) {
       setShowKycDialog(true);
       return false;
@@ -352,6 +429,18 @@ export default function FoodCheckout() {
       return false;
     }
 
+    const paymentValidation = validatePaymentMethod();
+    if (!paymentValidation.valid) {
+      setPaymentError(paymentValidation.error || "Invalid payment method");
+      toast({
+        title: "Payment issue",
+        description: paymentValidation.error || "Please check your payment method.",
+        variant: "destructive",
+      });
+      setShowPaymentSheet(true);
+      return false;
+    }
+
     if (!hasMinimumOrder && state.restaurant?.minOrderAmount) {
       toast({
         title: "Minimum order not met",
@@ -376,7 +465,24 @@ export default function FoodCheckout() {
     setShowConfirmDialog(false);
 
     const paymentMethodToUse = state.paymentMethod || defaultPaymentMethod?.id || "cash";
-    const paymentType = paymentMethodToUse === "cash" ? "cash" : "online";
+    
+    // Determine payment type and method ID
+    // Backend accepts: "cash" or "online"
+    // Wallet and card payments are both "online" payments
+    let paymentType: string;
+    let paymentMethodId: string | null = null;
+    
+    if (paymentMethodToUse === "cash") {
+      paymentType = "cash";
+    } else if (paymentMethodToUse === "wallet") {
+      // Wallet is an online payment type
+      paymentType = "online";
+      paymentMethodId = "wallet";
+    } else {
+      // It's a saved card ID - also an online payment
+      paymentType = "online";
+      paymentMethodId = paymentMethodToUse;
+    }
 
     try {
       await createOrderMutation.mutateAsync({
@@ -394,6 +500,7 @@ export default function FoodCheckout() {
         })),
         serviceFare: totals.total,
         paymentMethod: paymentType,
+        paymentMethodId: paymentMethodId,
       });
       
       toast({
@@ -915,6 +1022,16 @@ export default function FoodCheckout() {
             </SheetDescription>
           </SheetHeader>
           
+          {paymentError && (
+            <div className="mb-4 p-3 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-destructive">Payment Issue</p>
+                <p className="text-xs text-destructive/80">{paymentError}</p>
+              </div>
+            </div>
+          )}
+          
           <div className="space-y-4 overflow-y-auto max-h-[60vh]">
             <RadioGroup 
               value={state.paymentMethod || (defaultPaymentMethod?.id || "cash")}
@@ -946,15 +1063,34 @@ export default function FoodCheckout() {
                 </h4>
                 <Label
                   htmlFor="payment-wallet"
-                  className="flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover-elevate"
+                  className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover-elevate ${
+                    walletBalance < totals.total ? "opacity-60" : ""
+                  }`}
                 >
-                  <RadioGroupItem value="wallet" id="payment-wallet" data-testid="radio-payment-wallet" />
+                  <RadioGroupItem 
+                    value="wallet" 
+                    id="payment-wallet" 
+                    data-testid="radio-payment-wallet"
+                    disabled={walletBalance < totals.total}
+                  />
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <CreditCard className="h-5 w-5 text-primary" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-medium">SafeGo Wallet</p>
-                    <p className="text-sm text-muted-foreground">Pay with your wallet balance</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">SafeGo Wallet</p>
+                      <Badge variant="outline" className="text-xs font-mono">
+                        ${walletBalance.toFixed(2)}
+                      </Badge>
+                    </div>
+                    {walletBalance < totals.total ? (
+                      <p className="text-sm text-destructive flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Insufficient balance (need ${totals.total.toFixed(2)})
+                      </p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Pay with your wallet balance</p>
+                    )}
                   </div>
                 </Label>
               </div>
@@ -964,33 +1100,56 @@ export default function FoodCheckout() {
                   <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                     Saved Cards
                   </h4>
-                  {paymentMethods.map((method) => (
-                    <Label
-                      key={method.id}
-                      htmlFor={`payment-${method.id}`}
-                      className="flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover-elevate"
-                    >
-                      <RadioGroupItem 
-                        value={method.id} 
-                        id={`payment-${method.id}`} 
-                        data-testid={`radio-payment-${method.id}`}
-                      />
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        {getCardIcon(method.brand)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium capitalize">{method.brand} •••• {method.last4}</p>
-                          {method.isDefault && (
-                            <Badge variant="secondary" className="text-xs">Default</Badge>
+                  {paymentMethods.map((method) => {
+                    const expired = isCardExpired(method.expMonth, method.expYear);
+                    const expiringSoon = isCardExpiringSoon(method.expMonth, method.expYear);
+                    
+                    return (
+                      <Label
+                        key={method.id}
+                        htmlFor={`payment-${method.id}`}
+                        className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover-elevate ${
+                          expired ? "opacity-60 border-destructive/50" : ""
+                        }`}
+                      >
+                        <RadioGroupItem 
+                          value={method.id} 
+                          id={`payment-${method.id}`} 
+                          data-testid={`radio-payment-${method.id}`}
+                          disabled={expired}
+                        />
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                          {getCardIcon(method.brand)}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium capitalize">{method.brand} •••• {method.last4}</p>
+                            {method.isDefault && !expired && (
+                              <Badge variant="secondary" className="text-xs">Default</Badge>
+                            )}
+                            {expired && (
+                              <Badge variant="destructive" className="text-xs">Expired</Badge>
+                            )}
+                            {expiringSoon && !expired && (
+                              <Badge variant="outline" className="text-xs text-yellow-600 border-yellow-500">
+                                Expiring Soon
+                              </Badge>
+                            )}
+                          </div>
+                          {expired ? (
+                            <p className="text-sm text-destructive flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              Card expired {method.expMonth}/{method.expYear}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              Expires {method.expMonth}/{method.expYear}
+                            </p>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Expires {method.expMonth}/{method.expYear}
-                        </p>
-                      </div>
-                    </Label>
-                  ))}
+                      </Label>
+                    );
+                  })}
                 </div>
               )}
             </RadioGroup>

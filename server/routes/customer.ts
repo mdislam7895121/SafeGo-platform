@@ -352,6 +352,42 @@ router.get("/wallet", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// GET /api/customer/wallet/balance
+// Get customer wallet balance only (lightweight)
+// Note: Customer wallet balance is currently calculated from order history
+// For a production system, consider adding a dedicated CustomerWallet table
+// ====================================================
+router.get("/wallet/balance", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get customer profile
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // In this implementation, wallet balance starts at 0
+    // Users would need to add funds through a payment integration
+    // For demo purposes, we return 0 which means wallet payments are not available
+    // until a proper wallet funding system is implemented
+    const walletBalance = 0;
+
+    res.json({
+      balance: walletBalance,
+      currency: "USD",
+      isDemo: true, // Mark as demo until wallet funding is implemented
+    });
+  } catch (error) {
+    console.error("Get wallet balance error:", error);
+    res.status(500).json({ error: "Failed to fetch wallet balance" });
+  }
+});
+
+// ====================================================
 // GET /api/customer/notifications
 // Get customer notifications
 // ====================================================
@@ -1068,7 +1104,7 @@ router.get("/ride-options/availability/:categoryId", async (req: AuthRequest, re
 // GET /api/customer/active-promotions - Get active ride promotions
 router.get("/active-promotions", async (req: AuthRequest, res) => {
   try {
-    const userId = req.user?.id;
+    const userId = req.user?.userId;
     const now = new Date();
 
     const promotions = await prisma.ridePromotion.findMany({
