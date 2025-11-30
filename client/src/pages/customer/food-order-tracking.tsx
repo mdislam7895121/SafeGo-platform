@@ -623,12 +623,39 @@ export default function FoodOrderTracking() {
 
         {/* Help Section */}
         <Card>
-          <CardContent className="p-4">
-            <Link href="/customer/support">
-              <Button variant="outline" className="w-full" data-testid="button-get-help">
-                Need help with your order?
-              </Button>
-            </Link>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Need Help?
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Having issues with your order? Our support team is here to help.
+            </p>
+            <div className="flex gap-2">
+              <Link href="/customer/support" className="flex-1">
+                <Button variant="outline" className="w-full" data-testid="button-get-help">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Get Support
+                </Button>
+              </Link>
+              {data.driver?.phone && (
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => {
+                    const sanitizedPhone = data.driver?.phone?.replace(/[^0-9+]/g, '') || '';
+                    if (sanitizedPhone) {
+                      window.location.href = `tel:${sanitizedPhone}`;
+                    }
+                  }}
+                  data-testid="button-call-driver"
+                >
+                  <Phone className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 

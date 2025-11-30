@@ -75,7 +75,8 @@ type EatsCartAction =
   | { type: "CLEAR_CART" }
   | { type: "CLEAR_CART_FOR_NEW_RESTAURANT"; restaurant: RestaurantInfo }
   | { type: "CLEAR_AND_ADD_ITEM"; restaurant: RestaurantInfo; item: Omit<CartItem, "id"> }
-  | { type: "RESTORE_STATE"; state: Partial<EatsCartState> };
+  | { type: "RESTORE_STATE"; state: Partial<EatsCartState> }
+  | { type: "SET_CART_FROM_REORDER"; restaurant: RestaurantInfo; items: Omit<CartItem, "id">[] };
 
 const initialState: EatsCartState = {
   restaurant: null,
@@ -202,6 +203,18 @@ function eatsCartReducer(state: EatsCartState, action: EatsCartAction): EatsCart
     case "RESTORE_STATE":
       return { ...state, ...action.state };
 
+    case "SET_CART_FROM_REORDER": {
+      const newItems: CartItem[] = action.items.map((item) => ({
+        ...item,
+        id: generateItemId(),
+      }));
+      return {
+        ...initialState,
+        restaurant: action.restaurant,
+        items: newItems,
+      };
+    }
+
     default:
       return state;
   }
@@ -221,6 +234,7 @@ interface EatsCartContextType {
   clearCart: () => void;
   clearCartForNewRestaurant: (restaurant: RestaurantInfo) => void;
   clearAndAddItem: (item: Omit<CartItem, "id">, restaurant: RestaurantInfo) => void;
+  setCartFromReorder: (restaurant: RestaurantInfo, items: Omit<CartItem, "id">[]) => void;
   setError: (error: string | null) => void;
   getItemCount: () => number;
   getItemQuantity: (menuItemId: string) => number;
@@ -348,6 +362,10 @@ export function EatsCartProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "CLEAR_AND_ADD_ITEM", restaurant, item });
   }, []);
 
+  const setCartFromReorder = useCallback((restaurant: RestaurantInfo, items: Omit<CartItem, "id">[]) => {
+    dispatch({ type: "SET_CART_FROM_REORDER", restaurant, items });
+  }, []);
+
   const setError = useCallback((error: string | null) => {
     dispatch({ type: "SET_ERROR", error });
   }, []);
@@ -409,6 +427,7 @@ export function EatsCartProvider({ children }: { children: ReactNode }) {
         clearCart,
         clearCartForNewRestaurant,
         clearAndAddItem,
+        setCartFromReorder,
         setError,
         getItemCount,
         getItemQuantity,

@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Star, UtensilsCrossed, Calendar, CheckCircle } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Star, UtensilsCrossed, Calendar, CheckCircle, RotateCcw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { ReviewSubmissionDialog } from "@/components/customer/ReviewSubmissionDialog";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useEatsCart } from "@/contexts/EatsCartContext";
 
 interface FoodOrder {
   id: string;
@@ -33,10 +36,38 @@ interface FoodOrdersResponse {
 
 export default function FoodOrdersHistory() {
   const [selectedOrderForReview, setSelectedOrderForReview] = useState<FoodOrder | null>(null);
+  const [, setLocationPath] = useLocation();
+  const { toast } = useToast();
+  const { setCartFromReorder } = useEatsCart();
 
   const { data, isLoading, refetch } = useQuery<FoodOrdersResponse>({
     queryKey: ["/api/customer/food-orders"],
     retry: 1,
+  });
+
+  // Reorder mutation
+  const reorderMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await apiRequest("GET", `/api/customer/food/orders/${orderId}/reorder`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.items && data.restaurant) {
+        setCartFromReorder(data.restaurant, data.items);
+        toast({
+          title: "Items added to cart",
+          description: `${data.items.length} item(s) from ${data.restaurant.name} added to your cart`,
+        });
+        setLocationPath("/customer/food/checkout");
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Reorder failed",
+        description: error.message || "Could not reorder. Some items may no longer be available.",
+        variant: "destructive",
+      });
+    },
   });
 
   const orders = data?.orders || [];
@@ -141,22 +172,38 @@ export default function FoodOrdersHistory() {
                   <div>{order.deliveryAddress}</div>
                 </div>
 
-                {order.hasReview ? (
-                  <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
-                    <Star className="h-4 w-4 fill-current" />
-                    <span data-testid={`text-reviewed-${order.id}`}>You reviewed this order</span>
-                  </div>
-                ) : (
+                <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    className="w-full"
-                    onClick={() => setSelectedOrderForReview(order)}
-                    data-testid={`button-leave-review-${order.id}`}
+                    className="flex-1"
+                    onClick={() => reorderMutation.mutate(order.id)}
+                    disabled={reorderMutation.isPending}
+                    data-testid={`button-reorder-${order.id}`}
                   >
-                    <Star className="h-4 w-4 mr-2" />
-                    Leave a Review
+                    {reorderMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                    )}
+                    Reorder
                   </Button>
-                )}
+                  {order.hasReview ? (
+                    <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 px-3">
+                      <Star className="h-4 w-4 fill-current" />
+                      <span data-testid={`text-reviewed-${order.id}`}>Reviewed</span>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setSelectedOrderForReview(order)}
+                      data-testid={`button-leave-review-${order.id}`}
+                    >
+                      <Star className="h-4 w-4 mr-2" />
+                      Review
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))

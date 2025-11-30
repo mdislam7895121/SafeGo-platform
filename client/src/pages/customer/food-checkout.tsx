@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { 
   ArrowLeft, Plus, Minus, Trash2, ShoppingCart, MapPin, CreditCard, Ticket, 
   AlertCircle, Store, Clock, CheckCircle, Shield, Home, Briefcase, ChevronRight,
-  Loader2, X
+  Loader2, X, DollarSign, Heart
 } from "lucide-react";
 import { SiVisa, SiMastercard, SiAmericanexpress } from "react-icons/si";
 import { Button } from "@/components/ui/button";
@@ -182,8 +182,26 @@ export default function FoodCheckout() {
   const [showKycDialog, setShowKycDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [customAddress, setCustomAddress] = useState("");
+  
+  // Tip state
+  const [tipPreset, setTipPreset] = useState<number | "custom" | null>(15); // 10, 15, 20, or "custom"
+  const [customTipInput, setCustomTipInput] = useState<string>("");
 
   const totals = getTotals();
+
+  // Calculate tip amount
+  const tipAmount = useMemo(() => {
+    if (tipPreset === null) return 0;
+    if (tipPreset === "custom") {
+      const parsed = parseFloat(customTipInput);
+      return isNaN(parsed) || parsed < 0 ? 0 : Math.round(parsed * 100) / 100;
+    }
+    // tipPreset is percentage (10, 15, 20)
+    return Math.round(totals.subtotal * (tipPreset / 100) * 100) / 100;
+  }, [tipPreset, customTipInput, totals.subtotal]);
+
+  // Total with tip
+  const grandTotal = Math.round((totals.total + tipAmount) * 100) / 100;
 
   const { data: profileData, isLoading: profileLoading } = useQuery<CustomerProfile>({
     queryKey: ["/api/customer/profile"],
@@ -244,6 +262,8 @@ export default function FoodCheckout() {
       serviceFare: number;
       paymentMethod: string;
       paymentMethodId?: string | null;
+      tipAmount?: number;
+      deliveryInstructions?: string;
     }) => {
       const response = await apiRequest("/api/food-orders", {
         method: "POST",
@@ -368,10 +388,10 @@ export default function FoodCheckout() {
     }
     
     if (paymentMethodToUse === "wallet") {
-      if (walletBalance < totals.total) {
+      if (walletBalance < grandTotal) {
         return { 
           valid: false, 
-          error: `Insufficient wallet balance. You have $${walletBalance.toFixed(2)} but need $${totals.total.toFixed(2)}.` 
+          error: `Insufficient wallet balance. You have $${walletBalance.toFixed(2)} but need $${grandTotal.toFixed(2)}.` 
         };
       }
       return { valid: true };
@@ -501,6 +521,8 @@ export default function FoodCheckout() {
         serviceFare: totals.total,
         paymentMethod: paymentType,
         paymentMethodId: paymentMethodId,
+        tipAmount: tipAmount > 0 ? tipAmount : undefined,
+        deliveryInstructions: state.specialInstructions || undefined,
       });
       
       toast({
@@ -828,6 +850,84 @@ export default function FoodCheckout() {
           </CardContent>
         </Card>
 
+        {/* Tip Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Heart className="h-4 w-4" />
+              Add a Tip
+            </CardTitle>
+            <CardDescription>
+              100% of your tip goes to your delivery driver
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Preset tip buttons */}
+            <div className="grid grid-cols-4 gap-2">
+              {[10, 15, 20].map((percent) => {
+                const amount = Math.round(totals.subtotal * (percent / 100) * 100) / 100;
+                return (
+                  <Button
+                    key={percent}
+                    variant={tipPreset === percent ? "default" : "outline"}
+                    className="flex flex-col h-auto py-3"
+                    onClick={() => {
+                      setTipPreset(percent);
+                      setCustomTipInput("");
+                    }}
+                    data-testid={`button-tip-${percent}`}
+                  >
+                    <span className="font-semibold">{percent}%</span>
+                    <span className="text-xs opacity-80">${amount.toFixed(2)}</span>
+                  </Button>
+                );
+              })}
+              <Button
+                variant={tipPreset === "custom" ? "default" : "outline"}
+                className="flex flex-col h-auto py-3"
+                onClick={() => setTipPreset("custom")}
+                data-testid="button-tip-custom"
+              >
+                <span className="font-semibold">Custom</span>
+                <span className="text-xs opacity-80">Amount</span>
+              </Button>
+            </div>
+
+            {/* Custom tip input */}
+            {tipPreset === "custom" && (
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={customTipInput}
+                    onChange={(e) => setCustomTipInput(e.target.value)}
+                    className="pl-8"
+                    data-testid="input-custom-tip"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* No tip option */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`w-full text-muted-foreground ${tipPreset === null ? "bg-muted" : ""}`}
+              onClick={() => {
+                setTipPreset(null);
+                setCustomTipInput("");
+              }}
+              data-testid="button-no-tip"
+            >
+              No tip
+            </Button>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -889,6 +989,12 @@ export default function FoodCheckout() {
               <span className="text-muted-foreground">Tax</span>
               <span data-testid="text-tax">${totals.tax.toFixed(2)}</span>
             </div>
+            {tipAmount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Driver Tip</span>
+                <span data-testid="text-tip">${tipAmount.toFixed(2)}</span>
+              </div>
+            )}
             {totals.discount > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>Discount</span>
@@ -898,7 +1004,7 @@ export default function FoodCheckout() {
             <Separator />
             <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
-              <span data-testid="text-total">${totals.total.toFixed(2)}</span>
+              <span data-testid="text-total">${grandTotal.toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>
@@ -934,7 +1040,7 @@ export default function FoodCheckout() {
               Placing Order...
             </>
           ) : (
-            `Review Order - $${totals.total.toFixed(2)}`
+            `Review Order - $${grandTotal.toFixed(2)}`
           )}
         </Button>
       </div>
@@ -1064,14 +1170,14 @@ export default function FoodCheckout() {
                 <Label
                   htmlFor="payment-wallet"
                   className={`flex items-center gap-3 p-4 rounded-lg border cursor-pointer hover-elevate ${
-                    walletBalance < totals.total ? "opacity-60" : ""
+                    walletBalance < grandTotal ? "opacity-60" : ""
                   }`}
                 >
                   <RadioGroupItem 
                     value="wallet" 
                     id="payment-wallet" 
                     data-testid="radio-payment-wallet"
-                    disabled={walletBalance < totals.total}
+                    disabled={walletBalance < grandTotal}
                   />
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <CreditCard className="h-5 w-5 text-primary" />
@@ -1083,10 +1189,10 @@ export default function FoodCheckout() {
                         ${walletBalance.toFixed(2)}
                       </Badge>
                     </div>
-                    {walletBalance < totals.total ? (
+                    {walletBalance < grandTotal ? (
                       <p className="text-sm text-destructive flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
-                        Insufficient balance (need ${totals.total.toFixed(2)})
+                        Insufficient balance (need ${grandTotal.toFixed(2)})
                       </p>
                     ) : (
                       <p className="text-sm text-muted-foreground">Pay with your wallet balance</p>
@@ -1231,11 +1337,21 @@ export default function FoodCheckout() {
               </div>
             </div>
             
+            {tipAmount > 0 && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                <Heart className="h-5 w-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium">Driver Tip</p>
+                  <p className="text-sm text-muted-foreground">${tipAmount.toFixed(2)}</p>
+                </div>
+              </div>
+            )}
+            
             <Separator />
             
             <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
-              <span>${totals.total.toFixed(2)}</span>
+              <span>${grandTotal.toFixed(2)}</span>
             </div>
           </div>
           
