@@ -1,0 +1,230 @@
+SAFEGO – FIX DRIVER PROFILE NAVIGATION (DESKTOP), DRIVER HOME ROUTE, AND PHONE NUMBER FORMAT (E.164)
+
+You must keep ALL existing SafeGo Master Rules, KYC, commission, wallet, and status flows intact. Perform ONLY ADD-ON, backward-compatible changes.
+
+====================================================
+A. SAFEGO MASTER RULES (DO NOT BREAK)
+====================================================
+
+Roles:
+- customer, driver, restaurant, admin (strict separation).
+
+Services:
+- ride-hailing, food delivery, parcel delivery (all must continue to work).
+
+KYC:
+- BD: father_name, DOB, present/permanent address, NID (number + front/back images), emergency contact, verification_status, is_verified.
+- US: DOB, home_address, emergency contact, government_id_type, government_id_last4, verification_status, is_verified.
+- US drivers: driver_license_number, driver_license_image, driver_license_expiry, ssn_last4 (optional), driver_background_check_status.
+- Only admin can approve/reject KYC and change verification_status / is_verified.
+
+Wallet & Commission (Step 47):
+- BD: restaurant 12%, driver 10%.
+- US: restaurant 15%, driver 10%.
+- Cash → driver/restaurant holds all cash, platform commission → negative balance.
+- Online → platform keeps commission, driver/restaurant earnings → wallet.
+- Admin manages settlements and payouts.
+
+Security:
+- No user sees another role’s sensitive data.
+- Drivers never see customer NID or government IDs.
+- Only admin can change pricing, commission, verification, blocking.
+- Users edit only their own profile.
+
+Status flows (rides, food_orders, deliveries) must not change.
+
+All changes in this task are strictly ADD-ONLY.
+
+====================================================
+B. BUG 1 – PROFILE BUTTON WORKS ON MOBILE BUT NOT ON DESKTOP
+====================================================
+
+Observed behavior:
+- On mobile, tapping the top-right avatar/profile icon opens the driver account/profile (/driver/account/manage or equivalent).
+- On desktop (driver ride map screen and similar), clicking the same avatar does nothing.
+
+Goal:
+- Unify behavior so that the avatar works on BOTH mobile and desktop:
+  - For driver: clicking avatar always opens driver account/profile.
+  - For other roles, it opens their own profile.
+- Implementation must be role-aware and non-breaking.
+
+Implementation steps:
+
+1) Locate shared header / top nav component:
+   - Find the exact component that renders the avatar on:
+     - driver ride map screen,
+     - other driver screens,
+     - possibly shared across roles.
+   - Example: `components/layout/AppHeader.tsx` or similar.
+
+2) Identify existing mobile behavior:
+   - See how mobile click/tap on avatar currently navigates to `/driver/account/manage` (or other profile route).
+   - Extract this logic into a shared handler function:
+     - `handleAvatarClick()` which internally:
+       - reads authenticated user and role,
+       - computes the correct profile route using helper (see below),
+       - uses router.push() to navigate.
+
+3) Implement unified helper:
+
+   - Create `getProfileRouteForCurrentUser(session)`:
+
+     - if role === "driver"     → return "/driver/account/manage" (or "/driver/profile" wrapper).
+     - if role === "customer"   → "/customer/account/manage" or "/customer/profile".
+     - if role === "restaurant" → "/restaurant/account/manage" or "/restaurant/profile".
+     - if role === "admin"      → "/admin/profile" or admin account settings route.
+     - if unauthenticated       → return "/login" or auth entry route.
+
+   - Do NOT remove or rename existing profile routes. If needed, create thin wrapper pages at:
+     - /driver/profile → renders existing driver account/manage component.
+     - /customer/profile → renders existing customer account/manage.
+     - etc.
+
+4) Wire the avatar for both breakpoints:
+
+   - In header component, ensure the avatar element:
+
+     - Is wrapped in a clickable element (button/div with onClick).
+     - onClick calls `handleAvatarClick()` using the helper above.
+     - is keyboard-accessible (Enter/Space triggers click).
+
+   - Make sure this click handler is NOT hidden inside a “mobile-only” block (e.g. `md:hidden` or media-query).
+     - The same handler must exist for desktop layout too.
+     - If you use conditional rendering for mobile/desktop icons, attach the same handler to both.
+
+5) Test:
+
+   - As DRIVER:
+     - On desktop driver map screen: click avatar → must open `/driver/account/manage` (or `/driver/profile`) without errors.
+   - As DRIVER on mobile: behavior must remain unchanged (still works).
+   - As CUSTOMER and RESTAURANT: clicking avatar routes to their respective profile pages.
+   - If not logged in: clicking avatar should go to login or show safe message, not crash.
+
+====================================================
+C. BUG 2 – /driver/home RETURNS 404
+====================================================
+
+Observed behavior:
+- Visiting `/driver/home` shows "404 Page Not Found – Did you forget to add the page to the router?".
+
+Goal:
+- Ensure any internal navigation that targets `/driver/home` works by either:
+  - providing a real driver home page at `/driver/home`, or
+  - redirecting `/driver/home` → `/driver` (if `/driver` is the actual home).
+
+Implementation (ADD-ONLY):
+
+1) Check existing driver entry route:
+   - If main driver home is already `/driver` (likely from Step 48/49), then:
+     - Add a simple wrapper route `/driver/home` that immediately redirects to `/driver`.
+     - For example:
+       - On mount, use router.replace("/driver").
+       - Or configure a route-level redirect depending on framework.
+
+2) If there is a dedicated driver dashboard component:
+   - You may mount it at both `/driver` and `/driver/home` (sharing the same component).
+   - Do not move or rename existing `/driver` route.
+
+3) Verify:
+   - In browser, open `/driver/home`:
+     - You should see the same driver home/dashboard as `/driver`, or be redirected there.
+   - Ensure no other routes break.
+
+====================================================
+D. BUG 3 – PHONE NUMBER MUST BE IN E.164 FORMAT
+====================================================
+
+Observed behavior:
+- On `/driver/account/manage`, when updating phone number with a value like `9293369016`, backend returns HTTP 400:
+  - `Phone number must start with + and include country code (E.164 format)`.
+
+Goal:
+- Make the driver profile phone number UX friendly:
+  - Guide user to E.164 format,
+  - Optionally auto-format common cases,
+  - Keep backend validation strict and secure.
+
+Implementation:
+
+1) Frontend validation & formatting:
+
+   - On phone number edit form (driver account/manage and equivalent for other roles):
+
+     - Show helper text clearly:
+       - `"Enter your phone number in international format (E.164): +1 9293369016 or +8801XXXXXXXXX"`
+
+     - Implement a small formatter function, e.g. `normalizePhoneInput(raw, userCountry)`:
+
+       - Trim spaces, dashes, parentheses.
+       - If input already starts with `+`:
+         - Leave as-is and send to backend.
+       - Else, if:
+         - `userCountry === "US"` and raw is 10 digits:
+             - Prepend "+1" → `+1${raw}`.
+         - `userCountry === "BD"` and raw is 10 or 11 digits (typical local format):
+             - Convert to `+880` + remaining digits according to BD local rules.
+
+       - If after normalization the result does NOT match E.164 pattern:
+         - Show a clear inline error before calling API:
+           - `"Please include country code, e.g. +1 9293369016"`
+
+     - On Save:
+       - Send normalized value to backend.
+
+2) Backend:
+
+   - DO NOT weaken the existing E.164 validation.
+   - Continue to require numbers starting with `+` with country code.
+   - Optionally, improve error message to be more user-friendly.
+
+3) Test scenarios:
+
+   - US driver:
+     - Input: `9293369016` (10 digits, no +) → front-end should normalize to `+19293369016`, update succeeds.
+     - Input: `+19293369016` → succeeds.
+     - Input: `92933` → front-end shows validation error and does not call API.
+
+   - BD driver:
+     - Input: `017XXXXXXXX` or similar → normalize to `+88017XXXXXXXX`.
+
+====================================================
+E. RESPONSIVE & ROLE-AWARE CHECKLIST
+====================================================
+
+After applying these fixes, verify:
+
+1) Driver – Desktop:
+   - Avatar click → driver account/profile page.
+   - /driver/home → works (redirect or page).
+   - Phone number can be updated with local-looking input and automatically formatted to E.164.
+
+2) Driver – Mobile:
+   - Avatar tap still works and opens same profile.
+   - Phone number edit behaves consistently.
+
+3) Customer / Restaurant / Admin:
+   - Avatar navigation still works or is improved consistently.
+   - No cross-role profile leakage.
+
+====================================================
+F. NON-BREAKING GUARANTEE
+====================================================
+
+You MUST:
+- Keep all existing schemas, routes, and APIs intact.
+- Only add:
+  - shared helper for profile route selection,
+  - avatar click handler for desktop header,
+  - `/driver/home` wrapper/redirect route,
+  - phone input normalization logic on frontend.
+- NOT change:
+  - wallet / commission logic,
+  - status flows,
+  - KYC rules,
+  - existing auth or role models.
+
+Final expectation:
+- Profile avatar works on BOTH mobile and desktop.
+- `/driver/home` no longer returns 404.
+- Phone number edits are user-friendly but still stored strictly in E.164 format.

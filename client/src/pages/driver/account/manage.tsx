@@ -320,6 +320,54 @@ export default function ManageAccount() {
     setEditPhoneOpen(true);
   };
 
+  /**
+   * Normalize phone number to E.164 format
+   * @param raw - Raw phone input
+   * @param country - User's country code (US or BD)
+   * @returns Normalized E.164 phone number or null if invalid
+   */
+  const normalizePhoneInput = (raw: string, country: string | undefined): { normalized: string | null; error: string | null } => {
+    // Remove spaces, dashes, parentheses, and dots
+    const cleaned = raw.replace(/[\s\-\(\)\.]/g, "");
+    
+    // If already starts with +, validate and return
+    if (cleaned.startsWith("+")) {
+      // Validate E.164: + followed by 7-15 digits
+      if (/^\+[1-9]\d{6,14}$/.test(cleaned)) {
+        return { normalized: cleaned, error: null };
+      }
+      return { normalized: null, error: "Invalid phone format. Please include country code (e.g., +1 555 123 4567)" };
+    }
+    
+    // Auto-format based on country
+    if (country === "US") {
+      // US: 10 digits without country code → prepend +1
+      if (/^\d{10}$/.test(cleaned)) {
+        return { normalized: `+1${cleaned}`, error: null };
+      }
+      // US: 11 digits starting with 1 → prepend +
+      if (/^1\d{10}$/.test(cleaned)) {
+        return { normalized: `+${cleaned}`, error: null };
+      }
+      return { normalized: null, error: "For US numbers, enter 10 digits (e.g., 9293369016) or include +1" };
+    }
+    
+    if (country === "BD") {
+      // BD: 10-11 digits starting with 01 → convert to +880
+      if (/^01[3-9]\d{8}$/.test(cleaned)) {
+        return { normalized: `+880${cleaned.substring(1)}`, error: null };
+      }
+      // BD: 10 digits starting with 1 (without leading 0) → prepend +880
+      if (/^1[3-9]\d{8}$/.test(cleaned)) {
+        return { normalized: `+880${cleaned}`, error: null };
+      }
+      return { normalized: null, error: "For BD numbers, enter 11 digits starting with 01 (e.g., 01712345678) or include +880" };
+    }
+    
+    // Generic: require + prefix for other countries
+    return { normalized: null, error: "Please include country code starting with + (e.g., +44 20 7946 0958)" };
+  };
+
   const handleSavePhone = () => {
     if (!phoneNumber.trim()) {
       toast({
@@ -329,7 +377,20 @@ export default function ManageAccount() {
       });
       return;
     }
-    updatePhoneMutation.mutate(phoneNumber);
+    
+    // Normalize phone number to E.164 format
+    const { normalized, error } = normalizePhoneInput(phoneNumber, countryCode);
+    
+    if (error || !normalized) {
+      toast({
+        title: "Invalid phone number",
+        description: error || "Please enter a valid phone number with country code",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    updatePhoneMutation.mutate(normalized);
   };
 
   const handleEditDob = () => {

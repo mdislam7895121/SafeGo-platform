@@ -94,6 +94,7 @@ import DriverSupportTicketView from "@/pages/driver/support-ticket-view";
 import DriverPoints from "@/pages/driver/points";
 import DriverPromotions from "@/pages/driver/promotions";
 import DriverHelp from "@/pages/driver/help";
+import DriverHome from "@/pages/driver/home";
 import DriverAccount from "@/pages/driver/account";
 import DriverAccountVehicles from "@/pages/driver/account/vehicles";
 import DriverAccountWorkHub from "@/pages/driver/account/work-hub";
@@ -511,6 +512,14 @@ function Router() {
       <Route path="/driver">
         <ProtectedRoute allowedRoles={["driver"]}>
           <Redirect to="/driver/dashboard" />
+        </ProtectedRoute>
+      </Route>
+      {/* Driver home route - alias for dashboard */}
+      <Route path="/driver/home">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Home">
+            <DriverHome />
+          </DriverLayout>
         </ProtectedRoute>
       </Route>
       {/* All driver routes wrapped with unified DriverLayout */}
