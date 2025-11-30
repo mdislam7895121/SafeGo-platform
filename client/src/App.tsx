@@ -133,6 +133,7 @@ import DriverTrustScore from "@/pages/driver/trust-score";
 import DriverTripActive from "@/pages/driver/trip-active";
 import DriverTripRequests from "@/pages/driver/trip-requests";
 import DriverRideRequestDetail from "@/pages/driver/ride-request-detail";
+import DriverTripSummary from "@/pages/driver/trip-summary";
 import DriverMap from "@/pages/driver/map";
 import DriverFoodDeliveries from "@/pages/driver/food-deliveries";
 import DriverFoodDeliveryActive from "@/pages/driver/food-delivery-active";
@@ -723,6 +724,11 @@ function Router() {
           <DriverLayout pageTitle="Earnings Breakdown">
             <DriverTripEarnings />
           </DriverLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/driver/trip-summary/:tripId">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverTripSummary />
         </ProtectedRoute>
       </Route>
       <Route path="/driver/performance">

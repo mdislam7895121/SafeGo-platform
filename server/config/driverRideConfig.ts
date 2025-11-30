@@ -17,6 +17,15 @@ export interface DriverRideConfig {
   requestTimeoutSeconds: number;
   locationUpdateIntervalSeconds: number;
   maxActiveRequestsToShow: number;
+  activeRideWorkflow: {
+    liveLocationIntervalMs: number;
+    tripSummaryDisplaySeconds: number;
+    statusTransitionAnimationMs: number;
+    desktopBreakpointPx: number;
+    gpsHighAccuracyEnabled: boolean;
+    gpsMaxAgeMsForCompletion: number;
+    showSwipeToCompleteThreshold: number;
+  };
 }
 
 export const driverRideConfig: DriverRideConfig = {
@@ -31,6 +40,15 @@ export const driverRideConfig: DriverRideConfig = {
   requestTimeoutSeconds: 15,
   locationUpdateIntervalSeconds: 30,
   maxActiveRequestsToShow: 5,
+  activeRideWorkflow: {
+    liveLocationIntervalMs: 10000,
+    tripSummaryDisplaySeconds: 30,
+    statusTransitionAnimationMs: 200,
+    desktopBreakpointPx: 1024,
+    gpsHighAccuracyEnabled: true,
+    gpsMaxAgeMsForCompletion: 5000,
+    showSwipeToCompleteThreshold: 0.85,
+  },
 };
 
 export function getNegativeBalanceThreshold(countryCode: string): number {

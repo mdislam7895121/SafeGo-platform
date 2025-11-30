@@ -2250,4 +2250,271 @@ router.get(
   }
 );
 
+// Step 48 Phase 4: Driver location update for live location sharing during active rides
+const locationUpdateSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  accuracy: z.number().optional(),
+  heading: z.number().optional(),
+  speed: z.number().optional(),
+  timestamp: z.number().optional(),
+});
+
+router.post(
+  "/:tripId/location",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { tripId } = req.params;
+      const { serviceType } = req.query;
+      
+      const validatedData = locationUpdateSchema.parse(req.body);
+      const { lat, lng, accuracy, heading, speed, timestamp } = validatedData;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: { id: true, isSuspended: true },
+      });
+      
+      if (!driverProfile) {
+        return res.status(403).json({ error: "Driver profile not found" });
+      }
+      
+      if (driverProfile.isSuspended) {
+        return res.status(403).json({ error: "Account is suspended" });
+      }
+      
+      const driverId = driverProfile.id;
+      let tripFound = false;
+      
+      // Update driver profile location (Float fields, not Decimal)
+      await prisma.driverProfile.update({
+        where: { id: driverId },
+        data: {
+          currentLat: lat,
+          currentLng: lng,
+          lastLocationUpdatedAt: new Date(),
+        },
+      });
+      
+      // Update trip-specific location based on service type
+      // Driver profile location is the source of truth; we just verify trip exists and update timestamp
+      if (!serviceType || serviceType === "RIDE") {
+        const ride = await prisma.ride.findFirst({
+          where: { 
+            id: tripId, 
+            driverId, 
+            status: { in: ["accepted", "driver_arriving", "arrived", "in_progress"] },
+          },
+        });
+        
+        if (ride) {
+          tripFound = true;
+          await prisma.ride.update({
+            where: { id: tripId },
+            data: {
+              driverLocationUpdatedAt: new Date(),
+            },
+          });
+        }
+      }
+      
+      if (!tripFound && (!serviceType || serviceType === "FOOD")) {
+        const foodOrder = await prisma.foodOrder.findFirst({
+          where: { 
+            id: tripId, 
+            driverId, 
+            status: { in: ["accepted", "picked_up", "in_transit"] },
+          },
+        });
+        
+        if (foodOrder) {
+          tripFound = true;
+          await prisma.foodOrder.update({
+            where: { id: tripId },
+            data: {
+              driverLocationUpdatedAt: new Date(),
+            },
+          });
+        }
+      }
+      
+      if (!tripFound && (!serviceType || serviceType === "PARCEL")) {
+        const delivery = await prisma.delivery.findFirst({
+          where: { 
+            id: tripId, 
+            driverId, 
+            status: { in: ["accepted", "picked_up", "in_transit"] },
+          },
+        });
+        
+        if (delivery) {
+          tripFound = true;
+          // Delivery model may not have location timestamp, just verify trip exists
+        }
+      }
+      
+      if (!tripFound) {
+        return res.status(404).json({ error: "Active trip not found" });
+      }
+      
+      res.json({ 
+        success: true, 
+        location: { lat, lng, accuracy, heading, speed },
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid location data", details: error.errors });
+      }
+      console.error("Error updating driver location:", error);
+      res.status(500).json({ error: "Failed to update location" });
+    }
+  }
+);
+
+// Step 48 Phase 4: Trip summary after completion with earnings breakdown
+router.get(
+  "/:tripId/summary",
+  authenticateToken,
+  requireRole(["driver"]),
+  async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user!.userId;
+      const { tripId } = req.params;
+      
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      
+      if (!driverProfile) {
+        return res.status(403).json({ error: "Driver profile not found" });
+      }
+      
+      const driverId = driverProfile.id;
+      
+      // Try to find completed ride
+      const ride = await prisma.ride.findFirst({
+        where: { id: tripId, driverId },
+        include: {
+          customer: {
+            include: { user: { select: { email: true } } },
+          },
+        },
+      });
+      
+      if (ride) {
+        const summary = {
+          id: ride.id,
+          serviceType: "RIDE" as const,
+          tripCode: generateTripCode("RIDE", ride.id),
+          status: ride.status,
+          pickupAddress: ride.pickupAddress,
+          dropoffAddress: ride.dropoffAddress,
+          distanceKm: ride.estimatedDistanceKm || 0,
+          durationMinutes: ride.estimatedDurationMinutes || 0,
+          actualDurationMinutes: ride.completedAt && ride.tripStartedAt 
+            ? Math.round((ride.completedAt.getTime() - ride.tripStartedAt.getTime()) / 60000)
+            : null,
+          totalFare: serializeDecimal(ride.serviceFare),
+          platformCommission: serializeDecimal(ride.safegoCommission),
+          driverEarnings: serializeDecimal(ride.driverPayout),
+          tipAmount: serializeDecimal(ride.tipAmount),
+          paymentMethod: ride.paymentMethod as "cash" | "card" | "wallet",
+          rideType: ride.rideType || "Standard",
+          customerFirstName: ride.customer?.user?.email?.split("@")[0] || "Customer",
+          customerRating: ride.customerRating,
+          driverRating: ride.driverRating,
+          completedAt: ride.completedAt?.toISOString() || null,
+          startedAt: ride.tripStartedAt?.toISOString() || null,
+          createdAt: ride.createdAt.toISOString(),
+        };
+        
+        return res.json({ summary });
+      }
+      
+      // Try food order
+      const foodOrder = await prisma.foodOrder.findFirst({
+        where: { id: tripId, driverId },
+        include: {
+          restaurant: { select: { restaurantName: true } },
+          customer: { select: { firstName: true } },
+        },
+      });
+      
+      if (foodOrder) {
+        const summary = {
+          id: foodOrder.id,
+          serviceType: "FOOD" as const,
+          tripCode: foodOrder.orderCode || generateTripCode("FOOD", foodOrder.id),
+          status: foodOrder.status,
+          pickupAddress: foodOrder.restaurant?.restaurantName || "Restaurant",
+          dropoffAddress: foodOrder.deliveryAddress,
+          distanceKm: 0,
+          durationMinutes: 0,
+          actualDurationMinutes: foodOrder.deliveredAt && foodOrder.pickedUpAt
+            ? Math.round((foodOrder.deliveredAt.getTime() - foodOrder.pickedUpAt.getTime()) / 60000)
+            : null,
+          totalFare: serializeDecimal(foodOrder.deliveryFee),
+          platformCommission: serializeDecimal(foodOrder.platformDeliveryCommission),
+          driverEarnings: serializeDecimal(foodOrder.driverPayout),
+          tipAmount: serializeDecimal(foodOrder.tipAmount),
+          paymentMethod: foodOrder.paymentMethod as "cash" | "card" | "wallet",
+          restaurantName: foodOrder.restaurant?.restaurantName,
+          customerFirstName: foodOrder.customer?.firstName || "Customer",
+          customerRating: foodOrder.customerRating,
+          driverRating: foodOrder.driverRating,
+          completedAt: foodOrder.deliveredAt?.toISOString() || null,
+          startedAt: foodOrder.pickedUpAt?.toISOString() || null,
+          createdAt: foodOrder.createdAt.toISOString(),
+        };
+        
+        return res.json({ summary });
+      }
+      
+      // Try delivery
+      const delivery = await prisma.delivery.findFirst({
+        where: { id: tripId, driverId },
+      });
+      
+      if (delivery) {
+        const summary = {
+          id: delivery.id,
+          serviceType: "PARCEL" as const,
+          tripCode: generateTripCode("PARCEL", delivery.id),
+          status: delivery.status,
+          pickupAddress: delivery.pickupAddress,
+          dropoffAddress: delivery.dropoffAddress,
+          distanceKm: delivery.distanceMiles || 0,
+          durationMinutes: delivery.deliveryMinutes || 0,
+          actualDurationMinutes: delivery.deliveredAt && delivery.pickedUpAt
+            ? Math.round((delivery.deliveredAt.getTime() - delivery.pickedUpAt.getTime()) / 60000)
+            : null,
+          totalFare: serializeDecimal(delivery.baseFare),
+          platformCommission: serializeDecimal(delivery.platformCommission),
+          driverEarnings: serializeDecimal(delivery.driverPayout),
+          tipAmount: 0,
+          paymentMethod: delivery.paymentMethod as "cash" | "card" | "wallet",
+          customerFirstName: delivery.recipientName || "Recipient",
+          customerRating: delivery.customerRating,
+          driverRating: null,
+          completedAt: delivery.deliveredAt?.toISOString() || null,
+          startedAt: delivery.pickedUpAt?.toISOString() || null,
+          createdAt: delivery.createdAt.toISOString(),
+        };
+        
+        return res.json({ summary });
+      }
+      
+      res.status(404).json({ error: "Trip not found" });
+    } catch (error: any) {
+      console.error("Error fetching trip summary:", error);
+      res.status(500).json({ error: "Failed to fetch trip summary" });
+    }
+  }
+);
+
 export default router;

@@ -268,25 +268,57 @@ export default function DriverTripActive() {
   const preferredNavApp = preferences?.preferredNavigationApp || "google";
   const activeTrip = activeTripData?.activeTrip;
 
+  const locationUpdateRef = useRef<number | null>(null);
+  
+  const sendLocationUpdate = useCallback(async (position: GpsSnapshot, tripId: string, serviceType: string) => {
+    try {
+      await apiRequest(`/api/driver/trips/${tripId}/location?serviceType=${serviceType}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: position.lat,
+          lng: position.lng,
+          accuracy: position.accuracy,
+          timestamp: position.timestamp,
+        }),
+      });
+    } catch (err) {
+      console.warn("Failed to send location update:", err);
+    }
+  }, []);
+  
   useEffect(() => {
     if (activeTrip && navigator.geolocation) {
       const watchId = navigator.geolocation.watchPosition(
         (pos) => {
-          setCurrentGpsPosition({
+          const snapshot = {
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
             accuracy: pos.coords.accuracy,
             timestamp: pos.timestamp,
-          });
+          };
+          setCurrentGpsPosition(snapshot);
+          
+          // Send location update every 10 seconds (throttled)
+          if (!locationUpdateRef.current) {
+            locationUpdateRef.current = Date.now();
+            sendLocationUpdate(snapshot, activeTrip.id, activeTrip.serviceType);
+          } else if (Date.now() - locationUpdateRef.current > 10000) {
+            locationUpdateRef.current = Date.now();
+            sendLocationUpdate(snapshot, activeTrip.id, activeTrip.serviceType);
+          }
         },
         (err) => {
           console.warn("GPS tracking error:", err.message);
         },
         { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
       );
-      return () => navigator.geolocation.clearWatch(watchId);
+      return () => {
+        navigator.geolocation.clearWatch(watchId);
+        locationUpdateRef.current = null;
+      };
     }
-  }, [activeTrip?.id]);
+  }, [activeTrip?.id, activeTrip?.serviceType, sendLocationUpdate]);
 
   useEffect(() => {
     if (activeTrip?.status === "arrived" && activeTrip?.createdAt) {
@@ -340,8 +372,8 @@ export default function DriverTripActive() {
       if (variables.status === "completed") {
         setPollingEnabled(false);
         setTimeout(() => {
-          setLocation("/driver/trips");
-        }, 2500);
+          setLocation(`/driver/trip-summary/${variables.tripId}`);
+        }, 1500);
       }
     },
     onError: (error: any) => {
