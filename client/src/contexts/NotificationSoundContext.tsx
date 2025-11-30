@@ -9,6 +9,7 @@ interface NotificationSoundContextType {
   playTripCompleted: () => void;
   playMessage: () => void;
   playAlert: () => void;
+  resetToDefault: () => void;
 }
 
 const NotificationSoundContext = createContext<NotificationSoundContextType | undefined>(undefined);
@@ -205,6 +206,11 @@ export function NotificationSoundProvider({ children }: { children: React.ReactN
       console.warn("Could not play alert sound:", e);
     }
   }, [soundEnabled, getAudioContext]);
+
+  const resetToDefault = useCallback(() => {
+    setSoundEnabledState(true);
+    localStorage.removeItem(SOUND_STORAGE_KEY);
+  }, []);
   
   useEffect(() => {
     return () => {
@@ -225,6 +231,7 @@ export function NotificationSoundProvider({ children }: { children: React.ReactN
         playTripCompleted,
         playMessage,
         playAlert,
+        resetToDefault,
       }}
     >
       {children}

@@ -17,8 +17,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLogout } from "@/hooks/use-logout";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
@@ -53,11 +64,17 @@ interface RiderTopBarProps {
 }
 
 export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { performLogout } = useLogout();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [activeService, setActiveService] = useState<ServiceType>("ride");
   const [location, setLocation] = useLocation();
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+
+  const handleLogout = () => {
+    performLogout();
+  };
 
   const handleServiceClick = (type: ServiceType) => {
     setActiveService(type);
@@ -303,14 +320,37 @@ export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
                 </DropdownMenuItem>
               </Link>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} data-testid="rider-menu-logout">
+              <DropdownMenuItem 
+                onClick={() => setLogoutDialogOpen(true)} 
+                data-testid="rider-menu-logout"
+              >
                 <LogOut className="h-4 w-4 mr-2" />
-                Logout
+                Log Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+        <AlertDialogContent data-testid="logout-confirmation-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log Out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to sign out of your SafeGo account?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-logout-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleLogout}
+              data-testid="button-logout-confirm"
+            >
+              Log Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }

@@ -88,9 +88,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setToken(null);
     setUser(null);
+    
+    // Clear all localStorage items related to SafeGo
     localStorage.removeItem("safego_token");
     localStorage.removeItem("safego_user");
-    setLocation("/login");
+    localStorage.removeItem("safego_eats_cart");
+    localStorage.removeItem("safego_ride_booking");
+    localStorage.removeItem("auth_token");
+    
+    // Clear all sessionStorage
+    sessionStorage.clear();
+    
+    // Redirect to login page
+    setLocation("/auth/login");
   };
 
   return (

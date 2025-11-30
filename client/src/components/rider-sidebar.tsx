@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -13,6 +14,16 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,6 +44,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLogout } from "@/hooks/use-logout";
 
 interface MenuItem {
   title: string;
@@ -141,8 +153,10 @@ const menuSections: MenuSection[] = [
 
 export function RiderSidebar() {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { performLogout } = useLogout();
   const { setOpenMobile, isMobile } = useSidebar();
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
   const { data: riderData } = useQuery({
     queryKey: ["/api/customer/profile"],
@@ -154,9 +168,13 @@ export function RiderSidebar() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setLogoutDialogOpen(true);
+  };
+
+  const handleLogoutConfirm = () => {
     handleNavigation();
-    logout();
+    performLogout();
   };
 
   const profile = riderData as any;
@@ -246,7 +264,7 @@ export function RiderSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <button
-          onClick={handleLogout}
+          onClick={handleLogoutClick}
           className="flex items-center gap-3 w-full px-3 py-2.5 text-sm font-medium rounded-lg hover-elevate active-elevate-2 text-muted-foreground hover:text-foreground"
           data-testid="button-rider-logout"
         >
@@ -254,6 +272,26 @@ export function RiderSidebar() {
           <span>Log Out</span>
         </button>
       </SidebarFooter>
+
+      <AlertDialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+        <AlertDialogContent data-testid="sidebar-logout-confirmation-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log Out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to sign out of your SafeGo account?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-sidebar-logout-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleLogoutConfirm}
+              data-testid="button-sidebar-logout-confirm"
+            >
+              Log Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   );
 }
