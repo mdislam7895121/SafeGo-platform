@@ -415,11 +415,11 @@ export default function EatsRestaurant() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold" data-testid="text-restaurant-name">{restaurant.name}</h1>
-            <p className="text-muted-foreground">{restaurant.cuisineType}</p>
+            <p className="text-muted-foreground" data-testid="text-restaurant-cuisine">{restaurant.cuisineType}</p>
           </div>
-          <div className="flex items-center gap-1 bg-muted px-2 py-1 rounded-lg">
+          <div className="flex items-center gap-1 bg-muted px-2 py-1 rounded-lg" data-testid="rating-badge">
             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-            <span className="font-semibold">{restaurant.averageRating.toFixed(1)}</span>
+            <span className="font-semibold" data-testid="text-restaurant-rating">{restaurant.averageRating.toFixed(1)}</span>
             <span className="text-sm text-muted-foreground">({restaurant.totalRatings})</span>
           </div>
         </div>
@@ -567,6 +567,7 @@ export default function EatsRestaurant() {
                                   e.stopPropagation();
                                   handleAddToCart(item);
                                 }}
+                                data-testid={`button-quick-add-${item.id}`}
                               >
                                 <Plus className="h-4 w-4" />
                               </Button>
@@ -643,7 +644,7 @@ export default function EatsRestaurant() {
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
-                    <span className="w-8 text-center font-semibold">{itemQuantity}</span>
+                    <span className="w-8 text-center font-semibold" data-testid="text-item-quantity">{itemQuantity}</span>
                     <Button
                       variant="outline"
                       size="icon"
@@ -681,8 +682,8 @@ export default function EatsRestaurant() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Keep current cart</AlertDialogCancel>
-            <AlertDialogAction onClick={handleClearCartAndAdd}>
+            <AlertDialogCancel data-testid="button-keep-cart">Keep current cart</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearCartAndAdd} data-testid="button-start-new-order">
               Start new order
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -97,8 +97,8 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{state.restaurant.name}</p>
-                  <p className="text-sm text-muted-foreground truncate">{state.restaurant.cuisineType}</p>
+                  <p className="font-medium truncate" data-testid="text-cart-restaurant-name">{state.restaurant.name}</p>
+                  <p className="text-sm text-muted-foreground truncate" data-testid="text-cart-restaurant-cuisine">{state.restaurant.cuisineType}</p>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               </button>
@@ -128,9 +128,9 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{item.name}</p>
+                          <p className="font-medium text-sm truncate" data-testid={`text-item-name-${item.id}`}>{item.name}</p>
                           {item.specialInstructions && (
-                            <p className="text-xs text-muted-foreground truncate">
+                            <p className="text-xs text-muted-foreground truncate" data-testid={`text-item-instructions-${item.id}`}>
                               Note: {item.specialInstructions}
                             </p>
                           )}
@@ -147,7 +147,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                       </div>
                       
                       <div className="flex items-center justify-between mt-2">
-                        <p className="font-semibold text-sm">
+                        <p className="font-semibold text-sm" data-testid={`text-item-price-${item.id}`}>
                           ${(item.price * item.quantity).toFixed(2)}
                         </p>
                         <div className="flex items-center gap-2 bg-muted rounded-full p-0.5">
@@ -164,7 +164,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
                               <Minus className="h-3.5 w-3.5" />
                             )}
                           </Button>
-                          <span className="w-6 text-center text-sm font-medium">
+                          <span className="w-6 text-center text-sm font-medium" data-testid={`text-item-quantity-${item.id}`}>
                             {item.quantity}
                           </span>
                           <Button
@@ -189,30 +189,30 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
               <div className="p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>${totals.subtotal.toFixed(2)}</span>
+                  <span data-testid="text-cart-subtotal">${totals.subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Delivery Fee</span>
-                  <span>{totals.deliveryFee === 0 ? 'Free' : `$${totals.deliveryFee.toFixed(2)}`}</span>
+                  <span data-testid="text-cart-delivery-fee">{totals.deliveryFee === 0 ? 'Free' : `$${totals.deliveryFee.toFixed(2)}`}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Service Fee</span>
-                  <span>${totals.serviceFee.toFixed(2)}</span>
+                  <span data-testid="text-cart-service-fee">${totals.serviceFee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Tax</span>
-                  <span>${totals.tax.toFixed(2)}</span>
+                  <span data-testid="text-cart-tax">${totals.tax.toFixed(2)}</span>
                 </div>
                 {totals.discount > 0 && (
                   <div className="flex justify-between text-green-600">
                     <span>Discount</span>
-                    <span>-${totals.discount.toFixed(2)}</span>
+                    <span data-testid="text-cart-discount">-${totals.discount.toFixed(2)}</span>
                   </div>
                 )}
                 <Separator className="my-2" />
                 <div className="flex justify-between font-semibold text-base">
                   <span>Total</span>
-                  <span>${totals.total.toFixed(2)}</span>
+                  <span data-testid="text-cart-total">${totals.total.toFixed(2)}</span>
                 </div>
               </div>
 

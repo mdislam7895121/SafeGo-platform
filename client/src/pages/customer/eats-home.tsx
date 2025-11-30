@@ -314,6 +314,7 @@ export default function EatsHome() {
                 size="icon"
                 className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
                 onClick={() => setSearchQuery("")}
+                data-testid="button-clear-search"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -390,7 +391,7 @@ export default function EatsHome() {
 
             <Sheet open={showFilters} onOpenChange={setShowFilters}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2" data-testid="button-filters">
                   <Filter className="h-4 w-4" />
                   Filters
                 </Button>
@@ -404,15 +405,15 @@ export default function EatsHome() {
                     <Label>Dietary Preferences</Label>
                     <div className="space-y-2">
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="vegetarian" />
+                        <Checkbox id="vegetarian" data-testid="checkbox-vegetarian" />
                         <label htmlFor="vegetarian" className="text-sm">Vegetarian</label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="vegan" />
+                        <Checkbox id="vegan" data-testid="checkbox-vegan" />
                         <label htmlFor="vegan" className="text-sm">Vegan</label>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Checkbox id="halal" />
+                        <Checkbox id="halal" data-testid="checkbox-halal" />
                         <label htmlFor="halal" className="text-sm">Halal</label>
                       </div>
                     </div>
@@ -421,8 +422,8 @@ export default function EatsHome() {
                   <div className="space-y-3">
                     <Label>Price Range</Label>
                     <div className="flex gap-2">
-                      {["$", "$$", "$$$", "$$$$"].map((price) => (
-                        <Button key={price} variant="outline" size="sm">
+                      {["$", "$$", "$$$", "$$$$"].map((price, idx) => (
+                        <Button key={price} variant="outline" size="sm" data-testid={`button-price-${idx + 1}`}>
                           {price}
                         </Button>
                       ))}
@@ -483,7 +484,7 @@ export default function EatsHome() {
                       <Flame className="h-5 w-5 text-orange-500" />
                       Popular Near You
                     </h2>
-                    <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground">
+                    <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" data-testid="button-see-all-popular">
                       See all <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
@@ -506,7 +507,7 @@ export default function EatsHome() {
                       <Star className="h-5 w-5 text-yellow-500" />
                       Top Rated
                     </h2>
-                    <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground">
+                    <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" data-testid="button-see-all-top-rated">
                       See all <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
