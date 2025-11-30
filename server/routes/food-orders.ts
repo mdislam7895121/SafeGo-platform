@@ -7,8 +7,8 @@ import {
   updateEarningsTransactionStatus,
 } from "../services/earningsCommissionService";
 import { promotionBonusService } from "../services/promotionBonusService";
-import { broadcastOrderUpdate, broadcastToUser } from "../websocket/foodOrderNotificationsWs";
-import crypto from "crypto";
+import { sendFoodOrderNotifications } from "../services/foodOrderStatusService";
+import { randomUUID } from "node:crypto";
 
 const router = Router();
 
@@ -169,7 +169,7 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
     const restaurantPayout = fare - safegoCommission - deliveryPayout; // $75 on $100 ($100 - $20 - $5)
 
     // Use transaction to ensure atomic order creation and stock decrement
-    const orderId = crypto.randomUUID();
+    const orderId = randomUUID();
     const stockConflicts: string[] = [];
     
     const foodOrder = await prisma.$transaction(async (tx) => {
@@ -249,7 +249,7 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
     if (restaurantUser) {
       await prisma.notification.create({
         data: {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           userId: restaurantUser.id,
           type: "food_order_update",
           title: "New Food Order",
@@ -261,7 +261,7 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
     // Notify customer that order was placed successfully
     await prisma.notification.create({
       data: {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         userId: userId,
         type: "food_order_update",
         title: "Order Placed Successfully",
@@ -473,7 +473,7 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
     if (restaurantUser) {
       await prisma.notification.create({
         data: {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           userId: restaurantUser.id,
           type: "food_order_update",
           title: "Order Cancelled",
@@ -485,7 +485,7 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
     // Notify customer
     await prisma.notification.create({
       data: {
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         userId,
         type: "food_order_update",
         title: "Order Cancelled",
@@ -679,22 +679,16 @@ router.patch("/:id/accept", async (req: AuthRequest, res) => {
       data: { status: "accepted" },
     });
 
-    // Notify customer
-    const customerUser = await prisma.user.findFirst({
-      where: { customerProfile: { id: foodOrder.customerId } },
-    });
-
-    if (customerUser) {
-      await prisma.notification.create({
-        data: {
-          id: crypto.randomUUID(),
-          userId: customerUser.id,
-          type: "food_order_update",
-          title: "Order Accepted",
-          body: `Restaurant has accepted your order and is preparing your food.`,
-        },
-      });
-    }
+    // Send notifications via centralized service
+    await sendFoodOrderNotifications(
+      id,
+      "accepted",
+      {
+        customerId: foodOrder.customerId,
+        restaurantId: foodOrder.restaurantId,
+        driverId: foodOrder.driverId,
+      }
+    );
 
     res.json({
       message: "Order accepted successfully",
@@ -770,22 +764,16 @@ router.patch("/:id/assign-driver", async (req: AuthRequest, res) => {
       },
     });
 
-    // Notify customer
-    const customerUser = await prisma.user.findFirst({
-      where: { customerProfile: { id: foodOrder.customerId } },
-    });
-
-    if (customerUser) {
-      await prisma.notification.create({
-        data: {
-          id: crypto.randomUUID(),
-          userId: customerUser.id,
-          type: "food_order_update",
-          title: "Driver Assigned",
-          body: `Your order has been picked up and is on the way!`,
-        },
-      });
-    }
+    // Send notifications via centralized service
+    await sendFoodOrderNotifications(
+      id,
+      "picked_up",
+      {
+        customerId: foodOrder.customerId,
+        restaurantId: foodOrder.restaurantId,
+        driverId: driverProfile.id,
+      }
+    );
 
     res.json({
       message: "Driver assigned successfully",
@@ -848,101 +836,16 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
     // to prevent order status and ledgers from diverging
     await updateEarningsTransactionStatus(id, status);
 
-    // Create notification with status-specific messages
-    const customerUser = await prisma.user.findFirst({
-      where: { customerProfile: { id: foodOrder.customerId } },
-    });
-
-    if (customerUser) {
-      const notificationMessages: Record<string, { title: string; body: string }> = {
-        accepted: {
-          title: "Order Accepted",
-          body: "Great news! The restaurant has accepted your order and is getting it ready.",
-        },
-        preparing: {
-          title: "Order Being Prepared",
-          body: "Your food is now being prepared by the kitchen. We'll notify you when it's ready!",
-        },
-        ready_for_pickup: {
-          title: "Order Ready for Pickup",
-          body: "Your order is ready and waiting for a delivery driver. Almost there!",
-        },
-        picked_up: {
-          title: "Driver Has Your Order",
-          body: "Your food has been picked up and is on its way to you!",
-        },
-        on_the_way: {
-          title: "Almost There!",
-          body: "Your driver is approaching your delivery location. Get ready!",
-        },
-        delivered: {
-          title: "Order Delivered",
-          body: "Your food has been delivered. Enjoy your meal! Don't forget to rate your experience.",
-        },
-        cancelled: {
-          title: "Order Cancelled",
-          body: "Your food order has been cancelled. If you didn't request this, please contact support.",
-        },
-      };
-
-      const message = notificationMessages[status] || {
-        title: "Order Update",
-        body: `Your food order status is now: ${status}`,
-      };
-
-      await prisma.notification.create({
-        data: {
-          id: crypto.randomUUID(),
-          userId: customerUser.id,
-          type: "food_order_update",
-          title: message.title,
-          body: message.body,
-        },
-      });
-
-      broadcastToUser(customerUser.id, {
-        type: "food_order_update",
-        orderId: id,
-        title: message.title,
-        body: message.body,
-        status,
-      });
-    }
-
-    const restaurant = await prisma.restaurantProfile.findUnique({
-      where: { id: foodOrder.restaurantId },
-      select: { restaurantName: true, userId: true },
-    });
-
-    broadcastOrderUpdate(id, status, {
-      restaurantName: restaurant?.restaurantName || undefined,
-    });
-
-    if (restaurant?.userId) {
-      broadcastToUser(restaurant.userId, {
-        type: "food_order_update",
-        orderId: id,
-        title: "Order Status Updated",
-        body: `Order status changed to: ${status}`,
-        status,
-      });
-    }
-
-    if (foodOrder.driverId) {
-      const driver = await prisma.driverProfile.findUnique({
-        where: { id: foodOrder.driverId },
-        select: { userId: true },
-      });
-      if (driver?.userId) {
-        broadcastToUser(driver.userId, {
-          type: "food_order_update",
-          orderId: id,
-          title: "Delivery Status Updated",
-          body: `Order status changed to: ${status}`,
-          status,
-        });
+    // Send notifications via centralized service
+    await sendFoodOrderNotifications(
+      id,
+      status as any,
+      {
+        customerId: foodOrder.customerId,
+        restaurantId: foodOrder.restaurantId,
+        driverId: foodOrder.driverId,
       }
-    }
+    );
 
     res.json({
       message: "Food order status updated successfully",

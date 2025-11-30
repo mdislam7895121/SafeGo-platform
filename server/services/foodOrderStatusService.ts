@@ -1,6 +1,6 @@
 import { prisma } from "../db";
 import { broadcastOrderUpdate, broadcastToUser } from "../websocket/foodOrderNotificationsWs";
-import crypto from "crypto";
+import { randomUUID } from "node:crypto";
 
 type FoodOrderStatus = "placed" | "accepted" | "preparing" | "ready_for_pickup" | "driver_assigned" | "driver_arriving" | "picked_up" | "on_the_way" | "delivered" | "cancelled" | "completed";
 
@@ -56,11 +56,90 @@ export interface StatusUpdateResult {
   error?: string;
 }
 
+export async function sendFoodOrderNotifications(
+  orderId: string,
+  status: FoodOrderStatus,
+  orderInfo: {
+    customerId: string;
+    restaurantId: string;
+    driverId: string | null;
+  },
+  options?: {
+    customMessage?: { title: string; body: string };
+  }
+): Promise<void> {
+  const message = options?.customMessage || NOTIFICATION_MESSAGES[status] || {
+    title: "Order Update",
+    body: `Your food order status is now: ${status}`,
+  };
+
+  const customerUser = await prisma.user.findFirst({
+    where: { customerProfile: { id: orderInfo.customerId } },
+  });
+
+  if (customerUser) {
+    await prisma.notification.create({
+      data: {
+        id: randomUUID(),
+        userId: customerUser.id,
+        type: "food_order_update",
+        title: message.title,
+        body: message.body,
+      },
+    });
+
+    broadcastToUser(customerUser.id, {
+      type: "food_order_update",
+      orderId,
+      title: message.title,
+      body: message.body,
+      status,
+    });
+  }
+
+  const restaurant = await prisma.restaurantProfile.findUnique({
+    where: { id: orderInfo.restaurantId },
+    select: { restaurantName: true, userId: true },
+  });
+
+  broadcastOrderUpdate(orderId, status, {
+    restaurantName: restaurant?.restaurantName || undefined,
+  });
+
+  if (restaurant?.userId) {
+    broadcastToUser(restaurant.userId, {
+      type: "food_order_update",
+      orderId,
+      title: "Order Status Updated",
+      body: `Order status changed to: ${status}`,
+      status,
+    });
+  }
+
+  if (orderInfo.driverId) {
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id: orderInfo.driverId },
+      select: { userId: true },
+    });
+
+    if (driver?.userId) {
+      broadcastToUser(driver.userId, {
+        type: "food_order_update",
+        orderId,
+        title: "Delivery Status Updated",
+        body: `Order status changed to: ${status}`,
+        status,
+      });
+    }
+  }
+}
+
 export async function updateFoodOrderStatusWithNotifications(
   orderId: string,
   newStatus: FoodOrderStatus,
   options?: {
     skipNotification?: boolean;
+    skipStatusUpdate?: boolean;
     customMessage?: { title: string; body: string };
   }
 ): Promise<StatusUpdateResult> {
@@ -80,86 +159,37 @@ export async function updateFoodOrderStatusWithNotifications(
       return { success: false, error: "Food order not found" };
     }
 
-    const updatedOrder = await prisma.foodOrder.update({
-      where: { id: orderId },
-      data: { status: newStatus },
-    });
+    let updatedOrder = { id: foodOrder.id, status: newStatus };
+
+    if (!options?.skipStatusUpdate) {
+      const updated = await prisma.foodOrder.update({
+        where: { id: orderId },
+        data: { status: newStatus },
+      });
+      updatedOrder = { id: updated.id, status: updated.status };
+    }
 
     if (options?.skipNotification) {
       return {
         success: true,
-        order: { id: updatedOrder.id, status: updatedOrder.status },
+        order: updatedOrder,
       };
     }
 
-    const message = options?.customMessage || NOTIFICATION_MESSAGES[newStatus] || {
-      title: "Order Update",
-      body: `Your food order status is now: ${newStatus}`,
-    };
-
-    const customerUser = await prisma.user.findFirst({
-      where: { customerProfile: { id: foodOrder.customerId } },
-    });
-
-    if (customerUser) {
-      await prisma.notification.create({
-        data: {
-          id: crypto.randomUUID(),
-          userId: customerUser.id,
-          type: "food_order_update",
-          title: message.title,
-          body: message.body,
-        },
-      });
-
-      broadcastToUser(customerUser.id, {
-        type: "food_order_update",
-        orderId,
-        title: message.title,
-        body: message.body,
-        status: newStatus,
-      });
-    }
-
-    const restaurant = await prisma.restaurantProfile.findUnique({
-      where: { id: foodOrder.restaurantId },
-      select: { restaurantName: true, userId: true },
-    });
-
-    broadcastOrderUpdate(orderId, newStatus, {
-      restaurantName: restaurant?.restaurantName || undefined,
-    });
-
-    if (restaurant?.userId) {
-      broadcastToUser(restaurant.userId, {
-        type: "food_order_update",
-        orderId,
-        title: "Order Status Updated",
-        body: `Order status changed to: ${newStatus}`,
-        status: newStatus,
-      });
-    }
-
-    if (foodOrder.driverId) {
-      const driver = await prisma.driverProfile.findUnique({
-        where: { id: foodOrder.driverId },
-        select: { userId: true },
-      });
-
-      if (driver?.userId) {
-        broadcastToUser(driver.userId, {
-          type: "food_order_update",
-          orderId,
-          title: "Delivery Status Updated",
-          body: `Order status changed to: ${newStatus}`,
-          status: newStatus,
-        });
-      }
-    }
+    await sendFoodOrderNotifications(
+      orderId,
+      newStatus,
+      {
+        customerId: foodOrder.customerId,
+        restaurantId: foodOrder.restaurantId,
+        driverId: foodOrder.driverId,
+      },
+      { customMessage: options?.customMessage }
+    );
 
     return {
       success: true,
-      order: { id: updatedOrder.id, status: updatedOrder.status },
+      order: updatedOrder,
     };
   } catch (error) {
     console.error("[FoodOrderStatusService] Error updating order status:", error);

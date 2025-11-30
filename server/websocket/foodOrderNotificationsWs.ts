@@ -3,13 +3,17 @@ import { WebSocketServer, WebSocket } from "ws";
 import jwt from "jsonwebtoken";
 import { prisma } from "../db";
 
-const JWT_SECRET = process.env.JWT_SECRET;
+let cachedJwtSecret: string | null = null;
 
 function getJwtSecret(): string {
-  if (!JWT_SECRET) {
+  if (cachedJwtSecret) return cachedJwtSecret;
+  
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
     throw new Error("[FoodOrderNotificationsWS] CRITICAL: JWT_SECRET is not configured - cannot start WebSocket server");
   }
-  return JWT_SECRET;
+  cachedJwtSecret = secret;
+  return cachedJwtSecret;
 }
 
 interface AuthenticatedWebSocket extends WebSocket {

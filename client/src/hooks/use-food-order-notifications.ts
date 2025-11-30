@@ -23,6 +23,7 @@ interface Notification {
 interface UseFoodOrderNotificationsOptions {
   orderId?: string;
   enabled?: boolean;
+  showToasts?: boolean;
   onStatusUpdate?: (update: OrderStatusUpdate) => void;
   onNotification?: (notification: Notification) => void;
 }
@@ -30,6 +31,7 @@ interface UseFoodOrderNotificationsOptions {
 export function useFoodOrderNotifications({
   orderId,
   enabled = true,
+  showToasts = false,
   onStatusUpdate,
   onNotification,
 }: UseFoodOrderNotificationsOptions = {}) {
@@ -82,10 +84,12 @@ export function useFoodOrderNotifications({
               
             case "notification":
               onNotification?.(data.payload);
-              toast({
-                title: data.payload.title,
-                description: data.payload.body,
-              });
+              if (showToasts) {
+                toast({
+                  title: data.payload.title,
+                  description: data.payload.body,
+                });
+              }
               break;
               
             case "error":
@@ -121,7 +125,7 @@ export function useFoodOrderNotifications({
     } catch (error) {
       console.error("[FoodOrderNotifications] Failed to create WebSocket:", error);
     }
-  }, [enabled, orderId, getToken, onStatusUpdate, onNotification, toast]);
+  }, [enabled, orderId, getToken, onStatusUpdate, onNotification, showToasts, toast]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
