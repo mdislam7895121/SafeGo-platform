@@ -1,0 +1,194 @@
+SAFEGO – FIX PROFILE AVATAR CLICK (DRIVER MAP SCREEN + ALL ROLES)
+Bug: On the top navigation bar (header), the round profile avatar button on the right side still does nothing when clicked/tapped on the driver map screen and other app screens.
+
+You MUST fix this in a precise, ADD-ONLY, non-breaking way and verify it using the live app (driver map screen and other roles).
+
+====================================================
+1. RESPECT SAFEGO MASTER RULES
+====================================================
+
+Keep all existing SafeGo rules intact:
+- 4 roles: customer, driver, restaurant, admin (strict separation).
+- Existing KYC, wallet, commission, status flows must NOT be changed.
+- No renaming/removal of existing routes, components, models, or APIs.
+- Only add new routes/components/handlers as needed to make the profile avatar work.
+
+Security:
+- Never show one role’s profile to another.
+- Only show non-sensitive info in profile pages.
+- Government ID fields must remain masked.
+
+====================================================
+2. FIND THE EXACT HEADER COMPONENT IN USE
+====================================================
+
+1) Locate the shared header/top navigation component that renders the avatar on the screen shown in the screenshot (driver live map screen). Common candidates:
+   - components/layout/AppHeader.tsx
+   - components/TopNav.tsx
+   - or similar.
+
+2) Confirm which header instance is used on:
+   - driver ride map screen (Step 48 driver UI)
+   - customer home / food pages
+   - restaurant dashboard
+   - admin dashboard (if same header is reused).
+
+Do NOT replace the header. Only enhance the existing one.
+
+====================================================
+3. DEFINE ROLE-AWARE PROFILE ROUTES (ADD-ONLY)
+====================================================
+
+Create or confirm the following routes (pages). If equivalent routes already exist, just re-export or reuse them; DO NOT rename existing ones:
+
+- /customer/profile
+- /driver/profile
+- /restaurant/profile
+- /admin/profile
+
+Each page must:
+- Read the current authenticated user and role from existing auth/session.
+- Render a safe, minimal profile view:
+  - Display name
+  - Email
+  - Phone (if present)
+  - Country
+  - verification_status (badge)
+  - Logout button (reuse existing logout logic if already implemented elsewhere).
+- For drivers and restaurants, show a link to their wallet screen if it exists.
+- For security, NEVER show:
+  - NID full number
+  - government_id_last4 (unless masked)
+  - ssn_last4.
+
+If any of these profile pages already exist under a different route:
+- Keep the old route unchanged.
+- Add a thin wrapper that routes /role/profile to the same underlying component.
+
+====================================================
+4. IMPLEMENT getProfileRouteForCurrentUser()
+====================================================
+
+Create a small utility or hook, e.g.:
+
+- getProfileRouteForCurrentUser(session):
+
+  - If role === "customer"   → "/customer/profile"
+  - If role === "driver"     → "/driver/profile"
+  - If role === "restaurant" → "/restaurant/profile"
+  - If role === "admin"      → "/admin/profile"
+  - If no authenticated user:
+      → return login route (e.g. "/login") or null.
+
+This must not modify auth; only read existing user and role.
+
+====================================================
+5. WIRE THE AVATAR CLICK HANDLER
+====================================================
+
+In the header component where the avatar is rendered:
+
+1) Ensure the avatar is inside a clickable/button element:
+   - <button>…avatar…</button>
+   - or a clickable <div> with role="button" and keyboard handlers.
+
+2) Attach an onClick handler that:
+
+   - Reads the current user/role from session/auth context.
+   - Calls getProfileRouteForCurrentUser() to get profileRoute.
+   - If profileRoute is defined:
+       - Use the existing router (e.g. next/router, react-router) to navigate:
+         - router.push(profileRoute)
+   - If profileRoute is undefined (no user):
+       - Navigate to the login page or show a safe message.
+
+3) Make sure the cursor becomes pointer and the element is keyboard-accessible (Enter/Space triggers click).
+
+4) Do NOT add new global state or break existing navigation. Only add the missing handler and navigation.
+
+====================================================
+6. MOBILE VS DESKTOP BEHAVIOR
+====================================================
+
+For MOBILE (width < 768px):
+
+- Option A (preferred):
+  - When avatar is tapped, open a simple profile sheet/drawer with:
+    - "Profile"
+    - "Wallet" (if driver/restaurant and wallet exists)
+    - "Settings" (if applicable)
+    - "Logout"
+  - Tapping "Profile" then navigates to the same /role/profile route.
+
+For DESKTOP:
+
+- Clicking the avatar may either:
+  - open a small dropdown menu with "Profile" and "Logout", or
+  - directly navigate to /role/profile.
+
+You may choose the simplest consistent behavior, but it MUST navigate to the correct profile screen within one click or one extra click (menu item).
+
+====================================================
+7. CONFIG FOR BEHAVIOR (ADD-ONLY)
+====================================================
+
+Add a simple configuration object (if a config system exists):
+
+profileNavConfig = {
+  enableHeaderAvatarNavigation: true,
+  useMobileDrawer: true,
+  desktopDirectNavigate: true
+}
+
+Defaults should enable navigation so that the bug is truly fixed.
+
+====================================================
+8. TEST CASES (YOU MUST VERIFY IN THE RUNNING APP)
+====================================================
+
+You MUST manually (or via automated tests) verify the following:
+
+1) Driver on ride map screen:
+   - Log in as a DRIVER.
+   - Open the ride driver screen with live map (as in the screenshot).
+   - Click/tap the top-right avatar.
+   - EXPECTED:
+     - Either a profile menu opens, then "Profile" → /driver/profile,
+     - or direct navigation to /driver/profile.
+   - Confirm the URL and that driver info is shown.
+   - Confirm no error appears in console.
+
+2) Customer on /customer and /customer/food:
+   - Click avatar → /customer/profile.
+   - No driver/restaurant/admin fields are visible.
+
+3) Restaurant dashboard:
+   - Click avatar → /restaurant/profile.
+
+4) Admin dashboard:
+   - Click avatar → /admin/profile or admin account settings.
+
+5) Logged-out state (if avatar somehow appears):
+   - Click avatar → redirect to login or show safe message.
+   - Never crash.
+
+6) Accessibility:
+   - Avatar focusable with Tab.
+   - Enter/Space triggers profile navigation.
+
+====================================================
+9. NON-BREAKING GUARANTEE
+====================================================
+
+You MUST:
+- Keep all existing routes and components working as before.
+- Only ADD:
+  - profile routes (if missing),
+  - helper function getProfileRouteForCurrentUser(),
+  - click handler on avatar,
+  - optional dropdown/drawer UI.
+- NOT change any commission, wallet, ride, food, or parcel logic.
+
+Final expectation:
+- The top-right profile avatar button works consistently across all roles.
+- Especially on the DRIVER map screen, clicking the avatar always takes the driver to a working driver profile page (/driver/profile) or a menu that leads there.

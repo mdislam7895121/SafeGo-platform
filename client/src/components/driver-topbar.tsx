@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings, DollarSign, Car, Gift, MessageSquare, Shield, Megaphone } from "lucide-react";
+import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings, DollarSign, Car, Gift, MessageSquare, Shield, Megaphone, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,8 +53,10 @@ interface DriverTopBarProps {
 
 export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
   const { user, logout } = useAuth();
+  const [, setLocation] = useLocation();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // Fetch notifications from API
   const { data: notificationsData } = useQuery<NotificationsResponse>({
@@ -111,6 +114,22 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
   const unreadCount = notificationsData?.unreadCount || 0;
 
   const driverName = user?.email?.split('@')[0] || "Driver";
+  const driverInitials = driverName
+    .split(/[\s._-]/)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+
+  const handleProfileNavigation = (route: string) => {
+    setProfileOpen(false);
+    setLocation(route);
+  };
+
+  const handleLogout = () => {
+    setProfileOpen(false);
+    logout();
+  };
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
@@ -293,31 +312,64 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
           </DropdownMenu>
 
           {/* Profile Dropdown */}
-          <DropdownMenu>
+          <DropdownMenu open={profileOpen} onOpenChange={setProfileOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2" data-testid="button-profile-dropdown">
-                <UserIcon className="h-5 w-5" />
-                <span className="hidden md:inline-block">{driverName}</span>
-                <ChevronDown className="h-4 w-4" />
+              <Button 
+                variant="ghost" 
+                className="gap-2" 
+                data-testid="button-profile-avatar"
+                aria-label="Open profile menu"
+              >
+                <Avatar className="h-8 w-8 border-2 border-border">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                    {driverInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="hidden md:inline-block text-sm">{driverName}</span>
+                <ChevronDown className="h-4 w-4 hidden md:block" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <Link href="/driver/profile">
-                <DropdownMenuItem data-testid="menu-profile">
-                  <UserIcon className="h-4 w-4 mr-2" />
-                  Profile
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/driver/account">
-                <DropdownMenuItem data-testid="menu-settings">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Account
-                </DropdownMenuItem>
-              </Link>
+              <DropdownMenuLabel>
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium truncate" data-testid="text-driver-email">
+                    {user?.email || "Driver"}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-normal">
+                    Driver Account
+                  </p>
+                </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} data-testid="menu-logout">
+              <DropdownMenuItem 
+                onSelect={() => handleProfileNavigation("/driver/profile")}
+                data-testid="menu-item-driver-profile"
+              >
+                <UserIcon className="h-4 w-4 mr-2" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onSelect={() => handleProfileNavigation("/driver/wallet")}
+                data-testid="menu-item-driver-wallet"
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                Wallet
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onSelect={() => handleProfileNavigation("/driver/account")}
+                data-testid="menu-item-driver-settings"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onSelect={handleLogout} 
+                className="text-destructive focus:text-destructive"
+                data-testid="menu-item-driver-logout"
+              >
                 <LogOut className="h-4 w-4 mr-2" />
-                Logout
+                Log Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

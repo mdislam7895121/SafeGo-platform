@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings, Car, UtensilsCrossed, Package } from "lucide-react";
+import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings, Car, UtensilsCrossed, Package, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,6 +123,18 @@ export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
   const notifications = notificationsData?.notifications || [];
   const unreadCount = notificationsData?.unreadCount || 0;
   const riderName = user?.email?.split('@')[0] || "Rider";
+  const riderInitials = riderName
+    .split(/[\s._-]/)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const handleProfileNavigation = (route: string) => {
+    setProfileOpen(false);
+    setLocation(route);
+  };
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
@@ -298,31 +311,64 @@ export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
+          <DropdownMenu open={profileOpen} onOpenChange={setProfileOpen}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2" data-testid="button-rider-profile-dropdown">
-                <UserIcon className="h-5 w-5" />
-                <span className="hidden md:inline-block">{riderName}</span>
-                <ChevronDown className="h-4 w-4" />
+              <Button 
+                variant="ghost" 
+                className="gap-2" 
+                data-testid="button-profile-avatar"
+                aria-label="Open profile menu"
+              >
+                <Avatar className="h-8 w-8 border-2 border-border">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                    {riderInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="hidden md:inline-block text-sm">{riderName}</span>
+                <ChevronDown className="h-4 w-4 hidden md:block" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <Link href="/rider/account">
-                <DropdownMenuItem data-testid="rider-menu-account">
-                  <UserIcon className="h-4 w-4 mr-2" />
-                  Account
-                </DropdownMenuItem>
-              </Link>
-              <Link href="/rider/settings">
-                <DropdownMenuItem data-testid="rider-menu-settings">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </DropdownMenuItem>
-              </Link>
+              <DropdownMenuLabel>
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm font-medium truncate" data-testid="text-rider-email">
+                    {user?.email || "Rider"}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-normal">
+                    Customer Account
+                  </p>
+                </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem 
-                onClick={() => setLogoutDialogOpen(true)} 
-                data-testid="rider-menu-logout"
+                onSelect={() => handleProfileNavigation("/customer/profile")}
+                data-testid="menu-item-customer-profile"
+              >
+                <UserIcon className="h-4 w-4 mr-2" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onSelect={() => handleProfileNavigation("/customer/wallet")}
+                data-testid="menu-item-customer-wallet"
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                Wallet
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onSelect={() => handleProfileNavigation("/rider/settings")}
+                data-testid="menu-item-customer-settings"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onSelect={() => {
+                  setProfileOpen(false);
+                  setLogoutDialogOpen(true);
+                }} 
+                className="text-destructive focus:text-destructive"
+                data-testid="menu-item-customer-logout"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Log Out
