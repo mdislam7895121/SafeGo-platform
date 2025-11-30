@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Bell, Globe, ChevronDown, LogOut, User as UserIcon, Check, ExternalLink, Settings, DollarSign, Car, Gift, MessageSquare, Shield, Megaphone, Wallet } from "lucide-react";
+import { Bell, Globe, ChevronDown, Check, ExternalLink, DollarSign, Car, Gift, MessageSquare, Shield, Megaphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -11,7 +11,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Popover,
@@ -23,6 +22,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
+import { ProfileAvatarButton } from "@/components/ProfileAvatarButton";
 
 interface Notification {
   id: string;
@@ -52,11 +52,9 @@ interface DriverTopBarProps {
 }
 
 export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
-  const { user, logout } = useAuth();
-  const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
 
   // Fetch notifications from API
   const { data: notificationsData } = useQuery<NotificationsResponse>({
@@ -112,24 +110,6 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
 
   const notifications = notificationsData?.notifications || [];
   const unreadCount = notificationsData?.unreadCount || 0;
-
-  const driverName = user?.email?.split('@')[0] || "Driver";
-  const driverInitials = driverName
-    .split(/[\s._-]/)
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-  const handleProfileNavigation = (route: string) => {
-    setProfileOpen(false);
-    setLocation(route);
-  };
-
-  const handleLogout = () => {
-    setProfileOpen(false);
-    logout();
-  };
 
   const handleNotificationClick = (notification: Notification) => {
     if (!notification.isRead) {
@@ -311,70 +291,12 @@ export function DriverTopBar({ pageTitle = "Dashboard" }: DriverTopBarProps) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Profile Dropdown */}
-          <DropdownMenu open={profileOpen} onOpenChange={setProfileOpen}>
-            <DropdownMenuTrigger asChild>
-              <button 
-                type="button"
-                className="flex items-center gap-2 rounded-md px-3 py-2 hover-elevate active-elevate-2 cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-ring" 
-                data-testid="button-profile-avatar"
-                aria-label="Open profile menu"
-                aria-haspopup="menu"
-                aria-expanded={profileOpen}
-              >
-                <Avatar className="h-8 w-8 border-2 border-border">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                    {driverInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden md:inline-block text-sm">{driverName}</span>
-                <ChevronDown className="h-4 w-4 hidden md:block" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>
-                <div className="flex flex-col gap-1">
-                  <p className="text-sm font-medium truncate" data-testid="text-driver-email">
-                    {user?.email || "Driver"}
-                  </p>
-                  <p className="text-xs text-muted-foreground font-normal">
-                    Driver Account
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onSelect={() => handleProfileNavigation("/driver/profile")}
-                data-testid="menu-item-driver-profile"
-              >
-                <UserIcon className="h-4 w-4 mr-2" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onSelect={() => handleProfileNavigation("/driver/wallet")}
-                data-testid="menu-item-driver-wallet"
-              >
-                <Wallet className="h-4 w-4 mr-2" />
-                Wallet
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onSelect={() => handleProfileNavigation("/driver/account")}
-                data-testid="menu-item-driver-settings"
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                onSelect={handleLogout} 
-                className="text-destructive focus:text-destructive"
-                data-testid="menu-item-driver-logout"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Log Out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Profile Dropdown - Uses shared ProfileAvatarButton for consistent behavior */}
+          <ProfileAvatarButton 
+            overrideRole="driver"
+            showName={true}
+            size="md"
+          />
         </div>
       </div>
     </header>
