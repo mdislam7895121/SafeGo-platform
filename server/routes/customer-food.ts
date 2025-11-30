@@ -1015,7 +1015,7 @@ router.get("/blocked-restaurants", async (req: AuthRequest, res) => {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { blockedAt: 'desc' },
     });
 
     res.json({
@@ -1026,8 +1026,8 @@ router.get("/blocked-restaurants", async (req: AuthRequest, res) => {
         cuisineType: br.restaurant.cuisineType,
         averageRating: br.restaurant.averageRating,
         logoUrl: br.restaurant.branding?.logoUrl,
-        reason: br.reason,
-        blockedAt: br.createdAt,
+        reason: br.blockReason,
+        blockedAt: br.blockedAt,
       })),
     });
   } catch (error) {
@@ -1072,7 +1072,7 @@ router.post("/blocked-restaurants", async (req: AuthRequest, res) => {
     const existingBlock = await prisma.customerBlockedRestaurant.findFirst({
       where: {
         customerProfileId: customerProfile.id,
-        restaurantProfileId: restaurantId,
+        restaurantId: restaurantId,
       },
     });
 
@@ -1085,8 +1085,8 @@ router.post("/blocked-restaurants", async (req: AuthRequest, res) => {
       data: {
         id: randomUUID(),
         customerProfileId: customerProfile.id,
-        restaurantProfileId: restaurantId,
-        reason: reason || null,
+        restaurantId: restaurantId,
+        blockReason: reason || null,
       },
     });
 
@@ -1096,8 +1096,8 @@ router.post("/blocked-restaurants", async (req: AuthRequest, res) => {
         id: blockedRestaurant.id,
         restaurantId,
         restaurantName: restaurant.restaurantName,
-        reason: blockedRestaurant.reason,
-        blockedAt: blockedRestaurant.createdAt,
+        reason: blockedRestaurant.blockReason,
+        blockedAt: blockedRestaurant.blockedAt,
       },
     });
   } catch (error) {
