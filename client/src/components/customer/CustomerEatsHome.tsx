@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Star, MapPin, Heart, Clock, Filter, Search, ChevronRight, RefreshCw } from "lucide-react";
+import { Star, MapPin, Heart, Clock, Filter, Search, ChevronRight, RefreshCw, UtensilsCrossed } from "lucide-react";
+import { CustomerHomeButton } from "./EatsNavigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -163,7 +164,14 @@ export function CustomerEatsHome() {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="p-4 space-y-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="flex items-center justify-between px-4 pt-3 pb-1 bg-background">
+        <div className="flex items-center gap-2">
+          <UtensilsCrossed className="h-5 w-5 text-primary" />
+          <h1 className="text-lg font-semibold">SafeGo Eats</h1>
+        </div>
+        <CustomerHomeButton variant="ghost" size="sm" />
+      </div>
+      <div className="px-4 pb-3 pt-2 space-y-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
