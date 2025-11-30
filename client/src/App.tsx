@@ -342,9 +342,10 @@ function Router() {
           <EatsHome />
         </ProtectedRoute>
       </Route>
-      {/* Legacy /customer/eats routes - redirect to primary /customer/food */}
+      {/* Legacy /customer/eats routes - redirect to primary /customer/food
+          Auth is enforced at destination (/customer/food is protected) */}
       <Route path="/customer/eats/:id">
-        {({ params }) => <Redirect to={`/customer/food/${params?.id}`} />}
+        {({ params }) => <Redirect to={`/customer/food/${params?.id || ''}`} />}
       </Route>
       <Route path="/customer/eats">
         <Redirect to="/customer/food" />
