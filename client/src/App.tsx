@@ -29,6 +29,8 @@ import CustomerDriverProfile from "@/pages/customer/driver-public-profile";
 import FoodRestaurants from "@/pages/customer/food-restaurants";
 import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
 import FoodCheckout from "@/pages/customer/food-checkout";
+import EatsHome from "@/pages/customer/eats-home";
+import EatsRestaurant from "@/pages/customer/eats-restaurant";
 import FoodOrderTracking from "@/pages/customer/food-order-tracking";
 import FoodOrderReceipt from "@/pages/customer/food-order-receipt";
 import FoodOrdersHistory from "@/pages/customer/food-orders-history";
@@ -336,6 +338,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["customer"]}>
           <FoodRestaurants />
         </ProtectedRoute>
+      </Route>
+      {/* New DoorDash-style Eats routes */}
+      <Route path="/customer/eats/:id">
+        <EatsRestaurant />
+      </Route>
+      <Route path="/customer/eats">
+        <EatsHome />
       </Route>
       <Route path="/customer/parcel">
         <ProtectedRoute allowedRoles={["customer"]}>
