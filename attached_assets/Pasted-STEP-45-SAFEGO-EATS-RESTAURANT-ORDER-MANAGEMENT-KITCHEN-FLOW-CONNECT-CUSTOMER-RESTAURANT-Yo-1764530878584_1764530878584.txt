@@ -1,0 +1,502 @@
+STEP 45 – SAFEGO EATS RESTAURANT ORDER MANAGEMENT & KITCHEN FLOW (CONNECT CUSTOMER ↔ RESTAURANT)
+
+You must follow ALL SafeGo Master Rules exactly.
+Do NOT skip any rule. Do NOT break any existing feature. All changes must be backward-compatible and ADD-ONLY.
+
+====================================================
+SAFEGO MASTER RULES (ALWAYS ACTIVE – DO NOT MODIFY)
+====================================================
+
+ROLES (4 separate roles, no mixed access):
+1. Customer
+2. Driver
+3. Restaurant (Merchant)
+4. Admin
+
+Each role must have:
+- Its own signup & onboarding flow.
+- Country-specific KYC requirements.
+- Separate dashboard.
+- Separate permissions.
+- Separate status flows.
+
+GLOBAL SERVICES (3 core services that must always keep working):
+1. Ride-hailing
+2. Food delivery (SafeGo Eats)
+3. Parcel delivery
+
+COUNTRY-SPECIFIC KYC (MANDATORY):
+
+Bangladesh (BD) – mandatory fields (per user type):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID_number
+- NID_front_image
+- NID_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status ("pending", "approved", "rejected")
+- is_verified (boolean)
+
+United States (US) – mandatory fields:
+For all users:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- verification_status
+- is_verified
+
+For DRIVERS in US (extra mandatory):
+- driver_license_number
+- driver_license_image
+- driver_license_expiry
+- ssn_last4 (optional but supported)
+- driver_background_check_status (admin-only)
+
+ADMIN PANEL – REQUIRED CAPABILITIES (MUST REMAIN):
+
+Admin must be able to:
+- View and verify customers, drivers, restaurants (BD + US).
+- Approve/reject KYC with rejection_reason.
+- Configure pricing, fees, and commissions for rides, food_orders, deliveries.
+- Block/unblock any user with blocked_reason and blocked_at.
+- Manage payouts and settlements for drivers and restaurants.
+- View driver_negative_balance and restaurant_negative_balance.
+- Mark balances as settled.
+- View audit logs for verification, blocking, pricing changes, and payouts.
+
+CORE COLLECTIONS (CANNOT BE REMOVED OR RENAMED):
+1. rides
+2. food_orders
+3. deliveries
+
+Each collection must keep:
+- Identity fields:
+  - customer_id
+  - driver_id (where applicable)
+  - restaurant_id (for food_orders)
+  - admin_id (for manual overrides)
+- Location fields:
+  - pickup_address / dropoff_address (rides, deliveries)
+  - restaurant_address / delivery_address (food_orders)
+  - latitude / longitude
+- Financial fields:
+  - base_price
+  - distance_fee (where applicable)
+  - service_fee
+  - platform_commission_amount
+  - driver_earnings_amount (rides/deliveries)
+  - restaurant_earnings_amount (food_orders)
+  - total_amount_charged_to_customer
+  - payment_method (cash, card, wallet, etc.)
+  - payment_status (pending, paid, refunded, etc.)
+- Timestamps:
+  - created_at
+  - updated_at
+  - accepted_at
+  - completed_at
+  - cancelled_at (if cancelled)
+- Status (must follow allowed lifecycles).
+- Rating & feedback:
+  - customer_rating
+  - customer_feedback
+  - driver_rating
+  - restaurant_rating
+  - internal_tags
+
+COMMISSION & PAYOUT RULES (MUST STAY TRUE):
+
+1. CASH ride:
+   - Driver receives full cash.
+   - SafeGo commission becomes driver_negative_balance in driver_wallet_balance.
+   - Driver must settle regularly (e.g. weekly).
+
+2. CASH food order:
+   - Restaurant receives all cash.
+   - SafeGo commission becomes restaurant_negative_balance in restaurant_wallet_balance.
+   - Restaurant must settle later.
+
+3. ONLINE payments:
+   - SafeGo receives full payment.
+   - SafeGo keeps commission automatically.
+   - Payouts to drivers/restaurants are net of commissions and fees.
+
+4. Admin can settle balances and adjust wallets with audit logs.
+
+SECURITY & PRIVACY RULES (ALWAYS):
+
+- Customers cannot see any driver or restaurant KYC documents.
+- Drivers cannot see customer KYC or government IDs.
+- Restaurants cannot see other restaurants’ data, menus, or balances.
+- Only Admin can see full KYC details and modify verification_status, is_verified, pricing, commissions, and blocking.
+- Users can only update their own non-admin profile fields.
+- Sensitive numbers must be masked (last4) and never fully logged or rendered.
+
+STATUS FLOWS (CANNOT BE BROKEN):
+
+rides.status:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+food_orders.status:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+deliveries.status:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered
+or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+ONBOARDING (ALL ROLES):
+
+- Multi-step:
+  - basic info
+  - address (country-aware)
+  - KYC upload (BD vs US rules)
+  - emergency contact
+- After onboarding:
+  - verification_status = "pending"
+  - is_verified = false
+- Before verification:
+  - Customers: limited per business rules.
+  - Drivers: cannot accept jobs.
+  - Restaurants: cannot go live or receive orders.
+  - Admin: must review & approve.
+
+NOTIFICATIONS (MUST KEEP WORKING):
+
+- New ride alerts for drivers.
+- New food orders for restaurants.
+- Parcel updates.
+- Verification approval/rejection.
+- Important admin notifications (e.g. high negative balances).
+
+IMPLEMENTATION RULES:
+
+- All changes must be additive and backward-compatible.
+- Do NOT rename or remove fields, DB tables, APIs, or routes.
+- Only add new endpoints, fields (nullable), and components.
+- If in doubt, choose an additive alternative instead of modifying existing behavior.
+
+SECURITY ROADMAP FOCUS FOR STEP 45:
+
+- Strict role-based access for restaurant order management.
+- Data minimization: restaurants see only the customer data needed to fulfill orders (no KYC docs or unnecessary PII).
+- Input validation on all status-changing endpoints.
+- Audit logging for restaurant and admin status changes.
+
+DESKTOP LAYOUT CONSTRAINT:
+
+- You MUST NOT alter the desktop SafeGo Eats Home/Restaurant layout built in Step 43.
+- Step 45 may ONLY extend functionality via new restaurant dashboard screens, detail modals, and backend endpoints.
+- No breaking changes to existing customer-facing desktop UI.
+
+====================================================
+STEP 45 – GOAL (CONNECT CUSTOMER ORDERS TO RESTAURANT DASHBOARD)
+====================================================
+
+The goal of Step 45 is to implement a full restaurant-side order management and kitchen flow for SafeGo Eats, so that:
+
+1) When a customer places a food_order (already working after Step 44B), the restaurant dashboard shows this as a new live order in an “Order Inbox”.
+2) The restaurant can:
+   - Accept or reject the order.
+   - Set preparation time.
+   - Move the order through the status flow:
+     - placed → accepted → preparing → ready_for_pickup.
+3) All restaurant actions update the central food_orders collection and are reflected in the customer’s order tracking timeline in real time.
+4) Admin can monitor orders and override in a controlled, audited way.
+5) A DEMO setup is included, and restaurants can customize their order view & notifications.
+
+Driver pickup and actual delivery handoff will be refined in a later step; here we focus mainly on restaurant-side flow up to ready_for_pickup and picked_up.
+
+====================================================
+PHASE 1 – DATA MODEL ADDITIONS (ADD-ONLY)
+====================================================
+
+Extend food_orders ADDITIVELY (no renames) with:
+
+- restaurant_notes (text, nullable) – notes restaurant can add (e.g. “out of stock, replaced item”).
+- restaurant_preparation_minutes (integer, nullable) – ETA for preparation.
+- restaurant_internal_status (optional enum/string) for fine-grained tracking, but it must always map to the main status field that follows:
+  placed / accepted / preparing / ready_for_pickup / picked_up / on_the_way / delivered / cancelled_*.
+- customer_visible_status_message (string, nullable) – short text shown in tracking (e.g. “We’re preparing your pizza”).
+- restaurant_notification_flags (json/boolean fields as needed) – to track if restaurant has seen a new order.
+- is_demo_order (boolean, default false) – to differentiate seeded demo orders from real ones.
+
+Optionally add a new entity: restaurant_kitchen_events
+Fields:
+- id
+- food_order_id
+- restaurant_id
+- previous_status
+- new_status
+- changed_by (restaurant_user_id or admin_id)
+- changed_at timestamp
+- message (optional)
+This is for internal tracking/audit and is optional for UI.
+
+All new fields must be nullable/safe for existing records.
+
+====================================================
+PHASE 2 – RESTAURANT DASHBOARD: ORDER INBOX
+====================================================
+
+Create a dedicated “Orders” section in the Restaurant portal (SafeGo Eats):
+
+Screen: RestaurantOrdersInboxScreen
+
+Features:
+1) Tabs or filters:
+   - New (status = placed)
+   - In Progress (accepted/preparing)
+   - Ready (ready_for_pickup)
+   - Completed (delivered)
+   - Cancelled (any cancelled_* status)
+
+2) Each order card in the list must show:
+   - Order ID (short hash or formatted number).
+   - Time since order placed.
+   - Customer first name only (no full KYC details).
+   - Delivery area (city/neighborhood – not full KYC address).
+   - Items summary (first 1–2 items + “+ X more”).
+   - Total amount.
+   - Current status.
+
+3) Clicking an order opens OrderDetail view (see Phase 3).
+
+Access control:
+- Only Restaurant role, KYC-verified (is_verified = true) and not blocked, can see and act on orders.
+- Unverified or blocked restaurants see a read-only notice (no actions).
+
+====================================================
+PHASE 3 – RESTAURANT ORDER DETAIL & ACTIONS
+====================================================
+
+Screen: RestaurantOrderDetailScreen
+
+Show:
+- Order ID and timestamps.
+- Full item list with:
+  - item name
+  - variant name (if any)
+  - selected add-ons
+  - quantities
+- Customer info (minimal):
+  - first name
+  - masked phone or contact info as allowed
+  - delivery address (enough for delivery, but no KYC fields).
+- Payment info:
+  - payment_method (cash/online)
+  - read-only indication if commission will create negative balance (logic already exists; do not change it).
+
+Actions (depending on current status):
+
+1) For status = placed:
+   - Accept order:
+     - Set status → accepted.
+     - Optionally set restaurant_preparation_minutes.
+     - Write a kitchen event entry.
+   - Reject order:
+     - Require rejection_reason.
+     - Set status → cancelled_by_restaurant.
+     - Trigger notifications to customer and Admin.
+
+2) For status = accepted:
+   - Start preparing:
+     - status → preparing.
+     - Optionally update preparation time or message.
+   - Cancel (edge case):
+     - status → cancelled_by_restaurant with reason.
+     - Notify customer and Admin.
+
+3) For status = preparing:
+   - Mark as ready:
+     - status → ready_for_pickup.
+     - This will later trigger driver/parcel flow (future step).
+   - Optionally update message: “Order packed and ready for pickup.”
+
+All actions must:
+- Update food_orders.status according to allowed transitions.
+- Optionally insert a restaurant_kitchen_events record.
+- Notify customer app via existing or new event/notification mechanism.
+
+Validation:
+- Do not allow invalid transitions (e.g., move from placed directly to ready_for_pickup).
+- Return clear error messages and do not corrupt status.
+
+====================================================
+PHASE 4 – CUSTOMER ORDER TRACKING INTEGRATION
+====================================================
+
+Modify (ADD-ONLY) the existing Customer Order Tracking screen to:
+
+1) Use the current food_orders.status plus any restaurant_kitchen_events (if available) to populate the timeline:
+
+Timeline steps:
+- Order Received (status: placed)
+- Restaurant Accepted (status: accepted)
+- Preparing Order (status: preparing)
+- Ready for Pickup (status: ready_for_pickup)
+- Picked up (status: picked_up – may still be demo stage)
+- On the way (status: on_the_way – may still be demo stage)
+- Delivered (status: delivered)
+
+2) Instead of purely simulated states, tie the first four stages to restaurant actions:
+   - placed → order created.
+   - accepted → restaurant clicked "Accept".
+   - preparing → restaurant clicked "Start preparing".
+   - ready_for_pickup → restaurant clicked "Ready for pickup".
+
+3) If no restaurant action occurs within demo time window:
+   - Keep the existing simulation/demo logic as a fallback for demo orders (is_demo_order = true) WITHOUT touching real orders.
+
+4) Show optional customer_visible_status_message under each stage if available.
+
+====================================================
+PHASE 5 – DEMO MODE + CUSTOMIZATION (MANDATORY)
+====================================================
+
+You MUST provide DEMO + CUSTOMIZATION for Step 45:
+
+1) Demo mode:
+   - Seed demo orders for:
+     - 1 BD demo restaurant.
+     - 1 US demo restaurant.
+   - These orders should:
+     - Appear in RestaurantOrdersInboxScreen.
+     - Be fully manageable (accept, prepare, ready) without real payments.
+   - Use is_demo_order = true to mark them.
+   - Add a toggle or filter “Demo orders only” for restaurants and Admin.
+
+2) Customization for restaurants:
+   - In restaurant dashboard settings, allow configuration of:
+     - Default preparation time (e.g., 20 min, 30 min, 45 min).
+     - Whether auto-accept is enabled for demo mode (for future, keep config ready).
+   - These configs must be editable from UI (not only in code).
+
+3) Customization for Admin:
+   - In Admin panel, provide:
+     - A global switch or config for enabling/disabling demo orders.
+     - Basic controls for:
+       - Maximum allowed preparation_minutes for restaurants (to prevent abuse).
+       - Visibility of certain statuses (e.g., hide internal labels).
+
+All demo configs must be safe:
+- Do not affect real existing data when toggled off.
+- Do not break commission/payout logic.
+
+====================================================
+PHASE 6 – ADMIN OVERSIGHT OF RESTAURANT ORDERS
+====================================================
+
+Admin panel additions (ADD-ONLY):
+
+Screen: AdminRestaurantOrdersMonitorScreen
+
+Features:
+- Filters by:
+  - restaurant
+  - status
+  - country (BD / US)
+  - is_demo_order
+- For each order show:
+  - order ID
+  - restaurant name
+  - customer first name (or masked)
+  - total amount
+  - payment_method
+  - status
+  - timestamps.
+
+Admin actions (limited):
+- Force-cancel an order (e.g., fraud or user request):
+  - Set status → cancelled_by_admin.
+  - Require cancellation_reason.
+  - Notify both customer and restaurant.
+- Optionally adjust restaurant_preparation_minutes when necessary.
+- Admin must NOT adjust commission logic here.
+
+All admin actions must be logged in audit logs.
+
+====================================================
+PHASE 7 – SECURITY & VALIDATION (STEP 45 FOCUS)
+====================================================
+
+Security requirements:
+
+- Only Restaurant role can:
+  - View and manage its own orders.
+  - Never see orders belonging to other restaurants.
+- Only Admin can view all orders.
+
+Data minimization:
+- Restaurant sees:
+  - customer first name
+  - delivery address (just enough to deliver)
+  - phone number if needed.
+- Restaurant must NOT see:
+  - customer KYC documents
+  - government_id_last4
+  - NID details.
+
+Validation:
+- All status change endpoints must:
+  - Validate that the caller is the correct restaurant for the order.
+  - Validate allowed status transitions to avoid corrupted state.
+  - Handle race conditions gracefully (e.g. double click accept).
+
+Logging:
+- Log restaurant and admin status changes (previous_status, new_status, actor, timestamp).
+
+====================================================
+PHASE 8 – IMPLEMENTATION SCOPE & FILES (ADD-ONLY)
+====================================================
+
+You may add/update (ADD-ONLY) the following:
+
+Restaurant app:
+- restaurant-app/screens/RestaurantOrdersInboxScreen.*
+- restaurant-app/screens/RestaurantOrderDetailScreen.*
+- restaurant-app/components/orders/OrderCard.*
+- restaurant-app/components/orders/OrderStatusActions.*
+- restaurant-app/screens/RestaurantSettingsOrdersScreen.* (for prep time/demo settings)
+
+Customer app:
+- customer-app/screens/EatsOrderTrackingScreen.* (extend to use real statuses)
+- customer-app/components/eats/OrderTimeline.* (if separate)
+
+Admin app:
+- admin-app/screens/AdminRestaurantOrdersMonitorScreen.*
+- admin-app/components/orders/AdminOrderRow.*
+- admin-app/components/orders/AdminOrderFilter.* 
+
+Backend APIs (ADD-ONLY):
+- api/restaurant/orders/list
+- api/restaurant/orders/detail
+- api/restaurant/orders/action (accept/prepare/ready/cancel)
+- api/admin/orders/monitor
+- api/admin/orders/action (admin cancel, etc.)
+
+All endpoints must:
+- Respect role-based access control.
+- Be backward-compatible.
+- Integrate with existing food_orders, not introduce a parallel order system.
+
+====================================================
+FINAL REQUIREMENT FOR STEP 45
+====================================================
+
+Deliver Step 45 as a complete, demo-ready, customizable Restaurant Order Management & Kitchen Flow that:
+
+- Connects customer-placed food_orders to the restaurant dashboard.
+- Allows restaurants to accept/reject and progress orders through:
+  placed → accepted → preparing → ready_for_pickup.
+- Keeps the customer tracking UI fully in sync with restaurant actions.
+- Provides demo orders for BD and US restaurants.
+- Exposes configuration options for restaurants and Admin.
+- Does NOT alter Step 43 desktop layout, commission logic, payouts, rides, or parcel modules.
+- Is fully backward-compatible with all existing SafeGo features and rules.

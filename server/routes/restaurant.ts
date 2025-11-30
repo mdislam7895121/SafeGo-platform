@@ -1345,11 +1345,12 @@ router.get("/orders/:id", async (req: AuthRequest, res) => {
 
 // POST /api/restaurant/orders/:id/status
 // Update order status with audit logging (requires KYC completion)
+// Step 45: Extended to support restaurantNotes, prepMinutes, customerMessage
 router.post("/orders/:id/status", requireKYCCompletion, async (req: AuthRequest, res) => {
   try {
     const userId = req.user!.userId;
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, restaurantNotes, prepMinutes, customerMessage, cancellationReason } = req.body;
 
     const restaurantProfile = await prisma.restaurantProfile.findUnique({
       where: { userId },
@@ -1387,10 +1388,42 @@ router.post("/orders/:id/status", requireKYCCompletion, async (req: AuthRequest,
       });
     }
 
+    // Step 45: Validate optional kitchen fields with proper type handling
+    const kitchenSchema = z.object({
+      restaurantNotes: z.string().max(1000).optional().nullable(),
+      prepMinutes: z.number().int().min(1).max(180).optional().nullable(),
+      customerMessage: z.string().max(500).optional().nullable(),
+      cancellationReason: z.string().max(1000).optional().nullable(),
+    });
+    const kitchenValidation = kitchenSchema.safeParse({
+      restaurantNotes,
+      prepMinutes,
+      customerMessage,
+      cancellationReason,
+    });
+    if (!kitchenValidation.success) {
+      return res.status(400).json({
+        error: "Validation failed for kitchen fields",
+        details: kitchenValidation.error.errors,
+      });
+    }
+
     // Update order with transaction and audit log
     const updatedOrder = await prisma.$transaction(async (tx) => {
       // Update order status with timestamps
-      const updateData: any = { status };
+      const updateData: any = { status, updatedAt: new Date() };
+      
+      // Step 45: Include optional restaurant management fields
+      // Store empty strings as empty strings, nulls as nulls, undefined means don't update
+      if (restaurantNotes !== undefined) {
+        updateData.restaurantNotes = restaurantNotes === "" ? null : restaurantNotes;
+      }
+      if (prepMinutes !== undefined) {
+        updateData.restaurantPrepMinutes = prepMinutes === 0 || prepMinutes === null ? null : prepMinutes;
+      }
+      if (customerMessage !== undefined) {
+        updateData.customerStatusMessage = customerMessage === "" ? null : customerMessage;
+      }
       
       if (status === "accepted") updateData.acceptedAt = new Date();
       else if (status === "preparing") updateData.preparingAt = new Date();
@@ -1402,6 +1435,7 @@ router.post("/orders/:id/status", requireKYCCompletion, async (req: AuthRequest,
       } else if (status.startsWith("cancelled")) {
         updateData.cancelledAt = new Date();
         updateData.whoCancelled = "restaurant";
+        if (cancellationReason) updateData.cancellationReason = cancellationReason;
       }
 
       const updated = await tx.foodOrder.update({
@@ -1455,6 +1489,106 @@ router.post("/orders/:id/status", requireKYCCompletion, async (req: AuthRequest,
   } catch (error) {
     console.error("Update order status error:", error);
     res.status(500).json({ error: "Failed to update order status" });
+  }
+});
+
+// POST /api/restaurant/orders/:id/seen
+// Mark order as seen by restaurant (Step 45: Kitchen Flow)
+router.post("/orders/:id/seen", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Only mark as seen if not already seen
+    const order = await prisma.foodOrder.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (!order.restaurantSeenAt) {
+      await prisma.foodOrder.update({
+        where: { id },
+        data: { restaurantSeenAt: new Date() },
+      });
+    }
+
+    res.json({ success: true, seenAt: order.restaurantSeenAt || new Date() });
+  } catch (error) {
+    console.error("Mark order seen error:", error);
+    res.status(500).json({ error: "Failed to mark order as seen" });
+  }
+});
+
+// PATCH /api/restaurant/orders/:id/notes
+// Update restaurant notes for an order (Step 45: Kitchen Flow)
+router.patch("/orders/:id/notes", requireKYCCompletion, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+    const { restaurantNotes, customerStatusMessage, restaurantPrepMinutes } = req.body;
+
+    // Step 45: Validate notes fields with proper bounds
+    const notesSchema = z.object({
+      restaurantNotes: z.string().max(1000).optional().nullable(),
+      customerStatusMessage: z.string().max(500).optional().nullable(),
+      restaurantPrepMinutes: z.number().int().min(1).max(180).optional().nullable(),
+    });
+    const validation = notesSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validation.error.errors,
+      });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    const order = await prisma.foodOrder.findFirst({
+      where: { id, restaurantId: restaurantProfile.id },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    // Allow clearing fields with empty strings or null
+    const updateData: any = { updatedAt: new Date() };
+    if (restaurantNotes !== undefined) updateData.restaurantNotes = restaurantNotes || null;
+    if (customerStatusMessage !== undefined) updateData.customerStatusMessage = customerStatusMessage || null;
+    if (restaurantPrepMinutes !== undefined) updateData.restaurantPrepMinutes = restaurantPrepMinutes || null;
+
+    const updated = await prisma.foodOrder.update({
+      where: { id },
+      data: updateData,
+    });
+
+    res.json({
+      success: true,
+      order: {
+        ...updated,
+        items: typeof updated.items === 'string' ? JSON.parse(updated.items) : updated.items,
+      },
+    });
+  } catch (error) {
+    console.error("Update order notes error:", error);
+    res.status(500).json({ error: "Failed to update order notes" });
   }
 });
 

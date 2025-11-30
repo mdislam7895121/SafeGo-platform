@@ -1,11 +1,14 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation, Link } from "wouter";
-import { ArrowLeft, Clock, MapPin, User, Package, DollarSign, Check, X, ChefHat, Truck, CheckCircle2, XCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Clock, MapPin, User, Package, DollarSign, Check, X, ChefHat, Truck, CheckCircle2, XCircle, MessageSquare, Timer, FileText, Send } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ordersKeys } from "@/lib/queryKeys";
 import { format } from "date-fns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const STATUS_COLORS: Record<string, string> = {
   placed: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800",
@@ -73,6 +76,13 @@ export default function RestaurantOrderDetails() {
     action: () => {},
   });
 
+  // Step 45: Kitchen management state - use undefined/null-aware defaults
+  const [prepMinutes, setPrepMinutes] = useState<number>(15);
+  const [restaurantNotes, setRestaurantNotes] = useState("");
+  const [customerMessage, setCustomerMessage] = useState("");
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [formInitialized, setFormInitialized] = useState(false);
+
   // Fetch order details
   const { data, isLoading } = useQuery({
     queryKey: ordersKeys.detail(orderId || ""),
@@ -82,18 +92,35 @@ export default function RestaurantOrderDetails() {
 
   const order = data?.order;
 
-  // Status update mutation
+  // Initialize form fields when order data loads (only once)
+  useEffect(() => {
+    if (order && !formInitialized) {
+      setPrepMinutes(order.restaurantPrepMinutes ?? 15); // Default to 15 only if null
+      setRestaurantNotes(order.restaurantNotes || "");
+      setCustomerMessage(order.customerStatusMessage || "");
+      setFormInitialized(true);
+    }
+  }, [order, formInitialized]);
+
+  // Step 45: Enhanced status update mutation with kitchen fields
   const updateStatusMutation = useMutation({
-    mutationFn: async (status: string) => {
+    mutationFn: async (payload: { 
+      status: string; 
+      prepMinutes?: number;
+      restaurantNotes?: string;
+      customerMessage?: string;
+      cancellationReason?: string;
+    }) => {
       return await apiRequest(`/api/restaurant/orders/${orderId}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(payload),
       });
     },
     onSuccess: () => {
-      // Invalidate all order-related queries to refresh list, details, overview, and live board
+      // Invalidate both the list and the specific order detail for immediate UI update
       queryClient.invalidateQueries({ queryKey: ordersKeys.all });
+      queryClient.invalidateQueries({ queryKey: ordersKeys.detail(orderId || "") });
       toast({
         title: "Success",
         description: "Order status updated successfully",
@@ -108,15 +135,64 @@ export default function RestaurantOrderDetails() {
     },
   });
 
+  // Step 45: Update notes mutation
+  const updateNotesMutation = useMutation({
+    mutationFn: async (payload: {
+      restaurantNotes?: string;
+      customerStatusMessage?: string;
+      restaurantPrepMinutes?: number;
+    }) => {
+      return await apiRequest(`/api/restaurant/orders/${orderId}/notes`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      // Invalidate both the list and the specific order detail for immediate UI update
+      queryClient.invalidateQueries({ queryKey: ordersKeys.all });
+      queryClient.invalidateQueries({ queryKey: ordersKeys.detail(orderId || "") });
+      toast({
+        title: "Saved",
+        description: "Order notes updated",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update notes",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStatusUpdate = (status: string, title: string, description: string) => {
     setConfirmDialog({
       open: true,
       title,
       description,
       action: () => {
-        updateStatusMutation.mutate(status);
+        const payload: any = { status };
+        // Include prep time when accepting
+        if (status === "accepted" && prepMinutes) {
+          payload.prepMinutes = prepMinutes;
+          payload.customerMessage = `Estimated prep time: ${prepMinutes} minutes`;
+        }
+        // Include cancellation reason when rejecting
+        if (status === "cancelled_restaurant" && cancellationReason) {
+          payload.cancellationReason = cancellationReason;
+        }
+        updateStatusMutation.mutate(payload);
         setConfirmDialog({ ...confirmDialog, open: false });
       },
+    });
+  };
+
+  const handleSaveNotes = () => {
+    updateNotesMutation.mutate({
+      restaurantNotes,
+      customerStatusMessage: customerMessage,
+      restaurantPrepMinutes: prepMinutes,
     });
   };
 
@@ -387,11 +463,124 @@ export default function RestaurantOrderDetails() {
             </CardContent>
           </Card>
 
+          {/* Step 45: Kitchen Notes Card */}
+          {!isCompleted && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Kitchen Notes
+                </CardTitle>
+                <CardDescription>
+                  Manage preparation details and customer communication
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Prep Time */}
+                <div className="space-y-2">
+                  <Label htmlFor="prep-time" className="flex items-center gap-2">
+                    <Timer className="h-4 w-4" />
+                    Prep Time (minutes)
+                  </Label>
+                  <Input
+                    id="prep-time"
+                    type="number"
+                    min={5}
+                    max={120}
+                    value={prepMinutes}
+                    onChange={(e) => setPrepMinutes(parseInt(e.target.value) || 15)}
+                    data-testid="input-prep-time"
+                  />
+                </div>
+
+                {/* Restaurant Internal Notes */}
+                <div className="space-y-2">
+                  <Label htmlFor="restaurant-notes">Internal Notes</Label>
+                  <Textarea
+                    id="restaurant-notes"
+                    placeholder="Notes for kitchen staff (not visible to customer)"
+                    value={restaurantNotes}
+                    onChange={(e) => setRestaurantNotes(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="input-restaurant-notes"
+                  />
+                </div>
+
+                {/* Customer Message */}
+                <div className="space-y-2">
+                  <Label htmlFor="customer-message" className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Customer Message
+                  </Label>
+                  <Textarea
+                    id="customer-message"
+                    placeholder="Update visible to customer (e.g., 'Item substituted')"
+                    value={customerMessage}
+                    onChange={(e) => setCustomerMessage(e.target.value)}
+                    className="min-h-[60px]"
+                    data-testid="input-customer-message"
+                  />
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleSaveNotes}
+                  disabled={updateNotesMutation.isPending}
+                  data-testid="button-save-notes"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {updateNotesMutation.isPending ? "Saving..." : "Save Notes"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Rejection Reason Input (shown when order is placed or accepted) */}
+          {canReject && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-destructive">Reject Order</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="cancel-reason">Reason for Rejection</Label>
+                  <Textarea
+                    id="cancel-reason"
+                    placeholder="Enter reason (e.g., 'Item out of stock', 'Kitchen closed early')"
+                    value={cancellationReason}
+                    onChange={(e) => setCancellationReason(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="input-cancel-reason"
+                  />
+                </div>
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={() =>
+                    handleStatusUpdate(
+                      "cancelled_restaurant",
+                      "Reject Order",
+                      cancellationReason 
+                        ? `Reject with reason: "${cancellationReason}"?`
+                        : "Are you sure you want to reject this order? This action cannot be undone."
+                    )
+                  }
+                  disabled={updateStatusMutation.isPending}
+                  data-testid="button-reject"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Reject Order
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Action Buttons */}
           {!isCompleted && (
             <Card>
               <CardHeader>
-                <CardTitle>Actions</CardTitle>
+                <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {canAccept && (
@@ -401,14 +590,14 @@ export default function RestaurantOrderDetails() {
                       handleStatusUpdate(
                         "accepted",
                         "Accept Order",
-                        "Are you sure you want to accept this order? This will notify the customer."
+                        `Accept and notify customer? Prep time: ${prepMinutes} minutes`
                       )
                     }
                     disabled={updateStatusMutation.isPending}
                     data-testid="button-accept"
                   >
                     <Check className="h-4 w-4 mr-2" />
-                    Accept Order
+                    Accept Order ({prepMinutes} min)
                   </Button>
                 )}
 
@@ -463,25 +652,6 @@ export default function RestaurantOrderDetails() {
                   >
                     <Truck className="h-4 w-4 mr-2" />
                     Mark Picked Up
-                  </Button>
-                )}
-
-                {canReject && (
-                  <Button
-                    variant="destructive"
-                    className="w-full"
-                    onClick={() =>
-                      handleStatusUpdate(
-                        "cancelled_restaurant",
-                        "Reject Order",
-                        "Are you sure you want to reject this order? This action cannot be undone."
-                      )
-                    }
-                    disabled={updateStatusMutation.isPending}
-                    data-testid="button-reject"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Reject Order
                   </Button>
                 )}
               </CardContent>

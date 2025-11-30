@@ -494,6 +494,11 @@ model FoodOrder {
   readyAt            DateTime?         // When order ready for pickup
   pickedUpAt         DateTime?         // When driver picked up
   isDemo               Boolean           @default(false)
+  // Step 45: Restaurant Order Management fields (additive only)
+  restaurantNotes           String?           @db.Text  // Notes from restaurant (e.g., "item substituted")
+  restaurantPrepMinutes     Int?              // Estimated preparation time in minutes
+  customerStatusMessage     String?           // Customer-visible status message
+  restaurantSeenAt          DateTime?         // When restaurant first viewed order
   // Phase 7: Promotion & Coupon tracking (additive only)
   appliedPromotionId   String?
   appliedCouponCode    String?
