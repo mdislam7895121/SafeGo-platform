@@ -178,25 +178,26 @@ export default function EatsHome() {
   const RestaurantCard = ({ restaurant, featured = false }: { restaurant: Restaurant; featured?: boolean }) => (
     <Link href={`/customer/food/${restaurant.id}`}>
       <Card 
-        className={`overflow-hidden hover-elevate cursor-pointer transition-all group ${featured ? 'min-w-[280px]' : ''}`}
+        className={`overflow-hidden hover-elevate cursor-pointer transition-all group touch-manipulation ${featured ? 'min-w-[220px] xs:min-w-[240px] sm:min-w-[280px]' : ''}`}
         data-testid={`card-restaurant-${restaurant.id}`}
       >
         <div className="relative">
-          <div className={`${featured ? 'h-36' : 'h-32'} bg-muted relative overflow-hidden`}>
+          <div className={`${featured ? 'h-32 sm:h-36' : 'h-28 sm:h-32'} bg-muted relative overflow-hidden`}>
             {restaurant.logoUrl ? (
               <img 
                 src={restaurant.logoUrl} 
                 alt={restaurant.name}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                loading="lazy"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/40">
-                <UtensilsCrossed className="h-12 w-12 text-primary/60" />
+                <UtensilsCrossed className="h-10 w-10 sm:h-12 sm:w-12 text-primary/60" />
               </div>
             )}
             {!restaurant.isOpen && (
               <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                <Badge variant="secondary">Currently Closed</Badge>
+                <Badge variant="secondary" className="text-xs sm:text-sm">Currently Closed</Badge>
               </div>
             )}
           </div>
@@ -204,7 +205,7 @@ export default function EatsHome() {
             <Button
               variant="ghost"
               size="icon"
-              className="absolute top-2 right-2 h-8 w-8 bg-background/80 backdrop-blur-sm hover:bg-background"
+              className="absolute top-2 right-2 h-10 w-10 sm:h-9 sm:w-9 bg-background/80 backdrop-blur-sm hover:bg-background touch-manipulation"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -212,27 +213,27 @@ export default function EatsHome() {
               }}
               data-testid={`button-favorite-${restaurant.id}`}
             >
-              <Heart className={`h-4 w-4 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
+              <Heart className={`h-5 w-5 sm:h-4 sm:w-4 ${restaurant.isFavorite ? 'fill-red-500 text-red-500' : ''}`} />
             </Button>
           )}
           {restaurant.deliveryFee === 0 && (
-            <Badge className="absolute top-2 left-2 bg-green-600">Free Delivery</Badge>
+            <Badge className="absolute top-2 left-2 bg-green-600 text-xs">Free Delivery</Badge>
           )}
         </div>
-        <CardContent className="p-3">
+        <CardContent className="p-3 sm:p-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold truncate" data-testid={`text-restaurant-name-${restaurant.id}`}>
+              <h3 className="font-semibold text-sm sm:text-base truncate" data-testid={`text-restaurant-name-${restaurant.id}`}>
                 {restaurant.name}
               </h3>
-              <p className="text-sm text-muted-foreground truncate">{restaurant.cuisineType}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">{restaurant.cuisineType}</p>
             </div>
             <div className="flex items-center gap-1 flex-shrink-0">
               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
               <span className="font-medium text-sm">{restaurant.averageRating.toFixed(1)}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 sm:gap-3 mt-2 text-xs text-muted-foreground flex-wrap">
             <div className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
               <span>{restaurant.deliveryTime || '25-35'} min</span>
@@ -249,12 +250,12 @@ export default function EatsHome() {
   );
 
   const RestaurantSkeleton = ({ featured = false }: { featured?: boolean }) => (
-    <Card className={`overflow-hidden ${featured ? 'min-w-[280px]' : ''}`}>
-      <Skeleton className={`${featured ? 'h-36' : 'h-32'} rounded-none`} />
+    <Card className={`overflow-hidden ${featured ? 'min-w-[220px] xs:min-w-[240px] sm:min-w-[280px]' : ''}`}>
+      <Skeleton className={`${featured ? 'h-32 sm:h-36' : 'h-28 sm:h-32'} rounded-none`} />
       <CardContent className="p-3 space-y-2">
-        <Skeleton className="h-5 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-4 sm:h-5 w-3/4" />
+        <Skeleton className="h-3 sm:h-4 w-1/2" />
+        <Skeleton className="h-3 sm:h-4 w-2/3" />
       </CardContent>
     </Card>
   );
@@ -263,32 +264,31 @@ export default function EatsHome() {
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Header with delivery location and cart */}
       <header className="sticky top-0 z-40 bg-background border-b">
-        <div className="p-4 space-y-3">
+        <div className="p-3 sm:p-4 space-y-3">
           {/* Location and Cart Row */}
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
             <button 
-              className="flex items-center gap-2 hover:bg-muted/50 rounded-lg p-2 -m-2 transition-colors"
+              className="flex items-center gap-2 hover:bg-muted/50 rounded-lg p-2 -m-2 transition-colors min-h-[44px] touch-manipulation"
               data-testid="button-change-location"
             >
-              <MapPin className="h-5 w-5 text-primary" />
-              <div className="text-left">
+              <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
+              <div className="text-left min-w-0">
                 <p className="text-xs text-muted-foreground">Deliver to</p>
-                <p className="font-medium text-sm flex items-center gap-1">
-                  Current Location
-                  <ChevronDown className="h-4 w-4" />
+                <p className="font-medium text-sm flex items-center gap-1 truncate">
+                  <span className="truncate">Current Location</span>
+                  <ChevronDown className="h-4 w-4 flex-shrink-0" />
                 </p>
               </div>
             </button>
             
             <Button
               variant="outline"
-              size="sm"
-              className="relative"
+              className="relative h-10 sm:h-9 px-3 sm:px-4 touch-manipulation"
               onClick={() => setIsCartOpen(true)}
               data-testid="button-open-cart"
             >
-              <ShoppingCart className="h-4 w-4 mr-2" />
-              Cart
+              <ShoppingCart className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Cart</span>
               {cartItemCount > 0 && (
                 <Badge className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs">
                   {cartItemCount}
@@ -302,17 +302,17 @@ export default function EatsHome() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               ref={searchInputRef}
-              placeholder="Search restaurants, cuisines, dishes..."
+              placeholder="Search restaurants, cuisines..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-10 h-12 text-base rounded-full bg-muted/50 border-0 focus-visible:ring-2"
+              className="pl-10 pr-10 h-11 sm:h-12 text-base rounded-full bg-muted/50 border-0 focus-visible:ring-2"
               data-testid="input-search-restaurants"
             />
             {searchQuery && (
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 touch-manipulation"
                 onClick={() => setSearchQuery("")}
                 data-testid="button-clear-search"
               >
@@ -322,9 +322,9 @@ export default function EatsHome() {
           </div>
         </div>
 
-        {/* Cuisine Categories Strip */}
+        {/* Cuisine Categories Strip - Touch-friendly horizontal scroll */}
         <ScrollArea className="w-full whitespace-nowrap border-t">
-          <div className="flex gap-1 p-2">
+          <div className="flex gap-1.5 sm:gap-1 p-2 px-3 sm:px-2">
             {CUISINE_CATEGORIES.map((category) => {
               const Icon = category.icon;
               const isSelected = selectedCuisine === category.id;
@@ -332,13 +332,12 @@ export default function EatsHome() {
                 <Button
                   key={category.id}
                   variant={isSelected ? "default" : "ghost"}
-                  size="sm"
-                  className={`rounded-full gap-2 flex-shrink-0 ${isSelected ? '' : 'text-muted-foreground'}`}
+                  className={`rounded-full gap-1.5 sm:gap-2 flex-shrink-0 h-9 sm:h-8 px-3 sm:px-3 text-sm touch-manipulation ${isSelected ? '' : 'text-muted-foreground'}`}
                   onClick={() => setSelectedCuisine(category.id)}
                   data-testid={`button-cuisine-${category.id}`}
                 >
                   <Icon className="h-4 w-4" />
-                  {category.label}
+                  <span className="text-xs sm:text-sm">{category.label}</span>
                 </Button>
               );
             })}
@@ -349,16 +348,16 @@ export default function EatsHome() {
 
       {/* Main Content */}
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6">
-          {/* Filters Row */}
+        <div className="p-3 sm:p-4 space-y-5 sm:space-y-6">
+          {/* Filters Row - Touch-friendly with proper spacing */}
           <div className="flex items-center gap-2 flex-wrap">
             <Select value={sortBy} onValueChange={setSortBy}>
-              <SelectTrigger className="w-[140px] h-9" data-testid="select-sort">
+              <SelectTrigger className="w-[130px] sm:w-[140px] h-10 sm:h-9 text-sm touch-manipulation" data-testid="select-sort">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {SORT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
+                  <SelectItem key={option.value} value={option.value} className="min-h-[44px] sm:min-h-[36px]">
                     {option.label}
                   </SelectItem>
                 ))}
@@ -367,54 +366,53 @@ export default function EatsHome() {
 
             <Button
               variant={openNow ? "default" : "outline"}
-              size="sm"
               onClick={() => setOpenNow(!openNow)}
-              className="gap-2"
+              className="gap-1.5 sm:gap-2 h-10 sm:h-9 px-3 text-sm touch-manipulation"
               data-testid="button-open-now"
             >
               <Clock className="h-4 w-4" />
-              Open Now
+              <span className="hidden xs:inline">Open Now</span>
+              <span className="xs:hidden">Open</span>
             </Button>
 
             {isLoggedIn && (
               <Button
                 variant={favoritesOnly ? "default" : "outline"}
-                size="sm"
                 onClick={() => setFavoritesOnly(!favoritesOnly)}
-                className="gap-2"
+                className="gap-1.5 sm:gap-2 h-10 sm:h-9 px-3 text-sm touch-manipulation"
                 data-testid="button-favorites"
               >
                 <Heart className="h-4 w-4" />
-                Favorites
+                <span className="hidden sm:inline">Favorites</span>
               </Button>
             )}
 
             <Sheet open={showFilters} onOpenChange={setShowFilters}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2" data-testid="button-filters">
+                <Button variant="outline" className="gap-1.5 sm:gap-2 h-10 sm:h-9 px-3 text-sm touch-manipulation" data-testid="button-filters">
                   <Filter className="h-4 w-4" />
-                  Filters
+                  <span className="hidden sm:inline">Filters</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent>
+              <SheetContent className="w-[300px] sm:w-[400px]">
                 <SheetHeader>
                   <SheetTitle>Filters</SheetTitle>
                 </SheetHeader>
                 <div className="py-4 space-y-4">
                   <div className="space-y-3">
                     <Label>Dietary Preferences</Label>
-                    <div className="space-y-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="vegetarian" data-testid="checkbox-vegetarian" />
-                        <label htmlFor="vegetarian" className="text-sm">Vegetarian</label>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-3 min-h-[44px]">
+                        <Checkbox id="vegetarian" className="h-5 w-5" data-testid="checkbox-vegetarian" />
+                        <label htmlFor="vegetarian" className="text-sm cursor-pointer">Vegetarian</label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="vegan" data-testid="checkbox-vegan" />
-                        <label htmlFor="vegan" className="text-sm">Vegan</label>
+                      <div className="flex items-center space-x-3 min-h-[44px]">
+                        <Checkbox id="vegan" className="h-5 w-5" data-testid="checkbox-vegan" />
+                        <label htmlFor="vegan" className="text-sm cursor-pointer">Vegan</label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <Checkbox id="halal" data-testid="checkbox-halal" />
-                        <label htmlFor="halal" className="text-sm">Halal</label>
+                      <div className="flex items-center space-x-3 min-h-[44px]">
+                        <Checkbox id="halal" className="h-5 w-5" data-testid="checkbox-halal" />
+                        <label htmlFor="halal" className="text-sm cursor-pointer">Halal</label>
                       </div>
                     </div>
                   </div>
@@ -423,7 +421,12 @@ export default function EatsHome() {
                     <Label>Price Range</Label>
                     <div className="flex gap-2">
                       {["$", "$$", "$$$", "$$$$"].map((price, idx) => (
-                        <Button key={price} variant="outline" size="sm" data-testid={`button-price-${idx + 1}`}>
+                        <Button 
+                          key={price} 
+                          variant="outline" 
+                          className="h-10 px-4 touch-manipulation" 
+                          data-testid={`button-price-${idx + 1}`}
+                        >
                           {price}
                         </Button>
                       ))}
@@ -436,10 +439,10 @@ export default function EatsHome() {
 
           {/* Loading State */}
           {isLoading && (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               <div className="space-y-3">
-                <Skeleton className="h-6 w-32" />
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <Skeleton className="h-5 sm:h-6 w-32" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <RestaurantSkeleton key={i} />
                   ))}
@@ -450,16 +453,17 @@ export default function EatsHome() {
 
           {/* No Results */}
           {!isLoading && restaurants.length === 0 && (
-            <div className="text-center py-12">
-              <UtensilsCrossed className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No restaurants found</h3>
-              <p className="text-muted-foreground mb-4">
+            <div className="text-center py-8 sm:py-12 px-4">
+              <UtensilsCrossed className="h-12 w-12 sm:h-16 sm:w-16 mx-auto text-muted-foreground/50 mb-4" />
+              <h3 className="text-base sm:text-lg font-semibold mb-2">No restaurants found</h3>
+              <p className="text-sm sm:text-base text-muted-foreground mb-4">
                 {searchQuery 
                   ? `No results for "${searchQuery}"`
                   : "Try adjusting your filters or check back later"}
               </p>
               <Button 
                 variant="outline" 
+                className="h-10 touch-manipulation"
                 onClick={() => {
                   setSearchQuery("");
                   setSelectedCuisine("all");
@@ -479,17 +483,19 @@ export default function EatsHome() {
               {/* Popular Near You - Horizontal Scroll */}
               {!searchQuery && selectedCuisine === "all" && popularRestaurants.length > 0 && (
                 <section>
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-bold flex items-center gap-2">
-                      <Flame className="h-5 w-5 text-orange-500" />
-                      Popular Near You
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <h2 className="text-base sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2">
+                      <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500 flex-shrink-0" />
+                      <span>Popular Near You</span>
                     </h2>
-                    <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" data-testid="button-see-all-popular">
-                      See all <ChevronRight className="h-4 w-4" />
+                    <Button variant="ghost" className="gap-1 text-muted-foreground h-9 px-2 sm:px-3 text-sm touch-manipulation" data-testid="button-see-all-popular">
+                      <span className="hidden sm:inline">See all</span>
+                      <span className="sm:hidden">All</span>
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
-                  <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4">
-                    <div className="flex gap-4">
+                  <ScrollArea className="w-full whitespace-nowrap -mx-3 px-3 sm:-mx-4 sm:px-4">
+                    <div className="flex gap-3 sm:gap-4">
                       {popularRestaurants.map((restaurant) => (
                         <RestaurantCard key={restaurant.id} restaurant={restaurant} featured />
                       ))}
@@ -502,17 +508,19 @@ export default function EatsHome() {
               {/* Top Rated */}
               {!searchQuery && selectedCuisine === "all" && topRatedRestaurants.length > 0 && (
                 <section>
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-lg font-bold flex items-center gap-2">
-                      <Star className="h-5 w-5 text-yellow-500" />
-                      Top Rated
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <h2 className="text-base sm:text-lg font-bold flex items-center gap-1.5 sm:gap-2">
+                      <Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 flex-shrink-0" />
+                      <span>Top Rated</span>
                     </h2>
-                    <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" data-testid="button-see-all-top-rated">
-                      See all <ChevronRight className="h-4 w-4" />
+                    <Button variant="ghost" className="gap-1 text-muted-foreground h-9 px-2 sm:px-3 text-sm touch-manipulation" data-testid="button-see-all-top-rated">
+                      <span className="hidden sm:inline">See all</span>
+                      <span className="sm:hidden">All</span>
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
-                  <ScrollArea className="w-full whitespace-nowrap -mx-4 px-4">
-                    <div className="flex gap-4">
+                  <ScrollArea className="w-full whitespace-nowrap -mx-3 px-3 sm:-mx-4 sm:px-4">
+                    <div className="flex gap-3 sm:gap-4">
                       {topRatedRestaurants.map((restaurant) => (
                         <RestaurantCard key={restaurant.id} restaurant={restaurant} featured />
                       ))}
@@ -522,19 +530,19 @@ export default function EatsHome() {
                 </section>
               )}
 
-              {/* All Restaurants Grid */}
+              {/* All Restaurants Grid - Responsive columns */}
               <section>
-                <h2 className="text-lg font-bold mb-3">
+                <h2 className="text-base sm:text-lg font-bold mb-3">
                   {searchQuery 
                     ? `Results for "${searchQuery}"` 
                     : selectedCuisine !== "all"
                       ? `${selectedCuisine} Restaurants`
                       : "All Restaurants"}
-                  <span className="text-muted-foreground font-normal text-sm ml-2">
+                  <span className="text-muted-foreground font-normal text-xs sm:text-sm ml-2">
                     ({restaurants.length})
                   </span>
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                   {restaurants.map((restaurant) => (
                     <RestaurantCard key={restaurant.id} restaurant={restaurant} />
                   ))}
@@ -545,17 +553,17 @@ export default function EatsHome() {
         </div>
       </ScrollArea>
 
-      {/* Floating Cart Button (Mobile) */}
+      {/* Floating Cart Button (Mobile) - Safe area aware */}
       {cartItemCount > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 md:hidden z-50">
+        <div className="fixed bottom-4 left-3 right-3 sm:left-4 sm:right-4 md:hidden z-50 pb-safe">
           <Button
-            className="w-full h-14 shadow-lg gap-2"
+            className="w-full h-14 shadow-lg gap-2 text-sm sm:text-base touch-manipulation"
             onClick={() => setIsCartOpen(true)}
             data-testid="button-floating-cart"
           >
-            <ShoppingCart className="h-5 w-5" />
-            <span>View Cart ({cartItemCount} items)</span>
-            <span className="ml-auto font-bold">${cartTotals.total.toFixed(2)}</span>
+            <ShoppingCart className="h-5 w-5 flex-shrink-0" />
+            <span className="truncate">View Cart ({cartItemCount})</span>
+            <span className="ml-auto font-bold flex-shrink-0">${cartTotals.total.toFixed(2)}</span>
           </Button>
         </div>
       )}
