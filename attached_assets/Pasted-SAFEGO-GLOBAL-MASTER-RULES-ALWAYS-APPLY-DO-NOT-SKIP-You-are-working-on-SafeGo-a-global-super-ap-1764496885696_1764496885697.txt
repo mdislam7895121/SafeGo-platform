@@ -1,0 +1,162 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS APPLY, DO NOT SKIP)
+
+You are working on SafeGo, a global super-app.
+
+ROLES (must stay fully separated):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must have:
+- Separate signup & login
+- Country-specific KYC + verification
+- Its own dashboard and navigation
+- Its own permissions & status flows
+Never mix or leak access across roles.
+
+GLOBAL SERVICES (always enabled):
+1) Ride-hailing
+2) Food delivery (SafeGo Eats)
+3) Parcel delivery
+
+COUNTRIES:
+- Bangladesh (BD)
+- United States (US)
+
+COUNTRY-SPECIFIC KYC (summary)
+
+BD Customers:
+- full_name, father_name, date_of_birth
+- phone_number, email (optional)
+- present_address, permanent_address
+- NID_number + NID_front_image_url + NID_back_image_url
+- emergency_contact_name/phone/relation
+- verification_status: pending | approved | rejected
+- is_verified: boolean
+- rejection_reason (nullable)
+
+US Customers:
+- full_name, date_of_birth
+- phone_number, email
+- home_address
+- emergency_contact_name/phone/relation
+- government_id_type, government_id_last4
+- verification_status, is_verified, rejection_reason
+
+BD Drivers:
+- All BD customer fields
+- driver_license_number + front/back images
+- vehicle_type/model/color/plate_number
+- driver_wallet_balance (can be negative)
+- driver_status: offline | online | on_trip
+- is_blocked, verification_status, is_verified, rejection_reason
+
+US Drivers:
+- full_name, date_of_birth
+- phone_number, email, home_address
+- emergency_contact_*
+- government_id_type, government_id_last4
+- driver_license_number + image + expiry
+- ssn_last4 (optional)
+- driver_wallet_balance
+- driver_status
+- is_blocked, verification_status, is_verified, rejection_reason
+
+BD Restaurant Owners:
+- restaurant_owner_name, father_name, date_of_birth
+- phone_number, email
+- present_address, permanent_address
+- NID_number + front/back images
+- emergency_contact_*
+- restaurant_legal_name
+- trade_license_number (optional)
+- verification_status, is_verified, rejection_reason
+
+US Restaurant Owners:
+- restaurant_owner_name, date_of_birth
+- phone_number, email
+- home_address
+- emergency_contact_*
+- government_id_type, government_id_last4
+- restaurant_legal_name
+- EIN_last4 (optional)
+- verification_status, is_verified, rejection_reason
+
+ONBOARDING (all roles):
+- Multi-step: Basic info → Address → ID/KYC upload → Emergency contact
+- Set verification_status="pending", is_verified=false
+- Block core actions until Admin approval.
+
+CORE COLLECTIONS (never remove or rename):
+1) rides
+2) food_orders
+3) deliveries
+
+Each must include:
+- Identity fields (customer_id, driver_id, restaurant_id…)
+- Addresses + geolocation
+- Pricing, fees, commissions
+- Payment method + payment_status
+- Timestamps for each status change
+- Status field with required flow
+- Rating and feedback fields
+
+COMMISSION & PAYOUT RULES:
+1) Ride CASH:
+   - Driver gets full cash.
+   - SafeGo commission → negative driver_wallet_balance.
+2) Food CASH:
+   - Restaurant gets full cash.
+   - SafeGo commission → negative restaurant_wallet_balance.
+3) Online payment:
+   - SafeGo keeps commission automatically.
+4) Admin can view and settle negative balances and mark as paid.
+
+ADMIN PANEL (must remain capable to):
+- View/verify customers, drivers, restaurants
+- Approve/reject KYC with rejection_reason
+- Block/unblock any user or restaurant
+- Update pricing, fees, commissions
+- View driver_wallet_balance & restaurant_wallet_balance
+- Manage payouts & settlements
+- View all rides, food_orders, deliveries
+
+SECURITY RULES:
+- Customers cannot view driver/restaurant KYC or IDs.
+- Drivers cannot view customer KYC or IDs.
+- Restaurants cannot view other restaurants’ data.
+- Users can edit only their own profile.
+- Only Admin can change verification, blocking, pricing, commissions.
+- Customer-facing APIs must NEVER expose NID_number, government_id_last4, ssn_last4, or KYC images.
+
+STATUS FLOWS (do not rename):
+
+Ride:
+  requested → searching_driver → accepted → driver_arriving → in_progress → completed
+  or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+Food:
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+  or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_driver / cancelled_by_admin
+
+Parcel:
+  requested → searching_driver → accepted → picked_up → on_the_way → delivered
+  or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+NOTIFICATIONS:
+- Ride, food, parcel status updates
+- Verification approval/rejection
+- Important admin announcements
+
+NON-BREAKING DEVELOPMENT POLICY:
+- Do NOT rename or delete any collections, fields, APIs, routes, screens.
+- Only ADD new fields/components/endpoints.
+- Must not break:
+  - Admin dashboard
+  - Driver management
+  - Customer management
+  - Restaurant management
+  - Parcel management
+  - Wallet & commission settlement
+  - KYC flows
