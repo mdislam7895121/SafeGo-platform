@@ -294,6 +294,23 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
         conflictItems: conflictItems.split(", "),
       });
     }
+
+    // Step 44B: Handle commission rule errors gracefully
+    if (error.message?.includes("commission rule")) {
+      console.error("[FoodOrders] Commission calculation failed:", error.message);
+      return res.status(500).json({ 
+        error: "Order processing error",
+        message: "Unable to process order fees. Please try again or contact support."
+      });
+    }
+
+    // Step 44B: Handle validation errors
+    if (error.message?.includes("validation") || error.message?.includes("required")) {
+      return res.status(400).json({ 
+        error: "Validation error",
+        message: error.message 
+      });
+    }
     
     res.status(500).json({ error: "Failed to create food order" });
   }

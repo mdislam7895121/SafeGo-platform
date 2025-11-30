@@ -1,8 +1,7 @@
 import { EarningsStatus, Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '../db';
 import { logAuditEvent } from '../utils/audit';
-
-type Decimal = Prisma.Decimal;
 
 interface CommissionCalculation {
   baseCommission: Decimal;
@@ -56,9 +55,23 @@ export async function calculateCommission(
     });
 
     if (!globalRule) {
-      throw new Error(
-        'No commission rule found. Please contact support.'
+      // Step 44B: Safe fallback - use default 15% commission rate if no rule configured
+      console.warn('[CommissionService] No commission rule found, using default 15% rate');
+      const defaultCommissionRate = 15;
+      const baseCommissionAmount = new Decimal(
+        (serviceFareNum * defaultCommissionRate) / 100
       );
+      const netEarnings = new Decimal(serviceFareNum).minus(baseCommissionAmount);
+
+      return {
+        baseCommission: baseCommissionAmount,
+        categoryCommission: null,
+        totalCommission: baseCommissionAmount,
+        netEarnings,
+        baseCommissionRuleId: null,
+        categoryCommissionRuleId: null,
+        commissionRate: defaultCommissionRate,
+      };
     }
 
     const baseCommissionAmount = new Decimal(
