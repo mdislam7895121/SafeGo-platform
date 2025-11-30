@@ -33,8 +33,14 @@ export const commissionConfig: CommissionConfigType = {
   }
 };
 
+export const DEFAULT_FALLBACK_CONFIG: CountryCommissionConfig = {
+  restaurant_commission_percent: 15,
+  driver_commission_percent: 10,
+  currency: "USD"
+};
+
 export interface AdminCommissionOverride {
-  countryCode: "BD" | "US";
+  countryCode: string;
   restaurant_commission_percent?: number;
   driver_commission_percent?: number;
   effectiveFrom?: Date;
@@ -44,7 +50,14 @@ export interface AdminCommissionOverride {
 
 export const adminCommissionOverrideConfig: AdminCommissionOverride[] = [];
 
-export function getRestaurantCommissionRate(countryCode: "BD" | "US"): number {
+function getSafeCountryConfig(countryCode: string): CountryCommissionConfig {
+  if (countryCode === "BD" || countryCode === "US") {
+    return commissionConfig[countryCode];
+  }
+  return DEFAULT_FALLBACK_CONFIG;
+}
+
+export function getRestaurantCommissionRate(countryCode: string): number {
   const override = adminCommissionOverrideConfig.find(o => 
     o.countryCode === countryCode && 
     o.restaurant_commission_percent !== undefined &&
@@ -56,10 +69,10 @@ export function getRestaurantCommissionRate(countryCode: "BD" | "US"): number {
     return override.restaurant_commission_percent;
   }
   
-  return commissionConfig[countryCode].restaurant_commission_percent;
+  return getSafeCountryConfig(countryCode).restaurant_commission_percent;
 }
 
-export function getDriverCommissionRate(countryCode: "BD" | "US"): number {
+export function getDriverCommissionRate(countryCode: string): number {
   const override = adminCommissionOverrideConfig.find(o => 
     o.countryCode === countryCode && 
     o.driver_commission_percent !== undefined &&
@@ -71,19 +84,21 @@ export function getDriverCommissionRate(countryCode: "BD" | "US"): number {
     return override.driver_commission_percent;
   }
   
-  return commissionConfig[countryCode].driver_commission_percent;
+  return getSafeCountryConfig(countryCode).driver_commission_percent;
 }
 
-export function getCurrency(countryCode: "BD" | "US"): string {
-  return commissionConfig[countryCode].currency;
+export function getCurrency(countryCode: string): string {
+  return getSafeCountryConfig(countryCode).currency;
 }
 
 export function calculateRestaurantCommission(
   totalAmountChargedToCustomer: number,
-  countryCode: "BD" | "US"
+  countryCode: string
 ): {
   platformCommissionAmount: number;
+  platformCommissionAmountRaw: number;
   restaurantEarnings: number;
+  restaurantEarningsRaw: number;
   commissionRate: number;
   currency: string;
 } {
@@ -93,7 +108,9 @@ export function calculateRestaurantCommission(
   
   return {
     platformCommissionAmount: parseFloat(platformCommissionAmount.toFixed(2)),
+    platformCommissionAmountRaw: platformCommissionAmount,
     restaurantEarnings: parseFloat(restaurantEarnings.toFixed(2)),
+    restaurantEarningsRaw: restaurantEarnings,
     commissionRate,
     currency: getCurrency(countryCode)
   };
@@ -101,10 +118,12 @@ export function calculateRestaurantCommission(
 
 export function calculateDriverCommission(
   totalAmountChargedToCustomer: number,
-  countryCode: "BD" | "US"
+  countryCode: string
 ): {
   platformCommissionAmount: number;
+  platformCommissionAmountRaw: number;
   driverEarningsAmount: number;
+  driverEarningsAmountRaw: number;
   commissionRate: number;
   currency: string;
 } {
@@ -114,7 +133,9 @@ export function calculateDriverCommission(
   
   return {
     platformCommissionAmount: parseFloat(platformCommissionAmount.toFixed(2)),
+    platformCommissionAmountRaw: platformCommissionAmount,
     driverEarningsAmount: parseFloat(driverEarningsAmount.toFixed(2)),
+    driverEarningsAmountRaw: driverEarningsAmount,
     commissionRate,
     currency: getCurrency(countryCode)
   };
