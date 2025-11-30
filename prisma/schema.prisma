@@ -101,6 +101,7 @@ model CustomerProfile {
   customerSupportTickets CustomerSupportTicket[] @relation("CustomerSupportTickets") // Phase 12 Extension
   customerLiveChatSessions CustomerLiveChatSession[] @relation("CustomerLiveChatSessions") // Phase 12 Extension
   customerSupportCallbacks CustomerSupportCallback[] @relation("CustomerSupportCallbacks") // Phase 12 Extension
+  favoriteRestaurants   FoodRestaurantFavorite[] // Favorite restaurants for quick access
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -472,6 +473,8 @@ model FoodOrder {
   deliveryPayout     Decimal?          @db.Decimal(10, 2) // Alias for driverPayout for compatibility
   subtotal           Decimal?          @db.Decimal(10, 2) // Items subtotal before fees/taxes
   deliveryFee        Decimal?          @db.Decimal(10, 2) // Delivery fee component
+  tipAmount          Decimal?          @db.Decimal(10, 2) // Customer tip for driver
+  deliveryInstructions String?         // Special delivery instructions
   paymentMethod      String
   status             String
   customerRating     Int?
@@ -514,6 +517,21 @@ model FoodOrder {
   @@index([isDemo])
   @@index([appliedPromotionId])
   @@map("food_orders")
+}
+
+// Customer favorite restaurants for quick access
+model FoodRestaurantFavorite {
+  id                String            @id @default(uuid())
+  customerProfileId String
+  restaurantId      String
+  createdAt         DateTime          @default(now())
+  customer          CustomerProfile   @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  restaurant        RestaurantProfile @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@unique([customerProfileId, restaurantId])
+  @@index([customerProfileId])
+  @@index([restaurantId])
+  @@map("food_restaurant_favorites")
 }
 
 model Notification {
@@ -607,6 +625,7 @@ model RestaurantProfile {
   commissionRules       CommissionRule[] // R6: Commission rules
   earningsTransactions  EarningsTransaction[] // R6: Earnings transactions
   earningsSummaries     EarningsSummary[] // R6: Earnings summaries
+  favoritedBy           FoodRestaurantFavorite[] // Customers who favorited this restaurant
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
 
