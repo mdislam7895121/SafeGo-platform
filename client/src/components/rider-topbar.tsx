@@ -313,11 +313,13 @@ export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
 
           <DropdownMenu open={profileOpen} onOpenChange={setProfileOpen}>
             <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="gap-2" 
+              <button 
+                type="button"
+                className="flex items-center gap-2 rounded-md px-3 py-2 hover-elevate active-elevate-2 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" 
                 data-testid="button-profile-avatar"
                 aria-label="Open profile menu"
+                aria-haspopup="menu"
+                aria-expanded={profileOpen}
               >
                 <Avatar className="h-8 w-8 border-2 border-border">
                   <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
@@ -326,7 +328,7 @@ export function RiderTopBar({ pageTitle = "Home" }: RiderTopBarProps) {
                 </Avatar>
                 <span className="hidden md:inline-block text-sm">{riderName}</span>
                 <ChevronDown className="h-4 w-4 hidden md:block" />
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
