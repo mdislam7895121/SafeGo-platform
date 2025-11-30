@@ -46,7 +46,7 @@ export default function CartDrawer({ open, onOpenChange }: CartDrawerProps) {
   const handleViewRestaurant = () => {
     if (state.restaurant?.id) {
       onOpenChange(false);
-      setLocation(`/customer/eats/${state.restaurant.id}`);
+      setLocation(`/customer/food/${state.restaurant.id}`);
     }
   };
 

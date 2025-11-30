@@ -342,7 +342,7 @@ export default function EatsRestaurant() {
           <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h2 className="text-lg font-semibold mb-2">Restaurant not found</h2>
           <p className="text-muted-foreground mb-4">This restaurant may no longer be available</p>
-          <Button onClick={() => setLocationPath("/customer/eats")}>
+          <Button onClick={() => setLocationPath("/customer/food")}>
             Browse Restaurants
           </Button>
         </div>
@@ -370,7 +370,7 @@ export default function EatsRestaurant() {
           variant="ghost"
           size="icon"
           className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm hover:bg-background"
-          onClick={() => setLocationPath("/customer/eats")}
+          onClick={() => setLocationPath("/customer/food")}
           data-testid="button-back"
         >
           <ArrowLeft className="h-5 w-5" />

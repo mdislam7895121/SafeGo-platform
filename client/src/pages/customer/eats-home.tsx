@@ -176,7 +176,7 @@ export default function EatsHome() {
   const openRestaurants = restaurants.filter(r => r.isOpen);
 
   const RestaurantCard = ({ restaurant, featured = false }: { restaurant: Restaurant; featured?: boolean }) => (
-    <Link href={`/customer/eats/${restaurant.id}`}>
+    <Link href={`/customer/food/${restaurant.id}`}>
       <Card 
         className={`overflow-hidden hover-elevate cursor-pointer transition-all group ${featured ? 'min-w-[280px]' : ''}`}
         data-testid={`card-restaurant-${restaurant.id}`}
