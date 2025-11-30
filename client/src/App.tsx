@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationSoundProvider } from "@/contexts/NotificationSoundContext";
+import { EatsCartProvider } from "@/contexts/EatsCartContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
 // Auth pages
@@ -24,6 +25,7 @@ import OrderConfirmation from "@/pages/customer/order-confirmation";
 import CustomerDriverProfile from "@/pages/customer/driver-public-profile";
 import FoodRestaurants from "@/pages/customer/food-restaurants";
 import FoodRestaurantDetails from "@/pages/customer/food-restaurant-details";
+import FoodCheckout from "@/pages/customer/food-checkout";
 import FoodOrdersHistory from "@/pages/customer/food-orders-history";
 import CustomerMyReviews from "@/pages/customer/my-reviews";
 import ParcelRequest from "@/pages/customer/parcel-request";
@@ -297,6 +299,11 @@ function Router() {
       <Route path="/customer/food/orders">
         <ProtectedRoute allowedRoles={["customer"]}>
           <FoodOrdersHistory />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/food/checkout">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <FoodCheckout />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/my-reviews">
@@ -1686,10 +1693,12 @@ export default function App() {
       <ThemeProvider>
         <NotificationSoundProvider>
           <AuthProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Router />
-            </TooltipProvider>
+            <EatsCartProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Router />
+              </TooltipProvider>
+            </EatsCartProvider>
           </AuthProvider>
         </NotificationSoundProvider>
       </ThemeProvider>

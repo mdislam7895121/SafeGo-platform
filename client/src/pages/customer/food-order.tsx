@@ -28,14 +28,18 @@ export default function FoodOrder() {
 
     try {
       const parsedItems = JSON.parse(items);
-      await apiRequest("POST", "/api/food-orders", {
-        restaurantId,
-        deliveryAddress,
-        deliveryLat: parseFloat(deliveryLat),
-        deliveryLng: parseFloat(deliveryLng),
-        items: parsedItems,
-        serviceFare: parseFloat(serviceFare),
-        paymentMethod,
+      await apiRequest("/api/food-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          restaurantId,
+          deliveryAddress,
+          deliveryLat: parseFloat(deliveryLat),
+          deliveryLng: parseFloat(deliveryLng),
+          items: parsedItems,
+          serviceFare: parseFloat(serviceFare),
+          paymentMethod,
+        }),
       });
 
       toast({

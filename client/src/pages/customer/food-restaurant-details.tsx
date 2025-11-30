@@ -1,14 +1,26 @@
-import { Link, useParams } from "wouter";
+import { Link, useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle, Info, Tag } from "lucide-react";
+import { ArrowLeft, Star, MapPin, UtensilsCrossed, Plus, Minus, Camera, Clock, TrendingUp, AlertCircle, CheckCircle, Info, Tag, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import GalleryModal from "@/components/customer/GalleryModal";
 import { PricingBreakdownModal } from "@/components/PricingBreakdownModal";
+import { useEatsCart, type RestaurantInfo } from "@/contexts/EatsCartContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface MenuItem {
   id: string;
@@ -157,9 +169,23 @@ interface PricingData {
 
 export default function FoodRestaurantDetails() {
   const { id } = useParams() as { id: string };
+  const [, setLocationPath] = useLocation();
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [galleryStartIndex, setGalleryStartIndex] = useState(0);
   const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const [showDifferentRestaurantDialog, setShowDifferentRestaurantDialog] = useState(false);
+  const [pendingItem, setPendingItem] = useState<MenuItem | null>(null);
+  
+  const { toast } = useToast();
+  const { 
+    addItem, 
+    getItemCount, 
+    getItemQuantity, 
+    updateQuantity, 
+    isFromDifferentRestaurant, 
+    clearAndAddItem,
+    state: cartState 
+  } = useEatsCart();
 
   const { data: restaurantData, isLoading: restaurantLoading, error: restaurantError } = useQuery<RestaurantResponse>({
     queryKey: [`/api/customer/food/restaurants/${id}`],
@@ -257,6 +283,120 @@ export default function FoodRestaurantDetails() {
   };
 
   const statusBadge = getStatusBadge();
+
+  const getRestaurantInfo = (): RestaurantInfo | null => {
+    if (!restaurant) return null;
+    return {
+      id: restaurant.id,
+      name: restaurant.name,
+      cuisineType: restaurant.cuisineType,
+      address: restaurant.address,
+      deliveryFee: operational?.deliveryZone?.deliveryFee ?? undefined,
+      minOrderAmount: operational?.operational?.minOrderAmount ?? undefined,
+      estimatedDeliveryMinutes: operational?.deliveryZone?.estimatedTimeMinutes ?? undefined,
+    };
+  };
+
+  const handleAddToCart = (menuItem: MenuItem) => {
+    if (!menuItem.isAvailable) {
+      toast({
+        title: "Item unavailable",
+        description: "This item is currently out of stock.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isFromDifferentRestaurant(id)) {
+      setPendingItem(menuItem);
+      setShowDifferentRestaurantDialog(true);
+      return;
+    }
+
+    const restaurantInfo = getRestaurantInfo();
+    if (!restaurantInfo) {
+      toast({
+        title: "Error",
+        description: "Restaurant information not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const result = addItem({
+      menuItemId: menuItem.id,
+      name: menuItem.name,
+      description: menuItem.description,
+      price: menuItem.price,
+      quantity: 1,
+      imageUrl: menuItem.imageUrl,
+    }, restaurantInfo);
+
+    if (result.success) {
+      toast({
+        title: "Added to cart",
+        description: `${menuItem.name} added. ${result.newCount} item${result.newCount !== 1 ? "s" : ""} in cart.`,
+      });
+    }
+  };
+
+  const handleConfirmNewRestaurant = () => {
+    if (!pendingItem) return;
+    
+    const restaurantInfo = getRestaurantInfo();
+    if (!restaurantInfo) return;
+
+    clearAndAddItem({
+      menuItemId: pendingItem.id,
+      name: pendingItem.name,
+      description: pendingItem.description,
+      price: pendingItem.price,
+      quantity: 1,
+      imageUrl: pendingItem.imageUrl,
+    }, restaurantInfo);
+
+    toast({
+      title: "Cart updated",
+      description: `Started new order from ${restaurant?.name}. ${pendingItem.name} added.`,
+    });
+
+    setPendingItem(null);
+    setShowDifferentRestaurantDialog(false);
+  };
+
+  const handleIncrementItem = (menuItemId: string) => {
+    const currentQty = getItemQuantity(menuItemId);
+    const cartItem = cartState.items.find(item => item.menuItemId === menuItemId);
+    if (cartItem) {
+      updateQuantity(cartItem.id, currentQty + 1);
+      toast({
+        title: "Quantity updated",
+        description: `${getItemCount() + 1} item${getItemCount() + 1 !== 1 ? "s" : ""} in cart.`,
+      });
+    }
+  };
+
+  const handleDecrementItem = (menuItemId: string) => {
+    const currentQty = getItemQuantity(menuItemId);
+    const cartItem = cartState.items.find(item => item.menuItemId === menuItemId);
+    if (cartItem && currentQty > 0) {
+      updateQuantity(cartItem.id, currentQty - 1);
+      const newCount = getItemCount() - 1;
+      if (newCount > 0) {
+        toast({
+          title: "Quantity updated",
+          description: `${newCount} item${newCount !== 1 ? "s" : ""} in cart.`,
+        });
+      } else {
+        toast({
+          title: "Item removed",
+          description: "Your cart is now empty.",
+        });
+      }
+    }
+  };
+
+  const cartItemCount = getItemCount();
 
   if (error) {
     return (
@@ -853,16 +993,41 @@ export default function FoodRestaurantDetails() {
                         <span className="font-semibold text-lg" data-testid={`text-item-price-${item.id}`}>
                           ${item.price.toFixed(2)}
                         </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled
-                          className="gap-2"
-                          data-testid={`button-add-cart-${item.id}`}
-                        >
-                          <Plus className="h-4 w-4" />
-                          Add to Cart
-                        </Button>
+                        {getItemQuantity(item.id) > 0 ? (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => handleDecrementItem(item.id)}
+                              data-testid={`button-decrement-${item.id}`}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-8 text-center font-semibold" data-testid={`text-quantity-${item.id}`}>
+                              {getItemQuantity(item.id)}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => handleIncrementItem(item.id)}
+                              data-testid={`button-increment-${item.id}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!item.isAvailable}
+                            className="gap-2"
+                            onClick={() => handleAddToCart(item)}
+                            data-testid={`button-add-cart-${item.id}`}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -873,18 +1038,45 @@ export default function FoodRestaurantDetails() {
         )}
       </div>
 
-      {/* Coming Soon Notice */}
-      {!isLoading && categories.length > 0 && (
-        <div className="px-6 pb-6">
-          <Card className="bg-muted/50">
-            <CardContent className="p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Cart and checkout coming soon! Browse our menu and check back later to place your order.
-              </p>
-            </CardContent>
-          </Card>
+      {/* Floating Cart Bar */}
+      {cartItemCount > 0 && cartState.restaurant?.id === id && (
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50">
+          <Button
+            className="w-full gap-3"
+            size="lg"
+            onClick={() => setLocationPath("/customer/food/checkout")}
+            data-testid="button-view-cart"
+          >
+            <ShoppingCart className="h-5 w-5" />
+            <span>View Cart</span>
+            <Badge variant="secondary" className="ml-auto" data-testid="badge-cart-count">
+              {cartItemCount} item{cartItemCount !== 1 ? "s" : ""}
+            </Badge>
+            <span className="font-bold">${cartState.items.reduce((sum, item) => sum + item.price * item.quantity, 0).toFixed(2)}</span>
+          </Button>
         </div>
       )}
+
+      {/* Different Restaurant Dialog */}
+      <AlertDialog open={showDifferentRestaurantDialog} onOpenChange={setShowDifferentRestaurantDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Start new order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have items from {cartState.restaurant?.name} in your cart. Starting a new order will clear your current cart.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-keep-cart">Keep current cart</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmNewRestaurant}
+              data-testid="button-start-new-order"
+            >
+              Start new order
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Gallery Modal */}
       <GalleryModal
