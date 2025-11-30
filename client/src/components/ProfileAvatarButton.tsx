@@ -211,10 +211,12 @@ export function ProfileAvatarButton({
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          className={`gap-2 ${variant === "compact" ? "px-2" : ""} ${className}`}
+        <button
+          type="button"
+          className={`flex items-center gap-2 rounded-md px-3 py-2 hover-elevate active-elevate-2 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${variant === "compact" ? "px-2" : ""} ${className}`}
           aria-label="Open profile menu"
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
           data-testid="button-profile-avatar"
         >
           <Avatar className={`${sizeClasses[size]} border-2 border-border`}>
@@ -229,7 +231,7 @@ export function ProfileAvatarButton({
               <ChevronDown className="h-4 w-4 hidden md:block" />
             </>
           )}
-        </Button>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
