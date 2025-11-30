@@ -45,6 +45,7 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
 *   **TLC Report Generator & Audit Engine**: Monthly reporting system for TLC submissions and a comprehensive audit system with an automatic fix engine.
 *   **NYC Borough Detection Service**: Polygon-based borough boundary detection using ray-casting.
 *   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, UUID format validation, Zod schema validation, atomic transactions, and consistent error handling.
+*   **Profile Navigation System**: Role-aware profile navigation with strict role validation. Includes `profileNavConfig.ts` for route mapping, `ProfileAvatarButton.tsx` for reusable avatar buttons with dropdown/drawer support, and `AdminLayout.tsx` providing consistent admin page headers with profile navigation and logout functionality.
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, multi-role support models, and driver safety incidents. It supports country-specific identity fields with AES-256-GCM encryption.
