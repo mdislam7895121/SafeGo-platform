@@ -3,7 +3,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { 
   ArrowLeft, Star, MapPin, Clock, Heart, Plus, Minus, ShoppingCart,
-  ChevronRight, Info, Check, AlertCircle, Flame, Leaf, X
+  ChevronRight, ChevronDown, Info, Check, AlertCircle, Flame, Leaf, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,6 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Dialog,
   DialogContent,
@@ -93,6 +98,15 @@ interface BrandingResponse {
   }>;
 }
 
+interface RestaurantHour {
+  dayOfWeek: number;
+  isClosed: boolean;
+  openTime1: string | null;
+  closeTime1: string | null;
+  openTime2: string | null;
+  closeTime2: string | null;
+}
+
 interface OperationalStatusResponse {
   status: {
     isOpen: boolean;
@@ -101,6 +115,14 @@ interface OperationalStatusResponse {
     canAcceptOrders: boolean;
     isThrottled: boolean;
   };
+  todayHours: {
+    isClosed: boolean;
+    openTime1: string | null;
+    closeTime1: string | null;
+    openTime2: string | null;
+    closeTime2: string | null;
+  } | null;
+  hours: RestaurantHour[];
   operational: {
     deliveryEnabled: boolean;
     pickupEnabled: boolean;
@@ -134,6 +156,7 @@ export default function EatsRestaurant() {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [showDifferentRestaurantDialog, setShowDifferentRestaurantDialog] = useState(false);
   const [pendingItem, setPendingItem] = useState<MenuItem | null>(null);
+  const [moreInfoOpen, setMoreInfoOpen] = useState(false);
 
   const categoryRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const categoryNavRef = useRef<HTMLDivElement>(null);
@@ -445,9 +468,90 @@ export default function EatsRestaurant() {
           )}
         </div>
 
-        {restaurant.description && (
-          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 line-clamp-2">{restaurant.description}</p>
-        )}
+        {/* Collapsible More Info Section */}
+        <Collapsible open={moreInfoOpen} onOpenChange={setMoreInfoOpen} className="mt-2">
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full justify-between h-9 px-2 text-xs text-muted-foreground hover:text-foreground touch-manipulation"
+              data-testid="button-more-info"
+            >
+              <span className="flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5" />
+                More Info
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${moreInfoOpen ? 'rotate-180' : ''}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2 pb-1 px-1">
+            <div className="space-y-3 text-xs">
+              {/* Description */}
+              {restaurant.description && (
+                <div>
+                  <h4 className="font-medium text-foreground mb-1">About</h4>
+                  <p className="text-muted-foreground leading-relaxed">{restaurant.description}</p>
+                </div>
+              )}
+              
+              {/* Opening Hours - Dynamic from API */}
+              <div>
+                <h4 className="font-medium text-foreground mb-1.5">Opening Hours</h4>
+                {statusData?.hours && statusData.hours.length > 0 ? (
+                  <div className="space-y-1 text-muted-foreground">
+                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((dayName, dayIndex) => {
+                      const dayHours = statusData.hours.find(h => h.dayOfWeek === dayIndex);
+                      const formatTime = (time: string | null) => {
+                        if (!time) return '';
+                        const [hours, minutes] = time.split(':').map(Number);
+                        const period = hours >= 12 ? 'PM' : 'AM';
+                        const displayHours = hours % 12 || 12;
+                        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+                      };
+                      
+                      let hoursText = 'Closed';
+                      if (dayHours && !dayHours.isClosed) {
+                        if (dayHours.openTime1 && dayHours.closeTime1) {
+                          hoursText = `${formatTime(dayHours.openTime1)} - ${formatTime(dayHours.closeTime1)}`;
+                          if (dayHours.openTime2 && dayHours.closeTime2) {
+                            hoursText += `, ${formatTime(dayHours.openTime2)} - ${formatTime(dayHours.closeTime2)}`;
+                          }
+                        }
+                      }
+                      
+                      const isToday = new Date().getDay() === dayIndex;
+                      
+                      return (
+                        <div 
+                          key={dayIndex} 
+                          className={`flex justify-between py-0.5 ${isToday ? 'text-foreground font-medium' : ''}`}
+                        >
+                          <span>{dayName}{isToday && ' (Today)'}</span>
+                          <span className={dayHours?.isClosed ? 'text-muted-foreground/60' : ''}>
+                            {hoursText}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">Hours not available</p>
+                )}
+              </div>
+
+              {/* Address */}
+              {restaurant.address && (
+                <div>
+                  <h4 className="font-medium text-foreground mb-1">Location</h4>
+                  <p className="text-muted-foreground flex items-start gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    {restaurant.address}
+                  </p>
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
 
       <Separator />
@@ -480,24 +584,30 @@ export default function EatsRestaurant() {
 
         {/* Main Content Area */}
         <div className="flex-1 min-w-0">
-          {/* Mobile Category Navigation - Horizontal scroll tabs */}
+          {/* Mobile Category Navigation - Enhanced sticky bar with 44px touch targets */}
           <div 
             ref={categoryNavRef}
-            className="lg:hidden sticky top-0 z-30 bg-background border-b"
+            className="lg:hidden sticky top-0 z-30 bg-background/95 backdrop-blur-sm border-b shadow-sm"
           >
             <ScrollArea className="w-full">
-              <div className="flex gap-1 p-1.5 px-2">
+              <div className="flex gap-2 p-2 px-3">
                 {menu.map((category) => (
                   <Button
                     key={category.id}
-                    variant={activeCategoryId === category.id ? "default" : "ghost"}
-                    size="sm"
-                    className="flex-shrink-0 rounded-full h-7 px-2 text-[11px] touch-manipulation"
+                    variant={activeCategoryId === category.id ? "default" : "outline"}
+                    className={`flex-shrink-0 rounded-full h-11 px-4 text-sm touch-manipulation whitespace-nowrap ${
+                      activeCategoryId === category.id 
+                        ? 'shadow-md' 
+                        : 'bg-background hover:bg-muted'
+                    }`}
                     onClick={() => scrollToCategory(category.id)}
                     data-testid={`button-category-${category.id}`}
                   >
                     {category.name}
-                    <Badge variant="secondary" className="ml-1 h-4 text-[10px] px-1">
+                    <Badge 
+                      variant={activeCategoryId === category.id ? "secondary" : "outline"} 
+                      className="ml-1.5 h-5 text-xs px-1.5"
+                    >
                       {category.items.length}
                     </Badge>
                   </Button>

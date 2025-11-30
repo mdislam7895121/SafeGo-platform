@@ -56,20 +56,43 @@ interface RestaurantsResponse {
   count: number;
 }
 
-const CUISINE_CATEGORIES = [
+// Base cuisine categories
+const BASE_CUISINE_CATEGORIES = [
   { id: "all", label: "All", icon: UtensilsCrossed },
+  { id: "Bengali", label: "Bengali", icon: UtensilsCrossed },
+  { id: "Indian", label: "Indian", icon: Sparkles },
   { id: "American", label: "American", icon: Flame },
   { id: "Italian", label: "Italian", icon: Pizza },
-  { id: "Indian", label: "Indian", icon: Sparkles },
   { id: "Chinese", label: "Chinese", icon: UtensilsCrossed },
-  { id: "Bengali", label: "Bengali", icon: UtensilsCrossed },
   { id: "Japanese", label: "Japanese", icon: UtensilsCrossed },
   { id: "Mexican", label: "Mexican", icon: Flame },
   { id: "Thai", label: "Thai", icon: Sparkles },
   { id: "Fast Food", label: "Fast Food", icon: Truck },
   { id: "Healthy", label: "Healthy", icon: Salad },
   { id: "Coffee", label: "Coffee", icon: Coffee },
+  { id: "Halal", label: "Halal", icon: UtensilsCrossed },
+  { id: "Desserts", label: "Desserts", icon: Coffee },
+  { id: "Pizza", label: "Pizza", icon: Pizza },
+  { id: "Burgers", label: "Burgers", icon: Flame },
 ];
+
+// Country-specific cuisine ordering
+const BD_PRIORITY_CUISINES = ["all", "Bengali", "Indian", "Halal", "Chinese", "Thai"];
+const US_PRIORITY_CUISINES = ["all", "American", "Italian", "Mexican", "Burgers", "Pizza", "Fast Food"];
+
+function getCuisineCategories(countryCode: string | undefined) {
+  const priorityCuisines = countryCode === "BD" ? BD_PRIORITY_CUISINES : US_PRIORITY_CUISINES;
+  
+  const prioritized = priorityCuisines
+    .map(id => BASE_CUISINE_CATEGORIES.find(c => c.id === id))
+    .filter(Boolean) as typeof BASE_CUISINE_CATEGORIES;
+  
+  const remaining = BASE_CUISINE_CATEGORIES.filter(
+    c => !priorityCuisines.includes(c.id)
+  );
+  
+  return [...prioritized, ...remaining];
+}
 
 const SORT_OPTIONS = [
   { value: "rating", label: "Top Rated" },
@@ -83,6 +106,10 @@ export default function EatsHome() {
   const { getItemCount, getTotals, state: cartState } = useEatsCart();
   
   const isLoggedIn = !!user && !!token && user.role === "customer";
+  
+  // Get country-specific cuisine categories (BD shows Bengali/Indian first, US shows American/Italian first)
+  const userCountryCode = (user as { countryCode?: string } | null)?.countryCode;
+  const cuisineCategories = getCuisineCategories(userCountryCode);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState("all");
@@ -163,6 +190,22 @@ export default function EatsHome() {
   
   const popularRestaurants = [...restaurants]
     .sort((a, b) => b.totalRatings - a.totalRatings)
+    .slice(0, 8);
+  
+  // Delivered Under 30 Minutes - filter by delivery time
+  const fastDeliveryRestaurants = [...restaurants]
+    .filter(r => r.isOpen && (r.deliveryTime || 35) <= 30)
+    .sort((a, b) => (a.deliveryTime || 35) - (b.deliveryTime || 35))
+    .slice(0, 8);
+  
+  // Recommended For You - combined score of rating and popularity
+  const recommendedRestaurants = [...restaurants]
+    .filter(r => r.isOpen && r.averageRating >= 4.0)
+    .sort((a, b) => {
+      const scoreA = a.averageRating * Math.log10(a.totalRatings + 1);
+      const scoreB = b.averageRating * Math.log10(b.totalRatings + 1);
+      return scoreB - scoreA;
+    })
     .slice(0, 8);
 
   const DEFAULT_RESTAURANT_IMAGE = "/attached_assets/stock_images/italian_pizzeria_res_da132bc0.jpg";
@@ -467,10 +510,10 @@ export default function EatsHome() {
           </div>
         </div>
 
-        {/* Cuisine Categories Strip - WCAG 2.1 AA compliant 44px touch targets */}
+        {/* Cuisine Categories Strip - Country-specific ordering, WCAG 2.1 AA compliant 44px touch targets */}
         <ScrollArea className="w-full whitespace-nowrap border-t">
           <div className="flex gap-2 p-2 px-3">
-            {CUISINE_CATEGORIES.map((category) => {
+            {cuisineCategories.map((category) => {
               const Icon = category.icon;
               const isSelected = selectedCuisine === category.id;
               return (
@@ -680,6 +723,46 @@ export default function EatsHome() {
                     <div className="flex gap-4 pb-4">
                       {topRatedRestaurants.map((restaurant) => (
                         <CarouselRestaurantCard key={`rated-${restaurant.id}`} restaurant={restaurant} />
+                      ))}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </section>
+              )}
+
+              {/* Delivered Under 30 Minutes Carousel */}
+              {fastDeliveryRestaurants.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <Truck className="h-5 w-5 text-green-500" />
+                      Delivered Under 30 Minutes
+                    </h2>
+                  </div>
+                  <ScrollArea className="w-full">
+                    <div className="flex gap-4 pb-4">
+                      {fastDeliveryRestaurants.map((restaurant) => (
+                        <CarouselRestaurantCard key={`fast-${restaurant.id}`} restaurant={restaurant} />
+                      ))}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </section>
+              )}
+
+              {/* Recommended For You Carousel */}
+              {recommendedRestaurants.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-purple-500" />
+                      Recommended For You
+                    </h2>
+                  </div>
+                  <ScrollArea className="w-full">
+                    <div className="flex gap-4 pb-4">
+                      {recommendedRestaurants.map((restaurant) => (
+                        <CarouselRestaurantCard key={`recommended-${restaurant.id}`} restaurant={restaurant} />
                       ))}
                     </div>
                     <ScrollBar orientation="horizontal" />
