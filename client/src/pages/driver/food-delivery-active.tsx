@@ -122,6 +122,7 @@ const statusConfig: Record<string, {
 const deliveryKeys = {
   detail: (id: string) => ["/api/driver/food-delivery", id],
   active: ["/api/driver/food-delivery/active"],
+  history: ["/api/driver/food-delivery/history"],
 };
 
 export default function DriverFoodDeliveryActive() {
@@ -160,6 +161,11 @@ export default function DriverFoodDeliveryActive() {
       queryClient.invalidateQueries({ queryKey: deliveryKeys.active });
       
       if (newStatus === "delivered") {
+        queryClient.invalidateQueries({ 
+          predicate: (query) => 
+            typeof query.queryKey[0] === 'string' && 
+            query.queryKey[0].startsWith('/api/driver/food-delivery/history')
+        });
         setTimeout(() => navigate("/driver/food-deliveries"), 2000);
       }
     },

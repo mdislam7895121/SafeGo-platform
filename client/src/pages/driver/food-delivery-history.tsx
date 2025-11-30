@@ -58,7 +58,7 @@ export default function DriverFoodDeliveryHistory() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const limit = 20;
 
-  const buildQueryString = () => {
+  const queryString = (() => {
     const params = new URLSearchParams();
     params.set("page", page.toString());
     params.set("limit", limit.toString());
@@ -67,11 +67,15 @@ export default function DriverFoodDeliveryHistory() {
       params.set("status", statusFilter);
     }
     
+    if (dateFilter !== "all") {
+      params.set("dateFilter", dateFilter);
+    }
+    
     return params.toString();
-  };
+  })();
 
-  const { data, isLoading, error } = useQuery<HistoryResponse>({
-    queryKey: ["/api/driver/food-delivery/history", page, dateFilter, statusFilter],
+  const { data, isLoading, error, refetch } = useQuery<HistoryResponse>({
+    queryKey: [`/api/driver/food-delivery/history?${queryString}`],
   });
 
   const totalEarnings = data?.deliveries.reduce((sum, d) => 

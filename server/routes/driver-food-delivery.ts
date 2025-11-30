@@ -371,14 +371,47 @@ router.get("/history", async (req: AuthRequest, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
     const skip = (page - 1) * limit;
+    const statusFilter = req.query.status as string | undefined;
+    const dateFilter = req.query.dateFilter as string | undefined;
+
+    const whereClause: any = {
+      driverId: driverProfile.id,
+      serviceType: "food",
+    };
+
+    if (statusFilter && ["delivered", "cancelled"].includes(statusFilter)) {
+      whereClause.status = statusFilter;
+    } else {
+      whereClause.status = { in: ["delivered", "cancelled"] };
+    }
+
+    if (dateFilter && dateFilter !== "all") {
+      const now = new Date();
+      let dateStart: Date;
+      
+      switch (dateFilter) {
+        case "today":
+          dateStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case "7days":
+          dateStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "30days":
+          dateStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        default:
+          dateStart = new Date(0);
+      }
+      
+      whereClause.OR = [
+        { deliveredAt: { gte: dateStart } },
+        { cancelledAt: { gte: dateStart } },
+      ];
+    }
 
     const [deliveries, total] = await Promise.all([
       prisma.delivery.findMany({
-        where: {
-          driverId: driverProfile.id,
-          status: { in: ["delivered", "cancelled"] },
-          serviceType: "food",
-        },
+        where: whereClause,
         include: {
           restaurant: {
             select: {
@@ -398,11 +431,7 @@ router.get("/history", async (req: AuthRequest, res) => {
         take: limit,
       }),
       prisma.delivery.count({
-        where: {
-          driverId: driverProfile.id,
-          status: { in: ["delivered", "cancelled"] },
-          serviceType: "food",
-        },
+        where: whereClause,
       }),
     ]);
 
