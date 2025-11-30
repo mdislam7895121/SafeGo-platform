@@ -348,27 +348,27 @@ const DEFAULT_SETTINGS: AllSettings = {
   commission: {
     driver: {
       ride: {
-        defaultCommissionPercent: 20,
+        defaultCommissionPercent: 10,
       },
       parcel: {
-        defaultCommissionPercent: 20,
+        defaultCommissionPercent: 10,
       },
     },
     restaurant: {
       food: {
-        defaultCommissionPercent: 20,
+        defaultCommissionPercent: 15,
       },
     },
     countryOverrides: {
       BD: {
-        driverRideCommissionPercent: null,
-        restaurantFoodCommissionPercent: null,
-        driverParcelCommissionPercent: null,
+        driverRideCommissionPercent: 10,
+        restaurantFoodCommissionPercent: 12,
+        driverParcelCommissionPercent: 10,
       },
       US: {
-        driverRideCommissionPercent: null,
-        restaurantFoodCommissionPercent: null,
-        driverParcelCommissionPercent: null,
+        driverRideCommissionPercent: 10,
+        restaurantFoodCommissionPercent: 15,
+        driverParcelCommissionPercent: 10,
       },
     },
   },

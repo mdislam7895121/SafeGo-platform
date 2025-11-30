@@ -1,0 +1,157 @@
+PATCH – SAFEGO OFFICIAL COMMISSION CONFIGURATION  
+(Must be added to Step 47 Wallet & Commission Engine, ADD-ONLY)
+
+You must follow ALL SafeGo Master Rules.  
+Do NOT modify or delete any existing routes, DB fields, or logic.  
+This patch only ADDS configuration values for commissions per country.
+
+==============================
+ADD CONFIG SECTION (NEW)
+==============================
+
+Create a new config module:
+
+commissionConfig = {
+  BD: {
+    restaurant_commission_percent: 12,   // food_orders only
+    driver_commission_percent: 10,       // rides + deliveries
+    currency: "BDT"
+  },
+  US: {
+    restaurant_commission_percent: 15,
+    driver_commission_percent: 10,
+    currency: "USD"
+  }
+}
+
+Export this config and use it ONLY to calculate:
+- platform_commission_amount
+- driver_earnings_amount
+- restaurant_earnings_amount
+
+These fields MUST remain recorded in each service:
+- rides.platform_commission_amount
+- food_orders.platform_commission_amount
+- deliveries.platform_commission_amount
+
+==============================
+REQUIRED RULES FOR USAGE
+==============================
+
+1) RESTAURANT COMMISSION (SAFEGO EATS)
+----------------------------------------
+When food_orders.status = delivered:
+
+Let:
+country = food_order.country_code ("BD" or "US")
+restaurant_commission = commissionConfig[country].restaurant_commission_percent
+
+platform_commission_amount =
+  (total_amount_charged_to_customer * restaurant_commission) / 100
+
+restaurant_earnings =
+  total_amount_charged_to_customer - platform_commission_amount
+
+Apply cash/online rules exactly:
+- If payment_method = "cash":
+    restaurant receives all cash;
+    wallet.negative_balance += platform_commission_amount
+- If payment_method = "online":
+    wallet.available_balance += restaurant_earnings
+
+-----------------------------------------------------
+
+2) DRIVER COMMISSION (RIDES + PARCEL + FOOD DELIVERY PICKUP)
+--------------------------------------------------------------
+
+Let:
+country = driver.country_code
+driver_commission = commissionConfig[country].driver_commission_percent
+
+For ALL rides & deliveries:
+
+platform_commission_amount =
+  (total_amount_charged_to_customer * driver_commission) / 100
+
+driver_earnings_amount =
+  total_amount_charged_to_customer - platform_commission_amount
+
+Cash rule:
+- Driver collects full cash
+- wallet.negative_balance += platform_commission_amount
+
+Online rule:
+- wallet.available_balance += driver_earnings_amount
+
+-----------------------------------------------------
+
+3) MUST NOT CHANGE EXISTING FIELDS
+-------------------------------------
+These fields and names must stay untouched:
+- total_amount_charged_to_customer
+- platform_commission_amount
+- driver_earnings_amount
+- restaurant_earnings_amount
+- payment_method
+- payment_status
+- negative_balance
+- available_balance
+- wallet_transactions
+
+-----------------------------------------------------
+
+4) ADMIN PANEL EXTENSION (ADD-ONLY)
+-------------------------------------
+
+In Admin Pricing/Commission Settings UI:
+
+Show read-only defaults:
+- BD: Restaurant 12%, Driver 10%
+- US: Restaurant 15%, Driver 10%
+
+Allow ADMIN to override only through:
+adminCommissionOverrideConfig (new optional config block)
+
+But do NOT modify the original "commissionConfig" values.
+
+-----------------------------------------------------
+
+5) TEST CASES (MANDATORY)
+-------------------------------------
+
+A. FOOD ORDER – BD – CASH
+- total 1000 BDT
+- commission 12%
+- restaurant gets full 1000 cash
+- SafeGo commission = 120 BDT → restaurant_negative_balance += 120
+
+B. FOOD ORDER – US – ONLINE
+- total 40 USD
+- commission 15%
+- restaurant_earnings = 34 USD → added to wallet.available_balance
+
+C. RIDE – BD – CASH
+- total 300 BDT
+- commission 10%
+- driver gets 300 cash
+- driver_negative_balance += 30
+
+D. DELIVERY – US – ONLINE
+- total 20 USD
+- commission 10%
+- driver_earnings = 18 USD → wallet.available_balance += 18
+
+-----------------------------------------------------
+
+6) NON-BREAKING GUARANTEE
+-------------------------------------
+This patch must be fully backward-compatible:
+- No DB changes except reading country_code
+- No renaming of fields
+- No modification of any previous status flow
+- All logic must extend Step 47 Wallet/Commission Engine
+
+-----------------------------------------------------
+
+FINAL REQUIREMENT:
+Implement commissionConfig exactly as defined above and apply it across rides, food_orders, deliveries without changing the original SafeGo rules.
