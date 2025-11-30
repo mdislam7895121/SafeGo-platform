@@ -156,6 +156,15 @@ export default function EatsHome() {
   const cartItemCount = getItemCount();
   const cartTotals = getTotals();
 
+  // Featured sections for desktop horizontal carousels (sorted subsets)
+  const topRatedRestaurants = [...restaurants]
+    .sort((a, b) => b.averageRating - a.averageRating)
+    .slice(0, 8);
+  
+  const popularRestaurants = [...restaurants]
+    .sort((a, b) => b.totalRatings - a.totalRatings)
+    .slice(0, 8);
+
   const DEFAULT_RESTAURANT_IMAGE = "/attached_assets/stock_images/italian_pizzeria_res_da132bc0.jpg";
   
   const handleImageError = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -334,6 +343,68 @@ export default function EatsHome() {
     </Card>
   );
 
+  // Desktop Horizontal Carousel Card - Uses same styling as DesktopRestaurantCard for consistency
+  const CarouselRestaurantCard = ({ restaurant }: { restaurant: Restaurant }) => (
+    <Link href={`/customer/food/${restaurant.id}`}>
+      <Card 
+        className="overflow-hidden hover-elevate cursor-pointer transition-all group w-[280px] flex-shrink-0"
+        data-testid={`card-restaurant-${restaurant.id}`}
+      >
+        <div className="relative">
+          <div className="h-40 bg-muted relative overflow-hidden">
+            <img 
+              src={restaurant.coverPhotoUrl || restaurant.logoUrl || DEFAULT_RESTAURANT_IMAGE} 
+              alt={restaurant.name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+              onError={handleImageError}
+            />
+            {!restaurant.isOpen && (
+              <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                <Badge variant="secondary">Currently Closed</Badge>
+              </div>
+            )}
+          </div>
+          {restaurant.deliveryFee === 0 && (
+            <Badge className="absolute top-2 left-2 bg-green-600">Free Delivery</Badge>
+          )}
+        </div>
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-lg truncate">{restaurant.name}</h3>
+              <p className="text-sm text-muted-foreground truncate">{restaurant.cuisineType}</p>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0 bg-muted/50 rounded-md px-2 py-1">
+              <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+              <span className="font-medium text-sm">{restaurant.averageRating.toFixed(1)}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mt-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Clock className="h-4 w-4" />
+              <span>{restaurant.deliveryTime || '25-35'} min</span>
+            </div>
+            <span className="text-muted-foreground/40">·</span>
+            <span>{restaurant.deliveryFee ? `$${restaurant.deliveryFee.toFixed(2)} delivery` : 'Free delivery'}</span>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+
+  // Carousel Skeleton for featured sections - matches DesktopRestaurantSkeleton styling
+  const CarouselSkeleton = () => (
+    <Card className="overflow-hidden w-[280px] flex-shrink-0">
+      <Skeleton className="h-40 rounded-none" />
+      <CardContent className="p-4 space-y-2">
+        <Skeleton className="h-5 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-4 w-2/3" />
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
       {/* Header with delivery location and cart */}
@@ -460,9 +531,26 @@ export default function EatsHome() {
               </Button>
             )}
 
+            {/* Desktop: Show price range inline (≥1024px) */}
+            <div className="hidden lg:flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Price:</span>
+              {["$", "$$", "$$$", "$$$$"].map((price, idx) => (
+                <Button 
+                  key={price} 
+                  variant="outline" 
+                  size="sm"
+                  className="px-3" 
+                  data-testid={`button-price-desktop-${idx + 1}`}
+                >
+                  {price}
+                </Button>
+              ))}
+            </div>
+
+            {/* Mobile/Tablet: Show Filters Sheet button (≤1023px) */}
             <Sheet open={showFilters} onOpenChange={setShowFilters}>
               <SheetTrigger asChild>
-                <Button variant="outline" className="gap-1.5 h-11 px-4 text-sm touch-manipulation" data-testid="button-filters">
+                <Button variant="outline" className="gap-1.5 h-11 px-4 text-sm touch-manipulation lg:hidden" data-testid="button-filters">
                   <Filter className="h-4 w-4" />
                   <span>Filters</span>
                 </Button>
@@ -552,6 +640,76 @@ export default function EatsHome() {
               >
                 Clear Filters
               </Button>
+            </div>
+          )}
+
+          {/* Desktop Featured Sections (≥1024px only) - Horizontal Carousels */}
+          {/* Show only when not searching/filtering and restaurants are available */}
+          {!isLoading && restaurants.length > 0 && !searchQuery && selectedCuisine === "all" && !openNow && !favoritesOnly && (
+            <div className="hidden lg:block space-y-6">
+              {/* Popular Near You Carousel */}
+              {popularRestaurants.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <Flame className="h-5 w-5 text-orange-500" />
+                      Popular Near You
+                    </h2>
+                  </div>
+                  <ScrollArea className="w-full">
+                    <div className="flex gap-4 pb-4">
+                      {popularRestaurants.map((restaurant) => (
+                        <CarouselRestaurantCard key={`popular-${restaurant.id}`} restaurant={restaurant} />
+                      ))}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </section>
+              )}
+
+              {/* Top Rated Carousel */}
+              {topRatedRestaurants.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold flex items-center gap-2">
+                      <Star className="h-5 w-5 text-yellow-500" />
+                      Top Rated
+                    </h2>
+                  </div>
+                  <ScrollArea className="w-full">
+                    <div className="flex gap-4 pb-4">
+                      {topRatedRestaurants.map((restaurant) => (
+                        <CarouselRestaurantCard key={`rated-${restaurant.id}`} restaurant={restaurant} />
+                      ))}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
+                </section>
+              )}
+
+              <Separator />
+            </div>
+          )}
+
+          {/* Desktop Carousel Loading State (≥1024px only) */}
+          {isLoading && (
+            <div className="hidden lg:block space-y-6">
+              <section>
+                <Skeleton className="h-6 w-40 mb-4" />
+                <div className="flex gap-4 overflow-hidden">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <CarouselSkeleton key={`popular-skeleton-${i}`} />
+                  ))}
+                </div>
+              </section>
+              <section>
+                <Skeleton className="h-6 w-32 mb-4" />
+                <div className="flex gap-4 overflow-hidden">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <CarouselSkeleton key={`rated-skeleton-${i}`} />
+                  ))}
+                </div>
+              </section>
             </div>
           )}
 
