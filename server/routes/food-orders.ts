@@ -9,6 +9,10 @@ import {
 import { promotionBonusService } from "../services/promotionBonusService";
 import { sendFoodOrderNotifications } from "../services/foodOrderStatusService";
 import { randomUUID } from "node:crypto";
+import { settlementService } from "../services/settlementService";
+import { tipService } from "../services/tipService";
+import { incentiveService } from "../services/incentiveService";
+import { cancellationFeeService } from "../services/cancellationFeeService";
 
 const router = Router();
 
@@ -499,6 +503,23 @@ router.post("/:id/cancel", requireUnlockedAccount, async (req: AuthRequest, res)
       }
     }
 
+    // Phase 2A: Apply cancellation fee if driver was assigned
+    if (foodOrder.driverId) {
+      try {
+        await cancellationFeeService.applyCancellationFee({
+          entityType: "food_order",
+          entityId: id,
+          cancellationType: "customer_cancel",
+          cancelledBy: "customer",
+          cancellationReason: reason || "Customer cancelled order",
+          estimatedFare: Number(foodOrder.serviceFare),
+          driverArrived: false,
+        });
+      } catch (feeError) {
+        console.error("Cancellation fee error (non-blocking):", feeError);
+      }
+    }
+
     // Notify restaurant about cancellation
     const restaurantUser = await prisma.user.findFirst({
       where: { restaurantProfile: { id: result.restaurantId } },
@@ -945,12 +966,20 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
 router.post("/:id/complete", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { rating, feedback } = req.body;
+    const { rating, feedback, tipAmount, tipPaymentMethod } = req.body;
     const userId = req.user!.userId;
     const role = req.user!.role;
 
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ error: "Rating must be between 1 and 5" });
+    }
+
+    // Validate tip parameters if provided
+    if (tipAmount && tipAmount > 0 && !tipPaymentMethod) {
+      return res.status(400).json({ error: "Tip payment method is required when providing a tip" });
+    }
+    if (tipPaymentMethod && !["cash", "online"].includes(tipPaymentMethod)) {
+      return res.status(400).json({ error: "Tip payment method must be 'cash' or 'online'" });
     }
 
     const foodOrder = await prisma.foodOrder.findUnique({ where: { id } });
@@ -984,27 +1013,39 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Only customer or restaurant can complete order" });
     }
 
+    // Phase 2A: Single completion timestamp for consistency across all services
+    const completionTimestamp = new Date();
+    let driver: any = null;
+
     // If both have rated, mark as completed and apply commission logic
     if ((role === "customer" && foodOrder.restaurantRating) || (role === "restaurant" && foodOrder.customerRating)) {
       updateData.status = "completed";
-      updateData.completedAt = new Date();
+      updateData.completedAt = completionTimestamp;
 
-      // Record food order earning in restaurant wallet with full transaction logging
-      await walletService.recordFoodOrderEarning(
-        foodOrder.restaurantId,
-        {
-          id: foodOrder.id,
-          serviceFare: foodOrder.serviceFare,
-          restaurantPayout: foodOrder.restaurantPayout,
-          safegoCommission: foodOrder.safegoCommission,
-          paymentMethod: foodOrder.paymentMethod as "cash" | "online",
-          deliveryAddress: foodOrder.deliveryAddress,
-        }
-      );
+      // Phase 2A: Settlement (auto-credit earnings + commission deduction)
+      // Runs BEFORE update to avoid double-processing on retry
+      try {
+        await settlementService.settleCompletedFoodOrder(foodOrder.id);
+      } catch (settlementError) {
+        console.error("Settlement error (non-blocking):", settlementError);
+        // Fallback to legacy wallet recording for restaurant
+        await walletService.recordFoodOrderEarning(
+          foodOrder.restaurantId,
+          {
+            id: foodOrder.id,
+            serviceFare: foodOrder.serviceFare,
+            restaurantPayout: foodOrder.restaurantPayout,
+            safegoCommission: foodOrder.safegoCommission,
+            paymentMethod: foodOrder.paymentMethod as "cash" | "online",
+            deliveryAddress: foodOrder.deliveryAddress,
+          }
+        );
+      }
+
 
       // Apply commission logic for driver (if assigned)
       if (foodOrder.driverId) {
-        const driver = await prisma.driverProfile.findUnique({
+        driver = await prisma.driverProfile.findUnique({
           where: { id: foodOrder.driverId },
           include: { 
             driverWallet: true, 
@@ -1012,6 +1053,7 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
               where: { isActive: true },
               take: 1,
             },
+            user: true,
           },
         });
 
@@ -1027,30 +1069,46 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
               },
             });
           }
-
-          // Record food delivery earning in driver wallet
-          await walletService.recordFoodDeliveryEarning(
-            foodOrder.driverId!,
-            {
-              id: foodOrder.id,
-              deliveryPayout: foodOrder.deliveryPayout,
-              paymentMethod: foodOrder.paymentMethod as "cash" | "online",
-              deliveryAddress: foodOrder.deliveryAddress,
-            }
-          );
-
-          // Evaluate and apply promotion bonuses for driver (D5)
-          // Note: evaluateDriverBonuses is handled separately in the promotion bonus engine
-          // and evaluates based on completed trips
         }
       }
     }
 
-    // Update order
+    // Update order - persist BEFORE incentive evaluation
     const updatedOrder = await prisma.foodOrder.update({
       where: { id },
       data: updateData,
     });
+
+    // Phase 2A: Evaluate incentives AFTER update (uses persisted completedAt timestamp)
+    if (updateData.status === "completed" && driver && foodOrder.driverId) {
+      try {
+        const countryCode = driver.user.countryCode || "US";
+        await incentiveService.evaluateIncentives({
+          driverId: foodOrder.driverId!,
+          serviceType: "food",
+          entityId: foodOrder.id,
+          countryCode,
+          tripTimestamp: updatedOrder.completedAt ?? completionTimestamp,
+        });
+      } catch (incentiveError) {
+        console.error("Incentive evaluation error (non-blocking):", incentiveError);
+      }
+    }
+
+    // Phase 2A: Process tip if customer provided one
+    if (role === "customer" && tipAmount && tipAmount > 0 && tipPaymentMethod) {
+      try {
+        await tipService.recordTip({
+          entityId: foodOrder.id,
+          entityType: "food_order",
+          tipAmount: parseFloat(tipAmount.toString()),
+          tipPaymentMethod: tipPaymentMethod as "cash" | "online",
+          tippedBy: userId,
+        });
+      } catch (tipError) {
+        console.error("Tip recording error (non-blocking):", tipError);
+      }
+    }
 
     res.json({
       message: updateData.status === "completed" ? "Food order completed successfully" : "Rating submitted successfully",

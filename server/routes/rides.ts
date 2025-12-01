@@ -7,6 +7,10 @@ import { walletService } from "../services/walletService";
 import { promotionBonusService } from "../services/promotionBonusService";
 import { dispatchService } from "../services/dispatchService";
 import { startDispatchSession } from "../websocket/dispatchWs";
+import { settlementService } from "../services/settlementService";
+import { tipService } from "../services/tipService";
+import { incentiveService } from "../services/incentiveService";
+import { cancellationFeeService } from "../services/cancellationFeeService";
 
 const router = Router();
 
@@ -487,12 +491,20 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
 router.post("/:id/complete", async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { rating, feedback } = req.body;
+    const { rating, feedback, tipAmount, tipPaymentMethod } = req.body;
     const userId = req.user!.userId;
     const role = req.user!.role;
 
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ error: "Rating must be between 1 and 5" });
+    }
+
+    // Validate tip parameters if provided
+    if (tipAmount && tipAmount > 0 && !tipPaymentMethod) {
+      return res.status(400).json({ error: "Tip payment method is required when providing a tip" });
+    }
+    if (tipPaymentMethod && !["cash", "online"].includes(tipPaymentMethod)) {
+      return res.status(400).json({ error: "Tip payment method must be 'cash' or 'online'" });
     }
 
     const ride = await prisma.ride.findUnique({ where: { id } });
@@ -530,15 +542,19 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Only customer or driver can complete ride" });
     }
 
+    // Phase 2A: Single completion timestamp for consistency across all services
+    const completionTimestamp = new Date();
+    let driver: any = null;
+
     // If both have rated, mark as completed and apply commission logic
     if ((role === "customer" && ride.driverRating) || (role === "driver" && ride.customerRating)) {
       updateData.status = "completed";
-      updateData.completedAt = new Date();
+      updateData.completedAt = completionTimestamp;
 
       // Apply commission logic
-      const driver = await prisma.driverProfile.findUnique({
+      driver = await prisma.driverProfile.findUnique({
         where: { id: ride.driverId },
-        include: { driverWallet: true, vehicle: true, stats: true },
+        include: { driverWallet: true, vehicle: true, stats: true, user: true },
       });
 
       if (driver) {
@@ -559,21 +575,28 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
           },
         });
 
-        // Record ride earning in wallet with full transaction logging
-        await walletService.recordRideEarning(
-          ride.driverId,
-          {
-            id: ride.id,
-            serviceFare: ride.serviceFare,
-            driverPayout: ride.driverPayout,
-            safegoCommission: ride.safegoCommission,
-            paymentMethod: ride.paymentMethod as "cash" | "online",
-            pickupAddress: ride.pickupAddress,
-            dropoffAddress: ride.dropoffAddress,
-          }
-        );
+        // Phase 2A: Settlement (auto-credit earnings + commission deduction)
+        // Runs BEFORE update to avoid double-processing on retry
+        try {
+          await settlementService.settleCompletedRide(ride.id);
+        } catch (settlementError) {
+          console.error("Settlement error (non-blocking):", settlementError);
+          // Fallback to legacy wallet recording
+          await walletService.recordRideEarning(
+            ride.driverId,
+            {
+              id: ride.id,
+              serviceFare: ride.serviceFare,
+              driverPayout: ride.driverPayout,
+              safegoCommission: ride.safegoCommission,
+              paymentMethod: ride.paymentMethod as "cash" | "online",
+              pickupAddress: ride.pickupAddress,
+              dropoffAddress: ride.dropoffAddress,
+            }
+          );
+        }
 
-        // Evaluate and apply promotion bonuses (D5)
+        // Legacy promotion bonuses (D5) - kept for backward compatibility
         try {
           await promotionBonusService.evaluateDriverBonuses({
             driverId: ride.driverId,
@@ -587,11 +610,42 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
       }
     }
 
-    // Update ride
+    // Update ride - persist BEFORE incentive evaluation
     const updatedRide = await prisma.ride.update({
       where: { id },
       data: updateData,
     });
+
+    // Phase 2A: Evaluate incentives AFTER update (uses persisted completedAt timestamp)
+    if (updateData.status === "completed" && driver) {
+      try {
+        const countryCode = driver.user.countryCode || "US";
+        await incentiveService.evaluateIncentives({
+          driverId: ride.driverId,
+          serviceType: "ride",
+          entityId: ride.id,
+          countryCode,
+          tripTimestamp: updatedRide.completedAt ?? completionTimestamp,
+        });
+      } catch (incentiveError) {
+        console.error("Incentive evaluation error (non-blocking):", incentiveError);
+      }
+    }
+
+    // Phase 2A: Process tip if customer provided one
+    if (role === "customer" && tipAmount && tipAmount > 0 && tipPaymentMethod) {
+      try {
+        await tipService.recordTip({
+          entityId: ride.id,
+          entityType: "ride",
+          tipAmount: parseFloat(tipAmount.toString()),
+          tipPaymentMethod: tipPaymentMethod as "cash" | "online",
+          tippedBy: userId,
+        });
+      } catch (tipError) {
+        console.error("Tip recording error (non-blocking):", tipError);
+      }
+    }
 
     res.json({
       message: updateData.status === "completed" ? "Ride completed successfully" : "Rating submitted successfully",
@@ -770,11 +824,34 @@ router.post("/:id/cancel", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Ride cannot be cancelled in current status" });
     }
 
-    // Calculate cancellation fee (only if ride was accepted and cancelling after driver is en route)
+    // Phase 2A: Apply cancellation fee using CancellationFeeService
     let cancellationFee = 0;
     const feeWaivedReason: string | null = null;
-    if (cancelledBy === "customer" && ["accepted", "driver_arriving", "arrived"].includes(ride.status)) {
-      cancellationFee = 5.00; // $5 cancellation fee
+    const driverArrived = ride.status === "arrived";
+    
+    // Determine cancellation type based on who cancelled
+    const cancellationType = cancelledBy === "customer" ? "customer_cancel" : "driver_cancel";
+    
+    try {
+      const feeResult = await cancellationFeeService.applyCancellationFee({
+        entityType: "ride",
+        entityId: id,
+        cancellationType: cancellationType as "customer_cancel" | "driver_cancel" | "no_show",
+        cancelledBy,
+        cancellationReason: validatedData.reason,
+        estimatedFare: Number(ride.serviceFare),
+        driverArrived,
+      });
+      
+      if (feeResult.success && feeResult.feeApplied) {
+        cancellationFee = feeResult.feeAmount;
+      }
+    } catch (feeError) {
+      console.error("Cancellation fee error (non-blocking):", feeError);
+      // Fallback to legacy flat fee for customer cancellations after acceptance
+      if (cancelledBy === "customer" && ["accepted", "driver_arriving", "arrived"].includes(ride.status)) {
+        cancellationFee = 5.00;
+      }
     }
 
     // Create cancellation record
