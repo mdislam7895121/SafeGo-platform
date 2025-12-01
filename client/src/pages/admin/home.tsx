@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -392,6 +392,59 @@ export default function AdminHome() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="px-4 sm:px-6 md:px-8 pt-4 sm:pt-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-medium text-muted-foreground">Quick Actions</h2>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:gap-3">
+          <Link href="/admin/drivers?action=add">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full gap-1.5"
+              data-testid="button-quick-add-driver"
+            >
+              <UserPlus className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              <span>Add Driver</span>
+            </Button>
+          </Link>
+          <Link href="/admin/restaurants?action=add">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full gap-1.5"
+              data-testid="button-quick-add-restaurant"
+            >
+              <Store className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+              <span>Add Restaurant</span>
+            </Button>
+          </Link>
+          <Link href="/admin/promotions?action=create">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full gap-1.5"
+              data-testid="button-quick-create-promotion"
+            >
+              <Sparkles className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+              <span>Create Promotion</span>
+            </Button>
+          </Link>
+          <Link href="/admin/settings?tab=pricing">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full gap-1.5"
+              data-testid="button-quick-adjust-pricing"
+            >
+              <Calculator className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <span>Adjust Pricing</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       <div className="px-4 sm:px-6 md:px-8 py-6 sm:py-8 space-y-10 sm:space-y-14">
