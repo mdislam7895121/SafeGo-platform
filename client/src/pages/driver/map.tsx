@@ -193,7 +193,6 @@ export default function DriverMapPage() {
   const [showSosSheet, setShowSosSheet] = useState(false);
   const [incomingRequest, setIncomingRequest] = useState<TripRequest | null>(null);
   const [showServiceSheet, setShowServiceSheet] = useState(false);
-  const [showQuickActionsSheet, setShowQuickActionsSheet] = useState(false);
   const [servicePreferences, setServicePreferences] = useState<ServicePreferences>(defaultServicePreferences);
 
   // Fetch service preferences from API
@@ -729,7 +728,7 @@ export default function DriverMapPage() {
             <Button
               variant="outline"
               size="icon"
-              className="absolute bottom-6 left-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
               data-testid="button-service-select"
             >
               <Grid3X3 className="h-5 w-5" />
@@ -836,70 +835,6 @@ export default function DriverMapPage() {
             }
           </span>
         </button>
-
-        <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
-              data-testid="button-quick-actions"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
-            <SheetHeader>
-              <SheetTitle>Quick Actions</SheetTitle>
-            </SheetHeader>
-            <div className="py-6 space-y-2">
-              <button
-                onClick={() => {
-                  setLocation("/driver/earnings");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-earnings"
-              >
-                <DollarSign className="h-5 w-5" />
-                <span className="font-medium">Earnings</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/trips");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-history"
-              >
-                <History className="h-5 w-5" />
-                <span className="font-medium">Trip History</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/wallet");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-wallet"
-              >
-                <Wallet className="h-5 w-5" />
-                <span className="font-medium">Wallet</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/settings");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-settings"
-              >
-                <Settings className="h-5 w-5" />
-                <span className="font-medium">Settings</span>
-              </button>
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
 
       <AnimatePresence>

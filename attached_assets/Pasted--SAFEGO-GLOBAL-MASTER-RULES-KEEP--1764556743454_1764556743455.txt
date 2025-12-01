@@ -1,0 +1,157 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (KEEP)
+====================================
+
+ROLES (4, never mixed)
+- Customer
+- Driver
+- Restaurant (Merchant)
+- Admin
+
+SERVICES (always supported)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+BD KYC (all BD users)
+- father_name, date_of_birth, present_address, permanent_address
+- nid_number, nid_front_image_url, nid_back_image_url
+- emergency_contact_name, emergency_contact_phone
+- verification_status, is_verified
+
+US KYC (all US users)
+- date_of_birth, home_address
+- emergency_contact_name, emergency_contact_phone
+- government_id_type, government_id_last4
+- driver_license_number, driver_license_image_url, driver_license_expiry (drivers)
+- ssn_last4 (optional, drivers)
+- verification_status, is_verified
+
+ONBOARDING (all roles)
+- Steps: basic info → address → ID/KYC upload (BD/US rules) → emergency contact
+- Set verification_status="pending" after onboarding
+- Block rides/food/parcel until admin sets verification_status="approved"
+
+ADMIN PANEL (must keep)
+- Approve/reject KYC for customers/drivers/restaurants (with rejection_reason)
+- Block/unblock any user or restaurant
+- Configure pricing, fees, commissions
+- Manage payouts; view & settle driver negative balance and restaurant negative balance
+
+COLLECTIONS (no schema change)
+
+1) rides
+   - customer_id, driver_id
+   - pickup_address, dropoff_address + geo
+   - service_type
+   - fare, fees, safego_commission
+   - payment_method
+   - status: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+   - rating, feedback, timestamps
+
+2) food_orders
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address, delivery_address + geo
+   - items, subtotal, fees, safego_commission
+   - payment_method
+   - status: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+   - rating, feedback, timestamps
+
+3) deliveries
+   - customer_id, driver_id
+   - pickup_address, dropoff_address + geo
+   - package details
+   - fees, safego_commission
+   - payment_method
+   - status: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+   - rating, feedback, timestamps
+
+COMMISSION RULES
+- Cash ride: driver keeps cash; commission → negative driver_wallet_balance; weekly settlement; admin marks paid.
+- Cash food: restaurant keeps cash; commission → negative restaurant_wallet.
+- Online: SafeGo keeps commission automatically; payouts are net to driver/restaurant.
+- Admin can manage and settle balances.
+
+SECURITY
+- Customers cannot view driver documents.
+- Drivers cannot view customer KYC/sensitive info.
+- Restaurants cannot view other restaurants.
+- Only admin can change pricing, commissions, verification, blocking.
+- Users can edit only their own profile.
+
+STATUS FLOWS
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+NOTIFICATIONS
+- Trip/order alerts, status updates, verification results, payout reminders, admin messages.
+
+MAP
+- Do NOT change map engine, tiles, markers, or zoom controls.
+
+====================================================
+TASK: Move the trip selector footer button from LEFT to RIGHT
+====================================================
+
+Screen: /driver/map (driver app map view)
+
+Current state:
+- Bottom center: green “Go Online” button (correct).
+- Bottom left: circular trip selector button (hamburger icon).
+- Bottom right: no footer button.
+
+Required state:
+- Bottom center: keep “Go Online / Go Offline” button exactly as it is (centered).
+- Bottom RIGHT: trip selector button (hamburger icon) must move here.
+- Bottom LEFT: no footer button is needed for now (leave empty).
+
+-----------------------------------
+1) Reposition the trip selector button
+-----------------------------------
+The existing trip selector button (hamburger icon) should be moved from bottom-left to bottom-right of the MAP area.
+
+Inside the map content wrapper (position: relative):
+
+Center button (Go Online / Go Offline) – KEEP:
+- position: absolute;
+- bottom: 24px;
+- left: 50%;
+- transform: translateX(-50%);
+- z-index: 10;
+
+Trip selector button – CHANGE to bottom-right:
+- position: absolute;
+- bottom: 24px;
+- right: 24px;       // instead of left: 24px
+- z-index: 10;
+
+There should be no other footer button at bottom-left after this change.
+
+-----------------------------------
+2) Avoid overlap with right-side vertical FAB stack
+-----------------------------------
+- Keep the existing vertical stack of circular buttons on the right side of the map (reload, earnings, shield, navigation, etc.) unchanged.
+- Ensure the new bottom-right trip selector button appears BELOW this vertical stack and does not overlap it.
+  Example:
+  - vertical stack bottom: ~112px
+  - trip selector bottom: 24px
+
+-----------------------------------
+3) Keep existing behavior/logics
+-----------------------------------
+- Tapping the trip selector button must still open the trip-type selector drawer (Comfort / XL / etc.) with on/off toggles.
+- Do NOT change its click handler, only its position.
+- Do NOT modify Go Online/Go Offline logic, colors, or backend calls.
+
+-----------------------------------
+4) Non-breaking requirement
+-----------------------------------
+- Do NOT touch any DB schema, APIs, or backend logic.
+- Do NOT modify commission/KYC/admin/status engines.
+- Only adjust the layout so that:
+   • Go Online button stays centered at the bottom of the map,
+   • Trip selector button appears at bottom-right,
+   • Bottom-left stays empty.
+
+Apply all changes in a single update, with no questions.
