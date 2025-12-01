@@ -1,0 +1,196 @@
+TASK: Fix Trip Preferences interaction and hide "SafeGo Go" from the US driver modal (SafeGo Driver App)
+
+/* 1. Locate the Trip Preferences component */
+
+1. Find the component that renders the modal on the driver map:
+   - Likely paths (check and confirm one of them):
+     - client/src/components/driver/trip/TripPreferences.tsx
+     - client/src/pages/driver/map/TripPreferencesDialog.tsx
+     - client/src/features/driver/trips/TripPreferences.tsx
+
+2. Identify the data source for the cards:
+   - There should be a list/array of trip types, something like:
+       const TRIP_TYPES = [...]
+   - Or the component may be hard-coding every card.
+
+--------------------------------------------------
+2. Define the US-only trip type config (UI layer)
+--------------------------------------------------
+
+3. Create (or update) a config array for US driver trip types in a separate file to keep things clean and non-breaking:
+
+   File (new): client/src/config/tripTypes.us.ts
+
+   Add:
+
+   export type DriverTripTypeCode =
+     | "safeGoX"
+     | "safeGoComfort"
+     | "safeGoXL"
+     | "safeGoComfortXL"
+     | "safeGoBlack"
+     | "safeGoBlackSUV"
+     | "safeGoPremium"
+     | "safeGoPet"
+     | "safeGoEats"
+     | "safeGoParcel";
+
+   export interface DriverTripTypeConfig {
+     code: DriverTripTypeCode;
+     title: string;
+     icon: "car" | "crown" | "pet" | "parcel" | "eats";
+     isDefaultEnabled: boolean;
+   }
+
+   export const US_DRIVER_TRIP_TYPES: DriverTripTypeConfig[] = [
+     { code: "safeGoX",          title: "SafeGo X",          icon: "car",   isDefaultEnabled: true },
+     { code: "safeGoComfort",    title: "SafeGo Comfort",    icon: "car",   isDefaultEnabled: true },
+     { code: "safeGoXL",         title: "SafeGo XL",         icon: "car",   isDefaultEnabled: true },
+     { code: "safeGoComfortXL",  title: "Comfort XL",        icon: "car",   isDefaultEnabled: false },
+     { code: "safeGoBlack",      title: "SafeGo Black",      icon: "car",   isDefaultEnabled: false },
+     { code: "safeGoBlackSUV",   title: "Black SUV",         icon: "car",   isDefaultEnabled: false },
+     { code: "safeGoPremium",    title: "SafeGo Premium",    icon: "crown", isDefaultEnabled: false },
+     { code: "safeGoPet",        title: "SafeGo Pet",        icon: "pet",   isDefaultEnabled: false },
+     { code: "safeGoEats",       title: "SafeGo Eats",       icon: "eats",  isDefaultEnabled: true },
+     { code: "safeGoParcel",     title: "SafeGo Parcel",     icon: "parcel",isDefaultEnabled: true },
+   ];
+
+   IMPORTANT:
+   - Do NOT include "SafeGo Go" in this config.
+   - If "SafeGo Go" exists in the DB schema, leave the server and DB unchanged.
+     We are ONLY hiding it from the US driver UI.
+
+--------------------------------------------------
+3. Wire the modal to use this config and make cards clickable
+--------------------------------------------------
+
+4. In the Trip Preferences component, import this config:
+
+   import { US_DRIVER_TRIP_TYPES, DriverTripTypeCode } from "@/config/tripTypes.us";
+
+5. The component must read and write the driver’s active trip types from the existing profile / settings API, e.g.:
+
+   type DriverPreferences = {
+     enabledTripTypes: DriverTripTypeCode[];
+   };
+
+   Fetch this once when the modal opens (use the existing data-fetch hook, do NOT change the API contract).
+   - If the API already returns a list like ["safeGoX", "safeGoXL"], map it to DriverTripTypeCode.
+   - If the list is empty or undefined, fall back to `US_DRIVER_TRIP_TYPES.filter(t => t.isDefaultEnabled)`.
+
+6. In component state, hold a set of enabled trip types:
+
+   const [enabledTypes, setEnabledTypes] = useState<DriverTripTypeCode[]>(initialEnabled);
+
+7. Render the cards by mapping over the config instead of hard-coding:
+
+   US_DRIVER_TRIP_TYPES.map(type => {
+     const isActive = enabledTypes.includes(type.code);
+     return (
+       <button
+         key={type.code}
+         type="button"
+         className={cn(
+           "trip-card",
+           isActive ? "trip-card--active" : "trip-card--inactive"
+         )}
+         onClick={() => toggleTripType(type.code)}
+       >
+         <CardIcon icon={type.icon} />
+         <span className="trip-card__title">{type.title}</span>
+         {isActive && <CheckIcon className="trip-card__check" />}
+       </button>
+     );
+   });
+
+   Requirements:
+   - Use a <button> element (not plain <div>) so that click/tap and keyboard all work.
+   - Ensure no overlay div above the modal has `pointer-events: none` issues.
+
+8. Implement the toggle logic:
+
+   const toggleTripType = (code: DriverTripTypeCode) => {
+     setEnabledTypes(prev => {
+       if (prev.includes(code)) {
+         const next = prev.filter(c => c !== code);
+         // Prevent disabling ALL trip types – at least one must remain enabled.
+         if (next.length === 0) return prev;
+         return next;
+       }
+       return [...prev, code];
+     });
+   };
+
+--------------------------------------------------
+4. Persist the driver’s selection (non-breaking)
+--------------------------------------------------
+
+9. On modal “Save” or “Done” button, call the existing preferences API. Do NOT change the endpoint name or schema; only adjust the payload content:
+
+   await updateDriverPreferences({
+     enabledTripTypes: enabledTypes,  // array of codes defined above
+   });
+
+   - If “SafeGo Go” was previously enabled in the backend, leave it as-is;
+     the backend can still accept it, we are just not exposing it in the new UI.
+
+10. Make sure this change does NOT:
+   - rename any existing DB field,
+   - remove any existing trip type constant on the server,
+   - change any ride, food, or delivery collections.
+
+--------------------------------------------------
+5. Visual style adjustments (more compact, professional)
+--------------------------------------------------
+
+11. Update the CSS/utility classes for `.trip-card`:
+
+   Base:
+   - height: about 88–96px
+   - width: auto, but on desktop 6–7 cards per row, on mobile 2 per row.
+   - border-radius: 16px
+   - padding: 12–14px
+   - gap between icon and label: 8px
+
+   State styles:
+   - Active: 
+     - border: 2px solid rgba(56, 189, 248, 1)  // cyan style, or your existing blue accent
+     - subtle glow (box-shadow) to make selection obvious
+   - Inactive:
+     - border: 1px solid rgba(148, 163, 184, 0.5)
+     - background: transparent or very dark grey
+
+   The checkmark icon must appear in the top-right only when active.
+
+--------------------------------------------------
+6. Behavior constraints and security rules
+--------------------------------------------------
+
+12. This Trip Preferences modal:
+   - Must only be accessible to logged-in drivers.
+   - Must not expose any admin-only or restaurant-only fields.
+   - Must not allow drivers to see other drivers’ preferences.
+
+13. When the driver changes trip types:
+   - It only affects **what kinds of trip requests** they receive on:
+       - rides (SafeGo X, Comfort, XL, etc.)
+       - food_orders (SafeGo Eats)
+       - deliveries (SafeGo Parcel)
+   - It must NOT change fare rules, commission logic, or payout rules.
+
+--------------------------------------------------
+7. Testing checklist
+--------------------------------------------------
+
+14. After implementation, test:
+
+   - Open driver map (US driver).
+   - Tap the “trip selector” button in the map footer → Trip Preferences modal opens.
+   - Verify that:
+     - The card for "SafeGo Go" is NOT visible.
+     - Tapping any remaining card toggles its active state (border + check mark).
+     - You cannot end up with zero trip types enabled.
+     - Close and reopen the modal: previous selection is preserved (persisted to backend).
+   - Confirm that:
+     - Ride requests still come only from the enabled trip types.
+     - Food (SafeGo Eats) and Parcel requests respect the same preferences.

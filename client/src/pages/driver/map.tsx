@@ -152,8 +152,7 @@ interface ServiceCard {
 }
 
 const SAFEGO_SERVICES: ServiceCard[] = [
-  // US Standard Ride Types
-  { id: "safego_go", name: "SafeGo Go", icon: Car, category: "ride", preferenceKey: "safego_go", enabledCountries: ["US", "BD"] },
+  // US Standard Ride Types (SafeGo Go NOT included for US drivers per spec)
   { id: "safego_x", name: "SafeGo X", icon: Car, category: "ride", preferenceKey: "safego_x", enabledCountries: ["US"] },
   { id: "safego_comfort", name: "SafeGo Comfort", icon: Car, category: "ride", preferenceKey: "safego_comfort", enabledCountries: ["US"] },
   { id: "safego_xl", name: "SafeGo XL", icon: Truck, category: "ride", preferenceKey: "safego_xl", enabledCountries: ["US"] },
@@ -162,11 +161,12 @@ const SAFEGO_SERVICES: ServiceCard[] = [
   { id: "safego_black_suv", name: "Black SUV", icon: Crown, category: "ride", preferenceKey: "safego_black_suv", enabledCountries: ["US"] },
   { id: "safego_premium", name: "SafeGo Premium", icon: Crown, category: "ride", preferenceKey: "safego_premium", enabledCountries: ["US"] },
   { id: "safego_pet", name: "SafeGo Pet", icon: PawPrint, category: "ride", preferenceKey: "safego_pet", enabledCountries: ["US"] },
-  // BD-Specific Ride Types
+  // BD-Specific Ride Types (SafeGo Go included for BD drivers)
+  { id: "safego_go", name: "SafeGo Go", icon: Car, category: "ride", preferenceKey: "safego_go", enabledCountries: ["BD"] },
   { id: "safego_bike", name: "SafeGo Bike", icon: Bike, category: "ride", preferenceKey: "safego_bike", enabledCountries: ["BD"] },
   { id: "safego_cng", name: "SafeGo CNG", icon: Zap, category: "ride", preferenceKey: "safego_cng", enabledCountries: ["BD"] },
   { id: "safego_moto", name: "SafeGo Moto", icon: Bike, category: "ride", preferenceKey: "safego_moto", enabledCountries: ["BD"] },
-  // Common Services
+  // Common Services (available for both US and BD)
   { id: "safego_eats", name: "SafeGo Eats", icon: UtensilsCrossed, category: "food", preferenceKey: "foodEnabled", enabledCountries: ["US", "BD"] },
   { id: "safego_parcel", name: "SafeGo Parcel", icon: Package, category: "parcel", preferenceKey: "parcelEnabled", enabledCountries: ["US", "BD"] },
 ];
