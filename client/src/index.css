@@ -370,3 +370,310 @@
   background-color: #333333 !important;
   background: #333333 !important;
 }
+
+/* ========================================
+   MODERN UI ANIMATIONS - Admin Dashboard
+   ======================================== */
+
+/* Base transition for interactive elements */
+.transition-smooth {
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Dropdown fade-in animation */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+/* Modal scale animation */
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes modalScaleOut {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+}
+
+/* Dialog content scale animation (non-centered) */
+@keyframes dialogScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes dialogScaleOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Overlay fade animation */
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes overlayFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Slide animations for sheets/sidebars */
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+/* Apply animations to Radix UI components */
+
+/* Dropdown menu animations */
+[data-radix-popper-content-wrapper] [data-state="open"] {
+  animation: fadeIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-radix-popper-content-wrapper] [data-state="closed"] {
+  animation: fadeOut 100ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dialog/Modal animations */
+[role="dialog"][data-state="open"] {
+  animation: dialogScaleIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[role="dialog"][data-state="closed"] {
+  animation: dialogScaleOut 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Dialog overlay animations */
+[data-radix-dialog-overlay][data-state="open"],
+[data-state="open"].fixed.inset-0 {
+  animation: overlayFadeIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-radix-dialog-overlay][data-state="closed"],
+[data-state="closed"].fixed.inset-0 {
+  animation: overlayFadeOut 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Button hover transitions */
+button,
+[role="button"],
+.btn {
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Card hover transitions */
+[class*="card"],
+.card {
+  transition: box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Sidebar menu item transitions */
+[data-sidebar="menu-button"] {
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Input focus transitions */
+input,
+textarea,
+select {
+  transition: border-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              outline 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Badge transitions */
+[class*="badge"] {
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Tooltip animations */
+[role="tooltip"][data-state="delayed-open"],
+[role="tooltip"][data-state="instant-open"] {
+  animation: fadeIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[role="tooltip"][data-state="closed"] {
+  animation: fadeOut 80ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Accordion animations */
+[data-radix-accordion-content][data-state="open"] {
+  animation: slideDown 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-radix-accordion-content][data-state="closed"] {
+  animation: slideUp 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+/* Popover animations */
+[data-radix-popper-content-wrapper] [role="dialog"] {
+  animation: fadeIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Select content animations */
+[role="listbox"][data-state="open"] {
+  animation: fadeIn 120ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Tab indicator transition */
+[role="tablist"] [data-state="active"]::after {
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Stat card hover effect */
+.stat-card-hover {
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stat-card-hover:hover {
+  transform: translateY(-2px);
+}
+
+/* Navigation link transitions */
+nav a,
+[data-sidebar] a {
+  transition: background-color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 150ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Icon rotation for expandable sections */
+[data-state="open"] > svg.lucide-chevron-down,
+[data-state="open"] > svg.lucide-chevron-right {
+  transform: rotate(180deg);
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-state="closed"] > svg.lucide-chevron-down,
+[data-state="closed"] > svg.lucide-chevron-right {
+  transform: rotate(0deg);
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Loading skeleton pulse */
+@keyframes skeletonPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.skeleton-pulse {
+  animation: skeletonPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Focus ring transition */
+*:focus-visible {
+  transition: outline-offset 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
