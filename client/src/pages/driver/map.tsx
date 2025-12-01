@@ -778,29 +778,6 @@ export default function DriverMapPage() {
           </DropdownMenu>
         </div>
 
-        <div
-          className="absolute bottom-4 left-4 z-[1000]"
-          data-testid="map-legend"
-        >
-          <Card className="bg-background/95 backdrop-blur-sm shadow-lg">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-green-500 ring-2 ring-green-200 dark:ring-green-800" />
-                  <span className="text-muted-foreground">You</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-blue-500 ring-2 ring-blue-200 dark:ring-blue-800" />
-                  <span className="text-muted-foreground">Pickup</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-red-500 ring-2 ring-red-200 dark:ring-red-800" />
-                  <span className="text-muted-foreground">Dropoff</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {!activeTrip && isOnline && !incomingRequest && (
           <div
