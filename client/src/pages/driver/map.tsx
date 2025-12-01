@@ -293,6 +293,12 @@ export default function DriverMapPage() {
     return servicePreferences[service.preferenceKey as "foodEnabled" | "parcelEnabled"] ?? false;
   }, [servicePreferences]);
 
+  // Check if any service is enabled (for blocking toast when going online)
+  const hasAnyServiceEnabled = useMemo(() => {
+    const hasRideEnabled = Object.values(servicePreferences.rideTypes).some(v => v);
+    return hasRideEnabled || servicePreferences.foodEnabled || servicePreferences.parcelEnabled;
+  }, [servicePreferences]);
+
   const {
     isOnline,
     isUpdatingStatus,
@@ -951,7 +957,7 @@ export default function DriverMapPage() {
           >
             <div className="flex flex-col h-full">
               <SheetHeader className="px-5 pt-6 pb-4">
-                <SheetTitle className="text-white text-xl font-semibold">Your Active Services</SheetTitle>
+                <SheetTitle className="text-white text-xl font-semibold">Trip Preferences</SheetTitle>
               </SheetHeader>
               
               <div className="flex-1 overflow-y-auto px-4 pb-6">
@@ -1012,6 +1018,18 @@ export default function DriverMapPage() {
           onClick={async () => {
             if (isVerified && hasVehicle) {
               const wasOnline = isOnline;
+              
+              // Block going online if no services are enabled
+              if (!wasOnline && !hasAnyServiceEnabled) {
+                toast({ 
+                  title: "No trip types enabled",
+                  description: "Turn on at least one service to receive requests",
+                  variant: "destructive"
+                });
+                setShowServiceSheet(true);
+                return;
+              }
+              
               await toggleOnlineStatus();
               toast({ 
                 title: wasOnline ? "You're now offline" : "You're now online",

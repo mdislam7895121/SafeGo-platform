@@ -1,0 +1,272 @@
+=========================
+SAFEGO GLOBAL MASTER RULES
+(Always apply, do NOT skip)
+=========================
+
+ROLES (4 separate roles; never mix permissions):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+SERVICES (all 3 must be supported):
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+COUNTRY-SPECIFIC KYC (BD vs US):
+
+Bangladesh (BD) – mandatory for all users:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number + NID front/back images
+- emergency_contact details
+- verification_status + is_verified
+
+United States (US):
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license number + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified
+
+ONBOARDING (all roles):
+- Multi-step: basic info → address → ID/KYC upload (country-specific) → emergency contact
+- Set verification_status="pending"
+- Block access to ride/food/parcel until admin sets verification_status="approved".
+
+ADMIN PANEL (must remain):
+- Verify/approve/reject customers, drivers, restaurants
+- Store rejection_reason
+- Block/unblock any user or restaurant
+- Update pricing, fees, commissions per service & country
+- Manage payouts and mark settlements as paid
+- View driver negative balance
+- View restaurant negative balance
+
+CORE COLLECTIONS (must exist and be used):
+
+1) rides
+   - customer_id, driver_id
+   - pickup_address, dropoff_address
+   - pickup_geo, dropoff_geo
+   - service_type (e.g., SafeGo Go, SafeGo XL, etc.)
+   - fare, fees, safego_commission
+   - payment_method (cash / online)
+   - status: requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_by_x
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address, delivery_address + geo
+   - items, subtotal, fees, safego_commission
+   - payment_method
+   - status: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+   - rating, feedback
+   - timestamps
+
+3) deliveries
+   - customer_id, driver_id
+   - pickup_address, dropoff_address + geo
+   - package_type, notes
+   - fees, safego_commission
+   - payment_method
+   - status: requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+   - rating, feedback
+   - timestamps
+
+COMMISSION & PAYOUT RULES:
+- CASH ride:
+  - Driver receives full cash from customer.
+  - SafeGo commission recorded as negative driver_wallet_balance.
+  - Driver must settle weekly; admin can mark paid.
+- CASH food order:
+  - Restaurant receives all cash.
+  - SafeGo commission recorded as negative restaurant_wallet.
+- ONLINE payment:
+  - SafeGo automatically keeps commission.
+  - Driver/restaurant only receives net payout.
+- Admin can settle and mark balances paid.
+
+SECURITY RULES:
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer NID or sensitive KYC info.
+- Restaurants cannot view other restaurants.
+- Only admin can change pricing, commissions, verification, blocking.
+- Users may update only their own profile and preferences.
+- All APIs must use HTTPS.
+
+STATUS FLOWS (must stay complete):
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_by_driver / cancelled_by_customer / cancelled_by_system
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+NOTIFICATIONS:
+- New ride/food/parcel requests to driver
+- Trip/order status changes
+- Verification approval/rejection
+- Weekly payout/settlement reminders
+- Important admin notifications.
+
+MAP RULE:
+- DO NOT change the map engine, markers, or map controls for this task.
+
+======================================================
+TASK: Footer LEFT MENU = Uber-style TRIP TYPE SELECTOR
+======================================================
+
+GOAL:
+Keep the map, center pill button, and right “current trip” menu as they are.  
+Update ONLY the FOOTER LEFT ICON so that it opens an Uber-style trip selection grid where the driver can choose which trip types (services) they want to receive.
+
+------------------------------------------------
+1) FOOTER STRUCTURE (context, no major changes)
+------------------------------------------------
+Footer bar (bottom of driver map screen):
+- Left: new “Trip types” button (this task)
+- Center: black pill “Go Online / Go Offline” (existing behavior)
+- Right: current trip info menu (already implemented; keep as is)
+
+Map remains unchanged above the footer.
+
+------------------------------------------------
+2) LEFT BUTTON – OPEN TRIP TYPE SELECTOR
+------------------------------------------------
+Left icon:
+- Use a small car + hamburger/drawer icon to indicate “trip types”.
+- On tap: open a bottom sheet or left-side drawer titled “Trip Preferences”.
+
+Drawer must NOT overlap with admin features; this is driver-only preference.
+
+------------------------------------------------
+3) TRIP TYPE SELECTOR UI (Uber-style grid)
+------------------------------------------------
+Layout:
+- Dark background container (#101010 – #181818).
+- 2-column grid of large cards, exactly like the Uber screenshot:
+  - Each card has:
+    • Icon (person/car/bike/box/paw, etc.)
+    • Service name at bottom (e.g., “Comfort”, “UberX”) – we will use SafeGo names.
+
+Card states:
+- SELECTED:
+  - Bright white outline (2px).
+  - White checkmark box in top-right (filled square with ✓).
+- UNSELECTED:
+  - Subtle grey outline (#333, 1px).
+  - Empty square outline in top-right, no tick.
+
+Card behavior:
+- Tap toggles ON/OFF.
+- Animate softly (scale or highlight).
+- No extra text; keep it clean.
+
+SafeGo services to display (example; must be configurable):
+
+RIDE TYPES:
+- SafeGo Go
+- SafeGo X
+- SafeGo XL (7-seater)
+- SafeGo Premium
+- SafeGo Bike
+- SafeGo CNG
+- SafeGo Moto
+- SafeGo Pet
+
+DELIVERY TYPES:
+- SafeGo Eats (Food)
+- SafeGo Parcel
+
+Admin defines which of these products a driver is ALLOWED to use; only those appear in the grid.
+
+------------------------------------------------
+4) DATA MODEL – DRIVER SERVICE PREFERENCES
+------------------------------------------------
+ADD a new nested object (do not remove/rename anything existing):
+
+driver_profile.service_preferences = {
+  ride_types: {
+    safego_go: boolean,
+    safego_x: boolean,
+    safego_xl: boolean,
+    safego_premium: boolean,
+    safego_bike: boolean,
+    safego_cng: boolean,
+    safego_moto: boolean,
+    safego_pet: boolean
+  },
+  food_enabled: boolean,
+  parcel_enabled: boolean
+}
+
+Rules:
+- When a card is toggled:
+  - Update the corresponding boolean.
+  - Persist to driver_profile.
+  - Show toast: “Trip preferences updated”.
+
+- Admin may override these fields from the admin panel but driver cannot see admin overrides.
+
+------------------------------------------------
+5) MATCHING / DISPATCH LOGIC (TRIP ON/OFF EFFECT)
+------------------------------------------------
+When the system searches for a driver for:
+- rides
+- food_orders
+- deliveries
+
+Apply these filters together:
+
+1) driver_online_status = "online"  
+2) verification_status = "approved"  
+3) service_preferences for that product = true  
+
+Examples:
+- If driver has:
+  - safego_xl = true, others = false → Only SafeGo XL trips are eligible.
+- If driver turns OFF SafeGo Eats → No food_orders dispatched to them.
+- If driver turns OFF all ride_types but leaves parcel_enabled = true → Only parcel deliveries will be sent.
+
+If ALL services (rides + food + parcel) are OFF while driver_online_status = online:
+- Show blocking toast:
+  - “You have no trip types enabled. Turn on at least one to receive requests.”
+- Driver stays online but receives nothing until at least one type is ON.
+
+This must NOT break existing status flows; it only changes matching/eligibility.
+
+------------------------------------------------
+6) COUNTRY & VERIFICATION ENFORCEMENT
+------------------------------------------------
+- Driver cannot use this drawer or receive trips if verification_status != "approved".
+- BD vs US KYC rules from the top must still be enforced.
+- If unverified, show blocking banner and disable trip type toggles.
+
+------------------------------------------------
+7) COMMISSION, WALLETS, ADMIN (UNCHANGED)
+------------------------------------------------
+- All commission math for rides/food/deliveries stays as defined in global rules.
+- Admin still:
+  - sees and settles driver/restaurant negative balances,
+  - can block drivers,
+  - can globally enable/disable which SafeGo products are available to that driver.
+
+------------------------------------------------
+8) SECURITY & PRIVACY
+------------------------------------------------
+- Trip type selector affects only the driver’s own matching; it never exposes customer or restaurant data.
+- Customer, restaurant, and other drivers cannot see a driver’s service_preferences object.
+
+------------------------------------------------
+9) NON-BREAKING IMPLEMENTATION
+------------------------------------------------
+- Do NOT rename or remove any existing database fields, collections, endpoints, or routes.
+- Only ADD:
+  - driver_profile.service_preferences.* fields
+  - left “trip types” drawer UI
+- Keep map, right current trip menu, and center online/offline pill behavior exactly as they are, except for the new matching filter based on service_preferences.
