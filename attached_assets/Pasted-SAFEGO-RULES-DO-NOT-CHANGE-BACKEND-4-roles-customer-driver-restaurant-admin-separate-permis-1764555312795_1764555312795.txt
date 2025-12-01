@@ -1,0 +1,65 @@
+SAFEGO RULES (DO NOT CHANGE BACKEND)
+- 4 roles: customer, driver, restaurant, admin (separate permissions).
+- 3 services: rides, food_orders, deliveries (ride-hailing, food delivery, parcel).
+- BD KYC: father_name, date_of_birth, present_address, permanent_address, NID (number + front/back), emergency_contact, verification_status + is_verified.
+- US KYC: date_of_birth, home_address, emergency_contact, government_id_type, government_id_last4, driver_license (number + image + expiry), ssn_last4 (optional), verification_status + is_verified.
+- Onboarding: multi step → verification_status="pending" until admin approves.
+- Admin panel: approve/reject KYC (with rejection_reason), block/unblock, update pricing/commissions, manage payouts, view driver/restaurant negative balance.
+- Collections rides/food_orders/deliveries already exist with IDs, geo, fees+commission, payment_method, timestamps, full status flow, rating+feedback.
+- Commission rules, wallets, security rules, status flows, notifications – keep exactly as they are.
+
+This task is ONLY layout change on /driver/map.
+Do NOT modify any APIs, DB fields, business logic, or matching logic.
+
+================================================
+TASK: Center the "Go Online/Go Offline" button in the MAP AREA (not whole window)
+================================================
+
+Problem:
+- The center Go Online/Go Offline button was centered using `left: 50%` on the entire viewport.
+- Because the driver layout has a left sidebar, the button appears visually too far left.
+- We need the button centered relative to the MAP CONTENT area (the right panel), not the whole page.
+
+Goal:
+- The power button must be visually in the middle of the map area that starts to the right of the sidebar.
+- Left and right floating buttons stay near bottom-left and bottom-right of the map.
+
+Implementation steps:
+
+1) Wrap map and floating buttons in a relative container
+   - In client/src/pages/driver/map.tsx (or equivalent), ensure the main map content wrapper (the right side panel) has:
+       style / class: `position: relative;`
+   - This wrapper should be the parent of:
+       • the map component
+       • the 3 floating footer buttons (left trip-type, center power, right current-trip).
+
+2) Use ABSOLUTE positioning for the center button inside this wrapper
+   - Remove any `position: fixed` used for the center button.
+   - Instead, set:
+       position: absolute;
+       bottom: 16px;      // or existing vertical offset
+       left: 50%;
+       transform: translateX(-50%);
+   - This will center the button inside the map container width (excluding the sidebar).
+
+3) Keep left and right buttons anchored to map corners
+   - Left button:
+       position: absolute;
+       bottom: 16px;
+       left: 16px;
+   - Right button:
+       position: absolute;
+       bottom: 16px;
+       right: 16px;
+   - Do not change their click behavior.
+
+4) Responsive behavior:
+   - On mobile (no sidebar), the map container is full width, so the same absolute centering will still work automatically.
+   - No extra conditions are needed; just ensure the center button always uses the map wrapper as its positioning context.
+
+5) Do NOT change:
+   - Button size, colors (green offline / red online), online/offline toggle logic, or backend calls.
+   - Any other part of the driver UI, map engine, KYC logic, or admin systems.
+
+Apply ONLY this positioning fix so that the Go Online/Go Offline button is perfectly centered within the driver map content area.
+NO QUESTIONS.

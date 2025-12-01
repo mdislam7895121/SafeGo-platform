@@ -737,6 +737,184 @@ export default function DriverMapPage() {
             </Badge>
           </div>
         )}
+
+        {/* Floating footer buttons - positioned inside map container */}
+        <Sheet open={showServiceSheet} onOpenChange={setShowServiceSheet}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute bottom-4 left-4 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              data-testid="button-service-select"
+            >
+              <Grid3X3 className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent 
+            side="left" 
+            className="w-[320px] sm:w-[380px] bg-black border-r-0 p-0 z-[1010]"
+            data-testid="service-selection-drawer"
+          >
+            <div className="flex flex-col h-full">
+              <SheetHeader className="px-5 pt-6 pb-4">
+                <SheetTitle className="text-white text-xl font-semibold">Trip Preferences</SheetTitle>
+              </SheetHeader>
+              
+              <div className="flex-1 overflow-y-auto px-4 pb-6">
+                <div className="grid grid-cols-2 gap-3">
+                  {SAFEGO_SERVICES.map((service) => {
+                    const ServiceIcon = service.icon;
+                    const isEnabled = isServiceEnabled(service);
+                    const isUpdating = updateServicePrefsMutation.isPending;
+                    
+                    return (
+                      <button
+                        key={service.id}
+                        onClick={() => toggleServicePreference(service)}
+                        disabled={isUpdating}
+                        className={`relative flex flex-col items-center justify-center p-4 h-[140px] rounded-[20px] transition-all duration-200 ${
+                          isEnabled 
+                            ? "bg-[#181818] border-2 border-white" 
+                            : "bg-[#101010] border border-[#333] hover:border-[#555]"
+                        } ${isUpdating ? "opacity-60" : ""}`}
+                        data-testid={`service-card-${service.id}`}
+                      >
+                        <div 
+                          className={`absolute top-3 right-3 w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                            isEnabled 
+                              ? "bg-white" 
+                              : "border border-[#555]"
+                          }`}
+                        >
+                          {isEnabled && <Check className="h-3.5 w-3.5 text-black" />}
+                        </div>
+                        
+                        <div className="flex-1 flex items-center justify-center">
+                          <ServiceIcon className={`h-10 w-10 ${isEnabled ? "text-white" : "text-gray-500"}`} />
+                        </div>
+                        
+                        <span className={`text-sm font-medium text-center mt-2 ${
+                          isEnabled ? "text-white" : "text-gray-500"
+                        }`}>
+                          {service.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-6 px-1">
+                  <p className="text-[#666] text-xs text-center">
+                    Toggle services to control which trip types you receive. 
+                    Changes are saved automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <button
+          onClick={async () => {
+            if (isVerified && hasVehicle) {
+              const wasOnline = isOnline;
+              
+              if (!wasOnline && !hasAnyServiceEnabled) {
+                toast({ 
+                  title: "No trip types enabled",
+                  description: "Turn on at least one service to receive requests",
+                  variant: "destructive"
+                });
+                setShowServiceSheet(true);
+                return;
+              }
+              
+              await toggleOnlineStatus();
+            }
+          }}
+          disabled={isUpdatingStatus || !isVerified || !hasVehicle}
+          className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
+            isUpdatingStatus ? "opacity-70" : ""
+          } ${isOnline 
+            ? "bg-[#FF3B30] hover:bg-[#E63529]" 
+            : "bg-[#28C840] hover:bg-[#22B038]"
+          } text-white`}
+          data-testid="button-online-toggle"
+        >
+          <Power className="h-5 w-5 text-white" />
+          <span className="font-semibold text-base whitespace-nowrap">
+            {isUpdatingStatus 
+              ? "Updating..." 
+              : isOnline 
+                ? "Go Offline" 
+                : "Go Online"
+            }
+          </span>
+        </button>
+
+        <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute bottom-4 right-4 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              data-testid="button-quick-actions"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
+            <SheetHeader>
+              <SheetTitle>Quick Actions</SheetTitle>
+            </SheetHeader>
+            <div className="py-6 space-y-2">
+              <button
+                onClick={() => {
+                  setLocation("/driver/earnings");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-earnings"
+              >
+                <DollarSign className="h-5 w-5" />
+                <span className="font-medium">Earnings</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/trips");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-history"
+              >
+                <History className="h-5 w-5" />
+                <span className="font-medium">Trip History</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/wallet");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-wallet"
+              >
+                <Wallet className="h-5 w-5" />
+                <span className="font-medium">Wallet</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/settings");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-settings"
+              >
+                <Settings className="h-5 w-5" />
+                <span className="font-medium">Settings</span>
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
 
       <AnimatePresence>
@@ -858,188 +1036,6 @@ export default function DriverMapPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <div 
-        className="fixed bottom-0 left-0 right-0 z-[999] pb-safe flex items-center justify-between px-4 py-4 pointer-events-none"
-        data-testid="driver-footer-bar"
-      >
-        <Sheet open={showServiceSheet} onOpenChange={setShowServiceSheet}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-12 w-12 rounded-full border-2 shadow-lg bg-background pointer-events-auto"
-              data-testid="button-service-select"
-            >
-              <Grid3X3 className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent 
-            side="left" 
-            className="w-[320px] sm:w-[380px] bg-black border-r-0 p-0 z-[1010]"
-            data-testid="service-selection-drawer"
-          >
-            <div className="flex flex-col h-full">
-              <SheetHeader className="px-5 pt-6 pb-4">
-                <SheetTitle className="text-white text-xl font-semibold">Trip Preferences</SheetTitle>
-              </SheetHeader>
-              
-              <div className="flex-1 overflow-y-auto px-4 pb-6">
-                <div className="grid grid-cols-2 gap-3">
-                  {SAFEGO_SERVICES.map((service) => {
-                    const ServiceIcon = service.icon;
-                    const isEnabled = isServiceEnabled(service);
-                    const isUpdating = updateServicePrefsMutation.isPending;
-                    
-                    return (
-                      <button
-                        key={service.id}
-                        onClick={() => toggleServicePreference(service)}
-                        disabled={isUpdating}
-                        className={`relative flex flex-col items-center justify-center p-4 h-[140px] rounded-[20px] transition-all duration-200 ${
-                          isEnabled 
-                            ? "bg-[#181818] border-2 border-white" 
-                            : "bg-[#101010] border border-[#333] hover:border-[#555]"
-                        } ${isUpdating ? "opacity-60" : ""}`}
-                        data-testid={`service-card-${service.id}`}
-                      >
-                        <div 
-                          className={`absolute top-3 right-3 w-5 h-5 rounded flex items-center justify-center transition-colors ${
-                            isEnabled 
-                              ? "bg-white" 
-                              : "border border-[#555]"
-                          }`}
-                        >
-                          {isEnabled && <Check className="h-3.5 w-3.5 text-black" />}
-                        </div>
-                        
-                        <div className="flex-1 flex items-center justify-center">
-                          <ServiceIcon className={`h-10 w-10 ${isEnabled ? "text-white" : "text-gray-500"}`} />
-                        </div>
-                        
-                        <span className={`text-sm font-medium text-center mt-2 ${
-                          isEnabled ? "text-white" : "text-gray-500"
-                        }`}>
-                          {service.name}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-                
-                <div className="mt-6 px-1">
-                  <p className="text-[#666] text-xs text-center">
-                    Toggle services to control which trip types you receive. 
-                    Changes are saved automatically.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        <button
-          onClick={async () => {
-            if (isVerified && hasVehicle) {
-              const wasOnline = isOnline;
-              
-              if (!wasOnline && !hasAnyServiceEnabled) {
-                toast({ 
-                  title: "No trip types enabled",
-                  description: "Turn on at least one service to receive requests",
-                  variant: "destructive"
-                });
-                setShowServiceSheet(true);
-                return;
-              }
-              
-              await toggleOnlineStatus();
-            }
-          }}
-          disabled={isUpdatingStatus || !isVerified || !hasVehicle}
-          className={`fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 pointer-events-auto z-[1000] ${
-            isUpdatingStatus ? "opacity-70" : ""
-          } ${isOnline 
-            ? "bg-[#FF3B30] hover:bg-[#E63529]" 
-            : "bg-[#28C840] hover:bg-[#22B038]"
-          } text-white`}
-          data-testid="button-online-toggle"
-        >
-          <Power className="h-5 w-5 text-white" />
-          <span className="font-semibold text-base whitespace-nowrap">
-            {isUpdatingStatus 
-              ? "Updating..." 
-              : isOnline 
-                ? "Go Offline" 
-                : "Go Online"
-            }
-          </span>
-        </button>
-
-        <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-12 w-12 rounded-full border-2 shadow-lg bg-background pointer-events-auto"
-              data-testid="button-quick-actions"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
-            <SheetHeader>
-              <SheetTitle>Quick Actions</SheetTitle>
-            </SheetHeader>
-            <div className="py-6 space-y-2">
-              <button
-                onClick={() => {
-                  setLocation("/driver/earnings");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-earnings"
-              >
-                <DollarSign className="h-5 w-5" />
-                <span className="font-medium">Earnings</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/trips");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-history"
-              >
-                <History className="h-5 w-5" />
-                <span className="font-medium">Trip History</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/wallet");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-wallet"
-              >
-                <Wallet className="h-5 w-5" />
-                <span className="font-medium">Wallet</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/settings");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-settings"
-              >
-                <Settings className="h-5 w-5" />
-                <span className="font-medium">Settings</span>
-              </button>
-            </div>
-          </SheetContent>
-        </Sheet>
-      </div>
 
       {incomingRequest && (
         <IncomingTripRequest
