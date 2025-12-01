@@ -136,25 +136,28 @@ interface ServicePreferences {
   parcelEnabled: boolean;
 }
 
+type CountryCode = "US" | "BD";
+
 interface ServiceCard {
   id: string;
   name: string;
   icon: any;
   category: "ride" | "food" | "parcel";
   preferenceKey: keyof ServicePreferences["rideTypes"] | "foodEnabled" | "parcelEnabled";
+  enabledCountries: CountryCode[];
 }
 
 const SAFEGO_SERVICES: ServiceCard[] = [
-  { id: "safego_go", name: "SafeGo Go", icon: Car, category: "ride", preferenceKey: "safego_go" },
-  { id: "safego_x", name: "SafeGo X", icon: Car, category: "ride", preferenceKey: "safego_x" },
-  { id: "safego_xl", name: "SafeGo XL", icon: Truck, category: "ride", preferenceKey: "safego_xl" },
-  { id: "safego_premium", name: "SafeGo Premium", icon: Crown, category: "ride", preferenceKey: "safego_premium" },
-  { id: "safego_bike", name: "SafeGo Bike", icon: Bike, category: "ride", preferenceKey: "safego_bike" },
-  { id: "safego_cng", name: "SafeGo CNG", icon: Zap, category: "ride", preferenceKey: "safego_cng" },
-  { id: "safego_moto", name: "SafeGo Moto", icon: Bike, category: "ride", preferenceKey: "safego_moto" },
-  { id: "safego_pet", name: "SafeGo Pet", icon: PawPrint, category: "ride", preferenceKey: "safego_pet" },
-  { id: "safego_eats", name: "SafeGo Eats", icon: UtensilsCrossed, category: "food", preferenceKey: "foodEnabled" },
-  { id: "safego_parcel", name: "SafeGo Parcel", icon: Package, category: "parcel", preferenceKey: "parcelEnabled" },
+  { id: "safego_go", name: "SafeGo Go", icon: Car, category: "ride", preferenceKey: "safego_go", enabledCountries: ["US", "BD"] },
+  { id: "safego_x", name: "SafeGo X", icon: Car, category: "ride", preferenceKey: "safego_x", enabledCountries: ["US", "BD"] },
+  { id: "safego_xl", name: "SafeGo XL", icon: Truck, category: "ride", preferenceKey: "safego_xl", enabledCountries: ["US", "BD"] },
+  { id: "safego_premium", name: "SafeGo Premium", icon: Crown, category: "ride", preferenceKey: "safego_premium", enabledCountries: ["US", "BD"] },
+  { id: "safego_bike", name: "SafeGo Bike", icon: Bike, category: "ride", preferenceKey: "safego_bike", enabledCountries: ["BD"] },
+  { id: "safego_cng", name: "SafeGo CNG", icon: Zap, category: "ride", preferenceKey: "safego_cng", enabledCountries: ["BD"] },
+  { id: "safego_moto", name: "SafeGo Moto", icon: Bike, category: "ride", preferenceKey: "safego_moto", enabledCountries: ["BD"] },
+  { id: "safego_pet", name: "SafeGo Pet", icon: PawPrint, category: "ride", preferenceKey: "safego_pet", enabledCountries: ["US", "BD"] },
+  { id: "safego_eats", name: "SafeGo Eats", icon: UtensilsCrossed, category: "food", preferenceKey: "foodEnabled", enabledCountries: ["US", "BD"] },
+  { id: "safego_parcel", name: "SafeGo Parcel", icon: Package, category: "parcel", preferenceKey: "parcelEnabled", enabledCountries: ["US", "BD"] },
 ];
 
 const defaultServicePreferences: ServicePreferences = {
@@ -295,6 +298,14 @@ export default function DriverMapPage() {
     gpsStatus,
     profile,
   } = useDriverAvailability();
+
+  // Get driver's country and filter services accordingly
+  const driverCountry = (profile?.countryCode as CountryCode) || "US";
+  const filteredServices = useMemo(() => {
+    return SAFEGO_SERVICES.filter(service => 
+      service.enabledCountries.includes(driverCountry)
+    );
+  }, [driverCountry]);
 
   const { data: activeTripData, isLoading, error } = useQuery<{
     activeTrip: ActiveTrip | null;
@@ -658,7 +669,7 @@ export default function DriverMapPage() {
               
               <div className="flex-1 overflow-y-auto px-4 pb-6">
                 <div className="grid grid-cols-2 gap-3">
-                  {SAFEGO_SERVICES.map((service) => {
+                  {filteredServices.map((service) => {
                     const ServiceIcon = service.icon;
                     const isEnabled = isServiceEnabled(service);
                     const isUpdating = updateServicePrefsMutation.isPending;
@@ -728,7 +739,7 @@ export default function DriverMapPage() {
             </SheetHeader>
             <div className="pb-6">
               <div className="grid grid-cols-3 gap-3 mb-6">
-                {SAFEGO_SERVICES.map((service) => {
+                {filteredServices.map((service) => {
                   const ServiceIcon = service.icon;
                   const isEnabled = isServiceEnabled(service);
                   const isUpdating = updateServicePrefsMutation.isPending;
