@@ -184,9 +184,9 @@ function AutoFollowHandler({
       recenterTrigger !== prevRecenterTrigger.current;
     
     if (forceRecenter) {
-      map.setView([driverLocation.lat, driverLocation.lng], 17, {
-        animate: true,
-        duration: 0.5,
+      map.flyTo([driverLocation.lat, driverLocation.lng], 17, {
+        duration: 0.8,
+        easeLinearity: 0.25,
       });
       prevRecenterTrigger.current = recenterTrigger;
       prevLocation.current = driverLocation;
