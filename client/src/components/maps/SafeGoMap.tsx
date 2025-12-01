@@ -36,32 +36,51 @@ export interface SafeGoMapProps {
 const createDriverIcon = (heading: number = 0) => L.divIcon({
   className: "safego-driver-marker-animated",
   html: `<div style="
-    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    border: 4px solid white;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    width: 52px;
+    height: 52px;
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    transform: rotate(${heading}deg);
-    transition: transform 0.5s ease-out;
-    animation: pulse-driver 2s infinite;
   ">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-      <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
-    </svg>
+    <!-- Outer white circle with shadow -->
+    <div style="
+      position: absolute;
+      width: 48px;
+      height: 48px;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      animation: pulse-driver 2s infinite;
+    "></div>
+    <!-- Inner dark circle with arrow -->
+    <div style="
+      position: relative;
+      width: 38px;
+      height: 38px;
+      background: #1a1a1a;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: rotate(${heading}deg);
+      transition: transform 0.5s ease-out;
+    ">
+      <!-- Uber-style navigation arrow pointing up -->
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 3L4 20L12 16L20 20L12 3Z" fill="white"/>
+      </svg>
+    </div>
   </div>
   <style>
     @keyframes pulse-driver {
-      0%, 100% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4); }
-      50% { box-shadow: 0 4px 20px rgba(16, 185, 129, 0.7); }
+      0%, 100% { box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+      50% { box-shadow: 0 4px 24px rgba(0,0,0,0.5); }
     }
   </style>`,
-  iconSize: [44, 44],
-  iconAnchor: [22, 22],
-  popupAnchor: [0, -22],
+  iconSize: [52, 52],
+  iconAnchor: [26, 26],
+  popupAnchor: [0, -26],
 });
 
 const pickupIcon = L.divIcon({
@@ -206,10 +225,10 @@ function MapBoundsHandler({
     
     if (bounds.length >= 2) {
       const latLngBounds = L.latLngBounds(bounds);
-      map.fitBounds(latLngBounds, { padding: [60, 60], maxZoom: 16 });
+      map.fitBounds(latLngBounds, { padding: [60, 60], maxZoom: 17 });
       hasInitialized.current = true;
     } else if (bounds.length === 1) {
-      map.setView(bounds[0], 15);
+      map.setView(bounds[0], 17);
       hasInitialized.current = true;
     }
   }, [map, driverLocation, pickupLocation, dropoffLocation, activeLeg, autoFollow]);

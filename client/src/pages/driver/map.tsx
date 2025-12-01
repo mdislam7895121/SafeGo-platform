@@ -511,7 +511,7 @@ export default function DriverMapPage() {
       <div className="flex-1 relative">
         <SafeGoMap
           center={mapCenter}
-          zoom={15}
+          zoom={17}
           driverLocation={driverPosition}
           pickupLocation={pickupLocation}
           dropoffLocation={dropoffLocation}
