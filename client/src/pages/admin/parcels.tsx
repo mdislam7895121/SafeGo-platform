@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, Search, Filter, Package, Eye, MapPin } from "lucide-react";
+import { ArrowLeft, Search, Filter, Package, Eye, MapPin, Truck, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyStateCard } from "@/components/ui/empty-state";
 import {
   Select,
   SelectContent,
@@ -268,22 +269,7 @@ export default function AdminParcels() {
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Commission Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8" data-testid="empty-commission-summary">
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-lg font-medium">No commission data available</p>
-                <p className="text-sm text-muted-foreground">
-                  No parcel deliveries found for the selected filters
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        ) : null}
 
         {/* Statistics */}
         {data && (
@@ -372,12 +358,29 @@ export default function AdminParcels() {
               </Card>
             ))
           ) : (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-muted-foreground">No parcels found</p>
-              </CardContent>
-            </Card>
+            <EmptyStateCard
+              icon={Package}
+              title={searchQuery || statusFilter !== "all" || countryFilter !== "all" 
+                ? "No parcels match your filters" 
+                : "No active parcels today"}
+              description={searchQuery || statusFilter !== "all" || countryFilter !== "all"
+                ? "Try adjusting your search terms or filters to find what you're looking for."
+                : "All parcels have been delivered or there are no new orders. New parcels will appear here as customers place orders."}
+              iconColor="text-indigo-500/70"
+              iconBgColor="bg-indigo-50 dark:bg-indigo-950/30"
+              action={(searchQuery || statusFilter !== "all" || countryFilter !== "all") ? {
+                label: "Clear Filters",
+                onClick: () => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                  setCountryFilter("all");
+                  setCurrentPage(1);
+                },
+                variant: "outline"
+              } : undefined}
+              testId="empty-parcels"
+              size="md"
+            />
           )}
         </div>
 

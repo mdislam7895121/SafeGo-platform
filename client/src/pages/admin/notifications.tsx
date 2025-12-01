@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { ArrowLeft, Bell, CheckCheck, Filter, Search, X } from "lucide-react";
+import { ArrowLeft, Bell, CheckCheck, Filter, Search, X, BellOff } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Select,
   SelectContent,
@@ -306,10 +307,22 @@ export default function AdminNotifications() {
                 <Skeleton key={i} className="h-24 w-full" />
               ))
             ) : !data || data.notifications.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No notifications found</p>
-              </div>
+              <EmptyState
+                icon={BellOff}
+                title={Object.values(filters).some(v => v) ? "No notifications match your filters" : "All caught up!"}
+                description={Object.values(filters).some(v => v) 
+                  ? "Try adjusting your filters to see more notifications." 
+                  : "You have no notifications at the moment. We'll notify you when something needs your attention."}
+                iconColor="text-slate-400"
+                iconBgColor="bg-slate-100 dark:bg-slate-800/50"
+                action={Object.values(filters).some(v => v) ? {
+                  label: "Clear Filters",
+                  onClick: () => setFilters({ type: "", severity: "", isRead: "", countryCode: "", entityType: "" }),
+                  variant: "outline"
+                } : undefined}
+                testId="empty-notifications"
+                size="md"
+              />
             ) : (
               <>
                 {data.notifications.map((notification) => (
