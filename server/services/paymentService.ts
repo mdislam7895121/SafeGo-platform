@@ -11,6 +11,8 @@ import {
 } from "./paymentProviders/base";
 import { mockPaymentProvider } from "./paymentProviders/mock";
 import { stripePaymentProvider } from "./paymentProviders/stripe";
+import { bkashPaymentProvider } from "./paymentProviders/bkash";
+import { nagadPaymentProvider } from "./paymentProviders/nagad";
 import { walletService } from "./walletService";
 import { settlementService } from "./settlementService";
 
@@ -51,8 +53,8 @@ const COUNTRY_DEFAULT_PROVIDERS: Record<string, PaymentProvider> = {
 const providerInstances: Record<PaymentProvider, IPaymentProvider> = {
   [PaymentProvider.mock]: mockPaymentProvider,
   [PaymentProvider.stripe]: stripePaymentProvider,
-  [PaymentProvider.bkash]: mockPaymentProvider,
-  [PaymentProvider.nagad]: mockPaymentProvider,
+  [PaymentProvider.bkash]: bkashPaymentProvider,
+  [PaymentProvider.nagad]: nagadPaymentProvider,
   [PaymentProvider.paypal]: mockPaymentProvider,
   [PaymentProvider.braintree]: mockPaymentProvider,
 };
