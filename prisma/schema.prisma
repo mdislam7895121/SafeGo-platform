@@ -530,6 +530,17 @@ model DriverProfile {
   tripRevenueTotalYtd   Decimal?           @db.Decimal(12, 2) // 1099-K: Trip revenue
   nonTripIncomeTotalYtd Decimal?           @db.Decimal(12, 2) // 1099-NEC: Bonuses, promos
   taxYear               Int?               // Current tax year being tracked
+  
+  // Phase 4 Part 2: Background Check consent and verification
+  backgroundCheckConsent        Boolean   @default(false)  // Driver authorized background check
+  backgroundCheckConsentAt      DateTime? // When consent was given
+  latestBackgroundCheckId       String?   // Most recent background check ID
+  faceVerificationRequired      Boolean   @default(false)
+  faceVerificationCompleted     Boolean   @default(false)
+  faceVerificationCompletedAt   DateTime?
+  
+  // Relations
+  backgroundChecks              DriverBackgroundCheck[]
   securityStatus        SecurityStatus     @default(normal)
   securityNotes         String?
   // Driver Preferences
@@ -1896,12 +1907,20 @@ model PaymentMethod {
   fingerprint         String?             // Card fingerprint for duplicate detection
   lastVerifiedAt      DateTime?
   
+  // Phase 4 Part 2: BD Mobile Wallet fields
+  providerType        String?             @default("card") // card | mobile_wallet | bank_transfer
+  walletBrand         String?             // bkash | nagad | null
+  walletPhoneMasked   String?             // Last 4 digits of phone: ****1234
+  walletVerified      Boolean             @default(false)
+  walletVerifiedAt    DateTime?
+  
   // Relations
   customer            CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Cascade)
   payments            Payment[]
 
   @@index([customerId])
   @@index([customerId, isDefault])
+  @@index([providerType])
   @@map("payment_methods")
 }
 
@@ -4952,6 +4971,11 @@ model Payment {
   paymentMethodLast4    String?             // Last 4 digits of card/account
   paymentMethodBrand    String?             // visa, mastercard, bkash, etc.
   
+  // Phase 4 Part 2: BD Mobile Wallet fields
+  providerChannel       String?             // card | mobile_wallet
+  mobileWalletReference String?             // Transaction ID from bKash/Nagad
+  mobileWalletPhone     String?             // Masked phone number used
+  
   // Error handling
   errorCode             String?
   errorMessage          String?
@@ -5449,4 +5473,244 @@ model AdminMonitoringSnapshot {
   @@index([snapshotAt])
   @@index([countryCode])
   @@map("admin_monitoring_snapshots")
+}
+
+// ============================================================
+// Phase 4 Part 2: Identity Verification, Background Checks, Face Verification
+// ============================================================
+
+// Phase 4: KYC Verification status types
+enum KycVerificationStatus {
+  pending
+  in_progress
+  match
+  mismatch
+  error
+  manual_review
+}
+
+// Phase 4: KYC document types for verification
+enum KycDocumentType {
+  nid
+  passport
+  driver_license
+  ssn_last4_check
+  government_id
+}
+
+// Phase 4: Background check status
+enum BackgroundCheckStatus {
+  not_started
+  pending
+  in_progress
+  completed
+  failed
+  expired
+}
+
+// Phase 4: Background check result
+enum BackgroundCheckResult {
+  clear
+  consider
+  review
+  not_applicable
+}
+
+// Phase 4: Face verification status
+enum FaceMatchStatus {
+  pending
+  match
+  mismatch
+  inconclusive
+  failed
+  liveness_failed
+}
+
+// Phase 4: Payment provider type (card vs mobile wallet)
+enum PaymentProviderType {
+  card
+  mobile_wallet
+  bank_transfer
+}
+
+// Phase 4: Mobile wallet brand
+enum MobileWalletBrand {
+  bkash
+  nagad
+  other
+}
+
+// ============================================================
+// Phase 4 Part 2: KYC Verification Logs
+// ============================================================
+
+model KycVerificationLog {
+  id                    String                @id @default(uuid())
+  
+  // User reference
+  userType              String                // customer | driver | restaurant
+  userId                String
+  countryCode           String
+  
+  // Provider info
+  provider              String                // bd_nid_provider, us_kyc_provider, etc.
+  documentType          KycDocumentType
+  
+  // Request/response (no raw sensitive data)
+  requestPayloadHash    String?               // SHA-256 hash of request payload
+  responseCode          String?
+  responseStatus        KycVerificationStatus @default(pending)
+  responseMessage       String?               @db.Text // Non-sensitive message
+  matchScore            Decimal?              @db.Decimal(5, 2) // 0-100 match confidence
+  
+  // Admin fields
+  triggeredByAdminId    String?               // Admin who triggered the verification
+  adminViewNotes        String?               @db.Text
+  
+  // Auto or manual
+  autoTriggered         Boolean               @default(false)
+  
+  // Timestamps
+  createdAt             DateTime              @default(now())
+  completedAt           DateTime?
+  
+  @@index([userId, userType])
+  @@index([countryCode])
+  @@index([responseStatus])
+  @@index([createdAt])
+  @@index([triggeredByAdminId])
+  @@map("kyc_verification_logs")
+}
+
+// ============================================================
+// Phase 4 Part 2: Driver Background Checks
+// ============================================================
+
+model DriverBackgroundCheck {
+  id                    String                    @id @default(uuid())
+  driverId              String
+  
+  // Provider info
+  provider              String                    // background check provider name
+  countryCode           String
+  requestReference      String?                   // Provider's reference/case ID
+  
+  // Status tracking
+  status                BackgroundCheckStatus     @default(not_started)
+  result                BackgroundCheckResult?
+  
+  // Report access (admin only)
+  reportUrl             String?                   @db.Text // Secure link to provider portal
+  reportSummary         String?                   @db.Text // Brief summary of findings
+  
+  // Admin notes
+  initiatedByAdminId    String?
+  adminNotes            String?                   @db.Text
+  
+  // Timestamps
+  createdAt             DateTime                  @default(now())
+  completedAt           DateTime?
+  expiresAt             DateTime?                 // Background checks may expire
+  
+  // Audit
+  consentRecordedAt     DateTime?                 // When driver gave consent
+  
+  // Relations
+  driver                DriverProfile             @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  
+  @@index([driverId])
+  @@index([status])
+  @@index([countryCode])
+  @@index([createdAt])
+  @@map("driver_background_checks")
+}
+
+// ============================================================
+// Phase 4 Part 2: Face Verification Sessions
+// ============================================================
+
+model FaceVerificationSession {
+  id                    String                @id @default(uuid())
+  
+  // User reference
+  userType              String                // customer | driver
+  userId                String
+  countryCode           String
+  
+  // Document being matched against
+  documentType          KycDocumentType
+  idPhotoRef            String?               // Reference to ID photo in secure storage
+  selfieRef             String?               // Reference to selfie/liveness capture
+  
+  // Provider info
+  provider              String
+  
+  // Results
+  status                FaceMatchStatus       @default(pending)
+  matchScore            Decimal?              @db.Decimal(5, 2) // 0-100 match score
+  livenessScore         Decimal?              @db.Decimal(5, 2) // 0-100 liveness score
+  livenessRequired      Boolean               @default(true)
+  livenessPassed        Boolean?
+  
+  // Decision
+  decision              String?               // match | mismatch | inconclusive
+  
+  // Admin review
+  reviewedByAdminId     String?
+  adminNotes            String?               @db.Text
+  
+  // Metadata (non-sensitive)
+  metadata              Json?                 // { liveness_checks: [...], device_info: {...} }
+  
+  // Timestamps
+  createdAt             DateTime              @default(now())
+  completedAt           DateTime?
+  
+  @@index([userId, userType])
+  @@index([countryCode])
+  @@index([status])
+  @@index([createdAt])
+  @@map("face_verification_sessions")
+}
+
+// ============================================================
+// Phase 4 Part 2: BD Mobile Wallet Configuration
+// ============================================================
+
+model MobileWalletConfig {
+  id                    String                @id @default(uuid())
+  
+  countryCode           String                // BD, etc.
+  provider              MobileWalletBrand
+  providerName          String                // bKash, Nagad, etc.
+  
+  // Status
+  isEnabled             Boolean               @default(false)
+  isDefault             Boolean               @default(false)
+  
+  // Service availability
+  enabledForRides       Boolean               @default(true)
+  enabledForFood        Boolean               @default(true)
+  enabledForParcels     Boolean               @default(true)
+  
+  // Configuration (non-sensitive)
+  merchantId            String?
+  merchantName          String?
+  callbackUrl           String?
+  webhookSecret         String?               // For webhook validation
+  sandboxMode           Boolean               @default(true)
+  
+  // Display
+  displayName           String?
+  logoUrl               String?
+  
+  // Timestamps
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  lastVerifiedAt        DateTime?
+  createdByAdminId      String?
+  
+  @@unique([countryCode, provider])
+  @@index([countryCode, isEnabled])
+  @@map("mobile_wallet_configs")
 }

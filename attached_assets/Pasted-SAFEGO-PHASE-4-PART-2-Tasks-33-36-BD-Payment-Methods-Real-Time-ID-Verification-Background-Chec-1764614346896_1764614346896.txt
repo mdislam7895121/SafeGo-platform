@@ -1,0 +1,468 @@
+SAFEGO PHASE 4 — PART 2
+(Tasks 33–36: BD Payment Methods, Real-Time ID Verification, Background Checks, Facial Recognition Matching)
+
+You are an expert full-stack engineer working on the global super-app “SafeGo”.
+
+In Phase 4 – Part 2 you must implement, in a fully NON-BREAKING way:
+
+33. Bangladesh-Specific Payment Methods (bKash / Nagad or similar)  
+34. Real-Time ID Verification Integration (country-aware; BD + US)  
+35. Background Check Integration for Drivers  
+36. Facial Recognition Matching for KYC Photos (verification-only, not general surveillance)
+
+All changes must comply with:
+- SafeGo Master Rules (roles, services, KYC, admin-only control)
+- Privacy/security best practices
+- ADD-ONLY database and API changes (no renames/removals)
+- No “legal case” / complaint-taking features in any country
+
+==================================================
+A. GLOBAL SAFEGO MASTER RULES (REQUIRED)
+==================================================
+
+1) Four roles – strict separation
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+Each role:
+   - has separate onboarding/KYC,
+   - separate dashboards,
+   - separate permissions.
+
+Role access isolation:
+   - Customers must not see driver KYC documents (NID, license, SSN, etc.).
+   - Drivers must not see customer NID, SSN, or document images.
+   - Restaurants must not see other restaurants’ data.
+   - Only Admin can change:
+       - pricing & commissions,
+       - verification & rejection with rejection_reason,
+       - blocking/unblocking,
+       - wallet/settlement overrides.
+
+2) Three services – must keep working
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+New features (payments, ID checks, background checks, facial match) must be designed cross-service and must not break any existing ride/food/parcel flow.
+
+3) Country-specific KYC (BD vs US)
+
+Bangladesh ("BD") – customers/drivers must have:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID number + front/back images
+   - emergency contact details
+   - verification_status
+   - is_verified
+
+United States ("US") – customers:
+   - date_of_birth
+   - home_address
+   - emergency contact details
+   - government_id_type
+   - government_id_last4
+   - verification_status
+   - is_verified
+
+United States – drivers:
+   - same as above, plus:
+       - driver_license_number
+       - driver_license_image
+       - driver_license_expiry
+       - optional ssn_last4
+
+You MUST:
+   - Never expose these raw ID numbers or images in customer/driver/restaurant UIs.
+   - Only expose them to Admin views where required for verification.
+
+4) Commission & payout rules – DO NOT change
+   - Already implemented in Phase 2:
+       - Cash → partner holds cash, SafeGo commission = negative wallet balance (driver/restaurant).
+       - Online → SafeGo receives full, partner gets net via wallet.
+   - This Phase 4 – Part 2 MUST NOT alter these semantics.
+   - BD payment methods must feed into the same PaymentService and wallet logic.
+
+5) Collections & APIs – ADD ONLY
+   - Core collections: rides, food_orders, deliveries, wallet_transactions, payments, customers, drivers, restaurants
+   - You must not rename or delete existing columns or routes.
+   - Only add new tables/columns/endpoints.
+
+6) No legal-case / complaint system
+   - You must NOT add “case”, “complaint”, “lawsuit”, or similar features for any country.
+   - These integrations are for identity & trust, not for legal dispute management.
+
+==================================================
+B. TASK 33 – BANGLADESH PAYMENT METHODS (BKASH/NAGAD)
+==================================================
+
+Goal:
+   - Add support for BD mobile wallet payments (e.g., bKash, Nagad) as **online payment methods** that plug into the existing PaymentService and wallet/commission flow.
+
+### 1) Payment provider abstraction (extension)
+
+Extend existing PaymentService provider interface to include “mobile_wallet” type providers.
+
+Examples:
+   - "bkash"
+   - "nagad"
+   - Generic "bd_mobile_wallet_mock" for sandbox.
+
+Provider adapter responsibilities:
+   - initiate payment (generate checkout URL / token),
+   - confirm payment (after redirect/webhook),
+   - report status (captured/failed/cancelled).
+
+### 2) Data model extensions (ADD ONLY)
+
+Extend `payment_methods` table:
+
+   - provider_type: "card" | "mobile_wallet"
+   - wallet_brand: "bkash" | "nagad" | null
+   - wallet_phone_masked: string | null
+
+These fields are OPTIONAL. For existing card methods they remain null.
+
+Extend `payments` table:
+
+   - provider_channel: "card" | "mobile_wallet"
+   - mobile_wallet_reference (string, nullable) – transaction id from bKash/Nagad.
+
+### 3) Customer BD payment method UX
+
+For customers whose country_code = "BD":
+
+   - In Payment Methods UI, show option:
+       - “Add bKash” / “Add Nagad”
+   - Flow (simplified):
+       - Customer enters wallet phone number.
+       - Backend:
+           - creates a mobile_wallet type payment method (no card data).
+           - may send a verification OTP via provider or show instructions (depending on provider).
+   - Store only masked phone (wallet_phone_masked) and provider name; NO full phone numbers in logs.
+
+### 4) Using BD payment methods in checkout
+
+At booking/ordering time in BD:
+
+   - If customer selects bKash/Nagad:
+       - PaymentService.createPaymentIntent with provider = "bkash" or "nagad" and provider_channel="mobile_wallet".
+       - Provider may:
+           - redirect user to payment gateway UI, or
+           - send a push/USSD request to confirm.
+   - On provider callback/webhook:
+       - PaymentService.handleWebhook must:
+           - set payments.status = "captured" or "failed".
+           - on "captured":
+               - mark entity.payment_status = "paid".
+               - trigger WalletService settlement as usual (no special-case logic).
+   - If BD mobile wallet integration is not configured in env:
+       - Use mock provider that simulates capture for demo.
+
+### 5) Admin control
+
+Admin panel additions (additive):
+
+   - BD Payments config screen:
+       - show provider credentials (masked),
+       - enable/disable providers per environment,
+       - toggle “Allow bKash/Nagad for rides/food/parcels”.
+
+Admin can:
+   - see aggregated stats for mobile_wallet usage via existing analytics (no extra semantics).
+
+==================================================
+C. TASK 34 – REAL-TIME ID VERIFICATION INTEGRATION
+==================================================
+
+Goal:
+   - Integrate with external KYC verification providers (different per country) in an abstracted, configurable way.
+
+### 1) New module: `IdentityVerificationService`
+
+Responsibilities:
+   - Provide unified API for SafeGo to verify identities/documents:
+       - verifyNationalIDForBD
+       - verifyGovernmentIDForUS
+       - verifyDriverLicense
+   - Hide provider-specific details.
+
+Configuration:
+   - Provider choice and API keys per country:
+       - BD: e.g., `"bd_nid_provider"` (sandbox or stub).
+       - US: e.g., `"us_kyc_provider"`.
+   - All credentials pulled from environment variables, never hard-coded.
+
+### 2) Data model – `kyc_verification_logs` (ADD ONLY)
+
+Table: `kyc_verification_logs`
+   - id
+   - user_type: "customer" | "driver" | "restaurant"
+   - user_id
+   - country_code
+   - provider
+   - document_type: "nid" | "passport" | "driver_license" | "ssn_last4_check"
+   - request_payload_hash (no raw sensitive data)
+   - response_code
+   - response_status: "match" | "mismatch" | "error"
+   - response_message (short, non-sensitive)
+   - created_at
+   - admin_view_notes (nullable)
+
+NO raw NID/SSN values stored here; only hashed references or last4 for debugging.
+
+### 3) Admin-triggered verification
+
+Admin panel must gain buttons or actions:
+
+   - For BD customer/driver:
+       - "Run NID Verification"
+   - For US customer/driver:
+       - "Run Government ID Verification"  
+       - "Run Driver License Check" (drivers)
+
+When clicked:
+   - Backend pulls already-stored KYC images/numbers from secure data store.
+   - Calls IdentityVerificationService, sends minimal required info.
+   - Stores a kyc_verification_logs entry.
+   - Updates user record:
+       - verification_status = "approved" | "rejected" (if policy allows auto-decision) OR leaves for manual review but showing last result.
+
+For this phase:
+   - Keep final decision human-driven:
+       - autopopulate "latest_verification_result" but require admin to click Approve/Reject, so that mistakes can be overridden.
+
+### 4) Automated verification at onboarding (optional, guarded)
+
+Config flag:
+   - AUTO_KYC_ON_SIGNUP_BD / AUTO_KYC_ON_SIGNUP_US
+
+If enabled:
+   - When KYC documents are uploaded and ready:
+       - system triggers IdentityVerificationService.
+       - logs results, notifies admin.
+   - If disabled:
+       - only admin manual trigger is allowed.
+
+==================================================
+D. TASK 35 – BACKGROUND CHECK INTEGRATION (DRIVERS)
+==================================================
+
+Goal:
+   - Allow SafeGo to integrate with 3rd-party background check providers for drivers only, in a compliant way.
+   - This feature MUST be explicit, consent-based, and admin-controlled.
+
+### 1) Data model – `driver_background_checks`
+
+New table:
+   - id
+   - driver_id
+   - provider
+   - country_code
+   - request_reference (string) – provider id
+   - status: "pending" | "in_progress" | "completed" | "failed"
+   - result: "clear" | "consider" | "review" | "not_applicable" | null
+   - report_url (nullable, private link to provider portal, not shown to driver)
+   - created_at
+   - completed_at (nullable)
+   - admin_notes (nullable)
+
+### 2) BackgroundCheckService
+
+Encapsulate provider API:
+   - createCheck(driver_id, country_code)
+   - fetchCheckStatus(reference)
+   - optionally handle provider webhooks.
+
+Drivers MUST explicitly consent in onboarding UI:
+   - e.g., "I authorize SafeGo to run background checks where required by law."
+   - The consent flag must be stored in drivers table (e.g., `background_check_consent` boolean).
+
+### 3) Admin workflow
+
+Admin panel:
+   - On driver profile:
+       - show background check status:
+           - Not Started / Pending / Clear / Review / Failed
+       - button “Start Background Check” (if consent = true).
+   - For completed checks:
+       - show summary: result + provider name + timestamp.
+       - provide link for admin to open provider report in a separate, secure console (if available).
+
+Effect on driver account:
+   - This prompt should NOT automatically block drivers based on result.
+   - Admin must manually set:
+       - is_verified / verification_status,
+       - is_blocked.
+   - Background check is an input to decision, not an automated final decision.
+
+==================================================
+E. TASK 36 – FACIAL RECOGNITION MATCHING FOR KYC PHOTOS
+==================================================
+
+Goal:
+   - Add an OPTIONAL, limited-use face-matching step to detect if:
+       - the person in a live capture (selfie/liveness check) matches the ID document photo they submitted.
+   - This is used ONLY for KYC verification, not for general tracking or surveillance.
+
+### 1) Key constraints (privacy & safety)
+
+   - Face data is used only for:
+       - one-time or periodic KYC verification.
+   - No building of public “face databases” for unrelated search.
+   - No law-enforcement style search features.
+   - All face templates or embeddings:
+       - must be stored securely,
+       - must be deletable on user account deletion,
+       - must not be exported to other services.
+
+### 2) Data model – `face_verification_sessions`
+
+New table:
+   - id
+   - user_type: "customer" | "driver"
+   - user_id
+   - country_code
+   - document_type: "nid" | "driver_license" | "passport"
+   - provider
+   - status: "pending" | "match" | "mismatch" | "failed"
+   - score (numeric, nullable)
+   - created_at
+   - completed_at
+   - metadata JSON (non-sensitive, e.g., {liveness_passed: true})
+
+Raw images should be stored in secure object storage or existing KYC store; this table contains only references.
+
+### 3) FaceVerificationService
+
+Responsibilities:
+   - accept references to:
+       - government ID photo,
+       - user selfie / liveness capture.
+   - call an external provider that:
+       - performs 1:1 face match,
+       - optionally performs liveness detection.
+   - return:
+       - match score,
+       - decision: "match" / "mismatch" / "inconclusive".
+
+Service must be fully configurable:
+   - provider name,
+   - match threshold,
+   - liveness requirement.
+
+### 4) Integration into KYC flow
+
+For drivers and (optionally) customers:
+
+   - On KYC screen, system prompts:
+       - “Take a live selfie” or “Start liveness check”.
+   - After image captured:
+       - create face_verification_sessions row.
+       - call FaceVerificationService.
+       - store result (score, status).
+   - Admin KYC panel shows:
+       - ID verification result (from Task 34).
+       - face verification result (Task 36).
+       - option to mark user:
+           - “Face Match Successful” (or not) and then Approve/Reject KYC.
+
+No automatic blocking:
+   - As with background checks, admin must make final decision.
+
+==================================================
+F. NOTIFICATIONS & AUDIT LOGGING
+==================================================
+
+1) Notifications
+
+Using existing NotificationService:
+
+   - To Admins:
+       - when BD payment provider credentials misconfigured or API fails repeatedly,
+       - when KYC verification fails or mismatch is detected,
+       - when background check results arrive,
+       - when face verification returns mismatch.
+
+   - To Users:
+       - high-level events only (no provider details):
+           - “Your ID verification is complete.”
+           - “Your account is under review.”
+           - “Your documents were not verified. Please contact support.”
+
+No user-facing notification should expose raw provider error messages.
+
+2) Audit logging
+
+Use or extend existing audit mechanisms to log:
+
+   - Who (admin) triggered:
+       - ID verification,
+       - background check,
+       - manual KYC decisions.
+   - Including:
+       - actorId, actorRole,
+       - IP address,
+       - timestamp.
+
+These logs must be immutable (append-only).
+
+==================================================
+G. NON-BREAKING GUARANTEES & MODULE LIST
+==================================================
+
+This Phase 4 – Part 2 prompt MUST NOT:
+
+   - rename or remove any database columns, tables, or enums,
+   - change any existing PaymentService behavior for card/online payments,
+   - change wallet/commission rules,
+   - change dispatch/status logic,
+   - introduce any “case”, “complaint”, or law-enforcement style search features.
+
+You MUST ONLY ADD:
+
+   - New tables:
+       - kyc_verification_logs
+       - driver_background_checks
+       - face_verification_sessions
+       - possible small extensions to payments/payment_methods (provider_type, wallet_brand, etc.)
+
+   - New services:
+       - IdentityVerificationService
+       - BackgroundCheckService
+       - FaceVerificationService
+       - extended PaymentService adapters for BD mobile wallets
+
+   - New admin routes & UI sections:
+       - Admin BD Payments config
+       - Admin KYC verification log view
+       - Admin background-check status view on driver profiles
+       - Admin face-verification status view
+
+   - New customer-facing capabilities:
+       - BD mobile wallet registration and usage in checkout
+
+Backward compatibility requirements:
+
+   - If BD mobile wallet providers are disabled in config:
+       - All existing card/cash flows continue to work as before.
+   - If external KYC providers are unavailable:
+       - Admin can still manually verify based on document images,
+       - System must not block the entire KYC flow.
+   - If background checks are not enabled in a region:
+       - Drivers can still onboard under existing rules.
+
+Implement production-quality code with clear boundaries:
+
+   - PaymentService ←→ BD providers  
+   - IdentityVerificationService ←→ KYC providers  
+   - BackgroundCheckService ←→ background vendors  
+   - FaceVerificationService ←→ face match providers  
+
+and ensure all sensitive operations are behind admin-only endpoints and properly logged.
+
+End of Phase 4 – Part 2.
