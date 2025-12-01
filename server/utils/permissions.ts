@@ -49,6 +49,17 @@ export enum Permission {
   VIEW_PERFORMANCE_DASHBOARD = 'VIEW_PERFORMANCE_DASHBOARD',
   MODERATE_PROMOTIONS = 'MODERATE_PROMOTIONS',
   MANAGE_RESTAURANT_PROFILES = 'MANAGE_RESTAURANT_PROFILES',
+  
+  // Phase 4: Admin Monitoring & Analytics
+  VIEW_REALTIME_MONITORING = 'VIEW_REALTIME_MONITORING',
+  VIEW_LIVE_MAP = 'VIEW_LIVE_MAP',
+  VIEW_REVENUE_ANALYTICS = 'VIEW_REVENUE_ANALYTICS',
+  EXPORT_ANALYTICS = 'EXPORT_ANALYTICS',
+  
+  // Phase 4: Fraud Detection
+  VIEW_FRAUD_ALERTS = 'VIEW_FRAUD_ALERTS',
+  MANAGE_FRAUD_ALERTS = 'MANAGE_FRAUD_ALERTS',
+  RESOLVE_FRAUD_ALERTS = 'RESOLVE_FRAUD_ALERTS',
 }
 
 type RolePermissions = {
@@ -99,6 +110,14 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_PERFORMANCE_DASHBOARD,
     Permission.MODERATE_PROMOTIONS,
     Permission.MANAGE_RESTAURANT_PROFILES,
+    // Phase 4 permissions
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_LIVE_MAP,
+    Permission.VIEW_REVENUE_ANALYTICS,
+    Permission.EXPORT_ANALYTICS,
+    Permission.VIEW_FRAUD_ALERTS,
+    Permission.MANAGE_FRAUD_ALERTS,
+    Permission.RESOLVE_FRAUD_ALERTS,
   ]),
 
   [AdminRole.COMPLIANCE_ADMIN]: new Set([
@@ -126,6 +145,11 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_PERFORMANCE_DASHBOARD,
     Permission.MODERATE_PROMOTIONS,
     Permission.MANAGE_RESTAURANT_PROFILES,
+    // Phase 4 permissions (Compliance can view alerts)
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_FRAUD_ALERTS,
+    Permission.MANAGE_FRAUD_ALERTS,
+    Permission.RESOLVE_FRAUD_ALERTS,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
@@ -159,6 +183,10 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_AUDIT_LOG,
     Permission.VIEW_EARNINGS_DASHBOARD,
     Permission.VIEW_ANALYTICS_DASHBOARD,
+    // Phase 4 permissions (Finance sees revenue analytics)
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_REVENUE_ANALYTICS,
+    Permission.EXPORT_ANALYTICS,
   ]),
 
   [AdminRole.READONLY_ADMIN]: new Set([
@@ -175,6 +203,10 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SUPPORT_CONVERSATIONS,
     Permission.VIEW_EARNINGS_DASHBOARD,
     Permission.VIEW_ANALYTICS_DASHBOARD,
+    // Phase 4 permissions (read-only view)
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_REVENUE_ANALYTICS,
+    Permission.VIEW_FRAUD_ALERTS,
   ]),
 };
 
