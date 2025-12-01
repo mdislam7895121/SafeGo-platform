@@ -25,11 +25,8 @@ export interface SOSAlertResult {
 
 export class SOSSafetyService {
   private static instance: SOSSafetyService;
-  private readonly encryptionKey: Buffer;
 
   constructor() {
-    const key = process.env.ENCRYPTION_KEY || 'default-32-char-encryption-key!!';
-    this.encryptionKey = Buffer.from(key.slice(0, 32).padEnd(32, '0'));
   }
 
   static getInstance(): SOSSafetyService {
