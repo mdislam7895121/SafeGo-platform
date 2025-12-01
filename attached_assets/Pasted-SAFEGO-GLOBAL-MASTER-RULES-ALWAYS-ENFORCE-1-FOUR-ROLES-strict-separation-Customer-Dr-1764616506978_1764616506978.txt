@@ -1,0 +1,66 @@
+SAFEGO GLOBAL MASTER RULES (ALWAYS ENFORCE)
+
+1. FOUR ROLES (strict separation)
+   - Customer
+   - Driver
+   - Restaurant
+   - Admin
+   Each must have independent dashboards, permissions, KYC, and onboarding.
+
+2. THREE SERVICES
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+   All new features must support all three unless explicitly irrelevant.
+
+3. COUNTRY-SPECIFIC KYC (BD vs US)
+   BD: father_name, DOB, present/permanent address, NID with images, emergency_contact, is_verified  
+   US: DOB, home_address, gov_id_type, gov_id_last4, (drivers: license+expiry, optional ssn_last4), emergency_contact, is_verified  
+   Never expose raw ID images/numbers to non-admin users.
+
+4. ADMIN AUTHORITY
+   Admin can:
+   - verify KYC (approve/reject, rejection_reason)
+   - block/unblock users
+   - manage pricing/commissions
+   - manage payouts/settlements
+   - view negative balances
+   No other role can override this.
+
+5. CORE COLLECTIONS (must NOT be renamed/removed)
+   - rides
+   - food_orders
+   - deliveries
+   Always include ID fields, addresses, payments, timestamps, rating, status flow.
+
+6. COMMISSION & WALLET RULES (NEVER alter)
+   Cash ride → driver keeps cash; platform commission = driver negative wallet  
+   Cash food → restaurant keeps cash; platform commission = restaurant negative wallet  
+   Online → platform receives full, partners paid net wallet  
+   Admin can settle balances manually.
+
+7. SECURITY RULES
+   - No cross-role access to private data
+   - No exposure of NID/SSN/license images
+   - Drivers cannot see customer sensitive data
+   - Restaurants cannot see other restaurants
+
+8. STATUS FLOWS (must remain intact)
+   Ride: requested → searching → accepted → arriving → in_progress → completed/cancelled  
+   Food: placed → accepted → preparing → pickup_ready → picked_up → on_the_way → delivered/cancelled  
+   Parcel: requested → searching → accepted → picked_up → on_the_way → delivered/cancelled
+
+9. ONBOARDING LOCK
+   Users cannot access core features until is_verified = true.
+
+10. NOTIFICATIONS
+   Every new event must integrate with:
+   - WebSockets
+   - FCM (driver + customer)
+   Additive only, never break existing channels.
+
+11. NON-BREAKING RULE
+   - Add tables, never remove.
+   - Add fields, never rename/delete.
+   - Add endpoints, never break old ones.
+   - Must remain backward compatible across all phases.
