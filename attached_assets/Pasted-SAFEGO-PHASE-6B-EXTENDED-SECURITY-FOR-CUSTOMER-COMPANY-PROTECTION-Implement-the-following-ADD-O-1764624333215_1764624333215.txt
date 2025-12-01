@@ -1,0 +1,106 @@
+SAFEGO PHASE 6B — EXTENDED SECURITY FOR CUSTOMER & COMPANY PROTECTION
+
+Implement the following ADD-ONLY security enhancements without breaking any existing behavior or modifying any Phase 1–6 schema or logic. Continue to enforce all SafeGo Master Rules.
+
+=====================================================
+A. CUSTOMER SECURITY ENHANCEMENTS
+=====================================================
+
+1. Phone Number Masking:
+   - Mask all customer and driver phone numbers in all UI views.
+   - Format: +8801******23 or +1-347-***-**45
+   - Only admin can see full numbers.
+
+2. Proxy Calling System:
+   - Add ProxyCallService to route all calls through virtual numbers.
+   - Ensure drivers never receive the customer’s real phone number.
+
+3. Enhanced SOS System:
+   - Add encrypted live GPS streaming during SOS.
+   - Add emergency escalation levels (L1, L2, L3).
+   - Add “High risk zone” auto-warning for customers.
+
+4. Route Deviation Detection:
+   - Extend FraudDetectionModule to detect suspicious detours.
+   - Trigger customer alert if deviation exceeds distance threshold.
+
+5. Device Binding:
+   - Add device_fingerprint and login_audit_logs table.
+   - Notify user for new-device logins.
+   - Block high-risk devices automatically.
+
+=====================================================
+B. COMPANY SECURITY ENHANCEMENTS
+=====================================================
+
+1. Admin Two-Factor Authentication:
+   - Add Admin2FAService with TOTP-based verification.
+   - Enable for all admin login flows.
+
+2. Admin IP Whitelist:
+   - Add middleware: AdminIPFilter
+   - Configurable list of allowed admin IP ranges for critical routes.
+
+3. Suspicious Admin Activity Detection:
+   - Add AdminRiskMonitor:
+       - detects unusual KYC access attempts,
+       - payout tampering,
+       - mass block/unblock activity,
+       - rapid pricing changes.
+
+4. Developer Access Control:
+   - Mark KYC and payout routes as “NO_DEV_ACCESS”.
+   - Enforce signed-access for production logs.
+
+5. Financial Audit Trails:
+   - Add payout_audit_logs table for admin financial actions:
+       - action_type, amount, before_balance, after_balance, admin_id, timestamp
+
+=====================================================
+C. PLATFORM HARDENING
+=====================================================
+
+1. Bot Protection:
+   - Add Invisible CAPTCHA on signup/login.
+   - Add bot-risk header validation.
+   - Block automated high-volume requests.
+
+2. API Abuse Firewall:
+   - Add APIFirewallService:
+       - IP reputation scoring
+       - Tor/VPN detection
+       - country mismatch detection
+       - velocity-based blocking
+
+3. Content Moderation:
+   - Add TextModerationService:
+       - profanity detection in chat
+       - menu item moderation for restaurants
+       - driver profile photo moderation (AI-based)
+
+4. Global Privacy Compliance Layer:
+   - Add DataPrivacyModule:
+       - data export
+       - data deletion
+       - consent tracking
+       - anonymization engine
+
+5. Breach Response Plan:
+   - Add BreachMonitor:
+       - detects suspicious DB activity
+       - triggers emergency admin alerts
+       - locks sensitive endpoints in emergency mode
+
+=====================================================
+D. NON-BREAKING GUARANTEES
+=====================================================
+
+- Add new tables only, never modify existing ones.
+- Add new services only.
+- Add new endpoints under /api/security/* and /api/admin/security/*.
+- No impact on ride, food, parcel flows.
+- No impact on payment or wallet semantics.
+- No changes to core status flows.
+- No sensitive KYC exposure to customers/drivers.
+
+END OF PHASE 6B PROMPT.

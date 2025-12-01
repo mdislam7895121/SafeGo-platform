@@ -257,6 +257,11 @@ model AdminProfile {
   adminLiveChatSessions        AdminLiveChatSession[] @relation("AdminLiveChatSessions") // Phase 12 Extension
   adminSupportCallbacks        AdminSupportCallback[] @relation("AdminSupportCallbacks") // Phase 12 Extension
 
+  // Phase 6B: Admin Security relations
+  totpSecret              AdminTotpSecret?      @relation("AdminTotpSecret")
+  activityAnomalies       AdminActivityAnomaly[] @relation("AdminAnomalies")
+  payoutAuditLogs         PayoutAuditLog[]      @relation("PayoutAuditLogs")
+
   @@index([countryCode])
   @@index([cityCode])
   @@map("admin_profiles")
@@ -868,6 +873,9 @@ model FoodOrder {
   earningsTransaction  EarningsTransaction? // R6: Earnings tracking
   kitchenTicket        KitchenTicket?    // Phase 3: Kitchen ticket for this order
 
+  // Phase 6B: Safety & Security relations
+  sosAlerts            SOSAlert[]        @relation("FoodOrderSOSAlerts")
+
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt])
   @@index([orderCode])
@@ -1385,6 +1393,10 @@ model Ride {
   paymentId               String?           // FK to payments table (for online payments)
   paymentStatus           String?           // mirrors payments.status for fast queries (paid, failed, pending)
 
+  // Phase 6B: Safety & Security relations
+  sosAlerts             SOSAlert[]          @relation("RideSOSAlerts")
+  routeMonitoring       RouteMonitoringSession? @relation("RideRouteMonitoring")
+
   @@index([countryCode])
   @@index([cityCode])
   @@index([isDemo])
@@ -1534,6 +1546,12 @@ model User {
   // Phase 2B: Device tokens and notification logs
   devices               UserDevice[]
   notificationLogs      NotificationLog[]
+
+  // Phase 6B: Security relations
+  sosAlerts             SOSAlert[]        @relation("UserSOSAlerts")
+  deviceBindings        DeviceBinding[]   @relation("UserDeviceBindings")
+  privacyRequests       PrivacyRequest[]  @relation("UserPrivacyRequests")
+  consents              UserConsent[]     @relation("UserConsents")
 
   @@index([isDemo])
   @@index([isAccountLocked])
@@ -6396,4 +6414,847 @@ model DeploymentCheck {
   @@index([passed])
   @@index([runAt])
   @@map("deployment_checks")
+}
+
+// =====================================================
+// PHASE 6B: EXTENDED SECURITY TABLES
+// Customer Security, Company Security, Platform Hardening
+// ADD-ONLY: No modifications to existing tables
+// =====================================================
+
+// =====================================================
+// A. CUSTOMER SECURITY TABLES
+// =====================================================
+
+// SOS Alert System - Enhanced emergency escalation
+enum SOSEscalationLevel {
+  L1_INITIAL        // Initial alert, notify safety team
+  L2_ESCALATED      // Escalated to supervisor, possible police contact
+  L3_EMERGENCY      // Full emergency, authorities contacted
+}
+
+enum SOSAlertStatus {
+  active            // SOS is active
+  escalated         // Escalated to higher level
+  resolved          // Resolved by customer/driver/support
+  false_alarm       // Marked as false alarm
+  cancelled         // Cancelled by customer
+}
+
+model SOSAlert {
+  id                    String                @id @default(uuid())
+  
+  userId                String
+  user                  User                  @relation("UserSOSAlerts", fields: [userId], references: [id])
+  
+  rideId                String?
+  ride                  Ride?                 @relation("RideSOSAlerts", fields: [rideId], references: [id])
+  
+  foodOrderId           String?
+  foodOrder             FoodOrder?            @relation("FoodOrderSOSAlerts", fields: [foodOrderId], references: [id])
+  
+  escalationLevel       SOSEscalationLevel    @default(L1_INITIAL)
+  status                SOSAlertStatus        @default(active)
+  
+  triggerLocation       Json                  // {lat, lng, accuracy, timestamp}
+  encryptedGpsStream    String?               // AES-256-GCM encrypted live GPS data
+  gpsStreamKey          String?               // Encrypted key for GPS stream decryption
+  
+  highRiskZone          Boolean               @default(false)
+  highRiskZoneId        String?
+  
+  triggerReason         String?               // "button_press", "voice_command", "auto_detected"
+  additionalInfo        String?
+  
+  respondedBy           String?               // Admin/support user who responded
+  responseNotes         String?
+  
+  resolvedAt            DateTime?
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  escalations           SOSEscalationEvent[]
+  
+  @@index([userId])
+  @@index([rideId])
+  @@index([status])
+  @@index([escalationLevel])
+  @@index([createdAt])
+  @@map("sos_alerts")
+}
+
+model SOSEscalationEvent {
+  id                    String                @id @default(uuid())
+  
+  sosAlertId            String
+  sosAlert              SOSAlert              @relation(fields: [sosAlertId], references: [id])
+  
+  fromLevel             SOSEscalationLevel
+  toLevel               SOSEscalationLevel
+  
+  escalatedBy           String?               // "system", "support_agent_id", "auto"
+  reason                String?
+  
+  notificationsSent     Json?                 // List of notifications sent during escalation
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([sosAlertId])
+  @@index([createdAt])
+  @@map("sos_escalation_events")
+}
+
+// High-Risk Zone Configuration
+model HighRiskZone {
+  id                    String                @id @default(uuid())
+  
+  name                  String
+  description           String?
+  
+  countryCode           String
+  cityCode              String?
+  
+  // GeoJSON polygon defining the zone
+  boundary              Json                  // GeoJSON Polygon
+  
+  riskLevel             Int                   @default(1) // 1-5 scale
+  warningMessage        String?
+  
+  isActive              Boolean               @default(true)
+  
+  createdBy             String
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@index([countryCode])
+  @@index([isActive])
+  @@map("high_risk_zones")
+}
+
+// Proxy Call System - Virtual number pool and sessions
+model ProxyNumberPool {
+  id                    String                @id @default(uuid())
+  
+  virtualNumber         String                @unique
+  provider              String                // "twilio", "nexmo", etc.
+  
+  countryCode           String
+  
+  status                String                @default("available") // "available", "in_use", "reserved", "disabled"
+  
+  lastUsedAt            DateTime?
+  usageCount            Int                   @default(0)
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  sessions              ProxyCallSession[]
+  
+  @@index([countryCode])
+  @@index([status])
+  @@map("proxy_number_pool")
+}
+
+model ProxyCallSession {
+  id                    String                @id @default(uuid())
+  
+  proxyNumberId         String
+  proxyNumber           ProxyNumberPool       @relation(fields: [proxyNumberId], references: [id])
+  
+  callerId              String                // User ID of caller
+  receiverId            String                // User ID of receiver
+  
+  rideId                String?
+  foodOrderId           String?
+  
+  // Real numbers are never exposed
+  callerMaskedNumber    String                // Masked display number for caller
+  receiverMaskedNumber  String                // Masked display number for receiver
+  
+  sessionType           String                @default("ride") // "ride", "food", "parcel"
+  
+  status                String                @default("active") // "active", "ended", "expired"
+  
+  startedAt             DateTime              @default(now())
+  expiresAt             DateTime
+  endedAt               DateTime?
+  
+  callCount             Int                   @default(0)
+  
+  @@index([callerId])
+  @@index([receiverId])
+  @@index([rideId])
+  @@index([status])
+  @@map("proxy_call_sessions")
+}
+
+// Route Deviation Detection
+model RouteMonitoringSession {
+  id                    String                @id @default(uuid())
+  
+  rideId                String                @unique
+  ride                  Ride                  @relation("RideRouteMonitoring", fields: [rideId], references: [id])
+  
+  driverId              String
+  customerId            String
+  
+  expectedRoute         Json                  // Array of expected route coordinates
+  expectedDistance      Decimal               @db.Decimal(10, 2) // In meters
+  
+  deviationThreshold    Decimal               @default(500) @db.Decimal(10, 2) // Meters before alert
+  
+  isMonitoring          Boolean               @default(true)
+  alertsSent            Int                   @default(0)
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  deviations            RouteDeviationEvent[]
+  
+  @@index([driverId])
+  @@index([isMonitoring])
+  @@map("route_monitoring_sessions")
+}
+
+model RouteDeviationEvent {
+  id                    String                @id @default(uuid())
+  
+  sessionId             String
+  session               RouteMonitoringSession @relation(fields: [sessionId], references: [id])
+  
+  deviationLocation     Json                  // {lat, lng}
+  deviationDistance     Decimal               @db.Decimal(10, 2) // Distance from expected route
+  
+  severity              String                @default("low") // "low", "medium", "high", "critical"
+  
+  alertSentToCustomer   Boolean               @default(false)
+  alertSentToSupport    Boolean               @default(false)
+  
+  driverExplanation     String?
+  resolved              Boolean               @default(false)
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([sessionId])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("route_deviation_events")
+}
+
+// Device Binding and Login Audit
+model DeviceBinding {
+  id                    String                @id @default(uuid())
+  
+  userId                String
+  user                  User                  @relation("UserDeviceBindings", fields: [userId], references: [id])
+  
+  deviceFingerprint     String
+  deviceName            String?
+  deviceModel           String?
+  osVersion             String?
+  appVersion            String?
+  
+  platform              DevicePlatform?
+  
+  ipAddress             String?
+  location              Json?                 // Approximate location from IP
+  
+  isTrusted             Boolean               @default(false)
+  isBlocked             Boolean               @default(false)
+  blockReason           String?
+  
+  riskScore             Int                   @default(0) // 0-100
+  
+  firstSeenAt           DateTime              @default(now())
+  lastSeenAt            DateTime              @default(now())
+  
+  loginEvents           DeviceLoginEvent[]
+  
+  @@unique([userId, deviceFingerprint])
+  @@index([userId])
+  @@index([deviceFingerprint])
+  @@index([isBlocked])
+  @@index([riskScore])
+  @@map("device_bindings")
+}
+
+model DeviceLoginEvent {
+  id                    String                @id @default(uuid())
+  
+  deviceBindingId       String
+  deviceBinding         DeviceBinding         @relation(fields: [deviceBindingId], references: [id])
+  
+  userId                String
+  
+  eventType             String                // "login_success", "login_failed", "logout", "session_refresh"
+  
+  ipAddress             String?
+  userAgent             String?
+  
+  isNewDevice           Boolean               @default(false)
+  notificationSent      Boolean               @default(false)
+  
+  riskFlags             Json?                 // Any risk indicators
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([deviceBindingId])
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("device_login_events")
+}
+
+// =====================================================
+// B. COMPANY SECURITY TABLES
+// =====================================================
+
+// Admin Two-Factor Authentication (TOTP)
+model AdminTotpSecret {
+  id                    String                @id @default(uuid())
+  
+  adminId               String                @unique
+  admin                 AdminProfile          @relation("AdminTotpSecret", fields: [adminId], references: [id])
+  
+  encryptedSecret       String                // AES-256-GCM encrypted TOTP secret
+  secretIv              String                // IV for decryption
+  
+  isEnabled             Boolean               @default(false)
+  
+  backupCodes           Json?                 // Encrypted backup codes
+  backupCodesUsed       Int                   @default(0)
+  
+  lastVerifiedAt        DateTime?
+  failedAttempts        Int                   @default(0)
+  lockedUntil           DateTime?
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@index([adminId])
+  @@map("admin_totp_secrets")
+}
+
+// Admin IP Whitelist
+model AdminIpWhitelist {
+  id                    String                @id @default(uuid())
+  
+  ipAddress             String?               // Single IP
+  ipRange               String?               // CIDR notation
+  
+  description           String?
+  
+  isActive              Boolean               @default(true)
+  
+  allowedRoles          Json?                 // Array of admin roles this applies to
+  
+  createdBy             String
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@index([ipAddress])
+  @@index([isActive])
+  @@map("admin_ip_whitelist")
+}
+
+// Admin Activity Anomaly Detection
+enum AdminAnomalyType {
+  unusual_kyc_access
+  payout_tampering
+  mass_block_unblock
+  rapid_pricing_changes
+  bulk_data_export
+  sensitive_config_change
+  unusual_login_pattern
+  privilege_escalation_attempt
+}
+
+enum AdminAnomalyStatus {
+  detected
+  investigating
+  confirmed_threat
+  false_positive
+  resolved
+}
+
+model AdminActivityAnomaly {
+  id                    String                @id @default(uuid())
+  
+  adminId               String
+  admin                 AdminProfile          @relation("AdminAnomalies", fields: [adminId], references: [id])
+  
+  anomalyType           AdminAnomalyType
+  status                AdminAnomalyStatus    @default(detected)
+  
+  severity              String                @default("medium") // "low", "medium", "high", "critical"
+  
+  description           String
+  details               Json?                 // Detailed anomaly data
+  
+  affectedResources     Json?                 // List of affected resources (users, payouts, etc.)
+  
+  detectedAt            DateTime              @default(now())
+  
+  investigatedBy        String?
+  investigationNotes    String?
+  resolvedAt            DateTime?
+  
+  @@index([adminId])
+  @@index([anomalyType])
+  @@index([status])
+  @@index([severity])
+  @@index([detectedAt])
+  @@map("admin_activity_anomalies")
+}
+
+// Developer Access Control - Protected Routes
+model DeveloperRoutePolicy {
+  id                    String                @id @default(uuid())
+  
+  routePattern          String                // e.g., "/api/admin/kyc/*", "/api/admin/payout/*"
+  
+  policyType            String                @default("NO_DEV_ACCESS") // "NO_DEV_ACCESS", "SIGNED_ACCESS", "AUDIT_REQUIRED"
+  
+  description           String?
+  
+  requiresSignedAccess  Boolean               @default(false)
+  requiresAuditLog      Boolean               @default(true)
+  
+  allowedEnvironments   Json?                 // ["production", "staging"]
+  
+  isActive              Boolean               @default(true)
+  
+  createdBy             String
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@index([routePattern])
+  @@index([policyType])
+  @@index([isActive])
+  @@map("developer_route_policies")
+}
+
+// Financial Audit Trails - Immutable Payout Logs
+model PayoutAuditLog {
+  id                    String                @id @default(uuid())
+  
+  adminId               String
+  admin                 AdminProfile          @relation("PayoutAuditLogs", fields: [adminId], references: [id])
+  
+  targetUserId          String
+  targetUserType        String                // "driver", "restaurant"
+  
+  actionType            String                // "payout_initiated", "payout_approved", "payout_cancelled", "balance_adjustment"
+  
+  amount                Decimal               @db.Decimal(12, 2)
+  currency              String                @default("USD")
+  
+  beforeBalance         Decimal               @db.Decimal(12, 2)
+  afterBalance          Decimal               @db.Decimal(12, 2)
+  
+  payoutMethod          String?
+  payoutReference       String?
+  
+  reason                String?
+  notes                 String?
+  
+  ipAddress             String?
+  deviceInfo            String?
+  
+  // Tamper-proof chain
+  previousLogId         String?
+  logHash               String                // SHA-256 hash of log content + previousLogId
+  
+  createdAt             DateTime              @default(now())
+  
+  // Immutable - no updatedAt, no soft delete
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([actionType])
+  @@index([createdAt])
+  @@map("payout_audit_logs")
+}
+
+// =====================================================
+// C. PLATFORM HARDENING TABLES
+// =====================================================
+
+// Bot Protection - Challenge Logs
+model BotChallengeLog {
+  id                    String                @id @default(uuid())
+  
+  ipAddress             String
+  userAgent             String?
+  
+  challengeType         String                @default("invisible_captcha") // "invisible_captcha", "recaptcha_v3", "hcaptcha"
+  
+  endpoint              String                // The endpoint being protected
+  
+  challengeToken        String?
+  score                 Decimal?              @db.Decimal(3, 2) // 0.00 - 1.00
+  
+  passed                Boolean
+  failureReason         String?
+  
+  riskSignals           Json?                 // Additional risk indicators
+  
+  userId                String?               // If user was identified
+  sessionId             String?
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([ipAddress])
+  @@index([passed])
+  @@index([endpoint])
+  @@index([createdAt])
+  @@map("bot_challenge_logs")
+}
+
+// API Abuse Firewall
+model ApiThreatSignal {
+  id                    String                @id @default(uuid())
+  
+  ipAddress             String
+  
+  signalType            String                // "tor_exit", "vpn", "proxy", "datacenter", "bad_reputation"
+  
+  reputationScore       Int?                  // 0-100, lower is worse
+  
+  countryCode           String?
+  asnInfo               String?               // Autonomous System Number info
+  
+  isTor                 Boolean               @default(false)
+  isVpn                 Boolean               @default(false)
+  isProxy               Boolean               @default(false)
+  isDatacenter          Boolean               @default(false)
+  
+  threatCategories      Json?                 // Array of threat categories
+  
+  source                String?               // Data source (e.g., "ipqualityscore", "maxmind")
+  
+  validUntil            DateTime              // Cache expiry
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@unique([ipAddress])
+  @@index([signalType])
+  @@index([reputationScore])
+  @@index([validUntil])
+  @@map("api_threat_signals")
+}
+
+model ApiFirewallEvent {
+  id                    String                @id @default(uuid())
+  
+  ipAddress             String
+  
+  eventType             String                // "blocked", "rate_limited", "suspicious", "country_mismatch"
+  
+  endpoint              String
+  method                String                // HTTP method
+  
+  userId                String?
+  sessionId             String?
+  
+  blockReason           String?
+  riskScore             Int?                  // Calculated risk score
+  
+  requestHeaders        Json?                 // Relevant headers (sanitized)
+  
+  actionTaken           String                @default("logged") // "logged", "blocked", "captcha_required", "rate_limited"
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([ipAddress])
+  @@index([eventType])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("api_firewall_events")
+}
+
+// Content Moderation
+enum ModerationStatus {
+  pending
+  approved
+  rejected
+  flagged
+  escalated
+}
+
+enum ModerationType {
+  text_profanity
+  text_spam
+  text_harassment
+  image_inappropriate
+  image_identity_mismatch
+  menu_item_violation
+  profile_violation
+}
+
+model ModerationFlag {
+  id                    String                @id @default(uuid())
+  
+  contentType           String                // "chat_message", "menu_item", "driver_photo", "review"
+  contentId             String
+  contentText           String?
+  contentUrl            String?
+  
+  moderationType        ModerationType
+  status                ModerationStatus      @default(pending)
+  
+  autoDetected          Boolean               @default(true)
+  detectionConfidence   Decimal?              @db.Decimal(3, 2)
+  
+  detectedIssues        Json?                 // Array of detected issues
+  
+  reportedBy            String?               // User ID if user-reported
+  
+  reviewedBy            String?               // Admin who reviewed
+  reviewNotes           String?
+  reviewedAt            DateTime?
+  
+  actionTaken           String?               // "removed", "warned", "banned", "none"
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@index([contentType, contentId])
+  @@index([status])
+  @@index([moderationType])
+  @@index([createdAt])
+  @@map("moderation_flags")
+}
+
+// Global Privacy Compliance
+enum PrivacyRequestType {
+  data_export           // GDPR Article 20 - Data portability
+  data_deletion         // GDPR Article 17 - Right to erasure
+  data_access           // GDPR Article 15 - Right of access
+  consent_withdrawal    // Withdraw consent
+  rectification         // GDPR Article 16 - Right to rectification
+}
+
+enum PrivacyRequestStatus {
+  submitted
+  in_progress
+  pending_verification
+  completed
+  rejected
+  cancelled
+}
+
+model PrivacyRequest {
+  id                    String                @id @default(uuid())
+  
+  userId                String
+  user                  User                  @relation("UserPrivacyRequests", fields: [userId], references: [id])
+  
+  requestType           PrivacyRequestType
+  status                PrivacyRequestStatus  @default(submitted)
+  
+  requestDetails        String?
+  
+  verificationMethod    String?               // "email", "sms", "support_call"
+  verifiedAt            DateTime?
+  
+  exportFileUrl         String?               // For data export requests
+  exportFileExpiry      DateTime?
+  
+  processedBy           String?               // Admin who processed
+  processingNotes       String?
+  
+  completedAt           DateTime?
+  rejectionReason       String?
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@index([userId])
+  @@index([requestType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("privacy_requests")
+}
+
+model ConsentVersion {
+  id                    String                @id @default(uuid())
+  
+  consentType           String                // "privacy_policy", "terms_of_service", "marketing", "data_sharing"
+  
+  version               String
+  title                 String
+  contentHash           String                // Hash of consent document
+  
+  effectiveDate         DateTime
+  
+  isCurrentVersion      Boolean               @default(false)
+  
+  createdAt             DateTime              @default(now())
+  
+  userConsents          UserConsent[]
+  
+  @@unique([consentType, version])
+  @@index([consentType])
+  @@index([isCurrentVersion])
+  @@map("consent_versions")
+}
+
+model UserConsent {
+  id                    String                @id @default(uuid())
+  
+  userId                String
+  user                  User                  @relation("UserConsents", fields: [userId], references: [id])
+  
+  consentVersionId      String
+  consentVersion        ConsentVersion        @relation(fields: [consentVersionId], references: [id])
+  
+  granted               Boolean
+  
+  ipAddress             String?
+  userAgent             String?
+  
+  grantedAt             DateTime              @default(now())
+  withdrawnAt           DateTime?
+  
+  @@unique([userId, consentVersionId])
+  @@index([userId])
+  @@index([consentVersionId])
+  @@map("user_consents")
+}
+
+model AnonymizationJob {
+  id                    String                @id @default(uuid())
+  
+  userId                String
+  
+  status                String                @default("pending") // "pending", "processing", "completed", "failed"
+  
+  dataCategories        Json                  // Categories of data to anonymize
+  
+  anonymizationRules    Json?                 // Rules applied
+  
+  recordsProcessed      Int                   @default(0)
+  recordsAnonymized     Int                   @default(0)
+  
+  startedAt             DateTime?
+  completedAt           DateTime?
+  
+  errorMessage          String?
+  
+  triggeredBy           String                // "user_request", "retention_policy", "admin"
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("anonymization_jobs")
+}
+
+// Breach Response System
+enum BreachSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+enum BreachStatus {
+  detected
+  investigating
+  contained
+  remediated
+  closed
+}
+
+model BreachIncident {
+  id                    String                @id @default(uuid())
+  
+  title                 String
+  description           String
+  
+  severity              BreachSeverity        @default(medium)
+  status                BreachStatus          @default(detected)
+  
+  detectionMethod       String                // "automated", "user_report", "audit", "external"
+  
+  affectedSystems       Json?                 // Array of affected systems/tables
+  affectedUserCount     Int?
+  
+  indicators            Json?                 // Indicators of compromise
+  
+  containmentActions    Json?                 // Actions taken to contain
+  
+  notifiedAuthorities   Boolean               @default(false)
+  notifiedUsers         Boolean               @default(false)
+  
+  leadInvestigator      String?
+  
+  detectedAt            DateTime              @default(now())
+  containedAt           DateTime?
+  remediatedAt          DateTime?
+  closedAt              DateTime?
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  actions               BreachAction[]
+  lockdowns             EndpointLockdown[]
+  
+  @@index([severity])
+  @@index([status])
+  @@index([detectedAt])
+  @@map("breach_incidents")
+}
+
+model BreachAction {
+  id                    String                @id @default(uuid())
+  
+  incidentId            String
+  incident              BreachIncident        @relation(fields: [incidentId], references: [id])
+  
+  actionType            String                // "investigate", "contain", "notify", "remediate", "document"
+  
+  description           String
+  
+  performedBy           String
+  
+  outcome               String?
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([incidentId])
+  @@index([actionType])
+  @@map("breach_actions")
+}
+
+model EndpointLockdown {
+  id                    String                @id @default(uuid())
+  
+  incidentId            String?
+  incident              BreachIncident?       @relation(fields: [incidentId], references: [id])
+  
+  endpointPattern       String                // Route pattern to lock
+  
+  lockdownType          String                @default("full") // "full", "read_only", "admin_only"
+  
+  reason                String
+  
+  isActive              Boolean               @default(true)
+  
+  activatedBy           String
+  activatedAt           DateTime              @default(now())
+  
+  deactivatedBy         String?
+  deactivatedAt         DateTime?
+  
+  @@index([endpointPattern])
+  @@index([isActive])
+  @@map("endpoint_lockdowns")
 }
