@@ -40,7 +40,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, uploadWithAuth } from "@/lib/queryClient";
 
 interface DocumentInfo {
   id: string;
@@ -831,18 +831,7 @@ export default function DriverDocuments() {
         formData.append("expiresAt", expiresAt);
       }
       
-      const response = await fetch(`/api/driver/documents/upload/${docType}`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || "Upload failed");
-      }
-      
-      return response.json();
+      return uploadWithAuth(`/api/driver/documents/upload/${docType}`, formData);
     },
     onSuccess: () => {
       toast({

@@ -9,7 +9,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, uploadWithAuth } from "@/lib/queryClient";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 export default function ManageAccount() {
@@ -184,42 +184,9 @@ export default function ManageAccount() {
       const formData = new FormData();
       formData.append("file", file);
       
-      const token = localStorage.getItem("safego_token");
-      const headers: any = {};
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
-      
-      let res: Response;
-      try {
-        res = await fetch("/api/driver/upload/profile-photo", {
-          method: "POST",
-          body: formData,
-          headers,
-          credentials: "include",
-        });
-      } catch (networkError) {
-        throw new Error("Network error. Please check your connection and try again.");
-      }
-
-      if (!res) {
-        throw new Error("No response from server. Please try again.");
-      }
-
-      if (!res.ok) {
-        let errorMessage = "Failed to upload photo";
-        try {
-          const errorData = await res.json();
-          errorMessage = errorData.error || errorData.message || errorMessage;
-        } catch {
-          errorMessage = await res.text() || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || data.message || "Upload failed");
+      const data = await uploadWithAuth("/api/driver/upload/profile-photo", formData);
+      if (!data?.success) {
+        throw new Error(data?.error || data?.message || "Upload failed");
       }
       
       return data;

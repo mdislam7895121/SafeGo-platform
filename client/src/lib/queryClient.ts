@@ -135,6 +135,49 @@ export async function apiRequest(
   return await res.json();
 }
 
+/**
+ * Upload a file with proper authentication and token refresh handling.
+ * This should be used for all file uploads to prevent "Access token required" errors
+ * during long uploads or when tokens expire mid-upload.
+ * 
+ * @param url - The upload endpoint URL
+ * @param formData - FormData containing the file and any additional fields
+ * @returns The parsed JSON response
+ */
+export async function uploadWithAuth(url: string, formData: FormData): Promise<any> {
+  // Proactively refresh token if we're close to expiry (within 2 minutes)
+  // This prevents token expiration during long file uploads
+  const token = localStorage.getItem("safego_token");
+  if (token) {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const expiresIn = payload.exp * 1000 - Date.now();
+      // If token expires within 2 minutes, refresh it first
+      if (expiresIn < 120000) {
+        await refreshAccessToken();
+      }
+    } catch (e) {
+      // Invalid token format, proceed anyway - the request will fail and trigger refresh
+    }
+  }
+
+  // Now perform the upload with authentication
+  const res = await fetchWithAuth(url, {
+    method: "POST",
+    body: formData,
+    // Don't set Content-Type - browser will set it with boundary for FormData
+  });
+
+  await throwIfResNotOk(res);
+  
+  const contentType = res.headers.get("content-type");
+  if (!contentType || !contentType.includes("application/json")) {
+    return null;
+  }
+  
+  return await res.json();
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
