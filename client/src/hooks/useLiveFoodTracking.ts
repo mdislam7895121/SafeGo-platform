@@ -17,6 +17,7 @@ export interface DriverInfo {
   lastName: string | null;
   rating: number | null;
   photoUrl: string | null;
+  phone: string | null;
   vehicle: {
     make: string;
     model: string;
