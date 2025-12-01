@@ -547,7 +547,7 @@ export default function DriverMapPage() {
         )}
 
         {/* Right side control buttons - Safety and Recenter */}
-        <div className="fixed right-6 bottom-[120px] z-[1000] flex flex-col gap-2">
+        <div className="fixed right-6 bottom-[180px] z-[1000] flex flex-col gap-2">
           <Sheet open={showSosSheet} onOpenChange={setShowSosSheet}>
             <SheetTrigger asChild>
               <Button
@@ -631,13 +631,13 @@ export default function DriverMapPage() {
           </div>
         )}
 
-        {/* Floating footer buttons - positioned inside map container */}
+        {/* Floating footer buttons - fixed positioning for proper overlay */}
         <Sheet open={showServiceSheet} onOpenChange={setShowServiceSheet}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
               size="icon"
-              className="absolute bottom-6 left-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              className="fixed bottom-6 left-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[1000]"
               data-testid="button-service-select"
             >
               <Grid3X3 className="h-5 w-5" />
@@ -713,7 +713,7 @@ export default function DriverMapPage() {
             <Button
               variant="outline"
               size="icon"
-              className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              className="fixed bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[1000]"
               data-testid="button-quick-actions"
             >
               <Menu className="h-5 w-5" />
@@ -808,7 +808,7 @@ export default function DriverMapPage() {
             toggleOnlineStatus();
           }}
           disabled={isUpdatingStatus}
-          className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
             isUpdatingStatus ? "opacity-70 cursor-wait" : ""
           } ${!isVerified || !hasVehicle ? "opacity-50 cursor-not-allowed" : ""} ${isOnline 
             ? "bg-[#FF3B30] hover:bg-[#E63529] active:bg-[#CC2F26]" 
