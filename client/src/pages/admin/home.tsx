@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StatCard, ManagementCard } from "@/components/ui/stat-card";
+import { SectionHeader } from "@/components/ui/section-header";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
@@ -395,7 +396,12 @@ export default function AdminHome() {
       <div className="p-6 space-y-6">
         {/* Quick Stats */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">Platform Overview</h2>
+          <SectionHeader 
+            title="Platform Overview" 
+            icon={LayoutGrid}
+            iconColor="text-blue-600"
+            testId="section-platform-overview"
+          />
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Link href="/admin/users">
               <StatCard
@@ -461,7 +467,12 @@ export default function AdminHome() {
 
         {/* Driver Stats */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">Driver Statistics</h2>
+          <SectionHeader 
+            title="Driver Statistics" 
+            icon={Car}
+            iconColor="text-purple-600"
+            testId="section-driver-statistics"
+          />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link href="/admin/kyc">
               <StatCard
@@ -515,7 +526,12 @@ export default function AdminHome() {
 
         {/* Parcel Statistics */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">Parcel Delivery Statistics</h2>
+          <SectionHeader 
+            title="Parcel Delivery Statistics" 
+            icon={Truck}
+            iconColor="text-indigo-600"
+            testId="section-parcel-statistics"
+          />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link href="/admin/parcels">
               <StatCard
@@ -569,7 +585,13 @@ export default function AdminHome() {
 
         {/* Admin Sections */}
         <div>
-          <h2 className="text-lg font-semibold mb-4">Management</h2>
+          <SectionHeader 
+            title="Management" 
+            icon={Cog}
+            iconColor="text-slate-600"
+            description="Quick access to all admin tools and settings"
+            testId="section-management"
+          />
           
           {/* Error Banner for Capabilities Fetch Failure */}
           {hasCapabilitiesError && (
