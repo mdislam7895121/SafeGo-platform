@@ -29,6 +29,10 @@ import {
   Minus,
   Menu,
   Bell,
+  Bike,
+  Check,
+  Wallet,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -146,6 +150,16 @@ export default function DriverMapPage() {
   const [autoFollowEnabled, setAutoFollowEnabled] = useState(true);
   const [showSosSheet, setShowSosSheet] = useState(false);
   const [incomingRequest, setIncomingRequest] = useState<TripRequest | null>(null);
+  const [showVehicleSheet, setShowVehicleSheet] = useState(false);
+  const [showQuickActionsSheet, setShowQuickActionsSheet] = useState(false);
+  const [selectedVehicle, setSelectedVehicle] = useState<string>("car");
+
+  const vehicleTypes = [
+    { id: "car", name: "Car", icon: Car },
+    { id: "bike", name: "Bike", icon: Bike },
+    { id: "cng", name: "CNG", icon: Car },
+    { id: "scooter", name: "Scooter", icon: Bike },
+  ];
 
   const {
     isOnline,
@@ -409,45 +423,31 @@ export default function DriverMapPage() {
           data-testid="driver-status-card"
         >
           <Card className="shadow-lg bg-background/95 backdrop-blur-sm border-2 border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex-shrink-0">
-                    <GpsSignalIcon strength={gpsStatus.signalStrength} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 
-                        className="font-semibold text-base truncate"
-                        data-testid="text-driver-status"
-                      >
-                        {isOnline ? "You're Online" : "You're Offline"}
-                      </h3>
-                      {isOnline && (
-                        <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {isOnline 
-                        ? activeTrip 
-                          ? "Trip in progress" 
-                          : "Waiting for trip requests..."
-                        : "Go online to start getting trips"
-                      }
-                    </p>
-                  </div>
+            <CardContent className="p-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0">
+                  <GpsSignalIcon strength={gpsStatus.signalStrength} />
                 </div>
-                
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {isVerified && hasVehicle && (
-                    <Switch
-                      checked={isOnline}
-                      onCheckedChange={toggleOnlineStatus}
-                      disabled={isUpdatingStatus}
-                      className={`${isOnline ? "data-[state=checked]:bg-green-500" : ""}`}
-                      data-testid="switch-online-status"
-                    />
-                  )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 
+                      className="font-semibold text-sm truncate"
+                      data-testid="text-driver-status"
+                    >
+                      {isOnline ? "You're Online" : "You're Offline"}
+                    </h3>
+                    {isOnline && (
+                      <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {isOnline 
+                      ? activeTrip 
+                        ? "Trip in progress" 
+                        : "Waiting for trip requests..."
+                      : "Go online to start getting trips"
+                    }
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -796,6 +796,153 @@ export default function DriverMapPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div 
+        className="fixed bottom-0 left-0 right-0 z-[1002] h-20 md:h-[90px] bg-white dark:bg-zinc-900 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] flex items-center justify-between px-4"
+        data-testid="driver-footer-bar"
+      >
+        <Sheet open={showVehicleSheet} onOpenChange={setShowVehicleSheet}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-12 w-12 rounded-full border-2"
+              data-testid="button-vehicle-select"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle>Select Vehicle</SheetTitle>
+            </SheetHeader>
+            <div className="py-6 space-y-2">
+              {vehicleTypes.map((vehicle) => {
+                const VehicleIcon = vehicle.icon;
+                const isSelected = selectedVehicle === vehicle.id;
+                return (
+                  <button
+                    key={vehicle.id}
+                    onClick={() => {
+                      setSelectedVehicle(vehicle.id);
+                      setShowVehicleSheet(false);
+                      toast({ title: `${vehicle.name} selected` });
+                    }}
+                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-colors ${
+                      isSelected 
+                        ? "border-primary bg-primary/5" 
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    data-testid={`vehicle-option-${vehicle.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <VehicleIcon className="h-6 w-6" />
+                      <span className="font-medium">{vehicle.name}</span>
+                    </div>
+                    {isSelected && (
+                      <Check className="h-5 w-5 text-primary" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <button
+          onClick={async () => {
+            if (isVerified && hasVehicle) {
+              const wasOnline = isOnline;
+              await toggleOnlineStatus();
+              toast({ 
+                title: wasOnline ? "You're now offline" : "You're now online",
+                description: wasOnline ? "You won't receive new trip requests" : "Ready to receive trip requests"
+              });
+            }
+          }}
+          disabled={isUpdatingStatus || !isVerified || !hasVehicle}
+          className={`flex items-center gap-2 h-14 md:h-[60px] px-6 rounded-full shadow-md transition-all ${
+            isUpdatingStatus ? "opacity-70" : ""
+          } bg-black text-white`}
+          data-testid="button-online-toggle"
+        >
+          <Power 
+            className={`h-5 w-5 ${isOnline ? "text-red-500" : "text-green-500"}`} 
+          />
+          <span className="font-semibold text-base whitespace-nowrap">
+            {isUpdatingStatus 
+              ? "Updating..." 
+              : isOnline 
+                ? "Go Offline" 
+                : "Go Online"
+            }
+          </span>
+        </button>
+
+        <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-12 w-12 rounded-full border-2"
+              data-testid="button-quick-actions"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-2xl">
+            <SheetHeader>
+              <SheetTitle>Quick Actions</SheetTitle>
+            </SheetHeader>
+            <div className="py-6 space-y-2">
+              <button
+                onClick={() => {
+                  setLocation("/driver/earnings");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-earnings"
+              >
+                <DollarSign className="h-5 w-5" />
+                <span className="font-medium">Earnings</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/trips");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-history"
+              >
+                <History className="h-5 w-5" />
+                <span className="font-medium">Trip History</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/wallet");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-wallet"
+              >
+                <Wallet className="h-5 w-5" />
+                <span className="font-medium">Wallet</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/settings");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-settings"
+              >
+                <Settings className="h-5 w-5" />
+                <span className="font-medium">Settings</span>
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
 
       {incomingRequest && (
         <IncomingTripRequest

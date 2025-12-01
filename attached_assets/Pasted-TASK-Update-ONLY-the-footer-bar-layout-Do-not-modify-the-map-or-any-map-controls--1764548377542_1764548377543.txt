@@ -1,0 +1,120 @@
+TASK: Update ONLY the footer bar layout. Do not modify the map or any map controls.
+
+========================
+FOOTER BAR — FINAL REQUIRED LAYOUT
+========================
+Footer must have 3 sections:
+
+LEFT SECTION:
+- A vehicle selection drawer button
+- Style: white circular or outlined icon similar to a hamburger (drawer icon)
+- Tap opens “Select Vehicle” bottom sheet
+- Vehicle list: car, bike, CNG, scooter (demo list)
+- Selected vehicle stored in driver_profile.selected_vehicle
+
+CENTER SECTION:
+- The black pill Online/Offline button
+- EXACT style from reference:
+    • Black pill
+    • Left: power icon (green when offline, red when online)
+    • Text: “Go Online” or “Go Offline”
+    • Size: 55–60px height
+    • Shadow soft
+    • Must stay centered in the footer bar
+
+RIGHT SECTION:
+- Three hyphen icon ( ≡ )
+- Thin-stroke icon
+- Tap opens quick actions drawer:
+    • Earnings
+    • Trip history
+    • Wallet
+    • Settings
+
+========================
+FOOTER BAR STYLE
+========================
+- Height: 80px (mobile), 90px (desktop)
+- Background: white (#FFFFFF)
+- Top shadow: soft 12–14px blur
+- Items aligned vertically center
+- Left, center, right sections spaced exactly as described
+- Map stays untouched above the bar
+
+========================
+BUTTON LOGIC (MANDATORY)
+========================
+Offline state:
+- Show green power icon + “Go Online”
+- On tap → driver_online_status = "online"
+
+Online state:
+- Show red power icon + “Go Offline”
+- On tap → driver_online_status = "offline"
+
+Toast notifications:
+- “You’re now online”
+- “You’re now offline”
+
+========================
+DRIVER STATUS FLOW (MUST KEEP SAFEGO RULES)
+========================
+offline → online → searching_driver → accepted → driver_arriving → in_progress → completed  
+All cancellation states must remain.
+
+========================
+SAFEGO COLLECTIONS (NO CHANGE)
+========================
+Integrate with:
+- rides
+- food_orders
+- deliveries  
+All fields unchanged.
+
+========================
+COMMISSION RULES (NO CHANGE)
+========================
+CASH:
+- Driver receives all cash
+- Commission added as negative driver_wallet_balance
+
+ONLINE:
+- SafeGo keeps commission instantly
+
+Admin:
+- Can settle and mark paid
+- Can block/unblock drivers
+
+========================
+COUNTRY-SPECIFIC DRIVER KYC (MUST KEEP)
+========================
+Block driver from entering this screen unless verified.
+
+BD DRIVER KYC:
+- father_name, date_of_birth
+- present_address, permanent_address
+- NID + front/back
+- emergency_contact
+- is_verified
+
+US DRIVER KYC:
+- date_of_birth, home_address
+- government_id_type + last4
+- driver_license + expiry
+- ssn_last4 optional
+- emergency_contact
+- is_verified
+
+========================
+SECURITY RULES (UNCHANGED)
+========================
+- Customer documents hidden
+- Driver documents hidden from customers
+- Only admin can modify fees/commission/blocking
+- Users can update only their own profile
+
+========================
+NO QUESTIONS
+========================
+Implement this footer exactly as described in one build.
+Do not modify the map UI or its controls.
