@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -38,6 +38,7 @@ import {
   Square,
   User,
 } from "lucide-react";
+import { useDispatchWebSocket, type RideOffer } from "@/hooks/useDispatchWebSocket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -313,6 +314,9 @@ export default function DriverMapPage() {
   const [demoPhase, setDemoPhase] = useState<"idle" | "ride_request" | "ride_active" | "ride_complete" | "food_request" | "food_active" | "food_complete" | "finished">("idle");
   const [demoIsOnline, setDemoIsOnline] = useState(false);
 
+  // Get auth token for WebSocket connection
+  const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
   // Fetch service preferences from API
   const { data: preferencesData, isLoading: isLoadingPrefs } = useQuery<{
     preferences: ServicePreferences;
@@ -428,6 +432,58 @@ export default function DriverMapPage() {
     gpsStatus,
     profile,
   } = useDriverAvailability();
+
+  // Dispatch WebSocket for real-time ride offers
+  const dispatchWebSocket = useDispatchWebSocket({
+    token: authToken || '',
+    onRideOffer: useCallback((offer: RideOffer) => {
+      if (incomingRequest) return;
+      
+      const tripRequest: TripRequest = {
+        id: offer.sessionId,
+        serviceType: offer.serviceType === 'ride' ? 'RIDE' : 'FOOD',
+        customerName: `${offer.customer.firstName} ${offer.customer.lastName}`,
+        customerRating: 4.5,
+        pickupAddress: offer.pickup.address,
+        pickupLat: offer.pickup.lat,
+        pickupLng: offer.pickup.lng,
+        dropoffAddress: offer.dropoff.address,
+        dropoffLat: offer.dropoff.lat,
+        dropoffLng: offer.dropoff.lng,
+        estimatedFare: 0,
+        distanceToPickup: 0,
+        etaMinutes: 0,
+        surgeMultiplier: null,
+        boostAmount: null,
+        requestedAt: new Date().toISOString(),
+        expiresAt: offer.expiresAt,
+      };
+      setIncomingRequest(tripRequest);
+      triggerHapticFeedback("heavy");
+      toast({ title: "New ride offer", description: `Pickup at ${offer.pickup.address}` });
+    }, [incomingRequest, toast]),
+    onOfferCancelled: useCallback(() => {
+      setIncomingRequest(null);
+      toast({ title: "Offer cancelled", description: "The ride was assigned to another driver" });
+    }, [toast]),
+    onError: useCallback((error: string) => {
+      console.error('Dispatch WebSocket error:', error);
+    }, []),
+  });
+
+  // Sync driver location to dispatch WebSocket when online
+  useEffect(() => {
+    if (!dispatchWebSocket.isConnected) return;
+    
+    if (isOnline && driverLocation && profile?.countryCode) {
+      dispatchWebSocket.updateLocation(
+        driverLocation.lat,
+        driverLocation.lng,
+        profile.countryCode,
+        profile.cityCode
+      );
+    }
+  }, [dispatchWebSocket.isConnected, isOnline, driverLocation?.lat, driverLocation?.lng, profile?.countryCode, profile?.cityCode, dispatchWebSocket.updateLocation]);
 
   // Get driver's country and filter services accordingly
   const driverCountry = (profile?.countryCode as CountryCode) || "US";
