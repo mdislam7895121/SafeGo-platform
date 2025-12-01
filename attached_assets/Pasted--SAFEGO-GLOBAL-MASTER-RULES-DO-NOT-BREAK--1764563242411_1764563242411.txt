@@ -1,0 +1,264 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK)
+====================================
+
+ROLES (4 roles, never mixed)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+SERVICES (always supported)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+KYC – BANGLADESH (BD)
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified (boolean)
+
+KYC – UNITED STATES (US)
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (drivers)
+- driver_license_image_url
+- driver_license_expiry
+- ssn_last4 (optional, drivers)
+- verification_status
+- is_verified (boolean)
+
+ONBOARDING (all roles)
+- Multi-step: basic info → address → ID/KYC upload (BD/US rules) → emergency contact
+- After onboarding: verification_status="pending"
+- Block rides/food/parcel until admin sets verification_status="approved".
+
+ADMIN PANEL (must keep)
+- Verify customers/drivers/restaurants (approve/reject + rejection_reason)
+- Block/unblock any user/restaurant
+- Configure pricing, fees, commissions
+- Manage payouts; view & settle driver negative balance and restaurant negative balance
+
+COLLECTIONS (NO BREAKING CHANGES)
+
+1) rides
+   - customer_id, driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng, dropoff_lat, dropoff_lng
+   - service_type
+   - fare_amount, tax_amount
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status: requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback, timestamps
+
+2) food_orders
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address (+geo), delivery_address (+geo)
+   - items, subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount, restaurant_payout_amount
+   - payment_method
+   - status: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback, timestamps
+
+3) deliveries
+   - customer_id, driver_id
+   - pickup_address (+geo), dropoff_address (+geo)
+   - package_description, package_size
+   - delivery_fee
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status: requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback, timestamps
+
+COMMISSION RULES
+- Cash ride: driver keeps full cash; commission → negative driver_wallet_balance; weekly settlement; admin marks paid.
+- Cash food: restaurant keeps cash; commission → negative restaurant_wallet_balance.
+- Online: SafeGo keeps commission automatically; payouts are net.
+- Admin can settle balances and mark paid.
+
+SECURITY
+- Customers cannot view driver documents.
+- Drivers cannot view customer KYC/sensitive info.
+- Restaurants cannot view other restaurants.
+- Only admin can change pricing, commissions, verification, blocking.
+- Users can update only their own profile.
+
+STATUS FLOWS
+- Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+NOTIFICATIONS
+- Trip/order alerts, status updates, verification events, payouts, admin announcements.
+
+MAP ENGINE
+- Do NOT change the tile provider or routing engine.
+- Do NOT show a full-screen black “Loading” on /driver/map.
+
+====================================================
+TASK: DRIVER MAP SHOULD CENTER ON CURRENT LOCATION (UBER-STYLE)
+====================================================
+
+Screen: `/driver/map` (driver app)
+
+Goal:
+- When the driver opens the map, it should behave like the Uber driver app:
+  - Show the driver’s **current GPS location** with an arrow icon in the center.
+  - Zoom to a **street/block-level zoom** (similar to the screenshot, not full city zoom).
+  - Follow the driver position smoothly as it changes.
+  - No big “Loading…” overlay; only the map and small indicators.
+
+We are only changing the **driver map location engine and UI**, nothing else.
+
+------------------------------------------------
+1) Driver location model (backend – additive only)
+------------------------------------------------
+Use existing driver location fields if present (e.g. `current_lat`, `current_lng`, `last_seen_at`).
+If no such fields exist, ADD (do not rename any existing):
+
+- `current_lat` (number, nullable)
+- `current_lng` (number, nullable)
+- `last_location_at` (timestamp)
+
+These fields are for DRIVER only and used by:
+- live map centering
+- matching engine (already existing proximity logic)
+
+Do not modify any ride/food/delivery schema.
+
+------------------------------------------------
+2) Frontend: initial map centering on /driver/map
+------------------------------------------------
+When `/driver/map` loads:
+
+Step 1 – Try to use recent backend location:
+- Call an existing driver profile/location endpoint.
+- If `current_lat` and `current_lng` exist and are not stale
+  (e.g. `last_location_at` < 5 minutes ago), use that as the initial center.
+- Otherwise, fall back to browser/device geolocation.
+
+Step 2 – Use HTML5 Geolocation as fallback (or primary on mobile):
+- Call `navigator.geolocation.getCurrentPosition(...)` once on load.
+- If permission granted:
+  - Center the map on that location.
+  - Set zoom level to a **street/block** value:
+    - For example: zoom 17 (or equivalent in your map library).
+- If permission denied or fails:
+  - Keep the previous known backend location if available.
+  - Otherwise fall back to a default city-level zoom (but only as a last resort).
+  - Show a small toast: “Location permission is needed to show your exact position.”
+
+Important:
+- Do NOT reload the entire page.
+- Do NOT show a full-screen black overlay with “Loading”.
+- While the location is being fetched, keep showing the map and previous view.
+
+------------------------------------------------
+3) Continuous tracking (follow mode)
+------------------------------------------------
+Enable continuous tracking similar to Uber:
+
+- Use `navigator.geolocation.watchPosition(...)` (or equivalent native hook) while the driver is on `/driver/map`.
+- On each new position:
+  - Update the driver marker position.
+  - If the user has NOT manually moved the map recently (no pan/zoom event within the last N seconds, e.g. 10s), automatically recenter the map on the new location.
+  - If the user drags the map away, **pause auto-centering** until they tap the recenter/arrow button.
+
+- Throttle/limit updates:
+  - At most 1 update per 1–2 seconds to avoid performance issues.
+
+- Optionally, send the updated coordinates to backend via an existing `updateLocation` endpoint so the matching engine stays in sync.
+
+------------------------------------------------
+4) Driver marker icon (arrow-style like Uber)
+------------------------------------------------
+Update the driver marker styling to match the Uber-style arrow:
+
+- Replace generic pin with a **directional arrow inside a white circle**, similar to the screenshot:
+  - Outer circle: white border.
+  - Inner arrow: dark/black pointing to heading direction if available.
+- If heading/bearing data is available from GPS:
+  - Rotate the arrow to match heading.
+- If heading is not available:
+  - Keep arrow pointing up by default.
+
+Make sure:
+- Only the logged-in driver sees this arrow for themselves.
+- No sensitive KYC data is ever exposed.
+
+------------------------------------------------
+5) Zoom level and bounds
+------------------------------------------------
+- On initial location lock, set zoom to a fixed street-level, e.g.:
+
+  - Leaflet/OSM: `map.setView([lat, lng], 17);`
+  - Or equivalent in your map provider.
+
+- Prevent the map from jumping out to a full city view after load.
+- When the driver moves, keep zoom close to this level unless the driver manually adjusts zoom.
+
+------------------------------------------------
+6) Recenter button (existing arrow FAB)
+------------------------------------------------
+We already have a bottom-right FAB arrow (navigation/recenter). Its behavior must now be:
+
+- On tap:
+  - Immediately recenter the map on the driver’s **current** position.
+  - Restore default follow mode:
+    - The next `watchPosition` update should again auto-center the map.
+- If geolocation permission is missing or failed:
+  - Prompt the driver to enable location services, but do not crash.
+
+Do NOT remove this button; we already decided to keep it.
+
+------------------------------------------------
+7) No full-screen loading or blackout
+------------------------------------------------
+- While fetching current location, the map should NOT:
+  - Turn completely black.
+  - Show a blocking spinner over the entire map.
+- Acceptable:
+  - Small spinner inside the driver marker until the first fix.
+  - Small toast: “Finding your location…”
+
+------------------------------------------------
+8) Compatibility with existing logic
+------------------------------------------------
+- Do NOT modify any commission, KYC, admin, or status logic.
+- Do NOT alter ride/food/parcel status flows.
+- Do NOT change the Go Online/Go Offline toggle behavior.
+- The only changes are:
+  - Where the map centers.
+  - What icon is used for the driver.
+  - How the map follows the driver position.
+
+------------------------------------------------
+9) Non-breaking requirement
+------------------------------------------------
+- All schema changes must be additive.
+- No API route renames or removals.
+- Existing customer/restaurant/admin maps must keep their previous behavior.
+- Only the driver map (`/driver/map`) gains this Uber-style current-location centering and follow mode.
+
+Implement everything so that, after deployment, when a driver opens `/driver/map`:
+
+- The map quickly centers on their current GPS location at street/block zoom.
+- A clear arrow icon shows exactly where they are (like Uber).
+- As they move, the map smoothly follows them unless they manually drag away.
+- The interface never flashes full black or heavy loading; it always feels live and professional.
