@@ -581,7 +581,7 @@ export default function DriverMapPage() {
           </DropdownMenu>
         </div>
 
-        <div className="absolute bottom-24 right-4 z-[1000] flex flex-col gap-2">
+        <div className="fixed right-6 bottom-[120px] z-[1000] flex flex-col gap-2">
           <Button
             size="icon"
             variant="secondary"
@@ -729,7 +729,7 @@ export default function DriverMapPage() {
             <Button
               variant="outline"
               size="icon"
-              className="absolute bottom-4 left-4 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              className="absolute bottom-6 left-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
               data-testid="button-service-select"
             >
               <Grid3X3 className="h-5 w-5" />
@@ -818,7 +818,7 @@ export default function DriverMapPage() {
             }
           }}
           disabled={isUpdatingStatus || !isVerified || !hasVehicle}
-          className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
+          className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
             isUpdatingStatus ? "opacity-70" : ""
           } ${isOnline 
             ? "bg-[#FF3B30] hover:bg-[#E63529]" 
@@ -842,7 +842,7 @@ export default function DriverMapPage() {
             <Button
               variant="outline"
               size="icon"
-              className="absolute bottom-4 right-4 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
               data-testid="button-quick-actions"
             >
               <Menu className="h-5 w-5" />
