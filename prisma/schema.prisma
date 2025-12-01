@@ -118,6 +118,9 @@ model CustomerProfile {
   favoriteRestaurants   FoodRestaurantFavorite[] // Favorite restaurants for quick access
   savedAddresses        CustomerAddress[]        // Multiple delivery addresses
   blockedRestaurants    CustomerBlockedRestaurant[] // Restaurants blocked by customer
+  
+  // Phase 1A: Real-Time Dispatch
+  dispatchSessions      DispatchSession[]        // Dispatch sessions for this customer
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -342,6 +345,11 @@ model DriverProfile {
   rewardLedger          DriverRewardLedger[]      // D19: Driver reward ledger
   safetyIncidents       DriverSafetyIncident[]    // D20: Driver safety incidents
   rideLiveLocations     RideLiveLocation[]        // Phase A: Driver live locations during rides
+  
+  // Phase 1A: Real-Time Dispatch
+  realtimeState         DriverRealtimeState?      // Driver's real-time presence/location
+  assignedDispatchSessions DispatchSession[]      @relation("AssignedDriver")
+  dispatchOfferEvents   DispatchOfferEvent[]      // Offers received by this driver
 
   @@map("driver_profiles")
 }
@@ -1034,11 +1042,18 @@ model Ride {
   chatMessages     RideChatMessage[]
   receipt          RideReceipt?
   stops            RideStop[]
+  
+  // Phase 1A: Real-Time Dispatch
+  dispatchSessionId  String?           @unique // FK to dispatch_sessions
+  dispatchStatus     String?           // Mirror of dispatch_sessions.status for fast queries
+  requestedAt        DateTime?         // When ride was initially requested
+  dispatchSession    DispatchSession?  @relation("RideDispatch", fields: [dispatchSessionId], references: [id])
 
   @@index([countryCode])
   @@index([cityCode])
   @@index([isDemo])
   @@index([status])
+  @@index([dispatchStatus])
   @@map("rides")
 }
 
@@ -4151,4 +4166,133 @@ model RidePromoCodeUsage {
   @@index([promoCodeId])
   @@index([appliedAt])
   @@map("ride_promo_code_usages")
+}
+
+// ============================================================
+// Phase 1A: Real-Time Dispatch Core
+// ============================================================
+
+enum DispatchServiceMode {
+  ride
+  food
+  parcel
+  offline
+}
+
+enum DispatchSessionStatus {
+  requested
+  searching_driver
+  offer_pending
+  driver_accepted
+  no_driver_found
+  cancelled_by_customer
+  cancelled_by_admin
+  expired
+}
+
+// Driver real-time presence and location state
+model DriverRealtimeState {
+  id                    String              @id @default(uuid())
+  driverId              String              @unique
+  isOnline              Boolean             @default(false)
+  isAvailable           Boolean             @default(false)
+  currentServiceMode    DispatchServiceMode @default(offline)
+  lastKnownLat          Float?
+  lastKnownLng          Float?
+  lastUpdateAt          DateTime            @default(now())
+  countryCode           String?
+  cityCode              String?
+  currentAssignmentId   String?             // FK to DispatchSession
+  connectedAt           DateTime?           // When driver connected to WebSocket
+  disconnectedAt        DateTime?           // When driver disconnected
+  
+  driver                DriverProfile       @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  currentAssignment     DispatchSession?    @relation("CurrentAssignment", fields: [currentAssignmentId], references: [id])
+  
+  @@index([isOnline, isAvailable])
+  @@index([countryCode, cityCode])
+  @@index([currentServiceMode])
+  @@index([lastKnownLat, lastKnownLng])
+  @@map("driver_realtime_states")
+}
+
+// Dispatch session for ride/food/parcel assignment
+model DispatchSession {
+  id                    String                @id @default(uuid())
+  serviceType           DeliveryServiceType   @default(ride)
+  entityId              String                // FK to rides.id OR food_orders.id OR deliveries.id
+  customerId            String
+  assignedDriverId      String?
+  candidateDriverIds    String[]              @default([])
+  rejectedDriverIds     String[]              @default([])
+  expiredDriverIds      String[]              @default([])
+  status                DispatchSessionStatus @default(requested)
+  
+  // Location data (denormalized for fast queries)
+  pickupLat             Float?
+  pickupLng             Float?
+  dropoffLat            Float?
+  dropoffLng            Float?
+  pickupAddress         String?
+  dropoffAddress        String?
+  
+  // Timing
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  expiresAt             DateTime?             // When entire session expires
+  acceptedAt            DateTime?
+  
+  // Jurisdiction (denormalized)
+  countryCode           String?
+  cityCode              String?
+  
+  // Dispatch metadata
+  maxRadiusKm           Float?
+  offerTimeoutSeconds   Int?                  @default(30)
+  currentOfferDriverId  String?               // Driver currently being offered
+  currentOfferExpiresAt DateTime?
+  searchRound           Int                   @default(1)
+  
+  // Audit logs
+  logs                  Json?                 // JSON array of status changes
+  
+  // Relations
+  customer              CustomerProfile       @relation(fields: [customerId], references: [id])
+  assignedDriver        DriverProfile?        @relation("AssignedDriver", fields: [assignedDriverId], references: [id])
+  ride                  Ride?                 @relation("RideDispatch")
+  driversWithAssignment DriverRealtimeState[] @relation("CurrentAssignment")
+  offerEvents           DispatchOfferEvent[]
+  
+  @@index([serviceType, status])
+  @@index([countryCode, cityCode])
+  @@index([entityId])
+  @@index([customerId])
+  @@index([assignedDriverId])
+  @@index([status])
+  @@map("dispatch_sessions")
+}
+
+// Track individual offer events to drivers
+model DispatchOfferEvent {
+  id                    String            @id @default(uuid())
+  dispatchSessionId     String
+  driverId              String
+  
+  offeredAt             DateTime          @default(now())
+  expiresAt             DateTime
+  respondedAt           DateTime?
+  response              String?           // accept, reject, expired
+  
+  // Driver location at time of offer
+  driverLat             Float?
+  driverLng             Float?
+  distanceKm            Float?
+  
+  dispatchSession       DispatchSession   @relation(fields: [dispatchSessionId], references: [id], onDelete: Cascade)
+  driver                DriverProfile     @relation(fields: [driverId], references: [id])
+  
+  @@index([dispatchSessionId])
+  @@index([driverId])
+  @@index([response])
+  @@map("dispatch_offer_events")
 }

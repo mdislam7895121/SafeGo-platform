@@ -1,0 +1,466 @@
+PROMPT PART 1 — SAFEGO PHASE 1A: REAL-TIME DISPATCH CORE (TASK 1–3 + HALF OF 4)
+
+You are an expert full-stack engineer working on the global super-app “SafeGo”.  
+Your job in THIS task is to implement **Phase 1A: Real-Time Dispatch Core**, without breaking any existing SafeGo feature.
+
+This prompt is ONLY for:
+1) Implementing WebSocket Server for real-time dispatch  
+2) Building the proximity-based driver selection algorithm  
+3) Building the driver assignment engine  
+4) Wiring the basic real-time customer–driver connection up to “driver accepted” (not ETA, not route updates yet)
+
+Do NOT touch commission, wallet, payment methods, or any existing pricing logic in this prompt. Those will be handled in later phases.
+
+==================================================
+A. ALWAYS RESPECT GLOBAL SAFEGO MASTER RULES
+==================================================
+
+1) ROLES (must stay fully separated)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+Each role has:
+   - Their own signup + KYC rules
+   - Their own dashboard
+   - Their own permissions
+Never mix access between roles.
+
+2) SERVICES (must all continue to work)
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+The dispatch architecture you build in this task MUST be designed so it can support all three, even if in this Part 1 we fully wire only the **ride** flow end-to-end. Don’t hardcode anything that blocks food_orders or deliveries later.
+
+3) COUNTRY-SPECIFIC KYC & VERIFICATION (MUST ENFORCE AT DISPATCH TIME)
+SafeGo currently supports at least:
+   - Bangladesh ("BD")
+   - United States ("US")
+
+You MUST enforce that:
+   - Only **verified customers** can request rides/orders/deliveries.
+   - Only **verified drivers** can receive offers.
+
+BD Customers/Drivers (stored in existing user/driver tables):
+   - Must have: father_name, date_of_birth, present_address, permanent_address, NID (number + front/back images),
+     emergency contact details, verification_status, is_verified.
+US Customers/Drivers:
+   - Must have: date_of_birth, home_address, emergency contact details, government_id_type, government_id_last4,
+     and for drivers: driver_license_number, driver_license_image, driver_license_expiry, optional ssn_last4,
+     plus verification_status, is_verified.
+
+At dispatch time:
+   - Reject any request if customer.is_verified != true or verification_status != "approved".
+   - Exclude any driver whose is_verified != true or verification_status != "approved".
+
+4) ADMIN PANEL (cannot be broken)
+   - Admin must keep the ability to:
+     - verify customers, drivers, restaurants
+     - approve/reject KYC with rejection_reason
+     - block/unblock users
+     - manage pricing, fees, commissions
+     - manage payouts and see negative balances
+
+In this Part 1, you MAY:
+   - Add NON-BREAKING admin tools to view live driver connectivity and basic dispatch logs.
+   - But you MUST NOT remove or rename any existing admin routes, screens, or API fields.
+
+5) CORE COLLECTIONS (must NOT be renamed or deleted)
+SafeGo already relies on these collections:
+   - rides
+   - food_orders
+   - deliveries
+
+Each has (or will have):
+   - identity fields (customer_id, driver_id, restaurant_id…)
+   - addresses + geolocation
+   - fees + commission-related fields
+   - payment details
+   - timestamps
+   - full status flow
+   - rating and feedback
+
+In this prompt, you may ONLY **add** fields, indexes, or new collections.  
+Do NOT rename or delete any existing field, index, or collection.
+
+6) COMMISSION & PAYOUT RULES (DO NOT CHANGE HERE)
+Just keep them intact; you are NOT implementing or altering them in Part 1.  
+Recall the rules for context only:
+   - Cash ride: driver keeps full cash; SafeGo commission becomes negative driver_wallet_balance (settled weekly).
+   - Cash food order: restaurant keeps full cash; commission becomes negative restaurant_wallet.
+   - Online payments: SafeGo keeps commission automatically.
+   - Admin can settle balances and mark paid.
+
+In this task, you ONLY build dispatch & real-time layers and must not modify the commission logic.
+
+7) SECURITY RULES (must NEVER be broken)
+   - Customers must NOT see driver documents (NID, license, SSN, etc.).
+   - Drivers must NOT see customer NID or sensitive KYC data.
+   - Restaurants must NOT see other restaurants’ data.
+   - Only admin can change pricing, commission, verification, blocking.
+   - Any user may only update their own profile.
+
+When sending data in WebSocket payloads:
+   - Send only minimal, non-sensitive info (names, vehicle info, rating, phone masking if needed).
+   - Do NOT expose any KYC documents, NID numbers, SSN, or raw IDs.
+
+8) STATUS FLOWS (MUST stay consistent)
+For rides:
+   requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_x
+
+For food orders:
+   placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+
+For parcels:
+   requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+This prompt will implement the real-time parts for ride status transitions:
+   - requested
+   - searching_driver
+   - accepted
+   - (prepare the hooks for driver_arriving / in_progress, but you don’t fully implement routing yet)
+
+9) ONBOARDING (do not loosen any checks)
+For each role (customer, driver, restaurant):
+   - Multi-step onboarding must remain:
+     - Basic info
+     - Address
+     - Country-specific ID/KYC upload
+     - Emergency contact
+     - verification_status = "pending" initially
+     - Block app access until approved by admin
+
+Your dispatch logic must respect these flags; do not let unverified users bypass onboarding.
+
+10) NOTIFICATIONS (this task = WebSocket events only)
+   - There is or will be FCM for push notifications (later tasks).
+   - In this prompt, ensure you emit structured events so later the FCM layer can subscribe.
+
+==================================================
+B. SCOPE OF THIS PROMPT (PHASE 1A)
+==================================================
+
+Map to the “SafeGo Next Required Tasks” list:
+
+   1. Implement WebSocket Server for Real-Time Dispatch
+   2. Build Proximity-Based Driver Selection Algorithm
+   3. Build Driver Assignment Engine
+   4. Implement Real-Time Customer–Driver Connection (UP TO “ACCEPTED” ONLY)
+
+You must produce a complete, working implementation for these, end-to-end, without touching later tasks (ETA, route updates, fare changes, in-trip chat, food/parcel dispatch details).
+
+==================================================
+C. ARCHITECTURE & DATA MODEL CHANGES (NON-BREAKING)
+==================================================
+
+1) WebSocket Server Layer
+Implement a gateway for real-time communication. Example (adjust to existing stack, but keep semantics):
+
+   - Endpoint: /ws
+   - Protocol: WebSocket (or Socket.io, or framework-native equivalent)
+   - Auth: JWT or session token, using existing SafeGo auth.
+   - Roles supported:
+       - customer
+       - driver
+       - admin (read-only monitoring, no ride acceptance)
+
+Connection handshake must:
+   - Validate token.
+   - Detect role (customer/driver/admin).
+   - Load user profile with country, is_verified, verification_status, is_blocked.
+   - If user is blocked or not verified, refuse connection.
+
+Define logical “channels/rooms”:
+   - customer:{customer_id}
+   - driver:{driver_id}
+   - ride:{ride_id}
+   - admin:dispatch (for admin live monitoring)
+
+2) New/Extended Collections (ADD ONLY)
+
+a) driver_realtime_state (new collection/table)
+   - driver_id (FK)
+   - is_online (boolean)
+   - is_available (boolean)  // available for new job
+   - current_service_mode: "ride" | "food" | "parcel" | "offline"
+   - last_known_lat
+   - last_known_lng
+   - last_update_at (timestamp)
+   - country_code ("BD" | "US" | others future)
+   - city / region (optional, for locality filtering)
+   - current_assignment_id (nullable) // FK to dispatch_sessions
+
+b) dispatch_sessions (new collection/table)
+DO NOT rename rides/food_orders/deliveries. Instead, add a dedicated dispatch_sessions table:
+
+   - id (dispatch_session_id)
+   - service_type: "ride" | "food" | "parcel"
+   - entity_id: FK to rides.id OR food_orders.id OR deliveries.id
+   - customer_id
+   - assigned_driver_id (nullable until accepted)
+   - candidate_driver_ids (array)
+   - status:
+       "requested" | "searching_driver" | "offer_pending" | "driver_accepted" |
+       "no_driver_found" | "cancelled_by_customer" | "cancelled_by_admin"
+   - pickup_lat, pickup_lng
+   - dropoff_lat, dropoff_lng
+   - created_at, updated_at, expires_at
+   - country_code, city (denormalized for fast queries)
+   - logs (JSON array of status changes/events) – optional
+
+c) rides collection (non-breaking extension)
+   - Add fields if not present:
+       - dispatch_session_id (FK)
+       - dispatch_status (mirror of dispatch_sessions.status subset)
+       - assigned_driver_id
+       - requested_at
+       - accepted_at
+       - cancelled_at
+   - DO NOT remove or rename any existing fields.
+
+3) Driver presence & location updates via WebSocket
+   - For drivers:
+       - On connect, mark is_online = true.
+       - On disconnect, mark is_online = false and is_available = false (unless they are in an active trip).
+   - Implement WebSocket messages for drivers:
+       - "driver:set_status": { is_available, current_service_mode }
+       - "driver:location_update": { lat, lng }
+   - Persist to driver_realtime_state with timestamps and indexing (country_code, city, is_online, is_available, current_service_mode).
+
+==================================================
+D. PROXIMITY-BASED DRIVER SELECTION (TASK 2)
+==================================================
+
+Implement a reusable function:
+
+   findNearestDriversForDispatch({
+       service_type,      // "ride" | "food" | "parcel"
+       country_code,      // "BD" | "US"
+       city,
+       pickup_lat,
+       pickup_lng,
+       max_radius_km,     // e.g. configurable per country/service
+       max_candidates     // e.g. 5–10
+   })
+
+Algorithm requirements:
+   - Filter driver_realtime_state where:
+       - is_online = true
+       - is_available = true
+       - current_service_mode matches service_type OR is generic for all
+       - driver is_verified = true and verification_status = "approved"
+       - driver.country_code = request.country_code
+       - if city known, match or approximate city
+
+   - Compute distance between (pickup_lat, pickup_lng) and (last_known_lat, last_known_lng) using Haversine or equivalent.
+   - Discard drivers farther than max_radius_km.
+   - Sort by:
+       1) distance ascending
+       2) driver rating (if available) descending
+       3) acceptance rate or recent activity (optional, if already tracked)
+   - Return top `max_candidates` with:
+       - driver_id
+       - distance_km
+       - last_known_lat/lng
+   - Make radius & candidate count configurable via environment or admin-config table, not hardcoded.
+
+DO NOT include:
+   - Any NID, SSN, license numbers, or sensitive details.
+
+==================================================
+E. DRIVER ASSIGNMENT ENGINE (TASK 3)
+==================================================
+
+1) Entry point – when a ride is requested
+Assume an existing HTTP API like:
+
+   POST /api/rides/request
+   body: {
+       pickup_location,
+       dropoff_location,
+       country_code,
+       city,
+       ...other ride details...
+   }
+
+Extend this flow NON-BREAKING:
+   - After the ride record is created in `rides`:
+       - Create a dispatch_sessions row with:
+           - service_type = "ride"
+           - entity_id = rides.id
+           - customer_id = ride.customer_id
+           - pickup_lat/lng, dropoff_lat/lng
+           - status = "requested"
+       - Immediately call findNearestDriversForDispatch(...) to get candidates.
+       - If no candidates:
+           - Update dispatch_sessions.status = "no_driver_found"
+           - Update rides.dispatch_status = "no_driver_found"
+           - Emit WebSocket event to customer channel:
+               event: "ride:no_driver_found"
+           - Return an appropriate HTTP response.
+       - If candidates found:
+           - Update dispatch_sessions:
+               - status = "searching_driver"
+               - candidate_driver_ids = [...]
+           - Update rides.dispatch_status = "searching_driver"
+           - For each candidate, send WebSocket offer event.
+
+2) WebSocket offer event to drivers
+   - To each selected driver (via driver:{driver_id} room), emit:
+     event: "ride:offer"
+     payload: {
+         dispatch_session_id,
+         ride_id,
+         pickup_location_summary,
+         dropoff_location_summary,
+         estimated_distance_km,   // from nearest-route or straight-line for now
+         country_code,
+         city,
+         customer_name_short,     // optional, generalized
+         fare_estimate_range,     // if already computed elsewhere, or placeholder
+         response_timeout_seconds // e.g. 20–30 seconds
+     }
+
+   - Do NOT include:
+       - customer phone
+       - customer exact address detail more than needed for pickup (and even then only necessary info)
+       - any KYC or ID numbers.
+
+3) Driver response API / WS handlers
+Implement both a REST and a WS handler (reusing same core logic):
+
+   POST /api/driver/ride-offers/{dispatch_session_id}/respond
+   body: { decision: "accept" | "reject" }
+
+Or WS messages:
+   - "driver:ride_offer_response": { dispatch_session_id, decision }
+
+Business rules:
+   - If decision = "reject":
+       - Mark this driver as “rejected” for this dispatch_sessions (e.g., maintain a rejected_driver_ids list in memory or logs).
+       - Immediately try to send offer to the next best driver if not already offered.
+   - If decision = "accept":
+       - First check if dispatch_sessions.status is still "searching_driver" or "offer_pending".
+       - Use a transactional lock so that only ONE driver can win.
+       - On success:
+           - Set dispatch_sessions.assigned_driver_id = driver_id
+           - Set dispatch_sessions.status = "driver_accepted"
+           - Update rides.assigned_driver_id = driver_id
+           - Update rides.dispatch_status = "accepted"
+           - Update driver_realtime_state.is_available = false, current_assignment_id = dispatch_session_id
+           - Emit WebSocket events:
+               - To customer:{customer_id}: "ride:driver_assigned"
+               - To driver:{driver_id}: "ride:assignment_confirmed"
+               - Optionally to ride:{ride_id} room.
+       - If already assigned:
+           - Respond with “offer expired” to late drivers.
+
+4) Offer timeout & fallback
+   - When initial offers are sent:
+       - For each candidate, start a per-offer timeout (e.g. 20–30 seconds).
+       - If timeout hits and driver did not respond:
+           - Mark that candidate as “expired” and move to next driver.
+   - If all candidates reject or expire:
+       - Set dispatch_sessions.status = "no_driver_found"
+       - Update rides.dispatch_status = "no_driver_found"
+       - Emit WebSocket event to customer: "ride:no_driver_found".
+
+==================================================
+F. REAL-TIME CUSTOMER–DRIVER CONNECTION (UP TO ACCEPT)
+==================================================
+
+In this Part 1A:
+   - You MUST fully implement real-time events up to “driver accepted”.
+   - You MUST NOT yet implement ETA calculation, live route updates, or in-trip chat – just create the hooks.
+
+1) Customer-side WebSocket events
+Customer WS client must handle:
+
+   - "ride:requested" (optional confirmation)
+   - "ride:searching_driver"  → show searching UI
+   - "ride:driver_assigned"   → show driver card & basic info
+   - "ride:no_driver_found"   → show retry/alternative options
+
+Payload for "ride:driver_assigned" must include:
+   - ride_id
+   - dispatch_session_id
+   - basic driver profile summary:
+       - first_name / display_name
+       - vehicle_make_model
+       - vehicle_plate_masked (e.g. partial)
+       - driver_rating (if exists)
+   - pickup ETA placeholder (null or basic straight-line estimate for now)
+   - pickup_location summary
+
+2) Driver-side WebSocket events
+Driver WS client must handle:
+
+   - "ride:offer"                → show accept/reject card
+   - "ride:offer_expired"        → if they were late
+   - "ride:assignment_confirmed" → confirm success
+
+3) Admin-side WebSocket events (optional, lightweight)
+Admin WS client (if present) may listen to "admin:dispatch" room and receive:
+
+   - dispatch session created
+   - driver offer sent
+   - driver accepted
+   - no driver found
+
+This must be read-only; admin cannot manipulate dispatch via WS in this phase.
+
+==================================================
+G. SECURITY, LOGGING & CONFIG
+==================================================
+
+1) Security
+   - Validate all WS connections with auth tokens.
+   - Ensure drivers can ONLY:
+       - receive offers about their own driver_id
+       - respond only for offers where they are a candidate.
+   - Ensure customers can only see rides where they are the customer.
+
+2) Logging
+   - Every status change in dispatch_sessions must be logged with timestamp, actor (system/driver/customer), and reason.
+   - Useful for fraud detection and debugging later.
+
+3) Configuration
+   - Provide central config for:
+       - max_radius_km per country/service
+       - max_candidates per service
+       - offer timeout seconds
+   - Do NOT hardcode those values randomly into the code.
+
+==================================================
+H. FRONTEND INTEGRATION NOTES
+==================================================
+
+You must:
+   - Wire the WebSocket client into the existing customer web app “Book a ride” screen WITHOUT breaking any layout.
+   - Wire the WebSocket into the driver app (or driver web) to show ride offers in a clear, non-blocking way.
+
+Do NOT:
+   - Remove existing “Go Online” behavior for drivers.
+   - Change desktop/mobile layouts beyond minimum required components to show offer cards.
+
+==================================================
+I. NON-BREAKING GUARANTEES
+==================================================
+
+When applying this prompt:
+   - Only ADD:
+       - driver_realtime_state collection/table
+       - dispatch_sessions collection/table
+       - additional fields on rides
+       - new WS endpoints / handlers
+       - new backend services for dispatch
+   - Do NOT:
+       - rename any existing field, route, component, or table
+       - remove any existing APIs or screens
+   - All existing functionality (user login, signup, profile, ride request creation, etc.) must continue to work exactly as before, now enriched with real-time behavior.
+
+Implement all of the above in production-quality code with:
+   - Clear service boundaries (DispatchService, DriverRealtimeService, WebSocketGateway, etc.)
+   - Sufficient comments so future prompts can extend ETA, routing, and multi-service dispatch (food + parcel) without refactoring core logic.
