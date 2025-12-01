@@ -48,6 +48,7 @@ import eatsRoutes from "./routes/eats"; // Public Eats endpoint for restaurant b
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
+import { setupDispatchWebSocket } from "./websocket/dispatchWs";
 import { db } from "./db";
 
 // Public Driver Profile Summary Type (D2 Spec)
@@ -241,6 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupSupportChatWebSocket(httpServer);
   setupRideChatWebSocket(httpServer);
   setupFoodOrderNotificationsWebSocket(httpServer);
+  setupDispatchWebSocket(httpServer);
 
   return httpServer;
 }

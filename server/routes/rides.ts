@@ -4,6 +4,8 @@ import { z } from "zod";
 import { authenticateToken, AuthRequest, requireUnlockedAccount } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 import { promotionBonusService } from "../services/promotionBonusService";
+import { dispatchService } from "../services/dispatchService";
+import { startDispatchSession } from "../websocket/dispatchWs";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -164,6 +166,34 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
       },
     });
 
+    let dispatchSessionId: string | undefined;
+    
+    if (validPickupLat && validPickupLng && !req.body.isDemo) {
+      try {
+        const dispatchResult = await dispatchService.createDispatchSession({
+          serviceType: 'ride',
+          entityId: ride.id,
+          customerId: customerProfile.id,
+          pickupLat: validPickupLat,
+          pickupLng: validPickupLng,
+          dropoffLat: validDropoffLat,
+          dropoffLng: validDropoffLng,
+          pickupAddress,
+          dropoffAddress,
+          countryCode,
+          cityCode,
+        });
+        
+        dispatchSessionId = dispatchResult.sessionId;
+        
+        if (dispatchResult.candidateDrivers.length > 0) {
+          startDispatchSession(dispatchResult.sessionId).catch(console.error);
+        }
+      } catch (dispatchError) {
+        console.error("Dispatch session creation failed:", dispatchError);
+      }
+    }
+
     res.status(201).json({
       message: "Ride requested successfully",
       ride: {
@@ -176,6 +206,7 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
         paymentMethod: ride.paymentMethod,
         status: ride.status,
         createdAt: ride.createdAt,
+        dispatchSessionId,
       },
     });
   } catch (error) {
@@ -1529,6 +1560,156 @@ router.post("/:id/driver-location", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Update driver location error:", error);
     res.status(500).json({ error: "Failed to update location" });
+  }
+});
+
+// ====================================================
+// POST /api/rides/dispatch/:sessionId/respond
+// Driver responds to a ride offer (accept/reject)
+// ====================================================
+router.post("/dispatch/:sessionId/respond", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { sessionId } = req.params;
+    const { action, reason } = req.body;
+
+    if (role !== "driver") {
+      return res.status(403).json({ error: "Only drivers can respond to offers" });
+    }
+
+    if (!["accept", "reject"].includes(action)) {
+      return res.status(400).json({ error: "Action must be 'accept' or 'reject'" });
+    }
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      select: { id: true, isVerified: true },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    if (!driverProfile.isVerified) {
+      return res.status(403).json({ error: "Driver must be verified to accept rides" });
+    }
+
+    if (action === "accept") {
+      const result = await dispatchService.handleDriverAccept(sessionId, driverProfile.id);
+      if (result.success) {
+        res.json({ success: true, message: "Ride accepted" });
+      } else {
+        res.status(400).json({ error: result.error || "Failed to accept ride" });
+      }
+    } else {
+      const result = await dispatchService.handleDriverReject(sessionId, driverProfile.id, reason);
+      res.json({ success: true, message: "Offer rejected", nextOfferId: result.nextOfferId });
+    }
+  } catch (error) {
+    console.error("Dispatch respond error:", error);
+    res.status(500).json({ error: "Failed to process response" });
+  }
+});
+
+// ====================================================
+// GET /api/rides/dispatch/:sessionId
+// Get dispatch session status
+// ====================================================
+router.get("/dispatch/:sessionId", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { sessionId } = req.params;
+
+    const session = await dispatchService.getDispatchSession(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: "Dispatch session not found" });
+    }
+
+    if (role === "customer") {
+      const customerProfile = await prisma.customerProfile.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      if (session.customerId !== customerProfile?.id) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    } else if (role === "driver") {
+      const driverProfile = await prisma.driverProfile.findUnique({
+        where: { userId },
+        select: { id: true },
+      });
+      const isCandidate = session.candidateDriverIds.includes(driverProfile?.id || "");
+      const isAssigned = session.assignedDriverId === driverProfile?.id;
+      if (!isCandidate && !isAssigned) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
+    res.json({
+      id: session.id,
+      status: session.status,
+      serviceType: session.serviceType,
+      pickup: {
+        lat: session.pickupLat,
+        lng: session.pickupLng,
+        address: session.pickupAddress,
+      },
+      dropoff: {
+        lat: session.dropoffLat,
+        lng: session.dropoffLng,
+        address: session.dropoffAddress,
+      },
+      assignedDriver: session.assignedDriver ? {
+        id: session.assignedDriver.id,
+        firstName: session.assignedDriver.firstName,
+        lastName: session.assignedDriver.lastName,
+        profilePhotoUrl: session.assignedDriver.profilePhotoUrl,
+        vehicle: session.assignedDriver.vehicles[0] || null,
+      } : null,
+      candidateCount: session.candidateDriverIds.length,
+      createdAt: session.createdAt,
+      acceptedAt: session.acceptedAt,
+    });
+  } catch (error) {
+    console.error("Get dispatch session error:", error);
+    res.status(500).json({ error: "Failed to fetch dispatch session" });
+  }
+});
+
+// ====================================================
+// DELETE /api/rides/dispatch/:sessionId
+// Cancel dispatch session (customer only)
+// ====================================================
+router.delete("/dispatch/:sessionId", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const role = req.user!.role;
+    const { sessionId } = req.params;
+
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can cancel dispatch" });
+    }
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+      select: { id: true },
+    });
+
+    const session = await dispatchService.getDispatchSession(sessionId);
+
+    if (!session || session.customerId !== customerProfile?.id) {
+      return res.status(404).json({ error: "Dispatch session not found" });
+    }
+
+    await dispatchService.cancelDispatchSession(sessionId, "customer");
+
+    res.json({ success: true, message: "Dispatch cancelled" });
+  } catch (error) {
+    console.error("Cancel dispatch error:", error);
+    res.status(500).json({ error: "Failed to cancel dispatch" });
   }
 });
 
