@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link } from "wouter";
 import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw } from "lucide-react";
 import { SystemAlert } from "@/components/ui/system-alert";
+import { WelcomeMessage } from "@/components/ui/welcome-message";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -391,6 +392,18 @@ export default function AdminHome() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Welcome Message for New Admins */}
+      <div className="px-4 sm:px-6 md:px-8 pt-4 sm:pt-6">
+        <WelcomeMessage
+          title="Welcome to SafeGo Admin!"
+          message="You have full access to manage drivers, restaurants, customers, and platform settings. Use the quick actions below to get started or explore the management sections."
+          ctaText="View Getting Started Guide"
+          ctaHref="/admin/settings"
+          variant="gradient"
+          storageKey="admin_dashboard"
+        />
       </div>
 
       {/* Quick Actions */}
