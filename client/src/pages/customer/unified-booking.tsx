@@ -1962,18 +1962,18 @@ export default function UnifiedBookingPage() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="rounded-full"
+                    className="rounded-full relative z-10"
                     aria-label="Open profile menu"
                     data-testid="button-profile"
                   >
-                    <Avatar className="h-8 w-8 border-2 border-border">
+                    <Avatar className="h-8 w-8 border-2 border-border pointer-events-none">
                       <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-56 z-[9999]">
                   <div className="px-3 py-2 border-b">
                     <p className="text-sm font-medium">{user?.email || "Guest"}</p>
                     <p className="text-xs text-muted-foreground">SafeGo Account</p>

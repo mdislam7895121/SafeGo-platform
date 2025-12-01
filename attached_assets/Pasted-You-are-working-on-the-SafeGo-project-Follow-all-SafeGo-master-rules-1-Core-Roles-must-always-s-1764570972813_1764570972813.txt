@@ -1,0 +1,118 @@
+You are working on the SafeGo project. Follow all SafeGo master rules:
+
+1. Core Roles (must always stay valid)
+   - Customer: books rides, food delivery, parcel delivery.
+   - Driver: accepts trips/deliveries, goes online/offline, manages trip preferences.
+   - Restaurant: manages menu, accepts/cancels food orders, sees earnings.
+   - Admin: full-backoffice for users, trips, payouts, disputes, fraud, and configuration.
+
+2. Global App Logic
+   - We support Ride, Eats (food delivery), and Parcel flows globally.
+   - Every flow must respect role-based access:
+     - Customers see only their own profile, trips, and payments.
+     - Drivers see driver-only data (their trips, documents, earnings).
+     - Restaurants see restaurant orders and menus.
+     - Admins see everything through an admin panel, never via customer/driver UIs.
+   - Country rules:
+     - For USA, show only USA-legal services (no CNG, Rickshaw, etc.).
+     - For Bangladesh, show local vehicle types (CNG, Bike, Rickshaw, etc.).
+   - Status flows, commission, payouts and notifications must remain consistent with previous SafeGo prompts.
+
+3. Mandatory Data Collections
+   - rides, food_orders, deliveries, driver_profiles, customer_profiles, payouts, earnings, trips_status_history.
+   - Any new UI interaction that touches trips must use these collections and never bypass security.
+
+4. Security & Access Control
+   - All profile/activity pages must require authentication.
+   - Never expose admin features inside customer or driver UIs.
+   - Always ensure users can only read/write their own records (by user_id / customer_id).
+
+TASK: Fix the Customer profile button on the main customer map so it opens the customer account/profile screen correctly (on both desktop and mobile).
+
+Current behavior:
+- On the SafeGo customer web app (the “Book a ride” screen with the left-side panel for Pickup/Dropoff and a large map on the right), there is a profile button in the top-right header (it shows the user avatar / initial).
+- When I tap/click the profile button, nothing happens. No drawer, no navigation – it is non-functional.
+
+Expected behavior:
+- When a logged-in customer taps the profile button:
+  - A customer Account/Profile view should open. This can be:
+    - Either a right-side drawer/panel sliding over the map, or
+    - A full page like `/customer/account` (depending on our design).
+  - From this Account/Profile view, the customer must be able to:
+    - See basic profile info (name, email, phone).
+    - Access “Payment methods” or “Wallet” section.
+    - Access “Trips history / Activity” (read-only list of their own trips).
+    - Access “Help / Support” (existing customer help entry).
+    - Log out safely.
+
+Implementation details:
+
+1. Locate the customer layout & header
+   - Find the customer layout component used for the customer map/booking page, for example something like:
+     - `client/src/pages/customer/index.tsx` or
+     - `client/src/pages/customer/map.tsx` or the shared customer layout component containing the top header.
+   - Identify the profile button element in the header (avatar / initial / profile icon).
+   - Confirm if it currently has an `onClick` handler; right now it appears to be either missing or not wired to the router.
+
+2. Routing
+   - Ensure there is a proper route for the customer profile/account, for example:
+     - `/customer/account`
+   - If such a route/page already exists (e.g. for account settings), reuse it.
+   - If it doesn’t exist yet, create a minimal, production-safe customer Account page that:
+     - Reads the current authenticated customer from context/session.
+     - Displays their profile data.
+     - Links to trips history and help.
+   - Add this page to the router (e.g. in `client/src/router.tsx` or the equivalent routing configuration).
+   - Ensure the route is protected:
+     - If the user is not logged in, redirect to the customer login/onboarding flow instead of showing account data.
+
+3. Wiring the profile button
+   - On the customer header profile button:
+     - Add an `onClick` handler that:
+       - If we use a drawer pattern:
+         - Opens a right-side drawer component `<CustomerAccountDrawer />`.
+       - If we use page navigation:
+         - Calls the router navigation: `router.push('/customer/account')`.
+   - Make sure the profile button is keyboard accessible:
+     - It should be a `<button>` or a clickable element with `role="button"` and `tabIndex={0}`.
+     - Support Enter/Space to trigger as well.
+
+4. Drawer/Page design (keep consistent with SafeGo style)
+   - Use the same visual style we already use in the driver dashboard/account:
+     - Dark theme background with cards, clear section titles.
+   - Sections to include:
+     - Profile overview
+     - Payment methods
+     - Trips / Activity link
+     - Help / Support link
+     - Logout button
+   - For mobile:
+     - Ensure the drawer/page is full-width and scrollable.
+     - The close/back action is clearly visible (X icon or back arrow).
+
+5. Security and data loading
+   - Use the existing customer auth/session provider (do NOT create a new auth system).
+   - On the Account/Profile view:
+     - Load the current user from context or a `/api/customer/me` endpoint.
+     - Never allow viewing any other customer’s data.
+   - If the access token is missing/expired:
+     - Redirect to login.
+     - Or show a clear message: “Session expired. Please log in again.”
+
+6. Testing
+   - Scenario 1 (desktop):
+     - Open the main customer “Book a ride” page.
+     - Click the profile button in the top-right.
+     - Confirm the Account/Profile view opens (drawer or page).
+     - Check that navigation back to the map works properly (close drawer or back link).
+   - Scenario 2 (mobile viewport):
+     - In mobile preview, tap the profile button.
+     - Ensure it opens the same Account/Profile view and is fully usable.
+   - Scenario 3 (logged out):
+     - Simulate an expired session and tap the profile button.
+     - Verify that the user is redirected to the login/onboarding and not shown profile data.
+
+Important:
+- Do not break any existing customer flows (ride, eats, parcel).
+- Do not expose any admin or driver functionality in the customer profile.
+- Make the fix fully functional so that tapping the profile icon always leads to the customer’s account/profile area.
