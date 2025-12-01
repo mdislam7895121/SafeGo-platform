@@ -1,4 +1,4 @@
-import { prisma } from '../prisma';
+import { prisma } from '../db';
 import type { NavigationSession, NavigationWaypoint, RoutingConfig } from '@prisma/client';
 
 interface RoutePoint {

@@ -1,4 +1,4 @@
-import { prisma } from '../prisma';
+import { prisma } from '../db';
 import type { IncentiveRecommendation, DriverEngagementMetric } from '@prisma/client';
 
 interface DriverPerformanceData {

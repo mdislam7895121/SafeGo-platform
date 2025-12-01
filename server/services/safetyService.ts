@@ -1,4 +1,4 @@
-import { prisma } from '../prisma';
+import { prisma } from '../db';
 import type { SafetyEvent } from '@prisma/client';
 import { notificationService } from './notificationService';
 

@@ -50,6 +50,7 @@ import paymentWebhooksRoutes from "./routes/payment-webhooks"; // Phase 2B: Paym
 import devicesRoutes from "./routes/devices"; // Phase 2B: Device registration for FCM
 import kitchenRoutes from "./routes/kitchen"; // Phase 3: Kitchen Ticket System
 import parcelRoutes from "./routes/parcel"; // Phase 3: Parcel Pricing, Scheduling & POD
+import phase5Routes from "./routes/phase5"; // Phase 5: Experience Intelligence & Real-Time Optimization
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -246,6 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/devices", devicesRoutes); // Phase 2B: Device registration for FCM
   app.use("/api/kitchen", kitchenRoutes); // Phase 3: Kitchen Ticket System
   app.use("/api/parcel", parcelRoutes); // Phase 3: Parcel Pricing, Scheduling & POD
+  app.use("/api/phase5", phase5Routes); // Phase 5: Experience Intelligence & Real-Time Optimization
 
   const httpServer = createServer(app);
   
