@@ -284,6 +284,7 @@ function Router() {
       {/* Public routes */}
       <Route path="/" component={HomeRedirect} />
       <Route path="/login" component={Login} />
+      <Route path="/auth/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/customer-register" component={CustomerRegister} />
 
