@@ -1148,105 +1148,139 @@ export default function UnifiedBookingPage() {
   ];
 
   const handleRequestRide = useCallback(async () => {
-    if (!canRequestRide || !pickup) return;
+    if (!canRequestRide || !pickup || !dropoff || !activeRoute) return;
     
-    // Move to CONFIRMING briefly, then to SEARCHING_DRIVER
     setRideStatus("CONFIRMING");
     setIsRequestingRide(true);
     
-    // Store the pickup → dropoff route polyline for EN_ROUTE_TO_DROPOFF phase
     if (activeRoutePoints.length > 0) {
       setPickupToDropoffRoute(activeRoutePoints);
     }
     
-    // Immediately transition to SEARCHING_DRIVER
-    setTimeout(() => {
-      setRideStatus("SEARCHING_DRIVER");
-      setIsRequestingRide(false);
-      
-      // Simulate driver search (3-5 seconds)
-      const searchDuration = 3000 + Math.random() * 2000;
-      searchTimeoutRef.current = setTimeout(async () => {
-        // Assign a random driver
-        const driver = mockDrivers[Math.floor(Math.random() * mockDrivers.length)];
+    if (!useSimulation) {
+      try {
+        const response = await apiRequest("/api/rides", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pickupAddress: pickup.address,
+            pickupLat: pickup.lat,
+            pickupLng: pickup.lng,
+            dropoffAddress: dropoff.address,
+            dropoffLat: dropoff.lat,
+            dropoffLng: dropoff.lng,
+            countryCode: "US",
+            cityCode: "NYC",
+            paymentMethod: "card",
+            serviceFare: fareEstimate?.subtotal || "10.00",
+            distanceMiles: activeRoute.distanceMiles,
+            durationMinutes: Math.ceil(activeRoute.durationSeconds / 60),
+            rawDistanceMeters: activeRoute.distanceMeters,
+            rawDurationSeconds: activeRoute.durationSeconds,
+            routePolyline: activeRoute.polyline,
+            routeProviderSource: "google",
+          }),
+        });
         
-        // Generate driver starting position 1-3 miles from pickup (not 20+ miles away)
-        const driverStart = generateDriverStartPosition(pickup.lat, pickup.lng);
-        setDriverStartPosition(driverStart);
+        if (response.ride) {
+          setCurrentRideId(response.ride.id);
+          if (response.ride.dispatchSessionId) {
+            setDispatchSessionId(response.ride.dispatchSessionId);
+          }
+        }
         
-        // Fetch the driver → pickup route using Google Directions API
-        // This creates a separate polyline for the EN_ROUTE_TO_PICKUP phase
-        if (isGoogleMapsReady) {
-          try {
-            const directionsService = new google.maps.DirectionsService();
-            const result = await new Promise<google.maps.DirectionsResult | null>((resolve) => {
-              directionsService.route(
-                {
-                  origin: { lat: driverStart.lat, lng: driverStart.lng },
-                  destination: { lat: pickup.lat, lng: pickup.lng },
-                  travelMode: google.maps.TravelMode.DRIVING,
-                },
-                (result, status) => {
-                  if (status === google.maps.DirectionsStatus.OK && result) {
-                    resolve(result);
-                  } else {
-                    resolve(null);
+        setRideStatus("SEARCHING_DRIVER");
+        setIsRequestingRide(false);
+      } catch (error) {
+        console.error("[UnifiedBooking] Failed to create ride:", error);
+        toast({
+          title: "Failed to request ride",
+          description: "Please try again",
+          variant: "destructive",
+        });
+        setRideStatus("SELECTING");
+        setIsRequestingRide(false);
+        return;
+      }
+    } else {
+      setTimeout(() => {
+        setRideStatus("SEARCHING_DRIVER");
+        setIsRequestingRide(false);
+        
+        const searchDuration = 3000 + Math.random() * 2000;
+        searchTimeoutRef.current = setTimeout(async () => {
+          const driver = mockDrivers[Math.floor(Math.random() * mockDrivers.length)];
+          
+          const driverStart = generateDriverStartPosition(pickup.lat, pickup.lng);
+          setDriverStartPosition(driverStart);
+          
+          if (isGoogleMapsReady) {
+            try {
+              const directionsService = new google.maps.DirectionsService();
+              const result = await new Promise<google.maps.DirectionsResult | null>((resolve) => {
+                directionsService.route(
+                  {
+                    origin: { lat: driverStart.lat, lng: driverStart.lng },
+                    destination: { lat: pickup.lat, lng: pickup.lng },
+                    travelMode: google.maps.TravelMode.DRIVING,
+                  },
+                  (result, status) => {
+                    if (status === google.maps.DirectionsStatus.OK && result) {
+                      resolve(result);
+                    } else {
+                      resolve(null);
+                    }
                   }
-                }
-              );
-            });
-            
-            if (result && result.routes[0]) {
-              const route = result.routes[0];
-              const polyline = route.overview_polyline;
-              const polylineStr = typeof polyline === "string" ? polyline : "";
-              const driverToPickupPoints = decodePolyline(polylineStr);
-              setDriverToPickupRoute(driverToPickupPoints);
+                );
+              });
               
-              // Calculate initial pickup ETA and distance from the route
-              const leg = route.legs[0];
-              const etaMinutes = Math.ceil((leg.duration?.value || 300) / 60);
-              const distMiles = (leg.distance?.value || 1600) / 1609.34;
-              setPickupEtaMinutes(etaMinutes);
-              setPickupDistanceMiles(distMiles);
-              setRemainingMinutes(etaMinutes);
-              setRemainingMiles(distMiles);
-            } else {
-              // Fallback: generate a simple straight-line route if API fails
+              if (result && result.routes[0]) {
+                const route = result.routes[0];
+                const polyline = route.overview_polyline;
+                const polylineStr = typeof polyline === "string" ? polyline : "";
+                const driverToPickupPoints = decodePolyline(polylineStr);
+                setDriverToPickupRoute(driverToPickupPoints);
+                
+                const leg = route.legs[0];
+                const etaMinutes = Math.ceil((leg.duration?.value || 300) / 60);
+                const distMiles = (leg.distance?.value || 1600) / 1609.34;
+                setPickupEtaMinutes(etaMinutes);
+                setPickupDistanceMiles(distMiles);
+                setRemainingMinutes(etaMinutes);
+                setRemainingMiles(distMiles);
+              } else {
+                setDriverToPickupRoute([[driverStart.lat, driverStart.lng], [pickup.lat, pickup.lng]]);
+                const straightLineDistance = calculateDistance(driverStart, pickup);
+                setPickupEtaMinutes(Math.ceil(straightLineDistance * 2));
+                setPickupDistanceMiles(straightLineDistance);
+                setRemainingMinutes(Math.ceil(straightLineDistance * 2));
+                setRemainingMiles(straightLineDistance);
+              }
+            } catch (error) {
+              console.error("[UnifiedBooking] Failed to fetch driver-to-pickup route:", error);
               setDriverToPickupRoute([[driverStart.lat, driverStart.lng], [pickup.lat, pickup.lng]]);
               const straightLineDistance = calculateDistance(driverStart, pickup);
-              setPickupEtaMinutes(Math.ceil(straightLineDistance * 2)); // ~30 mph estimate
+              setPickupEtaMinutes(Math.ceil(straightLineDistance * 2));
               setPickupDistanceMiles(straightLineDistance);
               setRemainingMinutes(Math.ceil(straightLineDistance * 2));
               setRemainingMiles(straightLineDistance);
             }
-          } catch (error) {
-            console.error("[UnifiedBooking] Failed to fetch driver-to-pickup route:", error);
-            // Fallback route
-            setDriverToPickupRoute([[driverStart.lat, driverStart.lng], [pickup.lat, pickup.lng]]);
-            const straightLineDistance = calculateDistance(driverStart, pickup);
-            setPickupEtaMinutes(Math.ceil(straightLineDistance * 2));
-            setPickupDistanceMiles(straightLineDistance);
-            setRemainingMinutes(Math.ceil(straightLineDistance * 2));
-            setRemainingMiles(straightLineDistance);
           }
-        }
-        
-        setDriverInfo(driver);
-        setRideStatus("DRIVER_ASSIGNED");
-        // Set tracking phase to EN_ROUTE_TO_PICKUP (driver heading toward customer)
-        setTrackingPhase("EN_ROUTE_TO_PICKUP");
-        
-        // Play driver assigned notification sound
-        playDriverAssigned();
-        
-        toast({ 
-          title: "Driver found!", 
-          description: `${driver.name} is on the way in a ${driver.carColor} ${driver.carModel}` 
-        });
-      }, searchDuration);
-    }, 500);
-  }, [canRequestRide, pickup, activeRoutePoints, isGoogleMapsReady, toast, mockDrivers, playDriverAssigned]);
+          
+          setDriverInfo(driver);
+          setRideStatus("DRIVER_ASSIGNED");
+          setTrackingPhase("EN_ROUTE_TO_PICKUP");
+          
+          playDriverAssigned();
+          
+          toast({ 
+            title: "Driver found!", 
+            description: `${driver.name} is on the way in a ${driver.carColor} ${driver.carModel}` 
+          });
+        }, searchDuration);
+      }, 500);
+    }
+  }, [canRequestRide, pickup, dropoff, activeRoute, activeRoutePoints, isGoogleMapsReady, toast, mockDrivers, playDriverAssigned, useSimulation, fareEstimate]);
 
   // Handle ride cancellation
   const handleCancelRide = useCallback(() => {

@@ -11,7 +11,11 @@ import { dispatchService } from '../services/dispatchService';
 import { driverRealtimeStateService } from '../services/driverRealtimeStateService';
 import { DispatchServiceMode } from '@prisma/client';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  console.warn('[Dispatch WebSocket] WARNING: JWT_SECRET not set, WebSocket authentication will fail');
+}
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: string;
@@ -43,6 +47,12 @@ export function setupDispatchWebSocket(server: HTTPServer) {
 
     if (!token) {
       ws.send(JSON.stringify({ type: 'error', payload: { message: 'No token provided' } }));
+      ws.close();
+      return;
+    }
+
+    if (!JWT_SECRET) {
+      ws.send(JSON.stringify({ type: 'error', payload: { message: 'Server configuration error' } }));
       ws.close();
       return;
     }
