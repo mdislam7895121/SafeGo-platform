@@ -1,6 +1,9 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { rateLimitPayout, rateLimitSupport, rateLimitSensitive } from "./middleware/rateLimit";
+import { initStripe } from "./services/stripeInit";
+import { StripeWebhookHandler } from "./services/stripeWebhookHandler";
 import authRoutes from "./routes/auth";
 import driverRoutes from "./routes/driver";
 import driverSupportRoutes from "./routes/driver-support"; // Phase 12
@@ -77,6 +80,40 @@ type DriverPublicProfile = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize Stripe integration (creates schema, webhooks, syncs data)
+  const stripeInit = await initStripe();
+  if (stripeInit.success && stripeInit.webhookUuid) {
+    console.log('[Routes] Stripe initialized, registering webhook route');
+    
+    // Register Stripe webhook route - MUST be before express.json() middleware
+    // The webhook needs raw body for signature verification
+    app.post(
+      `/api/stripe/webhook/${stripeInit.webhookUuid}`,
+      express.raw({ type: 'application/json' }),
+      async (req: Request, res: Response) => {
+        const signature = req.headers['stripe-signature'];
+        if (!signature) {
+          return res.status(400).json({ error: 'Missing stripe-signature' });
+        }
+
+        try {
+          const sig = Array.isArray(signature) ? signature[0] : signature;
+          
+          if (!Buffer.isBuffer(req.body)) {
+            console.error('[StripeWebhook] req.body is not a Buffer');
+            return res.status(500).json({ error: 'Webhook processing error' });
+          }
+
+          await StripeWebhookHandler.processWebhook(req.body, sig, stripeInit.webhookUuid!);
+          res.status(200).json({ received: true });
+        } catch (error: any) {
+          console.error('[StripeWebhook] Error:', error.message);
+          res.status(400).json({ error: 'Webhook processing error' });
+        }
+      }
+    );
+  }
+
   // Public routes (no authentication required)
   // Public Eats endpoint for restaurant browsing (no auth required)
   app.use("/api/eats", eatsRoutes);

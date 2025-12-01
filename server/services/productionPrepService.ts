@@ -1,5 +1,6 @@
 import { prisma } from '../db';
 import { recordDeploymentCheck } from './monitoringService';
+import { isStripeConfigured } from './stripeClient';
 
 interface DeploymentCheckResult {
   name: string;
@@ -63,21 +64,28 @@ async function checkEnvVars(): Promise<DeploymentCheckResult[]> {
     details: { missing: missingCritical }
   });
   
-  const missingPayment: string[] = [];
-  for (const envVar of REQUIRED_ENV_VARS.payment) {
-    if (!process.env[envVar]) {
-      missingPayment.push(envVar);
-    }
+  // Check for Stripe via Replit connector OR legacy env vars
+  let stripeConfigured = false;
+  try {
+    stripeConfigured = await isStripeConfigured();
+  } catch {
+    stripeConfigured = false;
   }
+  
+  const hasLegacyStripeConfig = !!(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PUBLISHABLE_KEY);
+  const paymentConfigured = stripeConfigured || hasLegacyStripeConfig;
   
   results.push({
     name: 'Payment Configuration',
     category: 'payment',
-    passed: missingPayment.length === 0,
-    message: missingPayment.length === 0
-      ? 'Payment providers configured'
-      : `Missing payment config: ${missingPayment.join(', ')}`,
-    details: { missing: missingPayment }
+    passed: paymentConfigured,
+    message: paymentConfigured
+      ? stripeConfigured ? 'Stripe configured via Replit connector' : 'Stripe configured via environment variables'
+      : 'No payment provider configured (Stripe connector or env vars)',
+    details: { 
+      stripeConnector: stripeConfigured, 
+      legacyEnvVars: hasLegacyStripeConfig 
+    }
   });
   
   const availableOptional: string[] = [];

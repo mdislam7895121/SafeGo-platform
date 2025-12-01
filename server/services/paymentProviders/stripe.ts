@@ -12,45 +12,54 @@ import {
   ParseWebhookParams,
   ParseWebhookResult,
 } from "./base";
+import { getUncachableStripeClient, isStripeConfigured } from "../stripeClient";
 
 export class StripePaymentProvider extends BasePaymentProvider {
   readonly providerType = PaymentProvider.stripe;
   
-  private apiKey: string | null;
-  private webhookSecret: string | null;
+  private configured: boolean | null = null;
   
   constructor() {
     super();
-    this.apiKey = process.env.STRIPE_SECRET_KEY || null;
-    this.webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || null;
   }
   
   isConfigured(): boolean {
-    return !!this.apiKey;
+    if (this.configured === null) {
+      isStripeConfigured().then(result => {
+        this.configured = result;
+      }).catch(() => {
+        this.configured = false;
+      });
+      return false;
+    }
+    return this.configured;
   }
   
   async createPaymentIntent(params: CreatePaymentIntentParams): Promise<CreatePaymentIntentResult> {
-    if (!this.isConfigured()) {
-      console.warn("[StripePaymentProvider] Stripe is not configured, falling back to mock");
-      return {
-        success: false,
-        status: PaymentStatus.failed,
-        error: "Stripe is not configured",
-        errorCode: "provider_not_configured",
-      };
-    }
-    
     try {
+      const stripe = await getUncachableStripeClient();
       const amountInCents = Math.round(params.amount * 100);
       
-      console.log(`[StripePaymentProvider] Would create payment intent for ${amountInCents} cents ${params.currency}`);
-      console.log(`[StripePaymentProvider] Note: Full Stripe SDK integration required for production`);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amountInCents,
+        currency: params.currency.toLowerCase(),
+        payment_method_types: ['card'],
+        metadata: {
+          entityId: params.entityId,
+          serviceType: params.serviceType,
+          customerId: params.customerId,
+          ...(params.metadata || {}),
+        },
+        capture_method: 'automatic',
+      });
+      
+      console.log(`[StripePaymentProvider] Created payment intent: ${paymentIntent.id}`);
       
       return {
-        success: false,
-        status: PaymentStatus.failed,
-        error: "Stripe SDK not yet integrated",
-        errorCode: "not_implemented",
+        success: true,
+        providerPaymentId: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret || undefined,
+        status: this.mapStripeStatus(paymentIntent.status),
       };
     } catch (error: any) {
       console.error("[StripePaymentProvider] Error creating payment intent:", error);
@@ -64,23 +73,20 @@ export class StripePaymentProvider extends BasePaymentProvider {
   }
   
   async capturePayment(params: CapturePaymentParams): Promise<CapturePaymentResult> {
-    if (!this.isConfigured()) {
-      return {
-        success: false,
-        status: PaymentStatus.failed,
-        error: "Stripe is not configured",
-        errorCode: "provider_not_configured",
-      };
-    }
-    
     try {
-      console.log(`[StripePaymentProvider] Would capture payment: ${params.providerPaymentId}`);
+      const stripe = await getUncachableStripeClient();
+      
+      const paymentIntent = await stripe.paymentIntents.capture(
+        params.providerPaymentId,
+        params.amount ? { amount_to_capture: Math.round(params.amount * 100) } : undefined
+      );
+      
+      console.log(`[StripePaymentProvider] Captured payment: ${paymentIntent.id}`);
       
       return {
-        success: false,
-        status: PaymentStatus.failed,
-        error: "Stripe SDK not yet integrated",
-        errorCode: "not_implemented",
+        success: true,
+        providerPaymentId: paymentIntent.id,
+        status: this.mapStripeStatus(paymentIntent.status),
       };
     } catch (error: any) {
       console.error("[StripePaymentProvider] Error capturing payment:", error);
@@ -94,23 +100,17 @@ export class StripePaymentProvider extends BasePaymentProvider {
   }
   
   async cancelPayment(params: CancelPaymentParams): Promise<CancelPaymentResult> {
-    if (!this.isConfigured()) {
-      return {
-        success: false,
-        status: PaymentStatus.failed,
-        error: "Stripe is not configured",
-        errorCode: "provider_not_configured",
-      };
-    }
-    
     try {
-      console.log(`[StripePaymentProvider] Would cancel payment: ${params.providerPaymentId}`);
+      const stripe = await getUncachableStripeClient();
+      
+      const paymentIntent = await stripe.paymentIntents.cancel(params.providerPaymentId);
+      
+      console.log(`[StripePaymentProvider] Cancelled payment: ${paymentIntent.id}`);
       
       return {
-        success: false,
-        status: PaymentStatus.failed,
-        error: "Stripe SDK not yet integrated",
-        errorCode: "not_implemented",
+        success: true,
+        providerPaymentId: paymentIntent.id,
+        status: PaymentStatus.cancelled,
       };
     } catch (error: any) {
       console.error("[StripePaymentProvider] Error cancelling payment:", error);
@@ -124,23 +124,22 @@ export class StripePaymentProvider extends BasePaymentProvider {
   }
   
   async refundPayment(params: RefundPaymentParams): Promise<RefundPaymentResult> {
-    if (!this.isConfigured()) {
-      return {
-        success: false,
-        status: "failed",
-        error: "Stripe is not configured",
-        errorCode: "provider_not_configured",
-      };
-    }
-    
     try {
-      console.log(`[StripePaymentProvider] Would refund payment: ${params.providerPaymentId}`);
+      const stripe = await getUncachableStripeClient();
+      
+      const refund = await stripe.refunds.create({
+        payment_intent: params.providerPaymentId,
+        amount: params.amount ? Math.round(params.amount * 100) : undefined,
+        reason: (params.reason as any) || 'requested_by_customer',
+      });
+      
+      console.log(`[StripePaymentProvider] Created refund: ${refund.id}`);
       
       return {
-        success: false,
-        status: "failed",
-        error: "Stripe SDK not yet integrated",
-        errorCode: "not_implemented",
+        success: true,
+        refundId: refund.id,
+        status: refund.status === 'succeeded' ? 'succeeded' : 'pending',
+        amount: refund.amount / 100,
       };
     } catch (error: any) {
       console.error("[StripePaymentProvider] Error refunding payment:", error);
@@ -154,19 +153,59 @@ export class StripePaymentProvider extends BasePaymentProvider {
   }
   
   async parseWebhook(params: ParseWebhookParams): Promise<ParseWebhookResult> {
-    if (!this.webhookSecret) {
-      return {
-        success: false,
-        error: "Stripe webhook secret not configured",
-      };
-    }
-    
     try {
-      console.log("[StripePaymentProvider] Would verify and parse Stripe webhook");
+      const stripe = await getUncachableStripeClient();
+      
+      const event = stripe.webhooks.constructEvent(
+        params.rawBody,
+        params.signature,
+        process.env.STRIPE_WEBHOOK_SECRET || ''
+      );
+      
+      console.log(`[StripePaymentProvider] Parsed webhook event: ${event.type}`);
+      
+      let eventType: string;
+      let paymentId: string | undefined;
+      let status: PaymentStatus | undefined;
+      let metadata: Record<string, any> | undefined;
+      
+      switch (event.type) {
+        case 'payment_intent.succeeded':
+          eventType = 'payment.succeeded';
+          paymentId = (event.data.object as any).id;
+          status = PaymentStatus.captured;
+          metadata = (event.data.object as any).metadata;
+          break;
+        case 'payment_intent.payment_failed':
+          eventType = 'payment.failed';
+          paymentId = (event.data.object as any).id;
+          status = PaymentStatus.failed;
+          metadata = (event.data.object as any).metadata;
+          break;
+        case 'payment_intent.canceled':
+          eventType = 'payment.cancelled';
+          paymentId = (event.data.object as any).id;
+          status = PaymentStatus.cancelled;
+          metadata = (event.data.object as any).metadata;
+          break;
+        case 'charge.refunded':
+          eventType = 'payment.refunded';
+          paymentId = (event.data.object as any).payment_intent;
+          status = PaymentStatus.refunded;
+          break;
+        default:
+          eventType = event.type;
+      }
       
       return {
-        success: false,
-        error: "Stripe SDK not yet integrated",
+        success: true,
+        event: {
+          type: eventType,
+          providerPaymentId: paymentId,
+          status,
+          metadata,
+          rawEvent: event,
+        },
       };
     } catch (error: any) {
       console.error("[StripePaymentProvider] Error parsing webhook:", error);
@@ -174,6 +213,25 @@ export class StripePaymentProvider extends BasePaymentProvider {
         success: false,
         error: error.message,
       };
+    }
+  }
+  
+  private mapStripeStatus(stripeStatus: string): PaymentStatus {
+    switch (stripeStatus) {
+      case 'succeeded':
+        return PaymentStatus.captured;
+      case 'requires_capture':
+        return PaymentStatus.authorized;
+      case 'requires_payment_method':
+      case 'requires_confirmation':
+      case 'requires_action':
+        return PaymentStatus.pending;
+      case 'processing':
+        return PaymentStatus.processing;
+      case 'canceled':
+        return PaymentStatus.cancelled;
+      default:
+        return PaymentStatus.pending;
     }
   }
 }
