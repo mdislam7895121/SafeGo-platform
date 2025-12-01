@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { GlobalSearch } from "@/components/admin/GlobalSearch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuery } from "@tanstack/react-query";
@@ -95,6 +96,13 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
             </Badge>
 
             <div className="flex-1" />
+
+            {/* Global Search */}
+            <div className="hidden md:flex flex-1 max-w-md mx-4">
+              <GlobalSearch />
+            </div>
+
+            <div className="flex-1 hidden md:block" />
 
             {/* Right Side Actions */}
             <div className="flex items-center gap-1 md:gap-2">
