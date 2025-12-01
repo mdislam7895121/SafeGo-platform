@@ -37,6 +37,7 @@ The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with
 *   **Multi-Category Vehicle System**: Supports 7 Uber-style vehicle categories with configurable fare multipliers and minimum fares.
 *   **Cross-State Fare Engine**: Dedicated Uber-style pricing for interstate trips.
 *   **Promo Code System**: User-entered promotional codes with comprehensive validation.
+*   **Social Media Sharing for Promotions**: Reusable SocialShareButton component (client/src/components/ui/social-share-button.tsx) enabling promotion sharing to Twitter/X, Facebook, LinkedIn, WhatsApp with copy-link and native Web Share API support. Includes UTM tracking parameters for analytics. Integrated in admin ride promotions and restaurant promotion management pages.
 *   **Ride System Features**: Ride lifecycle management with customer controls, post-trip rating, detailed receipts, and driver status workflow with audit trails.
 *   **Driver Incentive Engine**: Comprehensive incentive system with 5 bonus types.
 *   **AI Marketplace Balancer**: Enterprise-grade real-time marketplace optimization.
