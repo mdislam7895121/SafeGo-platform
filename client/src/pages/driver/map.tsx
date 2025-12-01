@@ -772,10 +772,9 @@ export default function DriverMapPage() {
           </SheetContent>
         </Sheet>
 
-        {/* Go Online/Offline Button - Centered */}
+        {/* Go Online/Offline Button - Uber-style centered pill */}
         <button
           onClick={() => {
-            // Show why button won't work
             if (!isVerified) {
               toast({ 
                 title: "Account not verified",
@@ -792,8 +791,6 @@ export default function DriverMapPage() {
               });
               return;
             }
-            
-            // Check service preferences only when going online
             if (!isOnline && !hasAnyServiceEnabled) {
               toast({ 
                 title: "No trip types enabled",
@@ -803,21 +800,26 @@ export default function DriverMapPage() {
               setShowServiceSheet(true);
               return;
             }
-            
-            // Call the toggle function
             toggleOnlineStatus();
           }}
           disabled={isUpdatingStatus}
-          className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
+          className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 h-14 px-8 rounded-full transition-all duration-200 z-[1000] ${
             isUpdatingStatus ? "opacity-70 cursor-wait" : ""
-          } ${!isVerified || !hasVehicle ? "opacity-50 cursor-not-allowed" : ""} ${isOnline 
-            ? "bg-[#FF3B30] hover:bg-[#E63529] active:bg-[#CC2F26]" 
-            : "bg-[#28C840] hover:bg-[#22B038] active:bg-[#1D9A30]"
-          } text-white`}
+          } ${!isVerified || !hasVehicle ? "opacity-50 cursor-not-allowed" : ""}`}
+          style={{
+            backgroundColor: "#000000",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.28)",
+          }}
           data-testid="button-online-toggle"
         >
-          <Power className="h-5 w-5 text-white" />
-          <span className="font-semibold text-base whitespace-nowrap">
+          <Power 
+            className="h-5 w-5" 
+            style={{ color: isOnline ? "#FF3B30" : "#00E676" }}
+          />
+          <span 
+            className="font-semibold text-base whitespace-nowrap"
+            style={{ color: "#FFFFFF" }}
+          >
             {isUpdatingStatus 
               ? "Updating..." 
               : isOnline 
