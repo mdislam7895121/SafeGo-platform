@@ -201,11 +201,16 @@ export class WalletService {
     });
   }
 
+  /**
+   * Record a commission debit against a wallet (increases negative balance).
+   * Always uses serviceType "commission" internally to trigger negative balance logic.
+   * The service context (ride/food/parcel) is tracked via referenceType parameter.
+   */
   async recordCommission(
     ownerId: string,
     ownerType: WalletOwnerType,
     countryCode: string,
-    serviceType: WalletTransactionServiceType,
+    _serviceType: WalletTransactionServiceType, // Kept for API compatibility, but overridden
     amount: number,
     referenceType: WalletTransactionReferenceType,
     referenceId: string,
@@ -219,11 +224,13 @@ export class WalletService {
       currency,
     });
 
+    // Always use "commission" to trigger negative balance logic in recordTransaction
+    // The service context is preserved in referenceType (ride, food_order, delivery)
     await this.recordTransaction({
       walletId: wallet.id,
       ownerType,
       countryCode,
-      serviceType,  // CRITICAL: Preserve passed serviceType (ride, parcel_delivery, food_order)
+      serviceType: "commission",
       direction: "debit",
       amount,
       referenceType,
@@ -273,11 +280,12 @@ export class WalletService {
 
     if (ride.paymentMethod === "cash") {
       // Cash: Driver collects full cash, SafeGo commission becomes negative balance
+      // Use serviceType "commission" to trigger negative balance logic in recordTransaction
       await this.recordCommission(
         driverId,
         "driver",
         countryCode,
-        "ride",
+        "commission",
         commissionAmount,
         "ride",
         ride.id,
@@ -337,11 +345,12 @@ export class WalletService {
 
     if (order.paymentMethod === "cash") {
       // Cash: Restaurant collects full cash, SafeGo commission becomes negative balance
+      // Use serviceType "commission" to trigger negative balance logic in recordTransaction
       await this.recordCommission(
         restaurantId,
         "restaurant",
         countryCode,
-        "food_order",
+        "commission",
         commissionAmount,
         "food_order",
         order.id,
@@ -353,7 +362,7 @@ export class WalletService {
         restaurantId,
         "restaurant",
         countryCode,
-        "food_order",
+        "food",
         payoutAmount,
         "food_order",
         order.id,
@@ -410,47 +419,72 @@ export class WalletService {
     }
 
     if (order.paymentMethod === "cash") {
-      // Cash: Reverse commission that was owed (credited to negative balance)
+      // Cash: Reverse commission that was owed (reduces negative balance)
+      // Mirror recordTransaction logic: reduce negativeBalance first, credit excess to availableBalance
+      const currentNegativeBalance = parseFloat(wallet.negativeBalance.toString());
+      const amountToReduceDebt = Math.min(commissionAmount, currentNegativeBalance);
+      const excessAmount = commissionAmount - amountToReduceDebt;
+      
+      // Atomic update with proper debt reduction + excess crediting
+      const updatedWallet = await db.wallet.update({
+        where: { id: wallet.id },
+        data: { 
+          negativeBalance: { decrement: amountToReduceDebt },
+          availableBalance: excessAmount > 0 ? { increment: excessAmount } : undefined,
+        },
+      });
+      
       await db.walletTransaction.create({
         data: {
           walletId: wallet.id,
+          ownerType: "restaurant",
+          countryCode,
           serviceType: "commission_refund",
           direction: "credit",
           amount: commissionAmount,
-          balanceAfter: wallet.balance + commissionAmount,
+          balanceSnapshot: updatedWallet.availableBalance,
+          negativeBalanceSnapshot: updatedWallet.negativeBalance,
           referenceType: "food_order",
           referenceId: orderId,
           description: `Refund: Commission reversed for cancelled cash order`,
         },
       });
-      
-      await db.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: { increment: commissionAmount } },
-      });
     } else {
       // Online: Reverse payout that was credited to available balance
       // Use netEarnings (what was actually credited) instead of restaurantPayout
+      // Atomic update with decrement to avoid race conditions
+      const updatedWallet = await db.wallet.update({
+        where: { id: wallet.id },
+        data: { availableBalance: { decrement: netEarningsAmount } },
+      });
+      
       await db.walletTransaction.create({
         data: {
           walletId: wallet.id,
-          serviceType: "food_order",
+          ownerType: "restaurant",
+          countryCode,
+          serviceType: "refund",
           direction: "debit",
           amount: netEarningsAmount,
-          balanceAfter: wallet.balance - netEarningsAmount,
+          balanceSnapshot: updatedWallet.availableBalance,
+          negativeBalanceSnapshot: updatedWallet.negativeBalance,
           referenceType: "food_order",
           referenceId: orderId,
           description: `Refund: Payout reversed for cancelled online order`,
         },
       });
-      
-      await db.wallet.update({
-        where: { id: wallet.id },
-        data: { balance: { decrement: netEarningsAmount } },
-      });
     }
   }
 
+  /**
+   * Record food delivery earnings for a driver.
+   * For online payments: Credits the driver's wallet with their delivery payout.
+   * For cash payments: No wallet transaction needed - driver collects cash directly.
+   * 
+   * NOTE: SafeGo does NOT charge drivers a commission on food delivery courier fees.
+   * Commission is only charged to restaurants (via recordFoodOrderEarning).
+   * Drivers keep 100% of their delivery fee.
+   */
   async recordFoodDeliveryEarning(
     driverId: string,
     delivery: {
@@ -487,7 +521,7 @@ export class WalletService {
         driverId,
         "driver",
         countryCode,
-        "food_delivery",
+        "food",
         deliveryPayoutAmount,
         "food_order",
         delivery.id,
@@ -495,6 +529,7 @@ export class WalletService {
       );
     }
     // Cash: Driver collects delivery fee directly, no wallet transaction needed
+    // No commission charged on food delivery courier fees
   }
 
   async recordParcelDeliveryEarning(
@@ -537,11 +572,12 @@ export class WalletService {
 
     if (parcel.paymentMethod === "cash") {
       // Cash: Driver collects full cash, SafeGo commission becomes negative balance
+      // Use serviceType "commission" to trigger negative balance logic in recordTransaction
       await this.recordCommission(
         driverId,
         "driver",
         countryCode,
-        "parcel_delivery",
+        "commission",
         commissionAmount,
         "delivery",
         parcel.id,
@@ -553,7 +589,7 @@ export class WalletService {
         driverId,
         "driver",
         countryCode,
-        "parcel_delivery",
+        "parcel",
         payoutAmount,
         "delivery",
         parcel.id,
@@ -837,12 +873,15 @@ export class WalletService {
       serviceType: "commission",
     };
 
-    if (filters?.startDate) {
-      where.createdAt = { ...where.createdAt, gte: filters.startDate };
-    }
-
-    if (filters?.endDate) {
-      where.createdAt = { ...where.createdAt, lte: filters.endDate };
+    if (filters?.startDate || filters?.endDate) {
+      const createdAtFilter: { gte?: Date; lte?: Date } = {};
+      if (filters?.startDate) {
+        createdAtFilter.gte = filters.startDate;
+      }
+      if (filters?.endDate) {
+        createdAtFilter.lte = filters.endDate;
+      }
+      where.createdAt = createdAtFilter;
     }
 
     if (filters?.countryCode) {
@@ -959,13 +998,14 @@ export class WalletService {
     const { adminRole, countryCode, cityCode, ownerType } = adminContext;
 
     // Build RBAC filter for user jurisdiction
+    // Note: cityCode is on profiles, not User model - only filter by countryCode at User level
     const userFilter: Prisma.UserWhereInput = {};
     
     if (adminRole === "COUNTRY_ADMIN" && countryCode) {
       userFilter.countryCode = countryCode;
-    } else if (adminRole === "CITY_ADMIN" && countryCode && cityCode) {
+    } else if (adminRole === "CITY_ADMIN" && countryCode) {
       userFilter.countryCode = countryCode;
-      userFilter.cityCode = cityCode;
+      // cityCode filtering is done at profile level, not user level
     }
     // SUPER_ADMIN: no filter (sees all)
 
@@ -1036,7 +1076,7 @@ export class WalletService {
             owner = {
               email: user.email,
               countryCode: user.countryCode || '',
-              cityCode: user.cityCode || '',
+              cityCode: '', // cityCode is on profile, not user model
               fullName: user.driverProfile?.fullName || user.email,
             };
           }
@@ -1046,7 +1086,7 @@ export class WalletService {
             owner = {
               email: user.email,
               countryCode: user.countryCode || '',
-              cityCode: user.cityCode || '',
+              cityCode: user.customerProfile?.cityCode || '',
               fullName: user.customerProfile?.fullName || user.email,
             };
           }
@@ -1056,7 +1096,7 @@ export class WalletService {
             owner = {
               email: restaurant.user?.email || '',
               countryCode: restaurant.user?.countryCode || '',
-              cityCode: restaurant.user?.cityCode || '',
+              cityCode: restaurant.cityCode || '',
               restaurantName: restaurant.restaurantName || 'Unknown Restaurant',
             };
           }
