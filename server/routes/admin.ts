@@ -12967,4 +12967,415 @@ router.get("/analytics/top-earners", checkPermission(Permission.VIEW_REVENUE_ANA
   }
 });
 
+// ============================================================
+// Phase 4 Part 2: Identity Verification Routes
+// ============================================================
+
+import { identityVerificationService } from "../services/identityVerificationService";
+import { backgroundCheckService } from "../services/backgroundCheckService";
+import { faceVerificationService } from "../services/faceVerificationService";
+import { KycDocumentType, KycVerificationStatus, BackgroundCheckResult, MobileWalletBrand } from "@prisma/client";
+
+// GET /api/admin/kyc/stats - Get KYC verification statistics
+router.get("/kyc/stats", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode } = req.query;
+    const stats = await identityVerificationService.getVerificationStats(countryCode as string | undefined);
+    res.json({ success: true, stats });
+  } catch (error: any) {
+    console.error("KYC stats error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch KYC stats" });
+  }
+});
+
+// GET /api/admin/kyc/pending - Get pending KYC verifications
+router.get("/kyc/pending", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode } = req.query;
+    const pending = await identityVerificationService.getPendingVerifications(countryCode as string | undefined);
+    res.json({ success: true, verifications: pending });
+  } catch (error: any) {
+    console.error("KYC pending error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch pending verifications" });
+  }
+});
+
+// POST /api/admin/kyc/verify - Trigger identity verification
+router.post("/kyc/verify", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      userType: z.enum(["customer", "driver", "restaurant"]),
+      userId: z.string().uuid(),
+      countryCode: z.string().length(2),
+      documentType: z.nativeEnum(KycDocumentType),
+      documentData: z.record(z.string()),
+    });
+
+    const data = schema.parse(req.body);
+
+    const result = await identityVerificationService.verifyIdentity({
+      ...data,
+      triggeredByAdminId: req.adminUser?.id,
+      autoTriggered: false,
+    });
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.DRIVER,
+      entityId: data.userId,
+      description: `Triggered KYC verification for ${data.userType} ${data.userId}`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, result });
+  } catch (error: any) {
+    console.error("KYC verify error:", error);
+    res.status(500).json({ error: error.message || "Failed to trigger verification" });
+  }
+});
+
+// GET /api/admin/kyc/history/:userType/:userId - Get verification history
+router.get("/kyc/history/:userType/:userId", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { userType, userId } = req.params;
+    const history = await identityVerificationService.getVerificationHistory(userId, userType);
+    res.json({ success: true, history });
+  } catch (error: any) {
+    console.error("KYC history error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch verification history" });
+  }
+});
+
+// PUT /api/admin/kyc/:logId/review - Mark for or resolve manual review
+router.put("/kyc/:logId/review", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const { logId } = req.params;
+    const schema = z.object({
+      action: z.enum(["mark_review", "resolve"]),
+      decision: z.enum(["match", "mismatch"]).optional(),
+      notes: z.string().min(1),
+    });
+
+    const data = schema.parse(req.body);
+
+    if (data.action === "mark_review") {
+      await identityVerificationService.markForManualReview(logId, req.adminUser!.id, data.notes);
+    } else if (data.action === "resolve" && data.decision) {
+      await identityVerificationService.resolveManualReview(logId, req.adminUser!.id, data.decision, data.notes);
+    }
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.DRIVER,
+      entityId: logId,
+      description: `KYC ${data.action} with decision: ${data.decision || 'N/A'}`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, message: "Review action completed" });
+  } catch (error: any) {
+    console.error("KYC review error:", error);
+    res.status(500).json({ error: error.message || "Failed to process review" });
+  }
+});
+
+// ============================================================
+// Phase 4 Part 2: Background Check Routes
+// ============================================================
+
+// GET /api/admin/background-checks/stats - Get background check statistics
+router.get("/background-checks/stats", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode } = req.query;
+    const stats = await backgroundCheckService.getStats(countryCode as string | undefined);
+    res.json({ success: true, stats });
+  } catch (error: any) {
+    console.error("Background check stats error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch stats" });
+  }
+});
+
+// GET /api/admin/background-checks/driver/:driverId - Get driver's background checks
+router.get("/background-checks/driver/:driverId", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { driverId } = req.params;
+    const checks = await backgroundCheckService.getDriverChecks(driverId);
+    res.json({ success: true, checks });
+  } catch (error: any) {
+    console.error("Background checks fetch error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch driver checks" });
+  }
+});
+
+// POST /api/admin/background-checks/initiate - Initiate background check
+router.post("/background-checks/initiate", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      driverId: z.string().uuid(),
+      countryCode: z.string().length(2),
+    });
+
+    const data = schema.parse(req.body);
+
+    const result = await backgroundCheckService.initiateCheck({
+      ...data,
+      initiatedByAdminId: req.adminUser?.id,
+    });
+
+    if (result.success) {
+      await logAuditEvent({
+        adminId: req.adminUser!.id,
+        actionType: ActionType.UPDATE_STATUS,
+        entityType: EntityType.DRIVER,
+        entityId: data.driverId,
+        description: `Initiated background check for driver ${data.driverId}`,
+        clientIp: getClientIp(req),
+      });
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    console.error("Background check initiate error:", error);
+    res.status(500).json({ error: error.message || "Failed to initiate background check" });
+  }
+});
+
+// PUT /api/admin/background-checks/:checkId/resolve - Manually resolve background check
+router.put("/background-checks/:checkId/resolve", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const { checkId } = req.params;
+    const schema = z.object({
+      result: z.nativeEnum(BackgroundCheckResult),
+      notes: z.string().min(1),
+    });
+
+    const data = schema.parse(req.body);
+
+    await backgroundCheckService.manuallyResolve(checkId, req.adminUser!.id, data.result, data.notes);
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.DRIVER,
+      entityId: checkId,
+      description: `Manually resolved background check with result: ${data.result}`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, message: "Background check resolved" });
+  } catch (error: any) {
+    console.error("Background check resolve error:", error);
+    res.status(500).json({ error: error.message || "Failed to resolve background check" });
+  }
+});
+
+// GET /api/admin/background-checks/expiring - Get expiring background checks
+router.get("/background-checks/expiring", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30;
+    const expiring = await backgroundCheckService.getExpiringChecks(days);
+    res.json({ success: true, expiring });
+  } catch (error: any) {
+    console.error("Expiring checks error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch expiring checks" });
+  }
+});
+
+// ============================================================
+// Phase 4 Part 2: Face Verification Routes
+// ============================================================
+
+// GET /api/admin/face-verification/stats - Get face verification statistics
+router.get("/face-verification/stats", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode } = req.query;
+    const stats = await faceVerificationService.getStats(countryCode as string | undefined);
+    res.json({ success: true, stats });
+  } catch (error: any) {
+    console.error("Face verification stats error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch stats" });
+  }
+});
+
+// GET /api/admin/face-verification/pending - Get pending face verifications
+router.get("/face-verification/pending", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode } = req.query;
+    const pending = await faceVerificationService.getPendingSessions(countryCode as string | undefined);
+    res.json({ success: true, sessions: pending });
+  } catch (error: any) {
+    console.error("Face verification pending error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch pending sessions" });
+  }
+});
+
+// GET /api/admin/face-verification/user/:userType/:userId - Get user's sessions
+router.get("/face-verification/user/:userType/:userId", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { userType, userId } = req.params;
+    const sessions = await faceVerificationService.getUserSessions(userId, userType);
+    res.json({ success: true, sessions });
+  } catch (error: any) {
+    console.error("Face verification sessions error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch sessions" });
+  }
+});
+
+// PUT /api/admin/face-verification/:sessionId/review - Admin review session
+router.put("/face-verification/:sessionId/review", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const { sessionId } = req.params;
+    const schema = z.object({
+      decision: z.enum(["match", "mismatch"]),
+      notes: z.string().min(1),
+    });
+
+    const data = schema.parse(req.body);
+
+    await faceVerificationService.adminReview(sessionId, req.adminUser!.id, data.decision, data.notes);
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.DRIVER,
+      entityId: sessionId,
+      description: `Face verification review: ${data.decision}`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, message: "Review completed" });
+  } catch (error: any) {
+    console.error("Face verification review error:", error);
+    res.status(500).json({ error: error.message || "Failed to complete review" });
+  }
+});
+
+// POST /api/admin/face-verification/require - Require face verification for driver
+router.post("/face-verification/require", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      driverId: z.string().uuid(),
+    });
+
+    const { driverId } = schema.parse(req.body);
+
+    await faceVerificationService.requireFaceVerification(driverId);
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.DRIVER,
+      entityId: driverId,
+      description: `Required face verification for driver`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, message: "Face verification required" });
+  } catch (error: any) {
+    console.error("Require face verification error:", error);
+    res.status(500).json({ error: error.message || "Failed to require verification" });
+  }
+});
+
+// ============================================================
+// Phase 4 Part 2: BD Mobile Wallet Configuration Routes
+// ============================================================
+
+// GET /api/admin/mobile-wallets/config - Get mobile wallet configurations
+router.get("/mobile-wallets/config", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode } = req.query;
+    const configs = await prisma.mobileWalletConfig.findMany({
+      where: countryCode ? { countryCode: countryCode as string } : undefined,
+      orderBy: [{ countryCode: "asc" }, { provider: "asc" }],
+    });
+    res.json({ success: true, configs });
+  } catch (error: any) {
+    console.error("Mobile wallet config error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch configs" });
+  }
+});
+
+// POST /api/admin/mobile-wallets/config - Create or update mobile wallet config
+router.post("/mobile-wallets/config", checkPermission(Permission.MANAGE_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const schema = z.object({
+      countryCode: z.string().length(2),
+      provider: z.nativeEnum(MobileWalletBrand),
+      providerName: z.string().min(1),
+      isEnabled: z.boolean().default(false),
+      isDefault: z.boolean().default(false),
+      enabledForRides: z.boolean().default(true),
+      enabledForFood: z.boolean().default(true),
+      enabledForParcels: z.boolean().default(true),
+      merchantId: z.string().optional(),
+      merchantName: z.string().optional(),
+      callbackUrl: z.string().url().optional(),
+      sandboxMode: z.boolean().default(true),
+      displayName: z.string().optional(),
+      logoUrl: z.string().url().optional(),
+    });
+
+    const data = schema.parse(req.body);
+
+    const config = await prisma.mobileWalletConfig.upsert({
+      where: {
+        countryCode_provider: {
+          countryCode: data.countryCode,
+          provider: data.provider,
+        },
+      },
+      update: {
+        ...data,
+        updatedAt: new Date(),
+      },
+      create: {
+        ...data,
+        createdByAdminId: req.adminUser?.id,
+      },
+    });
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.RESTAURANT,
+      entityId: config.id,
+      description: `Updated mobile wallet config for ${data.provider} in ${data.countryCode}`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, config });
+  } catch (error: any) {
+    console.error("Mobile wallet config update error:", error);
+    res.status(500).json({ error: error.message || "Failed to update config" });
+  }
+});
+
+// DELETE /api/admin/mobile-wallets/config/:id - Delete mobile wallet config
+router.delete("/mobile-wallets/config/:id", checkPermission(Permission.MANAGE_SETTINGS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    await prisma.mobileWalletConfig.delete({
+      where: { id },
+    });
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.DELETE,
+      entityType: EntityType.RESTAURANT,
+      entityId: id,
+      description: `Deleted mobile wallet config`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, message: "Config deleted" });
+  } catch (error: any) {
+    console.error("Mobile wallet config delete error:", error);
+    res.status(500).json({ error: error.message || "Failed to delete config" });
+  }
+});
+
 export default router;
