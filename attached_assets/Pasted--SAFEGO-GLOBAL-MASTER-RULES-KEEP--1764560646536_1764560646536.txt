@@ -1,0 +1,309 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (KEEP)
+====================================
+
+ROLES (4 roles, never mixed)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+SERVICES (must always work)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+KYC – BANGLADESH (BD)
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified (boolean)
+
+KYC – UNITED STATES (US)
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (for drivers)
+- driver_license_image_url
+- driver_license_expiry
+- ssn_last4 (optional, drivers)
+- verification_status
+- is_verified (boolean)
+
+ONBOARDING (all roles)
+- Multi-step:
+  1) Basic info
+  2) Address
+  3) ID/KYC upload using BD/US rules
+  4) Emergency contact
+- After onboarding: verification_status = "pending"
+- Block all rides/food/parcel until admin sets verification_status = "approved"
+
+ADMIN PANEL (must keep all)
+- Approve/reject KYC for customers, drivers, restaurants (store rejection_reason)
+- Block/unblock any user or restaurant
+- Configure pricing, fees, commissions (per country + service)
+- Manage payouts and mark balances paid
+- View driver negative balance
+- View restaurant negative balance
+
+COLLECTIONS (no breaking changes)
+
+1) rides
+   - ride_id
+   - customer_id, driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng, dropoff_lat, dropoff_lng
+   - service_type
+   - fare_amount, tax_amount, safego_commission_amount, driver_earnings_amount
+   - payment_method (cash / online)
+   - status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - order_id
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address, restaurant_lat, restaurant_lng
+   - delivery_address, delivery_lat, delivery_lng
+   - items, subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount, restaurant_payout_amount
+   - payment_method
+   - status:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+3) deliveries
+   - delivery_id
+   - customer_id, driver_id
+   - pickup_address, pickup_lat, pickup_lng
+   - dropoff_address, dropoff_lat, dropoff_lng
+   - package_description, package_size
+   - delivery_fee, safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+COMMISSION & PAYOUT RULES (always)
+- CASH ride:
+  - Driver receives full cash.
+  - SafeGo commission → negative driver_wallet_balance.
+  - Driver must settle weekly; admin marks paid.
+- CASH food:
+  - Restaurant receives full cash.
+  - Commission → negative restaurant_wallet_balance.
+- ONLINE payments:
+  - SafeGo collects full amount.
+  - SafeGo keeps safego_commission_amount automatically.
+  - Driver/restaurant receive net payout only.
+- Admin can view and settle all negative balances.
+
+SECURITY RULES
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer KYC/sensitive fields.
+- Restaurants cannot view other restaurants.
+- Only admin can change pricing, commissions, verification_status, blocking.
+- Users can update only their own profile.
+- All APIs over HTTPS.
+
+STATUS FLOWS (unchanged)
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+NOTIFICATIONS
+- New ride/food/parcel alerts for drivers
+- Status updates for customers & drivers
+- Verification approval/rejection
+- Payout/settlement reminders
+- Important admin announcements
+
+MAP
+- Do NOT change tiles, zoom behaviour, or routing.
+- No full-screen black/“Loading” overlay on /driver/map.
+
+====================================================
+TASK: MAKE THE “GO ONLINE / GO OFFLINE” FOOTER BUTTON FULLY WORKING
+====================================================
+
+Screen: /driver/map
+
+Current behavior:
+- The green “Go Online” footer button is visible and centered.
+- Pressing it does NOT actually change the driver’s online status in the backend.
+- The button color/label does not toggle correctly.
+
+Goal:
+- The footer button must be the ONLY control for driver availability.
+- Pressing it should reliably toggle between OFFLINE and ONLINE:
+  - Update backend driver status.
+  - Update UI color and label.
+  - Affect ride/food/parcel matching.
+- No full page reload or black flash.
+
+-----------------------------------
+1) Driver online status field (backend)
+-----------------------------------
+Use an existing driver availability field if present (for example: `status`, `availability`, `online_status`, etc.).
+
+If there is NO simple online/offline field yet, ADD a new field (additive, non-breaking):
+
+- Field name: `driver_online_status`
+- Type: string
+- Allowed values: `"offline"`, `"online"`
+- Default value for existing drivers: `"offline"`.
+
+Do NOT rename or remove any existing fields.
+
+-----------------------------------
+2) Online/offline validation rules
+-----------------------------------
+The button can change status only if all of these are true:
+
+To go ONLINE:
+- driver.verification_status == "approved"
+- driver.is_verified == true
+- driver is NOT blocked by admin (no `blocked` flag, or `blocked_at` is null)
+- driver has a primary vehicle assigned and active (reuse existing vehicle relation)
+- driver has at least one active service preference (ride type / delivery type)
+
+To go OFFLINE:
+- No active ride/food/delivery in a “live” state:
+  - rides with status in:
+    • accepted, driver_arriving, in_progress
+  - food_orders with status in:
+    • accepted, preparing, ready_for_pickup, picked_up, on_the_way
+  - deliveries with status in:
+    • accepted, picked_up, on_the_way
+
+If there is any active trip in those states, prevent going offline.
+
+-----------------------------------
+3) API endpoints (backend)
+-----------------------------------
+Reuse existing endpoints if they already update driver status.
+
+If needed, ADD a minimal, non-breaking API:
+
+- `PATCH /api/driver/status`
+  Request body:
+    { "driver_online_status": "online" | "offline" }
+
+- Auth:
+  - Must be authenticated as the driver.
+  - Must check KYC + block status according to rules above.
+
+- Logic:
+  - Validate permissions & conditions.
+  - If going online passes validation:
+      set driver_online_status = "online".
+  - If going offline and there is no active trip:
+      set driver_online_status = "offline".
+  - Respond with updated driver object or at least:
+      { "driver_online_status": "online" | "offline" }
+
+Do NOT change any commission/wallet logic here.
+
+-----------------------------------
+4) Frontend behavior for footer button
+-----------------------------------
+The footer button on /driver/map must:
+
+Initial state on page load:
+- Call an endpoint to fetch current driver_online_status.
+- If status == "online":
+    - Button background: RED (#FF3B30)
+    - Icon: power symbol (white)
+    - Label: "Go Offline"
+- Else (offline or missing):
+    - Button background: GREEN (#28C840)
+    - Icon: power symbol (white)
+    - Label: "Go Online"
+
+On click when OFFLINE:
+- Temporarily disable the button while request is in flight.
+- Call PATCH /api/driver/status with driver_online_status="online".
+- Do NOT reload the page; do NOT unmount the map.
+- On success:
+    - Update local state to "online".
+    - Change button color to RED and label to "Go Offline".
+    - Show toast: "You are now online."
+- On validation error (not verified / blocked):
+    - Keep status offline.
+    - Show the backend error message (e.g. "Your account is not approved yet.").
+- On network error:
+    - Keep status offline.
+    - Show a generic toast error.
+
+On click when ONLINE:
+- First check if the frontend knows about an active trip.
+  - If active trip exists with a live status, show:
+      "Finish or cancel your current trip before going offline."
+    and do NOT call the API.
+- If no active trip:
+    - Call PATCH /api/driver/status with driver_online_status="offline".
+    - Do NOT reload page.
+    - On success:
+        - Update local state to "offline".
+        - Change button color to GREEN and label to "Go Online".
+        - Show toast: "You are now offline."
+    - On error:
+        - Keep status online and show error toast.
+
+-----------------------------------
+5) Matching engine integration
+-----------------------------------
+Ensure all trip assignment logic (rides, food_orders, deliveries) ONLY consider drivers who are truly online.
+
+Wherever drivers are queried for matching:
+- Add a filter:
+    driver_online_status == "online"
+AND
+    verification_status == "approved"
+AND
+    not blocked.
+
+Do not change existing geographic or service-type filters; just add online/offline condition.
+
+-----------------------------------
+6) Remove all other “Go Online” controls
+-----------------------------------
+- Driver side menu must NOT contain a separate “Go Online” or “Go Offline” menu item.
+- The footer button on /driver/map is the single source of truth for toggling driver_online_status.
+
+-----------------------------------
+7) UX constraints
+-----------------------------------
+- No full-screen black state.
+- No big “Loading…” text over the map.
+- At most, a small spinner inside the button while waiting for the API.
+
+-----------------------------------
+8) Non-breaking requirement
+-----------------------------------
+- Do NOT rename or remove any existing DB fields, APIs, or routes.
+- Only ADD `driver_online_status` if it does not already exist.
+- Do NOT modify commission rules, KYC, admin panel, or status flow semantics.
+
+Implement all backend + frontend changes above so that:
+- Pressing the footer "Go Online" button truly sends the driver online,
+- Pressing "Go Offline" truly sends the driver offline (when allowed),
+- Matching uses this state,
+- The UI color and text always reflect the real backend status.

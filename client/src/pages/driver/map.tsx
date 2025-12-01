@@ -824,27 +824,43 @@ export default function DriverMapPage() {
 
         {/* Go Online/Offline Button - Centered */}
         <button
-          onClick={async () => {
-            if (isVerified && hasVehicle) {
-              const wasOnline = isOnline;
-              
-              if (!wasOnline && !hasAnyServiceEnabled) {
-                toast({ 
-                  title: "No trip types enabled",
-                  description: "Turn on at least one service to receive requests",
-                  variant: "destructive"
-                });
-                setShowServiceSheet(true);
-                return;
-              }
-              
-              await toggleOnlineStatus();
+          onClick={() => {
+            // Show why button won't work
+            if (!isVerified) {
+              toast({ 
+                title: "Account not verified",
+                description: "Please complete verification to go online",
+                variant: "destructive"
+              });
+              return;
             }
+            if (!hasVehicle) {
+              toast({ 
+                title: "No vehicle assigned",
+                description: "Please add a vehicle to go online",
+                variant: "destructive"
+              });
+              return;
+            }
+            
+            // Check service preferences only when going online
+            if (!isOnline && !hasAnyServiceEnabled) {
+              toast({ 
+                title: "No trip types enabled",
+                description: "Turn on at least one service to receive requests",
+                variant: "destructive"
+              });
+              setShowServiceSheet(true);
+              return;
+            }
+            
+            // Call the toggle function
+            toggleOnlineStatus();
           }}
-          disabled={isUpdatingStatus || !isVerified || !hasVehicle}
+          disabled={isUpdatingStatus}
           className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
-            isUpdatingStatus ? "opacity-70" : ""
-          } ${isOnline 
+            isUpdatingStatus ? "opacity-70 cursor-wait" : ""
+          } ${!isVerified || !hasVehicle ? "opacity-50 cursor-not-allowed" : ""} ${isOnline 
             ? "bg-[#FF3B30] hover:bg-[#E63529] active:bg-[#CC2F26]" 
             : "bg-[#28C840] hover:bg-[#22B038] active:bg-[#1D9A30]"
           } text-white`}
