@@ -344,7 +344,7 @@ export default function AdminHome() {
   return (
     <div className="min-h-screen bg-background pb-6">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
+      <div className="bg-primary text-primary-foreground px-6 md:px-8 py-6 rounded-b-3xl shadow-lg">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
@@ -393,7 +393,7 @@ export default function AdminHome() {
         </Card>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="px-6 md:px-8 py-8 space-y-14">
         {/* Quick Stats */}
         <div>
           <SectionHeader 
@@ -402,7 +402,7 @@ export default function AdminHome() {
             iconColor="text-blue-600"
             testId="section-platform-overview"
           />
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-5">
             <Link href="/admin/users">
               <StatCard
                 icon={Users}
@@ -473,7 +473,7 @@ export default function AdminHome() {
             iconColor="text-purple-600"
             testId="section-driver-statistics"
           />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             <Link href="/admin/kyc">
               <StatCard
                 icon={Clock}
@@ -532,7 +532,7 @@ export default function AdminHome() {
             iconColor="text-indigo-600"
             testId="section-parcel-statistics"
           />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
             <Link href="/admin/parcels">
               <StatCard
                 icon={Package}
@@ -612,7 +612,7 @@ export default function AdminHome() {
           )}
           
           {isLoadingCapabilities ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="rounded-[14px] border border-border/60 bg-gradient-to-br from-card via-card to-muted/20 p-6">
                   <div className="flex items-start justify-between mb-4">
@@ -624,7 +624,7 @@ export default function AdminHome() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {filteredSections.map((section) => (
                 <Link key={section.name} href={section.href}>
                   <ManagementCard
