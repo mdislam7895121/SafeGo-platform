@@ -772,7 +772,7 @@ export default function DriverMapPage() {
           </SheetContent>
         </Sheet>
 
-        {/* Go Online/Offline Button - Uber-style centered pill */}
+        {/* Go Online/Offline Button - Uber-style pure black pill */}
         <button
           onClick={() => {
             if (!isVerified) {
@@ -803,22 +803,43 @@ export default function DriverMapPage() {
             toggleOnlineStatus();
           }}
           disabled={isUpdatingStatus}
-          className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 h-14 px-8 rounded-full transition-all duration-200 z-[1000] ${
-            isUpdatingStatus ? "opacity-70 cursor-wait" : ""
-          } ${!isVerified || !hasVehicle ? "opacity-50 cursor-not-allowed" : ""}`}
           style={{
+            position: "absolute",
+            bottom: "24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "12px",
+            height: "56px",
+            paddingLeft: "32px",
+            paddingRight: "32px",
+            borderRadius: "9999px",
             backgroundColor: "#000000",
+            border: "none",
             boxShadow: "0 4px 12px rgba(0, 0, 0, 0.28)",
+            zIndex: 1000,
+            cursor: isUpdatingStatus || !isVerified || !hasVehicle ? "not-allowed" : "pointer",
+            opacity: isUpdatingStatus || !isVerified || !hasVehicle ? 0.7 : 1,
           }}
           data-testid="button-online-toggle"
         >
           <Power 
-            className="h-5 w-5" 
-            style={{ color: isOnline ? "#FF3B30" : "#00E676" }}
+            style={{ 
+              width: "20px", 
+              height: "20px", 
+              color: isOnline ? "#FF3B30" : "#00E676",
+              flexShrink: 0,
+            }}
           />
           <span 
-            className="font-semibold text-base whitespace-nowrap"
-            style={{ color: "#FFFFFF" }}
+            style={{ 
+              color: "#FFFFFF",
+              fontSize: "16px",
+              fontWeight: 600,
+              whiteSpace: "nowrap",
+            }}
           >
             {isUpdatingStatus 
               ? "Updating..." 
