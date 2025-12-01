@@ -1,0 +1,175 @@
+SAFEGO PHASE 5 — EXPERIENCE, INTELLIGENCE & REAL-TIME OPTIMIZATION
+(Enhancement Layer — Turn-by-Turn Navigation, Smart Notifications, Dynamic Routing)
+
+You must implement the following Phase 5 features WITHOUT breaking any Phase 1–4 logic:
+
+======================================================
+A. DRIVER TURN-BY-TURN NAVIGATION (Task P5-1)
+======================================================
+
+Goal: Drivers get native navigation inside SafeGo Web + App.
+
+Implementation:
+1. Add NavigationService:
+   - fetchRoute(from_lat, from_lng, to_lat, to_lng)
+   - return polyline, ETA, distance
+   - provider: OpenRouteService / Mapbox / Google Maps (configurable)
+   - fallback: internal routing if provider unavailable
+
+2. Driver App:
+   - New “Navigate” button in ride/food/parcel screens
+   - Real-time guidance UI:
+        - step-by-step instructions
+        - next turn indicator
+        - remaining distance/time
+        - auto-update route every 10 seconds
+   - If driver deviates, system recalculates route (reuse Phase 1 ETA engine)
+
+3. WebSocket Events:
+   - "driver:navigation_step"
+   - "driver:reroute"
+   - "driver:arrival_update"
+
+Admin Safety:
+   - Admin can view **driver heading + route**, not full trip history.
+
+======================================================
+B. SMART PERSONALIZED PUSH NOTIFICATIONS (Task P5-2)
+======================================================
+
+Goal: SafeGo intelligently notifies users with correct timing and context.
+
+Enhancements:
+1. Driver:
+   - “New ride request” → with distance + earnings estimate
+   - “Food pickup ready”
+   - “Parcel scheduled pickup alert”
+   - “Earnings summary after each shift”
+
+2. Customer:
+   - “Your driver is X min away”
+   - “Food preparation is 50% done”
+   - “Parcel delivered — POD ready”
+
+3. Notification Intelligence:
+   - Add `NotificationScheduler`:
+       - Avoid sending redundant alerts within short windows.
+       - Throttle repeated events.
+       - Group similar notifications.
+
+4. All logic must use:
+   - existing NotificationService
+   - existing FCM device registration
+
+======================================================
+C. DYNAMIC ROUTING OPTIMIZATION (Task P5-3)
+======================================================
+
+Goal: Smart route selection for fastest + cheapest paths.
+
+1. Add RoutingOptimizationEngine:
+   - inputs:
+       distance
+       traffic_level (from provider or heuristic)
+       road_type quality
+       safety_score (for BD contexts)
+   - outputs:
+       “optimal path” polyline  
+       ETA  
+       cost_estimate (for parcel/ride)  
+
+2. Integrate with:
+   - ride dispatch → better driver selection  
+   - food → selecting fastest pickup route  
+   - parcel → heavier weight affects route cost  
+
+3. Admin config panel:
+   - weight factors: traffic_weight, safety_weight, distance_weight
+
+======================================================
+D. REAL-TIME ETA REFINEMENT (Task P5-4)
+======================================================
+
+Goal: Make ETA more accurate using continuous recalibration.
+
+1. ETA engine enhancements:
+   - consider driver speed profile
+   - road congestion factor
+   - previous trip history (per city)
+   - weather impact config (optional)
+
+2. Customer UI:
+   - ETA must update every 5 seconds
+   - Smooth animation, not jumps
+
+3. Driver UI:
+   - shows time to pickup + time to dropoff separately
+
+======================================================
+E. RIDER SAFETY & SOS IMPROVEMENTS (Task P5-5)
+======================================================
+
+Add customer-side safety refinements:
+1. In-trip safety bar:
+   - “Share Trip” (already supported, improve UI)
+   - “Safety Helpline” (config-driven)
+   - “SOS” (trigger admin alert + send customer details to emergency contact)
+
+2. Admin receives SOS events:
+   - WebSocket: "safety:sos_triggered"
+   - Show driver location, customer location, trip ID
+
+3. Logs stored in `safety_events` table:
+   - id, type, entity_id, customer_id, driver_id, timestamp, location
+
+======================================================
+F. DRIVER INCENTIVE OPTIMIZATION ENGINE (Task P5-6)
+======================================================
+
+Goal: Make incentive/bonus smart and adaptive.
+
+1. IncentiveEngine:
+   - checks daily performance (trips completed, rating, on-time)
+   - predicts expected demand (based on Phase 4 analytics)
+   - suggests:
+       - surge pricing windows
+       - bonus tiers
+       - target zones
+
+2. Admin panel:
+   - incentive recommendations feed
+   - one-click “Activate”
+
+======================================================
+G. CUSTOMER EXPERIENCE POLISH (Task P5-7)
+======================================================
+
+1. Ultra-fast UI transitions  
+2. Skeleton loaders for ride/food/parcel screens  
+3. Live driver marker smoothing  
+4. “Smart Search” for addresses → ranking based on past behavior  
+5. Quick Actions:
+   - Reorder food
+   - Repeat last ride route  
+   - Saved parcel sender/receiver  
+6. Dark mode support for all screens
+
+======================================================
+H. NON-BREAKING GUARANTEES
+======================================================
+
+You MUST NOT:
+- modify wallet/commission logic  
+- modify dispatch session core  
+- change any Phase 1–4 DB fields  
+- break existing ride/food/parcel flows  
+- expose sensitive KYC to customers/drivers  
+- rename/delete any table or column  
+
+You MUST:
+- Add new modules (NavigationService, RoutingOptimizationEngine, IncentiveEngine, SafetyEvents, etc.)
+- Add new tables only (ADD-ONLY)
+- Extend existing screens without breaking layout
+- Keep FCM + WebSocket stable
+
+End of Phase 5 prompt.

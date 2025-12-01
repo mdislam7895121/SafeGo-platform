@@ -5714,3 +5714,479 @@ model MobileWalletConfig {
   @@index([countryCode, isEnabled])
   @@map("mobile_wallet_configs")
 }
+
+// ============================================================
+// Phase 5: Navigation Sessions
+// ============================================================
+
+enum NavigationStatus {
+  active
+  paused
+  completed
+  cancelled
+  rerouting
+}
+
+enum NavigationProvider {
+  openrouteservice
+  mapbox
+  google_maps
+  internal
+}
+
+model NavigationSession {
+  id                    String                @id @default(uuid())
+  driverId              String
+  
+  tripType              String
+  tripId                String
+  
+  status                NavigationStatus      @default(active)
+  provider              NavigationProvider    @default(internal)
+  
+  originLat             Decimal               @db.Decimal(10, 7)
+  originLng             Decimal               @db.Decimal(10, 7)
+  destinationLat        Decimal               @db.Decimal(10, 7)
+  destinationLng        Decimal               @db.Decimal(10, 7)
+  
+  currentLat            Decimal?              @db.Decimal(10, 7)
+  currentLng            Decimal?              @db.Decimal(10, 7)
+  currentHeading        Decimal?              @db.Decimal(5, 2)
+  currentSpeed          Decimal?              @db.Decimal(6, 2)
+  
+  polyline              String?               @db.Text
+  totalDistanceMeters   Int?
+  totalDurationSeconds  Int?
+  remainingDistanceM    Int?
+  remainingDurationSec  Int?
+  
+  currentStepIndex      Int                   @default(0)
+  
+  rerouteCount          Int                   @default(0)
+  lastRerouteAt         DateTime?
+  
+  startedAt             DateTime              @default(now())
+  completedAt           DateTime?
+  lastUpdateAt          DateTime              @default(now())
+  
+  waypoints             NavigationWaypoint[]
+  
+  @@index([driverId])
+  @@index([tripType, tripId])
+  @@index([status])
+  @@map("navigation_sessions")
+}
+
+model NavigationWaypoint {
+  id                    String                @id @default(uuid())
+  sessionId             String
+  stepIndex             Int
+  
+  lat                   Decimal               @db.Decimal(10, 7)
+  lng                   Decimal               @db.Decimal(10, 7)
+  
+  instruction           String                @db.Text
+  maneuver              String?
+  
+  distanceMeters        Int?
+  durationSeconds       Int?
+  
+  roadName              String?
+  
+  passed                Boolean               @default(false)
+  passedAt              DateTime?
+  
+  session               NavigationSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@index([sessionId])
+  @@index([stepIndex])
+  @@map("navigation_waypoints")
+}
+
+// ============================================================
+// Phase 5: Safety Events
+// ============================================================
+
+enum SafetyEventType {
+  sos_triggered
+  sos_resolved
+  sos_false_alarm
+  trip_shared
+  emergency_contact_notified
+  safety_check_in
+  driver_behavior_alert
+  route_deviation
+  long_stop_detected
+}
+
+enum SafetyEventStatus {
+  active
+  acknowledged
+  resolved
+  escalated
+}
+
+model SafetyEvent {
+  id                    String                @id @default(uuid())
+  
+  eventType             SafetyEventType
+  status                SafetyEventStatus     @default(active)
+  
+  tripType              String?
+  tripId                String?
+  customerId            String?
+  driverId              String?
+  
+  latitude              Decimal?              @db.Decimal(10, 7)
+  longitude             Decimal?              @db.Decimal(10, 7)
+  
+  description           String?               @db.Text
+  metadata              Json?
+  
+  resolvedByAdminId     String?
+  resolutionNotes       String?               @db.Text
+  resolvedAt            DateTime?
+  
+  escalatedAt           DateTime?
+  escalationLevel       Int                   @default(0)
+  
+  emergencyContactNotified Boolean            @default(false)
+  emergencyContactNotifiedAt DateTime?
+  
+  createdAt             DateTime              @default(now())
+  acknowledgedAt        DateTime?
+  
+  @@index([eventType])
+  @@index([status])
+  @@index([customerId])
+  @@index([driverId])
+  @@index([tripType, tripId])
+  @@index([createdAt])
+  @@map("safety_events")
+}
+
+// ============================================================
+// Phase 5: Notification Intelligence
+// ============================================================
+
+enum NotificationPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+model NotificationSchedule {
+  id                    String                @id @default(uuid())
+  
+  userId                String
+  userType              String
+  
+  notificationType      String
+  title                 String
+  body                  String                @db.Text
+  data                  Json?
+  priority              NotificationPriority  @default(normal)
+  
+  scheduledFor          DateTime
+  expiresAt             DateTime?
+  
+  groupKey              String?
+  throttleKey           String?
+  
+  sent                  Boolean               @default(false)
+  sentAt                DateTime?
+  failed                Boolean               @default(false)
+  failureReason         String?
+  cancelled             Boolean               @default(false)
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([userId, userType])
+  @@index([scheduledFor])
+  @@index([sent])
+  @@index([groupKey])
+  @@index([throttleKey])
+  @@map("notification_schedules")
+}
+
+model NotificationPreference {
+  id                    String                @id @default(uuid())
+  userId                String
+  userType              String
+  
+  pushEnabled           Boolean               @default(true)
+  smsEnabled            Boolean               @default(false)
+  emailEnabled          Boolean               @default(true)
+  
+  rideUpdatesEnabled    Boolean               @default(true)
+  foodUpdatesEnabled    Boolean               @default(true)
+  parcelUpdatesEnabled  Boolean               @default(true)
+  promotionsEnabled     Boolean               @default(true)
+  earningsEnabled       Boolean               @default(true)
+  safetyAlertsEnabled   Boolean               @default(true)
+  
+  quietHoursEnabled     Boolean               @default(false)
+  quietHoursStart       String?
+  quietHoursEnd         String?
+  
+  minIntervalMinutes    Int                   @default(1)
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@unique([userId, userType])
+  @@map("notification_preferences")
+}
+
+// ============================================================
+// Phase 5: Routing Optimization
+// ============================================================
+
+model RoutingConfig {
+  id                    String                @id @default(uuid())
+  countryCode           String
+  cityCode              String?
+  
+  provider              NavigationProvider    @default(internal)
+  
+  distanceWeight        Int                   @default(40)
+  timeWeight            Int                   @default(40)
+  trafficWeight         Int                   @default(10)
+  safetyWeight          Int                   @default(10)
+  
+  maxRerouteAttempts    Int                   @default(3)
+  rerouteTriggerMeters  Int                   @default(100)
+  updateIntervalSeconds Int                   @default(10)
+  
+  tollAvoidance         Boolean               @default(false)
+  highwayPreference     Boolean               @default(true)
+  
+  isActive              Boolean               @default(true)
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@unique([countryCode, cityCode])
+  @@map("routing_configs")
+}
+
+model RouteOptimizationRun {
+  id                    String                @id @default(uuid())
+  
+  tripType              String
+  tripId                String
+  driverId              String
+  
+  originLat             Decimal               @db.Decimal(10, 7)
+  originLng             Decimal               @db.Decimal(10, 7)
+  destinationLat        Decimal               @db.Decimal(10, 7)
+  destinationLng        Decimal               @db.Decimal(10, 7)
+  
+  trafficLevel          Int?
+  weatherCondition      String?
+  timeOfDay             String?
+  
+  selectedRouteIndex    Int                   @default(0)
+  routeCount            Int                   @default(1)
+  optimizedDistanceM    Int?
+  optimizedDurationSec  Int?
+  optimizedPolyline     String?               @db.Text
+  
+  distanceScore         Decimal?              @db.Decimal(5, 2)
+  timeScore             Decimal?              @db.Decimal(5, 2)
+  safetyScore           Decimal?              @db.Decimal(5, 2)
+  overallScore          Decimal?              @db.Decimal(5, 2)
+  
+  provider              NavigationProvider
+  providerResponseMs    Int?
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([tripType, tripId])
+  @@index([driverId])
+  @@index([createdAt])
+  @@map("route_optimization_runs")
+}
+
+// ============================================================
+// Phase 5: ETA Profiles
+// ============================================================
+
+model DriverEtaProfile {
+  id                    String                @id @default(uuid())
+  driverId              String                @unique
+  
+  avgSpeedCity          Decimal               @db.Decimal(5, 2) @default(25)
+  avgSpeedHighway       Decimal               @db.Decimal(5, 2) @default(80)
+  avgSpeedRush          Decimal               @db.Decimal(5, 2) @default(15)
+  
+  etaAccuracyPercent    Decimal               @db.Decimal(5, 2) @default(80)
+  totalTripsAnalyzed    Int                   @default(0)
+  
+  morningRushFactor     Decimal               @db.Decimal(3, 2) @default(1.3)
+  eveningRushFactor     Decimal               @db.Decimal(3, 2) @default(1.4)
+  nightFactor           Decimal               @db.Decimal(3, 2) @default(0.9)
+  
+  last7DaysAvgSpeed     Decimal?              @db.Decimal(5, 2)
+  last7DaysTrips        Int                   @default(0)
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  lastCalculatedAt      DateTime?
+  
+  @@map("driver_eta_profiles")
+}
+
+// ============================================================
+// Phase 5: Incentive Optimization
+// ============================================================
+
+enum IncentiveRecommendationType {
+  surge_pricing
+  bonus_tier
+  target_zone
+  peak_hour_bonus
+  completion_bonus
+  rating_bonus
+}
+
+enum IncentiveRecommendationStatus {
+  pending
+  approved
+  activated
+  rejected
+  expired
+}
+
+model IncentiveRecommendation {
+  id                    String                           @id @default(uuid())
+  
+  countryCode           String
+  cityCode              String?
+  zoneId                String?
+  
+  type                  IncentiveRecommendationType
+  status                IncentiveRecommendationStatus    @default(pending)
+  
+  title                 String
+  description           String                           @db.Text
+  
+  suggestedMultiplier   Decimal?                         @db.Decimal(4, 2)
+  suggestedAmount       Decimal?                         @db.Decimal(10, 2)
+  suggestedStartTime    DateTime?
+  suggestedEndTime      DateTime?
+  
+  demandForecast        Decimal?                         @db.Decimal(5, 2)
+  supplyForecast        Decimal?                         @db.Decimal(5, 2)
+  historicalConversion  Decimal?                         @db.Decimal(5, 2)
+  confidenceScore       Decimal?                         @db.Decimal(5, 2)
+  
+  modelVersion          String?
+  analysisData          Json?
+  
+  reviewedByAdminId     String?
+  reviewedAt            DateTime?
+  adminNotes            String?                          @db.Text
+  
+  activatedAt           DateTime?
+  activatedByAdminId    String?
+  
+  actualPerformance     Json?
+  
+  createdAt             DateTime                         @default(now())
+  expiresAt             DateTime?
+  
+  @@index([countryCode])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@map("incentive_recommendations")
+}
+
+model DriverEngagementMetric {
+  id                    String                @id @default(uuid())
+  driverId              String
+  date                  DateTime              @db.Date
+  
+  tripsCompleted        Int                   @default(0)
+  tripsCancelled        Int                   @default(0)
+  hoursOnline           Decimal               @db.Decimal(4, 2) @default(0)
+  
+  avgRating             Decimal?              @db.Decimal(3, 2)
+  onTimePickupRate      Decimal?              @db.Decimal(5, 2)
+  acceptanceRate        Decimal?              @db.Decimal(5, 2)
+  
+  grossEarnings         Decimal               @db.Decimal(12, 2) @default(0)
+  bonusEarnings         Decimal               @db.Decimal(12, 2) @default(0)
+  tipsEarnings          Decimal               @db.Decimal(12, 2) @default(0)
+  
+  peakHoursWorked       Decimal               @db.Decimal(4, 2) @default(0)
+  targetZoneTrips       Int                   @default(0)
+  
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@unique([driverId, date])
+  @@index([driverId])
+  @@index([date])
+  @@map("driver_engagement_metrics")
+}
+
+// ============================================================
+// Phase 5: Quick Actions & Smart Search
+// ============================================================
+
+model CustomerQuickAction {
+  id                    String                @id @default(uuid())
+  customerId            String
+  
+  actionType            String
+  
+  referenceType         String?
+  referenceId           String?
+  
+  title                 String
+  subtitle              String?
+  iconName              String?
+  
+  priority              Int                   @default(0)
+  usageCount            Int                   @default(0)
+  
+  actionData            Json?
+  
+  isActive              Boolean               @default(true)
+  
+  createdAt             DateTime              @default(now())
+  lastUsedAt            DateTime?
+  
+  @@index([customerId])
+  @@index([actionType])
+  @@map("customer_quick_actions")
+}
+
+model SearchHistory {
+  id                    String                @id @default(uuid())
+  userId                String
+  userType              String
+  
+  query                 String
+  searchType            String
+  
+  selectedResultId      String?
+  selectedResultType    String?
+  selectedResultLabel   String?
+  
+  searchLat             Decimal?              @db.Decimal(10, 7)
+  searchLng             Decimal?              @db.Decimal(10, 7)
+  
+  selectCount           Int                   @default(1)
+  
+  createdAt             DateTime              @default(now())
+  lastUsedAt            DateTime              @default(now())
+  
+  @@index([userId, userType])
+  @@index([searchType])
+  @@index([query])
+  @@map("search_history")
+}
