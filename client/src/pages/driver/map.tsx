@@ -838,17 +838,17 @@ export default function DriverMapPage() {
         </button>
 
         {/* Quick Actions button - bottom right */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+          onClick={() => setShowQuickActionsSheet(true)}
+          data-testid="button-quick-actions"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
         <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
-          <SheetTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
-              data-testid="button-quick-actions"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
             <SheetHeader>
               <SheetTitle>Quick Actions</SheetTitle>
