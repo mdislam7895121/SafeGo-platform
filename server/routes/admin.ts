@@ -7075,6 +7075,241 @@ router.get("/customers/:customerId/payment-methods", checkPermission(Permission.
 });
 
 // ====================================================
+// GET /api/admin/customers/:customerId/saved-places
+// List all saved places for a customer (read-only)
+// ====================================================
+router.get("/customers/:customerId/saved-places", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id: customerId },
+      select: { id: true },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const savedPlaces = await prisma.customerSavedPlace.findMany({
+      where: { customerId },
+      orderBy: [
+        { label: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json({
+      savedPlaces: savedPlaces.map((place) => ({
+        id: place.id,
+        label: place.label,
+        name: place.name,
+        address: place.address,
+        lat: Number(place.lat),
+        lng: Number(place.lng),
+        isDefaultPickup: place.isDefaultPickup,
+        isDefaultDropoff: place.isDefaultDropoff,
+        createdAt: place.createdAt,
+        updatedAt: place.updatedAt,
+      })),
+    });
+  } catch (error: any) {
+    console.error("List saved places error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch saved places" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/customers/:customerId/ride-preferences
+// Get ride preferences for a customer (read-only)
+// ====================================================
+router.get("/customers/:customerId/ride-preferences", checkPermission(Permission.VIEW_USER), async (req: AuthRequest, res) => {
+  try {
+    const { customerId } = req.params;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { id: customerId },
+      select: { id: true },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const preferences = await prisma.customerRidePreferences.findUnique({
+      where: { customerId },
+    });
+
+    if (!preferences) {
+      return res.json({
+        preferences: null,
+        message: "No ride preferences set for this customer",
+      });
+    }
+
+    res.json({
+      preferences: {
+        id: preferences.id,
+        temperaturePreference: preferences.temperaturePreference,
+        musicPreference: preferences.musicPreference,
+        conversationLevel: preferences.conversationLevel,
+        accessibilityNeeds: preferences.accessibilityNeeds,
+        petFriendly: preferences.petFriendly,
+        childSeatRequired: preferences.childSeatRequired,
+        specialInstructions: preferences.specialInstructions,
+        createdAt: preferences.createdAt,
+        updatedAt: preferences.updatedAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Get ride preferences error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch ride preferences" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/parcels/scheduled
+// List all scheduled parcel pickups (admin view)
+// ====================================================
+router.get("/parcels/scheduled", checkPermission(Permission.VIEW_PARCELS), async (req: AuthRequest, res) => {
+  try {
+    const { status, countryCode, page = "1", pageSize = "20" } = req.query;
+    
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize as string) || 20), 100);
+    const skip = (pageNum - 1) * pageSizeNum;
+
+    const whereClause: any = {
+      scheduledPickupTime: { not: null },
+    };
+
+    if (status) {
+      whereClause.status = String(status);
+    }
+
+    if (countryCode) {
+      whereClause.countryCode = String(countryCode).toUpperCase();
+    }
+
+    const [deliveries, total] = await Promise.all([
+      prisma.delivery.findMany({
+        where: whereClause,
+        include: {
+          customer: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              user: {
+                select: { email: true, phone: true },
+              },
+            },
+          },
+          driver: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: { scheduledPickupTime: "asc" },
+        skip,
+        take: pageSizeNum,
+      }),
+      prisma.delivery.count({ where: whereClause }),
+    ]);
+
+    res.json({
+      scheduledParcels: deliveries.map((d) => ({
+        id: d.id,
+        status: d.status,
+        pickupAddress: d.pickupAddress,
+        dropoffAddress: d.dropoffAddress,
+        scheduledPickupTime: d.scheduledPickupTime,
+        fare: Number(d.serviceFare),
+        paymentMethod: d.paymentMethod,
+        customer: d.customer ? {
+          id: d.customer.id,
+          name: `${d.customer.firstName || ""} ${d.customer.lastName || ""}`.trim(),
+          email: d.customer.user?.email,
+          phone: d.customer.user?.phone,
+        } : null,
+        driver: d.driver ? {
+          id: d.driver.id,
+          name: `${d.driver.firstName || ""} ${d.driver.lastName || ""}`.trim(),
+        } : null,
+        createdAt: d.createdAt,
+      })),
+      pagination: {
+        page: pageNum,
+        pageSize: pageSizeNum,
+        total,
+        totalPages: Math.ceil(total / pageSizeNum),
+      },
+    });
+  } catch (error: any) {
+    console.error("List scheduled parcels error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch scheduled parcels" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/parcels/:deliveryId/proof-of-delivery
+// View proof-of-delivery photos for a delivery (admin)
+// ====================================================
+router.get("/parcels/:deliveryId/proof-of-delivery", checkPermission(Permission.VIEW_PARCELS), async (req: AuthRequest, res) => {
+  try {
+    const { deliveryId } = req.params;
+
+    const delivery = await prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      include: {
+        customer: {
+          select: { firstName: true, lastName: true },
+        },
+        driver: {
+          select: { firstName: true, lastName: true },
+        },
+      },
+    });
+
+    if (!delivery) {
+      return res.status(404).json({ error: "Delivery not found" });
+    }
+
+    const photos = await prisma.deliveryProofPhoto.findMany({
+      where: { deliveryId },
+      orderBy: { capturedAt: "asc" },
+    });
+
+    res.json({
+      delivery: {
+        id: delivery.id,
+        status: delivery.status,
+        pickupAddress: delivery.pickupAddress,
+        dropoffAddress: delivery.dropoffAddress,
+        customer: delivery.customer 
+          ? `${delivery.customer.firstName || ""} ${delivery.customer.lastName || ""}`.trim()
+          : null,
+        driver: delivery.driver
+          ? `${delivery.driver.firstName || ""} ${delivery.driver.lastName || ""}`.trim()
+          : null,
+      },
+      photos: photos.map((p) => ({
+        id: p.id,
+        photoUrl: p.photoUrl,
+        capturedAt: p.capturedAt,
+        meta: p.meta,
+      })),
+    });
+  } catch (error: any) {
+    console.error("Get POD photos error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch proof of delivery photos" });
+  }
+});
+
+// ====================================================
 // Support Chat Admin Endpoints
 // ====================================================
 import * as supportService from "../services/supportService";
