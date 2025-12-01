@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import type {
   WalletOwnerType,
   WalletTransactionServiceType,
@@ -7,11 +7,14 @@ import type {
 } from "@prisma/client";
 import { prisma } from "../db";
 
+export type TransactionClient = Parameters<Parameters<PrismaClient['$transaction']>[0]>[0];
+
 export interface CreateWalletParams {
   ownerId: string;
   ownerType: WalletOwnerType;
   countryCode: string;
   currency: string;
+  tx?: TransactionClient;
 }
 
 export interface RecordTransactionParams {
@@ -25,6 +28,7 @@ export interface RecordTransactionParams {
   referenceId?: string;
   description: string;
   createdByAdminId?: string;
+  tx?: TransactionClient;
 }
 
 export interface WalletBalanceUpdate {
@@ -34,9 +38,10 @@ export interface WalletBalanceUpdate {
 
 export class WalletService {
   async getOrCreateWallet(params: CreateWalletParams) {
-    const { ownerId, ownerType, countryCode, currency } = params;
+    const { ownerId, ownerType, countryCode, currency, tx } = params;
+    const db = tx || prisma;
 
-    let wallet = await prisma.wallet.findUnique({
+    let wallet = await db.wallet.findUnique({
       where: {
         ownerId_ownerType: {
           ownerId,
@@ -46,7 +51,7 @@ export class WalletService {
     });
 
     if (!wallet) {
-      wallet = await prisma.wallet.create({
+      wallet = await db.wallet.create({
         data: {
           ownerId,
           ownerType,
@@ -78,7 +83,10 @@ export class WalletService {
     });
   }
 
-  async recordTransaction(params: RecordTransactionParams): Promise<void> {
+  private async executeRecordTransaction(
+    params: RecordTransactionParams,
+    db: TransactionClient
+  ): Promise<void> {
     const {
       walletId,
       ownerType,
@@ -92,82 +100,90 @@ export class WalletService {
       createdByAdminId,
     } = params;
 
-    await prisma.$transaction(async (tx) => {
-      const wallet = await tx.wallet.findUnique({
-        where: { id: walletId },
-      });
-
-      if (!wallet) {
-        throw new Error(`Wallet ${walletId} not found`);
-      }
-
-      let newAvailableBalance = new Prisma.Decimal(wallet.availableBalance.toString());
-      let newNegativeBalance = new Prisma.Decimal(wallet.negativeBalance.toString());
-
-      if (direction === "credit") {
-        if (serviceType === "commission_refund") {
-          const currentNegativeBalance = parseFloat(newNegativeBalance.toString());
-          const refundAmount = parseFloat(amount.toString());
-          
-          if (currentNegativeBalance > 0) {
-            const amountToReduceDebt = Math.min(currentNegativeBalance, refundAmount);
-            const excessAmount = refundAmount - amountToReduceDebt;
-            
-            newNegativeBalance = newNegativeBalance.minus(amountToReduceDebt);
-            
-            if (excessAmount > 0) {
-              newAvailableBalance = newAvailableBalance.plus(excessAmount);
-            }
-          } else {
-            newAvailableBalance = newAvailableBalance.plus(refundAmount);
-          }
-        } else {
-          newAvailableBalance = newAvailableBalance.plus(amount);
-        }
-      } else if (direction === "debit") {
-        if (serviceType === "commission") {
-          newNegativeBalance = newNegativeBalance.plus(amount);
-        } else if (serviceType === "commission_settlement") {
-          const currentNegativeBalance = parseFloat(newNegativeBalance.toString());
-          const settlementAmount = parseFloat(amount.toString());
-          
-          if (settlementAmount > currentNegativeBalance) {
-            throw new Error(
-              `Cannot settle ${settlementAmount} - outstanding debt is only ${currentNegativeBalance}`
-            );
-          }
-          
-          newNegativeBalance = newNegativeBalance.minus(amount);
-        } else {
-          newAvailableBalance = newAvailableBalance.minus(amount);
-        }
-      }
-
-      await tx.wallet.update({
-        where: { id: walletId },
-        data: {
-          availableBalance: newAvailableBalance,
-          negativeBalance: newNegativeBalance,
-        },
-      });
-
-      await tx.walletTransaction.create({
-        data: {
-          walletId,
-          ownerType,
-          countryCode,
-          serviceType,
-          direction,
-          amount: new Prisma.Decimal(amount),
-          balanceSnapshot: newAvailableBalance,
-          negativeBalanceSnapshot: newNegativeBalance,
-          referenceType,
-          referenceId,
-          description,
-          createdByAdminId,
-        },
-      });
+    const wallet = await db.wallet.findUnique({
+      where: { id: walletId },
     });
+
+    if (!wallet) {
+      throw new Error(`Wallet ${walletId} not found`);
+    }
+
+    let newAvailableBalance = new Prisma.Decimal(wallet.availableBalance.toString());
+    let newNegativeBalance = new Prisma.Decimal(wallet.negativeBalance.toString());
+
+    if (direction === "credit") {
+      if (serviceType === "commission_refund") {
+        const currentNegativeBalance = parseFloat(newNegativeBalance.toString());
+        const refundAmount = parseFloat(amount.toString());
+        
+        if (currentNegativeBalance > 0) {
+          const amountToReduceDebt = Math.min(currentNegativeBalance, refundAmount);
+          const excessAmount = refundAmount - amountToReduceDebt;
+          
+          newNegativeBalance = newNegativeBalance.minus(amountToReduceDebt);
+          
+          if (excessAmount > 0) {
+            newAvailableBalance = newAvailableBalance.plus(excessAmount);
+          }
+        } else {
+          newAvailableBalance = newAvailableBalance.plus(refundAmount);
+        }
+      } else {
+        newAvailableBalance = newAvailableBalance.plus(amount);
+      }
+    } else if (direction === "debit") {
+      if (serviceType === "commission") {
+        newNegativeBalance = newNegativeBalance.plus(amount);
+      } else if (serviceType === "commission_settlement") {
+        const currentNegativeBalance = parseFloat(newNegativeBalance.toString());
+        const settlementAmount = parseFloat(amount.toString());
+        
+        if (settlementAmount > currentNegativeBalance) {
+          throw new Error(
+            `Cannot settle ${settlementAmount} - outstanding debt is only ${currentNegativeBalance}`
+          );
+        }
+        
+        newNegativeBalance = newNegativeBalance.minus(amount);
+      } else {
+        newAvailableBalance = newAvailableBalance.minus(amount);
+      }
+    }
+
+    await db.wallet.update({
+      where: { id: walletId },
+      data: {
+        availableBalance: newAvailableBalance,
+        negativeBalance: newNegativeBalance,
+      },
+    });
+
+    await db.walletTransaction.create({
+      data: {
+        walletId,
+        ownerType,
+        countryCode,
+        serviceType,
+        direction,
+        amount: new Prisma.Decimal(amount),
+        balanceSnapshot: newAvailableBalance,
+        negativeBalanceSnapshot: newNegativeBalance,
+        referenceType,
+        referenceId,
+        description,
+        createdByAdminId,
+      },
+    });
+  }
+
+  async recordTransaction(params: RecordTransactionParams): Promise<void> {
+    if (params.tx) {
+      await this.executeRecordTransaction(params, params.tx);
+    } else {
+      await prisma.$transaction(async (tx) => {
+        await this.executeRecordTransaction(params, tx);
+      });
+    }
   }
 
   async recordEarning(
@@ -178,7 +194,8 @@ export class WalletService {
     amount: number,
     referenceType: WalletTransactionReferenceType,
     referenceId: string,
-    description: string
+    description: string,
+    tx?: TransactionClient
   ): Promise<void> {
     const currency = countryCode === "BD" ? "BDT" : "USD";
     const wallet = await this.getOrCreateWallet({
@@ -186,6 +203,7 @@ export class WalletService {
       ownerType,
       countryCode,
       currency,
+      tx,
     });
 
     await this.recordTransaction({
@@ -198,6 +216,7 @@ export class WalletService {
       referenceType,
       referenceId,
       description,
+      tx,
     });
   }
 
@@ -214,7 +233,8 @@ export class WalletService {
     amount: number,
     referenceType: WalletTransactionReferenceType,
     referenceId: string,
-    description: string
+    description: string,
+    tx?: TransactionClient
   ): Promise<void> {
     const currency = countryCode === "BD" ? "BDT" : "USD";
     const wallet = await this.getOrCreateWallet({
@@ -222,6 +242,7 @@ export class WalletService {
       ownerType,
       countryCode,
       currency,
+      tx,
     });
 
     // Always use "commission" to trigger negative balance logic in recordTransaction
@@ -236,6 +257,7 @@ export class WalletService {
       referenceType,
       referenceId,
       description,
+      tx,
     });
   }
 
@@ -250,9 +272,11 @@ export class WalletService {
       paymentMethod: "cash" | "online";
       pickupAddress: string;
       dropoffAddress: string;
-    }
+    },
+    tx?: TransactionClient
   ): Promise<void> {
-    const driver = await prisma.driverProfile.findUnique({
+    const db = tx || prisma;
+    const driver = await db.driverProfile.findUnique({
       where: { id: driverId },
       include: { user: true },
     });
@@ -289,7 +313,8 @@ export class WalletService {
         commissionAmount,
         "ride",
         ride.id,
-        `Commission owed for cash ride: ${ride.pickupAddress} → ${ride.dropoffAddress}`
+        `Commission owed for cash ride: ${ride.pickupAddress} → ${ride.dropoffAddress}`,
+        tx
       );
     } else {
       // Online: SafeGo pays driver their payout
@@ -301,7 +326,8 @@ export class WalletService {
         payoutAmount,
         "ride",
         ride.id,
-        `Ride payout: ${ride.pickupAddress} → ${ride.dropoffAddress}`
+        `Ride payout: ${ride.pickupAddress} → ${ride.dropoffAddress}`,
+        tx
       );
     }
   }
@@ -315,9 +341,11 @@ export class WalletService {
       safegoCommission: any;
       paymentMethod: "cash" | "online";
       deliveryAddress: string;
-    }
+    },
+    tx?: TransactionClient
   ): Promise<void> {
-    const restaurant = await prisma.restaurantProfile.findUnique({
+    const db = tx || prisma;
+    const restaurant = await db.restaurantProfile.findUnique({
       where: { id: restaurantId },
       include: { user: true },
     });
@@ -354,7 +382,8 @@ export class WalletService {
         commissionAmount,
         "food_order",
         order.id,
-        `Commission owed for cash food order → ${order.deliveryAddress}`
+        `Commission owed for cash food order → ${order.deliveryAddress}`,
+        tx
       );
     } else {
       // Online: SafeGo pays restaurant their payout
@@ -366,7 +395,8 @@ export class WalletService {
         payoutAmount,
         "food_order",
         order.id,
-        `Food order payout → ${order.deliveryAddress}`
+        `Food order payout → ${order.deliveryAddress}`,
+        tx
       );
     }
   }
@@ -492,9 +522,11 @@ export class WalletService {
       deliveryPayout: any;
       paymentMethod: "cash" | "online";
       deliveryAddress: string;
-    }
+    },
+    tx?: TransactionClient
   ): Promise<void> {
-    const driver = await prisma.driverProfile.findUnique({
+    const db = tx || prisma;
+    const driver = await db.driverProfile.findUnique({
       where: { id: driverId },
       include: { user: true },
     });
@@ -525,7 +557,8 @@ export class WalletService {
         deliveryPayoutAmount,
         "food_order",
         delivery.id,
-        `Food delivery payout → ${delivery.deliveryAddress}`
+        `Food delivery payout → ${delivery.deliveryAddress}`,
+        tx
       );
     }
     // Cash: Driver collects delivery fee directly, no wallet transaction needed
@@ -542,9 +575,11 @@ export class WalletService {
       paymentMethod: "cash" | "online";
       pickupAddress: string;
       dropoffAddress: string;
-    }
+    },
+    tx?: TransactionClient
   ): Promise<void> {
-    const driver = await prisma.driverProfile.findUnique({
+    const db = tx || prisma;
+    const driver = await db.driverProfile.findUnique({
       where: { id: driverId },
       include: { user: true },
     });
@@ -581,7 +616,8 @@ export class WalletService {
         commissionAmount,
         "delivery",
         parcel.id,
-        `Commission owed for cash parcel: ${parcel.pickupAddress} → ${parcel.dropoffAddress}`
+        `Commission owed for cash parcel: ${parcel.pickupAddress} → ${parcel.dropoffAddress}`,
+        tx
       );
     } else {
       // Online: SafeGo pays driver their payout
@@ -593,7 +629,8 @@ export class WalletService {
         payoutAmount,
         "delivery",
         parcel.id,
-        `Parcel delivery payout: ${parcel.pickupAddress} → ${parcel.dropoffAddress}`
+        `Parcel delivery payout: ${parcel.pickupAddress} → ${parcel.dropoffAddress}`,
+        tx
       );
     }
   }

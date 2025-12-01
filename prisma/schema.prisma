@@ -67,7 +67,8 @@ enum IncentiveBonusType {
 // Phase 2A: Incentive award status
 enum IncentiveAwardStatus {
   pending           // Awaiting wallet credit
-  credited          // Successfully credited to wallet
+  granted           // Successfully granted and credited to wallet
+  credited          // Successfully credited to wallet (alias for granted)
   failed            // Credit attempt failed
   expired           // Award expired before crediting
 }
@@ -1768,6 +1769,9 @@ enum WalletTransactionServiceType {
   refund
   commission_settlement
   commission_refund
+  tip                       // Phase 2A: Driver tips from customers
+  cancellation_fee          // Phase 2A: Cancellation fee credits
+  incentive                 // Phase 2A: Bonus/incentive awards
 }
 
 enum WalletTransactionDirection {
