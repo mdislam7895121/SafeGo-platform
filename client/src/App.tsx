@@ -259,6 +259,7 @@ import AdminDriverSupportCenter from "@/pages/admin/driver-support";
 import AdminMobileWalletConfig from "@/pages/admin/mobile-wallet-config";
 import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
+import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -1697,6 +1698,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Background Checks">
             <AdminBackgroundChecks />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/phase5">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Phase 5: Experience Intelligence">
+            <AdminPhase5Dashboard />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

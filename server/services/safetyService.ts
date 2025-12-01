@@ -139,6 +139,31 @@ class SafetyService {
     });
   }
 
+  async createSafetyReport(data: {
+    tripType: string;
+    tripId: string;
+    eventType: string;
+    priority: string;
+    latitude?: number;
+    longitude?: number;
+    description?: string;
+    metadata?: Record<string, any>;
+  }): Promise<SafetyEvent> {
+    return prisma.safetyEvent.create({
+      data: {
+        eventType: data.eventType,
+        status: 'pending',
+        priority: data.priority,
+        tripType: data.tripType,
+        tripId: data.tripId,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        description: data.description,
+        metadata: data.metadata || {},
+      },
+    });
+  }
+
   async recordDriverBehaviorAlert(
     tripType: string,
     tripId: string,

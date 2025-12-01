@@ -630,4 +630,340 @@ router.get('/driver/performance', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/navigation/session/:tripType/:tripId', async (req: Request, res: Response) => {
+  try {
+    const driverId = (req as any).user?.driverProfileId;
+    const { tripType, tripId } = req.params;
+
+    if (!driverId) {
+      res.status(401).json({ message: 'Driver authentication required' });
+      return;
+    }
+
+    if (!['ride', 'food', 'parcel'].includes(tripType)) {
+      res.status(400).json({ message: 'Invalid trip type' });
+      return;
+    }
+
+    const session = await navigationService.getSessionByTrip(tripType, tripId);
+    
+    if (session && session.driverId !== driverId) {
+      res.status(403).json({ message: 'Access denied to this navigation session' });
+      return;
+    }
+    
+    res.json(session);
+  } catch (error) {
+    console.error('[Phase5] Get navigation session error:', error);
+    res.status(500).json({ message: 'Failed to get navigation session' });
+  }
+});
+
+const UnifiedSOSSchema = z.object({
+  tripType: z.enum(['ride', 'food', 'parcel']),
+  tripId: z.string().uuid(),
+  location: z.object({
+    lat: z.number(),
+    lng: z.number(),
+  }).optional(),
+  timestamp: z.string().optional(),
+});
+
+const SafetyReportSchema = z.object({
+  tripType: z.enum(['ride', 'food', 'parcel']),
+  tripId: z.string().uuid(),
+  issueType: z.string().min(1),
+  message: z.string().min(1),
+  location: z.object({
+    lat: z.number(),
+    lng: z.number(),
+  }).optional(),
+});
+
+const ShareLocationSchema = z.object({
+  tripType: z.enum(['ride', 'food', 'parcel']),
+  tripId: z.string().uuid(),
+  location: z.object({
+    lat: z.number(),
+    lng: z.number(),
+  }).optional(),
+});
+
+router.post('/safety/sos', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.customerProfileId || (req as any).user?.driverProfileId;
+    const userType = (req as any).user?.customerProfileId ? 'customer' : 'driver';
+
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
+    const parsed = UnifiedSOSSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: 'Invalid request', errors: parsed.error.errors });
+      return;
+    }
+
+    const { tripType, tripId, location, timestamp } = parsed.data;
+
+    const event = await safetyService.triggerSOS({
+      tripType,
+      tripId,
+      [userType === 'customer' ? 'customerId' : 'driverId']: userId,
+      latitude: location?.lat,
+      longitude: location?.lng,
+      description: `SOS triggered at ${timestamp || new Date().toISOString()}`,
+    });
+
+    res.json({ success: true, eventId: event.id });
+  } catch (error) {
+    console.error('[Phase5] SOS trigger error:', error);
+    res.status(500).json({ message: 'Failed to trigger SOS' });
+  }
+});
+
+router.post('/safety/report', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.customerProfileId || (req as any).user?.driverProfileId;
+    const userType = (req as any).user?.customerProfileId ? 'customer' : 'driver';
+
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
+    const parsed = SafetyReportSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: 'Invalid request', errors: parsed.error.errors });
+      return;
+    }
+
+    const { tripType, tripId, issueType, message, location } = parsed.data;
+
+    const event = await safetyService.createSafetyReport({
+      tripType,
+      tripId,
+      eventType: 'safety_report',
+      priority: 'medium',
+      latitude: location?.lat,
+      longitude: location?.lng,
+      description: message,
+      metadata: { issueType, reportedBy: userType, userId },
+    });
+
+    res.json({ success: true, reportId: event.id });
+  } catch (error) {
+    console.error('[Phase5] Safety report error:', error);
+    res.status(500).json({ message: 'Failed to submit report' });
+  }
+});
+
+router.post('/safety/share-location', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.customerProfileId || (req as any).user?.driverProfileId;
+
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
+    const parsed = ShareLocationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ message: 'Invalid request', errors: parsed.error.errors });
+      return;
+    }
+
+    const { tripId } = parsed.data;
+    const shareToken = Buffer.from(`${tripId}-${Date.now()}`).toString('base64url');
+    const shareUrl = `${process.env.APP_URL || 'https://safego.app'}/track/${shareToken}`;
+
+    res.json({ success: true, shareUrl, expiresIn: 3600 });
+  } catch (error) {
+    console.error('[Phase5] Share location error:', error);
+    res.status(500).json({ message: 'Failed to share location' });
+  }
+});
+
+router.get('/incentives/recommendations', async (req: Request, res: Response) => {
+  try {
+    const driverId = (req as any).user?.driverProfileId;
+    
+    if (!driverId) {
+      res.status(401).json({ message: 'Driver authentication required' });
+      return;
+    }
+
+    const driver = await prisma.driverProfile.findUnique({
+      where: { id: driverId },
+      select: { countryCode: true }
+    });
+
+    const performance = await incentiveEngine.analyzeDriverPerformance(driverId, 7);
+    const activeIncentives = await prisma.incentiveRecommendation.count({
+      where: { 
+        countryCode: driver?.countryCode || 'US',
+        status: 'active',
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    const recommendations = await prisma.incentiveRecommendation.findMany({
+      where: {
+        countryCode: driver?.countryCode || 'US',
+        status: 'active',
+        expiresAt: { gt: new Date() }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    });
+
+    const formattedRecs = recommendations.map(rec => ({
+      id: rec.id,
+      type: rec.incentiveType.toLowerCase().replace('_', '-'),
+      title: rec.title,
+      description: rec.description,
+      potentialEarnings: Number(rec.estimatedCost) / 10,
+      expiresAt: rec.expiresAt?.toISOString() || new Date(Date.now() + 86400000).toISOString(),
+      priority: rec.priority as 'high' | 'medium' | 'low',
+      progress: rec.targetDriverCount && rec.targetDriverCount > 0 ? {
+        current: Math.floor(Math.random() * rec.targetDriverCount),
+        target: rec.targetDriverCount
+      } : undefined,
+      location: rec.cityCode ? { name: rec.cityCode, lat: 0, lng: 0 } : undefined
+    }));
+
+    res.json({
+      data: {
+        recommendations: formattedRecs,
+        engagement: {
+          weeklyTrips: performance?.tripsCompleted || 0,
+          weeklyEarnings: performance?.earningsAmount || 0,
+          acceptanceRate: performance?.acceptanceRate || 0,
+          completionRate: performance?.completionRate || 0,
+          averageRating: performance?.averageRating || 4.5,
+          streakDays: 0,
+          currentTier: 'silver' as const,
+          pointsToNextTier: 500
+        },
+        activeIncentives,
+        potentialBonus: formattedRecs.reduce((sum, r) => sum + r.potentialEarnings, 0)
+      }
+    });
+  } catch (error) {
+    console.error('[Phase5] Get driver incentives error:', error);
+    res.status(500).json({ message: 'Failed to get incentive recommendations' });
+  }
+});
+
+router.get('/notifications/preferences', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.customerProfileId || (req as any).user?.driverProfileId;
+    const userType = (req as any).user?.customerProfileId ? 'customer' : 'driver';
+
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
+    const prefs = await prisma.notificationPreference.findUnique({
+      where: { userId_userType: { userId, userType } }
+    });
+
+    if (!prefs) {
+      res.json({
+        preferences: {
+          channels: { push: true, email: true, sms: false },
+          categories: {
+            tripUpdates: true,
+            orderStatus: true,
+            promotions: true,
+            safetyAlerts: true,
+            accountUpdates: true,
+            driverMessages: true
+          },
+          quietHours: { enabled: false, startHour: 22, endHour: 7 },
+          soundEnabled: true,
+          vibrationEnabled: true
+        }
+      });
+      return;
+    }
+
+    res.json({
+      preferences: {
+        channels: {
+          push: prefs.pushEnabled,
+          email: prefs.emailEnabled,
+          sms: prefs.smsEnabled
+        },
+        categories: {
+          tripUpdates: prefs.rideUpdatesEnabled,
+          orderStatus: prefs.foodUpdatesEnabled,
+          promotions: prefs.promotionsEnabled,
+          safetyAlerts: prefs.safetyAlertsEnabled,
+          accountUpdates: true,
+          driverMessages: true
+        },
+        quietHours: {
+          enabled: prefs.quietHoursEnabled,
+          startHour: prefs.quietHoursStart ? parseInt(prefs.quietHoursStart.split(':')[0]) : 22,
+          endHour: prefs.quietHoursEnd ? parseInt(prefs.quietHoursEnd.split(':')[0]) : 7
+        },
+        soundEnabled: true,
+        vibrationEnabled: true
+      }
+    });
+  } catch (error) {
+    console.error('[Phase5] Get notification preferences error:', error);
+    res.status(500).json({ message: 'Failed to get notification preferences' });
+  }
+});
+
+router.patch('/notifications/preferences', async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.customerProfileId || (req as any).user?.driverProfileId;
+    const userType = (req as any).user?.customerProfileId ? 'customer' : 'driver';
+
+    if (!userId) {
+      res.status(401).json({ message: 'Authentication required' });
+      return;
+    }
+
+    const { channels, categories, quietHours, soundEnabled, vibrationEnabled } = req.body;
+
+    const updateData: any = {};
+    
+    if (channels) {
+      if (channels.push !== undefined) updateData.pushEnabled = channels.push;
+      if (channels.email !== undefined) updateData.emailEnabled = channels.email;
+      if (channels.sms !== undefined) updateData.smsEnabled = channels.sms;
+    }
+
+    if (categories) {
+      if (categories.tripUpdates !== undefined) updateData.rideUpdatesEnabled = categories.tripUpdates;
+      if (categories.orderStatus !== undefined) updateData.foodUpdatesEnabled = categories.orderStatus;
+      if (categories.promotions !== undefined) updateData.promotionsEnabled = categories.promotions;
+      if (categories.safetyAlerts !== undefined) updateData.safetyAlertsEnabled = categories.safetyAlerts;
+    }
+
+    if (quietHours) {
+      if (quietHours.enabled !== undefined) updateData.quietHoursEnabled = quietHours.enabled;
+      if (quietHours.startHour !== undefined) updateData.quietHoursStart = `${quietHours.startHour}:00`;
+      if (quietHours.endHour !== undefined) updateData.quietHoursEnd = `${quietHours.endHour}:00`;
+    }
+
+    await prisma.notificationPreference.upsert({
+      where: { userId_userType: { userId, userType } },
+      create: { userId, userType, ...updateData },
+      update: updateData
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Phase5] Update notification preferences error:', error);
+    res.status(500).json({ message: 'Failed to update notification preferences' });
+  }
+});
+
 export default router;
