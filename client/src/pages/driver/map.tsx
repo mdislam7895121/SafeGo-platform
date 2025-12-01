@@ -214,7 +214,10 @@ export default function DriverMapPage() {
   const [servicePreferences, setServicePreferences] = useState<ServicePreferences>(defaultServicePreferences);
 
   // Fetch service preferences from API
-  const { data: preferencesData, isLoading: isLoadingPrefs } = useQuery({
+  const { data: preferencesData, isLoading: isLoadingPrefs } = useQuery<{
+    preferences: ServicePreferences;
+    lockedPreferences: any;
+  }>({
     queryKey: ["/api/driver/preferences/services"],
     enabled: true,
   });
@@ -229,7 +232,11 @@ export default function DriverMapPage() {
   // Mutation to update service preferences
   const updateServicePrefsMutation = useMutation({
     mutationFn: async (newPrefs: Partial<ServicePreferences>) => {
-      const response = await apiRequest("PATCH", "/api/driver/preferences/services", newPrefs);
+      const response = await apiRequest("/api/driver/preferences/services", {
+        method: "PATCH",
+        body: JSON.stringify(newPrefs),
+        headers: { "Content-Type": "application/json" },
+      });
       return response.json();
     },
     onSuccess: (data) => {
