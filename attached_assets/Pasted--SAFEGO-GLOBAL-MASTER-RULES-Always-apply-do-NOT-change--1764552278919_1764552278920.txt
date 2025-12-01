@@ -1,0 +1,145 @@
+=========================
+SAFEGO GLOBAL MASTER RULES
+(Always apply – do NOT change)
+=========================
+
+ROLES (4 roles, separate permissions):
+- Customer
+- Driver
+- Restaurant (Merchant)
+- Admin
+
+SERVICES (must all work):
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+COUNTRY-SPECIFIC KYC:
+
+Bangladesh (BD):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number + front/back images
+- emergency_contact details
+- verification_status + is_verified
+
+United States (US):
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- driver_license number + image + expiry (drivers)
+- ssn_last4 (optional, drivers)
+- verification_status + is_verified
+
+ONBOARDING:
+- Multi-step: basic info → address → ID/KYC upload (country specific) → emergency contact.
+- Set verification_status="pending"; block rides/food/parcel until admin approves.
+
+ADMIN PANEL must continue to:
+- Approve/reject KYC for customers/drivers/restaurants (with rejection_reason).
+- Block/unblock any user or restaurant.
+- Configure pricing, fees, commissions.
+- Manage payouts, mark balances paid.
+- View driver negative balance and restaurant negative balance.
+
+CORE COLLECTIONS (unchanged):
+
+1) rides   – identity fields, addresses + geo, fees/commission, payment_method, timestamps, rating, full ride status flow.
+2) food_orders – identity fields, restaurant + delivery addresses, fees/commission, payment_method, timestamps, rating, full food status flow.
+3) deliveries – identity fields, pickup/dropoff + geo, fees/commission, payment_method, timestamps, rating, full parcel status flow.
+
+COMMISSION RULES:
+- Cash ride: driver keeps cash; SafeGo commission → negative driver_wallet_balance; weekly settle; admin marks paid.
+- Cash food: restaurant keeps cash; commission → negative restaurant_wallet.
+- Online: SafeGo keeps commission automatically.
+- Admin can settle all balances.
+
+SECURITY:
+- Customers can’t view driver documents.
+- Drivers can’t view customer KYC.
+- Restaurants can’t view other restaurants.
+- Only admin can change pricing/commission/verification/blocking.
+- Users edit only their own profile.
+- All APIs via HTTPS.
+
+STATUS FLOWS (keep as is):
+- Ride, Food, Parcel flows remain complete (requested→…→delivered/completed or cancelled_x).
+
+NOTIFICATIONS:
+- New trip/order, status changes, verification, payout reminders, admin alerts.
+
+MAP RULE:
+- DO NOT change the map engine, tiles, markers, or zoom controls for this task.
+
+==================================================
+TASK: Clean overlays on driver map – remove top status card + bottom legend
+==================================================
+
+GOAL:
+Make the driver map screen clean like Uber:
+- NO big status card on top of the map.
+- NO “You / Pickup / Dropoff” legend card on bottom.
+- Only footer will show online/offline status and provide the Go Online/Offline toggle.
+
+-----------------------------
+1) REMOVE TOP STATUS CARD
+-----------------------------
+Current:
+- A white rounded card appears over the map near the top-left with:
+  - Title: “You’re Offline” / “You’re Online”
+  - Subtitle: “Go online to start getting trips…”
+  - (Previously also had buttons/bell, etc.)
+
+Required:
+- Completely remove this entire status card component from the driver map UI.
+- The map should be visible without any card overlay in that position.
+- Do NOT move it somewhere else; delete it.
+- Online/offline information will only be shown in the footer (center text) and controlled via the footer toggle/GO button.
+
+Backend:
+- Do NOT remove or modify the API that sets driver_online_status.
+- Ensure only the footer control triggers that API.
+- Make sure removing the card does NOT break any status logic.
+
+-----------------------------
+2) REMOVE BOTTOM LEGEND “You / Pickup / Dropoff”
+-----------------------------
+Current:
+- At the bottom of the map, just above the footer, there is a row of white pill buttons:
+  - “You” (green dot)
+  - “Pickup” (blue dot)
+  - “Dropoff” (red dot)
+
+Required:
+- Delete the entire legend container and the three pill components.
+- Do NOT simply hide them with CSS; remove them so they no longer render or occupy space.
+- Markers on the map (driver, pickup, dropoff) must remain as they are; only the textual legend is removed.
+
+-----------------------------
+3) KEEP FOOTER AS THE ONLY ONLINE/OFFLINE CONTROL
+-----------------------------
+- The footer bar at the very bottom (with Go Online/Go Offline, and left/right menus) must remain exactly as designed.
+- This footer is now the ONLY UI that can:
+  - Show current status text (“You’re offline” / “You’re online”).
+  - Toggle driver_online_status.
+
+Ensure:
+- driver_online_status = "offline" → footer shows “Go Online”.
+- driver_online_status = "online" → footer shows “Go Offline”.
+- All ride/food/parcel matching logic continues to depend on driver_online_status + service_preferences.
+
+-----------------------------
+4) NON-BREAKING REQUIREMENTS
+-----------------------------
+- Do NOT rename or remove any fields, collections, APIs, or routes.
+- Do NOT touch KYC, admin panel, commission system, or notification engine.
+- This change is purely UI: remove two overlay components:
+  (a) top status card
+  (b) bottom “You / Pickup / Dropoff” legend.
+
+NO QUESTIONS.  
+Apply these overlay removals in a single update.

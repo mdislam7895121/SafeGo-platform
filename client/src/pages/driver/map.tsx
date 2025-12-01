@@ -17,10 +17,6 @@ import {
   Route,
   Clock,
   Signal,
-  SignalHigh,
-  SignalMedium,
-  SignalLow,
-  SignalZero,
   Power,
   History,
   DollarSign,
@@ -179,19 +175,6 @@ function triggerHapticFeedback(type: "light" | "medium" | "heavy" = "medium") {
   if (navigator.vibrate) {
     const patterns = { light: 10, medium: 25, heavy: 50 };
     navigator.vibrate(patterns[type]);
-  }
-}
-
-function GpsSignalIcon({ strength }: { strength: "strong" | "medium" | "weak" | "none" }) {
-  switch (strength) {
-    case "strong":
-      return <SignalHigh className="h-5 w-5 text-green-500" />;
-    case "medium":
-      return <SignalMedium className="h-5 w-5 text-yellow-500" />;
-    case "weak":
-      return <SignalLow className="h-5 w-5 text-orange-500" />;
-    default:
-      return <SignalZero className="h-5 w-5 text-gray-400" />;
   }
 }
 
@@ -556,45 +539,9 @@ export default function DriverMapPage() {
           className="h-full w-full"
         />
 
-        <div
-          className="absolute top-4 left-4 z-[1000]"
-          data-testid="driver-status-card"
-        >
-          <Card className="shadow-lg bg-background/95 backdrop-blur-sm border-2 border-border max-w-[220px]">
-            <CardContent className="p-3">
-              <div className="flex items-center gap-3">
-                <div className="flex-shrink-0">
-                  <GpsSignalIcon strength={gpsStatus.signalStrength} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 
-                      className="font-semibold text-sm truncate"
-                      data-testid="text-driver-status"
-                    >
-                      {isOnline ? "You're Online" : "You're Offline"}
-                    </h3>
-                    {isOnline && (
-                      <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {isOnline 
-                      ? activeTrip 
-                        ? "Trip in progress" 
-                        : "Waiting for trip requests..."
-                      : "Go online to start getting trips"
-                    }
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {gpsError && (
           <div
-            className="absolute top-28 left-4 right-4 z-[1000]"
+            className="absolute top-4 left-4 right-4 z-[1000]"
             data-testid="gps-error-banner"
           >
             <Card className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
