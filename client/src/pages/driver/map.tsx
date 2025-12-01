@@ -803,26 +803,7 @@ export default function DriverMapPage() {
             toggleOnlineStatus();
           }}
           disabled={isUpdatingStatus}
-          style={{
-            position: "absolute",
-            bottom: "24px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: "12px",
-            height: "56px",
-            paddingLeft: "32px",
-            paddingRight: "32px",
-            borderRadius: "9999px",
-            backgroundColor: "#000000",
-            border: "none",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.28)",
-            zIndex: 1000,
-            cursor: isUpdatingStatus || !isVerified || !hasVehicle ? "not-allowed" : "pointer",
-            opacity: isUpdatingStatus || !isVerified || !hasVehicle ? 0.7 : 1,
-          }}
+          className="go-online-button"
           data-testid="button-online-toggle"
         >
           <Power 
