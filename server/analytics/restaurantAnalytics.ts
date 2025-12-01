@@ -1,6 +1,5 @@
-import { PrismaClient, Decimal } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { Decimal } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
 export interface DateRangeFilter {
   startDate: Date;

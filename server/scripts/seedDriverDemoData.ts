@@ -9,11 +9,10 @@
  * This script is idempotent - it will clean existing demo data before inserting fresh records.
  */
 
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
 const Decimal = Prisma.Decimal;
-
-const prisma = new PrismaClient();
 
 // Environment guard
 function checkEnvironment(): void {

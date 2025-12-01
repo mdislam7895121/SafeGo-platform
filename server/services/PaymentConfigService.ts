@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma as db } from "../lib/prisma";
 import type { CountryCode, ServiceType, KycLevel } from "../../shared/types";
-
-const db = new PrismaClient();
 
 export class PaymentConfigService {
   /**

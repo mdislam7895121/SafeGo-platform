@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, requireRole, AuthRequest } from '../middleware/auth';
 import { logAuditEvent } from '../utils/audit';
 import {
@@ -8,7 +8,6 @@ import {
 } from '../services/earningsCommissionService';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.get(
   '/dashboard',

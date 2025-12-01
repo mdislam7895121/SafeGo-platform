@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 import { getAdminCapabilities } from "../utils/permissions";
 import { loadAdminProfile, AuthRequest, authenticateToken } from "../middleware/auth";
@@ -9,7 +9,6 @@ import { rateLimitAdminLogin, resetLoginAttempts } from "../middleware/rateLimit
 import { isTwoFactorEnabled, verifyTwoFactorToken, getTwoFactorSecret } from "../services/twoFactorService";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Defense in depth: Fail fast if JWT_SECRET missing in production
 if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {

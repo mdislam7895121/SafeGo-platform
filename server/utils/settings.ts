@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { z } from "zod";
-
-const prisma = new PrismaClient();
 
 // Type definitions for each settings section
 export interface GeneralSettings {

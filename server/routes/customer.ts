@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
@@ -7,7 +8,6 @@ import { z } from "zod";
 import { validatePromotionForOrder, validateCouponCode } from "../promotions/validationUtils";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // All routes require authentication and customer role
 router.use(authenticateToken);

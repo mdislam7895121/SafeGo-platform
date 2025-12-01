@@ -1,6 +1,5 @@
-import { PrismaClient, LiveChatStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { LiveChatStatus } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
 export class LiveChatService {
   async createSession(restaurantId: string) {

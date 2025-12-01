@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { 
@@ -15,7 +15,6 @@ import {
 } from "../config/driverDeliveryConfig";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 router.use(authenticateToken);
 router.use(requireRole(["driver"]));

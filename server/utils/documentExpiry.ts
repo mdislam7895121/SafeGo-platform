@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { notifyDocumentExpiring, notifyDocumentExpired } from "./notifications";
 import { SettingsService } from "./settings";
-
-const prisma = new PrismaClient();
 
 const DAYS_BEFORE_EXPIRY_WARNING = 30; // Fallback default
 

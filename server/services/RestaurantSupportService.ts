@@ -1,6 +1,5 @@
-import { PrismaClient, RestaurantSupportCategory, RestaurantSupportPriority, RestaurantSupportStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { RestaurantSupportCategory, RestaurantSupportPriority, RestaurantSupportStatus } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
 const VALID_CATEGORIES: RestaurantSupportCategory[] = ["orders", "payouts", "menu_pricing", "account_kyc", "technical", "other"];
 const VALID_PRIORITIES: RestaurantSupportPriority[] = ["low", "normal", "high", "urgent"];

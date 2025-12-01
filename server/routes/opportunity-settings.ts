@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { PrismaClient, OpportunityBonusType } from "@prisma/client";
+import { OpportunityBonusType } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // All routes require admin authentication
 router.use(authenticateToken);

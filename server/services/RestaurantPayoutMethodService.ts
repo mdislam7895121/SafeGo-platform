@@ -1,9 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma as db } from "../lib/prisma";
 import type { CountryCode, PayoutRailType, PayoutProvider, PayoutMethodStatus } from "../../shared/types";
 import { encryptSensitive } from "../utils/crypto";
 import { PayoutConfigService } from "./PayoutConfigService";
-
-const db = new PrismaClient();
 
 export class RestaurantPayoutMethodService {
   /**

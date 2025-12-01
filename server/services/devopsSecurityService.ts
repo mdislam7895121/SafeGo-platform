@@ -1,9 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { logAuditEvent, ActionType, EntityType } from "../utils/audit";
 import fs from "fs/promises";
 import path from "path";
-
-const prisma = new PrismaClient();
 
 /**
  * Log Rotation Service

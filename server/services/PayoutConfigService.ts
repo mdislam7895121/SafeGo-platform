@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma as db } from "../lib/prisma";
 import type { CountryCode, ActorType, KycLevel } from "../../shared/types";
-
-const db = new PrismaClient();
 
 export class PayoutConfigService {
   /**

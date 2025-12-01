@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { logAuditEvent } from "../utils/audit";
 import { z } from "zod";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 type ServiceType = "RIDE" | "FOOD" | "PARCEL";
 type TimeRange = "7d" | "30d" | "all";

@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { logAuditEvent, ActionType, EntityType } from "../utils/audit";
-
-const prisma = new PrismaClient();
 
 export interface FraudCheckResult {
   riskScore: number; // 0-100

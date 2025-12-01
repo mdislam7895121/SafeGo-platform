@@ -1,6 +1,5 @@
-import { PrismaClient, CallbackStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { CallbackStatus } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
 export class SupportCallbackService {
   async createCallback(data: {

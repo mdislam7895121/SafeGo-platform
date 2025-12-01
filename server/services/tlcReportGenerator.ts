@@ -12,10 +12,8 @@
  * Reference: NYC TLC HVFHV Reporting Requirements
  */
 
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { NYC_TLC_CONFIG, calculatePerRideMinimumPay } from "./tlcMinimumPayEngine";
-
-const prisma = new PrismaClient();
 
 // ============================================
 // Type Definitions

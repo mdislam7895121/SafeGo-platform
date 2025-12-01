@@ -1,6 +1,5 @@
-import { PrismaClient, DocumentStatus } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { DocumentStatus } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
 type DriverWithDocs = any;
 

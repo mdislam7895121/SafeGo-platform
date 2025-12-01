@@ -1,7 +1,6 @@
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { randomUUID } from "crypto";
-
-const prisma = new PrismaClient();
 
 type DriverAssignmentStatus = "none" | "searching_driver" | "driver_assigned" | "driver_rejected" | "no_driver_found";
 type DeliveryServiceType = "ride" | "food" | "parcel";

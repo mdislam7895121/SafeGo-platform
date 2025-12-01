@@ -1,7 +1,6 @@
-import { PrismaClient, WalletOwnerType, PayoutMethod } from "@prisma/client";
+import { WalletOwnerType, PayoutMethod } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma";
 
 interface SchedulePayoutParams {
   ownerType?: WalletOwnerType;

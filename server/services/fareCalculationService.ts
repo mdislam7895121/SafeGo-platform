@@ -10,10 +10,7 @@
  * - Full fare breakdown for transparency
  */
 
-import { PrismaClient } from "@prisma/client";
-
-// Create dedicated Prisma client for fare calculation
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma";
 
 // Type definitions for fare engine models
 export type RideTypeCode = "SAVER" | "STANDARD" | "COMFORT" | "XL" | "PREMIUM";

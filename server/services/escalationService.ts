@@ -1,7 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { BotService } from "./botService";
-
-const prisma = new PrismaClient();
 
 interface EscalationResult {
   escalated: boolean;

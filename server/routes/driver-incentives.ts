@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { logAuditEvent } from "../utils/audit";
@@ -23,7 +23,6 @@ type AchievementType =
 type RewardType = "TIER_BONUS" | "PROMO_BONUS" | "ACHIEVEMENT_BONUS" | "INCENTIVE_BONUS" | "REFERRAL_BONUS";
 type DriverRewardTier = "BRONZE" | "SILVER" | "GOLD";
 
-const prisma = new PrismaClient();
 const router = Router();
 
 function serializeDecimal(value: any): number {

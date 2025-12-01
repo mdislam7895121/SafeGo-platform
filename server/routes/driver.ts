@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { randomUUID } from "crypto";
@@ -24,7 +25,6 @@ import {
 import { driverVehicleService } from "../services/driverVehicleService";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // Helper functions to serialize Prisma Decimal fields to numbers
 function serializeDecimal(value: any): number {

@@ -1,6 +1,4 @@
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { prisma } from "../lib/prisma";
 
 type ServiceType = "ride" | "food" | "parcel";
 type DriverPromotionServiceType = "RIDES" | "FOOD" | "PARCEL" | "ANY";

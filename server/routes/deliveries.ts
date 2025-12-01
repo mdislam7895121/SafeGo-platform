@@ -1,11 +1,10 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { authenticateToken, AuthRequest, requireUnlockedAccount } from "../middleware/auth";
 import { walletService } from "../services/walletService";
 import { promotionBonusService } from "../services/promotionBonusService";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // All routes require authentication
 router.use(authenticateToken);

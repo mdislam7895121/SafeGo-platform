@@ -1,10 +1,10 @@
 import { Router, Response } from "express";
-import { PrismaClient, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { randomUUID } from "crypto";
 import { authenticateToken, requireRole, type AuthRequest } from "../middleware/auth";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 function serializeDecimal(value: any): number {
   if (value === null || value === undefined) return 0;

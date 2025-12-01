@@ -1,8 +1,6 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { logAuditEvent, ActionType, EntityType } from "../utils/audit";
 import { sendCrashAlert } from "./devopsSecurityService";
-
-const prisma = new PrismaClient();
 
 export interface IncidentReport {
   incidentId: string;

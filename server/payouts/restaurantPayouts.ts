@@ -3,9 +3,8 @@
  * Phase 5: Comprehensive payout management for restaurants
  */
 
-import { PrismaClient, Prisma } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { Prisma } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 
 export interface RestaurantPayoutOverview {
   restaurantId: string;

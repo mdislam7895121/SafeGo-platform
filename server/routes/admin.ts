@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { AuthRequest, loadAdminProfile, checkPermission } from "../middleware/auth";
 import { authenticateToken, requireAdmin } from "../middleware/authz";
 import { Permission } from "../utils/permissions";
@@ -20,7 +20,6 @@ import analyticsRouter, { getRBACFilter } from "./analytics";
 import performanceRouter from "./performance";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // All routes require authentication, admin role, and active admin status
 router.use(authenticateToken);  // Step 1: Verify JWT token and set req.user
