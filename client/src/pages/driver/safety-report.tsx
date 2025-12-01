@@ -65,8 +65,11 @@ export default function DriverSafetyReport() {
 
   const reportMutation = useMutation({
     mutationFn: async (data: ReportFormData) => {
-      const response = await apiRequest("POST", "/api/driver/safety/report", data);
-      return response.json();
+      return await apiRequest("/api/driver/safety/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
     },
     onSuccess: () => {
       setIsSuccess(true);

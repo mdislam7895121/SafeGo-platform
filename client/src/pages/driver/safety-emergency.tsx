@@ -16,12 +16,15 @@ export default function DriverSafetyEmergency() {
 
   const sosMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/driver/safety/emergency/sos", {
-        type: "SOS",
-        message: "Emergency SOS triggered",
-        location: { lat: null, lng: null }
+      return await apiRequest("/api/driver/safety/emergency/sos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "SOS",
+          message: "Emergency SOS triggered",
+          location: { lat: null, lng: null }
+        })
       });
-      return response.json();
     },
     onSuccess: () => {
       setSosTriggered(true);
@@ -41,11 +44,14 @@ export default function DriverSafetyEmergency() {
 
   const supportMutation = useMutation({
     mutationFn: async (message: string) => {
-      const response = await apiRequest("POST", "/api/driver/safety/emergency/quick-support", {
-        message,
-        urgency: "high"
+      return await apiRequest("/api/driver/safety/emergency/quick-support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          urgency: "high"
+        })
       });
-      return response.json();
     },
     onSuccess: () => {
       setMessageSent(true);

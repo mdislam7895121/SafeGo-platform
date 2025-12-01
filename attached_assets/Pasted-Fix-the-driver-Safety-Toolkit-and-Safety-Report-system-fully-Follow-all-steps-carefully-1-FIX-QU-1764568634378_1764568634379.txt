@@ -1,0 +1,52 @@
+Fix the driver Safety Toolkit and Safety Report system fully. Follow all steps carefully:
+
+1. FIX QUICK MESSAGE TO SUPPORT
+   - The “Quick Message to Support” box in /driver/safety-emergency currently returns “Failed to Send”.
+   - Implement a real working POST endpoint:
+       Endpoint: POST /api/driver/support/message
+       Body: { driverId, message, timestamp, location }
+   - Save message into Firestore under:
+       support_messages/{driverId}/messages/{autoId}
+   - If saved successfully, return { status: "ok" } and show the driver a green toast: “Message sent to SafeGo Support.”
+   - If error, return { status: "error" } and show red toast: “Failed to send message. Try again.”
+
+2. FIX EMERGENCY SOS
+   - The Red “Trigger Emergency SOS” button must:
+       a. Save an SOS alert to Firestore:
+          emergency_sos/{autoId}
+       b. Include:
+          { driverId, driverName, timestamp, exactLocation(lat, lng), status: "active" }
+       c. Show full-screen confirmation modal: “Emergency SOS triggered. Help is on the way.”
+
+3. ADD MISSING SAFETY REPORT PAGE
+   - The route /driver/safety-report currently shows:
+       “Did you forget to add the page to the router?”
+   - Create this new page at: client/src/pages/driver/safety-report.tsx
+   - Add correct router entry so it loads without error.
+   - Page content:
+       Title: “Report Safety Issue”
+       Sections:
+         • Choose Issue Type (dropdown)
+         • Describe the issue (textarea)
+         • Optional Photo Upload
+         • Submit Button
+   - On submit:
+       Save report to Firestore under:
+       safety_reports/{driverId}/reports/{autoId}
+       Show success toast: “Safety report submitted.”
+
+4. LINK ALL BUTTONS PROPERLY
+   - In the driver menu, the Safety Report button must navigate to: /driver/safety-report
+   - The Emergency Toolkit button goes to: /driver/safety-emergency
+
+5. SECURITY REQUIREMENTS
+   - Validate driver auth on every request.
+   - Prevent empty messages or empty reports.
+   - Save driver location automatically from map state.
+
+After completing, test these:
+   ✓ Emergency SOS works
+   ✓ Quick Message to Support sends successfully
+   ✓ /driver/safety-report opens without router error
+   ✓ Safety Report can be submitted
+   ✓ All toasts show correctly
