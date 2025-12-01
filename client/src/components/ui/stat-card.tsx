@@ -34,37 +34,39 @@ export function StatCard({
         "rounded-[14px] border border-border/60",
         "bg-gradient-to-br from-card via-card to-muted/20",
         "dark:from-card dark:via-card dark:to-muted/10",
-        "shadow-sm hover:shadow-md",
+        "shadow-sm hover:shadow-md active:shadow-sm",
         "transition-all duration-300 ease-out",
         "hover:-translate-y-1 hover:border-border",
+        "active:translate-y-0 active:scale-[0.98]",
+        "min-h-[120px] sm:min-h-[110px]",
         className
       )}
       data-testid={testId}
     >
-      <div className="p-5">
-        <div className="flex flex-col items-center text-center gap-3">
+      <div className="p-4 sm:p-5">
+        <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
           <div 
             className={cn(
-              "h-12 w-12 rounded-xl flex items-center justify-center",
+              "h-11 w-11 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center",
               "transition-transform duration-300 group-hover:scale-105",
               iconBgColor || "bg-muted/50"
             )}
           >
-            <Icon className={cn("h-[1.4rem] w-[1.4rem]", iconColor)} />
+            <Icon className={cn("h-5 w-5 sm:h-[1.4rem] sm:w-[1.4rem]", iconColor)} />
           </div>
           
           {isLoading ? (
-            <Skeleton className="h-8 w-14" />
+            <Skeleton className="h-7 sm:h-8 w-12 sm:w-14" />
           ) : (
             <p 
-              className="text-2xl font-bold tracking-tight"
+              className="text-xl sm:text-2xl font-bold tracking-tight"
               data-testid={testId ? `stat-${testId.replace('card-', '')}` : undefined}
             >
               {value}
             </p>
           )}
           
-          <p className="text-xs font-medium text-muted-foreground tracking-wide">
+          <p className="text-[11px] sm:text-xs font-medium text-muted-foreground tracking-wide leading-tight">
             {label}
           </p>
         </div>
@@ -101,37 +103,39 @@ export function ManagementCard({
         "rounded-[14px] border border-border/60",
         "bg-gradient-to-br from-card via-card to-muted/20",
         "dark:from-card dark:via-card dark:to-muted/10",
-        "shadow-sm hover:shadow-md",
+        "shadow-sm hover:shadow-md active:shadow-sm",
         "transition-all duration-300 ease-out",
         "hover:-translate-y-1 hover:border-border",
+        "active:translate-y-0 active:scale-[0.98]",
+        "min-h-[140px] sm:min-h-[160px]",
         className
       )}
       data-testid={testId}
     >
-      <div className="p-6">
-        <div className="flex items-start justify-between mb-4">
+      <div className="p-4 sm:p-6">
+        <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
           <div 
             className={cn(
-              "h-14 w-14 rounded-xl flex items-center justify-center",
+              "h-12 w-12 sm:h-14 sm:w-14 rounded-xl flex items-center justify-center shrink-0",
               "transition-transform duration-300 group-hover:scale-105",
               iconBgColor
             )}
           >
-            <Icon className={cn("h-7 w-7", iconColor)} />
+            <Icon className={cn("h-6 w-6 sm:h-7 sm:w-7", iconColor)} />
           </div>
           {badge !== undefined && badge > 0 && (
             <span 
-              className="min-w-[1.5rem] h-6 px-2 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold shadow-sm"
+              className="min-w-[1.5rem] h-6 px-2 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold shadow-sm shrink-0"
               data-testid={testId ? `badge-${testId.replace('card-', '')}` : undefined}
             >
               {badge > 99 ? "99+" : badge}
             </span>
           )}
         </div>
-        <h3 className="font-semibold text-lg mb-1.5 group-hover:text-primary transition-colors">
+        <h3 className="font-semibold text-base sm:text-lg mb-1 sm:mb-1.5 group-hover:text-primary transition-colors leading-tight">
           {title}
         </h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed line-clamp-2">
           {description}
         </p>
       </div>

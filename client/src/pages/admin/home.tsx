@@ -344,18 +344,18 @@ export default function AdminHome() {
   return (
     <div className="min-h-screen bg-background pb-6">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground px-6 md:px-8 py-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-            <p className="text-sm opacity-90">{user?.email}</p>
+      <div className="bg-primary text-primary-foreground px-4 sm:px-6 md:px-8 py-5 sm:py-6 rounded-b-2xl sm:rounded-b-3xl shadow-lg">
+        <div className="flex items-center justify-between mb-4 sm:mb-6 gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">Admin Dashboard</h1>
+            <p className="text-xs sm:text-sm opacity-90 truncate">{user?.email}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Link href="/admin/notifications">
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground relative"
+                className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground relative h-10 w-10 sm:h-9 sm:w-9"
                 data-testid="button-notifications"
               >
                 <Bell className="h-5 w-5" />
@@ -372,28 +372,29 @@ export default function AdminHome() {
               variant="outline" 
               size="sm" 
               onClick={logout}
-              className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground"
+              className="bg-primary-foreground/10 border-primary-foreground/20 text-primary-foreground h-10 sm:h-9 px-3 sm:px-4 text-sm"
               data-testid="button-logout"
             >
-              Logout
+              <span className="hidden xs:inline">Logout</span>
+              <span className="xs:hidden">Exit</span>
             </Button>
           </div>
         </div>
 
         <Card>
-          <CardContent className="p-4">
+          <CardContent className="p-3 sm:p-4">
             <div className="flex items-center gap-3">
-              <Shield className="h-6 w-6 text-primary" />
-              <div>
-                <p className="font-semibold">SafeGo Platform Management</p>
-                <p className="text-sm text-muted-foreground">Control and monitor the entire platform</p>
+              <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+              <div className="min-w-0">
+                <p className="font-semibold text-sm sm:text-base truncate">SafeGo Platform Management</p>
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">Control and monitor the entire platform</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="px-6 md:px-8 py-8 space-y-14">
+      <div className="px-4 sm:px-6 md:px-8 py-6 sm:py-8 space-y-10 sm:space-y-14">
         {/* Quick Stats */}
         <div>
           <SectionHeader 
@@ -402,7 +403,7 @@ export default function AdminHome() {
             iconColor="text-blue-600"
             testId="section-platform-overview"
           />
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
             <Link href="/admin/users">
               <StatCard
                 icon={Users}
@@ -473,7 +474,7 @@ export default function AdminHome() {
             iconColor="text-purple-600"
             testId="section-driver-statistics"
           />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
             <Link href="/admin/kyc">
               <StatCard
                 icon={Clock}
@@ -532,7 +533,7 @@ export default function AdminHome() {
             iconColor="text-indigo-600"
             testId="section-parcel-statistics"
           />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
             <Link href="/admin/parcels">
               <StatCard
                 icon={Package}
@@ -612,19 +613,19 @@ export default function AdminHome() {
           )}
           
           {isLoadingCapabilities ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="rounded-[14px] border border-border/60 bg-gradient-to-br from-card via-card to-muted/20 p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <Skeleton className="h-14 w-14 rounded-xl" />
+                <div key={i} className="rounded-[14px] border border-border/60 bg-gradient-to-br from-card via-card to-muted/20 p-4 sm:p-6">
+                  <div className="flex items-start justify-between mb-3 sm:mb-4">
+                    <Skeleton className="h-12 w-12 sm:h-14 sm:w-14 rounded-xl" />
                   </div>
-                  <Skeleton className="h-6 w-3/4 mb-2" />
+                  <Skeleton className="h-5 sm:h-6 w-3/4 mb-2" />
                   <Skeleton className="h-4 w-full" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
               {filteredSections.map((section) => (
                 <Link key={section.name} href={section.href}>
                   <ManagementCard

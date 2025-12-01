@@ -19,19 +19,19 @@ export function SectionHeader({
   testId,
 }: SectionHeaderProps) {
   return (
-    <div className={cn("pt-2 pb-4", className)} data-testid={testId}>
-      <div className="flex items-center gap-3 mb-3">
+    <div className={cn("pt-1 sm:pt-2 pb-3 sm:pb-4", className)} data-testid={testId}>
+      <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
         {Icon && (
-          <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-muted/60 dark:bg-muted/40">
-            <Icon className={cn("h-4 w-4", iconColor)} />
+          <div className="flex items-center justify-center h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-muted/60 dark:bg-muted/40 shrink-0">
+            <Icon className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", iconColor)} />
           </div>
         )}
-        <div className="flex-1">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base sm:text-lg font-semibold tracking-tight text-foreground truncate">
             {title}
           </h2>
           {description && (
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 line-clamp-1">
               {description}
             </p>
           )}
