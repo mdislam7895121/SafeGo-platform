@@ -129,11 +129,18 @@ export function useDriverAvailability(
     });
   }, []);
 
+  // Always track location when on map, regardless of online status
   useEffect(() => {
-    const vehicle = (driverData as any)?.vehicle;
-    const isOnline = vehicle?.isOnline;
+    if (!navigator.geolocation) {
+      setGpsStatus({
+        isAvailable: false,
+        signalStrength: "none",
+        error: "Geolocation not supported by browser",
+      });
+      return;
+    }
 
-    if (isOnline && !locationWatchId && navigator.geolocation) {
+    if (!locationWatchId) {
       const watchId = navigator.geolocation.watchPosition(
         sendLocationUpdate,
         handleLocationError,
@@ -144,9 +151,6 @@ export function useDriverAvailability(
         }
       );
       setLocationWatchId(watchId);
-    } else if (!isOnline && locationWatchId) {
-      navigator.geolocation.clearWatch(locationWatchId);
-      setLocationWatchId(null);
     }
 
     return () => {
@@ -154,7 +158,7 @@ export function useDriverAvailability(
         navigator.geolocation.clearWatch(locationWatchId);
       }
     };
-  }, [(driverData as any)?.vehicle?.isOnline, locationWatchId, sendLocationUpdate, handleLocationError, locationUpdateInterval]);
+  }, [locationWatchId, sendLocationUpdate, handleLocationError, locationUpdateInterval]);
 
   const toggleOnlineStatus = useCallback(() => {
     const vehicle = (driverData as any)?.vehicle;
