@@ -45,7 +45,7 @@ router.get('/admin/security-audit', requireAnyAdmin, async (req, res) => {
   }
 });
 
-router.post('/admin/security-audit/run', requireAdmin, async (req, res) => {
+router.post('/admin/security-audit/run', requireAnyAdmin, async (req, res) => {
   try {
     const result = await runSecurityAudit();
     res.json(result);
@@ -68,7 +68,7 @@ router.get('/admin/security-findings', requireAnyAdmin, async (req, res) => {
   }
 });
 
-router.patch('/admin/security-findings/:id', requireAdmin, async (req, res) => {
+router.patch('/admin/security-findings/:id', requireAnyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, resolution } = req.body;
@@ -139,7 +139,7 @@ router.get('/admin/deployment-checks', requireAnyAdmin, async (req, res) => {
   }
 });
 
-router.get('/admin/kyc-access-logs/:userId', requireAdmin, async (req, res) => {
+router.get('/admin/kyc-access-logs/:userId', requireAnyAdmin, async (req, res) => {
   try {
     const { userId } = req.params;
     const { limit, offset } = req.query;
