@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { StatCard, ManagementCard } from "@/components/ui/stat-card";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
@@ -394,259 +395,181 @@ export default function AdminHome() {
       <div className="p-6 space-y-6">
         {/* Quick Stats */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Platform Overview</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <h2 className="text-lg font-semibold mb-4">Platform Overview</h2>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Link href="/admin/users">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-total-users">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <Users className="h-8 w-8 text-blue-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-total-users">
-                        {stats?.totalUsers ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Total Users</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={Users}
+                iconColor="text-blue-600"
+                iconBgColor="bg-blue-50 dark:bg-blue-950/50"
+                value={stats?.totalUsers ?? 0}
+                label="Total Users"
+                isLoading={isLoading}
+                testId="card-total-users"
+              />
             </Link>
 
             <Link href="/admin/drivers">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-total-drivers">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <Car className="h-8 w-8 text-purple-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-total-drivers">
-                        {stats?.totalDrivers ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Total Drivers</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={Car}
+                iconColor="text-purple-600"
+                iconBgColor="bg-purple-50 dark:bg-purple-950/50"
+                value={stats?.totalDrivers ?? 0}
+                label="Total Drivers"
+                isLoading={isLoading}
+                testId="card-total-drivers"
+              />
             </Link>
 
             <Link href="/admin/drivers?status=active">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-active-drivers">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <UserCheck className="h-8 w-8 text-green-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-active-drivers">
-                        {stats?.activeDrivers ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Active Drivers</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={UserCheck}
+                iconColor="text-green-600"
+                iconBgColor="bg-green-50 dark:bg-green-950/50"
+                value={stats?.activeDrivers ?? 0}
+                label="Active Drivers"
+                isLoading={isLoading}
+                testId="card-active-drivers"
+              />
             </Link>
 
             <Link href="/admin/customers">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-customers">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <Users className="h-8 w-8 text-cyan-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-customers">
-                        {stats?.totalCustomers ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Customers</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={Users}
+                iconColor="text-cyan-600"
+                iconBgColor="bg-cyan-50 dark:bg-cyan-950/50"
+                value={stats?.totalCustomers ?? 0}
+                label="Customers"
+                isLoading={isLoading}
+                testId="card-customers"
+              />
             </Link>
 
             <Link href="/admin/restaurants">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-restaurants">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <UtensilsCrossed className="h-8 w-8 text-orange-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-restaurants">
-                        {stats?.restaurants ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Restaurants</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={UtensilsCrossed}
+                iconColor="text-orange-600"
+                iconBgColor="bg-orange-50 dark:bg-orange-950/50"
+                value={stats?.restaurants ?? 0}
+                label="Restaurants"
+                isLoading={isLoading}
+                testId="card-restaurants"
+              />
             </Link>
           </div>
         </div>
 
         {/* Driver Stats */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Driver Statistics</h2>
+          <h2 className="text-lg font-semibold mb-4">Driver Statistics</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link href="/admin/kyc">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-pending-kyc">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <Clock className="h-8 w-8 text-yellow-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-pending-drivers">
-                        {(stats?.pendingDrivers ?? 0) + (stats?.pendingCustomers ?? 0) + (stats?.pendingRestaurants ?? 0)}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Pending KYC</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={Clock}
+                iconColor="text-yellow-600"
+                iconBgColor="bg-yellow-50 dark:bg-yellow-950/50"
+                value={(stats?.pendingDrivers ?? 0) + (stats?.pendingCustomers ?? 0) + (stats?.pendingRestaurants ?? 0)}
+                label="Pending KYC"
+                isLoading={isLoading}
+                testId="card-pending-kyc"
+              />
             </Link>
 
             <Link href="/admin/drivers?status=suspended">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-suspended">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <Shield className="h-8 w-8 text-orange-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-suspended-drivers">
-                        {stats?.suspendedDrivers ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Suspended</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={Shield}
+                iconColor="text-orange-600"
+                iconBgColor="bg-orange-50 dark:bg-orange-950/50"
+                value={stats?.suspendedDrivers ?? 0}
+                label="Suspended"
+                isLoading={isLoading}
+                testId="card-suspended"
+              />
             </Link>
 
             <Link href="/admin/drivers?status=blocked">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-blocked">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <UserX className="h-8 w-8 text-red-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-blocked-drivers">
-                        {stats?.blockedDrivers ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Blocked</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={UserX}
+                iconColor="text-red-600"
+                iconBgColor="bg-red-50 dark:bg-red-950/50"
+                value={stats?.blockedDrivers ?? 0}
+                label="Blocked"
+                isLoading={isLoading}
+                testId="card-blocked"
+              />
             </Link>
 
             <Link href="/admin/complaints">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-open-complaints">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <AlertTriangle className="h-8 w-8 text-red-600 mb-2" />
-                    {isLoading ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-open-complaints">
-                        {stats?.openComplaints ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Open Complaints</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={AlertTriangle}
+                iconColor="text-red-600"
+                iconBgColor="bg-red-50 dark:bg-red-950/50"
+                value={stats?.openComplaints ?? 0}
+                label="Open Complaints"
+                isLoading={isLoading}
+                testId="card-open-complaints"
+              />
             </Link>
           </div>
         </div>
 
         {/* Parcel Statistics */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Parcel Delivery Statistics</h2>
+          <h2 className="text-lg font-semibold mb-4">Parcel Delivery Statistics</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <Link href="/admin/parcels">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-total-parcels">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <Package className="h-8 w-8 text-indigo-600 mb-2" />
-                    {isLoadingParcels ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-total-parcels">
-                        {parcelStats?.totalParcels ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Total Parcels</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={Package}
+                iconColor="text-indigo-600"
+                iconBgColor="bg-indigo-50 dark:bg-indigo-950/50"
+                value={parcelStats?.totalParcels ?? 0}
+                label="Total Parcels"
+                isLoading={isLoadingParcels}
+                testId="card-total-parcels"
+              />
             </Link>
 
             <Link href="/admin/parcels?status=active">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-active-parcels">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <TruckIcon className="h-8 w-8 text-blue-600 mb-2" />
-                    {isLoadingParcels ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-active-parcels">
-                        {parcelStats?.activeParcels ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Active Parcels</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={TruckIcon}
+                iconColor="text-blue-600"
+                iconBgColor="bg-blue-50 dark:bg-blue-950/50"
+                value={parcelStats?.activeParcels ?? 0}
+                label="Active Parcels"
+                isLoading={isLoadingParcels}
+                testId="card-active-parcels"
+              />
             </Link>
 
             <Link href="/admin/parcels?status=delivered">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-delivered-today">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <PackageCheck className="h-8 w-8 text-green-600 mb-2" />
-                    {isLoadingParcels ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-delivered-today">
-                        {parcelStats?.deliveredToday ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Delivered Today</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={PackageCheck}
+                iconColor="text-green-600"
+                iconBgColor="bg-green-50 dark:bg-green-950/50"
+                value={parcelStats?.deliveredToday ?? 0}
+                label="Delivered Today"
+                isLoading={isLoadingParcels}
+                testId="card-delivered-today"
+              />
             </Link>
 
             <Link href="/admin/parcels?status=cancelled">
-              <Card className="hover-elevate cursor-pointer" data-testid="card-cancelled-parcels">
-                <CardContent className="p-4">
-                  <div className="flex flex-col items-center text-center">
-                    <PackageX className="h-8 w-8 text-red-600 mb-2" />
-                    {isLoadingParcels ? (
-                      <Skeleton className="h-8 w-12 mb-1" />
-                    ) : (
-                      <p className="text-2xl font-bold" data-testid="stat-cancelled-parcels">
-                        {parcelStats?.cancelledParcels ?? 0}
-                      </p>
-                    )}
-                    <p className="text-xs text-muted-foreground">Cancelled</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatCard
+                icon={PackageX}
+                iconColor="text-red-600"
+                iconBgColor="bg-red-50 dark:bg-red-950/50"
+                value={parcelStats?.cancelledParcels ?? 0}
+                label="Cancelled"
+                isLoading={isLoadingParcels}
+                testId="card-cancelled-parcels"
+              />
             </Link>
           </div>
         </div>
 
         {/* Admin Sections */}
         <div>
-          <h2 className="text-lg font-semibold mb-3">Management</h2>
+          <h2 className="text-lg font-semibold mb-4">Management</h2>
           
           {/* Error Banner for Capabilities Fetch Failure */}
           {hasCapabilitiesError && (
@@ -667,39 +590,30 @@ export default function AdminHome() {
           )}
           
           {isLoadingCapabilities ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...Array(6)].map((_, i) => (
-                <Card key={i}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <Skeleton className="h-12 w-12 rounded-2xl" />
-                    </div>
-                    <Skeleton className="h-6 w-3/4 mb-2" />
-                    <Skeleton className="h-4 w-full" />
-                  </CardContent>
-                </Card>
+                <div key={i} className="rounded-[14px] border border-border/60 bg-gradient-to-br from-card via-card to-muted/20 p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <Skeleton className="h-14 w-14 rounded-xl" />
+                  </div>
+                  <Skeleton className="h-6 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-full" />
+                </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredSections.map((section) => (
                 <Link key={section.name} href={section.href}>
-                  <Card className="hover-elevate cursor-pointer" data-testid={`card-${section.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className={`h-12 w-12 rounded-2xl ${section.bgColor} flex items-center justify-center`}>
-                          <section.icon className={`h-6 w-6 ${section.color}`} />
-                        </div>
-                        {section.badge !== undefined && section.badge > 0 && (
-                          <Badge variant="destructive" data-testid={`badge-${section.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                            {section.badge}
-                          </Badge>
-                        )}
-                      </div>
-                      <h3 className="font-semibold text-lg mb-2">{section.name}</h3>
-                      <p className="text-sm text-muted-foreground">{section.description}</p>
-                    </CardContent>
-                  </Card>
+                  <ManagementCard
+                    icon={section.icon}
+                    iconColor={section.color}
+                    iconBgColor={section.bgColor}
+                    title={section.name}
+                    description={section.description}
+                    badge={section.badge}
+                    testId={`card-${section.name.toLowerCase().replace(/\s+/g, '-')}`}
+                  />
                 </Link>
               ))}
             </div>
