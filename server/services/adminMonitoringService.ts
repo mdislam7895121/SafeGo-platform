@@ -421,7 +421,7 @@ export async function getLiveMapData(countryCode?: string): Promise<LiveMapData>
       },
       include: {
         customer: {
-          select: { fullName: true, phone: true },
+          select: { fullName: true, phoneNumber: true },
         },
       },
       take: 200,
@@ -436,10 +436,10 @@ export async function getLiveMapData(countryCode?: string): Promise<LiveMapData>
       },
       include: {
         customer: {
-          select: { fullName: true, phone: true },
+          select: { fullName: true, phoneNumber: true },
         },
         restaurant: {
-          select: { businessName: true },
+          select: { restaurantName: true },
         },
       },
       take: 200,
@@ -456,7 +456,7 @@ export async function getLiveMapData(countryCode?: string): Promise<LiveMapData>
       },
       include: {
         customer: {
-          select: { fullName: true, phone: true },
+          select: { fullName: true, phoneNumber: true },
         },
       },
       take: 200,
@@ -476,7 +476,7 @@ export async function getLiveMapData(countryCode?: string): Promise<LiveMapData>
       currentAssignmentType: d.currentServiceMode !== 'offline' ? d.currentServiceMode : undefined,
     })),
     
-    rides: rides.map(r => ({
+    rides: rides.map((r: any) => ({
       rideId: r.id,
       status: r.status,
       pickupLat: r.pickupLat!,
@@ -484,10 +484,10 @@ export async function getLiveMapData(countryCode?: string): Promise<LiveMapData>
       dropoffLat: r.dropoffLat || r.pickupLat!,
       dropoffLng: r.dropoffLng || r.pickupLng!,
       driverId: r.driverId || undefined,
-      customerMasked: maskCustomerInfo(r.customer?.fullName, r.customer?.phone),
+      customerMasked: maskCustomerInfo(r.customer?.fullName, r.customer?.phoneNumber),
     })),
     
-    foodOrders: foodOrders.map(o => ({
+    foodOrders: foodOrders.map((o: any) => ({
       orderId: o.id,
       status: o.status,
       restaurantLat: o.pickupLat || 0,
@@ -495,11 +495,11 @@ export async function getLiveMapData(countryCode?: string): Promise<LiveMapData>
       deliveryLat: o.deliveryLat!,
       deliveryLng: o.deliveryLng!,
       driverId: o.driverId || undefined,
-      restaurantName: o.restaurant?.businessName || 'Restaurant',
-      customerMasked: maskCustomerInfo(o.customer?.fullName, o.customer?.phone),
+      restaurantName: o.restaurant?.restaurantName || 'Restaurant',
+      customerMasked: maskCustomerInfo(o.customer?.fullName, o.customer?.phoneNumber),
     })),
     
-    parcels: parcels.map(p => ({
+    parcels: parcels.map((p: any) => ({
       deliveryId: p.id,
       status: p.status,
       pickupLat: p.pickupLat!,
@@ -509,7 +509,7 @@ export async function getLiveMapData(countryCode?: string): Promise<LiveMapData>
       driverId: p.driverId || undefined,
       isScheduled: p.pickupType === 'scheduled',
       scheduledPickupAt: p.scheduledPickupAt || undefined,
-      customerMasked: maskCustomerInfo(p.customer?.fullName, p.customer?.phone),
+      customerMasked: maskCustomerInfo(p.customer?.fullName, p.customer?.phoneNumber),
     })),
     
     timestamp: new Date(),

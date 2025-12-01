@@ -12199,4 +12199,772 @@ router.post(
   }
 );
 
+// ============================================================
+// PHASE 4: ADMIN MONITORING, ANALYTICS, AND FRAUD DETECTION
+// ============================================================
+
+import * as adminMonitoringService from "../services/adminMonitoringService";
+import { formatCurrency, formatCurrencyByCountry, formatCompactCurrency } from "../../shared/currencyFormatting";
+
+// ====================================================
+// GET /api/admin/monitoring/overview
+// Real-time monitoring dashboard overview (Task 29)
+// ====================================================
+router.get("/monitoring/overview", checkPermission(Permission.VIEW_REALTIME_MONITORING), async (req: AuthRequest, res) => {
+  try {
+    const countryCode = req.query.countryCode as string | undefined;
+    const overview = await adminMonitoringService.getMonitoringOverview(countryCode);
+    
+    res.json({
+      success: true,
+      data: overview,
+    });
+  } catch (error: any) {
+    console.error("Monitoring overview error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch monitoring overview" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/monitoring/live-map
+// Live map data with driver locations and active trips (Task 29)
+// ====================================================
+router.get("/monitoring/live-map", checkPermission(Permission.VIEW_LIVE_MAP), async (req: AuthRequest, res) => {
+  try {
+    const countryCode = req.query.countryCode as string | undefined;
+    const liveMapData = await adminMonitoringService.getLiveMapData(countryCode);
+    
+    res.json({
+      success: true,
+      data: liveMapData,
+    });
+  } catch (error: any) {
+    console.error("Live map error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch live map data" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/monitoring/snapshots
+// Historical monitoring snapshots for trend analysis (Task 29)
+// ====================================================
+router.get("/monitoring/snapshots", checkPermission(Permission.VIEW_REALTIME_MONITORING), async (req: AuthRequest, res) => {
+  try {
+    const { startDate, endDate, countryCode, limit } = req.query;
+    
+    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const end = endDate ? new Date(endDate as string) : new Date();
+    const limitNum = Math.min(Math.max(1, parseInt(limit as string) || 100), 1000);
+    
+    const snapshots = await adminMonitoringService.getMonitoringSnapshots(
+      start,
+      end,
+      countryCode as string | undefined,
+      limitNum
+    );
+    
+    res.json({
+      success: true,
+      data: snapshots,
+      pagination: {
+        startDate: start,
+        endDate: end,
+        count: snapshots.length,
+      },
+    });
+  } catch (error: any) {
+    console.error("Monitoring snapshots error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch monitoring snapshots" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/analytics/daily
+// Daily revenue analytics (Task 30)
+// ====================================================
+router.get("/analytics/daily", checkPermission(Permission.VIEW_REVENUE_ANALYTICS), async (req: AuthRequest, res) => {
+  try {
+    const { date, countryCode, serviceType } = req.query;
+    
+    const targetDate = date ? new Date(date as string) : new Date();
+    targetDate.setUTCHours(0, 0, 0, 0);
+    
+    const whereClause: any = {
+      date: targetDate,
+    };
+    
+    if (countryCode) {
+      whereClause.countryCode = String(countryCode).toUpperCase();
+    }
+    
+    if (serviceType && ['ride', 'food', 'parcel'].includes(serviceType as string)) {
+      whereClause.serviceType = serviceType;
+    }
+    
+    const analytics = await prisma.analyticsDailyRevenue.findMany({
+      where: whereClause,
+      orderBy: { serviceType: 'asc' },
+    });
+    
+    const currencyCode = (countryCode as string)?.toUpperCase() === 'BD' ? 'BDT' : 'USD';
+    
+    const totals = analytics.reduce((acc, a) => ({
+      totalFare: acc.totalFare + Number(a.totalFare),
+      totalCommission: acc.totalCommission + Number(a.totalCommission),
+      totalPartnerPayout: acc.totalPartnerPayout + Number(a.totalPartnerPayout),
+      totalOnlinePayments: acc.totalOnlinePayments + Number(a.totalOnlinePayments),
+      totalCashCollected: acc.totalCashCollected + Number(a.totalCashCollected),
+      totalTrips: acc.totalTrips + a.totalTrips,
+      completedTrips: acc.completedTrips + a.completedTrips,
+      cancelledTrips: acc.cancelledTrips + a.cancelledTrips,
+      totalTips: acc.totalTips + Number(a.totalTips),
+      totalRefunds: acc.totalRefunds + Number(a.totalRefunds),
+      totalIncentivesPaid: acc.totalIncentivesPaid + Number(a.totalIncentivesPaid),
+    }), {
+      totalFare: 0,
+      totalCommission: 0,
+      totalPartnerPayout: 0,
+      totalOnlinePayments: 0,
+      totalCashCollected: 0,
+      totalTrips: 0,
+      completedTrips: 0,
+      cancelledTrips: 0,
+      totalTips: 0,
+      totalRefunds: 0,
+      totalIncentivesPaid: 0,
+    });
+    
+    res.json({
+      success: true,
+      date: targetDate,
+      countryCode: countryCode || 'ALL',
+      currencyCode,
+      analytics: analytics.map(a => ({
+        ...a,
+        totalFare: Number(a.totalFare),
+        totalCommission: Number(a.totalCommission),
+        totalPartnerPayout: Number(a.totalPartnerPayout),
+        totalOnlinePayments: Number(a.totalOnlinePayments),
+        totalCashCollected: Number(a.totalCashCollected),
+        totalTips: Number(a.totalTips),
+        totalRefunds: Number(a.totalRefunds),
+        totalIncentivesPaid: Number(a.totalIncentivesPaid),
+        totalFareFormatted: formatCurrency(Number(a.totalFare), currencyCode as 'BDT' | 'USD'),
+        totalCommissionFormatted: formatCurrency(Number(a.totalCommission), currencyCode as 'BDT' | 'USD'),
+      })),
+      totals: {
+        ...totals,
+        totalFareFormatted: formatCurrency(totals.totalFare, currencyCode as 'BDT' | 'USD'),
+        totalCommissionFormatted: formatCurrency(totals.totalCommission, currencyCode as 'BDT' | 'USD'),
+        totalPartnerPayoutFormatted: formatCurrency(totals.totalPartnerPayout, currencyCode as 'BDT' | 'USD'),
+      },
+    });
+  } catch (error: any) {
+    console.error("Daily analytics error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch daily analytics" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/analytics/summary
+// Revenue summary for date range (Task 30)
+// ====================================================
+router.get("/analytics/summary", checkPermission(Permission.VIEW_REVENUE_ANALYTICS), async (req: AuthRequest, res) => {
+  try {
+    const { range = 'last_7_days', countryCode } = req.query;
+    
+    let startDate: Date;
+    const endDate = new Date();
+    endDate.setUTCHours(23, 59, 59, 999);
+    
+    switch (range) {
+      case 'today':
+        startDate = new Date();
+        startDate.setUTCHours(0, 0, 0, 0);
+        break;
+      case 'last_7_days':
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        startDate.setUTCHours(0, 0, 0, 0);
+        break;
+      case 'last_30_days':
+        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        startDate.setUTCHours(0, 0, 0, 0);
+        break;
+      case 'this_month':
+        startDate = new Date();
+        startDate.setUTCDate(1);
+        startDate.setUTCHours(0, 0, 0, 0);
+        break;
+      case 'last_month':
+        startDate = new Date();
+        startDate.setUTCMonth(startDate.getUTCMonth() - 1);
+        startDate.setUTCDate(1);
+        startDate.setUTCHours(0, 0, 0, 0);
+        break;
+      default:
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        startDate.setUTCHours(0, 0, 0, 0);
+    }
+    
+    const whereClause: any = {
+      date: {
+        gte: startDate,
+        lte: endDate,
+      },
+    };
+    
+    if (countryCode) {
+      whereClause.countryCode = String(countryCode).toUpperCase();
+    }
+    
+    const analytics = await prisma.analyticsDailyRevenue.findMany({
+      where: whereClause,
+      orderBy: { date: 'asc' },
+    });
+    
+    const currencyCode = (countryCode as string)?.toUpperCase() === 'BD' ? 'BDT' : 'USD';
+    
+    const dailyData = analytics.reduce((acc: any, a) => {
+      const dateKey = a.date.toISOString().split('T')[0];
+      if (!acc[dateKey]) {
+        acc[dateKey] = {
+          date: dateKey,
+          totalFare: 0,
+          totalCommission: 0,
+          totalPartnerPayout: 0,
+          totalTrips: 0,
+          completedTrips: 0,
+          byService: {},
+        };
+      }
+      acc[dateKey].totalFare += Number(a.totalFare);
+      acc[dateKey].totalCommission += Number(a.totalCommission);
+      acc[dateKey].totalPartnerPayout += Number(a.totalPartnerPayout);
+      acc[dateKey].totalTrips += a.totalTrips;
+      acc[dateKey].completedTrips += a.completedTrips;
+      acc[dateKey].byService[a.serviceType] = {
+        fare: Number(a.totalFare),
+        commission: Number(a.totalCommission),
+        trips: a.totalTrips,
+      };
+      return acc;
+    }, {});
+    
+    const totals = Object.values(dailyData).reduce((acc: any, day: any) => ({
+      totalFare: acc.totalFare + day.totalFare,
+      totalCommission: acc.totalCommission + day.totalCommission,
+      totalPartnerPayout: acc.totalPartnerPayout + day.totalPartnerPayout,
+      totalTrips: acc.totalTrips + day.totalTrips,
+      completedTrips: acc.completedTrips + day.completedTrips,
+    }), {
+      totalFare: 0,
+      totalCommission: 0,
+      totalPartnerPayout: 0,
+      totalTrips: 0,
+      completedTrips: 0,
+    });
+    
+    res.json({
+      success: true,
+      range,
+      startDate,
+      endDate,
+      countryCode: countryCode || 'ALL',
+      currencyCode,
+      dailyData: Object.values(dailyData).map((day: any) => ({
+        ...day,
+        totalFareFormatted: formatCurrency(day.totalFare, currencyCode as 'BDT' | 'USD'),
+        totalCommissionFormatted: formatCurrency(day.totalCommission, currencyCode as 'BDT' | 'USD'),
+      })),
+      totals: {
+        ...totals,
+        totalFareFormatted: formatCurrency(totals.totalFare, currencyCode as 'BDT' | 'USD'),
+        totalCommissionFormatted: formatCurrency(totals.totalCommission, currencyCode as 'BDT' | 'USD'),
+        totalPartnerPayoutFormatted: formatCurrency(totals.totalPartnerPayout, currencyCode as 'BDT' | 'USD'),
+        averageDailyFare: Object.keys(dailyData).length > 0 
+          ? formatCurrency(totals.totalFare / Object.keys(dailyData).length, currencyCode as 'BDT' | 'USD')
+          : formatCurrency(0, currencyCode as 'BDT' | 'USD'),
+      },
+    });
+  } catch (error: any) {
+    console.error("Analytics summary error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch analytics summary" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/analytics/service-breakdown
+// Revenue breakdown by service type (Task 30)
+// ====================================================
+router.get("/analytics/service-breakdown", checkPermission(Permission.VIEW_REVENUE_ANALYTICS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode, startDate, endDate } = req.query;
+    
+    const start = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    start.setUTCHours(0, 0, 0, 0);
+    
+    const end = endDate ? new Date(endDate as string) : new Date();
+    end.setUTCHours(23, 59, 59, 999);
+    
+    const whereClause: any = {
+      date: {
+        gte: start,
+        lte: end,
+      },
+    };
+    
+    if (countryCode) {
+      whereClause.countryCode = String(countryCode).toUpperCase();
+    }
+    
+    const analytics = await prisma.analyticsDailyRevenue.groupBy({
+      by: ['serviceType'],
+      where: whereClause,
+      _sum: {
+        totalFare: true,
+        totalCommission: true,
+        totalPartnerPayout: true,
+        totalOnlinePayments: true,
+        totalCashCollected: true,
+        totalTrips: true,
+        completedTrips: true,
+        cancelledTrips: true,
+        totalTips: true,
+        totalRefunds: true,
+        totalIncentivesPaid: true,
+      },
+    });
+    
+    const currencyCode = (countryCode as string)?.toUpperCase() === 'BD' ? 'BDT' : 'USD';
+    
+    const breakdown = analytics.map((a: any) => ({
+      serviceType: a.serviceType,
+      totalFare: Number(a._sum.totalFare || 0),
+      totalCommission: Number(a._sum.totalCommission || 0),
+      totalPartnerPayout: Number(a._sum.totalPartnerPayout || 0),
+      totalOnlinePayments: Number(a._sum.totalOnlinePayments || 0),
+      totalCashCollected: Number(a._sum.totalCashCollected || 0),
+      totalTrips: a._sum.totalTrips || 0,
+      completedTrips: a._sum.completedTrips || 0,
+      cancelledTrips: a._sum.cancelledTrips || 0,
+      totalTips: Number(a._sum.totalTips || 0),
+      totalRefunds: Number(a._sum.totalRefunds || 0),
+      totalIncentivesPaid: Number(a._sum.totalIncentivesPaid || 0),
+      cashOnlineRatio: Number(a._sum.totalOnlinePayments || 0) > 0 
+        ? (Number(a._sum.totalCashCollected || 0) / Number(a._sum.totalOnlinePayments || 0)).toFixed(2)
+        : 'N/A',
+      totalFareFormatted: formatCurrency(Number(a._sum.totalFare || 0), currencyCode as 'BDT' | 'USD'),
+      totalCommissionFormatted: formatCurrency(Number(a._sum.totalCommission || 0), currencyCode as 'BDT' | 'USD'),
+    }));
+    
+    const grandTotal = breakdown.reduce((acc: any, b: any) => ({
+      totalFare: acc.totalFare + b.totalFare,
+      totalCommission: acc.totalCommission + b.totalCommission,
+      totalPartnerPayout: acc.totalPartnerPayout + b.totalPartnerPayout,
+      totalTrips: acc.totalTrips + b.totalTrips,
+    }), { totalFare: 0, totalCommission: 0, totalPartnerPayout: 0, totalTrips: 0 });
+    
+    res.json({
+      success: true,
+      startDate: start,
+      endDate: end,
+      countryCode: countryCode || 'ALL',
+      currencyCode,
+      breakdown,
+      grandTotal: {
+        ...grandTotal,
+        totalFareFormatted: formatCurrency(grandTotal.totalFare, currencyCode as 'BDT' | 'USD'),
+        totalCommissionFormatted: formatCurrency(grandTotal.totalCommission, currencyCode as 'BDT' | 'USD'),
+      },
+    });
+  } catch (error: any) {
+    console.error("Service breakdown error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch service breakdown" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/fraud/alerts
+// List fraud alerts with filtering (Task 31)
+// ====================================================
+router.get("/fraud/alerts", checkPermission(Permission.VIEW_FRAUD_ALERTS), async (req: AuthRequest, res) => {
+  try {
+    const { 
+      status, 
+      severity, 
+      entityType, 
+      alertType,
+      page = "1", 
+      pageSize = "20" 
+    } = req.query;
+    
+    const pageNum = Math.max(1, parseInt(page as string) || 1);
+    const pageSizeNum = Math.min(Math.max(1, parseInt(pageSize as string) || 20), 100);
+    const skip = (pageNum - 1) * pageSizeNum;
+    
+    const whereClause: any = {};
+    
+    if (status) {
+      whereClause.status = status;
+    }
+    
+    if (severity) {
+      whereClause.severity = severity;
+    }
+    
+    if (entityType) {
+      whereClause.entityType = entityType;
+    }
+    
+    if (alertType) {
+      whereClause.alertType = alertType;
+    }
+    
+    const [alerts, total] = await Promise.all([
+      prisma.fraudAlert.findMany({
+        where: whereClause,
+        orderBy: [
+          { severity: 'desc' },
+          { detectedAt: 'desc' },
+        ],
+        skip,
+        take: pageSizeNum,
+      }),
+      prisma.fraudAlert.count({ where: whereClause }),
+    ]);
+    
+    const statusCounts = await prisma.fraudAlert.groupBy({
+      by: ['status'],
+      _count: { id: true },
+    });
+    
+    const severityCounts = await prisma.fraudAlert.groupBy({
+      by: ['severity'],
+      where: { status: 'open' },
+      _count: { id: true },
+    });
+    
+    res.json({
+      success: true,
+      alerts: alerts.map(a => ({
+        id: a.id,
+        entityType: a.entityType,
+        entityId: a.entityId,
+        alertType: a.alertType,
+        severity: a.severity,
+        status: a.status,
+        detectedReason: a.detectedReason,
+        detectedMetrics: a.detectedMetrics,
+        detectedAt: a.detectedAt,
+        resolvedByAdminId: a.resolvedByAdminId,
+        resolvedAt: a.resolvedAt,
+        resolutionNotes: a.resolutionNotes,
+      })),
+      pagination: {
+        page: pageNum,
+        pageSize: pageSizeNum,
+        total,
+        totalPages: Math.ceil(total / pageSizeNum),
+      },
+      summary: {
+        byStatus: statusCounts.reduce((acc: any, s) => {
+          acc[s.status] = s._count.id;
+          return acc;
+        }, {}),
+        openBySeverity: severityCounts.reduce((acc: any, s) => {
+          acc[s.severity] = s._count.id;
+          return acc;
+        }, {}),
+      },
+    });
+  } catch (error: any) {
+    console.error("List fraud alerts error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch fraud alerts" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/fraud/alerts/:id
+// Get single fraud alert details (Task 31)
+// ====================================================
+router.get("/fraud/alerts/:id", checkPermission(Permission.VIEW_FRAUD_ALERTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    const alert = await prisma.fraudAlert.findUnique({
+      where: { id },
+    });
+    
+    if (!alert) {
+      return res.status(404).json({ error: "Fraud alert not found" });
+    }
+    
+    let entityDetails = null;
+    
+    switch (alert.entityType) {
+      case 'ride':
+        entityDetails = await prisma.ride.findUnique({
+          where: { id: alert.entityId },
+          select: {
+            id: true,
+            status: true,
+            serviceFare: true,
+            paymentMethod: true,
+            createdAt: true,
+            customerId: true,
+            driverId: true,
+          },
+        });
+        break;
+      case 'customer':
+        entityDetails = await prisma.customerProfile.findUnique({
+          where: { id: alert.entityId },
+          select: {
+            id: true,
+            fullName: true,
+            verificationStatus: true,
+            isSuspended: true,
+            createdAt: true,
+          },
+        });
+        break;
+      case 'driver':
+        entityDetails = await prisma.driverProfile.findUnique({
+          where: { id: alert.entityId },
+          select: {
+            id: true,
+            fullName: true,
+            verificationStatus: true,
+            status: true,
+            createdAt: true,
+          },
+        });
+        break;
+      case 'wallet':
+        entityDetails = await prisma.driverWallet.findUnique({
+          where: { id: alert.entityId },
+          select: {
+            id: true,
+            driverId: true,
+            balance: true,
+            negativeBalance: true,
+          },
+        });
+        break;
+    }
+    
+    res.json({
+      success: true,
+      alert: {
+        id: alert.id,
+        entityType: alert.entityType,
+        entityId: alert.entityId,
+        alertType: alert.alertType,
+        severity: alert.severity,
+        status: alert.status,
+        detectedReason: alert.detectedReason,
+        detectedMetrics: alert.detectedMetrics,
+        detectedAt: alert.detectedAt,
+        resolvedByAdminId: alert.resolvedByAdminId,
+        resolvedAt: alert.resolvedAt,
+        resolutionNotes: alert.resolutionNotes,
+        createdAt: alert.createdAt,
+        updatedAt: alert.updatedAt,
+      },
+      entityDetails,
+    });
+  } catch (error: any) {
+    console.error("Get fraud alert error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch fraud alert" });
+  }
+});
+
+// ====================================================
+// PATCH /api/admin/fraud/alerts/:id/resolve
+// Resolve a fraud alert (Task 31)
+// ====================================================
+const resolveFraudAlertSchema = z.object({
+  resolution: z.enum(['resolved_confirmed', 'resolved_false_positive', 'escalated']),
+  notes: z.string().min(1, "Resolution notes are required").max(2000),
+});
+
+router.patch("/fraud/alerts/:id/resolve", checkPermission(Permission.RESOLVE_FRAUD_ALERTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const validation = resolveFraudAlertSchema.safeParse(req.body);
+    
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Invalid request body",
+        details: validation.error.errors,
+      });
+    }
+    
+    const { resolution, notes } = validation.data;
+    
+    const alert = await prisma.fraudAlert.findUnique({
+      where: { id },
+    });
+    
+    if (!alert) {
+      return res.status(404).json({ error: "Fraud alert not found" });
+    }
+    
+    if (['resolved_confirmed', 'resolved_false_positive'].includes(alert.status)) {
+      return res.status(400).json({ error: "Alert is already resolved" });
+    }
+    
+    const updatedAlert = await prisma.fraudAlert.update({
+      where: { id },
+      data: {
+        status: resolution,
+        resolvedByAdminId: req.user!.id,
+        resolvedAt: new Date(),
+        resolutionNotes: notes,
+      },
+    });
+    
+    await logAuditEvent({
+      entityType: EntityType.FRAUD_ALERT || 'fraud_alert' as any,
+      entityId: id,
+      actionType: ActionType.UPDATE,
+      actorId: req.user!.id,
+      actorRole: 'admin',
+      ipAddress: getClientIp(req),
+      metadata: {
+        previousStatus: alert.status,
+        newStatus: resolution,
+        resolutionNotes: notes,
+      },
+    });
+    
+    res.json({
+      success: true,
+      message: "Fraud alert resolved successfully",
+      alert: {
+        id: updatedAlert.id,
+        status: updatedAlert.status,
+        resolvedByAdminId: updatedAlert.resolvedByAdminId,
+        resolvedAt: updatedAlert.resolvedAt,
+        resolutionNotes: updatedAlert.resolutionNotes,
+      },
+    });
+  } catch (error: any) {
+    console.error("Resolve fraud alert error:", error);
+    res.status(500).json({ error: error.message || "Failed to resolve fraud alert" });
+  }
+});
+
+// ====================================================
+// GET /api/admin/analytics/top-earners
+// Top earning drivers and restaurants (Task 30)
+// ====================================================
+router.get("/analytics/top-earners", checkPermission(Permission.VIEW_REVENUE_ANALYTICS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode, limit = "10", range = "last_30_days" } = req.query;
+    const limitNum = Math.min(Math.max(1, parseInt(limit as string) || 10), 50);
+    
+    let startDate: Date;
+    const endDate = new Date();
+    
+    switch (range) {
+      case 'last_7_days':
+        startDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'last_30_days':
+        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case 'this_month':
+        startDate = new Date();
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      default:
+        startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    }
+    
+    const currencyCode = (countryCode as string)?.toUpperCase() === 'BD' ? 'BDT' : 'USD';
+    
+    const topDrivers = await prisma.ride.groupBy({
+      by: ['driverId'],
+      where: {
+        completedAt: { gte: startDate, lte: endDate },
+        driverId: { not: null },
+        ...(countryCode ? { countryCode: String(countryCode).toUpperCase() } : {}),
+      },
+      _sum: {
+        driverPayout: true,
+        serviceFare: true,
+      },
+      _count: { id: true },
+      orderBy: { _sum: { driverPayout: 'desc' } },
+      take: limitNum,
+    });
+    
+    const driverIds = topDrivers.map(d => d.driverId).filter(Boolean) as string[];
+    const driverProfiles = await prisma.driverProfile.findMany({
+      where: { id: { in: driverIds } },
+      select: { id: true, fullName: true, firstName: true, lastName: true },
+    });
+    
+    const driverMap = new Map(driverProfiles.map(d => [d.id, d]));
+    
+    const topRestaurants = await prisma.foodOrder.groupBy({
+      by: ['restaurantId'],
+      where: {
+        deliveredAt: { gte: startDate, lte: endDate },
+      },
+      _sum: {
+        restaurantPayout: true,
+        serviceFare: true,
+      },
+      _count: { id: true },
+      orderBy: { _sum: { restaurantPayout: 'desc' } },
+      take: limitNum,
+    });
+    
+    const restaurantIds = topRestaurants.map(r => r.restaurantId);
+    const restaurantProfiles = await prisma.restaurantProfile.findMany({
+      where: { id: { in: restaurantIds } },
+      select: { id: true, restaurantName: true },
+    });
+    
+    const restaurantMap = new Map(restaurantProfiles.map(r => [r.id, r]));
+    
+    res.json({
+      success: true,
+      range,
+      startDate,
+      endDate,
+      currencyCode,
+      topDrivers: topDrivers.map((d, index) => {
+        const profile = driverMap.get(d.driverId!);
+        return {
+          rank: index + 1,
+          driverId: d.driverId,
+          name: profile?.fullName || profile?.firstName || 'Unknown Driver',
+          totalEarnings: Number(d._sum.driverPayout || 0),
+          totalEarningsFormatted: formatCurrency(Number(d._sum.driverPayout || 0), currencyCode as 'BDT' | 'USD'),
+          totalFare: Number(d._sum.serviceFare || 0),
+          totalTrips: d._count.id,
+        };
+      }),
+      topRestaurants: topRestaurants.map((r, index) => {
+        const profile = restaurantMap.get(r.restaurantId);
+        return {
+          rank: index + 1,
+          restaurantId: r.restaurantId,
+          name: profile?.restaurantName || 'Unknown Restaurant',
+          totalEarnings: Number(r._sum.restaurantPayout || 0),
+          totalEarningsFormatted: formatCurrency(Number(r._sum.restaurantPayout || 0), currencyCode as 'BDT' | 'USD'),
+          totalOrders: r._count.id,
+        };
+      }),
+    });
+  } catch (error: any) {
+    console.error("Top earners error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch top earners" });
+  }
+});
+
 export default router;
