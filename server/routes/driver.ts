@@ -147,6 +147,38 @@ const regionPreferenceSchema = z.object({
   regionPreference: z.enum(["auto", "us", "bd", "in", "pk", "gb"]),
 });
 
+// Service Preferences Schema for driver service selection (SafeGo services)
+const servicePreferencesSchema = z.object({
+  rideTypes: z.object({
+    safego_go: z.boolean().optional(),
+    safego_x: z.boolean().optional(),
+    safego_xl: z.boolean().optional(),
+    safego_premium: z.boolean().optional(),
+    safego_bike: z.boolean().optional(),
+    safego_cng: z.boolean().optional(),
+    safego_moto: z.boolean().optional(),
+    safego_pet: z.boolean().optional(),
+  }).optional(),
+  foodEnabled: z.boolean().optional(),
+  parcelEnabled: z.boolean().optional(),
+});
+
+// Default service preferences for new drivers
+const defaultServicePreferences = {
+  rideTypes: {
+    safego_go: true,
+    safego_x: true,
+    safego_xl: false,
+    safego_premium: false,
+    safego_bike: false,
+    safego_cng: false,
+    safego_moto: false,
+    safego_pet: false,
+  },
+  foodEnabled: true,
+  parcelEnabled: true,
+};
+
 // ====================================================
 // PUBLIC ENDPOINT - GET /api/driver/public-profile/:driverProfileId
 // Get driver public profile for customer-facing views (no auth required)
@@ -5824,6 +5856,134 @@ router.patch("/preferences/region", async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Update region preference error:", error);
     res.status(500).json({ error: "Failed to update region preference" });
+  }
+});
+
+// ====================================================
+// GET /api/driver/preferences/services
+// Get driver's current service preferences
+// ====================================================
+router.get("/preferences/services", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      select: {
+        servicePreferences: true,
+        servicePreferencesLocked: true,
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    // Return current preferences or defaults
+    const preferences = driverProfile.servicePreferences || defaultServicePreferences;
+    const lockedPreferences = driverProfile.servicePreferencesLocked || {};
+
+    res.json({
+      preferences,
+      lockedPreferences,
+    });
+  } catch (error) {
+    console.error("Get service preferences error:", error);
+    res.status(500).json({ error: "Failed to get service preferences" });
+  }
+});
+
+// ====================================================
+// PATCH /api/driver/preferences/services
+// Update driver's service preferences (respects admin locks)
+// ====================================================
+router.patch("/preferences/services", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Validate request body
+    const validationResult = servicePreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    // Get current profile with locked preferences
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      select: {
+        servicePreferences: true,
+        servicePreferencesLocked: true,
+      },
+    });
+
+    if (!driverProfile) {
+      return res.status(404).json({ error: "Driver profile not found" });
+    }
+
+    const currentPrefs = (driverProfile.servicePreferences as any) || defaultServicePreferences;
+    const lockedPrefs = (driverProfile.servicePreferencesLocked as any) || {};
+    const newPrefs = validationResult.data;
+
+    // Merge new preferences with current, respecting locks
+    const mergedPrefs = {
+      rideTypes: { ...currentPrefs.rideTypes },
+      foodEnabled: currentPrefs.foodEnabled,
+      parcelEnabled: currentPrefs.parcelEnabled,
+    };
+
+    // Update ride types (check locks)
+    if (newPrefs.rideTypes) {
+      for (const [key, value] of Object.entries(newPrefs.rideTypes)) {
+        if (value !== undefined) {
+          // Check if this specific ride type is locked by admin
+          const isLocked = lockedPrefs.rideTypes?.[key]?.locked === true;
+          if (!isLocked) {
+            (mergedPrefs.rideTypes as any)[key] = value;
+          }
+        }
+      }
+    }
+
+    // Update food preference (check lock)
+    if (newPrefs.foodEnabled !== undefined) {
+      if (!lockedPrefs.foodLocked) {
+        mergedPrefs.foodEnabled = newPrefs.foodEnabled;
+      }
+    }
+
+    // Update parcel preference (check lock)
+    if (newPrefs.parcelEnabled !== undefined) {
+      if (!lockedPrefs.parcelLocked) {
+        mergedPrefs.parcelEnabled = newPrefs.parcelEnabled;
+      }
+    }
+
+    // Check if at least one service is enabled
+    const hasRideEnabled = Object.values(mergedPrefs.rideTypes).some(v => v === true);
+    const hasAnyService = hasRideEnabled || mergedPrefs.foodEnabled || mergedPrefs.parcelEnabled;
+
+    // Save updated preferences
+    const updatedProfile = await prisma.driverProfile.update({
+      where: { userId },
+      data: {
+        servicePreferences: mergedPrefs,
+      },
+      select: {
+        servicePreferences: true,
+      },
+    });
+
+    res.json({
+      message: "Service preferences updated successfully",
+      preferences: updatedProfile.servicePreferences,
+      warning: !hasAnyService ? "No services enabled. You won't receive any trip requests." : null,
+    });
+  } catch (error) {
+    console.error("Update service preferences error:", error);
+    res.status(500).json({ error: "Failed to update service preferences" });
   }
 });
 
