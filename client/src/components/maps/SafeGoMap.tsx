@@ -354,21 +354,6 @@ export function SafeGoMap({
 
   return (
     <div className={`relative ${className}`} data-testid="safego-map-container">
-      <div className="absolute top-3 left-3 z-[1000] bg-primary/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border border-primary">
-        <div className="flex items-center gap-2.5">
-          <div className="relative">
-            <svg className="h-6 w-6 text-primary-foreground" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-            </svg>
-            <div className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-green-400 rounded-full animate-pulse" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-primary-foreground leading-tight">SafeGo Map</span>
-            <span className="text-[10px] text-primary-foreground/80 leading-tight">Live Navigation</span>
-          </div>
-        </div>
-      </div>
-      
       {showEtaOverlay && activeLeg !== "completed" && targetLocation && distanceKm > 0 && (
         <div className="absolute top-3 right-3 z-[1000] bg-background/95 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow-lg border" data-testid="map-eta-overlay">
           <div className="flex items-center gap-3">
@@ -509,10 +494,6 @@ export function SafeGoMap({
           </Marker>
         )}
       </MapContainer>
-      
-      <div className="absolute bottom-3 right-3 z-[1000] bg-background/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-md border text-[10px] text-muted-foreground font-medium">
-        Powered by SafeGo
-      </div>
       
       {showTrafficToggle && (
         <button

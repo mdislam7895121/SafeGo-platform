@@ -1,0 +1,52 @@
+==========================================
+SAFEGO GLOBAL MASTER RULES (REQUIRED ALWAYS)
+==========================================
+
+(Keep all previous rules: 4 roles, global logic for rides/food/parcel, BD & US KYC, admin panel, verification flow, collections, commission rules, wallet rules, payout rules, security rules, status flows, notifications, onboarding steps, etc. DO NOT modify any backend logic.)
+
+NO CHANGES to map engine, map markers, routing, footer, trip selector, or current trip panel.
+
+==================================================
+TASK: Remove ALL extra map overlay UI from driver map
+==================================================
+
+On the driver map screen (/driver/map), completely REMOVE the following three UI components:
+
+-------------------------------------
+1) REMOVE LEGEND PILL GROUP (bottom)
+-------------------------------------
+Remove the horizontal pill group containing:
+- “You” (green dot)
+- “Pickup” (blue dot)
+- “Dropoff” (red dot)
+
+Delete the entire component. Do NOT hide with CSS.
+
+-------------------------------------------
+2) REMOVE “Powered by SafeGo” MAP WATERMARK
+-------------------------------------------
+At the bottom-right, remove the small pill/button that shows “Powered by SafeGo”.
+Delete it entirely.
+
+-----------------------------------------------
+3) REMOVE BLUE “SafeGo Map – Live Navigation” BANNER
+-----------------------------------------------
+At the top-left of the map, remove the blue banner:
+- Icon + “SafeGo Map”
+- Subtitle “Live Navigation”
+
+Delete this banner completely so the map remains clean.
+
+------------------------------------------------
+KEEP EVERYTHING ELSE EXACTLY AS IT IS:
+------------------------------------------------
+- Map tiles, zoom buttons, FAB controls → unchanged
+- Driver marker, pickup marker, dropoff marker → unchanged
+- Footer bar with online/offline toggle → unchanged
+- Left menu drawer → unchanged
+- Right menu drawer → unchanged
+- No changes to backend, collections, KYC, verification, admin panel.
+
+This task is ONLY UI cleanup.
+
+NO QUESTIONS. Apply all removals in a single update.
