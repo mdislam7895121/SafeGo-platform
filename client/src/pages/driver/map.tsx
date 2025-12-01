@@ -799,57 +799,55 @@ export default function DriverMapPage() {
           </SheetContent>
         </Sheet>
 
-        {/* Unified Bottom Button Bar */}
-        <div className="fixed bottom-0 left-0 right-0 flex justify-between items-center px-4 pb-6 pt-4 z-[1000] pointer-events-none">
-          {/* Go Online/Offline Button - Left */}
-          <button
-            onClick={async () => {
-              if (isVerified && hasVehicle) {
-                const wasOnline = isOnline;
-                
-                if (!wasOnline && !hasAnyServiceEnabled) {
-                  toast({ 
-                    title: "No trip types enabled",
-                    description: "Turn on at least one service to receive requests",
-                    variant: "destructive"
-                  });
-                  setShowServiceSheet(true);
-                  return;
-                }
-                
-                await toggleOnlineStatus();
+        {/* Go Online/Offline Button - Centered */}
+        <button
+          onClick={async () => {
+            if (isVerified && hasVehicle) {
+              const wasOnline = isOnline;
+              
+              if (!wasOnline && !hasAnyServiceEnabled) {
+                toast({ 
+                  title: "No trip types enabled",
+                  description: "Turn on at least one service to receive requests",
+                  variant: "destructive"
+                });
+                setShowServiceSheet(true);
+                return;
               }
-            }}
-            disabled={isUpdatingStatus || !isVerified || !hasVehicle}
-            className={`pointer-events-auto flex items-center gap-2 h-14 px-8 rounded-full shadow-lg transition-all duration-200 ${
-              isUpdatingStatus ? "opacity-70" : ""
-            } ${isOnline 
-              ? "bg-[#FF3B30] hover:bg-[#E63529] active:bg-[#CC2F26]" 
-              : "bg-[#28C840] hover:bg-[#22B038] active:bg-[#1D9A30]"
-            } text-white`}
-            data-testid="button-online-toggle"
-          >
-            <Power className="h-5 w-5 text-white" />
-            <span className="font-semibold text-base whitespace-nowrap">
-              {isUpdatingStatus 
-                ? "Updating..." 
-                : isOnline 
-                  ? "Go Offline" 
-                  : "Go Online"
-              }
-            </span>
-          </button>
+              
+              await toggleOnlineStatus();
+            }
+          }}
+          disabled={isUpdatingStatus || !isVerified || !hasVehicle}
+          className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 z-[1000] ${
+            isUpdatingStatus ? "opacity-70" : ""
+          } ${isOnline 
+            ? "bg-[#FF3B30] hover:bg-[#E63529] active:bg-[#CC2F26]" 
+            : "bg-[#28C840] hover:bg-[#22B038] active:bg-[#1D9A30]"
+          } text-white`}
+          data-testid="button-online-toggle"
+        >
+          <Power className="h-5 w-5 text-white" />
+          <span className="font-semibold text-base whitespace-nowrap">
+            {isUpdatingStatus 
+              ? "Updating..." 
+              : isOnline 
+                ? "Go Offline" 
+                : "Go Online"
+            }
+          </span>
+        </button>
 
-          {/* Quick Actions Button - Right (same style as Go Online) */}
-          <button
-            onClick={() => setShowQuickActionsSheet(true)}
-            className="pointer-events-auto flex items-center gap-2 h-14 px-8 rounded-full shadow-lg transition-all duration-200 bg-[#28C840] hover:bg-[#22B038] active:bg-[#1D9A30] text-white"
-            data-testid="button-quick-actions"
-          >
-            <Menu className="h-5 w-5 text-white" />
-            <span className="font-semibold text-base whitespace-nowrap">Menu</span>
-          </button>
-        </div>
+        {/* Right Footer Button - Quick Actions (same style as left footer button) */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+          onClick={() => setShowQuickActionsSheet(true)}
+          data-testid="button-quick-actions"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
 
         <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
           <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
