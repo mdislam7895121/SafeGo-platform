@@ -726,17 +726,6 @@ export default function DriverMapPage() {
             <div className="py-6 space-y-2">
               <button
                 onClick={() => {
-                  setLocation("/driver/earnings");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-earnings"
-              >
-                <DollarSign className="h-5 w-5" />
-                <span className="font-medium">Earnings</span>
-              </button>
-              <button
-                onClick={() => {
                   setLocation("/driver/trips");
                   setShowQuickActionsSheet(false);
                 }}
@@ -745,28 +734,6 @@ export default function DriverMapPage() {
               >
                 <History className="h-5 w-5" />
                 <span className="font-medium">Trip History</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/wallet");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-wallet"
-              >
-                <Wallet className="h-5 w-5" />
-                <span className="font-medium">Wallet</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/profile");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-profile"
-              >
-                <User className="h-5 w-5" />
-                <span className="font-medium">Profile</span>
               </button>
             </div>
           </SheetContent>

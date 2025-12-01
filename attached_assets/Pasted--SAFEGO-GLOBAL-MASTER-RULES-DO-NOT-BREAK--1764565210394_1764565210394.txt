@@ -1,0 +1,218 @@
+====================================
+SAFEGO GLOBAL MASTER RULES (DO NOT BREAK)
+====================================
+
+ROLES (4 distinct roles)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role has:
+- Separate signup + KYC
+- Separate dashboard
+- Separate permissions
+- No cross-access to protected data
+
+SERVICES (must always work)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+====================================
+KYC RULES (COUNTRY SPECIFIC)
+====================================
+
+BANGLADESH (BD) – required fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified (boolean)
+
+UNITED STATES (US) – required fields:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (for drivers)
+- driver_license_image_url
+- driver_license_expiry
+- ssn_last4 (optional, drivers)
+- verification_status
+- is_verified (boolean)
+
+====================================
+ONBOARDING (ALL ROLES)
+====================================
+- Multi-step: basic info → address → ID/KYC (BD/US rules) → emergency contact
+- After submit: verification_status = "pending"
+- Block access to rides/food/parcel until Admin sets verification_status = "approved"
+
+====================================
+ADMIN PANEL CAPABILITIES
+====================================
+Admin can:
+- Verify customers, drivers, restaurants:
+  - approve/reject KYC
+  - set rejection_reason
+- Block/unblock any user or restaurant
+- Configure pricing, fees, commissions per country + service
+- Manage payouts:
+  - view driver negative balance
+  - view restaurant negative balance
+  - settle and mark paid
+
+====================================
+CORE COLLECTIONS (NO BREAKING CHANGES)
+====================================
+
+1) rides
+   - customer_id, driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng, dropoff_lat, dropoff_lng
+   - service_type
+   - fare_amount, tax_amount
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method (cash/online)
+   - status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - customer_id, driver_id, restaurant_id
+   - restaurant_address (+geo), delivery_address (+geo)
+   - items, subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount, restaurant_payout_amount
+   - payment_method
+   - status:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+3) deliveries
+   - customer_id, driver_id
+   - pickup_address (+geo), dropoff_address (+geo)
+   - package_description, package_size
+   - delivery_fee
+   - safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+====================================
+COMMISSION & PAYOUT LOGIC
+====================================
+1) Ride – CASH:
+   - Driver receives full cash.
+   - SafeGo commission → negative driver_wallet_balance.
+   - Driver settles weekly; admin marks as paid.
+
+2) Food – CASH:
+   - Restaurant receives all cash.
+   - Commission → negative restaurant_wallet_balance.
+
+3) ONLINE:
+   - SafeGo collects payment.
+   - SafeGo keeps safego_commission_amount automatically.
+   - Driver/restaurant only get net payout.
+
+4) Admin can settle and mark negative balances paid.
+
+====================================
+SECURITY RULES
+====================================
+- Customers cannot view driver documents (NID, license, SSN, etc.).
+- Drivers cannot view customer KYC or sensitive info.
+- Restaurants cannot view other restaurants.
+- Only Admin can change:
+  - pricing, commissions
+  - verification_status
+  - block/unblock users
+- Users can update only their own profile.
+
+====================================
+STATUS FLOWS (UNCHANGED)
+====================================
+Rides:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+Food:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+
+Parcel:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered
+- or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+
+====================================
+NOTIFICATIONS
+====================================
+- New ride/order/parcel alerts
+- Status updates
+- Verification approved/rejected
+- Payouts and admin announcements
+
+====================================
+TASK: UPDATE DRIVER QUICK ACTIONS PANEL – KEEP ONLY "TRIP HISTORY"
+====================================
+
+Screen: Driver app – the bottom Quick Actions sheet that opens from the circular button near the bottom-left of the map on `/driver/map`.
+
+Current behavior:
+- When the driver taps the bottom-left FAB (Quick Actions / grid button), a panel appears with:
+  - Earnings
+  - Trip History
+  - Wallet
+  - Profile
+
+New requirement:
+- This Quick Actions panel must show **only one item**:
+  - Trip History
+- The other three shortcuts (Earnings, Wallet, Profile) must be removed from this panel only.
+
+VERY IMPORTANT:
+- Do NOT delete or disable the Earnings / Wallet / Profile features themselves.
+- Only remove them from this specific **Quick Actions** panel.
+- The main left navigation menu and other entry points for Earnings, Wallet, Profile must continue to work exactly as before.
+
+------------------------------------
+1) Locate the Quick Actions component
+------------------------------------
+- Find the React component (or UI module) used on the driver side that renders the **“Quick Actions”** list.
+  - It might be something like `<DriverQuickActions />` or a list/array named `quickActions`.
+- Confirm that it currently renders four rows:
+  - Earnings
+  - Trip History
+  - Wallet
+  - Profile
+
+------------------------------------
+2) Restrict Quick Actions to Trip History only
+------------------------------------
+Adjust the data or JSX so that only Trip History remains.
+
+Example (data-driven pattern BEFORE):
+
+```ts
+const quickActions = [
+  { id: "earnings", label: "Earnings", icon: DollarIcon, route: "/driver/earnings" },
+  { id: "trips", label: "Trip History", icon: HistoryIcon, route: "/driver/trips" },
+  { id: "wallet", label: "Wallet", icon: WalletIcon, route: "/driver/wallet" },
+  { id: "profile", label: "Profile", icon: UserIcon, route: "/driver/profile" },
+];
