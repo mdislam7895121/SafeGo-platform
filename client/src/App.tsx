@@ -266,9 +266,10 @@ function HomeRedirect() {
   }
 
   if (user) {
+    // Drivers land on the live map screen by default (Uber-style experience)
     const roleRoutes: Record<string, string> = {
       customer: "/customer",
-      driver: "/driver",
+      driver: "/driver/map",
       restaurant: "/restaurant",
       admin: "/admin",
     };
@@ -509,10 +510,10 @@ function Router() {
       </Route>
 
       {/* Driver routes */}
-      {/* Main driver route redirects to dashboard with unified layout */}
+      {/* Drivers land on the live map screen by default (Uber-style experience) */}
       <Route path="/driver">
         <ProtectedRoute allowedRoles={["driver"]}>
-          <Redirect to="/driver/dashboard" />
+          <Redirect to="/driver/map" />
         </ProtectedRoute>
       </Route>
       {/* Driver home route - alias for dashboard */}
