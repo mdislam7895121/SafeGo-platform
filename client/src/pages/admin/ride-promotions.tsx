@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Plus, Edit, Trash2, Check, X, Zap, Percent, DollarSign, Tag, Users, Calendar, MapPin } from "lucide-react";
+import { SocialShareButton, formatPromotionForShare, generatePromotionShareUrl } from "@/components/ui/social-share-button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -660,6 +661,19 @@ export default function AdminRidePromotions() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
+                            {(() => {
+                              const shareData = formatPromotionForShare(promo);
+                              return (
+                                <SocialShareButton
+                                  title={shareData.title}
+                                  description={shareData.description}
+                                  url={generatePromotionShareUrl(promo.id, "ride")}
+                                  hashtags={shareData.hashtags}
+                                  variant="ghost"
+                                  size="icon"
+                                />
+                              );
+                            })()}
                             <Button
                               variant="ghost"
                               size="icon"

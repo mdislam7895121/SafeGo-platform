@@ -21,6 +21,7 @@ import {
   Percent,
   AlertCircle,
 } from "lucide-react";
+import { SocialShareButton, formatPromotionForShare, generatePromotionShareUrl } from "@/components/ui/social-share-button";
 import {
   Dialog,
   DialogContent,
@@ -397,6 +398,19 @@ export default function PromotionsCampaigns() {
                 <Edit className="h-3 w-3 mr-1" />
                 Edit
               </Button>
+              {(() => {
+                const shareData = formatPromotionForShare(promotion);
+                return (
+                  <SocialShareButton
+                    title={shareData.title}
+                    description={shareData.description}
+                    url={generatePromotionShareUrl(promotion.id, "restaurant")}
+                    hashtags={[...shareData.hashtags, "Food", "Restaurant"]}
+                    variant="outline"
+                    size="sm"
+                  />
+                );
+              })()}
               <Button
                 variant="outline"
                 size="sm"
