@@ -33,6 +33,13 @@ import {
   Check,
   Wallet,
   Settings,
+  Truck,
+  Crown,
+  PawPrint,
+  Zap,
+  Grid3X3,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -116,6 +123,58 @@ function getServiceLabel(serviceType: string, rideType?: string) {
   }
 }
 
+// SafeGo Service Types Configuration
+interface ServicePreferences {
+  rideTypes: {
+    safego_go: boolean;
+    safego_x: boolean;
+    safego_xl: boolean;
+    safego_premium: boolean;
+    safego_bike: boolean;
+    safego_cng: boolean;
+    safego_moto: boolean;
+    safego_pet: boolean;
+  };
+  foodEnabled: boolean;
+  parcelEnabled: boolean;
+}
+
+interface ServiceCard {
+  id: string;
+  name: string;
+  icon: any;
+  category: "ride" | "food" | "parcel";
+  preferenceKey: keyof ServicePreferences["rideTypes"] | "foodEnabled" | "parcelEnabled";
+}
+
+const SAFEGO_SERVICES: ServiceCard[] = [
+  { id: "safego_go", name: "SafeGo Go", icon: Car, category: "ride", preferenceKey: "safego_go" },
+  { id: "safego_x", name: "SafeGo X", icon: Car, category: "ride", preferenceKey: "safego_x" },
+  { id: "safego_xl", name: "SafeGo XL", icon: Truck, category: "ride", preferenceKey: "safego_xl" },
+  { id: "safego_premium", name: "SafeGo Premium", icon: Crown, category: "ride", preferenceKey: "safego_premium" },
+  { id: "safego_bike", name: "SafeGo Bike", icon: Bike, category: "ride", preferenceKey: "safego_bike" },
+  { id: "safego_cng", name: "SafeGo CNG", icon: Zap, category: "ride", preferenceKey: "safego_cng" },
+  { id: "safego_moto", name: "SafeGo Moto", icon: Bike, category: "ride", preferenceKey: "safego_moto" },
+  { id: "safego_pet", name: "SafeGo Pet", icon: PawPrint, category: "ride", preferenceKey: "safego_pet" },
+  { id: "safego_eats", name: "SafeGo Eats", icon: UtensilsCrossed, category: "food", preferenceKey: "foodEnabled" },
+  { id: "safego_parcel", name: "SafeGo Parcel", icon: Package, category: "parcel", preferenceKey: "parcelEnabled" },
+];
+
+const defaultServicePreferences: ServicePreferences = {
+  rideTypes: {
+    safego_go: true,
+    safego_x: true,
+    safego_xl: false,
+    safego_premium: false,
+    safego_bike: false,
+    safego_cng: false,
+    safego_moto: false,
+    safego_pet: false,
+  },
+  foodEnabled: true,
+  parcelEnabled: true,
+};
+
 function triggerHapticFeedback(type: "light" | "medium" | "heavy" = "medium") {
   if (navigator.vibrate) {
     const patterns = { light: 10, medium: 25, heavy: 50 };
@@ -150,16 +209,82 @@ export default function DriverMapPage() {
   const [autoFollowEnabled, setAutoFollowEnabled] = useState(true);
   const [showSosSheet, setShowSosSheet] = useState(false);
   const [incomingRequest, setIncomingRequest] = useState<TripRequest | null>(null);
-  const [showVehicleSheet, setShowVehicleSheet] = useState(false);
+  const [showServiceSheet, setShowServiceSheet] = useState(false);
   const [showQuickActionsSheet, setShowQuickActionsSheet] = useState(false);
-  const [selectedVehicle, setSelectedVehicle] = useState<string>("car");
+  const [servicePreferences, setServicePreferences] = useState<ServicePreferences>(defaultServicePreferences);
 
-  const vehicleTypes = [
-    { id: "car", name: "Car", icon: Car },
-    { id: "bike", name: "Bike", icon: Bike },
-    { id: "cng", name: "CNG", icon: Car },
-    { id: "scooter", name: "Scooter", icon: Bike },
-  ];
+  // Fetch service preferences from API
+  const { data: preferencesData, isLoading: isLoadingPrefs } = useQuery({
+    queryKey: ["/api/driver/preferences/services"],
+    enabled: true,
+  });
+
+  // Update local state when API data loads
+  useEffect(() => {
+    if (preferencesData?.preferences) {
+      setServicePreferences(preferencesData.preferences);
+    }
+  }, [preferencesData]);
+
+  // Mutation to update service preferences
+  const updateServicePrefsMutation = useMutation({
+    mutationFn: async (newPrefs: Partial<ServicePreferences>) => {
+      const response = await apiRequest("PATCH", "/api/driver/preferences/services", newPrefs);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      if (data.preferences) {
+        setServicePreferences(data.preferences);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/driver/preferences/services"] });
+      toast({ title: "Preferences updated" });
+      if (data.warning) {
+        toast({ 
+          title: "Warning", 
+          description: data.warning,
+          variant: "destructive" 
+        });
+      }
+    },
+    onError: () => {
+      toast({ 
+        title: "Failed to update preferences", 
+        variant: "destructive" 
+      });
+    },
+  });
+
+  // Toggle a service preference
+  const toggleServicePreference = useCallback((service: ServiceCard) => {
+    const currentValue = service.category === "ride" 
+      ? servicePreferences.rideTypes[service.preferenceKey as keyof ServicePreferences["rideTypes"]]
+      : servicePreferences[service.preferenceKey as "foodEnabled" | "parcelEnabled"];
+    
+    const newValue = !currentValue;
+    
+    if (service.category === "ride") {
+      updateServicePrefsMutation.mutate({
+        rideTypes: {
+          ...servicePreferences.rideTypes,
+          [service.preferenceKey]: newValue,
+        },
+      });
+    } else {
+      updateServicePrefsMutation.mutate({
+        [service.preferenceKey]: newValue,
+      });
+    }
+    
+    triggerHapticFeedback("light");
+  }, [servicePreferences, updateServicePrefsMutation]);
+
+  // Check if a service is enabled
+  const isServiceEnabled = useCallback((service: ServiceCard): boolean => {
+    if (service.category === "ride") {
+      return servicePreferences.rideTypes[service.preferenceKey as keyof ServicePreferences["rideTypes"]] ?? false;
+    }
+    return servicePreferences[service.preferenceKey as "foodEnabled" | "parcelEnabled"] ?? false;
+  }, [servicePreferences]);
 
   const {
     isOnline,
@@ -801,50 +926,77 @@ export default function DriverMapPage() {
         className="fixed bottom-0 left-0 right-0 z-[1002] h-20 md:h-[90px] bg-white dark:bg-zinc-900 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] flex items-center justify-between px-4"
         data-testid="driver-footer-bar"
       >
-        <Sheet open={showVehicleSheet} onOpenChange={setShowVehicleSheet}>
+        <Sheet open={showServiceSheet} onOpenChange={setShowServiceSheet}>
           <SheetTrigger asChild>
             <Button
               variant="outline"
               size="icon"
               className="h-12 w-12 rounded-full border-2"
-              data-testid="button-vehicle-select"
+              data-testid="button-service-select"
             >
-              <Menu className="h-5 w-5" />
+              <Grid3X3 className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl">
-            <SheetHeader>
-              <SheetTitle>Select Vehicle</SheetTitle>
-            </SheetHeader>
-            <div className="py-6 space-y-2">
-              {vehicleTypes.map((vehicle) => {
-                const VehicleIcon = vehicle.icon;
-                const isSelected = selectedVehicle === vehicle.id;
-                return (
-                  <button
-                    key={vehicle.id}
-                    onClick={() => {
-                      setSelectedVehicle(vehicle.id);
-                      setShowVehicleSheet(false);
-                      toast({ title: `${vehicle.name} selected` });
-                    }}
-                    className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-colors ${
-                      isSelected 
-                        ? "border-primary bg-primary/5" 
-                        : "border-border hover:border-primary/50"
-                    }`}
-                    data-testid={`vehicle-option-${vehicle.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <VehicleIcon className="h-6 w-6" />
-                      <span className="font-medium">{vehicle.name}</span>
-                    </div>
-                    {isSelected && (
-                      <Check className="h-5 w-5 text-primary" />
-                    )}
-                  </button>
-                );
-              })}
+          <SheetContent 
+            side="left" 
+            className="w-[320px] sm:w-[380px] bg-black border-r-0 p-0"
+            data-testid="service-selection-drawer"
+          >
+            <div className="flex flex-col h-full">
+              <SheetHeader className="px-5 pt-6 pb-4">
+                <SheetTitle className="text-white text-xl font-semibold">Your Active Services</SheetTitle>
+              </SheetHeader>
+              
+              <div className="flex-1 overflow-y-auto px-4 pb-6">
+                <div className="grid grid-cols-2 gap-3">
+                  {SAFEGO_SERVICES.map((service) => {
+                    const ServiceIcon = service.icon;
+                    const isEnabled = isServiceEnabled(service);
+                    const isUpdating = updateServicePrefsMutation.isPending;
+                    
+                    return (
+                      <button
+                        key={service.id}
+                        onClick={() => toggleServicePreference(service)}
+                        disabled={isUpdating}
+                        className={`relative flex flex-col items-center justify-center p-4 h-[140px] rounded-[20px] transition-all duration-200 ${
+                          isEnabled 
+                            ? "bg-[#181818] border-2 border-white" 
+                            : "bg-[#101010] border border-[#333] hover:border-[#555]"
+                        } ${isUpdating ? "opacity-60" : ""}`}
+                        data-testid={`service-card-${service.id}`}
+                      >
+                        <div 
+                          className={`absolute top-3 right-3 w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                            isEnabled 
+                              ? "bg-white" 
+                              : "border border-[#555]"
+                          }`}
+                        >
+                          {isEnabled && <Check className="h-3.5 w-3.5 text-black" />}
+                        </div>
+                        
+                        <div className="flex-1 flex items-center justify-center">
+                          <ServiceIcon className={`h-10 w-10 ${isEnabled ? "text-white" : "text-gray-500"}`} />
+                        </div>
+                        
+                        <span className={`text-sm font-medium text-center mt-2 ${
+                          isEnabled ? "text-white" : "text-gray-500"
+                        }`}>
+                          {service.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-6 px-1">
+                  <p className="text-[#666] text-xs text-center">
+                    Toggle services to control which trip types you receive. 
+                    Changes are saved automatically.
+                  </p>
+                </div>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
