@@ -313,6 +313,11 @@ model DriverProfile {
   activeVehicleId       String?            // FK to the driver's active/primary vehicle for dispatch
   canGoOnline           Boolean            @default(false) // Driver can only go online if vehicle is approved
   
+  // Service Preferences - Controls which services the driver is willing to accept
+  // JSON structure: { rideTypes: { safego_go: true, safego_x: true, ... }, foodEnabled: true, parcelEnabled: true }
+  servicePreferences    Json?              // Driver's service preference toggles
+  servicePreferencesLocked Json?           // Admin-locked service preferences (driver cannot change)
+  
   deliveries            Delivery[]
   driverComplaints      DriverComplaint[]
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
