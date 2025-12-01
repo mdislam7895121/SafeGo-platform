@@ -197,6 +197,97 @@ function triggerHapticFeedback(type: "light" | "medium" | "heavy" = "medium") {
   }
 }
 
+// Demo mode types and data
+interface DemoTrip {
+  id: string;
+  serviceType: "RIDE" | "FOOD" | "PARCEL";
+  status: string;
+  tripCode: string;
+  pickupAddress: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffAddress: string;
+  dropoffLat: number;
+  dropoffLng: number;
+  estimatedArrivalMinutes: number;
+  estimatedTripMinutes: number;
+  distanceKm: number;
+  fare: number;
+  customer: {
+    firstName: string;
+    lastName?: string;
+    phone: string | null;
+    rating?: number;
+  };
+  restaurantName?: string;
+  rideType?: string;
+}
+
+const DEMO_RIDE_REQUEST: TripRequest = {
+  id: "demo-ride-001",
+  serviceType: "RIDE",
+  customerName: "Sarah Johnson",
+  customerRating: 4.8,
+  pickupAddress: "350 5th Ave, New York, NY 10118",
+  pickupLat: 40.7484,
+  pickupLng: -73.9857,
+  dropoffAddress: "30 Rockefeller Plaza, New York, NY 10112",
+  dropoffLat: 40.7587,
+  dropoffLng: -73.9787,
+  estimatedFare: 18.50,
+  distanceToPickup: 1.2,
+  etaMinutes: 5,
+  surgeMultiplier: 1.2,
+  boostAmount: 2.00,
+  requestedAt: new Date().toISOString(),
+  expiresAt: new Date(Date.now() + 15000).toISOString(),
+};
+
+const DEMO_FOOD_REQUEST: TripRequest = {
+  id: "demo-food-001",
+  serviceType: "FOOD",
+  customerName: "Mike Chen",
+  customerRating: 4.9,
+  pickupAddress: "Joe's Pizza - 233 Bleecker St, New York, NY",
+  pickupLat: 40.7318,
+  pickupLng: -74.0033,
+  dropoffAddress: "85 Washington Place, New York, NY 10011",
+  dropoffLat: 40.7328,
+  dropoffLng: -73.9990,
+  estimatedFare: 12.75,
+  distanceToPickup: 0.8,
+  etaMinutes: 3,
+  surgeMultiplier: null,
+  boostAmount: 1.50,
+  requestedAt: new Date().toISOString(),
+  expiresAt: new Date(Date.now() + 15000).toISOString(),
+};
+
+const createDemoTrip = (request: TripRequest): DemoTrip => ({
+  id: request.id,
+  serviceType: request.serviceType,
+  status: "accepted",
+  tripCode: request.serviceType === "RIDE" ? "SGR-DEMO1" : "SGE-DEMO1",
+  pickupAddress: request.pickupAddress,
+  pickupLat: request.pickupLat || 40.7484,
+  pickupLng: request.pickupLng || -73.9857,
+  dropoffAddress: request.dropoffAddress,
+  dropoffLat: request.dropoffLat || 40.7587,
+  dropoffLng: request.dropoffLng || -73.9787,
+  estimatedArrivalMinutes: request.etaMinutes || 5,
+  estimatedTripMinutes: 12,
+  distanceKm: 3.5,
+  fare: request.estimatedFare,
+  customer: {
+    firstName: request.customerName.split(" ")[0],
+    lastName: request.customerName.split(" ")[1] || "",
+    phone: "+1 (555) 123-4567",
+    rating: request.customerRating || 4.5,
+  },
+  restaurantName: request.serviceType === "FOOD" ? "Joe's Pizza" : undefined,
+  rideType: request.serviceType === "RIDE" ? "SafeGo X" : undefined,
+});
+
 export default function DriverMapPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -215,6 +306,12 @@ export default function DriverMapPage() {
   const [showQuickActionsSheet, setShowQuickActionsSheet] = useState(false);
   const [showSosSheet, setShowSosSheet] = useState(false);
   const [servicePreferences, setServicePreferences] = useState<ServicePreferences>(defaultServicePreferences);
+  
+  // Demo mode state
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoTrip, setDemoTrip] = useState<DemoTrip | null>(null);
+  const [demoPhase, setDemoPhase] = useState<"idle" | "ride_request" | "ride_active" | "ride_complete" | "food_request" | "food_active" | "food_complete" | "finished">("idle");
+  const [demoIsOnline, setDemoIsOnline] = useState(false);
 
   // Fetch service preferences from API
   const { data: preferencesData, isLoading: isLoadingPrefs } = useQuery<{
@@ -506,6 +603,204 @@ export default function DriverMapPage() {
     setIncomingRequest(null);
     queryClient.invalidateQueries({ queryKey: ["/api/driver/pending-requests"] });
   }, []);
+
+  // Demo mode handlers
+  const startDemo = useCallback(() => {
+    setDemoMode(true);
+    setDemoIsOnline(true);
+    setDemoPhase("ride_request");
+    // Show ride request after a short delay
+    setTimeout(() => {
+      setIncomingRequest({
+        ...DEMO_RIDE_REQUEST,
+        requestedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 15000).toISOString(),
+      });
+    }, 500);
+    toast({ 
+      title: "Demo Mode Started", 
+      description: "Simulating a ride request..." 
+    });
+    triggerHapticFeedback("medium");
+  }, [toast]);
+
+  const handleDemoAccept = useCallback((tripId: string, serviceType: string) => {
+    setIncomingRequest(null);
+    const request = serviceType === "FOOD" ? DEMO_FOOD_REQUEST : DEMO_RIDE_REQUEST;
+    const trip = createDemoTrip(request);
+    setDemoTrip(trip);
+    
+    if (serviceType === "RIDE") {
+      setDemoPhase("ride_active");
+      toast({ 
+        title: "Ride Accepted!", 
+        description: "Demo: Navigate to pickup location" 
+      });
+    } else {
+      setDemoPhase("food_active");
+      toast({ 
+        title: "Delivery Accepted!", 
+        description: "Demo: Navigate to restaurant" 
+      });
+    }
+    triggerHapticFeedback("heavy");
+  }, [toast]);
+
+  const handleDemoDecline = useCallback((tripId: string, serviceType: string, reason?: string) => {
+    setIncomingRequest(null);
+    toast({ title: "Request Declined" });
+    // Move to next phase or reset
+    if (demoPhase === "ride_request") {
+      setDemoPhase("food_request");
+      setTimeout(() => {
+        setIncomingRequest({
+          ...DEMO_FOOD_REQUEST,
+          requestedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 15000).toISOString(),
+        });
+      }, 500);
+    } else {
+      setDemoPhase("finished");
+      setDemoMode(false);
+      setDemoIsOnline(false);
+    }
+  }, [demoPhase, toast]);
+
+  const handleDemoExpire = useCallback((tripId: string) => {
+    setIncomingRequest(null);
+    // Move to next phase
+    if (demoPhase === "ride_request") {
+      setDemoPhase("food_request");
+      setTimeout(() => {
+        setIncomingRequest({
+          ...DEMO_FOOD_REQUEST,
+          requestedAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + 15000).toISOString(),
+        });
+      }, 500);
+    } else {
+      setDemoPhase("finished");
+      setDemoMode(false);
+      setDemoIsOnline(false);
+    }
+  }, [demoPhase]);
+
+  const advanceDemoTrip = useCallback(() => {
+    if (!demoTrip) return;
+    
+    const statusProgression: Record<string, Record<string, string>> = {
+      RIDE: {
+        accepted: "arrived",
+        arrived: "started",
+        started: "completed",
+      },
+      FOOD: {
+        accepted: "at_restaurant",
+        at_restaurant: "picked_up",
+        picked_up: "completed",
+      },
+    };
+    
+    const nextStatus = statusProgression[demoTrip.serviceType]?.[demoTrip.status];
+    
+    if (nextStatus === "completed") {
+      setDemoTrip(null);
+      
+      if (demoPhase === "ride_active") {
+        setDemoPhase("ride_complete");
+        toast({ 
+          title: "Ride Completed!", 
+          description: `Demo earnings: $${DEMO_RIDE_REQUEST.estimatedFare.toFixed(2)}` 
+        });
+        // After showing completion, trigger food delivery
+        setTimeout(() => {
+          setDemoPhase("food_request");
+          setIncomingRequest({
+            ...DEMO_FOOD_REQUEST,
+            requestedAt: new Date().toISOString(),
+            expiresAt: new Date(Date.now() + 15000).toISOString(),
+          });
+          toast({ 
+            title: "New Delivery Request!", 
+            description: "A food delivery is waiting..." 
+          });
+        }, 2000);
+      } else if (demoPhase === "food_active") {
+        setDemoPhase("food_complete");
+        toast({ 
+          title: "Delivery Completed!", 
+          description: `Demo earnings: $${DEMO_FOOD_REQUEST.estimatedFare.toFixed(2)}` 
+        });
+        // End demo after food delivery
+        setTimeout(() => {
+          setDemoPhase("finished");
+          setDemoMode(false);
+          setDemoIsOnline(false);
+          toast({ 
+            title: "Demo Complete!", 
+            description: `Total demo earnings: $${(DEMO_RIDE_REQUEST.estimatedFare + DEMO_FOOD_REQUEST.estimatedFare).toFixed(2)}` 
+          });
+        }, 2000);
+      }
+      return;
+    }
+    
+    if (nextStatus) {
+      setDemoTrip({ ...demoTrip, status: nextStatus });
+      const statusLabels: Record<string, string> = {
+        arrived: "You've arrived at pickup!",
+        started: "Trip started - driving to destination",
+        at_restaurant: "Arrived at restaurant",
+        picked_up: "Order picked up - heading to customer",
+      };
+      toast({ title: statusLabels[nextStatus] || `Status: ${nextStatus}` });
+      triggerHapticFeedback("medium");
+    }
+  }, [demoTrip, demoPhase, toast]);
+
+  const stopDemo = useCallback(() => {
+    setDemoMode(false);
+    setDemoPhase("idle");
+    setDemoTrip(null);
+    setDemoIsOnline(false);
+    setIncomingRequest(null);
+    toast({ title: "Demo Mode Ended" });
+  }, [toast]);
+
+  // Get current status label for demo trip
+  const getDemoStatusLabel = (): string => {
+    if (!demoTrip) return "";
+    const labels: Record<string, Record<string, string>> = {
+      RIDE: {
+        accepted: "Navigate to Pickup",
+        arrived: "Waiting for Rider",
+        started: "On Trip",
+      },
+      FOOD: {
+        accepted: "Navigate to Restaurant",
+        at_restaurant: "Waiting for Order",
+        picked_up: "Delivering to Customer",
+      },
+    };
+    return labels[demoTrip.serviceType]?.[demoTrip.status] || demoTrip.status;
+  };
+
+  const getDemoActionLabel = (): string => {
+    if (!demoTrip) return "";
+    const labels: Record<string, Record<string, string>> = {
+      RIDE: {
+        accepted: "I've Arrived",
+        arrived: "Start Trip",
+        started: "Complete Trip",
+      },
+      FOOD: {
+        accepted: "At Restaurant",
+        at_restaurant: "Picked Up Order",
+        picked_up: "Delivered",
+      },
+    };
+    return labels[demoTrip.serviceType]?.[demoTrip.status] || "Next";
+  };
 
   const getActiveLeg = (): ActiveLeg => {
     if (!activeTrip) return "to_pickup";
@@ -1029,11 +1324,111 @@ export default function DriverMapPage() {
       {incomingRequest && (
         <IncomingTripRequest
           request={incomingRequest}
-          onAccept={handleAcceptTrip}
-          onDecline={handleDeclineTrip}
-          onExpire={handleExpireTrip}
+          onAccept={demoMode ? handleDemoAccept : handleAcceptTrip}
+          onDecline={demoMode ? handleDemoDecline : handleDeclineTrip}
+          onExpire={demoMode ? handleDemoExpire : handleExpireTrip}
           countdownSeconds={15}
         />
+      )}
+
+      {/* Demo Mode Trip Panel */}
+      <AnimatePresence>
+        {demoMode && demoTrip && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="absolute bottom-0 left-0 right-0 z-[1002]"
+            data-testid="demo-trip-panel"
+          >
+            <div className="bg-background border-t shadow-lg rounded-t-2xl p-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`p-2 rounded-full ${demoTrip.serviceType === "RIDE" ? "bg-blue-100 dark:bg-blue-900/30" : "bg-orange-100 dark:bg-orange-900/30"}`}>
+                  {demoTrip.serviceType === "RIDE" ? (
+                    <Car className={`h-5 w-5 text-blue-600 dark:text-blue-400`} />
+                  ) : (
+                    <UtensilsCrossed className={`h-5 w-5 text-orange-600 dark:text-orange-400`} />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-lg">{demoTrip.serviceType === "RIDE" ? "Demo Ride" : "Demo Delivery"}</p>
+                  <p className="text-sm text-muted-foreground">{getDemoStatusLabel()}</p>
+                </div>
+                <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                  DEMO
+                </Badge>
+              </div>
+
+              <div className="space-y-2 mb-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-3 w-3 rounded-full bg-green-500 mt-1" />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Pickup</p>
+                    <p className="text-sm font-medium">{demoTrip.pickupAddress}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="h-3 w-3 rounded-full bg-red-500 mt-1" />
+                  <div className="flex-1">
+                    <p className="text-xs text-muted-foreground">Dropoff</p>
+                    <p className="text-sm font-medium">{demoTrip.dropoffAddress}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={stopDemo}
+                  data-testid="button-stop-demo"
+                >
+                  End Demo
+                </Button>
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={advanceDemoTrip}
+                  data-testid="button-demo-advance"
+                >
+                  {getDemoActionLabel()}
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Demo Mode Button - Shows when offline and no active trip */}
+      {!isOnline && !activeTrip && !demoMode && !incomingRequest && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[1000]"
+        >
+          <Button
+            variant="outline"
+            onClick={startDemo}
+            className="bg-amber-500/10 border-amber-500/50 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 shadow-lg"
+            data-testid="button-start-demo"
+          >
+            <Zap className="h-4 w-4 mr-2" />
+            Start Demo
+          </Button>
+        </motion.div>
+      )}
+
+      {/* Demo Mode Status Badge */}
+      {demoMode && !demoTrip && !incomingRequest && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="absolute top-24 left-1/2 -translate-x-1/2 z-[999]"
+        >
+          <Badge variant="secondary" className="px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 shadow-md">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Demo: Waiting for trip...
+          </Badge>
+        </motion.div>
       )}
     </div>
   );
