@@ -57,6 +57,14 @@ The backend is built with Node.js 20+, TypeScript, Express.js 4, and Prisma Clie
     - **Feature Configuration** (`server/config/dispatchFeatures.ts`): Enable/disable flags for ETA, live tracking, chat, fare recalculation per environment.
     - **Extended WebSocket Handlers**: `driver:mark_arrived`, `driver:start_trip`, `driver:end_trip`, `driver:trip_location_update`, `chat:send_message`, `chat:mark_read` with corresponding `ride:eta_update`, `ride:route_update`, `ride:driver_arrived`, `ride:trip_started`, `ride:trip_completed`, `ride:fare_finalized`, `chat:message_new` events.
     - **Multi-Service Dispatch**: Extended dispatchService with `initiateDispatchForFoodOrder` and `initiateDispatchForDelivery` methods for food/parcel services.
+*   **Phase 2A: Financial Integrity & Wallet System**: Comprehensive settlement, commission, tip, incentive, and cancellation fee infrastructure with:
+    - **WalletService** (`server/services/walletService.ts`): Fixed commission logic to always use `serviceType="commission"` for proper negative balance tracking. Atomic operations with increment/decrement for race-condition safety. Proper cash/online payment handling for rides, food orders, and parcel deliveries.
+    - **Settlement Status Tracking**: All trips (Ride, FoodOrder, Delivery) now track `settlementStatus` (pending/settled/failed/manual_review), `settledAt` timestamp, and settlement-related financial fields.
+    - **Tip Handling**: `tipAmount`, `tipPaymentMethod` (cash/online), and `tipSettledAt` fields on trips for proper tip attribution.
+    - **Incentive System**: `IncentiveRule` model for admin-defined bonus rules (per_trip, streak, target, peak_hour, first_trip) with budget controls. `IncentiveAward` model tracks actual bonuses credited to drivers.
+    - **Cancellation Fees**: `CancellationFeeRule` model for country/service-specific cancellation policies (customer_cancel, no_show, driver_cancel) with configurable fees and driver/platform share distribution.
+    - **Platform Revenue Ledger**: `PlatformRevenueLedger` model for immutable, auditable tracking of all platform revenue (commissions, fees, adjustments) with idempotency key support.
+    - **Design Note**: Food delivery courier fees are commission-free for drivers; only restaurants pay commission on food orders.
 
 ### Database Schema Design
 The schema uses UUID primary keys, indexed foreign keys, and decimal types for monetary values. It includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, multi-role support models, and driver safety incidents. It supports country-specific identity fields with AES-256-GCM encryption.

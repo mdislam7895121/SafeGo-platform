@@ -47,6 +47,38 @@ enum DeliveryServiceType {
   parcel
 }
 
+// Phase 2A: Settlement status for trips/orders
+enum SettlementStatus {
+  pending           // Not yet settled
+  settled           // Successfully auto-credited/debited
+  failed            // Settlement attempt failed
+  manual_review     // Requires manual intervention
+}
+
+// Phase 2A: Incentive bonus types
+enum IncentiveBonusType {
+  per_trip          // Flat bonus per completed trip
+  streak            // Bonus for completing X trips in Y hours
+  target            // Bonus for hitting daily/weekly target
+  peak_hour         // Bonus during surge/peak times
+  first_trip        // First trip of the day bonus
+}
+
+// Phase 2A: Incentive award status
+enum IncentiveAwardStatus {
+  pending           // Awaiting wallet credit
+  credited          // Successfully credited to wallet
+  failed            // Credit attempt failed
+  expired           // Award expired before crediting
+}
+
+// Phase 2A: Cancellation fee type
+enum CancellationFeeType {
+  customer_cancel   // Customer cancelled after driver accepted
+  no_show           // Customer no-show at pickup
+  driver_cancel     // Driver cancelled (may incur penalty)
+}
+
 model AdminProfile {
   id                           String    @id @default(uuid())
   userId                       String    @unique
@@ -174,6 +206,17 @@ model Delivery {
   etaToDropoffSeconds  Int?          // ETA from pickup to dropoff
   etaLastUpdatedAt     DateTime?     // When ETA was last recalculated
   
+  // Phase 2A: Settlement & Financial tracking (additive only)
+  settlementStatus        SettlementStatus  @default(pending)  // Settlement lifecycle status
+  settledAt               DateTime?         // When wallet transactions were posted
+  tipAmount               Decimal?          @db.Decimal(10, 2) // Customer tip for driver
+  tipPaymentMethod        String?           // cash | online (how tip was paid)
+  tipSettledAt            DateTime?         // When tip was credited to driver
+  cancellationFeeApplied  Decimal?          @db.Decimal(10, 2) // Actual fee charged
+  cancellationFeeRuleId   String?           // FK to cancellation_fee_rules
+  cancellationFeeRule     CancellationFeeRule? @relation("DeliveryCancellationFeeRule", fields: [cancellationFeeRuleId], references: [id], onDelete: SetNull)
+  incentiveAwards         IncentiveAward[]  @relation("DeliveryIncentiveAwards") // Phase 2A: Proper relation to incentive awards
+  
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   driver           DriverProfile?   @relation(fields: [driverId], references: [id])
   restaurant       RestaurantProfile? @relation(fields: [restaurantId], references: [id]) // Step 46: For food deliveries
@@ -185,6 +228,7 @@ model Delivery {
   @@index([driverId])     // Step 46: Index for driver queries
   @@index([restaurantId]) // Step 46: Index for restaurant queries
   @@index([dispatchSessionId])
+  @@index([settlementStatus])  // Phase 2A: Fast settlement query
   @@map("deliveries")
 }
 
@@ -586,6 +630,17 @@ model FoodOrder {
   refundAmount         Decimal?          @db.Decimal(10, 2)
   refundedAt           DateTime?
   refundReason         String?           @db.Text
+  
+  // Phase 2A: Settlement & Financial tracking (additive only)
+  settlementStatus        SettlementStatus  @default(pending)  // Settlement lifecycle status
+  settledAt               DateTime?         // When wallet transactions were posted
+  tipPaymentMethod        String?           // cash | online (how tip was paid)
+  tipSettledAt            DateTime?         // When tip was credited to driver
+  cancellationFeeApplied  Decimal?          @db.Decimal(10, 2) // Actual fee charged
+  cancellationFeeRuleId   String?           // FK to cancellation_fee_rules
+  cancellationFeeRule     CancellationFeeRule? @relation("FoodOrderCancellationFeeRule", fields: [cancellationFeeRuleId], references: [id], onDelete: SetNull)
+  driverIncentiveAwards   IncentiveAward[]  @relation("FoodOrderIncentiveAwards") // Phase 2A: Proper relation to driver incentive awards
+  
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
   deliveredAt          DateTime?
@@ -606,6 +661,7 @@ model FoodOrder {
   @@index([appliedPromotionId])
   @@index([driverAssignmentStatus]) // Step 46: Index for driver assignment queries
   @@index([driverId])               // Step 46: Index for driver queries
+  @@index([settlementStatus])       // Phase 2A: Fast settlement query
   @@map("food_orders")
 }
 
@@ -1091,12 +1147,24 @@ model Ride {
   
   // Phase 1B: Telemetry relation
   telemetryLocations    RideTelemetryLocation[] @relation("RideTelemetry")
+  
+  // Phase 2A: Settlement & Financial tracking (additive only)
+  settlementStatus        SettlementStatus  @default(pending)  // Settlement lifecycle status
+  settledAt               DateTime?         // When wallet transactions were posted
+  tipAmount               Decimal?          @db.Decimal(10, 2) // Customer tip for driver
+  tipPaymentMethod        String?           // cash | online (how tip was paid)
+  tipSettledAt            DateTime?         // When tip was credited to driver
+  cancellationFeeApplied  Decimal?          @db.Decimal(10, 2) // Actual fee charged
+  cancellationFeeRuleId   String?           // FK to cancellation_fee_rules
+  cancellationFeeRule     CancellationFeeRule? @relation("RideCancellationFeeRule", fields: [cancellationFeeRuleId], references: [id], onDelete: SetNull)
+  incentiveAwards         IncentiveAward[]  @relation("RideIncentiveAwards") // Phase 2A: Proper relation to incentive awards
 
   @@index([countryCode])
   @@index([cityCode])
   @@index([isDemo])
   @@index([status])
   @@index([dispatchStatus])
+  @@index([settlementStatus])  // Phase 2A: Fast settlement query
   @@map("rides")
 }
 
@@ -4421,4 +4489,195 @@ model TripMessage {
   @@index([senderId])
   @@index([createdAt])
   @@map("trip_messages")
+}
+
+// ===== PHASE 2A: FINANCIAL INTEGRITY & WALLET SYSTEM =====
+
+// Platform Revenue Ledger - Immutable record of all platform revenue
+model PlatformRevenueLedger {
+  id                    String              @id @default(uuid())
+  
+  // Revenue source identification
+  sourceType            String              // commission | cancellation_fee | tip_fee | adjustment
+  serviceType           DeliveryServiceType // ride | food | parcel
+  referenceType         String              // ride | food_order | delivery | manual_adjustment
+  referenceId           String              // ID of the source entity
+  
+  // Actor involved
+  actorType             String              // driver | restaurant
+  actorId               String              // ID of driver/restaurant profile
+  
+  // Financial details
+  countryCode           String              // BD | US
+  currency              String              // BDT | USD
+  grossAmount           Decimal             @db.Decimal(12, 2) // Total before any deductions
+  netAmount             Decimal             @db.Decimal(12, 2) // Amount credited to platform
+  
+  // Metadata
+  description           String              @db.Text
+  metadata              Json?               // Additional context (e.g., fare breakdown)
+  
+  // Audit trail
+  createdAt             DateTime            @default(now())
+  createdBySystem       Boolean             @default(true) // true = automated, false = manual
+  createdByAdminId      String?             // Admin who created (if manual)
+  
+  // Idempotency
+  idempotencyKey        String?             @unique // Prevents duplicate entries
+  
+  @@index([sourceType])
+  @@index([serviceType])
+  @@index([referenceType, referenceId])
+  @@index([actorType, actorId])
+  @@index([countryCode])
+  @@index([createdAt])
+  @@map("platform_revenue_ledger")
+}
+
+// Incentive Rules - Admin-defined bonus rules for drivers
+model IncentiveRule {
+  id                    String              @id @default(uuid())
+  
+  // Targeting
+  countryCode           String              // BD | US | * (all)
+  cityCode              String?             // Specific city or null for country-wide
+  serviceType           DeliveryServiceType // ride | food | parcel
+  
+  // Rule configuration
+  bonusType             IncentiveBonusType  // per_trip | streak | target | peak_hour | first_trip
+  name                  String              // Display name (e.g., "Peak Hour Bonus")
+  description           String?             @db.Text
+  
+  // Bonus amount
+  currency              String              @default("USD")
+  bonusAmount           Decimal             @db.Decimal(10, 2) // Fixed bonus amount
+  bonusPercentage       Decimal?            @db.Decimal(5, 2)  // Alternative: % of trip fare
+  maxBonusAmount        Decimal?            @db.Decimal(10, 2) // Cap for percentage-based
+  
+  // Trigger conditions (JSON for flexibility)
+  triggerConditions     Json                // { minTrips: 5, timeWindowHours: 4, peakHours: [17,18,19,20] }
+  
+  // Validity period
+  startDate             DateTime            @default(now())
+  endDate               DateTime?           // null = no end date
+  isActive              Boolean             @default(true)
+  
+  // Budget controls
+  dailyBudget           Decimal?            @db.Decimal(12, 2) // Max daily spend
+  totalBudget           Decimal?            @db.Decimal(12, 2) // Lifetime cap
+  currentDailySpend     Decimal             @default(0) @db.Decimal(12, 2)
+  totalSpend            Decimal             @default(0) @db.Decimal(12, 2)
+  lastResetDate         DateTime            @default(now()) // For daily budget reset
+  
+  // Metadata
+  priority              Int                 @default(0) // Higher = evaluated first
+  stackable             Boolean             @default(false) // Can combine with other bonuses
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  createdByAdminId      String
+  lastUpdatedByAdminId  String?
+  
+  // Relations
+  awards                IncentiveAward[]
+  
+  @@index([countryCode, serviceType, isActive])
+  @@index([countryCode, cityCode, serviceType])
+  @@index([bonusType])
+  @@index([isActive, startDate, endDate])
+  @@map("incentive_rules")
+}
+
+// Incentive Awards - Actual bonuses awarded to drivers
+model IncentiveAward {
+  id                    String              @id @default(uuid())
+  
+  // Links
+  ruleId                String              // FK to incentive_rules
+  driverId              String              // FK to driver_profiles
+  
+  // Trip association - proper foreign keys with relations
+  serviceType           DeliveryServiceType // ride | food | parcel
+  rideId                String?             // FK to rides (for ride incentives)
+  foodOrderId           String?             // FK to food_orders (for food delivery incentives)
+  deliveryId            String?             // FK to deliveries (for parcel delivery incentives)
+  
+  // Award details
+  countryCode           String
+  currency              String
+  awardAmount           Decimal             @db.Decimal(10, 2)
+  
+  // Status tracking
+  status                IncentiveAwardStatus @default(pending)
+  creditedAt            DateTime?           // When credited to wallet
+  walletTransactionId   String?             // FK to wallet_transactions
+  
+  // Metadata
+  triggerDetails        Json?               // Details of how rule was triggered
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  rule                  IncentiveRule       @relation(fields: [ruleId], references: [id])
+  ride                  Ride?               @relation("RideIncentiveAwards", fields: [rideId], references: [id], onDelete: SetNull)
+  foodOrder             FoodOrder?          @relation("FoodOrderIncentiveAwards", fields: [foodOrderId], references: [id], onDelete: SetNull)
+  delivery              Delivery?           @relation("DeliveryIncentiveAwards", fields: [deliveryId], references: [id], onDelete: SetNull)
+  
+  @@index([driverId])
+  @@index([ruleId])
+  @@index([rideId])
+  @@index([foodOrderId])
+  @@index([deliveryId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("incentive_awards")
+}
+
+// Cancellation Fee Rules - Country/service-specific cancellation policies
+model CancellationFeeRule {
+  id                    String              @id @default(uuid())
+  
+  // Targeting
+  countryCode           String              // BD | US
+  serviceType           DeliveryServiceType // ride | food | parcel
+  
+  // Fee type and triggers
+  feeType               CancellationFeeType // customer_cancel | no_show | driver_cancel
+  
+  // Time-based triggers
+  gracePeriodSeconds    Int                 @default(60) // Time before fee applies
+  noShowWaitMinutes     Int?                // Minutes driver waits before no-show (rides only)
+  
+  // Fee calculation
+  currency              String              @default("USD")
+  flatFee               Decimal?            @db.Decimal(10, 2) // Fixed fee amount
+  percentageFee         Decimal?            @db.Decimal(5, 2)  // % of estimated fare
+  minFee                Decimal?            @db.Decimal(10, 2) // Minimum fee
+  maxFee                Decimal?            @db.Decimal(10, 2) // Maximum fee cap
+  
+  // Distribution
+  driverSharePercentage Decimal             @default(100) @db.Decimal(5, 2) // % to driver
+  platformSharePercentage Decimal           @default(0) @db.Decimal(5, 2)   // % to platform
+  
+  // Conditions
+  requiresDriverArrival Boolean             @default(true) // Driver must have arrived
+  
+  // Validity
+  isActive              Boolean             @default(true)
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  createdByAdminId      String
+  lastUpdatedByAdminId  String?
+  
+  // Reverse relations
+  rides                 Ride[]              @relation("RideCancellationFeeRule")
+  foodOrders            FoodOrder[]         @relation("FoodOrderCancellationFeeRule")
+  deliveries            Delivery[]          @relation("DeliveryCancellationFeeRule")
+  
+  @@unique([countryCode, serviceType, feeType])
+  @@index([countryCode, serviceType, isActive])
+  @@index([feeType])
+  @@map("cancellation_fee_rules")
 }
