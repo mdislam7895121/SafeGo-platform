@@ -838,15 +838,13 @@ export default function DriverMapPage() {
         </button>
 
         {/* Quick Actions button - bottom right (using fixed to match viewport positioning) */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="fixed bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[1001]"
+        <button
+          className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-xl bg-blue-500 hover:bg-blue-600 flex items-center justify-center z-[9999]"
           onClick={() => setShowQuickActionsSheet(true)}
           data-testid="button-quick-actions"
         >
-          <Menu className="h-5 w-5" />
-        </Button>
+          <Menu className="h-6 w-6 text-white" />
+        </button>
 
         <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
           <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
