@@ -533,26 +533,6 @@ export function SafeGoMap({
         </div>
       )}
       
-      {activeLeg !== "completed" && (
-        <div className="absolute bottom-3 left-3 z-[1000] flex gap-2 flex-wrap" data-testid="map-legend">
-          <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium" data-testid="legend-driver">
-            <div className="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" data-testid="marker-driver-indicator" />
-            <span>You</span>
-          </div>
-          {activeLeg === "to_pickup" && (
-            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium" data-testid="legend-pickup">
-              <div className="h-3 w-3 rounded-full bg-blue-500" data-testid="marker-pickup-indicator" />
-              <span>Pickup</span>
-            </div>
-          )}
-          {(activeLeg === "to_dropoff" || activeLeg === "to_pickup") && (
-            <div className="flex items-center gap-1.5 bg-background/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-md border text-xs font-medium" data-testid="legend-dropoff">
-              <div className="h-3 w-3 rounded-full bg-red-500" data-testid="marker-dropoff-indicator" />
-              <span>Dropoff</span>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
