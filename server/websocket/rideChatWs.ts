@@ -130,7 +130,8 @@ export function setupRideChatWebSocket(server: HTTPServer) {
     ws.send(JSON.stringify({ type: "connected", payload: { rideId } }));
   });
 
-  setInterval(() => {
+  // Store heartbeat interval for cleanup
+  const heartbeatInterval = setInterval(() => {
     wss.clients.forEach((ws: AuthenticatedWebSocket) => {
       if (!ws.isAlive) {
         ws.terminate();
@@ -140,6 +141,13 @@ export function setupRideChatWebSocket(server: HTTPServer) {
       ws.ping();
     });
   }, 30000);
+
+  // Cleanup interval when server closes to prevent memory leak
+  wss.on("close", () => {
+    clearInterval(heartbeatInterval);
+    rideRooms.clear();
+    messageRateLimit.clear();
+  });
 }
 
 async function handleMessage(ws: AuthenticatedWebSocket, rideId: string, message: WsMessage) {

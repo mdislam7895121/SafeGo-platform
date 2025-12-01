@@ -5,6 +5,7 @@ guardEnvironment();
 
 // Now safe to import other modules (they will throw if secrets missing, but guard already validated)
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { securityHeaders, corsMiddleware } from "./middleware/securityHeaders";
@@ -14,6 +15,9 @@ const app = express();
 // Apply CORS and security headers globally before any other middleware
 app.use(corsMiddleware);
 app.use(securityHeaders);
+
+// Parse cookies for refresh token handling
+app.use(cookieParser());
 
 declare module 'http' {
   interface IncomingMessage {

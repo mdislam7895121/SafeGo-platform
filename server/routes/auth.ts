@@ -1,10 +1,11 @@
 import { Router } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { prisma } from "../lib/prisma";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
 import { getAdminCapabilities } from "../utils/permissions";
-import { loadAdminProfile, AuthRequest, authenticateToken } from "../middleware/auth";
+import { loadAdminProfile, AuthRequest, authenticateToken, JWTPayload } from "../middleware/auth";
 import { rateLimitAdminLogin, resetLoginAttempts } from "../middleware/rateLimit";
 import { isTwoFactorEnabled, verifyTwoFactorToken, getTwoFactorSecret } from "../services/twoFactorService";
 
@@ -15,6 +16,40 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
   throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
 }
 const JWT_SECRET = process.env.JWT_SECRET || "safego-secret-key-change-in-production";
+
+// Separate secret for refresh tokens (derived from JWT_SECRET for simplicity)
+const REFRESH_SECRET = crypto.createHash('sha256').update(JWT_SECRET + '-refresh').digest('hex');
+
+// Token expiry configuration
+const ACCESS_TOKEN_EXPIRY = '15m';  // Short-lived access token
+const REFRESH_TOKEN_EXPIRY = '30d'; // Long-lived refresh token
+
+// Generate access token (short-lived)
+function generateAccessToken(payload: { userId: string; role: string; countryCode: string }): string {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+}
+
+// Generate refresh token (long-lived)
+function generateRefreshToken(userId: string): string {
+  return jwt.sign({ userId, type: 'refresh' }, REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRY });
+}
+
+// Set refresh token in HTTP-only cookie
+function setRefreshTokenCookie(res: any, token: string): void {
+  const isProduction = process.env.NODE_ENV === 'production';
+  res.cookie('safego_refresh_token', token, {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'strict' : 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    path: '/api/auth'
+  });
+}
+
+// Clear refresh token cookie
+function clearRefreshTokenCookie(res: any): void {
+  res.clearCookie('safego_refresh_token', { path: '/api/auth' });
+}
 
 // ====================================================
 // POST /api/auth/signup
@@ -384,16 +419,16 @@ router.post("/login", async (req, res, next) => {
       }
     }
 
-    // Generate JWT
-    const token = jwt.sign(
-      {
-        userId: user.id,
-        role: user.role,
-        countryCode: user.countryCode,
-      },
-      JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    // Generate tokens - short-lived access token + long-lived refresh token
+    const accessToken = generateAccessToken({
+      userId: user.id,
+      role: user.role,
+      countryCode: user.countryCode,
+    });
+    const refreshToken = generateRefreshToken(user.id);
+
+    // Set refresh token in HTTP-only cookie
+    setRefreshTokenCookie(res, refreshToken);
 
     // Log successful login (audit - especially important for admin users)
     await logAuditEvent({
@@ -411,7 +446,7 @@ router.post("/login", async (req, res, next) => {
 
     // Build response with admin capabilities if admin user
     const response: any = {
-      token,
+      token: accessToken,
       user: {
         id: user.id,
         email: user.email,
@@ -447,6 +482,67 @@ router.post("/login", async (req, res, next) => {
 });
 
 // ====================================================
+// POST /api/auth/refresh
+// Refresh access token using refresh token from cookie
+// ====================================================
+router.post("/refresh", async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.safego_refresh_token;
+
+    if (!refreshToken) {
+      return res.status(401).json({ error: "No refresh token provided" });
+    }
+
+    // Verify refresh token
+    let decoded: { userId: string; type: string };
+    try {
+      decoded = jwt.verify(refreshToken, REFRESH_SECRET) as { userId: string; type: string };
+    } catch (err) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: "Invalid or expired refresh token" });
+    }
+
+    if (decoded.type !== 'refresh') {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: "Invalid token type" });
+    }
+
+    // Get user from database
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, email: true, role: true, countryCode: true, isBlocked: true },
+    });
+
+    if (!user) {
+      clearRefreshTokenCookie(res);
+      return res.status(401).json({ error: "User not found" });
+    }
+
+    if (user.isBlocked) {
+      clearRefreshTokenCookie(res);
+      return res.status(403).json({ error: "Account is blocked" });
+    }
+
+    // Generate new access token
+    const newAccessToken = generateAccessToken({
+      userId: user.id,
+      role: user.role,
+      countryCode: user.countryCode,
+    });
+
+    // Optionally rotate refresh token for added security
+    const newRefreshToken = generateRefreshToken(user.id);
+    setRefreshTokenCookie(res, newRefreshToken);
+
+    res.json({ token: newAccessToken });
+  } catch (error) {
+    console.error("Token refresh error:", error);
+    clearRefreshTokenCookie(res);
+    res.status(500).json({ error: "Failed to refresh token" });
+  }
+});
+
+// ====================================================
 // POST /api/auth/logout
 // Log user logout event for audit trail (Security Phase 3)
 // ====================================================
@@ -454,6 +550,9 @@ router.post("/logout", authenticateToken, async (req: AuthRequest, res) => {
   try {
     const userId = req.user?.userId;
     const role = req.user?.role;
+    
+    // Clear refresh token cookie
+    clearRefreshTokenCookie(res);
     
     // Get user details for audit log
     const user = userId ? await prisma.user.findUnique({
@@ -479,6 +578,7 @@ router.post("/logout", authenticateToken, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error("Logout audit error:", error);
     // Still return success - don't block logout even if audit fails
+    clearRefreshTokenCookie(res);
     res.json({ message: "Logout recorded" });
   }
 });

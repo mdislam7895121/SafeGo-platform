@@ -133,7 +133,6 @@ export class DispatchService {
         where: { id: input.entityId },
         data: {
           dispatchSessionId: session.id,
-          dispatchStatus: session.status,
         },
       });
     } else if (input.serviceType === 'parcel') {
@@ -141,7 +140,6 @@ export class DispatchService {
         where: { id: input.entityId },
         data: {
           dispatchSessionId: session.id,
-          dispatchStatus: session.status,
         },
       });
     }
@@ -233,16 +231,6 @@ export class DispatchService {
         where: { id: session.entityId },
         data: { dispatchStatus: DispatchSessionStatus.offer_pending },
       });
-    } else if (session.serviceType === 'food') {
-      await prisma.foodOrder.update({
-        where: { id: session.entityId },
-        data: { dispatchStatus: DispatchSessionStatus.offer_pending },
-      });
-    } else if (session.serviceType === 'parcel') {
-      await prisma.delivery.update({
-        where: { id: session.entityId },
-        data: { dispatchStatus: DispatchSessionStatus.offer_pending },
-      });
     }
 
     return {
@@ -327,7 +315,6 @@ export class DispatchService {
         data: {
           driverId,
           status: 'driver_assigned',
-          dispatchStatus: DispatchSessionStatus.driver_accepted,
         },
       });
     } else if (session.serviceType === 'parcel') {
@@ -336,7 +323,6 @@ export class DispatchService {
         data: {
           driverId,
           status: 'driver_assigned',
-          dispatchStatus: DispatchSessionStatus.driver_accepted,
         },
       });
     }
@@ -482,26 +468,24 @@ export class DispatchService {
         customer: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
+            userId: true,
+            fullName: true,
           },
         },
         assignedDriver: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
-            profilePhotoUrl: true,
-            phone: true,
+            userId: true,
+            fullName: true,
+            phoneNumber: true,
             vehicles: {
               where: { isPrimary: true, isActive: true },
               select: {
                 make: true,
-                model: true,
+                vehicleModel: true,
                 color: true,
-                plateNumber: true,
-                vehicleCategory: true,
+                vehiclePlate: true,
+                vehicleType: true,
               },
             },
           },
@@ -711,16 +695,6 @@ export class DispatchService {
 
     if (session.serviceType === 'ride') {
       await prisma.ride.update({
-        where: { id: session.entityId },
-        data: { dispatchStatus: DispatchSessionStatus.no_driver_found },
-      });
-    } else if (session.serviceType === 'food') {
-      await prisma.foodOrder.update({
-        where: { id: session.entityId },
-        data: { dispatchStatus: DispatchSessionStatus.no_driver_found },
-      });
-    } else if (session.serviceType === 'parcel') {
-      await prisma.delivery.update({
         where: { id: session.entityId },
         data: { dispatchStatus: DispatchSessionStatus.no_driver_found },
       });

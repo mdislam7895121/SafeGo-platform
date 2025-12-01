@@ -14,6 +14,51 @@ class ApiError extends Error {
   }
 }
 
+// Token refresh state management
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+// Attempt to refresh the access token using the refresh token cookie
+async function refreshAccessToken(): Promise<string | null> {
+  // If already refreshing, wait for the existing promise
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        // Refresh failed - clear token and return null
+        localStorage.removeItem("safego_token");
+        return null;
+      }
+
+      const data = await res.json();
+      if (data.token) {
+        localStorage.setItem("safego_token", data.token);
+        return data.token;
+      }
+      return null;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      localStorage.removeItem("safego_token");
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -36,15 +81,17 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(
+// Core fetch function with automatic token refresh
+async function fetchWithAuth(
   url: string,
-  options?: RequestInit & { method?: string; body?: string | FormData | BodyInit; headers?: HeadersInit },
-): Promise<any> {
+  options?: RequestInit,
+  retryOnUnauthorized = true
+): Promise<Response> {
   const token = localStorage.getItem("safego_token");
   const headers: HeadersInit = { ...options?.headers };
   
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    (headers as Record<string, string>).Authorization = `Bearer ${token}`;
   }
 
   const res = await fetch(url, {
@@ -52,6 +99,30 @@ export async function apiRequest(
     headers,
     credentials: "include",
   });
+
+  // If unauthorized and we have a token, try to refresh
+  if (res.status === 401 && retryOnUnauthorized && token) {
+    const newToken = await refreshAccessToken();
+    
+    if (newToken) {
+      // Retry the request with the new token
+      (headers as Record<string, string>).Authorization = `Bearer ${newToken}`;
+      return fetch(url, {
+        ...options,
+        headers,
+        credentials: "include",
+      });
+    }
+  }
+
+  return res;
+}
+
+export async function apiRequest(
+  url: string,
+  options?: RequestInit & { method?: string; body?: string | FormData | BodyInit; headers?: HeadersInit },
+): Promise<any> {
+  const res = await fetchWithAuth(url, options);
 
   await throwIfResNotOk(res);
   
@@ -70,17 +141,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const token = localStorage.getItem("safego_token");
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
-    const res = await fetch(queryKey.join("/") as string, {
-      headers,
-      credentials: "include",
-    });
+    const res = await fetchWithAuth(queryKey.join("/") as string, {});
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
@@ -99,14 +160,8 @@ export async function fetchAdminCapabilities(token: string | null): Promise<{ ca
     throw new Error("No authentication token provided");
   }
 
-  const headers: HeadersInit = {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
-
-  const res = await fetch("/api/admin/capabilities", {
-    headers,
-    credentials: "include",
+  const res = await fetchWithAuth("/api/admin/capabilities", {
+    headers: { "Content-Type": "application/json" },
   });
 
   if (!res.ok) {
