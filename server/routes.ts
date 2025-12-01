@@ -29,6 +29,7 @@ import referralSettingsRoutes from "./routes/referral-settings";
 import opportunitySettingsRoutes from "./routes/opportunity-settings";
 import restaurantSettingsRoutes from "./routes/restaurant-settings"; // Phase 10
 import adminRestaurantSettingsRoutes from "./routes/admin-restaurant-settings"; // Phase 10
+import adminPhase2aRoutes from "./routes/admin-phase2a"; // Phase 2A: Financial Integrity & Wallet System
 import customerRestaurantStatusRoutes from "./routes/customer-restaurant-status"; // Phase 10
 import customerRestaurantPricingRoutes from "./routes/customer-restaurant-pricing"; // Phase 11
 import paymentConfigRoutes from "./routes/payment-config"; // Payment & Payout Configuration
@@ -218,6 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/admin", adminSupportRoutes); // Phase 12
   app.use("/api/admin", adminRestaurantSettingsRoutes); // Phase 10
+  app.use("/api/admin", adminPhase2aRoutes); // Phase 2A: Financial Integrity & Wallet System
   app.use("/api/admin/referral-settings", referralSettingsRoutes);
   app.use("/api/admin/opportunity-settings", opportunitySettingsRoutes);
   app.use("/api/rides", rideRoutes);
