@@ -1,0 +1,97 @@
+Follow ALL SafeGo Master Rules.
+
+Provide a complete and fully detailed project status report covering the entire SafeGo Driver App and Customer App.  
+Your report must include ALL four sections below, with no skipping and no summarizing.  
+Every statement must be accurate and based on the current codebase.
+
+-----------------------------------------
+1. COMPLETED WORK (100% functional)
+-----------------------------------------
+List everything that is fully working in both Driver App and Customer App:
+- Screens
+- Components
+- Trip flows (demo or real)
+- Map behaviors
+- Buttons
+- Routing
+- Backend endpoints
+- KYC flows
+- Dashboard elements
+- Document center features
+- Any logic or UI that is finished
+
+Be exhaustive. Nothing should be missed.
+
+-----------------------------------------
+2. PARTIALLY COMPLETED WORK
+-----------------------------------------
+List all features that are visible but not fully functional.
+For each item, clearly state:
+- What part works
+- What part is incomplete
+- What logic is missing
+- What UI is missing
+- What backend support is missing
+
+This MUST include verification of:
+- Driver Online/Offline logic
+- Trip Preferences select/deselect + persistence
+- USA/BD trip type separation
+- Recenter button accuracy
+- Demo mode limitations
+- Safety report routing
+- Document upload “access token required”
+- Customer profile button not opening
+- Trip matching not connected to backend
+- Anything else partly done
+
+-----------------------------------------
+3. INCOMPLETE / MISSING WORK
+-----------------------------------------
+List ALL remaining work that still needs to be built.
+
+Minimum items to include:
+- Real-time trip matching (Customer → Driver)
+- Full real Ride flow (non-demo)
+- Full real Food Delivery flow
+- Full real Parcel Delivery flow
+- Driver earnings calculation after each trip
+- Driver incentives logic
+- Driver cancellation / no-show flow
+- Customer account page (profile, wallet, trips, help)
+- Customer Eats order placing & tracking
+- Customer Parcel booking flow
+- Push notifications (driver, customer, restaurant)
+- Restaurant dashboard (menus, orders, payouts)
+- Full BD vs USA service separation
+- Any missing verification/KYC screens
+- Any missing admin panel functions
+
+Do NOT skip anything.
+
+-----------------------------------------
+4. NEXT REQUIRED TASKS (STRICT PRIORITY ORDER)
+-----------------------------------------
+Provide a step-by-step task list of what must be implemented next.
+
+Minimum required priority items:
+1. Fix driver Online/Offline backend state
+2. Fix Trip Preference toggle + save/load
+3. Fix current location recenter
+4. Fix Document Upload authentication
+5. Fix Customer Profile button navigation
+6. Fix Safety Report routing
+7. Implement real Customer → Driver trip matching
+8. Implement real trip lifecycle (accepted → arriving → in_progress → completed)
+9. Implement earnings update after trip
+10. Implement real Food Delivery flow
+11. Implement real Parcel Delivery flow
+
+Explain why each step is needed, and how it fits the SafeGo system.
+
+-----------------------------------------
+REQUIREMENTS
+-----------------------------------------
+- Follow ALL SafeGo Master Rules and DO NOT break any existing schema, route, or API.
+- The report must be complete enough for another engineer to continue development without confusion.
+- No assumptions. No skipping. No short-form answers.
