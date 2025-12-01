@@ -1090,6 +1090,311 @@ router.get("/payment-methods/default", async (req: AuthRequest, res) => {
 });
 
 // ====================================================
+// BANGLADESH MOBILE WALLET PAYMENT METHODS
+// ====================================================
+
+import { MobileWalletBrand } from "@prisma/client";
+
+// Validation schema for adding BD mobile wallet
+const addMobileWalletSchema = z.object({
+  brand: z.nativeEnum(MobileWalletBrand),
+  walletPhone: z.string().regex(/^01[3-9]\d{8}$/, "Invalid Bangladesh phone number"),
+  accountName: z.string().min(2).optional(),
+  makeDefault: z.boolean().optional().default(false),
+});
+
+// GET /api/customer/mobile-wallets - List all mobile wallets
+router.get("/mobile-wallets", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    if (customerProfile.user.countryCode !== "BD") {
+      return res.status(400).json({ error: "Mobile wallets are only available in Bangladesh" });
+    }
+
+    const wallets = await prisma.customerMobileWallet.findMany({
+      where: {
+        customerId: customerProfile.id,
+        status: "active",
+      },
+      orderBy: [
+        { isDefault: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json({
+      wallets: wallets.map((w) => ({
+        id: w.id,
+        brand: w.brand,
+        walletPhoneMasked: w.walletPhoneMasked,
+        accountName: w.accountName,
+        isDefault: w.isDefault,
+        isVerified: w.isVerified,
+        lastUsedAt: w.lastUsedAt,
+        createdAt: w.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error("Get mobile wallets error:", error);
+    res.status(500).json({ error: "Failed to get mobile wallets" });
+  }
+});
+
+// POST /api/customer/mobile-wallets - Add a new mobile wallet
+router.post("/mobile-wallets", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    if (customerProfile.user.countryCode !== "BD") {
+      return res.status(400).json({ error: "Mobile wallets are only available in Bangladesh" });
+    }
+
+    const validation = addMobileWalletSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ 
+        error: "Invalid mobile wallet data",
+        details: validation.error.errors,
+      });
+    }
+
+    const { brand, walletPhone, accountName, makeDefault } = validation.data;
+
+    // Check if wallet already exists for this customer
+    const existingWallet = await prisma.customerMobileWallet.findFirst({
+      where: {
+        customerId: customerProfile.id,
+        brand,
+        walletPhoneMasked: walletPhone.slice(0, 3) + "****" + walletPhone.slice(-4),
+        status: "active",
+      },
+    });
+
+    if (existingWallet) {
+      return res.status(400).json({ error: "This wallet is already registered" });
+    }
+
+    // Check if this is the first wallet
+    const existingWallets = await prisma.customerMobileWallet.count({
+      where: {
+        customerId: customerProfile.id,
+        status: "active",
+      },
+    });
+
+    const isFirstWallet = existingWallets === 0;
+    const shouldBeDefault = makeDefault || isFirstWallet;
+
+    // If setting as default, unset any existing default
+    if (shouldBeDefault) {
+      await prisma.customerMobileWallet.updateMany({
+        where: {
+          customerId: customerProfile.id,
+          isDefault: true,
+        },
+        data: { isDefault: false },
+      });
+    }
+
+    // Create masked phone number for storage
+    const walletPhoneMasked = walletPhone.slice(0, 3) + "****" + walletPhone.slice(-4);
+
+    const wallet = await prisma.customerMobileWallet.create({
+      data: {
+        customerId: customerProfile.id,
+        brand,
+        walletPhoneMasked,
+        accountName,
+        isDefault: shouldBeDefault,
+        isVerified: false, // Requires OTP verification
+        status: "active",
+      },
+    });
+
+    res.status(201).json({
+      wallet: {
+        id: wallet.id,
+        brand: wallet.brand,
+        walletPhoneMasked: wallet.walletPhoneMasked,
+        accountName: wallet.accountName,
+        isDefault: wallet.isDefault,
+        isVerified: wallet.isVerified,
+        createdAt: wallet.createdAt,
+      },
+      message: "Mobile wallet added. Verification may be required for transactions.",
+    });
+  } catch (error) {
+    console.error("Add mobile wallet error:", error);
+    res.status(500).json({ error: "Failed to add mobile wallet" });
+  }
+});
+
+// PUT /api/customer/mobile-wallets/:id/default - Set mobile wallet as default
+router.put("/mobile-wallets/:id/default", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify ownership
+    const wallet = await prisma.customerMobileWallet.findFirst({
+      where: {
+        id,
+        customerId: customerProfile.id,
+        status: "active",
+      },
+    });
+
+    if (!wallet) {
+      return res.status(404).json({ error: "Mobile wallet not found" });
+    }
+
+    // Unset all defaults first
+    await prisma.customerMobileWallet.updateMany({
+      where: {
+        customerId: customerProfile.id,
+        isDefault: true,
+      },
+      data: { isDefault: false },
+    });
+
+    // Set new default
+    await prisma.customerMobileWallet.update({
+      where: { id },
+      data: { isDefault: true },
+    });
+
+    res.json({ message: "Mobile wallet set as default" });
+  } catch (error) {
+    console.error("Set default mobile wallet error:", error);
+    res.status(500).json({ error: "Failed to set default mobile wallet" });
+  }
+});
+
+// DELETE /api/customer/mobile-wallets/:id - Remove mobile wallet
+router.delete("/mobile-wallets/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const { id } = req.params;
+
+    const customerProfile = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customerProfile) {
+      return res.status(404).json({ error: "Customer profile not found" });
+    }
+
+    // Verify ownership
+    const wallet = await prisma.customerMobileWallet.findFirst({
+      where: {
+        id,
+        customerId: customerProfile.id,
+        status: "active",
+      },
+    });
+
+    if (!wallet) {
+      return res.status(404).json({ error: "Mobile wallet not found" });
+    }
+
+    // Soft delete by setting status to inactive
+    await prisma.customerMobileWallet.update({
+      where: { id },
+      data: { status: "inactive" },
+    });
+
+    // If this was the default, set another as default
+    if (wallet.isDefault) {
+      const nextDefault = await prisma.customerMobileWallet.findFirst({
+        where: {
+          customerId: customerProfile.id,
+          status: "active",
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (nextDefault) {
+        await prisma.customerMobileWallet.update({
+          where: { id: nextDefault.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+
+    res.json({ message: "Mobile wallet removed" });
+  } catch (error) {
+    console.error("Delete mobile wallet error:", error);
+    res.status(500).json({ error: "Failed to remove mobile wallet" });
+  }
+});
+
+// GET /api/customer/mobile-wallets/available-providers - Get available wallet providers
+router.get("/mobile-wallets/available-providers", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { countryCode: true },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(400).json({ error: "Mobile wallets are only available in Bangladesh" });
+    }
+
+    // Get enabled providers for Bangladesh
+    const configs = await prisma.mobileWalletConfig.findMany({
+      where: {
+        countryCode: "BD",
+        isEnabled: true,
+      },
+      orderBy: { provider: "asc" },
+    });
+
+    res.json({
+      providers: configs.map((c) => ({
+        brand: c.provider,
+        displayName: c.displayName || c.providerName,
+        logoUrl: c.logoUrl,
+        isDefault: c.isDefault,
+        enabledForRides: c.enabledForRides,
+        enabledForFood: c.enabledForFood,
+        enabledForParcels: c.enabledForParcels,
+      })),
+    });
+  } catch (error) {
+    console.error("Get available providers error:", error);
+    res.status(500).json({ error: "Failed to get available providers" });
+  }
+});
+
+// ====================================================
 // GET /api/customer/ride-options/availability (C5)
 // Get driver availability and ETA per vehicle category
 // ====================================================
