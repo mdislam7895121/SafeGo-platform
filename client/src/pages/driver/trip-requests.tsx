@@ -57,8 +57,8 @@ interface PendingRequestsResponse {
   message?: string;
 }
 
-const POLLING_INTERVAL_ONLINE = 3000;
-const POLLING_INTERVAL_OFFLINE = 10000;
+const POLLING_INTERVAL_ONLINE = 10000; // Reduced for memory efficiency
+const POLLING_INTERVAL_OFFLINE = 30000;
 
 export default function DriverTripRequestsPage() {
   const [, navigate] = useLocation();
@@ -73,7 +73,7 @@ export default function DriverTripRequestsPage() {
 
   const { data: driverStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery<DriverStatus>({
     queryKey: ["/api/driver/trips/driver-status"],
-    refetchInterval: 5000,
+    refetchInterval: 15000, // Reduced for memory efficiency
     retry: 2,
   });
 

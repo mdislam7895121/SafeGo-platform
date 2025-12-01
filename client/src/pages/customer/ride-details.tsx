@@ -15,7 +15,7 @@ export default function RideDetails() {
 
   const { data: rideData, isLoading: isLoadingRide } = useQuery<{ ride: any }>({
     queryKey: [`/api/rides/${id}`],
-    refetchInterval: 5000,
+    refetchInterval: 15000, // Reduced for memory efficiency
   });
 
   const ride = rideData?.ride;

@@ -21,9 +21,11 @@ import {
   ShieldCheck,
   Gauge,
   BadgeDollarSign,
+  Sparkles,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { format } from "date-fns";
+import { DriverIncentiveDashboard } from "@/components/incentives/DriverIncentiveDashboard";
 
 interface EarningSummary {
   currency: string;
@@ -271,6 +273,22 @@ export default function DriverEarnings() {
             </CardContent>
           </Card>
         </div>
+
+        {/* AI-Powered Incentive Recommendations */}
+        <Card className="border-yellow-200 dark:border-yellow-800">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-yellow-500" />
+              Earn More Today
+              <Badge variant="secondary" className="ml-2 bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
+                AI Powered
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DriverIncentiveDashboard compact />
+          </CardContent>
+        </Card>
 
         {/* Weekly Breakdown */}
         <Card>

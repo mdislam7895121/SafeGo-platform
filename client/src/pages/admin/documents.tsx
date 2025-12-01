@@ -272,7 +272,7 @@ export default function AdminDocumentCenter() {
 
   const { data, isLoading } = useQuery<PaginatedResponse<Driver | Customer | Restaurant>>({
     queryKey: [fullUrl],
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 30000, // Auto-refresh every 30 seconds for memory efficiency
   });
 
   // Fetch document details for review

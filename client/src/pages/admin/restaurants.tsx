@@ -50,7 +50,7 @@ export default function AdminRestaurants() {
 
   const { data: restaurants, isLoading } = useQuery<Restaurant[]>({
     queryKey: [fullUrl],
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 30000, // Auto-refresh every 30 seconds for memory efficiency
   });
 
   const getStatusBadge = (restaurant: Restaurant) => {

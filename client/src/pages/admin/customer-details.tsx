@@ -122,7 +122,7 @@ export default function CustomerDetails() {
   const { data: customer, isLoading } = useQuery<Customer>({
     queryKey: [`/api/admin/customers/${customerId}`],
     enabled: !!customerId,
-    refetchInterval: 5000,
+    refetchInterval: 30000, // Reduced for memory efficiency
   });
 
   // Fetch payment methods

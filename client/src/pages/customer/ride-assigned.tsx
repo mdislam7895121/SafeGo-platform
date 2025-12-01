@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,16 +6,19 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DriverPreviewCard, DriverPublicProfile } from "@/components/DriverPreviewCard";
+import { RiderSafetyBar } from "@/components/safety/RiderSafetyBar";
+import { RefinedETADisplay } from "@/components/navigation/RefinedETADisplay";
 import { ArrowLeft, MapPin, Navigation, Clock, DollarSign, Phone, MessageCircle } from "lucide-react";
 
 export default function RideAssigned() {
   const [, setLocation] = useLocation();
   const [, params] = useRoute("/customer/ride-assigned/:id");
   const id = params?.id;
+  const [safetyExpanded, setSafetyExpanded] = useState(false);
 
   const { data: rideData, isLoading: isLoadingRide } = useQuery<{ ride: any }>({
     queryKey: [`/api/rides/${id}`],
-    refetchInterval: 5000,
+    refetchInterval: 15000, // Reduced from 5s to 15s for memory efficiency
   });
 
   const ride = rideData?.ride;
@@ -100,6 +104,21 @@ export default function RideAssigned() {
             ) : null}
           </>
         )}
+
+        <RiderSafetyBar
+          tripId={id || ""}
+          tripType="ride"
+          driverName={driverProfile?.name}
+          driverPhone={ride?.driver?.phone}
+          isExpanded={safetyExpanded}
+          onToggle={() => setSafetyExpanded(!safetyExpanded)}
+        />
+
+        <RefinedETADisplay
+          tripId={id}
+          tripType="ride"
+          compact
+        />
 
         <div className="flex gap-3">
           <Button variant="outline" className="flex-1" data-testid="button-call">

@@ -71,7 +71,7 @@ export default function AdminComplaintDetails() {
   const { data: complaint, isLoading } = useQuery<ComplaintDetails>({
     queryKey: [`/api/admin/complaints/${complaintId}`],
     enabled: !!complaintId,
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 30000, // Reduced for memory efficiency
   });
 
   // Resolve complaint mutation

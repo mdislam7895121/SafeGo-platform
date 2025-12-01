@@ -16,7 +16,7 @@ export default function AdminKYC() {
 
   const { data: pendingUsers, isLoading } = useQuery({
     queryKey: [`/api/admin/kyc/pending?role=${selectedRole}`],
-    refetchInterval: 5000,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds for memory efficiency
   });
 
   const approveMutation = useMutation({

@@ -121,13 +121,13 @@ export default function AdminSupportConsole() {
     nextCursor: string | null;
   }>({
     queryKey: [conversationsUrl],
-    refetchInterval: 5000,
+    refetchInterval: 15000, // Reduced for memory efficiency
   });
 
   const { data: conversationDetail, isLoading: loadingMessages } = useQuery<ConversationDetail>({
     queryKey: [`/api/support/admin/conversations/${selectedConversationId}`],
     enabled: !!selectedConversationId,
-    refetchInterval: 4000,
+    refetchInterval: 10000, // Reduced for memory efficiency
   });
 
   const assignMutation = useMutation({

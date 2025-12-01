@@ -34,7 +34,7 @@ export default function LiveOrders() {
   const { data: liveData, isLoading } = useQuery({
     queryKey: ordersKeys.live(),
     queryFn: () => apiRequest("/api/restaurant/orders/live"),
-    refetchInterval: 5000, // Refresh every 5 seconds
+    refetchInterval: 15000, // Reduced for memory efficiency
   });
 
   // Status update mutation

@@ -32,7 +32,7 @@ export default function OrderConfirmation() {
   // Fetch food order details
   const { data: orderData, isLoading: isLoadingOrder } = useQuery<{ order: any }>({
     queryKey: [`/api/food-orders/${id}`],
-    refetchInterval: 5000, // Refresh every 5 seconds for live updates
+    refetchInterval: 15000, // Reduced for memory efficiency
   });
 
   const order = orderData?.order;

@@ -68,7 +68,7 @@ export default function RestaurantDetails() {
 
   const { data: restaurant, isLoading } = useQuery<RestaurantDetails>({
     queryKey: [`/api/admin/restaurants/${restaurantId}`],
-    refetchInterval: 5000,
+    refetchInterval: 30000, // Reduced for memory efficiency
     enabled: !!restaurantId,
   });
 

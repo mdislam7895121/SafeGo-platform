@@ -49,7 +49,7 @@ export default function AdminParcelDetails() {
   const { data: parcel, isLoading } = useQuery<ParcelDetails>({
     queryKey: [`/api/admin/parcels/${parcelId}`],
     enabled: !!parcelId,
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 30000, // Auto-refresh every 30 seconds for memory efficiency
   });
 
   const getStatusBadge = (status: string) => {

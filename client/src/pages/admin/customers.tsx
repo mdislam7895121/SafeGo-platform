@@ -59,7 +59,7 @@ export default function AdminCustomers() {
   // Fetch customers
   const { data: customers, isLoading } = useQuery<Customer[]>({
     queryKey: [fullUrl],
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 30000, // Auto-refresh every 30 seconds for memory efficiency
   });
 
   const getKycStatusBadge = (status: string, isVerified: boolean) => {

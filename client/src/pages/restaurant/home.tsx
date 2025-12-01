@@ -73,7 +73,7 @@ export default function RestaurantHome() {
 
   const { data: restaurantData, isLoading, isError: homeError } = useQuery({
     queryKey: ["/api/restaurant/home"],
-    refetchInterval: 5000,
+    refetchInterval: 30000, // Reduced for memory efficiency
   });
 
   const { data: ordersData, isLoading: ordersLoading, isError: ordersError } = useQuery({
