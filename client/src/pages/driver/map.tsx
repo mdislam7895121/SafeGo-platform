@@ -719,21 +719,65 @@ export default function DriverMapPage() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
-            <SheetHeader>
-              <SheetTitle>Quick Actions</SheetTitle>
+          <SheetContent side="bottom" className="rounded-t-2xl z-[1010] bg-black border-t-0">
+            <SheetHeader className="pb-4">
+              <SheetTitle className="text-white text-xl font-semibold">Trip Preferences</SheetTitle>
             </SheetHeader>
-            <div className="py-6 space-y-2">
+            <div className="pb-6">
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                {SAFEGO_SERVICES.map((service) => {
+                  const ServiceIcon = service.icon;
+                  const isEnabled = isServiceEnabled(service);
+                  const isUpdating = updateServicePrefsMutation.isPending;
+                  
+                  return (
+                    <button
+                      key={service.id}
+                      onClick={() => toggleServicePreference(service)}
+                      disabled={isUpdating}
+                      className={`relative flex flex-col items-center justify-center p-3 h-[100px] rounded-[16px] transition-all duration-200 ${
+                        isEnabled 
+                          ? "bg-[#181818] border-2 border-white" 
+                          : "bg-[#101010] border border-[#333] hover:border-[#555]"
+                      } ${isUpdating ? "opacity-60" : ""}`}
+                      data-testid={`quick-service-card-${service.id}`}
+                    >
+                      <div 
+                        className={`absolute top-2 right-2 w-4 h-4 rounded flex items-center justify-center transition-colors ${
+                          isEnabled 
+                            ? "bg-white" 
+                            : "border border-[#555]"
+                        }`}
+                      >
+                        {isEnabled && <Check className="h-3 w-3 text-black" />}
+                      </div>
+                      
+                      <ServiceIcon className={`h-8 w-8 ${isEnabled ? "text-white" : "text-gray-500"}`} />
+                      
+                      <span className={`text-xs font-medium text-center mt-2 ${
+                        isEnabled ? "text-white" : "text-gray-500"
+                      }`}>
+                        {service.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <p className="text-[#666] text-xs text-center mb-4">
+                Toggle services to control which trip types you receive.
+              </p>
+              
               <button
                 onClick={() => {
                   setLocation("/driver/trips");
                   setShowQuickActionsSheet(false);
                 }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#181818] border border-[#333] hover:border-[#555] transition-colors"
                 data-testid="quick-action-history"
               >
-                <History className="h-5 w-5" />
-                <span className="font-medium">Trip History</span>
+                <History className="h-5 w-5 text-white" />
+                <span className="font-medium text-white">Trip History</span>
               </button>
             </div>
           </SheetContent>
