@@ -805,6 +805,13 @@ function Router() {
           </DriverLayout>
         </ProtectedRoute>
       </Route>
+      <Route path="/driver/safety-emergency">
+        <ProtectedRoute allowedRoles={["driver"]}>
+          <DriverLayout pageTitle="Emergency Toolkit">
+            <DriverSafetyEmergency />
+          </DriverLayout>
+        </ProtectedRoute>
+      </Route>
       <Route path="/driver/trust-score">
         <ProtectedRoute allowedRoles={["driver"]}>
           <DriverLayout pageTitle="Trust Score">
