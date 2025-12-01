@@ -14,6 +14,7 @@ import { SoundToggle } from "@/components/SoundToggle";
 import { useCustomerLocation, createCustomerLocationIcon } from "@/hooks/useCustomerLocation";
 import { useLiveRideTracking } from "@/hooks/useLiveRideTracking";
 import { reverseGeocode } from "@/lib/locationService";
+import { useDispatchWebSocket, type DispatchDriver } from "@/hooks/useDispatchWebSocket";
 import {
   Car,
   UtensilsCrossed,
@@ -525,6 +526,10 @@ export default function UnifiedBookingPage() {
   // Backend ride tracking - when a real rideId exists, use backend tracking
   const [currentRideId, setCurrentRideId] = useState<string | null>(null);
   const [useSimulation, setUseSimulation] = useState(true); // Demo mode by default
+  const [dispatchSessionId, setDispatchSessionId] = useState<string | null>(null);
+  
+  // Get auth token for WebSocket
+  const authToken = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const [tripStartTime, setTripStartTime] = useState<Date | null>(null);
   const [tripEndTime, setTripEndTime] = useState<Date | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState<number>(0);
@@ -686,6 +691,49 @@ export default function UnifiedBookingPage() {
     isDrawerOpen: isChatOpen,
     onNewDriverMessage: handleNewDriverMessage,
   });
+  
+  // Dispatch WebSocket for real-time driver matching
+  const dispatchWebSocket = useDispatchWebSocket({
+    token: authToken || '',
+    onDriverAssigned: useCallback((driver: DispatchDriver) => {
+      const assignedDriver: DriverInfo = {
+        name: `${driver.firstName} ${driver.lastName?.charAt(0) || ''}.`,
+        rating: 4.8,
+        carModel: driver.vehicle?.model || 'Vehicle',
+        carColor: driver.vehicle?.color || '',
+        plateNumber: driver.vehicle?.plateNumber || '',
+        avatarInitials: `${driver.firstName.charAt(0)}${driver.lastName?.charAt(0) || ''}`,
+        pickupEtaMinutes: 5,
+      };
+      setDriverInfo(assignedDriver);
+      setRideStatus("DRIVER_ASSIGNED");
+      setTrackingPhase("EN_ROUTE_TO_PICKUP");
+      playDriverAssigned();
+      toast({
+        title: "Driver found!",
+        description: `${assignedDriver.name} is on the way in a ${assignedDriver.carColor} ${assignedDriver.carModel}`,
+      });
+    }, [playDriverAssigned, toast]),
+    onNoDriversFound: useCallback(() => {
+      setRideStatus("SELECTING");
+      setDispatchSessionId(null);
+      toast({
+        title: "No drivers available",
+        description: "Please try again in a few moments",
+        variant: "destructive",
+      });
+    }, [toast]),
+    onError: useCallback((error: string) => {
+      console.error('Dispatch WebSocket error:', error);
+    }, []),
+  });
+  
+  // Subscribe to dispatch session when it's created
+  useEffect(() => {
+    if (dispatchSessionId && dispatchWebSocket.isConnected) {
+      dispatchWebSocket.subscribeToSession(dispatchSessionId);
+    }
+  }, [dispatchSessionId, dispatchWebSocket.isConnected, dispatchWebSocket.subscribeToSession]);
   
   // Developer debug mode (click logo 5 times to enable)
   const [showDebugControls, setShowDebugControls] = useState(false);
