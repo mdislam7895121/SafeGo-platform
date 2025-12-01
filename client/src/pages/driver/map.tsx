@@ -125,7 +125,11 @@ interface ServicePreferences {
   rideTypes: {
     safego_go: boolean;
     safego_x: boolean;
+    safego_comfort: boolean;
     safego_xl: boolean;
+    safego_comfort_xl: boolean;
+    safego_black: boolean;
+    safego_black_suv: boolean;
     safego_premium: boolean;
     safego_bike: boolean;
     safego_cng: boolean;
@@ -148,14 +152,21 @@ interface ServiceCard {
 }
 
 const SAFEGO_SERVICES: ServiceCard[] = [
+  // US Standard Ride Types
   { id: "safego_go", name: "SafeGo Go", icon: Car, category: "ride", preferenceKey: "safego_go", enabledCountries: ["US", "BD"] },
-  { id: "safego_x", name: "SafeGo X", icon: Car, category: "ride", preferenceKey: "safego_x", enabledCountries: ["US", "BD"] },
-  { id: "safego_xl", name: "SafeGo XL", icon: Truck, category: "ride", preferenceKey: "safego_xl", enabledCountries: ["US", "BD"] },
-  { id: "safego_premium", name: "SafeGo Premium", icon: Crown, category: "ride", preferenceKey: "safego_premium", enabledCountries: ["US", "BD"] },
+  { id: "safego_x", name: "SafeGo X", icon: Car, category: "ride", preferenceKey: "safego_x", enabledCountries: ["US"] },
+  { id: "safego_comfort", name: "SafeGo Comfort", icon: Car, category: "ride", preferenceKey: "safego_comfort", enabledCountries: ["US"] },
+  { id: "safego_xl", name: "SafeGo XL", icon: Truck, category: "ride", preferenceKey: "safego_xl", enabledCountries: ["US"] },
+  { id: "safego_comfort_xl", name: "Comfort XL", icon: Truck, category: "ride", preferenceKey: "safego_comfort_xl", enabledCountries: ["US"] },
+  { id: "safego_black", name: "SafeGo Black", icon: Crown, category: "ride", preferenceKey: "safego_black", enabledCountries: ["US"] },
+  { id: "safego_black_suv", name: "Black SUV", icon: Crown, category: "ride", preferenceKey: "safego_black_suv", enabledCountries: ["US"] },
+  { id: "safego_premium", name: "SafeGo Premium", icon: Crown, category: "ride", preferenceKey: "safego_premium", enabledCountries: ["US"] },
+  { id: "safego_pet", name: "SafeGo Pet", icon: PawPrint, category: "ride", preferenceKey: "safego_pet", enabledCountries: ["US"] },
+  // BD-Specific Ride Types
   { id: "safego_bike", name: "SafeGo Bike", icon: Bike, category: "ride", preferenceKey: "safego_bike", enabledCountries: ["BD"] },
   { id: "safego_cng", name: "SafeGo CNG", icon: Zap, category: "ride", preferenceKey: "safego_cng", enabledCountries: ["BD"] },
   { id: "safego_moto", name: "SafeGo Moto", icon: Bike, category: "ride", preferenceKey: "safego_moto", enabledCountries: ["BD"] },
-  { id: "safego_pet", name: "SafeGo Pet", icon: PawPrint, category: "ride", preferenceKey: "safego_pet", enabledCountries: ["US", "BD"] },
+  // Common Services
   { id: "safego_eats", name: "SafeGo Eats", icon: UtensilsCrossed, category: "food", preferenceKey: "foodEnabled", enabledCountries: ["US", "BD"] },
   { id: "safego_parcel", name: "SafeGo Parcel", icon: Package, category: "parcel", preferenceKey: "parcelEnabled", enabledCountries: ["US", "BD"] },
 ];
@@ -164,12 +175,16 @@ const defaultServicePreferences: ServicePreferences = {
   rideTypes: {
     safego_go: true,
     safego_x: true,
-    safego_xl: false,
-    safego_premium: false,
-    safego_bike: false,
-    safego_cng: false,
-    safego_moto: false,
-    safego_pet: false,
+    safego_comfort: true,
+    safego_xl: true,
+    safego_comfort_xl: true,
+    safego_black: true,
+    safego_black_suv: true,
+    safego_premium: true,
+    safego_bike: true,
+    safego_cng: true,
+    safego_moto: true,
+    safego_pet: true,
   },
   foodEnabled: true,
   parcelEnabled: true,
@@ -249,13 +264,32 @@ export default function DriverMapPage() {
     },
   });
 
-  // Toggle a service preference
+  // Toggle a service preference with validation
   const toggleServicePreference = useCallback((service: ServiceCard) => {
     const currentValue = service.category === "ride" 
       ? servicePreferences.rideTypes[service.preferenceKey as keyof ServicePreferences["rideTypes"]]
       : servicePreferences[service.preferenceKey as "foodEnabled" | "parcelEnabled"];
     
     const newValue = !currentValue;
+    
+    // Validate: At least one trip type must remain enabled
+    if (currentValue && !newValue) {
+      // Count currently enabled services
+      const enabledRideTypes = Object.values(servicePreferences.rideTypes).filter(Boolean).length;
+      const totalEnabled = enabledRideTypes + 
+        (servicePreferences.foodEnabled ? 1 : 0) + 
+        (servicePreferences.parcelEnabled ? 1 : 0);
+      
+      if (totalEnabled <= 1) {
+        toast({
+          title: "Cannot disable",
+          description: "You must keep at least one trip type on to receive rides.",
+          variant: "destructive",
+        });
+        triggerHapticFeedback("heavy");
+        return;
+      }
+    }
     
     if (service.category === "ride") {
       updateServicePrefsMutation.mutate({
@@ -271,7 +305,7 @@ export default function DriverMapPage() {
     }
     
     triggerHapticFeedback("light");
-  }, [servicePreferences, updateServicePrefsMutation]);
+  }, [servicePreferences, updateServicePrefsMutation, toast]);
 
   // Check if a service is enabled
   const isServiceEnabled = useCallback((service: ServiceCard): boolean => {

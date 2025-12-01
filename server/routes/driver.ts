@@ -152,7 +152,11 @@ const servicePreferencesSchema = z.object({
   rideTypes: z.object({
     safego_go: z.boolean().optional(),
     safego_x: z.boolean().optional(),
+    safego_comfort: z.boolean().optional(),
     safego_xl: z.boolean().optional(),
+    safego_comfort_xl: z.boolean().optional(),
+    safego_black: z.boolean().optional(),
+    safego_black_suv: z.boolean().optional(),
     safego_premium: z.boolean().optional(),
     safego_bike: z.boolean().optional(),
     safego_cng: z.boolean().optional(),
@@ -163,17 +167,21 @@ const servicePreferencesSchema = z.object({
   parcelEnabled: z.boolean().optional(),
 });
 
-// Default service preferences for new drivers
+// Default service preferences for new drivers (all US types ON by default)
 const defaultServicePreferences = {
   rideTypes: {
     safego_go: true,
     safego_x: true,
-    safego_xl: false,
-    safego_premium: false,
-    safego_bike: false,
-    safego_cng: false,
-    safego_moto: false,
-    safego_pet: false,
+    safego_comfort: true,
+    safego_xl: true,
+    safego_comfort_xl: true,
+    safego_black: true,
+    safego_black_suv: true,
+    safego_premium: true,
+    safego_bike: true,
+    safego_cng: true,
+    safego_moto: true,
+    safego_pet: true,
   },
   foodEnabled: true,
   parcelEnabled: true,
