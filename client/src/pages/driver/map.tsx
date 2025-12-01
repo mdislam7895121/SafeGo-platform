@@ -235,12 +235,11 @@ export default function DriverMapPage() {
   // Mutation to update service preferences
   const updateServicePrefsMutation = useMutation({
     mutationFn: async (newPrefs: Partial<ServicePreferences>) => {
-      const response = await apiRequest("/api/driver/preferences/services", {
+      return await apiRequest("/api/driver/preferences/services", {
         method: "PATCH",
         body: JSON.stringify(newPrefs),
         headers: { "Content-Type": "application/json" },
       });
-      return response.json();
     },
     onSuccess: (data) => {
       if (data.preferences) {
@@ -712,8 +711,16 @@ export default function DriverMapPage() {
                       <button
                         key={service.id}
                         onClick={() => toggleServicePreference(service)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            toggleServicePreference(service);
+                          }
+                        }}
                         disabled={isUpdating}
-                        className={`trip-preference-card relative flex flex-col items-center justify-center gap-1.5 h-[85px] sm:h-[85px] rounded-[14px] transition-all duration-[250ms] ease-out cursor-pointer ${
+                        aria-pressed={isEnabled}
+                        aria-label={`${service.name} - ${isEnabled ? 'enabled' : 'disabled'}`}
+                        className={`trip-preference-card relative flex flex-col items-center justify-center gap-1.5 h-[85px] sm:h-[85px] rounded-[14px] transition-all duration-[250ms] ease-out cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3E8BF7] focus:ring-offset-2 focus:ring-offset-black ${
                           isEnabled 
                             ? "bg-[rgba(62,139,247,0.18)] border-2 border-[#3E8BF7] shadow-[0_0_6px_rgba(62,139,247,0.55)]" 
                             : "bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.25)] hover:-translate-y-[1px]"
@@ -781,8 +788,16 @@ export default function DriverMapPage() {
                     <button
                       key={service.id}
                       onClick={() => toggleServicePreference(service)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          toggleServicePreference(service);
+                        }
+                      }}
                       disabled={isUpdating}
-                      className={`trip-preference-card relative flex flex-col items-center justify-center gap-1.5 h-[75px] sm:h-[85px] rounded-[14px] transition-all duration-[250ms] ease-out cursor-pointer ${
+                      aria-pressed={isEnabled}
+                      aria-label={`${service.name} - ${isEnabled ? 'enabled' : 'disabled'}`}
+                      className={`trip-preference-card relative flex flex-col items-center justify-center gap-1.5 h-[75px] sm:h-[85px] rounded-[14px] transition-all duration-[250ms] ease-out cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3E8BF7] focus:ring-offset-2 focus:ring-offset-black ${
                         isEnabled 
                           ? "bg-[rgba(62,139,247,0.18)] border-2 border-[#3E8BF7] shadow-[0_0_6px_rgba(62,139,247,0.55)]" 
                           : "bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.25)] hover:-translate-y-[1px]"

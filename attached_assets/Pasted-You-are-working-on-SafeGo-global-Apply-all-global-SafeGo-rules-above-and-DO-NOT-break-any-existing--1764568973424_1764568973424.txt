@@ -1,0 +1,161 @@
+You are working on SafeGo global. Apply all global SafeGo rules above and DO NOT break any existing routes, APIs, or schemas. Only add new fields or logic.
+
+GOAL
+Fix the Driver “Trip Preferences” system on the driver map so that:
+- Each trip card is fully clickable/tappable.
+- Drivers can toggle services ON/OFF (like Uber trip preferences).
+- Preferences are saved per driver and respected everywhere (map trip selector, matching engine).
+- For now we only support USA trip types on this screen. Bangladesh trip types will be added later and must stay compatible.
+
+CONTEXT
+- Current page: /driver/map, Trip Preferences bottom sheet/modal.
+- Cards now show:
+  SafeGo X, SafeGo Comfort, SafeGo XL, Comfort XL, SafeGo Black, Black SUV, SafeGo Premium, SafeGo Pet, SafeGo Eats, SafeGo Parcel.
+- Visually the cards look OK, but tapping does nothing. They are still auto-selected and the driver cannot change them.
+- We must:
+  - Remove “SafeGo Go” completely from this UI (already removed visually, keep it out of logic too).
+  - Keep everything non-breaking: do not rename old fields, do not remove existing APIs.
+
+REQUIREMENTS
+
+1) DATA MODEL (NON-BREAKING EXTENSION)
+- Add a new nested object to the driver document (or reuse if already present), e.g.:
+    driver_profile.trip_preferences_us : {
+      safego_x: boolean,
+      safego_comfort: boolean,
+      safego_xl: boolean,
+      safego_comfort_xl: boolean,
+      safego_black: boolean,
+      safego_black_suv: boolean,
+      safego_premium: boolean,
+      safego_pet: boolean,
+      safego_eats: boolean,
+      safego_parcel: boolean
+    }
+
+- Do NOT remove or rename any existing fields. If there is already a generic trip_preferences object, keep it and just add this new `trip_preferences_us` field for USA-specific settings.
+- Default behaviour:
+  - If a driver has no `trip_preferences_us`, initialize using a safe default, for example:
+      safego_x = true
+      safego_comfort = true
+      safego_xl = true
+      safego_comfort_xl = false
+      safego_black = false
+      safego_black_suv = false
+      safego_premium = false
+      safego_pet = false
+      safego_eats = true
+      safego_parcel = true
+  - Store this default only once when loading preferences, so old behaviour is preserved for existing drivers.
+
+- Add a country split:
+  - For drivers with country_code = "US", use `trip_preferences_us`.
+  - Reserve a separate field for Bangladesh for later:
+      driver_profile.trip_preferences_bd (do NOT use it yet, just define schema and keep it empty).
+  - This ensures USA and BD trip sets can diverge without breaking anything.
+
+2) BACKEND API (READ & UPDATE PREFERENCES)
+- Create or update a dedicated API for driver trip preferences:
+    GET  /api/driver/trip-preferences
+    PUT  /api/driver/trip-preferences
+
+- Behaviour:
+  - GET:
+      - Authenticated driver only.
+      - Detect driver.country_code.
+      - If country_code == "US", return `trip_preferences_us` plus a list of allowed keys.
+      - If preferences are missing, create defaults (as specified above), persist them, then return.
+  - PUT:
+      - Accept a JSON body like:
+          {
+            "countryCode": "US",
+            "preferences": {
+              "safego_x": true,
+              "safego_comfort": false,
+              ...
+            }
+          }
+      - Validate that only allowed keys are being changed for the given country.
+      - Save under driver_profile.trip_preferences_us for US drivers.
+      - Do NOT touch other fields (wallet, KYC, etc.).
+      - Return updated preferences.
+
+- SECURITY:
+  - Enforce auth: driver can only update their own preferences.
+  - Reject empty or invalid payloads with a clear error.
+
+3) FRONTEND: TRIP PREFERENCES MODAL UI
+- File: client/src/pages/driver/map.tsx (or equivalent)
+- There is a Trip Preferences component/bottom sheet. Refactor it as follows:
+
+  a) Define a constant list for USA trip types:
+     const USA_TRIP_TYPES = [
+       { key: "safego_x",        label: "SafeGo X",        icon: CarIcon },
+       { key: "safego_comfort",  label: "SafeGo Comfort",  icon: CarIcon },
+       { key: "safego_xl",       label: "SafeGo XL",       icon: VanIcon },
+       { key: "safego_comfort_xl", label: "Comfort XL",    icon: VanIcon },
+       { key: "safego_black",    label: "SafeGo Black",    icon: CrownIcon },
+       { key: "safego_black_suv",label: "Black SUV",      icon: CrownIcon },
+       { key: "safego_premium",  label: "SafeGo Premium",  icon: CrownIcon },
+       { key: "safego_pet",      label: "SafeGo Pet",      icon: PawIcon },
+       { key: "safego_eats",     label: "SafeGo Eats",     icon: CutleryIcon },
+       { key: "safego_parcel",   label: "SafeGo Parcel",   icon: BoxIcon }
+     ];
+
+     - “SafeGo Go” must NOT appear in this list.
+     - Use existing icon components where possible; do NOT break imports.
+
+  b) On mount of the Trip Preferences sheet:
+     - Call GET /api/driver/trip-preferences.
+     - Store the preferences in React state, e.g.:
+         const [tripPreferences, setTripPreferences] = useState<TripPreferencesState | null>(null);
+     - Show a small loading spinner while fetching.
+
+  c) Make each card fully clickable:
+     - Wrap the card in a <button> or clickable <div> with role="button".
+     - On click:
+         - Toggle the boolean in state for that key.
+         - Immediately show the visual state (so it feels snappy).
+         - Debounce or directly call PUT /api/driver/trip-preferences to persist.
+     - Visual states:
+         - Selected: bright blue border and background (current design), checkmark in the top-right corner.
+         - Unselected: darker background, grey border, no checkmark.
+
+  d) Accessibility:
+     - Add aria-pressed to each card based on selected state.
+     - Add keyboard support (Enter/Space toggles card).
+
+4) CONNECT TO MATCHING ENGINE & MAP TRIP SELECTOR
+- There is a footer trip selector button on the driver map (bottom-right) that should show only enabled trip types.
+- Ensure that whenever preferences are updated:
+    - The active trip types used by the matching/matching filters are derived from `trip_preferences_us`.
+    - If all rides are turned OFF but Eats/Parcel remain ON, the driver should only receive Eats/Parcel orders.
+- Do NOT change the status flow, rides/food_orders/deliveries schemas, or commission logic.
+
+5) GLOBAL & COUNTRY LOGIC
+- Ensure that:
+  - For drivers with country_code = "US": show only USA_TRIP_TYPES in the preferences modal.
+  - For drivers with country_code = "BD": keep current behaviour for now (no extra cards added yet). IMPORTANT: do not crash if `trip_preferences_bd` is undefined.
+- Prepare an easy extension point:
+  - Add a placeholder constant BD_TRIP_TYPES, but keep it unused for now.
+  - Comment clearly that BD trip types will be wired later.
+
+6) UI POLISH
+- Keep cards small and professional:
+  - Approx size: ~160–180px width, compact height so 2 rows of cards can fit on standard laptop.
+  - Use consistent padding, border-radius, and spacing (similar to the current smaller blue cards).
+  - Maintain the existing Trip Preferences title and the “Toggle services to control which trip types you receive.” helper text.
+
+7) TEST CASES
+- After implementation, verify:
+  - A USA driver opens Trip Preferences → sees ONLY the list:
+      SafeGo X, SafeGo Comfort, SafeGo XL, Comfort XL, SafeGo Black, Black SUV, SafeGo Premium, SafeGo Pet, SafeGo Eats, SafeGo Parcel.
+    No “SafeGo Go” card anywhere.
+  - Tapping a card toggles its border/checkmark instantly.
+  - Refreshing the page keeps the chosen ON/OFF state (preferences persist).
+  - The bottom-right trip selector and matching logic only use the enabled types.
+  - BD drivers still work without errors and see their current setup (no regression).
+
+At the end, summarize which files you changed and confirm that:
+- No existing route or field name was removed or renamed.
+- All changes are additive and backward compatible with the current SafeGo platform.
