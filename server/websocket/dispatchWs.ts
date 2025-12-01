@@ -1,6 +1,6 @@
 /**
  * SafeGo WebSocket Dispatch Hub
- * Phase 1A: Real-time dispatch communication between customers and drivers
+ * Phase 1A+1B: Real-time dispatch, ETA, route tracking, and chat
  */
 
 import { Server as HTTPServer } from 'http';
@@ -9,6 +9,12 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../db';
 import { dispatchService } from '../services/dispatchService';
 import { driverRealtimeStateService } from '../services/driverRealtimeStateService';
+import { routingService } from '../services/routingService';
+import { rideTelemetryService } from '../services/rideTelemetryService';
+import { chatService } from '../services/chatService';
+import { statusTransitionService } from '../services/statusTransitionService';
+import { fareRecalculationService } from '../services/fareRecalculationService';
+import { getDispatchFeatureConfig } from '../config/dispatchFeatures';
 import { DispatchServiceMode } from '@prisma/client';
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -169,6 +175,26 @@ async function handleMessage(ws: AuthenticatedWebSocket, message: WsMessage) {
       break;
     case 'customer:cancel_dispatch':
       await handleCustomerCancelDispatch(ws, payload);
+      break;
+    // Phase 1B: Driver trip lifecycle
+    case 'driver:mark_arrived':
+      await handleDriverMarkArrived(ws, payload);
+      break;
+    case 'driver:start_trip':
+      await handleDriverStartTrip(ws, payload);
+      break;
+    case 'driver:end_trip':
+      await handleDriverEndTrip(ws, payload);
+      break;
+    case 'driver:trip_location_update':
+      await handleDriverTripLocationUpdate(ws, payload);
+      break;
+    // Phase 1B: Chat
+    case 'chat:send_message':
+      await handleChatSendMessage(ws, payload);
+      break;
+    case 'chat:mark_read':
+      await handleChatMarkRead(ws, payload);
       break;
     default:
       ws.send(JSON.stringify({ type: 'error', payload: { message: 'Unknown message type' } }));
@@ -572,4 +598,510 @@ export function getCustomerConnection(customerId: string): AuthenticatedWebSocke
 export function isDriverOnline(driverId: string): boolean {
   const ws = driverConnections.get(driverId);
   return ws !== undefined && ws.readyState === WebSocket.OPEN;
+}
+
+// ============================================================
+// Phase 1B: Driver Trip Lifecycle Handlers
+// ============================================================
+
+async function handleDriverMarkArrived(
+  ws: AuthenticatedWebSocket,
+  payload: Record<string, unknown>
+) {
+  if (ws.userRole !== 'driver' || !ws.profileId) return;
+
+  const { rideId, sessionId } = payload as { rideId?: string; sessionId?: string };
+  const entityId = rideId || sessionId;
+
+  if (!entityId) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Ride or session ID required' } }));
+    return;
+  }
+
+  const ride = await prisma.ride.findFirst({
+    where: {
+      OR: [{ id: entityId }, { dispatchSessionId: entityId }],
+      driverId: ws.profileId,
+    },
+    select: { id: true, customerId: true, status: true },
+  });
+
+  if (!ride) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Ride not found or not assigned to you' } }));
+    return;
+  }
+
+  const result = await statusTransitionService.transitionRideStatus(
+    ride.id,
+    'driver_arriving',
+    'driver',
+    ws.profileId
+  );
+
+  if (result.success) {
+    ws.send(JSON.stringify({
+      type: 'driver:arrived_confirmed',
+      payload: { rideId: ride.id, status: 'driver_arriving' },
+    }));
+
+    const customerWs = customerConnections.get(ride.customerId);
+    if (customerWs && customerWs.readyState === WebSocket.OPEN) {
+      customerWs.send(JSON.stringify({
+        type: 'ride:driver_arrived',
+        payload: { rideId: ride.id, status: 'driver_arriving' },
+      }));
+    }
+  } else {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: result.error } }));
+  }
+}
+
+async function handleDriverStartTrip(
+  ws: AuthenticatedWebSocket,
+  payload: Record<string, unknown>
+) {
+  if (ws.userRole !== 'driver' || !ws.profileId) return;
+
+  const { rideId, sessionId } = payload as { rideId?: string; sessionId?: string };
+  const entityId = rideId || sessionId;
+
+  if (!entityId) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Ride or session ID required' } }));
+    return;
+  }
+
+  const ride = await prisma.ride.findFirst({
+    where: {
+      OR: [{ id: entityId }, { dispatchSessionId: entityId }],
+      driverId: ws.profileId,
+    },
+    select: { id: true, customerId: true, status: true, pickupLat: true, pickupLng: true, dropoffLat: true, dropoffLng: true },
+  });
+
+  if (!ride) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Ride not found or not assigned to you' } }));
+    return;
+  }
+
+  const result = await statusTransitionService.transitionRideStatus(
+    ride.id,
+    'in_progress',
+    'driver',
+    ws.profileId
+  );
+
+  if (result.success) {
+    const config = getDispatchFeatureConfig();
+    let etaToDropoff: number | undefined;
+
+    if (config.etaCalculation.enabled && ride.pickupLat && ride.pickupLng && ride.dropoffLat && ride.dropoffLng) {
+      const routeResult = await routingService.getRouteAndEta({
+        originLat: ride.pickupLat,
+        originLng: ride.pickupLng,
+        destLat: ride.dropoffLat,
+        destLng: ride.dropoffLng,
+        serviceType: 'ride',
+      });
+      etaToDropoff = routeResult.durationSeconds;
+
+      await prisma.ride.update({
+        where: { id: ride.id },
+        data: {
+          etaToDropoffSeconds: etaToDropoff,
+          etaLastUpdatedAt: new Date(),
+        },
+      });
+    }
+
+    ws.send(JSON.stringify({
+      type: 'driver:trip_started_confirmed',
+      payload: { rideId: ride.id, status: 'in_progress', etaToDropoffSeconds: etaToDropoff },
+    }));
+
+    const customerWs = customerConnections.get(ride.customerId);
+    if (customerWs && customerWs.readyState === WebSocket.OPEN) {
+      customerWs.send(JSON.stringify({
+        type: 'ride:trip_started',
+        payload: { rideId: ride.id, status: 'in_progress', etaToDropoffSeconds: etaToDropoff },
+      }));
+    }
+  } else {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: result.error } }));
+  }
+}
+
+async function handleDriverEndTrip(
+  ws: AuthenticatedWebSocket,
+  payload: Record<string, unknown>
+) {
+  if (ws.userRole !== 'driver' || !ws.profileId) return;
+
+  const { rideId, sessionId } = payload as { rideId?: string; sessionId?: string };
+  const entityId = rideId || sessionId;
+
+  if (!entityId) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Ride or session ID required' } }));
+    return;
+  }
+
+  const ride = await prisma.ride.findFirst({
+    where: {
+      OR: [{ id: entityId }, { dispatchSessionId: entityId }],
+      driverId: ws.profileId,
+    },
+    select: { id: true, customerId: true, status: true },
+  });
+
+  if (!ride) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Ride not found or not assigned to you' } }));
+    return;
+  }
+
+  const result = await statusTransitionService.transitionRideStatus(
+    ride.id,
+    'completed',
+    'driver',
+    ws.profileId
+  );
+
+  if (result.success) {
+    rideTelemetryService.clearRideCache(ride.id);
+
+    const config = getDispatchFeatureConfig();
+    let fareResult;
+
+    if (config.fareRecalculation.enabled) {
+      fareResult = await fareRecalculationService.recalculateFareForCompletedRide(ride.id);
+    }
+
+    ws.send(JSON.stringify({
+      type: 'driver:trip_ended_confirmed',
+      payload: {
+        rideId: ride.id,
+        status: 'completed',
+        fareRecalculated: fareResult?.success,
+        finalFare: fareResult?.newFare,
+      },
+    }));
+
+    const customerWs = customerConnections.get(ride.customerId);
+    if (customerWs && customerWs.readyState === WebSocket.OPEN) {
+      customerWs.send(JSON.stringify({
+        type: 'ride:trip_completed',
+        payload: {
+          rideId: ride.id,
+          status: 'completed',
+          finalFare: fareResult?.newFare,
+          breakdown: fareResult?.breakdown,
+        },
+      }));
+
+      if (fareResult?.success) {
+        customerWs.send(JSON.stringify({
+          type: 'ride:fare_finalized',
+          payload: {
+            rideId: ride.id,
+            originalFare: fareResult.originalFare,
+            finalFare: fareResult.newFare,
+            breakdown: fareResult.breakdown,
+            adjustmentReason: fareResult.adjustmentReason,
+          },
+        }));
+      }
+    }
+
+    const conversation = await chatService.getConversationByEntity('ride', ride.id);
+    if (conversation) {
+      await chatService.closeConversation(conversation.id);
+    }
+  } else {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: result.error } }));
+  }
+}
+
+async function handleDriverTripLocationUpdate(
+  ws: AuthenticatedWebSocket,
+  payload: Record<string, unknown>
+) {
+  if (ws.userRole !== 'driver' || !ws.profileId) return;
+
+  const { rideId, lat, lng, heading, speed } = payload as {
+    rideId: string;
+    lat: number;
+    lng: number;
+    heading?: number;
+    speed?: number;
+  };
+
+  if (!rideId || typeof lat !== 'number' || typeof lng !== 'number') {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Invalid location data' } }));
+    return;
+  }
+
+  const ride = await prisma.ride.findUnique({
+    where: { id: rideId },
+    select: {
+      id: true,
+      customerId: true,
+      driverId: true,
+      status: true,
+      dropoffLat: true,
+      dropoffLng: true,
+      etaLastUpdatedAt: true,
+    },
+  });
+
+  if (!ride || ride.driverId !== ws.profileId) {
+    return;
+  }
+
+  if (ride.status !== 'in_progress' && ride.status !== 'driver_arriving') {
+    return;
+  }
+
+  const sample = await rideTelemetryService.recordLocationSample(rideId, ws.profileId, {
+    lat,
+    lng,
+    heading,
+    speed,
+  });
+
+  const customerWs = customerConnections.get(ride.customerId);
+  if (customerWs && customerWs.readyState === WebSocket.OPEN) {
+    customerWs.send(JSON.stringify({
+      type: 'ride:route_update',
+      payload: {
+        rideId,
+        driverLat: lat,
+        driverLng: lng,
+        heading,
+        speed,
+        sampleId: sample?.id,
+      },
+    }));
+  }
+
+  const config = getDispatchFeatureConfig();
+  const lastUpdate = ride.etaLastUpdatedAt?.getTime() || 0;
+  const now = Date.now();
+  const throttleMs = config.etaCalculation.throttleIntervalSeconds * 1000;
+
+  if (now - lastUpdate >= throttleMs && ride.dropoffLat && ride.dropoffLng) {
+    const routeResult = await routingService.getRouteAndEta({
+      originLat: lat,
+      originLng: lng,
+      destLat: ride.dropoffLat,
+      destLng: ride.dropoffLng,
+      serviceType: 'ride',
+    });
+
+    await prisma.ride.update({
+      where: { id: rideId },
+      data: {
+        etaToDropoffSeconds: routeResult.durationSeconds,
+        etaLastUpdatedAt: new Date(),
+      },
+    });
+
+    if (customerWs && customerWs.readyState === WebSocket.OPEN) {
+      customerWs.send(JSON.stringify({
+        type: 'ride:eta_update',
+        payload: {
+          rideId,
+          phase: ride.status === 'in_progress' ? 'to_dropoff' : 'to_pickup',
+          etaSeconds: routeResult.durationSeconds,
+          distanceMeters: routeResult.distanceMeters,
+        },
+      }));
+    }
+  }
+}
+
+// ============================================================
+// Phase 1B: Chat Message Handlers
+// ============================================================
+
+async function handleChatSendMessage(
+  ws: AuthenticatedWebSocket,
+  payload: Record<string, unknown>
+) {
+  const { conversationId, entityId, serviceType, text } = payload as {
+    conversationId?: string;
+    entityId?: string;
+    serviceType?: 'ride' | 'food' | 'parcel';
+    text: string;
+  };
+
+  if (!text || typeof text !== 'string') {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Message text required' } }));
+    return;
+  }
+
+  if (!ws.profileId || !ws.userRole) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Not authenticated' } }));
+    return;
+  }
+
+  let convId = conversationId;
+
+  if (!convId && entityId && serviceType) {
+    let customerId: string | undefined;
+    let driverId: string | undefined;
+    let restaurantId: string | undefined;
+
+    if (serviceType === 'ride') {
+      const ride = await prisma.ride.findUnique({
+        where: { id: entityId },
+        select: { customerId: true, driverId: true },
+      });
+      if (ride) {
+        customerId = ride.customerId;
+        driverId = ride.driverId || undefined;
+      }
+    } else if (serviceType === 'food') {
+      const order = await prisma.foodOrder.findUnique({
+        where: { id: entityId },
+        select: { customerId: true, driverId: true, restaurantId: true },
+      });
+      if (order) {
+        customerId = order.customerId;
+        driverId = order.driverId || undefined;
+        restaurantId = order.restaurantId;
+      }
+    } else if (serviceType === 'parcel') {
+      const delivery = await prisma.delivery.findUnique({
+        where: { id: entityId },
+        select: { customerId: true, driverId: true },
+      });
+      if (delivery) {
+        customerId = delivery.customerId;
+        driverId = delivery.driverId || undefined;
+      }
+    }
+
+    if (customerId) {
+      const conv = await chatService.getOrCreateConversation(
+        serviceType,
+        entityId,
+        customerId,
+        driverId,
+        restaurantId
+      );
+      if (conv) {
+        convId = conv.id;
+      }
+    }
+  }
+
+  if (!convId) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Conversation not found' } }));
+    return;
+  }
+
+  const senderRole = ws.userRole as 'customer' | 'driver' | 'restaurant' | 'admin';
+  const result = await chatService.sendMessage(convId, senderRole, ws.profileId, text);
+
+  if (!result.success) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: result.error } }));
+    return;
+  }
+
+  ws.send(JSON.stringify({
+    type: 'chat:message_sent',
+    payload: { message: result.message },
+  }));
+
+  const conversation = await prisma.tripConversation.findUnique({
+    where: { id: convId },
+    select: { customerId: true, driverId: true, restaurantId: true },
+  });
+
+  if (conversation && result.message) {
+    const recipientIds = [
+      conversation.customerId,
+      conversation.driverId,
+      conversation.restaurantId,
+    ].filter((id): id is string => id !== null && id !== ws.profileId);
+
+    for (const recipientId of recipientIds) {
+      const recipientWs = customerConnections.get(recipientId) || driverConnections.get(recipientId);
+      if (recipientWs && recipientWs.readyState === WebSocket.OPEN) {
+        recipientWs.send(JSON.stringify({
+          type: 'chat:message_new',
+          payload: {
+            conversationId: convId,
+            message: result.message,
+          },
+        }));
+      }
+    }
+  }
+}
+
+async function handleChatMarkRead(
+  ws: AuthenticatedWebSocket,
+  payload: Record<string, unknown>
+) {
+  const { conversationId } = payload as { conversationId: string };
+
+  if (!conversationId || !ws.profileId || !ws.userRole) {
+    ws.send(JSON.stringify({ type: 'error', payload: { message: 'Invalid request' } }));
+    return;
+  }
+
+  const count = await chatService.markMessagesAsRead(
+    conversationId,
+    ws.profileId,
+    ws.userRole as 'customer' | 'driver' | 'restaurant' | 'admin'
+  );
+
+  ws.send(JSON.stringify({
+    type: 'chat:marked_read',
+    payload: { conversationId, count },
+  }));
+}
+
+// ============================================================
+// Phase 1B: ETA Broadcast Utility
+// ============================================================
+
+export async function broadcastEtaUpdate(
+  rideId: string,
+  customerId: string,
+  phase: 'to_pickup' | 'to_dropoff',
+  etaSeconds: number,
+  distanceMeters: number
+): Promise<void> {
+  const customerWs = customerConnections.get(customerId);
+  if (customerWs && customerWs.readyState === WebSocket.OPEN) {
+    customerWs.send(JSON.stringify({
+      type: 'ride:eta_update',
+      payload: {
+        rideId,
+        phase,
+        etaSeconds,
+        distanceMeters,
+      },
+    }));
+  }
+}
+
+export async function broadcastStatusUpdate(
+  serviceType: 'ride' | 'food' | 'parcel',
+  entityId: string,
+  customerId: string,
+  status: string,
+  additionalPayload?: Record<string, unknown>
+): Promise<void> {
+  const customerWs = customerConnections.get(customerId);
+  if (customerWs && customerWs.readyState === WebSocket.OPEN) {
+    customerWs.send(JSON.stringify({
+      type: `${serviceType}:status_update`,
+      payload: {
+        entityId,
+        status,
+        ...additionalPayload,
+      },
+    }));
+  }
 }

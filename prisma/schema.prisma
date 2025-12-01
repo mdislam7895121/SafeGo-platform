@@ -121,6 +121,9 @@ model CustomerProfile {
   
   // Phase 1A: Real-Time Dispatch
   dispatchSessions      DispatchSession[]        // Dispatch sessions for this customer
+  
+  // Phase 1B: Trip conversations
+  tripConversations     TripConversation[]
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -163,6 +166,14 @@ model Delivery {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime
   deliveredAt      DateTime?
+  
+  // Phase 1B: Real-Time Dispatch for parcel deliveries
+  dispatchSessionId    String?       @unique // FK to dispatch_sessions
+  statusHistory        Json?         @default("[]") // Array of {status, timestamp, actor}
+  etaToPickupSeconds   Int?          // ETA from driver to pickup
+  etaToDropoffSeconds  Int?          // ETA from pickup to dropoff
+  etaLastUpdatedAt     DateTime?     // When ETA was last recalculated
+  
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   driver           DriverProfile?   @relation(fields: [driverId], references: [id])
   restaurant       RestaurantProfile? @relation(fields: [restaurantId], references: [id]) // Step 46: For food deliveries
@@ -173,6 +184,7 @@ model Delivery {
   @@index([status])       // Step 46: Index for status queries
   @@index([driverId])     // Step 46: Index for driver queries
   @@index([restaurantId]) // Step 46: Index for restaurant queries
+  @@index([dispatchSessionId])
   @@map("deliveries")
 }
 
@@ -350,6 +362,10 @@ model DriverProfile {
   realtimeState         DriverRealtimeState?      // Driver's real-time presence/location
   assignedDispatchSessions DispatchSession[]      @relation("AssignedDriver")
   dispatchOfferEvents   DispatchOfferEvent[]      // Offers received by this driver
+  
+  // Phase 1B: Trip conversations and telemetry
+  tripConversations     TripConversation[]
+  telemetryLocations    RideTelemetryLocation[]
 
   @@map("driver_profiles")
 }
@@ -560,6 +576,13 @@ model FoodOrder {
   lastSupportStatus    String?           // Latest support ticket status
   // Refund tracking
   refundStatus         RefundStatus      @default(none)
+  
+  // Phase 1B: Real-Time Dispatch for food orders
+  dispatchSessionId    String?           @unique // FK to dispatch_sessions
+  statusHistory        Json?             @default("[]") // Array of {status, timestamp, actor}
+  etaToRestaurantSeconds Int?            // ETA from driver to restaurant
+  etaToCustomerSeconds Int?              // ETA from restaurant to customer
+  etaLastUpdatedAt     DateTime?         // When ETA was last recalculated
   refundAmount         Decimal?          @db.Decimal(10, 2)
   refundedAt           DateTime?
   refundReason         String?           @db.Text
@@ -738,6 +761,9 @@ model RestaurantProfile {
   upsellGroups          MenuItemUpsellGroup[] // Step 44: Upsell groups for menu item recommendations
   user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   restaurantWallet      RestaurantWallet?
+  
+  // Phase 1B: Trip conversations for food orders
+  tripConversations     TripConversation[]
 
   @@index([cityCode])
   @@index([countryCode])
@@ -1048,6 +1074,23 @@ model Ride {
   dispatchStatus     String?           // Mirror of dispatch_sessions.status for fast queries
   requestedAt        DateTime?         // When ride was initially requested
   dispatchSession    DispatchSession?  @relation("RideDispatch", fields: [dispatchSessionId], references: [id])
+  
+  // Phase 1B: Status history and ETA tracking
+  statusHistory      Json?             @default("[]") // Array of {status, timestamp, actor}
+  etaToPickupSeconds Int?              // ETA from driver to pickup in seconds
+  etaToDropoffSeconds Int?             // ETA from pickup to dropoff in seconds
+  etaLastUpdatedAt   DateTime?         // When ETA was last recalculated
+  
+  // Phase 1B: Fare recalculation for actual distance/time
+  actualDistanceMeters  Int?           // Actual distance traveled (from telemetry)
+  actualDurationSeconds Int?           // Actual trip duration (from telemetry)
+  finalFareAmount       Decimal?       @db.Decimal(10, 2) // Final calculated fare
+  fareBreakdown         Json?          // Detailed fare breakdown JSON
+  fareRecalculated      Boolean        @default(false)
+  fareAdjustmentReason  String?        // Reason for fare adjustment
+  
+  // Phase 1B: Telemetry relation
+  telemetryLocations    RideTelemetryLocation[] @relation("RideTelemetry")
 
   @@index([countryCode])
   @@index([cityCode])
@@ -4184,8 +4227,12 @@ enum DispatchSessionStatus {
   searching_driver
   offer_pending
   driver_accepted
+  driver_arriving
+  in_progress
+  completed
   no_driver_found
   cancelled_by_customer
+  cancelled_by_driver
   cancelled_by_admin
   expired
 }
@@ -4295,4 +4342,83 @@ model DispatchOfferEvent {
   @@index([driverId])
   @@index([response])
   @@map("dispatch_offer_events")
+}
+
+// Phase 1B: Ride location telemetry for live tracking and fare recalculation
+model RideTelemetryLocation {
+  id                    String            @id @default(uuid())
+  rideId                String
+  driverId              String
+  
+  lat                   Float
+  lng                   Float
+  heading               Float?            // Compass heading in degrees
+  speed                 Float?            // Speed in meters per second
+  accuracy              Float?            // GPS accuracy in meters
+  
+  recordedAt            DateTime          @default(now())
+  
+  // Incremental distance tracking
+  distanceFromPrevious  Float?            // Meters from previous point
+  cumulativeDistance    Float?            // Total meters traveled so far
+  
+  ride                  Ride              @relation("RideTelemetry", fields: [rideId], references: [id], onDelete: Cascade)
+  driver                DriverProfile     @relation(fields: [driverId], references: [id])
+  
+  @@index([rideId])
+  @@index([driverId])
+  @@index([recordedAt])
+  @@map("ride_telemetry_locations")
+}
+
+// Phase 1B: In-trip messaging conversations
+model TripConversation {
+  id                    String              @id @default(uuid())
+  serviceType           DeliveryServiceType @default(ride)
+  entityId              String              // FK to ride/food_order/delivery id
+  
+  customerId            String
+  driverId              String?
+  restaurantId          String?             // For food orders
+  
+  isActive              Boolean             @default(true)
+  closedAt              DateTime?
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  messages              TripMessage[]
+  customer              CustomerProfile     @relation(fields: [customerId], references: [id])
+  driver                DriverProfile?      @relation(fields: [driverId], references: [id])
+  restaurant            RestaurantProfile?  @relation(fields: [restaurantId], references: [id])
+  
+  @@unique([serviceType, entityId])
+  @@index([customerId])
+  @@index([driverId])
+  @@index([restaurantId])
+  @@index([isActive])
+  @@map("trip_conversations")
+}
+
+// Phase 1B: Individual messages in trip conversations
+model TripMessage {
+  id                    String            @id @default(uuid())
+  conversationId        String
+  
+  senderRole            String            // customer, driver, restaurant, admin
+  senderId              String            // ID of the sender profile
+  
+  text                  String            @db.Text
+  
+  isRead                Boolean           @default(false)
+  readAt                DateTime?
+  
+  createdAt             DateTime          @default(now())
+  
+  conversation          TripConversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+  @@map("trip_messages")
 }

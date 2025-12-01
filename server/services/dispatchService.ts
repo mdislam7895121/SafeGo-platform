@@ -128,6 +128,22 @@ export class DispatchService {
           requestedAt: new Date(),
         },
       });
+    } else if (input.serviceType === 'food') {
+      await prisma.foodOrder.update({
+        where: { id: input.entityId },
+        data: {
+          dispatchSessionId: session.id,
+          dispatchStatus: session.status,
+        },
+      });
+    } else if (input.serviceType === 'parcel') {
+      await prisma.delivery.update({
+        where: { id: input.entityId },
+        data: {
+          dispatchSessionId: session.id,
+          dispatchStatus: session.status,
+        },
+      });
     }
 
     return {
@@ -217,6 +233,16 @@ export class DispatchService {
         where: { id: session.entityId },
         data: { dispatchStatus: DispatchSessionStatus.offer_pending },
       });
+    } else if (session.serviceType === 'food') {
+      await prisma.foodOrder.update({
+        where: { id: session.entityId },
+        data: { dispatchStatus: DispatchSessionStatus.offer_pending },
+      });
+    } else if (session.serviceType === 'parcel') {
+      await prisma.delivery.update({
+        where: { id: session.entityId },
+        data: { dispatchStatus: DispatchSessionStatus.offer_pending },
+      });
     }
 
     return {
@@ -293,6 +319,24 @@ export class DispatchService {
           status: 'accepted',
           dispatchStatus: DispatchSessionStatus.driver_accepted,
           acceptedAt: new Date(),
+        },
+      });
+    } else if (session.serviceType === 'food') {
+      await prisma.foodOrder.update({
+        where: { id: session.entityId },
+        data: {
+          driverId,
+          status: 'driver_assigned',
+          dispatchStatus: DispatchSessionStatus.driver_accepted,
+        },
+      });
+    } else if (session.serviceType === 'parcel') {
+      await prisma.delivery.update({
+        where: { id: session.entityId },
+        data: {
+          driverId,
+          status: 'driver_assigned',
+          dispatchStatus: DispatchSessionStatus.driver_accepted,
         },
       });
     }
@@ -486,6 +530,116 @@ export class DispatchService {
     });
   }
 
+  async getActiveDispatchSessionForFoodOrder(orderId: string) {
+    return prisma.dispatchSession.findFirst({
+      where: {
+        entityId: orderId,
+        serviceType: 'food',
+        status: {
+          notIn: [
+            DispatchSessionStatus.cancelled_by_customer,
+            DispatchSessionStatus.cancelled_by_admin,
+            DispatchSessionStatus.expired,
+          ],
+        },
+      },
+    });
+  }
+
+  async getActiveDispatchSessionForDelivery(deliveryId: string) {
+    return prisma.dispatchSession.findFirst({
+      where: {
+        entityId: deliveryId,
+        serviceType: 'parcel',
+        status: {
+          notIn: [
+            DispatchSessionStatus.cancelled_by_customer,
+            DispatchSessionStatus.cancelled_by_admin,
+            DispatchSessionStatus.expired,
+          ],
+        },
+      },
+    });
+  }
+
+  async initiateDispatchForFoodOrder(orderId: string): Promise<DispatchSessionResult | null> {
+    const order = await prisma.foodOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        restaurant: {
+          select: {
+            lat: true,
+            lng: true,
+            address: true,
+            countryCode: true,
+            cityCode: true,
+          },
+        },
+        deliveryAddress: {
+          select: {
+            lat: true,
+            lng: true,
+            fullAddress: true,
+          },
+        },
+      },
+    });
+
+    if (!order || !order.restaurant) {
+      return null;
+    }
+
+    return this.createDispatchSession({
+      serviceType: 'food',
+      entityId: orderId,
+      customerId: order.customerId,
+      pickupLat: order.restaurant.lat,
+      pickupLng: order.restaurant.lng,
+      pickupAddress: order.restaurant.address,
+      dropoffLat: order.deliveryAddress?.lat,
+      dropoffLng: order.deliveryAddress?.lng,
+      dropoffAddress: order.deliveryAddress?.fullAddress,
+      countryCode: order.restaurant.countryCode,
+      cityCode: order.restaurant.cityCode,
+    });
+  }
+
+  async initiateDispatchForDelivery(deliveryId: string): Promise<DispatchSessionResult | null> {
+    const delivery = await prisma.delivery.findUnique({
+      where: { id: deliveryId },
+      select: {
+        id: true,
+        customerId: true,
+        pickupLat: true,
+        pickupLng: true,
+        dropoffLat: true,
+        dropoffLng: true,
+        pickupAddress: true,
+        dropoffAddress: true,
+        countryCode: true,
+        cityCode: true,
+      },
+    });
+
+    if (!delivery) {
+      return null;
+    }
+
+    return this.createDispatchSession({
+      serviceType: 'parcel',
+      entityId: deliveryId,
+      customerId: delivery.customerId,
+      pickupLat: delivery.pickupLat,
+      pickupLng: delivery.pickupLng,
+      pickupAddress: delivery.pickupAddress,
+      dropoffLat: delivery.dropoffLat,
+      dropoffLng: delivery.dropoffLng,
+      dropoffAddress: delivery.dropoffAddress,
+      countryCode: delivery.countryCode,
+      cityCode: delivery.cityCode,
+    });
+  }
+
   private async handleNoDriversLeft(sessionId: string): Promise<void> {
     const session = await prisma.dispatchSession.findUnique({
       where: { id: sessionId },
@@ -557,6 +711,16 @@ export class DispatchService {
 
     if (session.serviceType === 'ride') {
       await prisma.ride.update({
+        where: { id: session.entityId },
+        data: { dispatchStatus: DispatchSessionStatus.no_driver_found },
+      });
+    } else if (session.serviceType === 'food') {
+      await prisma.foodOrder.update({
+        where: { id: session.entityId },
+        data: { dispatchStatus: DispatchSessionStatus.no_driver_found },
+      });
+    } else if (session.serviceType === 'parcel') {
+      await prisma.delivery.update({
         where: { id: session.entityId },
         data: { dispatchStatus: DispatchSessionStatus.no_driver_found },
       });

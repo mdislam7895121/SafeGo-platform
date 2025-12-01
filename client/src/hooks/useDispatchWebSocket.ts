@@ -1,6 +1,6 @@
 /**
  * SafeGo Dispatch WebSocket Hook
- * Phase 1A: Real-time dispatch communication for customers and drivers
+ * Phase 1A+1B: Real-time dispatch, ETA, route tracking, and chat
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -51,6 +51,41 @@ export interface RideOffer {
   };
 }
 
+// Phase 1B: Live tracking types
+export interface DriverLocation {
+  lat: number;
+  lng: number;
+  heading?: number;
+  speed?: number;
+  sampleId?: string;
+}
+
+export interface EtaUpdate {
+  phase: 'to_pickup' | 'to_dropoff';
+  etaSeconds: number;
+  distanceMeters: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderRole: 'customer' | 'driver' | 'restaurant' | 'admin';
+  senderId: string;
+  text: string;
+  sentAt: string;
+  readAt?: string;
+}
+
+export interface TripState {
+  rideId?: string;
+  status?: string;
+  driverLocation?: DriverLocation;
+  etaToPickup?: number;
+  etaToDropoff?: number;
+  distanceMeters?: number;
+  finalFare?: number;
+  fareBreakdown?: Record<string, number>;
+}
+
 export interface DispatchState {
   isConnected: boolean;
   sessionId?: string;
@@ -61,6 +96,12 @@ export interface DispatchState {
     driverIndex: number;
     totalCandidates: number;
   };
+  // Phase 1B: Live trip tracking
+  trip?: TripState;
+  // Phase 1B: Chat
+  messages?: ChatMessage[];
+  unreadCount?: number;
+  conversationId?: string;
   error?: string;
 }
 
@@ -71,10 +112,34 @@ interface UseDispatchWebSocketOptions {
   onRideOffer?: (offer: RideOffer) => void;
   onOfferCancelled?: () => void;
   onError?: (error: string) => void;
+  // Phase 1B: Live trip tracking callbacks
+  onDriverArrived?: (rideId: string) => void;
+  onTripStarted?: (rideId: string, etaToDropoff?: number) => void;
+  onTripCompleted?: (rideId: string, finalFare?: number) => void;
+  onRouteUpdate?: (location: DriverLocation) => void;
+  onEtaUpdate?: (eta: EtaUpdate) => void;
+  onFareFinalized?: (rideId: string, originalFare: number, finalFare: number) => void;
+  // Phase 1B: Chat callbacks
+  onNewMessage?: (message: ChatMessage) => void;
 }
 
 export function useDispatchWebSocket(options: UseDispatchWebSocketOptions) {
-  const { token, onDriverAssigned, onNoDriversFound, onRideOffer, onOfferCancelled, onError } = options;
+  const { 
+    token, 
+    onDriverAssigned, 
+    onNoDriversFound, 
+    onRideOffer, 
+    onOfferCancelled, 
+    onError,
+    // Phase 1B callbacks
+    onDriverArrived,
+    onTripStarted,
+    onTripCompleted,
+    onRouteUpdate,
+    onEtaUpdate,
+    onFareFinalized,
+    onNewMessage,
+  } = options;
   
   const [state, setState] = useState<DispatchState>({
     isConnected: false,
@@ -235,6 +300,135 @@ export function useDispatchWebSocket(options: UseDispatchWebSocketOptions) {
         }));
         break;
 
+      // Phase 1B: Trip lifecycle events
+      case 'ride:driver_arrived':
+        setState(prev => ({
+          ...prev,
+          trip: {
+            ...prev.trip,
+            rideId: payload.rideId as string,
+            status: payload.status as string,
+          },
+        }));
+        onDriverArrived?.(payload.rideId as string);
+        break;
+
+      case 'ride:trip_started':
+        setState(prev => ({
+          ...prev,
+          trip: {
+            ...prev.trip,
+            rideId: payload.rideId as string,
+            status: 'in_progress',
+            etaToDropoff: payload.etaToDropoffSeconds as number | undefined,
+          },
+        }));
+        onTripStarted?.(payload.rideId as string, payload.etaToDropoffSeconds as number | undefined);
+        break;
+
+      case 'ride:trip_completed':
+        setState(prev => ({
+          ...prev,
+          trip: {
+            ...prev.trip,
+            rideId: payload.rideId as string,
+            status: 'completed',
+            finalFare: payload.finalFare as number | undefined,
+            fareBreakdown: payload.breakdown as Record<string, number> | undefined,
+          },
+        }));
+        onTripCompleted?.(payload.rideId as string, payload.finalFare as number | undefined);
+        break;
+
+      case 'ride:route_update':
+        const location: DriverLocation = {
+          lat: payload.driverLat as number,
+          lng: payload.driverLng as number,
+          heading: payload.heading as number | undefined,
+          speed: payload.speed as number | undefined,
+          sampleId: payload.sampleId as string | undefined,
+        };
+        setState(prev => ({
+          ...prev,
+          trip: {
+            ...prev.trip,
+            rideId: payload.rideId as string,
+            driverLocation: location,
+          },
+        }));
+        onRouteUpdate?.(location);
+        break;
+
+      case 'ride:eta_update':
+        const eta: EtaUpdate = {
+          phase: payload.phase as 'to_pickup' | 'to_dropoff',
+          etaSeconds: payload.etaSeconds as number,
+          distanceMeters: payload.distanceMeters as number,
+        };
+        setState(prev => ({
+          ...prev,
+          trip: {
+            ...prev.trip,
+            rideId: payload.rideId as string,
+            ...(eta.phase === 'to_pickup' 
+              ? { etaToPickup: eta.etaSeconds } 
+              : { etaToDropoff: eta.etaSeconds }),
+            distanceMeters: eta.distanceMeters,
+          },
+        }));
+        onEtaUpdate?.(eta);
+        break;
+
+      case 'ride:fare_finalized':
+        setState(prev => ({
+          ...prev,
+          trip: {
+            ...prev.trip,
+            rideId: payload.rideId as string,
+            finalFare: payload.finalFare as number,
+            fareBreakdown: payload.breakdown as Record<string, number> | undefined,
+          },
+        }));
+        onFareFinalized?.(
+          payload.rideId as string,
+          payload.originalFare as number,
+          payload.finalFare as number
+        );
+        break;
+
+      // Phase 1B: Chat events
+      case 'chat:message_new':
+        const newMessage = payload.message as ChatMessage;
+        setState(prev => ({
+          ...prev,
+          conversationId: payload.conversationId as string,
+          messages: [...(prev.messages || []), newMessage],
+          unreadCount: (prev.unreadCount || 0) + 1,
+        }));
+        onNewMessage?.(newMessage);
+        break;
+
+      case 'chat:message_sent':
+        const sentMessage = payload.message as ChatMessage;
+        setState(prev => ({
+          ...prev,
+          messages: [...(prev.messages || []), sentMessage],
+        }));
+        break;
+
+      case 'chat:marked_read':
+        setState(prev => ({
+          ...prev,
+          unreadCount: 0,
+        }));
+        break;
+
+      // Driver-side confirmations
+      case 'driver:arrived_confirmed':
+      case 'driver:trip_started_confirmed':
+      case 'driver:trip_ended_confirmed':
+        break;
+
       case 'error':
         setState(prev => ({
           ...prev,
@@ -243,7 +437,20 @@ export function useDispatchWebSocket(options: UseDispatchWebSocketOptions) {
         onError?.(payload.message as string);
         break;
     }
-  }, [onDriverAssigned, onNoDriversFound, onRideOffer, onOfferCancelled, onError]);
+  }, [
+    onDriverAssigned, 
+    onNoDriversFound, 
+    onRideOffer, 
+    onOfferCancelled, 
+    onError,
+    onDriverArrived,
+    onTripStarted,
+    onTripCompleted,
+    onRouteUpdate,
+    onEtaUpdate,
+    onFareFinalized,
+    onNewMessage,
+  ]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -293,6 +500,54 @@ export function useDispatchWebSocket(options: UseDispatchWebSocketOptions) {
     send('customer:cancel_dispatch', { sessionId });
   }, [send]);
 
+  // Phase 1B: Driver trip lifecycle actions
+  const markArrived = useCallback((rideId: string) => {
+    send('driver:mark_arrived', { rideId });
+  }, [send]);
+
+  const startTrip = useCallback((rideId: string) => {
+    send('driver:start_trip', { rideId });
+  }, [send]);
+
+  const endTrip = useCallback((rideId: string) => {
+    send('driver:end_trip', { rideId });
+  }, [send]);
+
+  const updateTripLocation = useCallback((
+    rideId: string,
+    lat: number,
+    lng: number,
+    heading?: number,
+    speed?: number
+  ) => {
+    send('driver:trip_location_update', { rideId, lat, lng, heading, speed });
+  }, [send]);
+
+  // Phase 1B: Chat actions
+  const sendChatMessage = useCallback((
+    text: string,
+    conversationId?: string,
+    entityId?: string,
+    serviceType?: 'ride' | 'food' | 'parcel'
+  ) => {
+    send('chat:send_message', { text, conversationId, entityId, serviceType });
+  }, [send]);
+
+  const markMessagesRead = useCallback((conversationId: string) => {
+    send('chat:mark_read', { conversationId });
+  }, [send]);
+
+  // Reset trip state
+  const resetTrip = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      trip: undefined,
+      messages: undefined,
+      unreadCount: undefined,
+      conversationId: undefined,
+    }));
+  }, []);
+
   useEffect(() => {
     if (token) {
       connect();
@@ -313,5 +568,14 @@ export function useDispatchWebSocket(options: UseDispatchWebSocketOptions) {
     rejectOffer,
     subscribeToSession,
     cancelDispatch,
+    // Phase 1B: Trip lifecycle
+    markArrived,
+    startTrip,
+    endTrip,
+    updateTripLocation,
+    // Phase 1B: Chat
+    sendChatMessage,
+    markMessagesRead,
+    resetTrip,
   };
 }
