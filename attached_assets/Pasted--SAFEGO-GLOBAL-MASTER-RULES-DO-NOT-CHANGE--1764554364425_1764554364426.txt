@@ -1,0 +1,249 @@
+========================================
+SAFEGO GLOBAL MASTER RULES (DO NOT CHANGE)
+========================================
+
+ROLES (4 roles, separate, never mixed):
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+SERVICES (all must remain supported):
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+COUNTRY-SPECIFIC KYC (MANDATORY):
+
+Bangladesh (BD):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number + front/back images
+- emergency_contact details
+- verification_status + is_verified
+
+United States (US):
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license number + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status + is_verified
+
+ONBOARDING (all roles):
+- Multi-step: basic info → address → ID/KYC upload (country-specific) → emergency contact.
+- After onboarding set verification_status = "pending".
+- Block rides/food/parcel until admin approval (verification_status = "approved").
+
+ADMIN PANEL (must keep all):
+- Approve/reject KYC for customers, drivers, restaurants; store rejection_reason.
+- Block/unblock any user or restaurant.
+- Configure pricing, fees, commissions by country and service.
+- Manage payouts and mark balances paid.
+- View driver negative balance and restaurant negative balance.
+
+CORE COLLECTIONS (NO breaking changes):
+
+1) rides
+   - ride_id, customer_id, driver_id
+   - pickup_address, dropoff_address, pickup_geo, dropoff_geo
+   - service_type
+   - fare, fees, safego_commission
+   - payment_method (cash/online)
+   - status: requested → searching_driver → accepted → driver_arriving → in_progress → completed or cancelled_by_x
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - order_id, customer_id, driver_id, restaurant_id
+   - restaurant_address, delivery_address, geo fields
+   - items, subtotal, fees, safego_commission
+   - payment_method
+   - status: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or cancelled_x
+   - rating, feedback
+   - timestamps
+
+3) deliveries
+   - delivery_id, customer_id, driver_id
+   - pickup_address, dropoff_address, geo fields
+   - package details
+   - fees, safego_commission
+   - payment_method
+   - status: requested → searching_driver → accepted → picked_up → on_the_way → delivered or cancelled_x
+   - rating, feedback
+   - timestamps
+
+COMMISSION & PAYOUT RULES:
+- CASH ride: driver keeps all cash; SafeGo commission recorded as negative driver_wallet_balance; settle weekly; admin can mark paid.
+- CASH food: restaurant keeps all cash; SafeGo commission recorded as negative restaurant_wallet.
+- ONLINE payments: SafeGo keeps commission automatically; driver/restaurant receives net payout.
+- Admin can view and settle all balances.
+
+SECURITY RULES:
+- Customers cannot view driver KYC/docs (NID, license, SSN, etc.).
+- Drivers cannot view customer KYC or sensitive fields.
+- Restaurants cannot see other restaurants.
+- Only admin can change pricing, commissions, verification, blocking.
+- Users can update only their own profile.
+- All APIs via HTTPS.
+
+STATUS FLOWS (KEEP COMPLETE):
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_by_driver / cancelled_by_customer / cancelled_by_system.
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x.
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x.
+
+NOTIFICATIONS:
+- New ride/food/parcel for drivers
+- Status updates for customers and drivers
+- Verification approval/rejection
+- Payout / settlement reminders
+- Important admin broadcasts.
+
+MAP RULE:
+- Do NOT change the map engine, tiles, routing, or zoom controls.
+
+=====================================================
+TASK A: Transform footer into 3 floating buttons (no black bar)
+=====================================================
+
+Goal:
+- Remove solid black footer bar.
+- Show only three floating controls on top of the map near the bottom:
+  1) LEFT: trip type selector button
+  2) CENTER: Go Online / Go Offline power button
+  3) RIGHT: current trip info button
+
+1) Remove existing solid footer background:
+   - Delete / disable the full-width black or white footer container.
+   - Keep only a bottom safe-area spacer (transparent) so controls are not cut off by system bar.
+
+2) Add 3 floating controls anchored to bottom:
+
+   Layout:
+   - Buttons sit on top of the map, horizontally aligned near the bottom, with transparent background around them.
+   - Each button is its own pill/circle with a small shadow.
+
+   LEFT BUTTON (Trip Type Selector):
+   - Circular or small pill icon button.
+   - Icon: slider/filter or car-grid icon.
+   - Tapping opens existing "Trip type selector" drawer (Uber-style grid of services).
+   - Keep existing service_preferences behavior.
+
+   CENTER BUTTON (Power Toggle – see TASK B):
+   - Pill-shaped button.
+   - Contains power icon + label text.
+   - Color depends on online/offline state (defined in TASK B).
+
+   RIGHT BUTTON (Current Trip Panel):
+   - Circular or small pill icon button.
+   - Icon: three-line list.
+   - Tapping opens existing "Current trip" panel with active ride/food/parcel summary.
+
+3) Ensure:
+   - Buttons do NOT overlap left or right side drawers when they slide.
+   - Buttons float above the map, but do not obscure essential map controls.
+   - On desktop, keep the same idea: three floating controls near bottom center.
+
+=====================================================
+TASK B: Make footer Go Online button the ONLY status toggle
+=====================================================
+
+Goal:
+- Driver online/offline will be controlled ONLY by the floating center power button.
+- All other “Go Online” entries must be removed from menus.
+- Button color: OFFLINE → GREEN; ONLINE → RED.
+
+1) Backend online status field:
+   - Use existing field (e.g. driver_online_status or driver_status).
+   - Allowed values: "online", "offline".
+   - Do NOT change field name or API signature; just reuse.
+
+2) Center power button behavior:
+
+   OFFLINE state:
+   - Condition: driver_online_status != "online".
+   - UI:
+     • Background color: GREEN (#28C840).
+     • Icon: power symbol in white.
+     • Label text: "Go Online".
+   - On tap:
+     • Check:
+         - verification_status == "approved"
+         - driver is not blocked by admin
+         - country-specific KYC is complete
+     • If checks pass:
+         - Call existing API to set driver_online_status = "online".
+         - On success:
+             · change button to ONLINE state (color red, label "Go Offline").
+             · emit toast: "You are now online".
+     • If checks fail:
+         - Do NOT change status.
+         - Show reason message (e.g. "Account not verified" or "You are blocked").
+
+   ONLINE state:
+   - Condition: driver_online_status == "online".
+   - UI:
+     • Background color: RED (#FF3B30).
+     • Icon: power symbol in white.
+     • Label text: "Go Offline".
+   - On tap:
+     • If there is NO active ride/food_order/delivery with status in_progress or driver_arriving/picked_up/on_the_way:
+         - Call existing API to set driver_online_status = "offline".
+         - On success:
+             · change button to OFFLINE state (color green, label "Go Online").
+             · toast: "You are now offline".
+     • If there IS an active trip:
+         - Do NOT set offline.
+         - Show message: "Finish or cancel your current trip before going offline."
+
+3) After page reload:
+   - On mount, read driver_online_status from backend.
+   - Set initial button state (color + label) to match backend.
+
+=====================================================
+TASK C: Remove side-menu "Go Online" entry
+=====================================================
+
+Goal:
+- There must be only one place to toggle online/offline: the center power button.
+- Any side menu item like "Go Online" / "Go Offline" must be removed.
+
+Implementation:
+1) In driver side navigation:
+   - Remove / hide the menu item that navigates to "Go Online" or toggles status.
+   - Keep other menu items: Dashboard, Active Trip, Food Delivery, Map, Trip History, Wallet, Incentives, Trust Score, Performance, Account, etc.
+
+2) Do NOT delete or break any route or backend logic;
+   - Only remove the visible menu entry for Go Online from the UI.
+
+=====================================================
+TASK D: Clean up remaining duplicate overlays (if still present)
+=====================================================
+If still present on /driver/map, remove:
+- Top status card over the map ("You're Offline – Go online to start getting trips").
+- Bottom legend pills: "You", "Pickup", "Dropoff".
+- "SafeGo Map – Live Navigation" blue banner.
+- "Powered by SafeGo" white pill.
+
+These overlays are no longer needed; the floating buttons + map are enough.
+
+Do NOT touch:
+- Map engine, markers, or dispatch logic.
+- Admin panel, KYC, commissions, or collections.
+
+=====================================================
+NON-BREAKING REQUIREMENT
+=====================================================
+- Do NOT rename or remove any existing DB fields, APIs, or routes.
+- All changes must be purely UI layout + reuse of existing online/offline API.
+- Trip matching must continue to filter drivers by:
+    • driver_online_status = "online"
+    • verification_status = "approved"
+    • driver service_preferences
+    • existing geo rules.
+
+NO QUESTIONS. Implement all of the above in a single, consistent update.

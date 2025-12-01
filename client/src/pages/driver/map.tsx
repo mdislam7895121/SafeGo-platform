@@ -860,7 +860,7 @@ export default function DriverMapPage() {
       </AnimatePresence>
 
       <div 
-        className="fixed bottom-0 left-0 right-0 z-[999] h-[65px] bg-white dark:bg-zinc-900 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] flex items-center justify-between px-4"
+        className="fixed bottom-0 left-0 right-0 z-[999] pb-safe flex items-center justify-between px-4 py-4 pointer-events-none"
         data-testid="driver-footer-bar"
       >
         <Sheet open={showServiceSheet} onOpenChange={setShowServiceSheet}>
@@ -868,7 +868,7 @@ export default function DriverMapPage() {
             <Button
               variant="outline"
               size="icon"
-              className="h-12 w-12 rounded-full border-2"
+              className="h-12 w-12 rounded-full border-2 shadow-lg bg-background pointer-events-auto"
               data-testid="button-service-select"
             >
               <Grid3X3 className="h-5 w-5" />
@@ -957,7 +957,7 @@ export default function DriverMapPage() {
             }
           }}
           disabled={isUpdatingStatus || !isVerified || !hasVehicle}
-          className={`flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 ${
+          className={`flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 pointer-events-auto ${
             isUpdatingStatus ? "opacity-70" : ""
           } ${isOnline 
             ? "bg-[#FF3B30] hover:bg-[#E63529]" 
@@ -981,7 +981,7 @@ export default function DriverMapPage() {
             <Button
               variant="outline"
               size="icon"
-              className="h-12 w-12 rounded-full border-2"
+              className="h-12 w-12 rounded-full border-2 shadow-lg bg-background pointer-events-auto"
               data-testid="button-quick-actions"
             >
               <Menu className="h-5 w-5" />
