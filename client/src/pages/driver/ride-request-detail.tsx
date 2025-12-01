@@ -100,7 +100,7 @@ export default function DriverRideRequestDetail() {
       return response.json();
     },
     enabled: !!params.id,
-    refetchInterval: 3000,
+    refetchInterval: 10000,
   });
 
   const request = requestData?.request;

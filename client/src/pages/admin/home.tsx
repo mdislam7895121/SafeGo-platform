@@ -36,25 +36,25 @@ export default function AdminHome() {
   // Fetch admin statistics
   const { data: stats, isLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
   // Fetch parcel statistics
   const { data: parcelStats, isLoading: isLoadingParcels } = useQuery<ParcelStats>({
     queryKey: ["/api/admin/stats/parcels"],
-    refetchInterval: 5000, // Auto-refresh every 5 seconds
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
   // Fetch unread notification count
   const { data: unreadCount } = useQuery<{ count: number }>({
     queryKey: ["/api/admin/notifications/unread-count"],
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
   });
 
   // Fetch unread support messages count
   const { data: supportConversations } = useQuery({
     queryKey: ["/api/support/admin/conversations"],
-    refetchInterval: 5000,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   }) as { data: Array<{ id: string; messages: Array<{ read: boolean; senderType: string }> }> };
 
   const unreadSupportMessages = supportConversations?.reduce((count, conv) => {

@@ -258,7 +258,7 @@ export default function DriverTripActive() {
 
   const { data: activeTripData, isLoading, error, refetch } = useQuery<{ activeTrip: ActiveTrip | null; hasActiveTrip: boolean }>({
     queryKey: ["/api/driver/trips/active"],
-    refetchInterval: pollingEnabled ? 2000 : false,
+    refetchInterval: pollingEnabled ? 10000 : false,
   });
 
   const { data: preferences } = useQuery<{ preferredNavigationApp?: string }>({

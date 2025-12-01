@@ -20,30 +20,34 @@ export default function DriverHome() {
 
   const { data: driverData, isLoading } = useQuery({
     queryKey: ["/api/driver/home"],
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
+
+  const isOnline = !!(driverData as any)?.vehicle?.isOnline;
+  const hasActiveRide = !!(driverData as any)?.activeRide;
 
   const { data: activeRideData } = useQuery({
     queryKey: ["/api/driver/active-ride"],
-    refetchInterval: 3000,
+    refetchInterval: isOnline ? 15000 : false,
+    enabled: isOnline,
   });
 
   const { data: pendingRequestsData, refetch: refetchPendingRequests } = useQuery({
     queryKey: ["/api/driver/pending-requests"],
-    refetchInterval: 3000,
-    enabled: !!(driverData as any)?.vehicle?.isOnline && !(activeRideData as any)?.activeRide,
+    refetchInterval: isOnline && !hasActiveRide ? 10000 : false,
+    enabled: isOnline && !hasActiveRide,
   });
 
   const { data: pendingFoodDeliveries } = useQuery({
     queryKey: ["/api/driver/food-delivery/pending"],
-    refetchInterval: 5000,
-    enabled: !!(driverData as any)?.vehicle?.isOnline,
+    refetchInterval: isOnline ? 15000 : false,
+    enabled: isOnline,
   });
 
   const { data: activeFoodDeliveries } = useQuery({
     queryKey: ["/api/driver/food-delivery/active"],
-    refetchInterval: 3000,
-    enabled: !!(driverData as any)?.vehicle?.isOnline,
+    refetchInterval: isOnline ? 15000 : false,
+    enabled: isOnline,
   });
 
   // Toggle online/offline status mutation

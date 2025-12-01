@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Bell, CheckCircle, AlertCircle, Info, Clock } from "lucide-react";
+import { ArrowLeft, Bell, CheckCircle, AlertCircle, Info, Clock, Settings } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,11 +56,23 @@ export default function CustomerNotifications() {
             </Link>
             <h1 className="text-2xl font-bold">Notifications</h1>
           </div>
-          {notifications.filter((n: any) => !n.isRead).length > 0 && (
-            <Badge variant="secondary">
-              {notifications.filter((n: any) => !n.isRead).length} new
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {notifications.filter((n: any) => !n.isRead).length > 0 && (
+              <Badge variant="secondary">
+                {notifications.filter((n: any) => !n.isRead).length} new
+              </Badge>
+            )}
+            <Link href="/customer/notification-settings">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-primary-foreground hover:bg-primary-foreground/10"
+                data-testid="button-notification-settings"
+              >
+                <Settings className="h-5 w-5" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 

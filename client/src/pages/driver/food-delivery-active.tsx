@@ -139,7 +139,7 @@ export default function DriverFoodDeliveryActive() {
   const { data: delivery, isLoading, error } = useQuery<DeliveryDetail>({
     queryKey: deliveryKeys.detail(deliveryId || ""),
     enabled: !!deliveryId,
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
 
   const statusMutation = useMutation({

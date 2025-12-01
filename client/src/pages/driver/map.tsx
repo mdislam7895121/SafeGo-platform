@@ -498,14 +498,14 @@ export default function DriverMapPage() {
     hasActiveTrip: boolean;
   }>({
     queryKey: ["/api/driver/trips/active"],
-    refetchInterval: 5000,
+    refetchInterval: isOnline ? 15000 : false,
   });
 
   const { data: pendingRequestsData, refetch: refetchPendingRequests } = useQuery<{
     pendingRequests: TripRequest[];
   }>({
     queryKey: ["/api/driver/pending-requests"],
-    refetchInterval: 3000,
+    refetchInterval: isOnline && !activeTripData?.hasActiveTrip ? 10000 : false,
     enabled: isOnline && !activeTripData?.hasActiveTrip,
   });
 

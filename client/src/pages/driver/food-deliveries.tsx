@@ -124,12 +124,12 @@ export default function DriverFoodDeliveries() {
 
   const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useQuery<PendingDeliveriesResponse>({
     queryKey: deliveryKeys.pending,
-    refetchInterval: 5000,
+    refetchInterval: 15000,
   });
 
   const { data: activeData, isLoading: activeLoading, refetch: refetchActive } = useQuery<ActiveDeliveriesResponse>({
     queryKey: deliveryKeys.active,
-    refetchInterval: 3000,
+    refetchInterval: 15000,
   });
 
   const { data: historyData, isLoading: historyLoading } = useQuery<HistoryDeliveriesResponse>({
