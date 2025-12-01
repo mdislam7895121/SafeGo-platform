@@ -70,8 +70,18 @@ The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with
 **Phase 3 Frontend Pages:**
 - `/customer/saved-places`: Manage favorite locations
 - `/customer/ride-preferences`: Set ride comfort preferences
+- `/customer/profile`: Enhanced profile with avatarUrl, language, and notification preferences
+- `/customer/payment-methods`: Full CRUD for customer payment methods
 - `/restaurant/kitchen`: Kitchen display system with ticket management
 - Enhanced `/customer/parcel`: Scheduled pickup option added
+
+**Phase 3 Admin Visibility Routes:**
+- `GET /api/admin/customers/:customerId/saved-places`: View customer's saved locations
+- `GET /api/admin/customers/:customerId/ride-preferences`: View customer's ride preferences
+- `GET /api/admin/customers/:customerId/payment-methods`: View customer's payment methods
+- `GET /api/admin/parcels/scheduled`: List all scheduled parcel pickups with pagination
+- `GET /api/admin/parcels/:deliveryId/proof-of-delivery`: View POD photos for a delivery
+- `GET /api/parcel/admin/pricing`: Manage parcel pricing configurations
 
 ## External Dependencies
 
