@@ -1752,12 +1752,15 @@ router.patch("/status", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "isOnline must be a boolean" });
     }
 
-    // Get driver profile with primary vehicle
+    // Get driver profile with primary vehicle and user data
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
       include: { 
         vehicles: {
           where: { isActive: true, isPrimary: true },
+        },
+        user: {
+          select: { isBlocked: true },
         },
       },
     });
@@ -1771,9 +1774,66 @@ router.patch("/status", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Vehicle not registered. Please complete vehicle registration first." });
     }
 
-    // Check if driver is verified
-    if (!driverProfile.isVerified) {
+    // Check if driver is verified (required to go online)
+    if (isOnline && !driverProfile.isVerified) {
       return res.status(403).json({ error: "Driver must be verified before going online" });
+    }
+
+    // Check if user is blocked by admin (cannot go online)
+    if (isOnline && driverProfile.user.isBlocked) {
+      return res.status(403).json({ error: "Your account is blocked. Please contact support." });
+    }
+
+    // Check for active trips - drivers with active trips cannot toggle status
+    // Check for active rides
+    const activeRide = await prisma.ride.findFirst({
+      where: {
+        driverId: driverProfile.id,
+        status: { in: ["accepted", "driver_arriving", "arrived", "in_progress"] },
+      },
+    });
+
+    if (activeRide) {
+      const action = isOnline ? "go online" : "go offline";
+      return res.status(400).json({ 
+        error: `Cannot ${action} with an active ride. Please complete or cancel your current ride first.`,
+        hasActiveTrip: true,
+        tripType: "ride",
+      });
+    }
+
+    // Check for active food deliveries
+    const activeFoodOrder = await prisma.foodOrder.findFirst({
+      where: {
+        deliveryDriverId: driverProfile.id,
+        status: { in: ["assigned_driver", "driver_picking_up", "picked_up", "delivering"] },
+      },
+    });
+
+    if (activeFoodOrder) {
+      const action = isOnline ? "go online" : "go offline";
+      return res.status(400).json({ 
+        error: `Cannot ${action} with an active food delivery. Please complete your current delivery first.`,
+        hasActiveTrip: true,
+        tripType: "food",
+      });
+    }
+
+    // Check for active parcel deliveries
+    const activeParcelDelivery = await prisma.delivery.findFirst({
+      where: {
+        driverId: driverProfile.id,
+        status: { in: ["accepted", "picked_up", "in_transit"] },
+      },
+    });
+
+    if (activeParcelDelivery) {
+      const action = isOnline ? "go online" : "go offline";
+      return res.status(400).json({ 
+        error: `Cannot ${action} with an active parcel delivery. Please complete your current delivery first.`,
+        hasActiveTrip: true,
+        tripType: "parcel",
+      });
     }
 
     // Update vehicle online status

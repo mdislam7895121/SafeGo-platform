@@ -943,7 +943,6 @@ export default function DriverMapPage() {
             if (isVerified && hasVehicle) {
               const wasOnline = isOnline;
               
-              // Block going online if no services are enabled
               if (!wasOnline && !hasAnyServiceEnabled) {
                 toast({ 
                   title: "No trip types enabled",
@@ -955,21 +954,18 @@ export default function DriverMapPage() {
               }
               
               await toggleOnlineStatus();
-              toast({ 
-                title: wasOnline ? "You're now offline" : "You're now online",
-                description: wasOnline ? "You won't receive new trip requests" : "Ready to receive trip requests"
-              });
             }
           }}
           disabled={isUpdatingStatus || !isVerified || !hasVehicle}
-          className={`flex items-center gap-2 h-14 md:h-[60px] px-6 rounded-full shadow-md transition-all ${
+          className={`flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 ${
             isUpdatingStatus ? "opacity-70" : ""
-          } bg-black text-white`}
+          } ${isOnline 
+            ? "bg-[#FF3B30] hover:bg-[#E63529]" 
+            : "bg-[#28C840] hover:bg-[#22B038]"
+          } text-white`}
           data-testid="button-online-toggle"
         >
-          <Power 
-            className={`h-5 w-5 ${isOnline ? "text-red-500" : "text-green-500"}`} 
-          />
+          <Power className="h-5 w-5 text-white" />
           <span className="font-semibold text-base whitespace-nowrap">
             {isUpdatingStatus 
               ? "Updating..." 

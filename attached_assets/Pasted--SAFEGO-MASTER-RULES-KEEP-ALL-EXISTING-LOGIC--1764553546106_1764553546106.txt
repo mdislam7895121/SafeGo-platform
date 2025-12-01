@@ -1,0 +1,68 @@
+===========================================
+SAFEGO MASTER RULES (KEEP ALL EXISTING LOGIC)
+===========================================
+Do NOT modify or remove: 4 roles, BD/US KYC rules, onboarding, admin approvals,
+commissions, payouts, security rules, collections (rides, food_orders, deliveries),
+status flows, wallet logic, blocking logic, or matching engine.
+
+Everything must remain backward-compatible.
+
+==========================================================
+TASK: MAKE FOOTER “GO ONLINE / GO OFFLINE” BUTTON FULLY ACTIVE
+==========================================================
+
+1) Create a single toggle button in the footer:
+   - When driver is OFFLINE, show:
+       - Label: “Go Online”
+       - Color: GREEN (#28C840)
+       - Icon: power symbol, green
+   - When driver taps it:
+       - Validate driver status:
+           • is_verified must be true
+           • not blocked
+           • vehicle assigned
+           • no active trip
+       - If valid → set driver_status = "online"
+       - Update UI to ONLINE mode
+
+   - When driver is ONLINE, show:
+       - Label: “Go Offline”
+       - Color: RED (#FF3B30)
+       - Icon: power symbol, red
+   - When tapped in ONLINE mode:
+       - If no active ride/food/delivery:
+            → set driver_status = "offline"
+       - If active trip exists → prevent offline
+
+2) Frontend requirements:
+   - The button must be a pill-shaped component in the footer.
+   - The background color must switch dynamically:
+       • offline → green
+       • online → red
+   - Label text must switch instantly without reload.
+   - Must use a single component (not two separate buttons).
+   - Must persist state from backend: if page reloads, read driver_status.
+
+3) Backend requirements:
+   - Store driver_status in driver record:
+       • "offline"
+       • "online"
+   - Changing this status must not break ride/food/parcel matchmaking.
+   - Must be used by ride-matching engine:
+       • only drivers with driver_status="online" can receive requests
+
+4) Notifications:
+   - When going online → show toast: “You are now online”
+   - When going offline → show toast: “You are now offline”
+
+5) Security:
+   - Drivers cannot force online if verification_status != "approved".
+   - Admin block must override toggle.
+   - Keep all existing SafeGo access controls intact.
+
+6) UI cleanup (if not already applied):
+   - Ensure no other Go Online/Offline button exists on screen.
+   - Footer toggle is the ONLY online/offline control.
+
+==========================================================
+Perform all changes above without modifying any unrelated UI.
