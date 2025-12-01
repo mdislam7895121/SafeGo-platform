@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Link } from "wouter";
-import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator } from "lucide-react";
+import { Shield, Users, Car, UtensilsCrossed, DollarSign, UserX, Clock, AlertTriangle, UserCheck, Package, PackageCheck, PackageX, TruckIcon, FileText, ScrollText, Bell, Settings, MessageCircle, Wallet, HandCoins, BarChart3, TrendingUp, Activity, ShieldAlert, Gauge, Gift, Target, LayoutGrid, Truck, Cog, UserPlus, Store, Sparkles, Calculator, RefreshCw } from "lucide-react";
+import { SystemAlert } from "@/components/ui/system-alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -310,27 +311,25 @@ export default function AdminHome() {
   if (hasCapabilitiesError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
-        <Card className="max-w-md border-amber-200 dark:border-amber-800">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              Unable to Verify Permissions
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              We couldn't verify your permissions to access the admin dashboard. This may be due to a temporary network issue.
-            </p>
-            <div className="flex gap-2">
-              <Button onClick={() => window.location.reload()} data-testid="button-retry">
-                Retry
-              </Button>
-              <Button variant="outline" onClick={logout} data-testid="button-logout">
-                Logout
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="max-w-md w-full">
+          <SystemAlert
+            variant="warning"
+            title="Unable to Verify Permissions"
+            action={
+              <div className="flex gap-2 flex-wrap">
+                <Button size="sm" onClick={() => window.location.reload()} data-testid="button-retry" className="gap-1.5">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Retry
+                </Button>
+                <Button variant="outline" size="sm" onClick={logout} data-testid="button-logout">
+                  Logout
+                </Button>
+              </div>
+            }
+          >
+            We couldn't verify your permissions to access the admin dashboard. This may be due to a temporary network issue.
+          </SystemAlert>
+        </div>
       </div>
     );
   }
@@ -649,20 +648,26 @@ export default function AdminHome() {
           
           {/* Error Banner for Capabilities Fetch Failure */}
           {hasCapabilitiesError && (
-            <Card className="mb-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="font-medium text-amber-900 dark:text-amber-100">Unable to load permissions</p>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                      All management cards are shown below, but some may require specific permissions to access. 
-                      Please refresh the page or contact support if this issue persists.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <SystemAlert
+              variant="warning"
+              title="Unable to load permissions"
+              dismissible
+              className="mb-4"
+              action={
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.reload()}
+                  className="gap-1.5"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Retry
+                </Button>
+              }
+            >
+              All management cards are shown below, but some may require specific permissions to access.
+              Please refresh the page or contact support if this issue persists.
+            </SystemAlert>
           )}
           
           {isLoadingCapabilities ? (
