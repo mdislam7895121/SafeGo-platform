@@ -957,7 +957,7 @@ export default function DriverMapPage() {
             }
           }}
           disabled={isUpdatingStatus || !isVerified || !hasVehicle}
-          className={`flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 pointer-events-auto ${
+          className={`fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 h-14 md:h-[60px] px-8 rounded-full shadow-lg transition-all duration-200 pointer-events-auto z-[1000] ${
             isUpdatingStatus ? "opacity-70" : ""
           } ${isOnline 
             ? "bg-[#FF3B30] hover:bg-[#E63529]" 
