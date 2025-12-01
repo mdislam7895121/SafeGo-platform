@@ -505,20 +505,8 @@ export default function DriverMapPage() {
 
   const unreadNotifications = notificationsData?.notifications?.filter((n: any) => !n.isRead).length ?? 0;
 
-  if (isLoading && !activeTripData) {
-    return (
-      <div className="flex items-center justify-center min-h-[80vh]">
-        <motion.div
-          className="text-center space-y-4"
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-        >
-          <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground font-medium">Loading map...</p>
-        </motion.div>
-      </div>
-    );
-  }
+  // Determine if we should show the map-local loading overlay
+  const showMapLoadingOverlay = (isLoading && !activeTripData) || isUpdatingStatus || isLoadingAvailability;
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] relative" data-testid="driver-map-view">
@@ -538,6 +526,27 @@ export default function DriverMapPage() {
           onDistanceCalculated={handleDistanceCalculated}
           className="h-full w-full"
         />
+
+        {/* Map-local loading overlay - only covers the map area, not the whole screen */}
+        <AnimatePresence>
+          {showMapLoadingOverlay && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 z-[998] flex items-center justify-center bg-black/10 pointer-events-none"
+              data-testid="map-loading-overlay"
+            >
+              <div className="bg-background/90 backdrop-blur-sm rounded-xl px-4 py-3 shadow-lg flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="text-sm font-medium text-foreground">
+                  {isUpdatingStatus ? "Updating status..." : "Loading..."}
+                </span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {gpsError && (
           <div

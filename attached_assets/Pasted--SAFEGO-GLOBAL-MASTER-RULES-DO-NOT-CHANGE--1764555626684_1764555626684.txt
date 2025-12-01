@@ -1,0 +1,270 @@
+========================================
+SAFEGO GLOBAL MASTER RULES (DO NOT CHANGE)
+========================================
+
+ROLES (4 distinct roles, separate permissions)
+- Customer
+- Driver
+- Restaurant (Merchant)
+- Admin
+
+SERVICES (must all work)
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+COUNTRY-SPECIFIC KYC (ALWAYS REQUIRED)
+
+Bangladesh (BD) users must have:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image_url
+- nid_back_image_url
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status
+- is_verified (boolean)
+
+United States (US) users must have:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (for drivers)
+- driver_license_image_url (front/back or combined)
+- driver_license_expiry
+- ssn_last4 (optional, drivers only)
+- verification_status
+- is_verified (boolean)
+
+ONBOARDING (all roles)
+- Multi-step for each role:
+  1) Basic info
+  2) Address
+  3) ID/KYC upload (using BD/US rules above)
+  4) Emergency contact
+- On completion: verification_status = "pending"
+- Block access to rides/food/parcel until admin sets verification_status = "approved".
+
+ADMIN PANEL (must keep full power)
+- Approve / reject KYC for customers, drivers, restaurants.
+- Store rejection_reason when rejecting.
+- Block / unblock any customer, driver, or restaurant.
+- Configure pricing, fees, and commissions per country and service (rides, food, parcel).
+- Manage payouts and mark negative balances as settled.
+- View driver negative balance.
+- View restaurant negative balance.
+
+CORE COLLECTIONS (do not break)
+
+1) rides
+   - ride_id
+   - customer_id
+   - driver_id
+   - pickup_address, dropoff_address
+   - pickup_lat, pickup_lng
+   - dropoff_lat, dropoff_lng
+   - service_type (e.g. safego_go, safego_xl, etc.)
+   - fare_amount
+   - tax_amount
+   - safego_commission_amount
+   - driver_earnings_amount
+   - payment_method (cash, card, wallet)
+   - status:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+2) food_orders
+   - order_id
+   - customer_id
+   - driver_id
+   - restaurant_id
+   - restaurant_address, restaurant_lat, restaurant_lng
+   - delivery_address, delivery_lat, delivery_lng
+   - items, subtotal_amount, delivery_fee, tax_amount
+   - safego_commission_amount
+   - restaurant_payout_amount
+   - payment_method
+   - status:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+3) deliveries
+   - delivery_id
+   - customer_id
+   - driver_id
+   - pickup_address, pickup_lat, pickup_lng
+   - dropoff_address, dropoff_lat, dropoff_lng
+   - package_description, package_size
+   - delivery_fee, safego_commission_amount, driver_earnings_amount
+   - payment_method
+   - status:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_system
+   - rating, feedback
+   - created_at, updated_at
+
+COMMISSION & PAYOUT RULES (must remain)
+
+- Ride – CASH:
+  - Driver receives full cash from customer.
+  - SafeGo commission is recorded as a negative driver_wallet_balance.
+  - Driver must settle weekly; admin can mark balance as paid.
+
+- Food – CASH:
+  - Restaurant receives full cash from customer.
+  - SafeGo commission is recorded as a negative restaurant_wallet_balance.
+  - Admin can settle this negative balance.
+
+- ONLINE payments (card/wallet):
+  - SafeGo collects full payment.
+  - SafeGo keeps safego_commission_amount automatically.
+  - Driver / restaurant receives net payout only.
+
+SECURITY RULES
+- Customers cannot see driver KYC docs or sensitive fields.
+- Drivers cannot see customer NID/SSN/ID or other KYC documents.
+- Restaurants cannot see data for other restaurants.
+- Only admin can change pricing, commissions, verification_status, blocking.
+- Users may only update their own profile.
+- All API calls must go over HTTPS.
+
+STATUS FLOWS (must stay intact)
+- Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+- Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+- Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+NOTIFICATIONS
+- New ride/food/parcel requests to drivers.
+- Status updates to customers and drivers.
+- Verification approval / rejection.
+- Payouts / settlements.
+- Critical admin announcements.
+
+===========================================
+TASK: Fix driver map refresh UX – remove full-screen black flash
+===========================================
+
+Context:
+- On the driver map screen (/driver/map), when the map reloads or when the driver toggles Go Online/Go Offline, the user currently sees a full-screen black state while the map is re-rendering.
+- This feels like a crash and is not acceptable in production.
+
+Goal:
+- Map should never disappear into a full black screen.
+- The map container must remain visible at all times.
+- Loading should be indicated with a small overlay/spinner INSIDE the map area only.
+- Online/offline toggle and other updates must NOT trigger window-level reloads.
+
+------------------------------------
+A) REMOVE FULL-SCREEN BLACK OVERLAY
+------------------------------------
+1. Search for any global loading overlay used on the driver map route:
+   - Examples:
+     - A full-screen <div> with black background shown when map or trips are loading.
+     - A generic “loading screen” component mounted at app layout level.
+     - Any `fullscreenLoader` or similar component.
+
+2. For /driver/map:
+   - Do NOT use any full-viewport black or solid background overlay.
+   - Remove or disable this overlay for the driver map screen.
+   - The user should always see the map frame and surrounding UI, even while data is loading.
+
+3. Ensure there is no `window.location.reload()` or hard navigation triggered when:
+   - Toggling Go Online/Go Offline.
+   - Changing trip types.
+   - Refreshing driver position.
+
+   Replace any such logic with in-place state updates only.
+
+------------------------------------
+B) KEEP MAP COMPONENT MOUNTED
+------------------------------------
+1. In client/src/pages/driver/map.tsx (or equivalent):
+   - The map component should remain mounted while:
+     - fetching driver status,
+     - fetching trip data,
+     - toggling online/offline,
+     - refreshing current position.
+
+2. If you currently render “nothing” or a black background while data is loading (e.g. conditional render `if (loading) return <div className="bg-black" />`):
+   - Replace that with:
+     - Always render the map container,
+     - Show a lightweight loading overlay on top (see section C).
+
+3. DO NOT unmount the map when:
+   - online/offline state changes,
+   - service_preferences change,
+   - driver_wallet or other side data loads.
+
+------------------------------------
+C) USE MAP-LOCAL LOADING OVERLAY INSTEAD
+------------------------------------
+1. Inside the map container, add a SMALL, non-blocking loading indicator:
+
+   - A semi-transparent overlay only inside the map area:
+       • background: rgba(0,0,0,0.2) OR no background at all.
+       • center spinner icon.
+       • optional text: "Updating…" or "Refreshing location…".
+
+   - This overlay must:
+       • cover only the map viewport, not the sidebar and not the whole page,
+       • fade in/out quickly (200–400 ms),
+       • not trap focus (driver can still see overall screen layout).
+
+2. Show this overlay only when:
+   - map tiles are being re-fetched,
+   - we are updating driver position or pulling fresh trip data,
+   - or immediately after pressing the Go Online / Go Offline button while waiting for API response.
+
+3. Once the API call completes:
+   - Hide the overlay,
+   - Keep the driver in the same zoom/position if possible.
+
+------------------------------------
+D) ONLINE/OFFLINE TOGGLE MUST NOT BLACK OUT THE MAP
+------------------------------------
+1. For the floating Go Online / Go Offline button:
+   - Tapping it must:
+       • Optimistically update the UI state (e.g. show spinner on the button),
+       • Call the existing backend endpoint to set driver_online_status,
+       • NOT trigger a full route change or page reload.
+
+2. If the API request is in progress:
+   - Keep the map visible.
+   - Optionally show the small map-local overlay from section C.
+
+3. If the API request fails:
+   - Show a toast error message.
+   - Revert the button state to the previous status (online/offline).
+   - Do NOT show any full screen black error.
+
+------------------------------------
+E) ERROR HANDLING WITHOUT HIDING THE UI
+------------------------------------
+1. In case the map provider fails or tiles cannot be loaded:
+   - Keep the map frame visible with a neutral background.
+   - Show a message over the map: “Map temporarily unavailable. Please try again.”
+   - Do NOT show a full black screen with no context.
+
+------------------------------------
+F) NON-BREAKING REQUIREMENTS
+------------------------------------
+- Do NOT change any database structure, collections, or field names.
+- Do NOT change commission logic, KYC flow, admin features, or status flow definitions.
+- Only adjust:
+   • the loading/refresh behavior on /driver/map,
+   • the way the map is rendered during loading,
+   • any full-screen overlay that currently turns the app black.
+
+The driver should always see the map layout; only a light overlay/spinner inside the map is allowed during refresh.
+
+NO QUESTIONS. Implement all changes above in a single coherent update.
