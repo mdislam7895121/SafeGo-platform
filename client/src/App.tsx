@@ -243,6 +243,9 @@ import AdminMonitoring from "@/pages/admin/monitoring";
 import AdminSecurityCenter from "@/pages/admin/security-center";
 import AdminSupportCenter from "@/pages/admin/support-center";
 import AdminSupportTicketDetail from "@/pages/admin/support-ticket-detail";
+import AdminOperationsDashboard from "@/pages/admin/operations-dashboard";
+import AdminRevenueAnalytics from "@/pages/admin/revenue-analytics";
+import AdminFraudAlerts from "@/pages/admin/fraud-alerts";
 import AdminSupportHub from "@/pages/admin-portal/support-hub";
 import AdminSupportHelp from "@/pages/admin-portal/support-help";
 import AdminSupportArticle from "@/pages/admin-portal/support-article";
@@ -1838,6 +1841,27 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Security Center">
             <AdminSecurityCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/operations">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Operations Dashboard">
+            <AdminOperationsDashboard />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/revenue-analytics">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Revenue Analytics">
+            <AdminRevenueAnalytics />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/fraud-alerts">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Fraud Alerts">
+            <AdminFraudAlerts />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
