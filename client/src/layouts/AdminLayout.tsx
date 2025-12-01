@@ -72,17 +72,17 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
         <AdminSidebar />
         
         <SidebarInset className="flex flex-col flex-1">
-          {/* Header */}
-          <header className="sticky top-0 z-[100] flex h-16 items-center gap-4 border-b bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 shadow-sm px-4 md:px-6">
-            {/* Sidebar Toggle */}
-            <SidebarTrigger className="-ml-1" data-testid="button-sidebar-toggle">
+          {/* Header - Mobile optimized with larger tap targets */}
+          <header className="sticky top-0 z-[100] flex h-14 sm:h-16 items-center gap-2 sm:gap-4 border-b bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/85 shadow-sm px-3 sm:px-4 md:px-6">
+            {/* Sidebar Toggle - 44px minimum tap target */}
+            <SidebarTrigger className="-ml-1 min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9" data-testid="button-sidebar-toggle">
               <PanelLeft className="h-5 w-5" />
             </SidebarTrigger>
 
-            <Separator orientation="vertical" className="h-6" />
+            <Separator orientation="vertical" className="hidden sm:block h-6" />
 
-            {/* Page Title */}
-            <h1 className="text-base font-semibold text-foreground/90" data-testid="text-admin-page-title">
+            {/* Page Title - Responsive typography */}
+            <h1 className="text-sm sm:text-base font-semibold text-foreground/90 truncate max-w-[120px] xs:max-w-[180px] sm:max-w-none" data-testid="text-admin-page-title">
               {pageTitle}
             </h1>
 
@@ -97,21 +97,21 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
 
             <div className="flex-1" />
 
-            {/* Global Search */}
+            {/* Global Search - Desktop only */}
             <div className="hidden md:flex flex-1 max-w-md mx-4">
               <GlobalSearch />
             </div>
 
             <div className="flex-1 hidden md:block" />
 
-            {/* Right Side Actions */}
-            <div className="flex items-center gap-1 md:gap-2">
-              {/* Notifications */}
+            {/* Right Side Actions - Larger tap targets on mobile */}
+            <div className="flex items-center gap-0.5 sm:gap-1 md:gap-2">
+              {/* Notifications - 44px tap target on mobile */}
               <Link href="/admin/notifications">
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="relative h-9 w-9" 
+                  className="relative min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9 h-11 w-11 sm:h-9 sm:w-9" 
                   data-testid="button-admin-notifications"
                 >
                   <Bell className="h-5 w-5" />
@@ -131,15 +131,15 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
               {/* Theme Toggle */}
               <ThemeToggle variant="dropdown" />
 
-              {/* Profile Dropdown */}
+              {/* Profile Dropdown - 44px tap target on mobile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="gap-2 h-9 px-2 md:px-3"
+                    className="gap-1.5 sm:gap-2 min-h-[44px] sm:min-h-9 h-11 sm:h-9 px-2 sm:px-2 md:px-3"
                     data-testid="button-admin-profile"
                   >
-                    <Avatar className="h-7 w-7 border-2 border-primary/20">
+                    <Avatar className="h-8 w-8 sm:h-7 sm:w-7 border-2 border-primary/20">
                       <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary text-xs font-bold">
                         {initials}
                       </AvatarFallback>
@@ -165,6 +165,7 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
 
                   <DropdownMenuItem
                     onSelect={() => handleNavigation("/admin")}
+                    className="min-h-[44px] sm:min-h-[32px]"
                     data-testid="menu-item-admin-dashboard"
                   >
                     Dashboard
@@ -172,6 +173,7 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
 
                   <DropdownMenuItem
                     onSelect={() => handleNavigation("/admin/settings")}
+                    className="min-h-[44px] sm:min-h-[32px]"
                     data-testid="menu-item-admin-settings"
                   >
                     Settings
@@ -181,7 +183,7 @@ export function AdminLayout({ children, pageTitle = "Admin Dashboard" }: AdminLa
 
                   <DropdownMenuItem
                     onSelect={handleLogout}
-                    className="text-destructive focus:text-destructive"
+                    className="text-destructive focus:text-destructive min-h-[44px] sm:min-h-[32px]"
                     data-testid="menu-item-admin-logout"
                   >
                     Log Out
