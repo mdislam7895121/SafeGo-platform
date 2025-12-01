@@ -557,10 +557,10 @@ export default function DriverMapPage() {
         />
 
         <div
-          className="absolute top-4 left-4 right-4 z-[1000]"
+          className="absolute top-4 left-4 z-[1000]"
           data-testid="driver-status-card"
         >
-          <Card className="shadow-lg bg-background/95 backdrop-blur-sm border-2 border-border">
+          <Card className="shadow-lg bg-background/95 backdrop-blur-sm border-2 border-border max-w-[220px]">
             <CardContent className="p-3">
               <div className="flex items-center gap-3">
                 <div className="flex-shrink-0">
@@ -649,7 +649,7 @@ export default function DriverMapPage() {
           </DropdownMenu>
         </div>
 
-        <div className="absolute bottom-32 right-4 z-[1000] flex flex-col gap-2">
+        <div className="absolute bottom-24 right-4 z-[1000] flex flex-col gap-2">
           <Button
             size="icon"
             variant="secondary"
@@ -681,7 +681,7 @@ export default function DriverMapPage() {
                 <ShieldAlert className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="bottom" className="rounded-t-2xl">
+            <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <ShieldAlert className="h-5 w-5 text-red-500" />
@@ -936,7 +936,7 @@ export default function DriverMapPage() {
       </AnimatePresence>
 
       <div 
-        className="fixed bottom-0 left-0 right-0 z-[1002] h-20 md:h-[90px] bg-white dark:bg-zinc-900 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] flex items-center justify-between px-4"
+        className="fixed bottom-0 left-0 right-0 z-[999] h-[65px] bg-white dark:bg-zinc-900 shadow-[0_-4px_14px_rgba(0,0,0,0.08)] flex items-center justify-between px-4"
         data-testid="driver-footer-bar"
       >
         <Sheet open={showServiceSheet} onOpenChange={setShowServiceSheet}>
@@ -952,7 +952,7 @@ export default function DriverMapPage() {
           </SheetTrigger>
           <SheetContent 
             side="left" 
-            className="w-[320px] sm:w-[380px] bg-black border-r-0 p-0"
+            className="w-[320px] sm:w-[380px] bg-black border-r-0 p-0 z-[1010]"
             data-testid="service-selection-drawer"
           >
             <div className="flex flex-col h-full">
@@ -1067,7 +1067,7 @@ export default function DriverMapPage() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="rounded-t-2xl">
+          <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
             <SheetHeader>
               <SheetTitle>Quick Actions</SheetTitle>
             </SheetHeader>
