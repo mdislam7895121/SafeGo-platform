@@ -194,6 +194,7 @@ export default function DriverMapPage() {
   const [incomingRequest, setIncomingRequest] = useState<TripRequest | null>(null);
   const [showServiceSheet, setShowServiceSheet] = useState(false);
   const [showQuickActionsSheet, setShowQuickActionsSheet] = useState(false);
+  const [showSosSheet, setShowSosSheet] = useState(false);
   const [servicePreferences, setServicePreferences] = useState<ServicePreferences>(defaultServicePreferences);
 
   // Fetch service preferences from API
@@ -545,40 +546,75 @@ export default function DriverMapPage() {
           </div>
         )}
 
-        <div className="absolute top-4 right-4 z-[1001] flex flex-col gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+        {/* Right side control buttons - Safety and Recenter */}
+        <div className="fixed right-6 bottom-[120px] z-[1000] flex flex-col gap-2">
+          <Sheet open={showSosSheet} onOpenChange={setShowSosSheet}>
+            <SheetTrigger asChild>
               <Button
                 size="icon"
-                variant="secondary"
-                className="h-12 w-12 rounded-full shadow-lg relative"
-                data-testid="button-notifications"
+                variant="destructive"
+                className="h-12 w-12 rounded-full shadow-lg"
+                data-testid="button-sos"
               >
-                <Bell className="h-5 w-5" />
-                {unreadNotifications > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-medium">
-                    {unreadNotifications > 9 ? "9+" : unreadNotifications}
-                  </span>
-                )}
+                <ShieldAlert className="h-5 w-5" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {notificationsData?.notifications?.slice(0, 5).map((notif: any) => (
-                <DropdownMenuItem key={notif.id} className="flex flex-col items-start gap-1">
-                  <span className="font-medium text-sm">{notif.title}</span>
-                  <span className="text-xs text-muted-foreground truncate w-full">{notif.message}</span>
-                </DropdownMenuItem>
-              )) ?? (
-                <DropdownMenuItem disabled>No notifications</DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setLocation("/driver/account/notifications")}>
-                View all notifications
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-red-500" />
+                  Emergency SOS
+                </SheetTitle>
+              </SheetHeader>
+              <div className="py-6 space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  If you're in danger, use these emergency options:
+                </p>
+                <Button 
+                  variant="destructive" 
+                  className="w-full h-14 text-lg"
+                  onClick={() => {
+                    window.location.href = "tel:911";
+                  }}
+                  data-testid="button-call-911"
+                >
+                  Call 911
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setLocation("/driver/safety-emergency");
+                    setShowSosSheet(false);
+                  }}
+                  data-testid="button-safety-center"
+                >
+                  Go to Safety Center
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    setLocation("/driver/safety-report");
+                    setShowSosSheet(false);
+                  }}
+                  data-testid="button-report-incident"
+                >
+                  Report Safety Incident
+                </Button>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-12 w-12 rounded-full shadow-lg"
+            onClick={handleRecenter}
+            data-testid="driver-map-recenter"
+          >
+            <Crosshair className="h-5 w-5" />
+          </Button>
         </div>
 
 
