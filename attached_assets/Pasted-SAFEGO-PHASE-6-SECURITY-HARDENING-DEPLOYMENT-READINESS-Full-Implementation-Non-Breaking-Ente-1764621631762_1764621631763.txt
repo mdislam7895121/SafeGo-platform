@@ -1,0 +1,176 @@
+SAFEGO PHASE 6 — SECURITY HARDENING & DEPLOYMENT READINESS
+(Full Implementation — Non-Breaking, Enterprise-Grade)
+
+Your goal is to prepare SafeGo for global production deployment.
+You must implement ALL security layers, infrastructure checks, and deployment readiness tasks WITHOUT breaking any Phase 1–5 behavior or schemas.
+
+========================================================
+A. APPLICATION SECURITY HARDENING (Task 6.1)
+========================================================
+
+1. Add a dedicated module: AppSecurityAudit
+   Responsibilities:
+     - Perform permission validation checks on ALL routes
+     - Detect any insecure direct object access (IDOR)
+     - Validate role-based access control (RBAC) enforcement
+     - Ensure admin-only sensitive endpoints cannot be accessed by customers/drivers
+
+2. Add automated checks for:
+   - Missing authentication
+   - Missing authorization
+   - Unsafe query patterns
+   - Missing validation on user inputs
+   - Unsafe object storage access patterns
+
+3. Sensitive data masking in logs:
+   - NID, gov_id, license_number, full addresses, phone numbers
+   - Mask all sensitive fields before any log entry
+
+========================================================
+B. RATE LIMITING & ABUSE PROTECTION (Task 6.2)
+========================================================
+
+Add a new middleware: SafeGoRateLimiter
+
+Rules:
+  - Auth endpoints: 5 requests/min per IP
+  - Ride/food/parcel booking: 20 requests/min
+  - Payment endpoints: strict 3/min
+  - Admin panel: 10 requests/min
+  - Public maps/search: 30 requests/min
+  - Block IP automatically for 15 minutes after exceeding thresholds
+
+========================================================
+C. TRANSPORT SECURITY & HEADERS (Task 6.3)
+========================================================
+
+Add:
+  - HSTS headers
+  - X-Frame-Options: DENY
+  - X-Content-Type-Options: nosniff
+  - Referrer-Policy: strict-origin
+  - Content-Security-Policy for app domains
+  - Enforce HTTPS-only mode
+  - Disable TLS 1.0 / 1.1 if present
+
+========================================================
+D. DATABASE SECURITY (Task 6.4)
+========================================================
+
+Add DBSecurityModule:
+  - Ensure prepared statements everywhere
+  - Block raw SQL string concatenation
+  - Add IP firewall rules (local container simulation)
+  - Add automated backup verification
+  - Add encryption-at-rest validation for KYC data files
+
+========================================================
+E. PAYMENT WEBHOOK SECURITY (Task 6.5)
+========================================================
+
+Extend PaymentService:
+  - Validate all signatures of payment providers (bKash/Nagad/card)
+  - Reject mismatched amounts
+  - Detect replay attacks by storing webhook nonce/timestamp
+  - Log all webhook failures to attack_log table (ADD ONLY)
+
+Add new table:
+  attack_logs
+    id, type, source_ip, request_payload_hash,
+    detection_reason, created_at
+
+========================================================
+F. KYC & SENSITIVE-DATA SECURITY (Task 6.6)
+========================================================
+
+Add:
+  - KYCStorageGuard → time-limited signed URL generation
+  - Automatic KYC data access logging (admin only)
+  - Detect suspicious KYC access
+  - Encrypt all stored NID/license/passport images
+  - Block public access to KYC buckets
+
+Add new table:
+  kyc_access_logs
+    id, admin_id, user_type, user_id, timestamp, action, ip_address
+
+========================================================
+G. FRAUD & ABUSE DETECTION (Task 6.7)
+========================================================
+
+Extend FraudDetectionModule:
+  - Detect GPS spoofing more aggressively (distance jumps)
+  - Detect multiple-account overlap (device fingerprint)
+  - Detect repeated failed payments
+  - Detect abnormal cancellation patterns
+  - Flag suspicious referral usage
+
+Add WebSocket event:
+  "fraud:high_risk_activity"
+
+========================================================
+H. LOGGING & MONITORING (Task 6.8)
+========================================================
+
+Add MonitoringModule:
+  - Centralized error logs
+  - Real-time performance metrics
+  - Slow-query reporting
+  - WebSocket error tracking
+  - FCM delivery monitoring
+
+Add Admin dashboard section:
+  /admin/system-health
+
+Show:
+  - API error rates
+  - Payment failures
+  - KYC verification failures
+  - FCM delivery status
+  - Fraud alerts summary
+
+========================================================
+I. DEPLOYMENT READINESS (Task 6.9)
+========================================================
+
+Add ProductionPrepModule:
+
+1. Build checklist:
+   - Env var validation
+   - Payment keys required
+   - KYC provider keys required
+   - CDN & caching config required
+   - HTTPS enforcement check
+
+2. CI/CD:
+   - Run automated tests
+   - Run security audit
+   - Run migration validation
+   - Block deployment if critical issues found
+
+3. Containerization:
+   - Ensure base image minimal
+   - Remove dev tools from production build
+   - Enable health-check endpoint /health
+
+4. Load testing (local simulation):
+   - Simulate 1000 concurrent riders
+   - 300 food orders
+   - 200 parcel tasks
+
+========================================================
+J. NON-BREAKING GUARANTEES
+========================================================
+
+You MUST NOT:
+  - Rename or remove any existing field/table
+  - Modify commission, payout, or wallet semantics
+  - Break any ride/food/parcel status flow
+  - Change any existing authentication behavior
+  - Expose sensitive KYC or payment data to non-admins
+
+You MUST:
+  - Only ADD new modules, tables, endpoints, security layers
+  - Keep everything backward compatible with Phase 1–5
+
+END OF PHASE 6 PROMPT.

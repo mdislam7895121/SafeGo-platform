@@ -6190,3 +6190,210 @@ model SearchHistory {
   @@index([query])
   @@map("search_history")
 }
+
+// ============================================================
+// Phase 6: Security Hardening & Deployment Readiness
+// ============================================================
+
+enum AttackType {
+  replay_attack
+  signature_mismatch
+  amount_mismatch
+  rate_limit_exceeded
+  idor_attempt
+  unauthorized_access
+  injection_attempt
+  xss_attempt
+  csrf_attempt
+  brute_force
+  session_hijack
+  gps_spoofing
+  device_anomaly
+  suspicious_pattern
+}
+
+enum KycAccessAction {
+  view
+  download
+  decrypt
+  share
+  verify
+  reject
+}
+
+enum SecurityFindingSeverity {
+  info
+  low
+  medium
+  high
+  critical
+}
+
+enum SecurityFindingStatus {
+  open
+  acknowledged
+  resolved
+  false_positive
+}
+
+model AttackLog {
+  id                    String                @id @default(uuid())
+  type                  AttackType
+  sourceIp              String
+  
+  userId                String?
+  userType              String?
+  
+  requestPath           String?
+  requestMethod         String?
+  requestPayloadHash    String?
+  
+  detectionReason       String
+  detectionDetails      Json?
+  
+  webhookProvider       String?
+  transactionId         String?
+  
+  blocked               Boolean               @default(true)
+  
+  createdAt             DateTime              @default(now())
+  
+  @@index([type])
+  @@index([sourceIp])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("attack_logs")
+}
+
+model KycAccessLog {
+  id                    String                @id @default(uuid())
+  adminId               String
+  
+  targetUserType        String
+  targetUserId          String
+  
+  action                KycAccessAction
+  documentType          String?
+  documentId            String?
+  
+  ipAddress             String
+  userAgent             String?
+  
+  accessGranted         Boolean               @default(true)
+  accessDeniedReason    String?
+  
+  timestamp             DateTime              @default(now())
+  
+  @@index([adminId])
+  @@index([targetUserId])
+  @@index([action])
+  @@index([timestamp])
+  @@map("kyc_access_logs")
+}
+
+model SecurityAuditFinding {
+  id                    String                         @id @default(uuid())
+  
+  category              String
+  subcategory           String?
+  
+  severity              SecurityFindingSeverity
+  status                SecurityFindingStatus          @default(open)
+  
+  title                 String
+  description           String
+  affectedResource      String?
+  
+  routePath             String?
+  httpMethod            String?
+  
+  recommendation        String?
+  evidence              Json?
+  
+  detectedAt            DateTime              @default(now())
+  resolvedAt            DateTime?
+  resolvedBy            String?
+  resolution            String?
+  
+  @@index([severity])
+  @@index([status])
+  @@index([category])
+  @@index([detectedAt])
+  @@map("security_audit_findings")
+}
+
+model WebhookNonce {
+  id                    String                @id @default(uuid())
+  provider              String
+  nonce                 String
+  timestamp             DateTime
+  
+  transactionId         String?
+  amount                Decimal?              @db.Decimal(12, 2)
+  
+  processedAt           DateTime              @default(now())
+  
+  @@unique([provider, nonce])
+  @@index([provider])
+  @@index([timestamp])
+  @@map("webhook_nonces")
+}
+
+model SystemHealthMetric {
+  id                    String                @id @default(uuid())
+  
+  metricType            String
+  metricName            String
+  value                 Decimal               @db.Decimal(18, 6)
+  unit                  String?
+  
+  tags                  Json?
+  
+  timestamp             DateTime              @default(now())
+  
+  @@index([metricType])
+  @@index([metricName])
+  @@index([timestamp])
+  @@map("system_health_metrics")
+}
+
+model SlowQueryLog {
+  id                    String                @id @default(uuid())
+  
+  query                 String
+  queryHash             String
+  duration              Int
+  
+  tableName             String?
+  operationType         String?
+  
+  connectionId          String?
+  userId                String?
+  
+  timestamp             DateTime              @default(now())
+  
+  @@index([queryHash])
+  @@index([duration])
+  @@index([timestamp])
+  @@map("slow_query_logs")
+}
+
+model DeploymentCheck {
+  id                    String                @id @default(uuid())
+  
+  checkName             String
+  category              String
+  
+  passed                Boolean
+  message               String?
+  details               Json?
+  
+  environment           String                @default("development")
+  
+  runAt                 DateTime              @default(now())
+  
+  @@index([category])
+  @@index([passed])
+  @@index([runAt])
+  @@map("deployment_checks")
+}

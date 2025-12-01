@@ -51,6 +51,7 @@ import devicesRoutes from "./routes/devices"; // Phase 2B: Device registration f
 import kitchenRoutes from "./routes/kitchen"; // Phase 3: Kitchen Ticket System
 import parcelRoutes from "./routes/parcel"; // Phase 3: Parcel Pricing, Scheduling & POD
 import phase5Routes from "./routes/phase5"; // Phase 5: Experience Intelligence & Real-Time Optimization
+import phase6Routes from "./routes/phase6"; // Phase 6: Security Hardening & Deployment Readiness
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -248,6 +249,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/kitchen", kitchenRoutes); // Phase 3: Kitchen Ticket System
   app.use("/api/parcel", parcelRoutes); // Phase 3: Parcel Pricing, Scheduling & POD
   app.use("/api/phase5", phase5Routes); // Phase 5: Experience Intelligence & Real-Time Optimization
+  app.use("/api", phase6Routes); // Phase 6: Security Hardening & Deployment Readiness (includes /health)
 
   const httpServer = createServer(app);
   

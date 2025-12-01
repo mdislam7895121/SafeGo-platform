@@ -261,6 +261,7 @@ import AdminMobileWalletConfig from "@/pages/admin/mobile-wallet-config";
 import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
+import AdminSystemHealth from "@/pages/admin/system-health";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -1711,6 +1712,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Phase 5: Experience Intelligence">
             <AdminPhase5Dashboard />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/system-health">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="System Health">
+            <AdminSystemHealth />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
