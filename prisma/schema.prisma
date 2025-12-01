@@ -126,6 +126,12 @@ enum NotificationType {
   PAYOUT_PROCESSED
   EARNINGS_SETTLED
   
+  // Phase 3: Driver food/parcel notifications
+  FOOD_ORDER_READY_FOR_PICKUP
+  PARCEL_SCHEDULED_ASSIGNMENT
+  PARCEL_PICKUP_REMINDER
+  POD_REQUIRED_REMINDER
+  
   // Customer notifications
   DRIVER_ASSIGNED
   DRIVER_ARRIVING
@@ -139,15 +145,88 @@ enum NotificationType {
   ORDER_PICKED_UP
   ORDER_DELIVERED
   
+  // Phase 3: Customer notifications
+  PROFILE_UPDATED
+  FOOD_ORDER_STATUS_CHANGED
+  PARCEL_SCHEDULED_CONFIRMATION
+  PARCEL_PICKUP_REMINDER_CUSTOMER
+  PARCEL_DELIVERED_WITH_POD
+  
   // Restaurant notifications
   NEW_ORDER_RECEIVED
   ORDER_CANCELLED
   ORDER_READY_REMINDER
   
+  // Phase 3: Restaurant notifications
+  RESTAURANT_DRIVER_ASSIGNED
+  RESTAURANT_ORDER_PICKED_UP
+  
   // Admin notifications
   HIGH_FAILURE_RATE
   ABNORMAL_BALANCE
   SYSTEM_ALERT
+}
+
+// ============================================================
+// Phase 3: Customer Experience, Restaurant Flow & Parcel Features
+// ============================================================
+
+// Phase 3: Kitchen ticket status
+enum KitchenTicketStatus {
+  queued
+  preparing
+  ready
+  handed_to_driver
+  cancelled
+}
+
+// Phase 3: Parcel size categories
+enum ParcelSizeCategory {
+  small
+  medium
+  large
+  oversized
+}
+
+// Phase 3: Parcel pickup type
+enum ParcelPickupType {
+  immediate
+  scheduled
+}
+
+// Phase 3: Address label types (for saved places)
+enum SavedPlaceLabel {
+  home
+  work
+  other
+}
+
+// Phase 3: Music preference
+enum MusicPreference {
+  no_preference
+  quiet
+  loud_ok
+}
+
+// Phase 3: AC preference
+enum AcPreference {
+  no_preference
+  ac_on
+  ac_off
+}
+
+// Phase 3: Communication preference
+enum CommunicationPreference {
+  no_preference
+  minimal_talk
+  friendly
+}
+
+// Phase 3: Restaurant kitchen status
+enum KitchenStatus {
+  open
+  busy
+  closed
 }
 
 // Phase 2B: Notification status
@@ -240,6 +319,17 @@ model CustomerProfile {
   // Phase 2B: Payment methods and payments
   paymentMethods        PaymentMethod[]
   payments              Payment[]
+  
+  // Phase 3: Customer profile enhancements (additive only)
+  firstName             String?               // First name (separate from fullName)
+  lastName              String?               // Last name
+  avatarUrl             String?               // Profile picture URL
+  languagePreference    String?               @default("en") // en, bn, es, fr, ar
+  notificationPreferences Json?               // { ride_updates, food_updates, parcel_updates, marketing }
+  
+  // Phase 3: Saved places and ride preferences (relations)
+  savedPlaces           CustomerSavedPlace[]
+  ridePreferences       CustomerRidePreferences?
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -304,6 +394,23 @@ model Delivery {
   // Phase 2B: Online payment integration (additive only)
   paymentId               String?           // FK to payments table (for online payments)
   paymentStatus           String?           // mirrors payments.status for fast queries (paid, failed, pending)
+  
+  // Phase 3: Parcel size/weight pricing (Task 26) - additive only
+  parcelSizeCategory      ParcelSizeCategory? // small, medium, large, oversized
+  parcelWeightKg          Decimal?          @db.Decimal(6, 2) // Weight in kg
+  pricingConfigId         String?           // FK to parcel_pricing_configs
+  pricingBreakdown        Json?             // Detailed pricing breakdown (like rides/fare_breakdown)
+  
+  // Phase 3: Scheduled pickup (Task 28) - additive only
+  pickupType              ParcelPickupType  @default(immediate) // immediate, scheduled
+  scheduledPickupAt       DateTime?         // Scheduled pickup time
+  scheduledWindowMinutes  Int?              // Pickup window (e.g., 30, 60)
+  scheduledDispatchAt     DateTime?         // When to start driver search (scheduledPickupAt - lead_time)
+  scheduledDispatchStatus String?           // pending, dispatched, cancelled
+  
+  // Phase 3: Proof of delivery (Task 27) - relation
+  proofPhotos             DeliveryProofPhoto[]
+  pricingConfig           ParcelPricingConfig? @relation(fields: [pricingConfigId], references: [id], onDelete: SetNull)
   
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   driver           DriverProfile?   @relation(fields: [driverId], references: [id])
@@ -733,6 +840,10 @@ model FoodOrder {
   paymentId               String?           // FK to payments table (for online payments)
   paymentStatus           String?           // mirrors payments.status for fast queries (paid, failed, pending)
   
+  // Phase 3: Kitchen system (Task 25) - additive only
+  prepTimeMinutes         Int?              // Calculated prep time for this order
+  kitchenNotes            String?           @db.Text // Internal kitchen notes
+  
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
   deliveredAt          DateTime?
@@ -744,6 +855,7 @@ model FoodOrder {
   delivery             Delivery?         @relation(fields: [deliveryId], references: [id]) // Step 46: Link to delivery record
   review               Review?           // Phase 8: One review per order
   earningsTransaction  EarningsTransaction? // R6: Earnings tracking
+  kitchenTicket        KitchenTicket?    // Phase 3: Kitchen ticket for this order
 
   @@index([restaurantId, status])
   @@index([restaurantId, createdAt])
@@ -912,12 +1024,19 @@ model RestaurantProfile {
   
   // Phase 1B: Trip conversations for food orders
   tripConversations     TripConversation[]
+  
+  // Phase 3: Kitchen system (Task 25) - additive only
+  prepTimeDefaultMinutes Int?              @default(15) // Default prep time in minutes
+  isAcceptingOrders      Boolean           @default(true) // Can receive new orders
+  kitchenStatus          KitchenStatus     @default(open) // open, busy, closed
+  kitchenTickets         KitchenTicket[]   // Kitchen tickets for orders
 
   @@index([cityCode])
   @@index([countryCode])
   @@index([isActive])
   @@index([isDemo])
   @@index([verificationStatus])
+  @@index([kitchenStatus])
   @@map("restaurant_profiles")
 }
 
@@ -5016,4 +5135,175 @@ model NotificationLog {
   @@index([status])
   @@index([createdAt])
   @@map("notification_logs")
+}
+
+// ============================================================
+// Phase 3: Customer Experience, Restaurant Flow & Parcel Features
+// ============================================================
+
+// Task 21: Customer saved places for ride pickup/dropoff
+model CustomerSavedPlace {
+  id                    String              @id @default(uuid())
+  customerId            String              // FK to customer_profiles
+  
+  // Place details
+  label                 SavedPlaceLabel     @default(other) // home, work, other
+  customLabel           String?             // For "other" type, user-defined label
+  iconType              String?             @default("star") // home, work, star, etc.
+  addressText           String              // Full address text
+  latitude              Float
+  longitude             Float
+  placeId               String?             // Google Place ID (optional)
+  
+  // Default flags
+  isDefaultPickup       Boolean             @default(false)
+  isDefaultDropoff      Boolean             @default(false)
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  customer              CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  @@index([customerId])
+  @@index([customerId, label])
+  @@map("customer_saved_places")
+}
+
+// Task 22: Customer ride preferences
+model CustomerRidePreferences {
+  id                    String              @id @default(uuid())
+  customerId            String              @unique // One preferences record per customer
+  
+  // Service & vehicle preferences
+  preferredServiceTypes String[]            @default(["ride"]) // ride, food, parcel
+  preferredVehicleTypes String[]            @default([]) // car, bike, cng, premium
+  
+  // Comfort preferences
+  musicPreference       MusicPreference     @default(no_preference)
+  airConditioning       AcPreference        @default(no_preference)
+  communicationPreference CommunicationPreference @default(no_preference)
+  
+  // Accessibility & safety
+  accessibilityOptions  Json?               // { wheelchair_support: true, ... }
+  safetyPreferences     Json?               // { share_trip_automatically_with_contacts: true, ... }
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  customer              CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  @@map("customer_ride_preferences")
+}
+
+// Task 25: Kitchen tickets for restaurant order management
+model KitchenTicket {
+  id                    String              @id @default(uuid())
+  foodOrderId           String              @unique // One ticket per order
+  restaurantId          String              // FK to restaurant_profiles
+  
+  // Ticket status
+  status                KitchenTicketStatus @default(queued)
+  prepTimeEstimateMinutes Int?              // Estimated prep time for this ticket
+  
+  // Timestamps
+  startedAt             DateTime?           // When prep started
+  completedAt           DateTime?           // When marked ready
+  handedToDriverAt      DateTime?           // When handed to driver
+  
+  // Notes
+  notes                 String?             @db.Text // Kitchen notes
+  priority              Int                 @default(0) // Higher = more urgent
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  foodOrder             FoodOrder           @relation(fields: [foodOrderId], references: [id], onDelete: Cascade)
+  restaurant            RestaurantProfile   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  
+  @@index([restaurantId, status])
+  @@index([restaurantId, createdAt])
+  @@index([status])
+  @@map("kitchen_tickets")
+}
+
+// Task 26: Parcel pricing configuration
+model ParcelPricingConfig {
+  id                    String              @id @default(uuid())
+  countryCode           String              // BD, US
+  baseZone              String?             // City/region code
+  
+  // Size category config
+  sizeCategory          ParcelSizeCategory
+  maxWeightKg           Decimal             @db.Decimal(6, 2) // Max weight for this size
+  
+  // Pricing
+  baseFare              Decimal             @db.Decimal(10, 2)
+  perKmRate             Decimal             @db.Decimal(10, 2)
+  perKgSurcharge        Decimal?            @db.Decimal(10, 2) // Optional weight surcharge
+  
+  // Validity
+  activeFrom            DateTime?
+  activeTo              DateTime?
+  isActive              Boolean             @default(true)
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  deliveries            Delivery[]
+  
+  @@unique([countryCode, baseZone, sizeCategory])
+  @@index([countryCode, isActive])
+  @@index([sizeCategory])
+  @@map("parcel_pricing_configs")
+}
+
+// Task 27: Proof-of-delivery photos
+model DeliveryProofPhoto {
+  id                    String              @id @default(uuid())
+  deliveryId            String              // FK to deliveries
+  driverId              String              // FK to driver who captured
+  
+  // Photo details
+  photoUrl              String              // Uploaded photo URL
+  capturedAt            DateTime            @default(now())
+  
+  // Metadata
+  meta                  Json?               // { gps_lat, gps_lng, device, ... }
+  
+  createdAt             DateTime            @default(now())
+  
+  // Relations
+  delivery              Delivery            @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  
+  @@index([deliveryId])
+  @@index([driverId])
+  @@map("delivery_proof_photos")
+}
+
+// Phase 3 Feature Flags Configuration
+model Phase3FeatureConfig {
+  id                    String              @id @default(uuid())
+  countryCode           String              @unique // BD, US, or "*" for global
+  
+  // Feature toggles
+  savedPlacesEnabled    Boolean             @default(true)
+  ridePreferencesEnabled Boolean            @default(true)
+  kitchenSystemEnabled  Boolean             @default(true)
+  parcelSchedulingEnabled Boolean           @default(true)
+  podPhotosRequired     Boolean             @default(false) // Proof-of-delivery photos required
+  
+  // Limits
+  maxSavedPlaces        Int                 @default(10) // Max saved places per customer
+  parcelScheduleLeadMinutes Int             @default(30) // Lead time for scheduled dispatch
+  parcelScheduleMinHoursAhead Int           @default(2) // Min hours to schedule in advance
+  parcelScheduleMaxDaysAhead Int            @default(7) // Max days to schedule in advance
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  @@map("phase3_feature_configs")
 }

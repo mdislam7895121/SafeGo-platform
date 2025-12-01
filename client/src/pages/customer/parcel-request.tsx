@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Navigation, Package, User, Phone, Scale, Ruler, Tag, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, Navigation, Package, User, Phone, Scale, Ruler, Tag, Loader2, Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -39,6 +40,10 @@ export default function ParcelRequest() {
   
   const [paymentMethod, setPaymentMethod] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  
+  const [isScheduledPickup, setIsScheduledPickup] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
 
   const categories = [
     { value: "documents", label: "Documents" },
@@ -53,7 +58,7 @@ export default function ParcelRequest() {
     { value: "small", label: "Small (fits in a bag)" },
     { value: "medium", label: "Medium (shoebox size)" },
     { value: "large", label: "Large (suitcase size)" },
-    { value: "xlarge", label: "Extra Large" },
+    { value: "oversized", label: "Extra Large / Oversized" },
   ];
 
   const calculateEstimatedFare = () => {
@@ -61,7 +66,7 @@ export default function ParcelRequest() {
     
     const baseRate = 5.00;
     const weightFee = parcelWeight ? Math.max(0, (parseFloat(parcelWeight) - 2) * 0.5) : 0;
-    const sizeFee = parcelSize === "large" ? 3 : parcelSize === "xlarge" ? 5 : parcelSize === "medium" ? 1 : 0;
+    const sizeFee = parcelSize === "large" ? 3 : parcelSize === "oversized" ? 5 : parcelSize === "medium" ? 1 : 0;
     const fragileeFee = parcelCategory === "fragile" ? 2 : 0;
     
     const lat1 = pickupLocation.lat;
@@ -138,6 +143,10 @@ export default function ParcelRequest() {
     try {
       const estimatedFare = calculateEstimatedFare() || "15.00";
       
+      const scheduledPickupTime = isScheduledPickup && scheduledDate && scheduledTime
+        ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString()
+        : null;
+
       await apiRequest("/api/deliveries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -158,12 +167,15 @@ export default function ParcelRequest() {
           parcelDetails,
           serviceFare: parseFloat(estimatedFare),
           paymentMethod,
+          scheduledPickupTime,
         }),
       });
 
       toast({
-        title: "Delivery requested!",
-        description: "Searching for a nearby driver...",
+        title: isScheduledPickup ? "Pickup scheduled!" : "Delivery requested!",
+        description: isScheduledPickup 
+          ? `Your pickup is scheduled for ${new Date(`${scheduledDate}T${scheduledTime}`).toLocaleString()}`
+          : "Searching for a nearby driver...",
       });
       setLocation("/customer");
     } catch (error: any) {
@@ -376,6 +388,74 @@ export default function ParcelRequest() {
                   data-testid="input-details"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Scheduled Pickup - Phase 3 */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Pickup Time
+              </CardTitle>
+              <CardDescription>When should we pick up your parcel?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">Schedule for later</p>
+                  <p className="text-xs text-muted-foreground">
+                    Pick a date and time for pickup
+                  </p>
+                </div>
+                <Switch
+                  checked={isScheduledPickup}
+                  onCheckedChange={setIsScheduledPickup}
+                  data-testid="switch-scheduled-pickup"
+                />
+              </div>
+
+              {isScheduledPickup && (
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="scheduledDate">Date</Label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="scheduledDate"
+                        type="date"
+                        value={scheduledDate}
+                        min={new Date().toISOString().split('T')[0]}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="pl-10"
+                        data-testid="input-scheduled-date"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="scheduledTime">Time</Label>
+                    <div className="relative">
+                      <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="scheduledTime"
+                        type="time"
+                        value={scheduledTime}
+                        onChange={(e) => setScheduledTime(e.target.value)}
+                        className="pl-10"
+                        data-testid="input-scheduled-time"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!isScheduledPickup && (
+                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    A driver will be assigned immediately after you submit
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

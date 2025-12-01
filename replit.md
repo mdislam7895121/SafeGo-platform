@@ -51,6 +51,28 @@ The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with
 *   **Payment Gateway Integration & FCM Notifications**: Production-ready payment processing and push notification infrastructure. Features a `PaymentService` with a provider abstraction layer (supporting Mock and Stripe), a `NotificationService` for FCM integration, business-specific notification services, device registration endpoints, and payment webhooks.
 *   **Database Schema Design**: Uses UUID primary keys, indexed foreign keys, decimal types for monetary values, and includes models for wallets, payouts, audit logs, notifications, platform settings, payment/payout accounts, opportunity settings, driver tiers and points, blocked riders, reviews, restaurant branding, media, hours, operational settings, delivery zones, surge settings, country payment/payout configurations, restaurant payout methods, categories, subcategories, menu item categories, promotion usage, multi-role support models, and driver safety incidents. Supports country-specific identity fields with AES-256-GCM encryption.
 
+### Phase 3: Customer Experience, Restaurant Flow & Parcel Features
+*   **Customer Saved Places**: CRUD system for managing favorite locations (home, work, other) with default pickup/dropoff settings. Enforces max 1 home and 1 work location. API: `/api/customer/saved-places`
+*   **Customer Ride Preferences**: Personalization settings including temperature, music, conversation level, accessibility needs, pet-friendly, child seat requirements, and special instructions. API: `/api/customer/ride-preferences`
+*   **Restaurant Kitchen Display System**: Real-time ticket management for restaurant kitchens with status progression (pending → preparing → ready → completed), priority handling, and average prep time tracking. API: `/api/restaurant/kitchen/tickets`
+*   **Parcel Scheduled Pickup**: Allows customers to schedule parcel pickups for a future date/time instead of immediate dispatch. Integrated into parcel request flow.
+*   **Proof-of-Delivery Photos**: Photo upload system for delivery proof with access control. API: `/api/parcel/deliveries/:id/pod-photos`
+*   **Parcel Pricing Configuration**: Size/weight-based dynamic pricing with country-specific configurations. API: `/api/parcel/pricing-config`
+*   **Phase 3 Feature Flags**: Configuration file (`server/config/phase3Features.ts`) controls feature availability for saved places, parcel scheduling, and POD photo requirements.
+
+**Phase 3 New Database Models:**
+- `CustomerSavedPlace`: Stores saved locations with labels, coordinates, and default flags
+- `CustomerRidePreferences`: Stores ride comfort preferences per customer
+- `KitchenTicket`: Tracks food order preparation status in restaurant kitchens
+- `ParcelPricingConfig`: Defines size/weight pricing rules per country
+- `DeliveryProofPhoto`: Stores proof-of-delivery photo metadata and access control
+
+**Phase 3 Frontend Pages:**
+- `/customer/saved-places`: Manage favorite locations
+- `/customer/ride-preferences`: Set ride comfort preferences
+- `/restaurant/kitchen`: Kitchen display system with ticket management
+- Enhanced `/customer/parcel`: Scheduled pickup option added
+
 ## External Dependencies
 
 *   **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.

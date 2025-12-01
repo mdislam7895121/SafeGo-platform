@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { 
   ArrowLeft, User, MapPin, Phone, CreditCard, Shield, 
   Edit, Star, Clock, Home, Briefcase, Heart, Bell, Globe, CheckCircle2, Headphones,
-  X, Save, Loader2, Plus, Lock, Unlock, ShieldAlert, AlertTriangle
+  X, Save, Loader2, Plus, Lock, Unlock, ShieldAlert, AlertTriangle, Car, Bookmark
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -390,7 +390,7 @@ export default function CustomerProfile() {
 
       <div className="p-6 space-y-6">
         {/* Quick Action Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           <Link href="/customer/payment-methods">
             <Card className="hover-elevate active-elevate-2 cursor-pointer" data-testid="card-payment-methods">
               <CardContent className="p-4 text-center">
@@ -405,13 +405,41 @@ export default function CustomerProfile() {
           <Link href="/customer/delivery-addresses">
             <Card 
               className="hover-elevate active-elevate-2 cursor-pointer" 
-              data-testid="card-saved-places"
+              data-testid="card-delivery-addresses"
             >
               <CardContent className="p-4 text-center">
                 <div className="h-12 w-12 rounded-full bg-blue-100 dark:bg-blue-950 flex items-center justify-center mx-auto mb-2">
                   <MapPin className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <p className="text-sm font-medium">Addresses</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/customer/saved-places">
+            <Card 
+              className="hover-elevate active-elevate-2 cursor-pointer" 
+              data-testid="card-saved-places"
+            >
+              <CardContent className="p-4 text-center">
+                <div className="h-12 w-12 rounded-full bg-indigo-100 dark:bg-indigo-950 flex items-center justify-center mx-auto mb-2">
+                  <Bookmark className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <p className="text-sm font-medium">Places</p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link href="/customer/ride-preferences">
+            <Card 
+              className="hover-elevate active-elevate-2 cursor-pointer" 
+              data-testid="card-ride-preferences"
+            >
+              <CardContent className="p-4 text-center">
+                <div className="h-12 w-12 rounded-full bg-teal-100 dark:bg-teal-950 flex items-center justify-center mx-auto mb-2">
+                  <Car className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+                </div>
+                <p className="text-sm font-medium">Ride Prefs</p>
               </CardContent>
             </Card>
           </Link>

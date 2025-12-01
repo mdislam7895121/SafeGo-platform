@@ -1532,4 +1532,888 @@ router.post("/account/unlock", async (req: AuthRequest, res) => {
   }
 });
 
+// ============================================================
+// PHASE 3: Customer Experience, Restaurant Flow & Parcel Features
+// ============================================================
+
+// Import Phase 3 feature flags
+import { getPhase3Features } from "../config/phase3Features";
+
+// ====================================================
+// GET /api/customer/saved-places
+// Get customer's saved places (home, work, other)
+// ====================================================
+router.get("/saved-places", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: {
+        user: { select: { countryCode: true } },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const countryCode = customer.user?.countryCode || "US";
+    const features = await getPhase3Features(countryCode);
+
+    if (!features.savedPlacesEnabled) {
+      return res.status(403).json({ error: "Saved places feature is not enabled" });
+    }
+
+    const savedPlaces = await prisma.customerSavedPlace.findMany({
+      where: { customerId: customer.id },
+      orderBy: [
+        { label: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    res.json({ savedPlaces, maxAllowed: features.maxSavedPlaces });
+  } catch (error: any) {
+    console.error("[Customer] Error fetching saved places:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch saved places" });
+  }
+});
+
+// Validation schemas for Phase 3
+const savedPlaceSchema = z.object({
+  label: z.enum(["home", "work", "other"]),
+  customLabel: z.string().max(50).optional().nullable(),
+  addressText: z.string().min(1).max(500),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  placeId: z.string().optional().nullable(),
+  iconType: z.string().max(20).optional(),
+  isDefaultPickup: z.boolean().optional(),
+  isDefaultDropoff: z.boolean().optional(),
+});
+
+// ====================================================
+// POST /api/customer/saved-places
+// Add a new saved place
+// ====================================================
+router.post("/saved-places", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = savedPlaceSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: {
+        user: { select: { countryCode: true } },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const countryCode = customer.user?.countryCode || "US";
+    const features = await getPhase3Features(countryCode);
+
+    if (!features.savedPlacesEnabled) {
+      return res.status(403).json({ error: "Saved places feature is not enabled" });
+    }
+
+    const existingCount = await prisma.customerSavedPlace.count({
+      where: { customerId: customer.id },
+    });
+
+    if (existingCount >= features.maxSavedPlaces) {
+      return res.status(400).json({
+        error: `Maximum ${features.maxSavedPlaces} saved places allowed`,
+      });
+    }
+
+    // Enforce single home/work rule
+    if (data.label === "home" || data.label === "work") {
+      const existing = await prisma.customerSavedPlace.findFirst({
+        where: {
+          customerId: customer.id,
+          label: data.label,
+        },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          error: `A ${data.label} address already exists. Please update or delete it first.`,
+        });
+      }
+    }
+
+    // Clear existing defaults if setting new defaults
+    if (data.isDefaultPickup) {
+      await prisma.customerSavedPlace.updateMany({
+        where: { customerId: customer.id, isDefaultPickup: true },
+        data: { isDefaultPickup: false },
+      });
+    }
+
+    if (data.isDefaultDropoff) {
+      await prisma.customerSavedPlace.updateMany({
+        where: { customerId: customer.id, isDefaultDropoff: true },
+        data: { isDefaultDropoff: false },
+      });
+    }
+
+    const savedPlace = await prisma.customerSavedPlace.create({
+      data: {
+        customerId: customer.id,
+        label: data.label,
+        customLabel: data.customLabel,
+        addressText: data.addressText,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        placeId: data.placeId,
+        iconType: data.iconType || (data.label === "home" ? "home" : data.label === "work" ? "work" : "star"),
+        isDefaultPickup: data.isDefaultPickup || false,
+        isDefaultDropoff: data.isDefaultDropoff || false,
+      },
+    });
+
+    res.status(201).json({ savedPlace });
+  } catch (error: any) {
+    console.error("[Customer] Error creating saved place:", error);
+    res.status(500).json({ error: error.message || "Failed to create saved place" });
+  }
+});
+
+// ====================================================
+// PATCH /api/customer/saved-places/:id
+// Update a saved place
+// ====================================================
+router.patch("/saved-places/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const placeId = req.params.id;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const existingPlace = await prisma.customerSavedPlace.findFirst({
+      where: { id: placeId, customerId: customer.id },
+    });
+
+    if (!existingPlace) {
+      return res.status(404).json({ error: "Saved place not found" });
+    }
+
+    const partialSchema = savedPlaceSchema.partial();
+    const validationResult = partialSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    // Check home/work uniqueness if changing label
+    if (data.label && (data.label === "home" || data.label === "work") && data.label !== existingPlace.label) {
+      const existing = await prisma.customerSavedPlace.findFirst({
+        where: {
+          customerId: customer.id,
+          label: data.label,
+          id: { not: placeId },
+        },
+      });
+
+      if (existing) {
+        return res.status(400).json({
+          error: `A ${data.label} address already exists`,
+        });
+      }
+    }
+
+    // Clear existing defaults if setting new defaults
+    if (data.isDefaultPickup) {
+      await prisma.customerSavedPlace.updateMany({
+        where: { customerId: customer.id, isDefaultPickup: true, id: { not: placeId } },
+        data: { isDefaultPickup: false },
+      });
+    }
+
+    if (data.isDefaultDropoff) {
+      await prisma.customerSavedPlace.updateMany({
+        where: { customerId: customer.id, isDefaultDropoff: true, id: { not: placeId } },
+        data: { isDefaultDropoff: false },
+      });
+    }
+
+    const updated = await prisma.customerSavedPlace.update({
+      where: { id: placeId },
+      data: {
+        ...(data.label && { label: data.label }),
+        ...(data.customLabel !== undefined && { customLabel: data.customLabel }),
+        ...(data.addressText && { addressText: data.addressText }),
+        ...(data.latitude !== undefined && { latitude: data.latitude }),
+        ...(data.longitude !== undefined && { longitude: data.longitude }),
+        ...(data.placeId !== undefined && { placeId: data.placeId }),
+        ...(data.iconType && { iconType: data.iconType }),
+        ...(data.isDefaultPickup !== undefined && { isDefaultPickup: data.isDefaultPickup }),
+        ...(data.isDefaultDropoff !== undefined && { isDefaultDropoff: data.isDefaultDropoff }),
+      },
+    });
+
+    res.json({ savedPlace: updated });
+  } catch (error: any) {
+    console.error("[Customer] Error updating saved place:", error);
+    res.status(500).json({ error: error.message || "Failed to update saved place" });
+  }
+});
+
+// ====================================================
+// DELETE /api/customer/saved-places/:id
+// Delete a saved place
+// ====================================================
+router.delete("/saved-places/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const placeId = req.params.id;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const existingPlace = await prisma.customerSavedPlace.findFirst({
+      where: { id: placeId, customerId: customer.id },
+    });
+
+    if (!existingPlace) {
+      return res.status(404).json({ error: "Saved place not found" });
+    }
+
+    await prisma.customerSavedPlace.delete({
+      where: { id: placeId },
+    });
+
+    res.json({ success: true, message: "Saved place deleted" });
+  } catch (error: any) {
+    console.error("[Customer] Error deleting saved place:", error);
+    res.status(500).json({ error: error.message || "Failed to delete saved place" });
+  }
+});
+
+// ====================================================
+// GET /api/customer/ride-preferences
+// Get customer ride preferences
+// ====================================================
+router.get("/ride-preferences", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: {
+        user: { select: { countryCode: true } },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const countryCode = customer.user?.countryCode || "US";
+    const features = await getPhase3Features(countryCode);
+
+    if (!features.ridePreferencesEnabled) {
+      return res.status(403).json({ error: "Ride preferences feature is not enabled" });
+    }
+
+    const ridePreferences = await prisma.customerRidePreferences.findUnique({
+      where: { customerId: customer.id },
+    });
+
+    const preferences = ridePreferences || {
+      preferredServiceTypes: ["ride"],
+      preferredVehicleTypes: [],
+      musicPreference: "no_preference",
+      airConditioning: "no_preference",
+      communicationPreference: "no_preference",
+      accessibilityOptions: {},
+      safetyPreferences: {},
+    };
+
+    res.json({ preferences });
+  } catch (error: any) {
+    console.error("[Customer] Error fetching ride preferences:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch ride preferences" });
+  }
+});
+
+// Ride preferences validation schema
+const ridePreferencesSchema = z.object({
+  preferredServiceTypes: z.array(z.enum(["ride", "food", "parcel"])).optional(),
+  preferredVehicleTypes: z.array(z.string()).optional(),
+  musicPreference: z.enum(["no_preference", "quiet", "loud_ok"]).optional(),
+  airConditioning: z.enum(["no_preference", "ac_on", "ac_off"]).optional(),
+  communicationPreference: z.enum(["no_preference", "minimal_talk", "friendly"]).optional(),
+  accessibilityOptions: z.object({
+    wheelchair_support: z.boolean().optional(),
+    hearing_impaired: z.boolean().optional(),
+    vision_impaired: z.boolean().optional(),
+  }).optional(),
+  safetyPreferences: z.object({
+    share_trip_automatically_with_contacts: z.boolean().optional(),
+    require_mask: z.boolean().optional(),
+  }).optional(),
+});
+
+// ====================================================
+// PUT /api/customer/ride-preferences
+// Update customer ride preferences
+// ====================================================
+router.put("/ride-preferences", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = ridePreferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+      include: {
+        user: { select: { countryCode: true } },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const countryCode = customer.user?.countryCode || "US";
+    const features = await getPhase3Features(countryCode);
+
+    if (!features.ridePreferencesEnabled) {
+      return res.status(403).json({ error: "Ride preferences feature is not enabled" });
+    }
+
+    const preferences = await prisma.customerRidePreferences.upsert({
+      where: { customerId: customer.id },
+      create: {
+        customerId: customer.id,
+        preferredServiceTypes: data.preferredServiceTypes || ["ride"],
+        preferredVehicleTypes: data.preferredVehicleTypes || [],
+        musicPreference: data.musicPreference || "no_preference",
+        airConditioning: data.airConditioning || "no_preference",
+        communicationPreference: data.communicationPreference || "no_preference",
+        accessibilityOptions: data.accessibilityOptions || {},
+        safetyPreferences: data.safetyPreferences || {},
+      },
+      update: {
+        ...(data.preferredServiceTypes && { preferredServiceTypes: data.preferredServiceTypes }),
+        ...(data.preferredVehicleTypes && { preferredVehicleTypes: data.preferredVehicleTypes }),
+        ...(data.musicPreference && { musicPreference: data.musicPreference }),
+        ...(data.airConditioning && { airConditioning: data.airConditioning }),
+        ...(data.communicationPreference && { communicationPreference: data.communicationPreference }),
+        ...(data.accessibilityOptions && { accessibilityOptions: data.accessibilityOptions }),
+        ...(data.safetyPreferences && { safetyPreferences: data.safetyPreferences }),
+      },
+    });
+
+    res.json({ preferences });
+  } catch (error: any) {
+    console.error("[Customer] Error updating ride preferences:", error);
+    res.status(500).json({ error: error.message || "Failed to update ride preferences" });
+  }
+});
+
+// ====================================================
+// GET /api/customer/payment-methods
+// Get customer's saved payment methods
+// ====================================================
+router.get("/payment-methods", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const paymentAccounts = await prisma.paymentAccount.findMany({
+      where: { userId },
+      orderBy: [
+        { isDefault: "desc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    const paymentMethods = paymentAccounts.map((account) => ({
+      id: account.id,
+      type: account.type,
+      displayName: account.displayName,
+      last4: account.last4,
+      expiryMonth: account.expiryMonth,
+      expiryYear: account.expiryYear,
+      cardBrand: account.cardBrand,
+      bankName: account.bankName,
+      mobileNumber: account.mobileNumber,
+      isDefault: account.isDefault,
+      isVerified: account.isVerified,
+      createdAt: account.createdAt,
+    }));
+
+    res.json({ paymentMethods });
+  } catch (error: any) {
+    console.error("[Customer] Error fetching payment methods:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch payment methods" });
+  }
+});
+
+// Payment method validation schema
+const paymentMethodSchema = z.object({
+  type: z.enum(["card", "bank", "mobile_money", "wallet"]),
+  displayName: z.string().max(100).optional(),
+  last4: z.string().length(4).optional(),
+  expiryMonth: z.number().min(1).max(12).optional(),
+  expiryYear: z.number().min(2024).max(2099).optional(),
+  cardBrand: z.string().max(20).optional(),
+  bankName: z.string().max(100).optional(),
+  mobileNumber: z.string().max(20).optional(),
+  providerAccountId: z.string().optional(),
+  isDefault: z.boolean().optional(),
+});
+
+// ====================================================
+// POST /api/customer/payment-methods
+// Add a new payment method
+// ====================================================
+router.post("/payment-methods", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const validationResult = paymentMethodSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // If this is the first payment method or marked as default, set as default
+    const existingCount = await prisma.paymentAccount.count({
+      where: { userId },
+    });
+
+    const shouldBeDefault = existingCount === 0 || data.isDefault;
+
+    // Clear existing defaults if setting new default
+    if (shouldBeDefault) {
+      await prisma.paymentAccount.updateMany({
+        where: { userId, isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+
+    // Generate display name if not provided
+    const displayName = data.displayName ||
+      (data.type === "card" ? `${data.cardBrand || "Card"} ****${data.last4}` :
+       data.type === "mobile_money" ? `Mobile ${data.mobileNumber?.slice(-4)}` :
+       data.type === "bank" ? `${data.bankName} ****${data.last4}` :
+       "Payment Method");
+
+    const paymentAccount = await prisma.paymentAccount.create({
+      data: {
+        userId,
+        actorType: "customer",
+        type: data.type,
+        provider: "manual",
+        providerAccountId: data.providerAccountId || null,
+        displayName,
+        last4: data.last4,
+        expiryMonth: data.expiryMonth,
+        expiryYear: data.expiryYear,
+        cardBrand: data.cardBrand,
+        bankName: data.bankName,
+        mobileNumber: data.mobileNumber,
+        isDefault: shouldBeDefault,
+        isVerified: false,
+      },
+    });
+
+    res.status(201).json({
+      paymentMethod: {
+        id: paymentAccount.id,
+        type: paymentAccount.type,
+        displayName: paymentAccount.displayName,
+        last4: paymentAccount.last4,
+        expiryMonth: paymentAccount.expiryMonth,
+        expiryYear: paymentAccount.expiryYear,
+        cardBrand: paymentAccount.cardBrand,
+        bankName: paymentAccount.bankName,
+        mobileNumber: paymentAccount.mobileNumber,
+        isDefault: paymentAccount.isDefault,
+        isVerified: paymentAccount.isVerified,
+        createdAt: paymentAccount.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("[Customer] Error creating payment method:", error);
+    res.status(500).json({ error: error.message || "Failed to create payment method" });
+  }
+});
+
+// ====================================================
+// PATCH /api/customer/payment-methods/:id
+// Update a payment method
+// ====================================================
+router.patch("/payment-methods/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const methodId = req.params.id;
+
+    const existingMethod = await prisma.paymentAccount.findFirst({
+      where: { id: methodId, userId },
+    });
+
+    if (!existingMethod) {
+      return res.status(404).json({ error: "Payment method not found" });
+    }
+
+    const partialSchema = paymentMethodSchema.partial();
+    const validationResult = partialSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    // Clear existing defaults if setting new default
+    if (data.isDefault) {
+      await prisma.paymentAccount.updateMany({
+        where: { userId, isDefault: true, id: { not: methodId } },
+        data: { isDefault: false },
+      });
+    }
+
+    const updated = await prisma.paymentAccount.update({
+      where: { id: methodId },
+      data: {
+        ...(data.displayName && { displayName: data.displayName }),
+        ...(data.last4 && { last4: data.last4 }),
+        ...(data.expiryMonth && { expiryMonth: data.expiryMonth }),
+        ...(data.expiryYear && { expiryYear: data.expiryYear }),
+        ...(data.cardBrand && { cardBrand: data.cardBrand }),
+        ...(data.bankName && { bankName: data.bankName }),
+        ...(data.mobileNumber && { mobileNumber: data.mobileNumber }),
+        ...(data.isDefault !== undefined && { isDefault: data.isDefault }),
+      },
+    });
+
+    res.json({
+      paymentMethod: {
+        id: updated.id,
+        type: updated.type,
+        displayName: updated.displayName,
+        last4: updated.last4,
+        expiryMonth: updated.expiryMonth,
+        expiryYear: updated.expiryYear,
+        cardBrand: updated.cardBrand,
+        bankName: updated.bankName,
+        mobileNumber: updated.mobileNumber,
+        isDefault: updated.isDefault,
+        isVerified: updated.isVerified,
+      },
+    });
+  } catch (error: any) {
+    console.error("[Customer] Error updating payment method:", error);
+    res.status(500).json({ error: error.message || "Failed to update payment method" });
+  }
+});
+
+// ====================================================
+// DELETE /api/customer/payment-methods/:id
+// Delete a payment method
+// ====================================================
+router.delete("/payment-methods/:id", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const methodId = req.params.id;
+
+    const existingMethod = await prisma.paymentAccount.findFirst({
+      where: { id: methodId, userId },
+    });
+
+    if (!existingMethod) {
+      return res.status(404).json({ error: "Payment method not found" });
+    }
+
+    // Check if this is the default method
+    const wasDefault = existingMethod.isDefault;
+
+    await prisma.paymentAccount.delete({
+      where: { id: methodId },
+    });
+
+    // If we deleted the default, make the next one default
+    if (wasDefault) {
+      const nextMethod = await prisma.paymentAccount.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (nextMethod) {
+        await prisma.paymentAccount.update({
+          where: { id: nextMethod.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+
+    res.json({ success: true, message: "Payment method deleted" });
+  } catch (error: any) {
+    console.error("[Customer] Error deleting payment method:", error);
+    res.status(500).json({ error: error.message || "Failed to delete payment method" });
+  }
+});
+
+// ====================================================
+// POST /api/customer/payment-methods/:id/set-default
+// Set a payment method as default
+// ====================================================
+router.post("/payment-methods/:id/set-default", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const methodId = req.params.id;
+
+    const existingMethod = await prisma.paymentAccount.findFirst({
+      where: { id: methodId, userId },
+    });
+
+    if (!existingMethod) {
+      return res.status(404).json({ error: "Payment method not found" });
+    }
+
+    // Clear all defaults
+    await prisma.paymentAccount.updateMany({
+      where: { userId, isDefault: true },
+      data: { isDefault: false },
+    });
+
+    // Set new default
+    const updated = await prisma.paymentAccount.update({
+      where: { id: methodId },
+      data: { isDefault: true },
+    });
+
+    res.json({
+      success: true,
+      paymentMethod: {
+        id: updated.id,
+        type: updated.type,
+        displayName: updated.displayName,
+        isDefault: updated.isDefault,
+      },
+    });
+  } catch (error: any) {
+    console.error("[Customer] Error setting default payment method:", error);
+    res.status(500).json({ error: error.message || "Failed to set default payment method" });
+  }
+});
+
+// ====================================================
+// PATCH /api/customer/profile/preferences
+// Update customer notification and language preferences
+// ====================================================
+router.patch("/profile/preferences", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const preferencesSchema = z.object({
+      languagePreference: z.enum(["en", "bn", "es", "fr", "ar"]).optional(),
+      notificationPreferences: z.object({
+        ride_updates: z.boolean().optional(),
+        food_updates: z.boolean().optional(),
+        parcel_updates: z.boolean().optional(),
+        marketing: z.boolean().optional(),
+        promotions: z.boolean().optional(),
+        safety_alerts: z.boolean().optional(),
+      }).optional(),
+    });
+
+    const validationResult = preferencesSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const data = validationResult.data;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const updateData: any = {};
+
+    if (data.languagePreference) {
+      updateData.languagePreference = data.languagePreference;
+    }
+
+    if (data.notificationPreferences) {
+      const current = (customer.notificationPreferences as object) || {};
+      updateData.notificationPreferences = { ...current, ...data.notificationPreferences };
+    }
+
+    const updated = await prisma.customerProfile.update({
+      where: { id: customer.id },
+      data: updateData,
+    });
+
+    res.json({
+      success: true,
+      preferences: {
+        languagePreference: updated.languagePreference,
+        notificationPreferences: updated.notificationPreferences,
+      },
+    });
+  } catch (error: any) {
+    console.error("[Customer] Error updating preferences:", error);
+    res.status(500).json({ error: error.message || "Failed to update preferences" });
+  }
+});
+
+// ====================================================
+// PATCH /api/customer/profile/avatar
+// Update customer avatar
+// ====================================================
+router.patch("/profile/avatar", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const avatarSchema = z.object({
+      avatarUrl: z.string().url().nullable(),
+    });
+
+    const validationResult = avatarSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: validationResult.error.issues,
+      });
+    }
+
+    const { avatarUrl } = validationResult.data;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    const updated = await prisma.customerProfile.update({
+      where: { id: customer.id },
+      data: { avatarUrl },
+    });
+
+    res.json({
+      success: true,
+      avatarUrl: updated.avatarUrl,
+    });
+  } catch (error: any) {
+    console.error("[Customer] Error updating avatar:", error);
+    res.status(500).json({ error: error.message || "Failed to update avatar" });
+  }
+});
+
+// ====================================================
+// GET /api/customer/delivery-addresses
+// Get customer's default delivery address for food orders
+// ====================================================
+router.get("/delivery-addresses", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    const customer = await prisma.customerProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    // Get saved places marked as default dropoff for delivery
+    const savedPlaces = await prisma.customerSavedPlace.findMany({
+      where: { customerId: customer.id },
+      orderBy: [
+        { isDefaultDropoff: "desc" },
+        { label: "asc" },
+        { createdAt: "desc" },
+      ],
+    });
+
+    // Map to delivery address format
+    const deliveryAddresses = savedPlaces.map((place) => ({
+      id: place.id,
+      label: place.label,
+      customLabel: place.customLabel,
+      addressText: place.addressText,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      placeId: place.placeId,
+      isDefault: place.isDefaultDropoff,
+    }));
+
+    res.json({ deliveryAddresses });
+  } catch (error: any) {
+    console.error("[Customer] Error fetching delivery addresses:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch delivery addresses" });
+  }
+});
+
 export default router;

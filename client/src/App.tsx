@@ -49,6 +49,8 @@ import TripReceipt from "@/pages/customer/trip-receipt";
 import CustomerProfileSettings from "@/pages/customer/profile-settings";
 import CustomerPaymentMethods from "@/pages/customer/payment-methods";
 import CustomerDeliveryAddresses from "@/pages/customer/delivery-addresses";
+import CustomerSavedPlaces from "@/pages/customer/saved-places";
+import CustomerRidePreferences from "@/pages/customer/ride-preferences";
 import CustomerSupportHub from "@/pages/customer-app/support-hub";
 import CustomerSupportHelp from "@/pages/customer-app/support-help";
 import CustomerSupportArticle from "@/pages/customer-app/support-article";
@@ -196,6 +198,7 @@ import RestaurantSupportTicketDetail from "@/pages/restaurant/support-ticket-det
 import RestaurantWallet from "@/pages/restaurant/wallet";
 import StaffManagement from "@/pages/restaurant/staff";
 import StaffActivity from "@/pages/restaurant/staff-activity";
+import RestaurantKitchen from "@/pages/restaurant/kitchen";
 
 // Admin pages
 import { AdminLayout } from "@/layouts/AdminLayout";
@@ -418,6 +421,16 @@ function Router() {
       <Route path="/customer/delivery-addresses">
         <ProtectedRoute allowedRoles={["customer"]}>
           <CustomerDeliveryAddresses />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/saved-places">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerSavedPlaces />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/ride-preferences">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <CustomerRidePreferences />
         </ProtectedRoute>
       </Route>
       <Route path="/customer/rides/:id">
@@ -1161,6 +1174,15 @@ function Router() {
         <ProtectedRoute allowedRoles={["restaurant"]}>
           <RestaurantLayout>
             <RestaurantOrders />
+          </RestaurantLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Kitchen Display */}
+      <Route path="/restaurant/kitchen">
+        <ProtectedRoute allowedRoles={["restaurant"]}>
+          <RestaurantLayout>
+            <RestaurantKitchen />
           </RestaurantLayout>
         </ProtectedRoute>
       </Route>
