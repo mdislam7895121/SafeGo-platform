@@ -710,6 +710,29 @@ export default function DriverMapPage() {
           </DropdownMenu>
         </div>
 
+        {/* Right Footer Button - Quick Actions (matching left footer button style) */}
+        <button
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            border: '2px solid hsl(var(--border))',
+            backgroundColor: 'hsl(var(--background))',
+            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            cursor: 'pointer',
+          }}
+          onClick={() => setShowQuickActionsSheet(true)}
+          data-testid="button-quick-actions"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
 
         {!activeTrip && isOnline && !incomingRequest && (
           <div
@@ -837,17 +860,6 @@ export default function DriverMapPage() {
             }
           </span>
         </button>
-
-        {/* Right Footer Button - Quick Actions (same style as left footer button) */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="fixed bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[1001]"
-          onClick={() => setShowQuickActionsSheet(true)}
-          data-testid="button-quick-actions"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
 
         <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
           <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
