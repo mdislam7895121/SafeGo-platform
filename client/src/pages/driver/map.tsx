@@ -668,7 +668,7 @@ export default function DriverMapPage() {
               </SheetHeader>
               
               <div className="flex-1 overflow-y-auto px-4 pb-6">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
                   {filteredServices.map((service) => {
                     const ServiceIcon = service.icon;
                     const isEnabled = isServiceEnabled(service);
@@ -679,29 +679,28 @@ export default function DriverMapPage() {
                         key={service.id}
                         onClick={() => toggleServicePreference(service)}
                         disabled={isUpdating}
-                        className={`relative flex flex-col items-center justify-center p-4 h-[140px] rounded-[20px] transition-all duration-200 ${
+                        className={`trip-preference-card relative flex flex-col items-center justify-center gap-1.5 h-[85px] sm:h-[85px] rounded-[14px] transition-all duration-[250ms] ease-out cursor-pointer ${
                           isEnabled 
-                            ? "bg-[#181818] border-2 border-white" 
-                            : "bg-[#101010] border border-[#333] hover:border-[#555]"
+                            ? "bg-[rgba(62,139,247,0.18)] border-2 border-[#3E8BF7] shadow-[0_0_6px_rgba(62,139,247,0.55)]" 
+                            : "bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.25)] hover:-translate-y-[1px]"
                         } ${isUpdating ? "opacity-60" : ""}`}
+                        style={{ padding: '12px 10px' }}
                         data-testid={`service-card-${service.id}`}
                       >
                         <div 
-                          className={`absolute top-3 right-3 w-5 h-5 rounded flex items-center justify-center transition-colors ${
+                          className={`absolute top-2 right-2 w-3.5 h-3.5 rounded-sm flex items-center justify-center transition-colors ${
                             isEnabled 
-                              ? "bg-white" 
-                              : "border border-[#555]"
+                              ? "bg-[#3E8BF7]" 
+                              : "border border-[rgba(255,255,255,0.3)]"
                           }`}
                         >
-                          {isEnabled && <Check className="h-3.5 w-3.5 text-black" />}
+                          {isEnabled && <Check className="h-2.5 w-2.5 text-white" />}
                         </div>
                         
-                        <div className="flex-1 flex items-center justify-center">
-                          <ServiceIcon className={`h-10 w-10 ${isEnabled ? "text-white" : "text-gray-500"}`} />
-                        </div>
+                        <ServiceIcon className={`h-[22px] w-[22px] ${isEnabled ? "text-[#3E8BF7]" : "text-[rgba(255,255,255,0.75)]"}`} />
                         
-                        <span className={`text-sm font-medium text-center mt-2 ${
-                          isEnabled ? "text-white" : "text-gray-500"
+                        <span className={`text-[13.5px] text-center leading-tight ${
+                          isEnabled ? "font-semibold text-white" : "font-medium text-white"
                         }`}>
                           {service.name}
                         </span>
@@ -710,8 +709,8 @@ export default function DriverMapPage() {
                   })}
                 </div>
                 
-                <div className="mt-6 px-1">
-                  <p className="text-[#666] text-xs text-center">
+                <div className="mt-5 px-1">
+                  <p className="text-[rgba(255,255,255,0.4)] text-xs text-center">
                     Toggle services to control which trip types you receive. 
                     Changes are saved automatically.
                   </p>
@@ -734,11 +733,11 @@ export default function DriverMapPage() {
             </Button>
           </SheetTrigger>
           <SheetContent side="bottom" className="rounded-t-2xl z-[1010] bg-black border-t-0">
-            <SheetHeader className="pb-4">
+            <SheetHeader className="pb-3">
               <SheetTitle className="text-white text-xl font-semibold">Trip Preferences</SheetTitle>
             </SheetHeader>
             <div className="pb-6">
-              <div className="grid grid-cols-3 gap-3 mb-6">
+              <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
                 {filteredServices.map((service) => {
                   const ServiceIcon = service.icon;
                   const isEnabled = isServiceEnabled(service);
@@ -749,27 +748,28 @@ export default function DriverMapPage() {
                       key={service.id}
                       onClick={() => toggleServicePreference(service)}
                       disabled={isUpdating}
-                      className={`relative flex flex-col items-center justify-center p-3 h-[100px] rounded-[16px] transition-all duration-200 ${
+                      className={`trip-preference-card relative flex flex-col items-center justify-center gap-1.5 h-[75px] sm:h-[85px] rounded-[14px] transition-all duration-[250ms] ease-out cursor-pointer ${
                         isEnabled 
-                          ? "bg-[#181818] border-2 border-white" 
-                          : "bg-[#101010] border border-[#333] hover:border-[#555]"
+                          ? "bg-[rgba(62,139,247,0.18)] border-2 border-[#3E8BF7] shadow-[0_0_6px_rgba(62,139,247,0.55)]" 
+                          : "bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.25)] hover:-translate-y-[1px]"
                       } ${isUpdating ? "opacity-60" : ""}`}
+                      style={{ padding: '12px 10px' }}
                       data-testid={`quick-service-card-${service.id}`}
                     >
                       <div 
-                        className={`absolute top-2 right-2 w-4 h-4 rounded flex items-center justify-center transition-colors ${
+                        className={`absolute top-2 right-2 w-3.5 h-3.5 rounded-sm flex items-center justify-center transition-colors ${
                           isEnabled 
-                            ? "bg-white" 
-                            : "border border-[#555]"
+                            ? "bg-[#3E8BF7]" 
+                            : "border border-[rgba(255,255,255,0.3)]"
                         }`}
                       >
-                        {isEnabled && <Check className="h-3 w-3 text-black" />}
+                        {isEnabled && <Check className="h-2.5 w-2.5 text-white" />}
                       </div>
                       
-                      <ServiceIcon className={`h-8 w-8 ${isEnabled ? "text-white" : "text-gray-500"}`} />
+                      <ServiceIcon className={`h-5 w-5 sm:h-[22px] sm:w-[22px] ${isEnabled ? "text-[#3E8BF7]" : "text-[rgba(255,255,255,0.75)]"}`} />
                       
-                      <span className={`text-xs font-medium text-center mt-2 ${
-                        isEnabled ? "text-white" : "text-gray-500"
+                      <span className={`text-xs sm:text-[13.5px] text-center leading-tight ${
+                        isEnabled ? "font-semibold text-white" : "font-medium text-white"
                       }`}>
                         {service.name}
                       </span>
@@ -778,7 +778,7 @@ export default function DriverMapPage() {
                 })}
               </div>
               
-              <p className="text-[#666] text-xs text-center mb-4">
+              <p className="text-[rgba(255,255,255,0.4)] text-xs text-center mb-4">
                 Toggle services to control which trip types you receive.
               </p>
               
@@ -787,10 +787,10 @@ export default function DriverMapPage() {
                   setLocation("/driver/trips");
                   setShowQuickActionsSheet(false);
                 }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl bg-[#181818] border border-[#333] hover:border-[#555] transition-colors"
+                className="w-full flex items-center gap-3 p-4 rounded-[14px] bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.25)] transition-all duration-[250ms]"
                 data-testid="quick-action-history"
               >
-                <History className="h-5 w-5 text-white" />
+                <History className="h-5 w-5 text-[rgba(255,255,255,0.75)]" />
                 <span className="font-medium text-white">Trip History</span>
               </button>
             </div>
