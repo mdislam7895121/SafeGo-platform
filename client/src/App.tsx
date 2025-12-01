@@ -256,6 +256,9 @@ import AdminSupportPhone from "@/pages/admin-portal/support-phone";
 import AdminSupportTickets from "@/pages/admin-portal/support-tickets";
 import AdminSupportTicketDetail2 from "@/pages/admin-portal/support-ticket-detail";
 import AdminDriverSupportCenter from "@/pages/admin/driver-support";
+import AdminMobileWalletConfig from "@/pages/admin/mobile-wallet-config";
+import AdminKycVerification from "@/pages/admin/kyc-verification";
+import AdminBackgroundChecks from "@/pages/admin/background-checks";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -1673,6 +1676,27 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Settings">
             <AdminSettings />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/mobile-wallets">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Mobile Wallet Config">
+            <AdminMobileWalletConfig />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/kyc-verification">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="KYC Verification">
+            <AdminKycVerification />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/background-checks">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Background Checks">
+            <AdminBackgroundChecks />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
