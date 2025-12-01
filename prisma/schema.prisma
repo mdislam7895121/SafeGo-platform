@@ -80,6 +80,85 @@ enum CancellationFeeType {
   driver_cancel     // Driver cancelled (may incur penalty)
 }
 
+// Phase 2B: Payment status lifecycle
+enum PaymentStatus {
+  created               // Payment intent created
+  requires_payment_method // Waiting for payment method
+  requires_confirmation  // Payment method attached, awaiting confirmation
+  processing            // Payment is processing
+  authorized            // Payment authorized but not captured
+  captured              // Payment successfully captured
+  succeeded             // Payment fully completed
+  failed                // Payment failed
+  cancelled             // Payment cancelled
+  refunded              // Payment refunded
+  partially_refunded    // Partial refund issued
+}
+
+// Phase 2B: Payment provider types
+enum PaymentProvider {
+  mock      // Demo/test provider
+  stripe    // Stripe payment gateway
+  bkash     // bKash mobile payment (Bangladesh)
+  nagad     // Nagad mobile payment (Bangladesh)
+  paypal    // PayPal
+  braintree // Braintree
+}
+
+// Phase 2B: Device platform types
+enum DevicePlatform {
+  ios
+  android
+  web
+}
+
+// Phase 2B: Notification types
+enum NotificationType {
+  // Driver notifications
+  NEW_RIDE_OFFER
+  RIDE_ASSIGNED
+  RIDE_CANCELLED
+  RIDE_COMPLETED_SUMMARY
+  NEW_FOOD_ORDER_ASSIGNMENT
+  NEW_PARCEL_ASSIGNMENT
+  WALLET_NEGATIVE_BALANCE_REMINDER
+  INCENTIVE_AWARDED
+  PAYOUT_PROCESSED
+  EARNINGS_SETTLED
+  
+  // Customer notifications
+  DRIVER_ASSIGNED
+  DRIVER_ARRIVING
+  DRIVER_ARRIVED
+  TRIP_STARTED
+  TRIP_COMPLETED_RECEIPT
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  ORDER_STATUS_UPDATE
+  PARCEL_STATUS_UPDATE
+  ORDER_PICKED_UP
+  ORDER_DELIVERED
+  
+  // Restaurant notifications
+  NEW_ORDER_RECEIVED
+  ORDER_CANCELLED
+  ORDER_READY_REMINDER
+  
+  // Admin notifications
+  HIGH_FAILURE_RATE
+  ABNORMAL_BALANCE
+  SYSTEM_ALERT
+}
+
+// Phase 2B: Notification status
+enum NotificationStatus {
+  pending     // Not yet sent
+  sent        // Successfully sent to FCM
+  delivered   // Confirmed delivered to device
+  failed      // Failed to send
+  expired     // Message expired before delivery
+}
+
 model AdminProfile {
   id                           String    @id @default(uuid())
   userId                       String    @unique
@@ -157,6 +236,10 @@ model CustomerProfile {
   
   // Phase 1B: Trip conversations
   tripConversations     TripConversation[]
+  
+  // Phase 2B: Payment methods and payments
+  paymentMethods        PaymentMethod[]
+  payments              Payment[]
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -217,6 +300,10 @@ model Delivery {
   cancellationFeeRuleId   String?           // FK to cancellation_fee_rules
   cancellationFeeRule     CancellationFeeRule? @relation("DeliveryCancellationFeeRule", fields: [cancellationFeeRuleId], references: [id], onDelete: SetNull)
   incentiveAwards         IncentiveAward[]  @relation("DeliveryIncentiveAwards") // Phase 2A: Proper relation to incentive awards
+  
+  // Phase 2B: Online payment integration (additive only)
+  paymentId               String?           // FK to payments table (for online payments)
+  paymentStatus           String?           // mirrors payments.status for fast queries (paid, failed, pending)
   
   customer         CustomerProfile  @relation(fields: [customerId], references: [id])
   driver           DriverProfile?   @relation(fields: [driverId], references: [id])
@@ -641,6 +728,10 @@ model FoodOrder {
   cancellationFeeRuleId   String?           // FK to cancellation_fee_rules
   cancellationFeeRule     CancellationFeeRule? @relation("FoodOrderCancellationFeeRule", fields: [cancellationFeeRuleId], references: [id], onDelete: SetNull)
   driverIncentiveAwards   IncentiveAward[]  @relation("FoodOrderIncentiveAwards") // Phase 2A: Proper relation to driver incentive awards
+  
+  // Phase 2B: Online payment integration (additive only)
+  paymentId               String?           // FK to payments table (for online payments)
+  paymentStatus           String?           // mirrors payments.status for fast queries (paid, failed, pending)
   
   createdAt            DateTime          @default(now())
   updatedAt            DateTime
@@ -1159,6 +1250,10 @@ model Ride {
   cancellationFeeRuleId   String?           // FK to cancellation_fee_rules
   cancellationFeeRule     CancellationFeeRule? @relation("RideCancellationFeeRule", fields: [cancellationFeeRuleId], references: [id], onDelete: SetNull)
   incentiveAwards         IncentiveAward[]  @relation("RideIncentiveAwards") // Phase 2A: Proper relation to incentive awards
+  
+  // Phase 2B: Online payment integration (additive only)
+  paymentId               String?           // FK to payments table (for online payments)
+  paymentStatus           String?           // mirrors payments.status for fast queries (paid, failed, pending)
 
   @@index([countryCode])
   @@index([cityCode])
@@ -1305,6 +1400,10 @@ model User {
   approvedAdjustments FinancialAdjustment[] @relation("ApprovedAdjustments")
   assignedDriverTickets DriverSupportTicket[] @relation("AssignedDriverTickets")
   driverTicketStatusChanges DriverSupportStatusHistory[] @relation("DriverTicketStatusChanges")
+  
+  // Phase 2B: Device tokens and notification logs
+  devices               UserDevice[]
+  notificationLogs      NotificationLog[]
 
   @@index([isDemo])
   @@index([isAccountLocked])
@@ -1668,6 +1767,19 @@ model PaymentMethod {
   status            PaymentMethodStatus   @default(active)
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
+  
+  // Phase 2B: Additional fields for payment integration
+  providerCustomerId  String?             // Stripe cus_xxx, etc.
+  type                String              @default("card") // card, bank_account, mobile_money
+  billingName         String?
+  billingCountry      String?
+  billingPostalCode   String?
+  fingerprint         String?             // Card fingerprint for duplicate detection
+  lastVerifiedAt      DateTime?
+  
+  // Relations
+  customer            CustomerProfile     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  payments            Payment[]
 
   @@index([customerId])
   @@index([customerId, isDefault])
@@ -4684,4 +4796,224 @@ model CancellationFeeRule {
   @@index([countryCode, serviceType, isActive])
   @@index([feeType])
   @@map("cancellation_fee_rules")
+}
+
+// ============================================================
+// Phase 2B: Payment Gateway Integration
+// ============================================================
+
+// Payment - Tracks individual payment transactions
+model Payment {
+  id                    String              @id @default(uuid())
+  
+  // Service association (polymorphic)
+  serviceType           DeliveryServiceType // ride | food | parcel
+  entityId              String              // FK to rides/food_orders/deliveries
+  
+  // Customer
+  customerId            String
+  
+  // Payment details
+  amount                Decimal             @db.Decimal(10, 2)
+  currency              String              @default("USD")
+  countryCode           String
+  
+  // Provider information
+  provider              PaymentProvider     @default(mock)
+  providerPaymentId     String?             // External payment intent ID (e.g., Stripe pi_xxx)
+  providerCustomerId    String?             // External customer ID if applicable
+  clientSecret          String?             // Client secret for frontend confirmation (not stored long-term)
+  
+  // Status tracking
+  status                PaymentStatus       @default(created)
+  
+  // Payment method info (masked)
+  paymentMethodId       String?             // FK to payment_methods (if using saved method)
+  paymentMethodType     String?             // card, mobile_money, wallet, etc.
+  paymentMethodLast4    String?             // Last 4 digits of card/account
+  paymentMethodBrand    String?             // visa, mastercard, bkash, etc.
+  
+  // Error handling
+  errorCode             String?
+  errorMessage          String?
+  declineCode           String?             // Provider-specific decline code
+  
+  // Timestamps
+  authorizedAt          DateTime?
+  capturedAt            DateTime?
+  cancelledAt           DateTime?
+  refundedAt            DateTime?
+  
+  // Metadata
+  metadata              Json?               // Additional provider-specific data
+  webhookPayload        Json?               // Last webhook payload received
+  idempotencyKey        String?             @unique // Prevent duplicate payments
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  customer              CustomerProfile     @relation(fields: [customerId], references: [id])
+  paymentMethod         PaymentMethod?      @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  refunds               PaymentRefund[]
+  
+  @@index([customerId])
+  @@index([serviceType, entityId])
+  @@index([provider, providerPaymentId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+// PaymentRefund - Tracks refunds for payments
+model PaymentRefund {
+  id                    String              @id @default(uuid())
+  paymentId             String
+  
+  amount                Decimal             @db.Decimal(10, 2)
+  currency              String
+  reason                String?             // Refund reason
+  
+  // Provider info
+  providerRefundId      String?             // External refund ID
+  status                String              @default("pending") // pending, succeeded, failed
+  
+  // Error handling
+  errorCode             String?
+  errorMessage          String?
+  
+  createdAt             DateTime            @default(now())
+  processedAt           DateTime?
+  
+  payment               Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  
+  @@index([paymentId])
+  @@index([status])
+  @@map("payment_refunds")
+}
+
+
+// PaymentProviderConfig - Admin configuration for payment providers per country
+model PaymentProviderConfig {
+  id                    String              @id @default(uuid())
+  
+  countryCode           String
+  provider              PaymentProvider
+  serviceType           DeliveryServiceType?  // null = applies to all services
+  
+  // Configuration
+  isEnabled             Boolean             @default(true)
+  isDefault             Boolean             @default(false)
+  priority              Int                 @default(0) // Higher = preferred
+  
+  // Fees (platform may charge on top of provider fees)
+  platformFeePercentage Decimal?            @db.Decimal(5, 2)
+  platformFeeFixed      Decimal?            @db.Decimal(10, 2)
+  
+  // Provider-specific settings (encrypted or env-referenced)
+  configJson            Json?               // Non-sensitive config
+  
+  // Supported payment types
+  supportedMethods      String[]            @default([]) // ["card", "mobile_money", "bank"]
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  createdByAdminId      String?
+  
+  @@unique([countryCode, provider, serviceType])
+  @@index([countryCode, isEnabled])
+  @@index([provider])
+  @@map("payment_provider_configs")
+}
+
+// ============================================================
+// Phase 2B: FCM Notification System
+// ============================================================
+
+// UserDevice - FCM tokens for push notifications
+model UserDevice {
+  id                    String              @id @default(uuid())
+  userId                String              // FK to users table
+  role                  String              // customer | driver | restaurant | admin
+  
+  // Device info
+  platform              DevicePlatform
+  fcmToken              String              // Firebase Cloud Messaging token
+  deviceId              String?             // Unique device identifier
+  deviceModel           String?             // Device model info
+  osVersion             String?             // OS version
+  appVersion            String?             // App version
+  locale                String?             // User's locale (e.g., "en-US", "bn-BD")
+  
+  // Status
+  isActive              Boolean             @default(true)
+  revokedAt             DateTime?           // When token was revoked
+  revokeReason          String?             // Why token was revoked
+  
+  // Activity tracking
+  lastSeenAt            DateTime            @default(now())
+  notificationCount     Int                 @default(0)  // Total notifications sent
+  failureCount          Int                 @default(0)  // Failed sends (for cleanup)
+  
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  
+  // Relations
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notificationLogs      NotificationLog[]
+  
+  @@unique([userId, fcmToken])
+  @@index([userId, role])
+  @@index([fcmToken])
+  @@index([isActive])
+  @@index([lastSeenAt])
+  @@map("user_devices")
+}
+
+// NotificationLog - Track all sent notifications
+model NotificationLog {
+  id                    String              @id @default(uuid())
+  
+  // Target
+  userId                String
+  role                  String              // customer | driver | restaurant | admin
+  deviceId              String?             // FK to user_devices (null if sent to all devices)
+  
+  // Notification content
+  type                  NotificationType
+  title                 String
+  body                  String
+  data                  Json?               // Additional payload data
+  
+  // Service association (optional)
+  serviceType           DeliveryServiceType?
+  entityId              String?             // ride_id, food_order_id, delivery_id
+  
+  // Delivery status
+  status                NotificationStatus  @default(pending)
+  sentAt                DateTime?
+  deliveredAt           DateTime?
+  
+  // Error tracking
+  errorCode             String?
+  errorMessage          String?
+  fcmMessageId          String?             // FCM message ID for tracking
+  
+  // Metadata
+  priority              String              @default("normal") // normal, high
+  ttlSeconds            Int?                // Time-to-live for message
+  collapseKey           String?             // Collapse key for grouping
+  
+  createdAt             DateTime            @default(now())
+  
+  // Relations
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  device                UserDevice?         @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  
+  @@index([userId, role])
+  @@index([type])
+  @@index([serviceType, entityId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("notification_logs")
 }

@@ -1,6 +1,8 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, DeliveryServiceType } from "@prisma/client";
 import { prisma } from "../db";
 import { walletService, TransactionClient } from "./walletService";
+import { driverNotificationService } from "./driverNotificationService";
+import { customerNotificationService } from "./customerNotificationService";
 
 export interface SettlementResult {
   success: boolean;
@@ -141,6 +143,24 @@ export class SettlementService {
             settledAt: new Date(),
           },
         });
+
+        const driverEarnings = Number(ride.driverPayout?.toString() || fareAmount - commission);
+        driverNotificationService.sendEarningsSettled({
+          driverId: ride.driverId!,
+          amount: driverEarnings,
+          currency,
+          serviceType: DeliveryServiceType.ride,
+          entityId: rideId,
+        }).catch((err: Error) => console.error("[SettlementService] Notification error:", err));
+
+        if (ride.customerId) {
+          customerNotificationService.sendTripCompletedReceipt({
+            customerId: ride.customerId,
+            rideId,
+            totalFare: fareAmount,
+            currency,
+          }).catch((err: Error) => console.error("[SettlementService] Customer notification error:", err));
+        }
 
         return {
           success: true,
@@ -319,6 +339,25 @@ export class SettlementService {
           },
         });
 
+        if (order.driverId) {
+          driverNotificationService.sendEarningsSettled({
+            driverId: order.driverId,
+            amount: deliveryFee,
+            currency,
+            serviceType: DeliveryServiceType.food,
+            entityId: orderId,
+          }).catch((err: Error) => console.error("[SettlementService] Food driver notification error:", err));
+        }
+
+        if (order.customerId) {
+          customerNotificationService.sendOrderDelivered({
+            customerId: order.customerId,
+            orderId,
+            totalAmount: orderTotal,
+            currency,
+          }).catch((err: Error) => console.error("[SettlementService] Food customer notification error:", err));
+        }
+
         return {
           success: true,
           entityId: orderId,
@@ -475,6 +514,23 @@ export class SettlementService {
             settledAt: new Date(),
           },
         });
+
+        const driverEarnings = Number(delivery.driverPayout?.toString() || fareAmount - commission);
+        driverNotificationService.sendEarningsSettled({
+          driverId: delivery.driverId!,
+          amount: driverEarnings,
+          currency,
+          serviceType: DeliveryServiceType.parcel,
+          entityId: deliveryId,
+        }).catch((err: Error) => console.error("[SettlementService] Parcel driver notification error:", err));
+
+        if (delivery.customerId) {
+          customerNotificationService.sendParcelStatusUpdate({
+            customerId: delivery.customerId,
+            deliveryId,
+            status: "delivered",
+          }).catch((err: Error) => console.error("[SettlementService] Parcel customer notification error:", err));
+        }
 
         return {
           success: true,

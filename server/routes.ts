@@ -46,6 +46,8 @@ import marketplaceBalancerRoutes from "./routes/marketplace-balancer"; // AI Mar
 import loyaltyRoutes from "./routes/loyalty"; // SafeGo Loyalty Engine
 import tlcRoutes from "./routes/tlc"; // NYC TLC HVFHV Minimum Pay Enforcement
 import eatsRoutes from "./routes/eats"; // Public Eats endpoint for restaurant browsing
+import paymentWebhooksRoutes from "./routes/payment-webhooks"; // Phase 2B: Payment webhooks
+import devicesRoutes from "./routes/devices"; // Phase 2B: Device registration for FCM
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -238,6 +240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/marketplace", marketplaceBalancerRoutes); // AI Marketplace Balancer
   app.use("/api/loyalty", loyaltyRoutes); // SafeGo Loyalty Engine
   app.use("/api/tlc", tlcRoutes); // NYC TLC HVFHV Minimum Pay Enforcement
+  app.use("/api/webhooks/payments", paymentWebhooksRoutes); // Phase 2B: Payment webhooks (no auth)
+  app.use("/api/devices", devicesRoutes); // Phase 2B: Device registration for FCM
 
   const httpServer = createServer(app);
   
