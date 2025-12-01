@@ -55,6 +55,8 @@ import kitchenRoutes from "./routes/kitchen"; // Phase 3: Kitchen Ticket System
 import parcelRoutes from "./routes/parcel"; // Phase 3: Parcel Pricing, Scheduling & POD
 import phase5Routes from "./routes/phase5"; // Phase 5: Experience Intelligence & Real-Time Optimization
 import phase6Routes from "./routes/phase6"; // Phase 6: Security Hardening & Deployment Readiness
+import securityRoutes from "./routes/securityRoutes"; // Phase 6B: Customer Security Features
+import adminSecurityRoutes from "./routes/adminSecurityRoutes"; // Phase 6B: Admin Security Features
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -287,6 +289,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/parcel", parcelRoutes); // Phase 3: Parcel Pricing, Scheduling & POD
   app.use("/api/phase5", phase5Routes); // Phase 5: Experience Intelligence & Real-Time Optimization
   app.use("/api", phase6Routes); // Phase 6: Security Hardening & Deployment Readiness (includes /health)
+  app.use("/api/security", securityRoutes); // Phase 6B: Customer Security Features (SOS, device trust, privacy)
+  app.use("/api/admin/security", adminSecurityRoutes); // Phase 6B: Admin Security Features (2FA, IP whitelist, breach response)
 
   const httpServer = createServer(app);
   
