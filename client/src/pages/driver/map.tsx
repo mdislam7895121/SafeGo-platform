@@ -36,6 +36,7 @@ import {
   Grid3X3,
   CheckSquare,
   Square,
+  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -710,29 +711,6 @@ export default function DriverMapPage() {
           </DropdownMenu>
         </div>
 
-        {/* Right Footer Button - Quick Actions (matching left footer button style) */}
-        <button
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            right: '24px',
-            width: '48px',
-            height: '48px',
-            borderRadius: '50%',
-            border: '2px solid hsl(var(--border))',
-            backgroundColor: 'hsl(var(--background))',
-            boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            cursor: 'pointer',
-          }}
-          onClick={() => setShowQuickActionsSheet(true)}
-          data-testid="button-quick-actions"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
 
         {!activeTrip && isOnline && !incomingRequest && (
           <div
@@ -822,6 +800,71 @@ export default function DriverMapPage() {
           </SheetContent>
         </Sheet>
 
+        {/* Right Footer Button - Quick Actions (mirror of left button) */}
+        <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
+          <SheetTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="absolute bottom-6 right-6 h-12 w-12 rounded-full border-2 shadow-lg bg-background z-[999]"
+              data-testid="button-quick-actions"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
+            <SheetHeader>
+              <SheetTitle>Quick Actions</SheetTitle>
+            </SheetHeader>
+            <div className="py-6 space-y-2">
+              <button
+                onClick={() => {
+                  setLocation("/driver/earnings");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-earnings"
+              >
+                <DollarSign className="h-5 w-5" />
+                <span className="font-medium">Earnings</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/trips");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-history"
+              >
+                <History className="h-5 w-5" />
+                <span className="font-medium">Trip History</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/wallet");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-wallet"
+              >
+                <Wallet className="h-5 w-5" />
+                <span className="font-medium">Wallet</span>
+              </button>
+              <button
+                onClick={() => {
+                  setLocation("/driver/profile");
+                  setShowQuickActionsSheet(false);
+                }}
+                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
+                data-testid="quick-action-profile"
+              >
+                <User className="h-5 w-5" />
+                <span className="font-medium">Profile</span>
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
+
         {/* Go Online/Offline Button - Centered */}
         <button
           onClick={() => {
@@ -876,60 +919,6 @@ export default function DriverMapPage() {
             }
           </span>
         </button>
-
-        <Sheet open={showQuickActionsSheet} onOpenChange={setShowQuickActionsSheet}>
-          <SheetContent side="bottom" className="rounded-t-2xl z-[1010]">
-            <SheetHeader>
-              <SheetTitle>Quick Actions</SheetTitle>
-            </SheetHeader>
-            <div className="py-6 space-y-2">
-              <button
-                onClick={() => {
-                  setLocation("/driver/earnings");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-earnings"
-              >
-                <DollarSign className="h-5 w-5" />
-                <span className="font-medium">Earnings</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/trips");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-history"
-              >
-                <History className="h-5 w-5" />
-                <span className="font-medium">Trip History</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/wallet");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-wallet"
-              >
-                <Wallet className="h-5 w-5" />
-                <span className="font-medium">Wallet</span>
-              </button>
-              <button
-                onClick={() => {
-                  setLocation("/driver/settings");
-                  setShowQuickActionsSheet(false);
-                }}
-                className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/50 transition-colors"
-                data-testid="quick-action-settings"
-              >
-                <Settings className="h-5 w-5" />
-                <span className="font-medium">Settings</span>
-              </button>
-            </div>
-          </SheetContent>
-        </Sheet>
       </div>
 
       <AnimatePresence>
