@@ -191,6 +191,7 @@ export default function DriverMapPage() {
   const [showTripPanel, setShowTripPanel] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [autoFollowEnabled, setAutoFollowEnabled] = useState(true);
+  const [recenterTrigger, setRecenterTrigger] = useState(0);
   const [incomingRequest, setIncomingRequest] = useState<TripRequest | null>(null);
   const [showServiceSheet, setShowServiceSheet] = useState(false);
   const [showQuickActionsSheet, setShowQuickActionsSheet] = useState(false);
@@ -422,6 +423,7 @@ export default function DriverMapPage() {
 
   const handleRecenter = useCallback(() => {
     setAutoFollowEnabled(true);
+    setRecenterTrigger(prev => prev + 1);
     triggerHapticFeedback("light");
     toast({ title: "Recentered on your location" });
   }, [toast]);
@@ -518,6 +520,7 @@ export default function DriverMapPage() {
           activeLeg={activeLeg}
           showControls={true}
           autoFollow={autoFollowEnabled}
+          recenterTrigger={recenterTrigger}
           showEtaOverlay={!!activeTrip && activeLeg !== "completed"}
           showTrafficToggle={true}
           onMapReady={() => setMapReady(true)}

@@ -31,6 +31,7 @@ export interface SafeGoMapProps {
   showTrafficToggle?: boolean;
   isOffRoute?: boolean;
   onRecalculateRoute?: () => void;
+  recenterTrigger?: number;
 }
 
 const createDriverIcon = (heading: number = 0) => L.divIcon({
@@ -165,16 +166,34 @@ function AutoFollowHandler({
   driverLocation, 
   autoFollow,
   activeLeg,
+  recenterTrigger,
 }: { 
   driverLocation?: MapLocation | null;
   autoFollow?: boolean;
   activeLeg?: ActiveLeg;
+  recenterTrigger?: number;
 }) {
   const map = useMap();
   const prevLocation = useRef<MapLocation | null>(null);
+  const prevRecenterTrigger = useRef<number | undefined>(recenterTrigger);
   
   useEffect(() => {
-    if (!autoFollow || !driverLocation || activeLeg === "completed") return;
+    if (!driverLocation) return;
+    
+    const forceRecenter = recenterTrigger !== undefined && 
+      recenterTrigger !== prevRecenterTrigger.current;
+    
+    if (forceRecenter) {
+      map.setView([driverLocation.lat, driverLocation.lng], 17, {
+        animate: true,
+        duration: 0.5,
+      });
+      prevRecenterTrigger.current = recenterTrigger;
+      prevLocation.current = driverLocation;
+      return;
+    }
+    
+    if (!autoFollow || activeLeg === "completed") return;
     
     const hasLocationChanged = !prevLocation.current || 
       prevLocation.current.lat !== driverLocation.lat || 
@@ -187,7 +206,7 @@ function AutoFollowHandler({
       });
       prevLocation.current = driverLocation;
     }
-  }, [map, driverLocation, autoFollow, activeLeg]);
+  }, [map, driverLocation, autoFollow, activeLeg, recenterTrigger]);
   
   return null;
 }
@@ -323,6 +342,7 @@ export function SafeGoMap({
   showTrafficToggle = false,
   isOffRoute = false,
   onRecalculateRoute,
+  recenterTrigger,
 }: SafeGoMapProps) {
   const [mapReady, setMapReady] = useState(false);
   const [showTraffic, setShowTraffic] = useState(false);
@@ -413,6 +433,7 @@ export function SafeGoMap({
           driverLocation={driverLocation}
           autoFollow={autoFollow}
           activeLeg={activeLeg}
+          recenterTrigger={recenterTrigger}
         />
         
         <MapReadyHandler onMapReady={() => {
