@@ -32,7 +32,6 @@ export function StatCard({
       className={cn(
         "premium-card group relative overflow-visible cursor-pointer",
         "rounded-[14px]",
-        "bg-card dark:bg-[#1e1e1e]",
         "min-h-[120px] sm:min-h-[110px]",
         className
       )}
@@ -96,7 +95,6 @@ export function ManagementCard({
       className={cn(
         "premium-card group relative overflow-visible cursor-pointer",
         "rounded-[14px]",
-        "bg-card dark:bg-[#1e1e1e]",
         "min-h-[140px] sm:min-h-[160px]",
         className
       )}
