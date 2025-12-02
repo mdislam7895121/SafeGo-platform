@@ -10,6 +10,7 @@ import { NotificationSoundProvider } from "@/contexts/NotificationSoundContext";
 import { EatsCartProvider } from "@/contexts/EatsCartContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useToast } from "@/hooks/use-toast";
+import { getPostLoginPath } from "@/lib/roleRedirect";
 
 // Auth pages
 import Login from "@/pages/login";
@@ -316,14 +317,8 @@ function HomeRedirect() {
   }
 
   if (user) {
-    // Drivers land on the live map screen by default (Uber-style experience)
-    const roleRoutes: Record<string, string> = {
-      customer: "/customer",
-      driver: "/driver/map",
-      restaurant: "/restaurant",
-      admin: "/admin",
-    };
-    return <Redirect to={roleRoutes[user.role] || "/customer"} />;
+    // Use centralized role-based routing helper
+    return <Redirect to={getPostLoginPath(user)} />;
   }
 
   return <Redirect to="/login" />;

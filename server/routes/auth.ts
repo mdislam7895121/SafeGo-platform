@@ -206,9 +206,14 @@ router.post("/login", async (req, res, next) => {
     }
 
     // Find user first to determine if admin (for rate limiting)
+    // Also include BD role profiles for verification status routing
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { adminProfile: true },
+      include: { 
+        adminProfile: true,
+        ticketOperator: true,
+        shopPartner: true,
+      },
     });
     
     // Apply rate limiting for admin users BEFORE password check
@@ -500,6 +505,21 @@ router.post("/login", async (req, res, next) => {
       
       // Reset login attempts on successful admin authentication
       resetLoginAttempts(user.email, getClientIp(req) || 'unknown');
+    }
+
+    // Add BD role profile information for routing
+    if (user.role === 'ticket_operator' && user.ticketOperator) {
+      response.user.profile = {
+        verificationStatus: user.ticketOperator.verificationStatus,
+        isActive: user.ticketOperator.isActive,
+      };
+    }
+
+    if (user.role === 'shop_partner' && user.shopPartner) {
+      response.user.profile = {
+        verificationStatus: user.shopPartner.verificationStatus,
+        isActive: user.shopPartner.isActive,
+      };
     }
 
     res.json(response);

@@ -1,10 +1,13 @@
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useEffect } from "react";
+import { getPostLoginPath } from "@/lib/roleRedirect";
+
+type AllowedRole = "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: Array<"customer" | "driver" | "restaurant" | "admin">;
+  allowedRoles?: AllowedRole[];
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
@@ -15,14 +18,11 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     if (!isLoading && !user) {
       setLocation("/login");
     } else if (user && allowedRoles && !allowedRoles.includes(user.role)) {
-      // Redirect to their own dashboard if accessing wrong role route
-      const roleRoutes = {
-        customer: "/customer",
-        driver: "/driver",
-        restaurant: "/restaurant",
-        admin: "/admin",
-      };
-      setLocation(roleRoutes[user.role]);
+      // Use role-based redirect helper for proper routing
+      const targetPath = getPostLoginPath(user);
+      if (targetPath) {
+        setLocation(targetPath);
+      }
     }
   }, [user, isLoading, allowedRoles, setLocation]);
 

@@ -4,6 +4,7 @@ import { useLocation, Redirect } from "wouter";
 import { Loader2, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getPostLoginPath } from "@/lib/roleRedirect";
 
 interface ShopPartnerGuardProps {
   children: React.ReactNode;
@@ -16,13 +17,13 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
 
   const { data: profileData, isLoading: profileLoading } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
-    enabled: !!user && user.countryCode === "BD",
+    enabled: !!user && user.countryCode === "BD" && user.role === "shop_partner",
   });
 
   if (authLoading || profileLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader-shop-partner" />
       </div>
     );
   }
@@ -32,41 +33,13 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
   }
 
   if (user.countryCode !== "BD") {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="p-8">
-            <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-            <h2 className="text-xl font-bold mb-2">Access Denied</h2>
-            <p className="text-muted-foreground mb-4">
-              Shop Partner is only available in Bangladesh.
-            </p>
-            <Button onClick={() => window.history.back()} data-testid="button-go-back">
-              Go Back
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    console.warn("[ShopPartnerGuard] Non-BD user accessing shop_partner route, redirecting");
+    return <Redirect to={getPostLoginPath(user)} />;
   }
 
-  if (user.role !== "customer") {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="p-8">
-            <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-            <h2 className="text-xl font-bold mb-2">অ্যাক্সেস অস্বীকৃত</h2>
-            <p className="text-muted-foreground mb-4">
-              আপনি শপ পার্টনার হিসাবে নিবন্ধিত নন।
-            </p>
-            <Button onClick={() => window.history.back()} data-testid="button-go-back">
-              ফিরে যান
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  if (user.role !== "shop_partner") {
+    console.warn("[ShopPartnerGuard] Wrong role accessing shop_partner route, redirecting");
+    return <Redirect to={getPostLoginPath(user)} />;
   }
 
   const profile = profileData?.profile;
@@ -76,6 +49,11 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
   const isRejected = profile?.verificationStatus === "rejected";
   const isSetupRoute = location.startsWith("/shop-partner/onboarding") || 
                        location.startsWith("/shop-partner/setup");
+
+  // Approved users should go to dashboard, not onboarding/setup
+  if (hasProfile && isApproved && isSetupRoute) {
+    return <Redirect to="/shop-partner/dashboard" />;
+  }
 
   if (!hasProfile && !allowSetup && !isSetupRoute) {
     return <Redirect to="/shop-partner/onboarding" />;
@@ -116,10 +94,11 @@ export function useBDShopPartnerAccess() {
   
   const { data: profileData, isLoading } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
-    enabled: !!user && user.countryCode === "BD",
+    enabled: !!user && user.countryCode === "BD" && user.role === "shop_partner",
   });
 
   const isBD = user?.countryCode === "BD";
+  const isShopPartner = user?.role === "shop_partner";
   const hasShopPartner = !!profileData?.profile;
   const isApproved = profileData?.profile?.verificationStatus === "approved";
   const isPending = profileData?.profile?.verificationStatus === "pending";
@@ -133,8 +112,8 @@ export function useBDShopPartnerAccess() {
     isRejected,
     isLoading,
     profile: profileData?.profile,
-    canAccessShopPartner: isBD && user?.role === "customer",
-    canAccessFullDashboard: isBD && hasShopPartner && isApproved,
-    shouldRedirectToSetup: isBD && hasShopPartner && isPending,
+    canAccessShopPartner: isBD && isShopPartner,
+    canAccessFullDashboard: isBD && isShopPartner && hasShopPartner && isApproved,
+    shouldRedirectToSetup: isBD && isShopPartner && hasShopPartner && isPending,
   };
 }

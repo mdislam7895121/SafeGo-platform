@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useLocation } from "wouter";
+import { getPostLoginPath } from "@/lib/roleRedirect";
 
 interface User {
   id: string;
@@ -56,17 +57,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("safego_token", data.token);
     localStorage.setItem("safego_user", JSON.stringify(data.user));
 
-    // Redirect based on role (defer to next tick to ensure state updates complete)
-    const roleRoutes: Record<string, string> = {
-      customer: "/customer",
-      driver: "/driver",
-      restaurant: "/restaurant",
-      admin: "/admin",
-      ticket_operator: "/ticket-operator/onboarding",
-      shop_partner: "/shop-partner/onboarding",
-    };
+    // Role-based redirect using helper (accounts for verification status for BD roles)
     setTimeout(() => {
-      setLocation(roleRoutes[data.user.role] || "/customer");
+      const targetPath = getPostLoginPath(data.user);
+      setLocation(targetPath);
     }, 0);
   };
 
