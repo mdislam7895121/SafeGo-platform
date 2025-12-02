@@ -34,7 +34,6 @@ router.get("/tickets", async (req: AuthRequest, res: Response) => {
       where: {
         isActive: true,
         availableSeats: { gt: 0 },
-        departureTime: { gt: new Date() },
         operator: {
           countryCode: "BD",
           verificationStatus: "approved",
@@ -53,7 +52,7 @@ router.get("/tickets", async (req: AuthRequest, res: Response) => {
           },
         },
       },
-      orderBy: { departureTime: "asc" },
+      orderBy: { createdAt: "desc" },
     });
 
     if (origin && typeof origin === "string") {
@@ -73,7 +72,6 @@ router.get("/tickets", async (req: AuthRequest, res: Response) => {
         where: {
           isActive: true,
           availableSeats: { gt: 0 },
-          departureTime: { gt: new Date() },
           operator: {
             countryCode: "BD",
             verificationStatus: "approved",
@@ -91,7 +89,7 @@ router.get("/tickets", async (req: AuthRequest, res: Response) => {
             },
           },
         },
-        orderBy: { departureTime: "asc" },
+        orderBy: { createdAt: "desc" },
       });
     }
 
@@ -104,8 +102,8 @@ router.get("/tickets", async (req: AuthRequest, res: Response) => {
       originStation: l.originStation,
       destinationCity: l.destinationCity,
       destinationStation: l.destinationStation,
-      departureTime: l.departureTime.toISOString(),
-      arrivalTime: l.arrivalTime?.toISOString() || null,
+      departureTime: l.departureTime,
+      arrivalTime: l.arrivalTime || null,
       basePrice: Number(l.basePrice),
       discountPrice: l.discountPrice ? Number(l.discountPrice) : null,
       totalSeats: l.totalSeats,
@@ -937,7 +935,7 @@ async function seedDemoTicketListings() {
       const listingCount = await prisma.ticketListing.count({
         where: { 
           operatorId: existingDemo.id,
-          departureTime: { gt: new Date() },
+          isActive: true,
         },
       });
       
@@ -1007,12 +1005,6 @@ async function seedDemoTicketListings() {
       });
     }
 
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dayAfter = new Date(now);
-    dayAfter.setDate(dayAfter.getDate() + 2);
-
     const demoListings = [
       {
         routeName: "ঢাকা - চট্টগ্রাম এক্সপ্রেস",
@@ -1023,8 +1015,8 @@ async function seedDemoTicketListings() {
         originStation: "কমলাপুর বাস স্ট্যান্ড",
         destinationCity: "চট্টগ্রাম",
         destinationStation: "দামপাড়া বাস স্ট্যান্ড",
-        departureTime: new Date(tomorrow.setHours(8, 0, 0, 0)),
-        arrivalTime: new Date(tomorrow.setHours(14, 0, 0, 0)),
+        departureTime: "08:00",
+        arrivalTime: "14:00",
         durationMinutes: 360,
         basePrice: 850,
         totalSeats: 40,
@@ -1040,8 +1032,8 @@ async function seedDemoTicketListings() {
         originStation: "সায়দাবাদ বাস স্ট্যান্ড",
         destinationCity: "সিলেট",
         destinationStation: "কদমতলী বাস স্ট্যান্ড",
-        departureTime: new Date(tomorrow.setHours(10, 30, 0, 0)),
-        arrivalTime: new Date(tomorrow.setHours(16, 30, 0, 0)),
+        departureTime: "10:30",
+        arrivalTime: "16:30",
         durationMinutes: 360,
         basePrice: 750,
         totalSeats: 38,
@@ -1057,8 +1049,8 @@ async function seedDemoTicketListings() {
         originStation: "ফকিরাপুল বাস স্ট্যান্ড",
         destinationCity: "কক্সবাজার",
         destinationStation: "কক্সবাজার বাস স্ট্যান্ড",
-        departureTime: new Date(tomorrow.setHours(21, 0, 0, 0)),
-        arrivalTime: new Date(dayAfter.setHours(7, 0, 0, 0)),
+        departureTime: "21:00",
+        arrivalTime: "07:00",
         durationMinutes: 600,
         basePrice: 1200,
         totalSeats: 36,
@@ -1074,8 +1066,8 @@ async function seedDemoTicketListings() {
         originStation: "গাবতলী বাস স্ট্যান্ড",
         destinationCity: "রাজশাহী",
         destinationStation: "রাজশাহী বাস স্ট্যান্ড",
-        departureTime: new Date(tomorrow.setHours(7, 0, 0, 0)),
-        arrivalTime: new Date(tomorrow.setHours(13, 0, 0, 0)),
+        departureTime: "07:00",
+        arrivalTime: "13:00",
         durationMinutes: 360,
         basePrice: 600,
         totalSeats: 44,
@@ -1091,8 +1083,8 @@ async function seedDemoTicketListings() {
         originStation: "গাবতলী বাস স্ট্যান্ড",
         destinationCity: "খুলনা",
         destinationStation: "খুলনা বাস স্ট্যান্ড",
-        departureTime: new Date(tomorrow.setHours(9, 0, 0, 0)),
-        arrivalTime: new Date(tomorrow.setHours(15, 30, 0, 0)),
+        departureTime: "09:00",
+        arrivalTime: "15:30",
         durationMinutes: 390,
         basePrice: 700,
         totalSeats: 40,
@@ -1108,8 +1100,8 @@ async function seedDemoTicketListings() {
         originStation: "দামপাড়া বাস স্ট্যান্ড",
         destinationCity: "ঢাকা",
         destinationStation: "কমলাপুর বাস স্ট্যান্ড",
-        departureTime: new Date(tomorrow.setHours(22, 0, 0, 0)),
-        arrivalTime: new Date(dayAfter.setHours(4, 0, 0, 0)),
+        departureTime: "22:00",
+        arrivalTime: "04:00",
         durationMinutes: 360,
         basePrice: 900,
         totalSeats: 38,
@@ -1125,8 +1117,8 @@ async function seedDemoTicketListings() {
         originStation: "গুলিস্তান বাস স্ট্যান্ড",
         destinationCity: "বরিশাল",
         destinationStation: "বরিশাল বাস স্ট্যান্ড",
-        departureTime: new Date(dayAfter.setHours(6, 0, 0, 0)),
-        arrivalTime: new Date(dayAfter.setHours(12, 0, 0, 0)),
+        departureTime: "06:00",
+        arrivalTime: "12:00",
         durationMinutes: 360,
         basePrice: 550,
         totalSeats: 42,
@@ -1142,8 +1134,8 @@ async function seedDemoTicketListings() {
         originStation: "মহাখালী বাস স্ট্যান্ড",
         destinationCity: "ময়মনসিংহ",
         destinationStation: "ময়মনসিংহ বাস স্ট্যান্ড",
-        departureTime: new Date(tomorrow.setHours(11, 0, 0, 0)),
-        arrivalTime: new Date(tomorrow.setHours(14, 0, 0, 0)),
+        departureTime: "11:00",
+        arrivalTime: "14:00",
         durationMinutes: 180,
         basePrice: 300,
         totalSeats: 40,
