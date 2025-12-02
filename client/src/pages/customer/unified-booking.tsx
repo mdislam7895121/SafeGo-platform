@@ -71,6 +71,7 @@ interface DriverInfo {
   pickupEtaMinutes: number;
 }
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CustomerParcelBooking } from "@/components/customer/CustomerParcelBooking";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -3385,14 +3386,7 @@ export default function UnifiedBookingPage() {
             )}
 
             {activeService === "parcel" && (
-              <div className="flex-1 flex items-center justify-center text-muted-foreground py-12">
-                <div className="text-center">
-                  <Package className="h-16 w-16 mx-auto mb-4 opacity-40" />
-                  <p className="text-lg font-medium">SafeGo Parcel</p>
-                  <p className="text-sm mt-2">Send packages and documents</p>
-                  <p className="text-xs mt-4 text-muted-foreground/60">Coming soon...</p>
-                </div>
-              </div>
+              <CustomerParcelBooking />
             )}
           </div>
           
