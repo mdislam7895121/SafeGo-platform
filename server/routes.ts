@@ -60,6 +60,7 @@ import adminSecurityRoutes from "./routes/adminSecurityRoutes"; // Phase 6B: Adm
 import shopPartnerRoutes from "./routes/shop-partner"; // Bangladesh Expansion: Shop Partners
 import ticketOperatorRoutes from "./routes/ticket-operator"; // Bangladesh Expansion: Ticket & Rental Operators
 import adminBdExpansionRoutes from "./routes/admin-bd-expansion"; // Bangladesh Expansion: Admin management
+import bdCustomerRoutes from "./routes/bd-customer"; // Bangladesh Expansion: Customer BD services
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -299,6 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)
   app.use("/api/ticket-operator", ticketOperatorRoutes); // Ticket & Rental Operator management (BD only)
   app.use("/api/admin/bd-expansion", adminBdExpansionRoutes); // Admin management for BD expansion
+  app.use("/api/bd", bdCustomerRoutes); // Customer BD services (rentals, shops)
 
   const httpServer = createServer(app);
   

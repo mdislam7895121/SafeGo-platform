@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ChevronLeft,
   Search,
@@ -13,8 +14,9 @@ import {
   Users,
   Star,
   Calendar,
-  Clock,
   MapPin,
+  Filter,
+  AlertTriangle,
 } from "lucide-react";
 
 interface RentalVehicle {
@@ -22,17 +24,23 @@ interface RentalVehicle {
   vehicleType: string;
   brand: string;
   model: string;
+  year?: number;
+  color?: string;
   passengerCapacity: number;
+  luggageCapacity?: number;
   pricePerDay: number;
-  pricePerHour?: number;
-  images?: string[];
-  features?: string[];
+  pricePerHour?: number | null;
+  images?: string[] | null;
+  features?: string[] | null;
   isAvailable: boolean;
+  currentLocation?: string;
   operator: {
     id: string;
     operatorName: string;
-    logo?: string;
+    logo?: string | null;
     averageRating: number;
+    officeAddress?: string;
+    officePhone?: string;
   };
 }
 
@@ -46,20 +54,51 @@ const rentalTypeLabels: Record<string, string> = {
   van: "ভ্যান",
 };
 
-export default function BDRentalsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
+const vehicleTypeFilters = [
+  { value: "all", label: "সব গাড়ি" },
+  { value: "car", label: "কার" },
+  { value: "sedan", label: "সেডান" },
+  { value: "suv", label: "এসইউভি" },
+  { value: "micro", label: "মাইক্রো" },
+  { value: "tourist_bus", label: "ট্যুরিস্ট বাস" },
+];
 
-  const { data: rentalData, isLoading } = useQuery<{ vehicles: RentalVehicle[] }>({
-    queryKey: ["/api/bd-tickets/vehicles"],
+export default function BDRentalsPage() {
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedType, setSelectedType] = useState<string>("all");
+
+  useEffect(() => {
+    if (user && user.countryCode !== "BD") {
+      setLocation("/customer");
+    }
+  }, [user, setLocation]);
+
+  const { data: rentalData, isLoading, error } = useQuery<{ vehicles: RentalVehicle[] }>({
+    queryKey: ["/api/bd/rentals", selectedType],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedType && selectedType !== "all") {
+        params.set("vehicleType", selectedType);
+      }
+      const response = await fetch(`/api/bd/rentals?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch rentals");
+      }
+      return response.json();
+    },
   });
 
   const filteredVehicles = rentalData?.vehicles?.filter(
     (vehicle) =>
       vehicle.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vehicle.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vehicle.vehicleType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vehicle.operator.operatorName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      vehicle.operator.operatorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (vehicle.currentLocation && vehicle.currentLocation.toLowerCase().includes(searchQuery.toLowerCase()))
+  ) || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,22 +131,19 @@ export default function BDRentalsPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="cursor-pointer hover-elevate">
-            <CarFront className="h-3 w-3 mr-1" />
-            সব গাড়ি
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover-elevate">
-            কার
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover-elevate">
-            মাইক্রো
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover-elevate">
-            এসইউভি
-          </Badge>
-          <Badge variant="outline" className="cursor-pointer hover-elevate">
-            ট্যুরিস্ট বাস
-          </Badge>
+          {vehicleTypeFilters.map((filter) => (
+            <Button
+              key={filter.value}
+              variant={selectedType === filter.value ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedType(filter.value)}
+              className="gap-1"
+              data-testid={`button-filter-${filter.value}`}
+            >
+              {filter.value === "all" && <Filter className="h-3 w-3" />}
+              {filter.label}
+            </Button>
+          ))}
         </div>
 
         <div className="space-y-3">
@@ -115,30 +151,42 @@ export default function BDRentalsPage() {
             [...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-48" />
             ))
-          ) : filteredVehicles?.length === 0 ? (
+          ) : error ? (
             <Card>
               <CardContent className="p-8 text-center">
                 <CarFront className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-medium mb-2">কোনো গাড়ি পাওয়া যায়নি</h3>
+                <h3 className="font-medium mb-2">তথ্য লোড করতে সমস্যা হয়েছে</h3>
                 <p className="text-sm text-muted-foreground">
-                  অন্য গাড়ি বা ধরন খুঁজে দেখুন
+                  অনুগ্রহ করে আবার চেষ্টা করুন
+                </p>
+              </CardContent>
+            </Card>
+          ) : filteredVehicles.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <CarFront className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-medium mb-2">
+                  {searchQuery ? "কোনো গাড়ি পাওয়া যায়নি" : "এখনো কোনো রেন্টাল গাড়ি যোগ করা হয়নি"}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {searchQuery ? "অন্য গাড়ি বা ধরন খুঁজে দেখুন" : "শীঘ্রই আসছে।"}
                 </p>
               </CardContent>
             </Card>
           ) : (
-            filteredVehicles?.map((vehicle) => (
-              <Card key={vehicle.id} data-testid={`card-rental-${vehicle.id}`} className="overflow-hidden">
+            filteredVehicles.map((vehicle) => (
+              <Card key={vehicle.id} data-testid={`card-rental-${vehicle.id}`} className="overflow-hidden hover-elevate">
                 <CardContent className="p-0">
                   <div className="aspect-video bg-muted relative">
-                    {vehicle.images?.[0] ? (
+                    {vehicle.images && vehicle.images.length > 0 && vehicle.images[0] ? (
                       <img 
                         src={vehicle.images[0]} 
                         alt={`${vehicle.brand} ${vehicle.model}`}
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <CarFront className="h-16 w-16 text-muted-foreground" />
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+                        <CarFront className="h-16 w-16 text-primary/40" />
                       </div>
                     )}
                     {!vehicle.isAvailable && (
@@ -146,10 +194,16 @@ export default function BDRentalsPage() {
                         <Badge variant="destructive">অপ্রাপ্ত</Badge>
                       </div>
                     )}
+                    <Badge 
+                      variant="secondary" 
+                      className="absolute top-2 right-2"
+                    >
+                      {rentalTypeLabels[vehicle.vehicleType] || vehicle.vehicleType}
+                    </Badge>
                   </div>
                   
                   <div className="p-4 space-y-3">
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
                         <h3 className="font-bold text-lg" data-testid={`text-vehicle-${vehicle.id}`}>
                           {vehicle.brand} {vehicle.model}
@@ -158,9 +212,14 @@ export default function BDRentalsPage() {
                           {vehicle.operator.operatorName}
                         </p>
                       </div>
-                      <Badge variant="secondary">
-                        {rentalTypeLabels[vehicle.vehicleType] || vehicle.vehicleType}
-                      </Badge>
+                      {vehicle.operator.averageRating > 0 && (
+                        <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                          <Star className="h-4 w-4 fill-green-600 text-green-600" />
+                          <span className="font-bold text-green-700 dark:text-green-400">
+                            {vehicle.operator.averageRating.toFixed(1)}
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -168,10 +227,10 @@ export default function BDRentalsPage() {
                         <Users className="h-4 w-4" />
                         {vehicle.passengerCapacity} জন
                       </span>
-                      {vehicle.operator.averageRating > 0 && (
+                      {vehicle.currentLocation && (
                         <span className="flex items-center gap-1">
-                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                          {vehicle.operator.averageRating.toFixed(1)}
+                          <MapPin className="h-4 w-4" />
+                          {vehicle.currentLocation}
                         </span>
                       )}
                     </div>
@@ -183,6 +242,11 @@ export default function BDRentalsPage() {
                             {feature}
                           </Badge>
                         ))}
+                        {vehicle.features.length > 4 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{vehicle.features.length - 4}
+                          </Badge>
+                        )}
                       </div>
                     )}
 
@@ -200,13 +264,15 @@ export default function BDRentalsPage() {
                           </span>
                         )}
                       </div>
-                      <Button 
-                        disabled={!vehicle.isAvailable}
-                        data-testid={`button-rent-${vehicle.id}`}
-                      >
-                        <Calendar className="h-4 w-4 mr-2" />
-                        বুক করুন
-                      </Button>
+                      <Link href={`/customer/bd-rental/${vehicle.id}`}>
+                        <Button 
+                          disabled={!vehicle.isAvailable}
+                          data-testid={`button-rent-${vehicle.id}`}
+                        >
+                          <Calendar className="h-4 w-4 mr-2" />
+                          বুক করুন
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </CardContent>
@@ -215,16 +281,11 @@ export default function BDRentalsPage() {
           )}
         </div>
 
-        {!isLoading && (!filteredVehicles || filteredVehicles.length === 0) && (
-          <div className="text-center pt-8">
-            <p className="text-sm text-muted-foreground mb-4">
-              আপনি কি একটি রেন্টাল গাড়ি খুঁজছেন?
+        {!isLoading && filteredVehicles.length > 0 && (
+          <div className="text-center pt-4 pb-8">
+            <p className="text-sm text-muted-foreground">
+              {filteredVehicles.length}টি গাড়ি পাওয়া গেছে
             </p>
-            <Link href="/customer/bd-tickets">
-              <Button variant="outline" data-testid="button-view-tickets">
-                টিকিট দেখুন
-              </Button>
-            </Link>
           </div>
         )}
       </div>

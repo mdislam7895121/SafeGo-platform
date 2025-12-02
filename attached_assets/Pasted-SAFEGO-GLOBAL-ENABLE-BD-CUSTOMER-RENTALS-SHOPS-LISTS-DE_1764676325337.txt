@@ -1,0 +1,371 @@
+SAFEGO GLOBAL — ENABLE BD CUSTOMER RENTALS & SHOPS LISTS (DEMO-READY)
+
+This task must follow ALL SafeGo master rules and be 100% additive
+(non-breaking). Do NOT rename or remove any field, route, or schema.
+
+============================================================
+0) SAFEGO MASTER RULES (DO NOT BREAK)
+============================================================
+
+ROLES (no mixing access):
+1) customer
+2) driver
+3) restaurant
+4) admin
+
+BD-only business roles (already added, must be preserved):
+5) shop_partner        // small shops / e-store operators
+6) ticket_operator     // bus tickets + car rentals
+
+Each role keeps its own:
+- signup requirements
+- country-specific KYC
+- dashboard
+- permissions
+- status flows
+
+SERVICES (global, must all keep working):
+1) Ride-hailing
+2) Food delivery (Eats)
+3) Parcel delivery
+
+BD Expansion services (customer-facing):
+4) Tickets (bus tickets via ticket_operator)
+5) BD Rentals (car rental, via ticket_operator inventory)
+6) BD Shops (buy from shop_partner stores)
+
+COUNTRY-SPECIFIC KYC (NO SCHEMA CHANGE):
+
+Bangladesh (BD) mandatory:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number + front/back images
+- emergency_contact details
+- verification_status
+- is_verified
+
+United States (US) mandatory:
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status
+- is_verified
+
+ADMIN PANEL (must stay as-is, only extend):
+- verify customers, drivers, restaurants, shop partners, ticket operators
+- approve/reject KYC (with rejection_reason)
+- manage commission rates and pricing
+- block/unblock any user
+- manage payouts
+- view negative balances for drivers, restaurants, shop partners, ticket operators
+- BD expansion stats
+
+MANDATORY COLLECTIONS (NO BREAKING CHANGES):
+
+1) rides
+2) food_orders
+3) deliveries
+
+Each must retain:
+- identity fields (customer_id, driver_id, etc.)
+- addresses + geolocation
+- fees + commission
+- payment details
+- timestamps
+- full status flow
+- rating and feedback
+
+COMMISSION & PAYOUT RULES (KEEP EXACTLY):
+
+1) CASH rides:
+   - Driver receives full cash.
+   - SafeGo commission → negative driver_wallet_balance.
+   - Driver must settle weekly.
+
+2) CASH food:
+   - Restaurant receives cash.
+   - Commission → negative restaurant_wallet.
+
+3) CASH BD tickets / rentals:
+   - Ticket operator receives cash.
+   - Commission → negative operator_wallet_balance.
+
+4) ONLINE payment:
+   - SafeGo keeps commission automatically.
+
+5) Admin can settle negative balances and mark them paid.
+
+SECURITY RULES:
+- Customers cannot see any driver / operator documents.
+- Drivers cannot see customer NID or sensitive info.
+- Restaurant cannot view other restaurants.
+- Shop partners cannot view other shops or ticket operators.
+- Ticket operators cannot view other operators.
+- Only admin can change pricing, commissions, verification, blocking.
+- Users can update only their own profile.
+
+STATUS FLOWS (UNCHANGED):
+
+Ride:
+ requested → searching_driver → accepted → driver_arriving
+ → in_progress → completed / cancelled_x
+
+Food:
+ placed → accepted → preparing → ready_for_pickup
+ → picked_up → on_the_way → delivered / cancelled_x
+
+Parcel:
+ requested → searching_driver → accepted → picked_up
+ → on_the_way → delivered / cancelled_x
+
+ONBOARDING:
+- Multi-step for each role.
+- verification_status = "pending" until admin approves.
+- Full access blocked until approved.
+
+NOTIFICATIONS:
+- New ride alert for driver.
+- Order / parcel / ticket / rental updates.
+- Verification approval / rejection.
+- Important admin notifications.
+
+All of the above MUST remain intact.
+
+============================================================
+1) CURRENT PROBLEM (BD CUSTOMER)
+============================================================
+
+1) BD Rentals page: /customer/bd-rentals
+   - Shows header ("গাড়ি রেন্টাল"), search box, filter chips.
+   - Below that, nothing — no vehicle cards, no prices, no availability.
+
+2) BD Shops page: /customer/bd-shops
+   - Shows header, search, category chips.
+   - Always shows "এই এলাকায় কোন দোকান নেই" empty state.
+   - No list of shops, even when there are demo / existing shop_partner records.
+
+We need these to be DEMO-READY:
+- On first use, customer should see example rentals and shops,
+  coming from real backend queries or seeded demo data,
+  so the pages are actually usable.
+
+============================================================
+2) GOAL
+============================================================
+
+A) For BD Rentals (/customer/bd-rentals):
+   - Show a scrollable list/grid of available rental vehicles.
+   - Vehicles come from ticket_operator rental inventory.
+   - If there is no real data yet, seed demo inventory and fetch it.
+   - Customer can tap a vehicle to see details and proceed to booking.
+
+B) For BD Shops (/customer/bd-shops):
+   - Show a list/grid of nearby shops (shop_partners).
+   - If there is no real data yet, seed several demo shops (Dhaka-based)
+     so the list is never completely empty.
+   - Customer can open a shop to view its storefront (existing shop_partner
+     customer storefront) and add items to cart.
+
+Must respect:
+- CountryCode "BD" only.
+- Role separation (customer vs shop_partner vs ticket_operator).
+- No breaking change to existing US flows.
+
+============================================================
+3) BD RENTALS — CUSTOMER LIST IMPLEMENTATION
+============================================================
+
+3.1 Data Source
+- Use ticket_operator rental vehicles as the single source of truth.
+- There should be an internal collection/table like:
+  ticket_rentals or rental_vehicles linked to ticket_operator_id.
+- Do NOT rename or remove any existing fields; only add if necessary.
+
+If no such collection exists:
+- Add a minimal `rental_vehicles` table with:
+  - id
+  - operator_id (ticket_operator)
+  - country_code (must support "BD")
+  - city / area
+  - vehicle_type (car, bike, SUV, microbus, tourist_bus)
+  - name / model
+  - seats
+  - pricing:
+      * base_price_per_day
+      * base_price_per_hour (optional)
+  - images (URL list)
+  - is_available
+  - created_at, updated_at
+
+This must be additive and referenced from ticket_operator dashboard only,
+so it will not affect rides / food_orders / deliveries.
+
+3.2 Customer API
+- Create or extend an endpoint (BD only) e.g.:
+
+  GET /api/bd/rentals
+  - Query params: location (lat,lng or city), vehicle_type filter, paging.
+  - Returns a paginated list of rental vehicles with operator info.
+
+- For demo mode, if there are no rows:
+  - Seed a set of demo rental vehicles for Dhaka (at least 6–8),
+    linked to a demo ticket_operator.
+  - Then return them.
+
+3.3 Customer UI (/customer/bd-rentals)
+- Below the search+filters, render card list:
+
+   Card fields:
+   - Image of vehicle.
+   - Name (e.g., "Toyota Axio 2018").
+   - Type tag (Car / Microbus / SUV / Tourist Bus / Bike).
+   - Seats.
+   - Price summary: "From 2500৳ / day" or existing BD pricing.
+   - "View details" button.
+
+- On tap:
+   - Navigate to a details page: /customer/bd-rentals/[id]
+   - Show full details, images, pricing, and a "Request rental" CTA.
+   - Rental booking will create a record (preferably in an existing
+     rentals collection or in ticket bookings with type="rental") — 
+     but do NOT touch the rides/food_orders/deliveries schemas.
+
+- If there is absolutely no inventory:
+   - Show a better empty state in Bangla:
+     "এখনো কোনো রেন্টাল গাড়ি যোগ করা হয়নি। শীঘ্রই আসছে।"
+   - But after seeding demo data, this state should not appear.
+
+============================================================
+4) BD SHOPS — CUSTOMER LIST IMPLEMENTATION
+============================================================
+
+4.1 Data Source
+- Use existing shop_partner records as the source of shops.
+- Each approved BD shop_partner should appear on /customer/bd-shops,
+  filtered by country_code="BD" and optionally city/area.
+
+If there are zero approved shop_partners:
+- Seed demo BD shops (e.g., in Dhaka) into the shop_partner tables
+  or into a dedicated demo seed that appears only in dev mode.
+
+4.2 Customer API
+- Implement or extend an endpoint:
+
+  GET /api/bd/shops
+  - Params: location (lat,lng or city), category, search text.
+  - Returns list of shops with:
+    - id
+    - name
+    - category (e.g., "মুদিখানা", "মোবাইল দোকান", "কসমেটিকস")
+    - rating (demo or real)
+    - delivery_time_estimate
+    - distance (if available)
+    - logo_image / cover_image
+
+4.3 Customer UI (/customer/bd-shops)
+- Replace the permanent empty state with:
+   - A scrollable list of cards:
+
+     Shop card fields:
+     - Logo or icon.
+     - Shop name (Bangla).
+     - Category tag.
+     - "X km away" or "ডেলিভারির আনুমানিক সময়".
+     - Rating (stars) if available.
+     - "খুলুন" / "View shop" CTA.
+
+- On tap:
+   - Navigate to the existing shop storefront route
+     (DoorDash-style customer storefront already implemented for shop_partner).
+   - This storefront must show products, cart, checkout, etc., using existing logic.
+
+- If no shops for current filter/location:
+   - Show localized message:
+     "এই এলাকায় নির্বাচিত ক্যাটাগরির কোনো দোকান নেই।
+      অন্য ক্যাটাগরি চেষ্টা করুন অথবা লোকেশন পরিবর্তন করুন।"
+
+============================================================
+5) COUNTRY & ROLE GUARDS
+============================================================
+
+- /customer/bd-rentals and /customer/bd-shops must be accessible only to:
+  - role = "customer"
+  - country_code = "BD"
+
+- US customers must NOT see BD-specific pages or dropdown options.
+- Shop and rental operator dashboards remain unchanged:
+  - shop_partner dashboard for BD shops.
+  - ticket_operator dashboard for tickets & rentals.
+
+============================================================
+6) ADMIN & NEGATIVE BALANCE (REFERENCE ONLY)
+============================================================
+
+Do NOT change wallet or commission logic in this task,
+but make sure rentals & shops still behave as per rules:
+
+- CASH rental:
+  - customer pays operator directly.
+  - SafeGo commission → negative operator_wallet_balance.
+- ONLINE rental:
+  - SafeGo keeps commission automatically.
+
+- CASH shop orders (if using shop_partner checkout):
+  - shop_partner gets cash.
+  - commission → negative shop_partner_wallet.
+
+Admin panel already supports:
+- viewing negative balances
+- manual settlement
+
+No schema or route change required here.
+
+============================================================
+7) FILES / MODULES TO MODIFY (GUIDELINE)
+============================================================
+
+Frontend (additive):
+- client/src/modules/customer/bd/BdRentalsPage.tsx
+- client/src/modules/customer/bd/BdShopsPage.tsx
+- client/src/components/bd/BdRentalCard.tsx (new)
+- client/src/components/bd/BdShopCard.tsx (new)
+
+Backend (additive only):
+- api routes under /api/bd/rentals and /api/bd/shops
+- optional seed script for demo rental_vehicles and demo shop_partner rows.
+
+Must NOT:
+- rename any existing tables
+- remove any columns
+- break any existing USA or global customer routes.
+
+============================================================
+8) QA CHECKLIST
+============================================================
+
+1) BD customer:
+   - Open /customer/bd-rentals → sees at least several demo vehicles.
+   - Filter by type (car, bike, SUV, tourist bus) works.
+   - Can open details page.
+
+2) BD customer:
+   - Open /customer/bd-shops → sees multiple shops.
+   - Can filter by category (e.g., "মোবাইল দোকান", "কসমেটিকস").
+   - Can open a shop and reach the existing storefront.
+
+3) US customer:
+   - Does NOT see /customer/bd-rentals or /customer/bd-shops in UI.
+   - Direct navigation should redirect or 404 with proper guard.
+
+4) Admin:
+   - Existing KYC approvals, negative balances, and dashboards are unchanged.
+
+============================================================
+END OF TASK
+============================================================
