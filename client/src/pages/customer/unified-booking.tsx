@@ -48,6 +48,7 @@ import {
   Bus,
   Store,
   CarFront,
+  Maximize2,
 } from "lucide-react";
 
 type RideStatus = 
@@ -2898,6 +2899,94 @@ export default function UnifiedBookingPage() {
                         </Button>
                       </div>
                     )}
+
+                    {/* MOBILE: Mini Map Preview - Shows even before locations set */}
+                    <div 
+                      className="md:hidden rounded-xl overflow-hidden border border-border relative"
+                      style={{ height: "180px" }}
+                      data-testid="mobile-map-preview"
+                    >
+                      {isClient ? (
+                        <MapContainer
+                          center={[mapCenter.lat, mapCenter.lng]}
+                          zoom={14}
+                          className="h-full w-full"
+                          zoomControl={false}
+                          attributionControl={false}
+                          dragging={false}
+                          scrollWheelZoom={false}
+                          doubleClickZoom={false}
+                          touchZoom={false}
+                        >
+                          <TileLayer
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                            attribution='&copy; OpenStreetMap'
+                          />
+                          {customerLocation && customerLocationIcon && (
+                            <Marker 
+                              position={[customerLocation.lat, customerLocation.lng]} 
+                              icon={customerLocationIcon}
+                            />
+                          )}
+                        </MapContainer>
+                      ) : (
+                        <div className="h-full w-full bg-muted flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                      )}
+                      <div 
+                        className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                        onClick={() => setIsMobileMapOpen(true)}
+                        style={{ background: "rgba(0,0,0,0.02)" }}
+                      >
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          className="shadow-lg gap-2"
+                          data-testid="button-expand-map-mobile"
+                        >
+                          <Maximize2 className="h-4 w-4" />
+                          <span>Expand map</span>
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Car Categories Preview - Shows before locations are set */}
+                    <div className="space-y-3" data-testid="car-categories-preview">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-semibold">Available rides</p>
+                        <p className="text-xs text-muted-foreground">Select pickup & dropoff for prices</p>
+                      </div>
+                      
+                      {/* Horizontal scroll of car categories */}
+                      <div className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                        {VEHICLE_CATEGORY_ORDER.slice(0, 4).map((categoryId: VehicleCategoryId) => {
+                          const catConfig = VEHICLE_CATEGORIES[categoryId];
+                          const vehicleImage = getVehicleCategoryImage(categoryId);
+                          return (
+                            <div
+                              key={categoryId}
+                              className="flex-shrink-0 w-[120px] rounded-xl border border-border bg-background p-3 text-center"
+                              data-testid={`preview-car-${categoryId}`}
+                            >
+                              <div 
+                                className="h-12 w-full rounded-lg flex items-center justify-center mb-2"
+                                style={{ background: "linear-gradient(180deg, #FFFFFF 0%, #F2F2F2 100%)" }}
+                              >
+                                <img 
+                                  src={vehicleImage} 
+                                  alt={catConfig.displayName}
+                                  className="h-10 w-auto object-contain"
+                                  style={{ filter: "drop-shadow(0px 3px 6px rgba(0,0,0,0.1))" }}
+                                />
+                              </div>
+                              <p className="text-xs font-semibold truncate">{catConfig.displayName}</p>
+                              <p className="text-[10px] text-muted-foreground">{catConfig.seatCount} seats</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </>
                 )}
 
