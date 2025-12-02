@@ -1,0 +1,257 @@
+# SAFEGO GLOBAL SUPER-PROMPT — FULL RULESET (MUST FOLLOW EXACTLY)
+
+You are building the SafeGo global super-app backend, admin panel, and role engine.  
+All rules here are mandatory. Never remove, rename, or break existing logic.
+
+===================================================
+A) ALWAYS INCLUDE THE FOUR CORE ROLES EXACTLY:
+===================================================
+1. Customer  
+2. Driver  
+3. Restaurant / Merchant  
+4. Admin  
+
+Each role MUST have:
+- own signup requirements  
+- country-specific KYC  
+- own dashboard  
+- own permissions  
+- own status flows  
+- cannot see another role’s sensitive data  
+- cannot bypass verification  
+
+Never mix role access.
+
+===================================================
+B) GLOBAL APP SERVICES (MUST ALWAYS EXIST)
+===================================================
+1. Ride-hailing  
+2. Food Delivery  
+3. Parcel Delivery  
+
+These three services must ALWAYS work in every prompt.
+
+===================================================
+C) COUNTRY-SPECIFIC KYC RULES (MANDATORY)
+===================================================
+
+### Bangladesh (BD)
+For ALL roles in BD:
+- father_name  
+- date_of_birth  
+- present_address  
+- permanent_address  
+- NID number  
+- NID front/back images  
+- emergency_contact details  
+- verification_status  
+- is_verified  
+
+### United States (US)
+For ALL roles in US:
+- date_of_birth  
+- home_address  
+- emergency_contact  
+- government_id_type  
+- government_id_last4  
+- verification_status  
+- is_verified  
+
+For US Drivers ONLY:
+- driver_license number + image + expiry  
+- ssn_last4 (optional)  
+
+===================================================
+D) ADMIN PANEL (ALWAYS)
+===================================================
+Admin must be able to:
+- verify customers  
+- verify drivers  
+- verify restaurants  
+- approve/reject KYC with rejection_reason  
+- update pricing, commissions, fees  
+- block/unblock any user  
+- manage payouts  
+- view driver negative balance  
+- view restaurant negative balance  
+
+===================================================
+E) THREE MANDATORY COLLECTIONS
+===================================================
+1. rides  
+2. food_orders  
+3. deliveries  
+
+Each collection MUST include:
+- customer_id  
+- driver_id  
+- addresses  
+- geolocation  
+- fees + commission  
+- payment_details  
+- timestamps  
+- full status flow  
+- rating + feedback  
+
+===================================================
+F) COMMISSION & PAYOUT RULES (NON-NEGOTIABLE)
+===================================================
+Cash Ride:
+- driver keeps full cash  
+- Safego commission becomes driver negative balance  
+
+Cash Food:
+- restaurant keeps full cash  
+- Safego commission becomes restaurant negative balance  
+
+Online Payment:
+- Safego keeps commission automatically  
+
+Admin can settle balances manually.
+
+===================================================
+G) SECURITY RULES
+===================================================
+- Customers cannot see driver documents  
+- Drivers cannot see customer KYC  
+- Restaurants cannot view other restaurants  
+- Only admin can verify, block, change commission  
+- Users may edit ONLY their own profile  
+
+===================================================
+H) STATUS FLOWS (MUST MATCH EXACTLY)
+===================================================
+
+### Ride:
+requested → searching_driver → accepted → driver_arriving  
+→ in_progress → completed OR cancelled_x
+
+### Food:
+placed → accepted → preparing → ready_for_pickup  
+→ picked_up → on_the_way → delivered OR cancelled_x
+
+### Parcel:
+requested → searching_driver → accepted → picked_up  
+→ on_the_way → delivered OR cancelled_x
+
+===================================================
+I) MULTI-STEP ONBOARDING (ALL ROLES)
+===================================================
+- basic info  
+- address  
+- KYC upload (country-specific)  
+- emergency contact  
+- verification_status="pending"  
+- block access until admin approval  
+
+===================================================
+J) NOTIFICATIONS
+===================================================
+- ride alerts  
+- food updates  
+- parcel updates  
+- verification approval/rejection  
+- payout alerts  
+
+===================================================
+K) EXTENSION (BANGLADESH ONLY — APPROVED NEW ROLES)
+===================================================
+
+You must now add EXACTLY TWO NEW BD-ONLY ROLES:
+
+1. **SafeGo Shop Partner** (Small shops selling products via SafeGo)  
+2. **SafeGo Ticket & Rental Operator** (Ticket sales + car/micro/bus rental)
+
+These must be BD-ONLY and must NOT appear in the US market.
+
+---------------------------------------
+1) SAFEGO SHOP PARTNER REQUIREMENTS
+---------------------------------------
+KYC (BD only):
+- shop_name  
+- shop_type  
+- trade_license (optional)  
+- shop_address + geolocation  
+- shop_logo  
+- NID front/back  
+- emergency_contact  
+- verification_status  
+
+Dashboard:
+- product listing  
+- price, inventory, category  
+- order management  
+- request SafeGo driver pickup  
+- earnings + payout wallet  
+- negative_balance tracking  
+- shop reports  
+
+Permissions:
+- cannot see drivers  
+- cannot see customers  
+- cannot see restaurants  
+- cannot see ticket/rental operators  
+
+Commission Logic:
+- customer pays  
+- SafeGo keeps commission automatically  
+- shop balance updated  
+
+---------------------------------------
+2) TICKET & RENTAL OPERATOR REQUIREMENTS
+---------------------------------------
+KYC (BD only):
+- operator_name  
+- route permits (if applicable)  
+- vehicle documents  
+- office_address  
+- NID front/back  
+- emergency_contact  
+- verification_status  
+
+Dashboard:
+- ticket listing (routes, seat map, price, schedule)  
+- rental vehicles (car, micro, tourist bus)  
+- booking management  
+- earnings & payout wallet  
+- cancellation rules  
+- commission automation  
+
+Commission:
+- per booking or per rental  
+- SafeGo collects based on online payment rules  
+
+---------------------------------------
+DATABASE EXTENSIONS (NON-BREAKING)
+---------------------------------------
+Add optional fields ONLY (never replace):
+- product_orders collection  
+- tickets collection  
+- rentals collection  
+
+rides, food_orders, deliveries must remain unchanged except optional additions:
+- shop_partner_id (optional)  
+- ticket_operator_id (optional)  
+- rental_operator_id (optional)  
+
+---------------------------------------
+ADMIN PANEL EXTENSION
+---------------------------------------
+Admin must manage:
+- Shop Partner verification  
+- Ticket & Rental Operator verification  
+- commission rate setup (per role)  
+- block/unblock  
+- payout settlement  
+- negative balance view  
+
+---------------------------------------
+SECURITY (MANDATORY)
+---------------------------------------
+Shop Partners cannot view other partners  
+Ticket Operators cannot view other operators  
+Strict role isolation  
+
+===================================================
+END OF RULESET
+===================================================
