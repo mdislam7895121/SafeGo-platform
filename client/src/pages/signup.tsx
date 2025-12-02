@@ -19,6 +19,7 @@ const ALL_ROLES: RoleOption[] = [
   { value: "customer", label: "Use services (Customer)" },
   { value: "driver", label: "Drive & deliver (Driver)" },
   { value: "restaurant", label: "Manage restaurant (Restaurant)" },
+  { value: "shop_partner", label: "দোকানদার (Shop Partner)", bdOnly: true },
   { value: "ticket_operator", label: "টিকিট ও রেন্টাল অপারেটর (Ticket Operator)", bdOnly: true },
   { value: "admin", label: "Manage platform (Admin)" },
 ];

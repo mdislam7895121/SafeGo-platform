@@ -1,0 +1,77 @@
+# SAFEGO BD — ADD "SHOP PARTNER" SIGNUP ROLE
+# Follow ALL SafeGo master rules. BD-only. Non-breaking. Additive only.
+
+======================================================
+A) PURPOSE
+======================================================
+Enable the "Shop Partner" role for signup so Bangladeshi shop owners
+can create accounts and access the BD Shop Partner onboarding wizard.
+This role already exists (dashboard + onboarding + product system),
+but it is NOT visible in the signup role selector.
+
+======================================================
+B) ROLE DETAILS
+======================================================
+Internal role ID:
+  "shop_partner"
+
+Signup dropdown label (Bangla-first):
+  "দোকানদার (Shop Partner)"
+
+Visibility rule:
+  Show ONLY when countryCode === "BD"
+  (US users must never see this role)
+
+======================================================
+C) SIGNUP PAGE INTEGRATION
+======================================================
+Update the signup role selector to include "shop_partner"
+WITHOUT modifying existing roles.
+
+Existing roles:
+- customer
+- driver
+- restaurant
+- admin
+- ticket_operator   (newly added — keep intact)
+
+Add "shop_partner" as a separate option.
+
+======================================================
+D) POST-SIGNUP ROUTING
+======================================================
+After signup with role = "shop_partner":
+Redirect to:
+  /shop-partner/onboarding
+
+Onboarding wizard must load:
+1) Basic info (Bangla)
+2) Shop details
+3) Delivery area + shop hours
+4) KYC upload (BD rules)
+5) Pending verification screen
+
+verification_status must start as "pending"
+until admin approves BD KYC.
+
+======================================================
+E) SECURITY RULES
+======================================================
+- Shop Partner cannot access restaurant or operator dashboards.
+- Cannot view driver documents or customer sensitive data.
+- Only admin can approve or reject.
+
+======================================================
+F) NON-BREAKING REQUIREMENTS
+======================================================
+Do NOT:
+- Change existing route names
+- Modify schemas
+- Touch rides/food_orders/deliveries logic
+- Affect US flows
+
+Only extend signup role list + routing.
+
+======================================================
+END OF TASK
+======================================================

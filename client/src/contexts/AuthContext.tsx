@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 interface User {
   id: string;
   email: string;
-  role: "customer" | "driver" | "restaurant" | "admin" | "ticket_operator";
+  role: "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner";
   countryCode: "BD" | "US";
   profile?: any;
 }
@@ -63,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       restaurant: "/restaurant",
       admin: "/admin",
       ticket_operator: "/ticket-operator/onboarding",
+      shop_partner: "/shop-partner/onboarding",
     };
     setTimeout(() => {
       setLocation(roleRoutes[data.user.role] || "/customer");

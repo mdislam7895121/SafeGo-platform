@@ -72,14 +72,15 @@ router.post("/signup", async (req, res) => {
     const userRole = role || "driver";
 
     // Validate role
-    const validRoles = ["customer", "driver", "restaurant", "admin", "ticket_operator"];
+    const validRoles = ["customer", "driver", "restaurant", "admin", "ticket_operator", "shop_partner"];
     if (!validRoles.includes(userRole)) {
-      return res.status(400).json({ error: "Invalid role. Must be: customer, driver, restaurant, admin, or ticket_operator" });
+      return res.status(400).json({ error: "Invalid role. Must be: customer, driver, restaurant, admin, ticket_operator, or shop_partner" });
     }
 
     // BD-only role validation
-    if (userRole === "ticket_operator" && countryCode !== "BD") {
-      return res.status(400).json({ error: "Ticket Operator role is only available in Bangladesh" });
+    const bdOnlyRoles = ["ticket_operator", "shop_partner"];
+    if (bdOnlyRoles.includes(userRole) && countryCode !== "BD") {
+      return res.status(400).json({ error: `${userRole} role is only available in Bangladesh` });
     }
 
     // Check if user already exists
@@ -159,6 +160,17 @@ router.post("/signup", async (req, res) => {
           operatorName: email.split("@")[0],
           operatorType: "both",
           officeAddress: "",
+          verificationStatus: "pending",
+          isActive: false,
+        },
+      });
+    } else if (userRole === "shop_partner") {
+      await prisma.shopPartner.create({
+        data: {
+          userId: user.id,
+          shopName: email.split("@")[0],
+          shopType: "general_store",
+          shopAddress: "",
           verificationStatus: "pending",
           isActive: false,
         },
