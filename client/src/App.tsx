@@ -283,6 +283,21 @@ import ShopPartnerProfile from "@/pages/shop-partner/profile";
 import BDShops from "@/pages/customer/bd-shops";
 import BDShopDetails from "@/pages/customer/bd-shop-details";
 
+// Ticket Operator pages (BD only)
+import { TicketOperatorGuard } from "@/components/TicketOperatorGuard";
+import { TicketOperatorLayout } from "@/layouts/TicketOperatorLayout";
+import TicketOperatorDashboard from "@/pages/ticket-operator/dashboard";
+import TicketOperatorOnboarding from "@/pages/ticket-operator/onboarding";
+import TicketOperatorSetup from "@/pages/ticket-operator/setup";
+import TicketOperatorTickets from "@/pages/ticket-operator/tickets";
+import TicketOperatorRentals from "@/pages/ticket-operator/rentals";
+import TicketOperatorBookings from "@/pages/ticket-operator/bookings";
+import TicketOperatorWallet from "@/pages/ticket-operator/wallet";
+import TicketOperatorProfile from "@/pages/ticket-operator/profile";
+
+// Customer BD Tickets & Rentals
+import BDTickets from "@/pages/customer/bd-tickets";
+
 import NotFound from "@/pages/not-found";
 
 function HomeRedirect() {
@@ -2090,6 +2105,74 @@ function Router() {
         <ProtectedRoute allowedRoles={["customer"]}>
           <BDShops />
         </ProtectedRoute>
+      </Route>
+
+      {/* Customer BD Tickets & Rentals Routes */}
+      <Route path="/customer/bd-tickets">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <BDTickets />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Ticket Operator Routes (BD only) */}
+      <Route path="/ticket-operator/onboarding">
+        <TicketOperatorGuard allowSetup>
+          <TicketOperatorOnboarding />
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/setup">
+        <TicketOperatorGuard allowSetup>
+          <TicketOperatorSetup />
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/tickets">
+        <TicketOperatorGuard>
+          <TicketOperatorLayout>
+            <TicketOperatorTickets />
+          </TicketOperatorLayout>
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/rentals">
+        <TicketOperatorGuard>
+          <TicketOperatorLayout>
+            <TicketOperatorRentals />
+          </TicketOperatorLayout>
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/bookings">
+        <TicketOperatorGuard>
+          <TicketOperatorLayout>
+            <TicketOperatorBookings />
+          </TicketOperatorLayout>
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/wallet">
+        <TicketOperatorGuard>
+          <TicketOperatorLayout>
+            <TicketOperatorWallet />
+          </TicketOperatorLayout>
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/profile">
+        <TicketOperatorGuard>
+          <TicketOperatorLayout>
+            <TicketOperatorProfile />
+          </TicketOperatorLayout>
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator/dashboard">
+        <TicketOperatorGuard>
+          <TicketOperatorLayout>
+            <TicketOperatorDashboard />
+          </TicketOperatorLayout>
+        </TicketOperatorGuard>
+      </Route>
+      <Route path="/ticket-operator">
+        <TicketOperatorGuard>
+          <TicketOperatorLayout>
+            <TicketOperatorDashboard />
+          </TicketOperatorLayout>
+        </TicketOperatorGuard>
       </Route>
 
       {/* 404 */}

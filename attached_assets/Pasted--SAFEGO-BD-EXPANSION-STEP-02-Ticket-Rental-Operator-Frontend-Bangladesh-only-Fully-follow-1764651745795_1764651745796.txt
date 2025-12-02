@@ -1,0 +1,159 @@
+# SAFEGO BD EXPANSION — STEP 02
+# Ticket & Rental Operator Frontend (Bangladesh-only)
+# Fully follows all SafeGo master rules. No backend breaking.
+
+===================================================
+A) ENABLE BD-ONLY TICKET & RENTAL OPERATOR ROLE
+===================================================
+1. Show “টিকিট ও রেন্টাল অপারেটর” role ONLY when:
+   user.country == "BD"
+
+2. Hide this role entirely for US users.
+
+3. Must follow BD KYC requirements:
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - nid_number + front/back
+   - emergency_contact
+   - verification_status
+   - is_verified
+
+4. Do NOT modify Customer/Driver/Restaurant/Admin flows.
+
+===================================================
+B) ROUTING + GUARD SETUP
+===================================================
+Create the following pages (empty shells allowed initially):
+
+- /ticket-operator/dashboard
+- /ticket-operator/setup
+- /ticket-operator/tickets
+- /ticket-operator/rentals
+- /ticket-operator/bookings
+- /ticket-operator/wallet
+- /ticket-operator/profile
+
+Add a strict guard:
+- Only BD Ticket & Rental operators can access these routes.
+- US users or other BD roles cannot access these screens.
+
+===================================================
+C) 3-STEP BANGLA ONBOARDING WIZARD
+===================================================
+Create the full Bangla setup wizard similar to Shop Partner simplicity.
+
+### Step 1: অপারেটরের তথ্য
+Fields:
+- “অপারেটরের নাম”
+- “অফিসের ঠিকানা”
+- “রুট/সার্ভিস এলাকা”
+- Geo pin
+- KYC upload fields in Bangla
+
+### Step 2: টিকিট সেটআপ (DoorDash-like simplicity)
+Operator can add:
+- Route name (Bangla)
+- Start → End
+- ভাড়া (৳)
+- সময়সূচী
+- আসন সংখ্যা
+- "টিকিট যোগ করুন" button (large, Bangla)
+
+### Step 3: রেন্টাল সেটআপ
+Operator can add:
+- গাড়ির নাম (Car, Microbus, Tourist Bus)
+- ভাড়ার ধরন (ঘণ্টা/দিন)
+- ভাড়া (৳)
+- ছবি (capture button)
+- “রেন্টাল যোগ করুন”
+
+===================================================
+D) PRODUCT-LIKE SIMPLE MANAGEMENT UI (IN BANGLA)
+===================================================
+
+### Ticket List Screen:
+- Route
+- Price
+- Seats
+- Status toggle (চালু/বন্ধ)
+- Edit (সম্পাদনা)
+- Duplicate (কপি)
+
+### Rental Vehicle List:
+- Image
+- Vehicle name
+- Price
+- Type
+- Status toggle
+- Edit / Duplicate
+
+===================================================
+E) BANGLA BOOKING DASHBOARD
+===================================================
+Two tabs:
+1. “নতুন বুকিং”
+2. “সম্পন্ন বুকিং”
+
+Fields to show:
+- গ্রাহকের নাম
+- রুট/গাড়ি
+- বুকিং সময়
+- মোট টাকা
+- স্ট্যাটাস
+
+Bangla action buttons:
+- “বুকিং গ্রহণ”
+- “গাড়ি প্রস্তুত”
+- “যাত্রা শুরু”
+- “সম্পন্ন”
+- “বাতিল”
+
+Must follow backend status workflow.
+
+===================================================
+F) CUSTOMER APP — DISCOVERY + BOOKING FLOW (BD ONLY)
+===================================================
+Add new BD-only entry: “টিকিট ও রেন্টাল”
+
+### Ticket Tab:
+- Route list (Bangla)
+- Price
+- Available seats
+- “বুক করুন”
+
+### Rental Tab:
+- Vehicles
+- Photo
+- Price (hour/day)
+- “বুক করুন”
+
+Checkout → Same existing SafeGo flow:
+- Address
+- Payment method
+- Order confirmation
+
+===================================================
+G) WALLET + PAYOUT (BANGLA)
+===================================================
+Wallet Screen:
+- মোট আয়
+- কমিশন কাটা হয়েছে
+- উত্তোলন অপেক্ষমান
+- পেমেন্ট হিস্টরি
+
+Completely BD-only.
+
+===================================================
+H) DO NOT CHANGE BACKEND
+===================================================
+Use ONLY:
+- /api/ticket-operator/*
+- /api/admin/bd-expansion/*
+
+Backend schema MUST remain untouched.
+
+===================================================
+END OF STEP 02
+===================================================
