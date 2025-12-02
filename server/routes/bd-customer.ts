@@ -8,6 +8,124 @@ const router = Router();
 
 router.use(authenticateToken);
 
+router.get("/tickets", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "This feature is only available in Bangladesh" });
+    }
+
+    const { vehicleType, origin, destination } = req.query;
+
+    const validTicketVehicleTypes = ["bus", "coach", "ac_bus", "train"];
+    const vehicleTypeFilter = vehicleType && vehicleType !== "all" && validTicketVehicleTypes.includes(vehicleType as string)
+      ? { vehicleType: vehicleType as string }
+      : {};
+
+    let listings = await prisma.ticketListing.findMany({
+      where: {
+        isActive: true,
+        availableSeats: { gt: 0 },
+        departureTime: { gt: new Date() },
+        operator: {
+          countryCode: "BD",
+          verificationStatus: "approved",
+          isActive: true,
+          operatorType: { in: ["ticket", "both"] },
+        },
+        ...vehicleTypeFilter,
+      },
+      include: {
+        operator: {
+          select: {
+            id: true,
+            operatorName: true,
+            logo: true,
+            averageRating: true,
+          },
+        },
+      },
+      orderBy: { departureTime: "asc" },
+    });
+
+    if (origin && typeof origin === "string") {
+      const originLower = origin.toLowerCase();
+      listings = listings.filter((l) => l.originCity.toLowerCase().includes(originLower));
+    }
+
+    if (destination && typeof destination === "string") {
+      const destLower = destination.toLowerCase();
+      listings = listings.filter((l) => l.destinationCity.toLowerCase().includes(destLower));
+    }
+
+    if (listings.length === 0) {
+      await seedDemoTicketListings();
+
+      listings = await prisma.ticketListing.findMany({
+        where: {
+          isActive: true,
+          availableSeats: { gt: 0 },
+          departureTime: { gt: new Date() },
+          operator: {
+            countryCode: "BD",
+            verificationStatus: "approved",
+            isActive: true,
+            operatorType: { in: ["ticket", "both"] },
+          },
+        },
+        include: {
+          operator: {
+            select: {
+              id: true,
+              operatorName: true,
+              logo: true,
+              averageRating: true,
+            },
+          },
+        },
+        orderBy: { departureTime: "asc" },
+      });
+    }
+
+    const formattedListings = listings.map((l) => ({
+      id: l.id,
+      routeName: l.routeName,
+      vehicleType: l.vehicleType,
+      vehicleNumber: l.vehicleNumber,
+      originCity: l.originCity,
+      originStation: l.originStation,
+      destinationCity: l.destinationCity,
+      destinationStation: l.destinationStation,
+      departureTime: l.departureTime.toISOString(),
+      arrivalTime: l.arrivalTime?.toISOString() || null,
+      basePrice: Number(l.basePrice),
+      discountPrice: l.discountPrice ? Number(l.discountPrice) : null,
+      totalSeats: l.totalSeats,
+      availableSeats: l.availableSeats,
+      amenities: l.amenities as string[] | null,
+      operator: {
+        id: l.operator.id,
+        operatorName: l.operator.operatorName,
+        logo: l.operator.logo,
+        averageRating: l.operator.averageRating || 0,
+      },
+    }));
+
+    res.json({ listings: formattedListings });
+  } catch (error) {
+    console.error("BD tickets fetch error:", error);
+    res.status(500).json({ error: "Failed to fetch ticket listings" });
+  }
+});
+
 router.get("/rentals", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
@@ -738,6 +856,264 @@ async function seedDemoShops() {
     console.log("[BD-Customer] Seeded demo shops");
   } catch (error) {
     console.error("[BD-Customer] Failed to seed demo shops:", error);
+  }
+}
+
+async function seedDemoTicketListings() {
+  try {
+    let existingDemo = await prisma.ticketOperator.findFirst({
+      where: { operatorName: "SafeGo Demo Tickets BD" },
+    });
+
+    let operator: typeof existingDemo;
+
+    if (existingDemo) {
+      const listingCount = await prisma.ticketListing.count({
+        where: { 
+          operatorId: existingDemo.id,
+          departureTime: { gt: new Date() },
+        },
+      });
+      
+      if (listingCount > 0) {
+        return;
+      }
+      
+      operator = await prisma.ticketOperator.update({
+        where: { id: existingDemo.id },
+        data: {
+          verificationStatus: "approved",
+          isActive: true,
+          operatorType: "ticket",
+          countryCode: "BD",
+          verifiedAt: new Date(),
+        },
+      });
+    } else {
+      const demoUser = await prisma.user.findFirst({
+        where: { email: "demo-ticket-operator@safego.bd" },
+      });
+
+      let userId: string;
+      if (!demoUser) {
+        const newUser = await prisma.user.create({
+          data: {
+            id: randomUUID(),
+            email: "demo-ticket-operator@safego.bd",
+            passwordHash: "demo-not-for-login",
+            role: "ticket_operator",
+            countryCode: "BD",
+            isDemo: true,
+          },
+        });
+        userId = newUser.id;
+      } else {
+        userId = demoUser.id;
+      }
+
+      operator = await prisma.ticketOperator.create({
+        data: {
+          id: randomUUID(),
+          userId,
+          operatorName: "SafeGo Demo Tickets BD",
+          operatorType: "ticket",
+          description: "বাংলাদেশের বিশ্বস্ত বাস টিকিট সেবা",
+          officeAddress: "মতিঝিল, ঢাকা-১০০০",
+          officeLat: 23.7287,
+          officeLng: 90.4175,
+          officePhone: "+8801700000003",
+          officeEmail: "tickets-demo@safego.bd",
+          ownerName: "ডেমো টিকিট অপারেটর",
+          fatherName: "ডেমো পিতা",
+          dateOfBirth: new Date("1980-05-15"),
+          presentAddress: "মতিঝিল, ঢাকা",
+          permanentAddress: "মতিঝিল, ঢাকা",
+          nidNumber: "9876543210123",
+          emergencyContactName: "ডেমো ইমার্জেন্সি",
+          emergencyContactPhone: "+8801700000004",
+          verificationStatus: "approved",
+          verifiedAt: new Date(),
+          isActive: true,
+          countryCode: "BD",
+          averageRating: 4.7,
+          totalRatings: 250,
+        },
+      });
+    }
+
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date(now);
+    dayAfter.setDate(dayAfter.getDate() + 2);
+
+    const demoListings = [
+      {
+        routeName: "ঢাকা - চট্টগ্রাম এক্সপ্রেস",
+        vehicleType: "ac_bus",
+        vehicleNumber: "ঢাকা মেট্রো ব ১২৩৪",
+        vehicleBrand: "Scania",
+        originCity: "ঢাকা",
+        originStation: "কমলাপুর বাস স্ট্যান্ড",
+        destinationCity: "চট্টগ্রাম",
+        destinationStation: "দামপাড়া বাস স্ট্যান্ড",
+        departureTime: new Date(tomorrow.setHours(8, 0, 0, 0)),
+        arrivalTime: new Date(tomorrow.setHours(14, 0, 0, 0)),
+        durationMinutes: 360,
+        basePrice: 850,
+        totalSeats: 40,
+        availableSeats: 35,
+        amenities: ["এসি", "ওয়াইফাই", "মোবাইল চার্জার", "রিক্লাইনিং সিট"],
+      },
+      {
+        routeName: "ঢাকা - সিলেট ডিলাক্স",
+        vehicleType: "coach",
+        vehicleNumber: "ঢাকা মেট্রো চ ৫৬৭৮",
+        vehicleBrand: "Hyundai",
+        originCity: "ঢাকা",
+        originStation: "সায়দাবাদ বাস স্ট্যান্ড",
+        destinationCity: "সিলেট",
+        destinationStation: "কদমতলী বাস স্ট্যান্ড",
+        departureTime: new Date(tomorrow.setHours(10, 30, 0, 0)),
+        arrivalTime: new Date(tomorrow.setHours(16, 30, 0, 0)),
+        durationMinutes: 360,
+        basePrice: 750,
+        totalSeats: 38,
+        availableSeats: 28,
+        amenities: ["এসি", "টিভি", "স্ন্যাকস"],
+      },
+      {
+        routeName: "ঢাকা - কক্সবাজার সুপার",
+        vehicleType: "ac_bus",
+        vehicleNumber: "ঢাকা মেট্রো ক ৯০১২",
+        vehicleBrand: "Volvo",
+        originCity: "ঢাকা",
+        originStation: "ফকিরাপুল বাস স্ট্যান্ড",
+        destinationCity: "কক্সবাজার",
+        destinationStation: "কক্সবাজার বাস স্ট্যান্ড",
+        departureTime: new Date(tomorrow.setHours(21, 0, 0, 0)),
+        arrivalTime: new Date(dayAfter.setHours(7, 0, 0, 0)),
+        durationMinutes: 600,
+        basePrice: 1200,
+        totalSeats: 36,
+        availableSeats: 20,
+        amenities: ["এসি", "ওয়াইফাই", "ব্ল্যাংকেট", "স্লিপার সিট", "টয়লেট"],
+      },
+      {
+        routeName: "ঢাকা - রাজশাহী এক্সপ্রেস",
+        vehicleType: "bus",
+        vehicleNumber: "ঢাকা মেট্রো গ ৩৪৫৬",
+        vehicleBrand: "Ashok Leyland",
+        originCity: "ঢাকা",
+        originStation: "গাবতলী বাস স্ট্যান্ড",
+        destinationCity: "রাজশাহী",
+        destinationStation: "রাজশাহী বাস স্ট্যান্ড",
+        departureTime: new Date(tomorrow.setHours(7, 0, 0, 0)),
+        arrivalTime: new Date(tomorrow.setHours(13, 0, 0, 0)),
+        durationMinutes: 360,
+        basePrice: 600,
+        totalSeats: 44,
+        availableSeats: 40,
+        amenities: ["পানি", "স্ন্যাকস"],
+      },
+      {
+        routeName: "ঢাকা - খুলনা সুপার ডিলাক্স",
+        vehicleType: "coach",
+        vehicleNumber: "ঢাকা মেট্রো ঘ ৭৮৯০",
+        vehicleBrand: "Mercedes",
+        originCity: "ঢাকা",
+        originStation: "গাবতলী বাস স্ট্যান্ড",
+        destinationCity: "খুলনা",
+        destinationStation: "খুলনা বাস স্ট্যান্ড",
+        departureTime: new Date(tomorrow.setHours(9, 0, 0, 0)),
+        arrivalTime: new Date(tomorrow.setHours(15, 30, 0, 0)),
+        durationMinutes: 390,
+        basePrice: 700,
+        totalSeats: 40,
+        availableSeats: 32,
+        amenities: ["এসি", "ওয়াইফাই", "টিভি", "মোবাইল চার্জার"],
+      },
+      {
+        routeName: "চট্টগ্রাম - ঢাকা নাইট কোচ",
+        vehicleType: "ac_bus",
+        vehicleNumber: "চট্টগ্রাম মেট্রো জ ১১২২",
+        vehicleBrand: "Scania",
+        originCity: "চট্টগ্রাম",
+        originStation: "দামপাড়া বাস স্ট্যান্ড",
+        destinationCity: "ঢাকা",
+        destinationStation: "কমলাপুর বাস স্ট্যান্ড",
+        departureTime: new Date(tomorrow.setHours(22, 0, 0, 0)),
+        arrivalTime: new Date(dayAfter.setHours(4, 0, 0, 0)),
+        durationMinutes: 360,
+        basePrice: 900,
+        totalSeats: 38,
+        availableSeats: 25,
+        amenities: ["এসি", "ব্ল্যাংকেট", "বালিশ", "স্লিপার সিট"],
+      },
+      {
+        routeName: "ঢাকা - বরিশাল ওয়াটার বাস",
+        vehicleType: "bus",
+        vehicleNumber: "ঢাকা মেট্রো ড ৩৩৪৪",
+        vehicleBrand: "Tata",
+        originCity: "ঢাকা",
+        originStation: "গুলিস্তান বাস স্ট্যান্ড",
+        destinationCity: "বরিশাল",
+        destinationStation: "বরিশাল বাস স্ট্যান্ড",
+        departureTime: new Date(dayAfter.setHours(6, 0, 0, 0)),
+        arrivalTime: new Date(dayAfter.setHours(12, 0, 0, 0)),
+        durationMinutes: 360,
+        basePrice: 550,
+        totalSeats: 42,
+        availableSeats: 38,
+        amenities: ["পানি", "টিভি"],
+      },
+      {
+        routeName: "ঢাকা - ময়মনসিংহ লোকাল",
+        vehicleType: "bus",
+        vehicleNumber: "ঢাকা মেট্রো ঢ ৫৫৬৬",
+        vehicleBrand: "Hino",
+        originCity: "ঢাকা",
+        originStation: "মহাখালী বাস স্ট্যান্ড",
+        destinationCity: "ময়মনসিংহ",
+        destinationStation: "ময়মনসিংহ বাস স্ট্যান্ড",
+        departureTime: new Date(tomorrow.setHours(11, 0, 0, 0)),
+        arrivalTime: new Date(tomorrow.setHours(14, 0, 0, 0)),
+        durationMinutes: 180,
+        basePrice: 300,
+        totalSeats: 40,
+        availableSeats: 30,
+        amenities: ["পানি"],
+      },
+    ];
+
+    for (const listing of demoListings) {
+      await prisma.ticketListing.create({
+        data: {
+          id: randomUUID(),
+          operatorId: operator.id,
+          routeName: listing.routeName,
+          vehicleType: listing.vehicleType,
+          vehicleNumber: listing.vehicleNumber,
+          vehicleBrand: listing.vehicleBrand,
+          originCity: listing.originCity,
+          originStation: listing.originStation,
+          destinationCity: listing.destinationCity,
+          destinationStation: listing.destinationStation,
+          departureTime: listing.departureTime,
+          arrivalTime: listing.arrivalTime,
+          durationMinutes: listing.durationMinutes,
+          basePrice: listing.basePrice,
+          totalSeats: listing.totalSeats,
+          availableSeats: listing.availableSeats,
+          amenities: listing.amenities,
+          isActive: true,
+        },
+      });
+    }
+
+    console.log("[BD-Customer] Seeded demo ticket listings");
+  } catch (error) {
+    console.error("[BD-Customer] Failed to seed demo tickets:", error);
   }
 }
 

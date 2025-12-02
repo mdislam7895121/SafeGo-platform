@@ -80,11 +80,11 @@ export default function BDTicketsPage() {
   const [activeTab, setActiveTab] = useState("tickets");
 
   const { data: ticketData, isLoading: ticketLoading } = useQuery<{ listings: TicketListing[] }>({
-    queryKey: ["/api/bd-tickets/listings"],
+    queryKey: ["/api/bd/tickets"],
   });
 
   const { data: rentalData, isLoading: rentalLoading } = useQuery<{ vehicles: RentalVehicle[] }>({
-    queryKey: ["/api/bd-tickets/vehicles"],
+    queryKey: ["/api/bd/rentals"],
   });
 
   const filteredTickets = ticketData?.listings?.filter(
@@ -105,7 +105,7 @@ export default function BDTicketsPage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-card">
         <div className="flex h-14 items-center gap-4 px-4">
-          <Link href="/">
+          <Link href="/customer">
             <Button variant="ghost" size="icon" data-testid="button-back">
               <ChevronLeft className="h-5 w-5" />
             </Button>
