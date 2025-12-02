@@ -15,9 +15,11 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
   const { user, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
 
+  const isShopPartnerRole = user?.role === "shop_partner" || user?.role === "pending_shop_partner";
+
   const { data: profileData, isLoading: profileLoading } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
-    enabled: !!user && user.countryCode === "BD" && user.role === "shop_partner",
+    enabled: !!user && user.countryCode === "BD" && isShopPartnerRole,
   });
 
   if (authLoading || profileLoading) {
@@ -37,7 +39,7 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
     return <Redirect to={getPostLoginPath(user)} />;
   }
 
-  if (user.role !== "shop_partner") {
+  if (!isShopPartnerRole) {
     console.warn("[ShopPartnerGuard] Wrong role accessing shop_partner route, redirecting");
     return <Redirect to={getPostLoginPath(user)} />;
   }
@@ -60,6 +62,9 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
   }
 
   if (hasProfile && isRejected) {
+    if (isSetupRoute) {
+      return <>{children}</>;
+    }
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <Card className="max-w-md w-full text-center">
@@ -92,13 +97,14 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
 export function useBDShopPartnerAccess() {
   const { user } = useAuth();
   
+  const isShopPartnerRole = user?.role === "shop_partner" || user?.role === "pending_shop_partner";
+
   const { data: profileData, isLoading } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
-    enabled: !!user && user.countryCode === "BD" && user.role === "shop_partner",
+    enabled: !!user && user.countryCode === "BD" && isShopPartnerRole,
   });
 
   const isBD = user?.countryCode === "BD";
-  const isShopPartner = user?.role === "shop_partner";
   const hasShopPartner = !!profileData?.profile;
   const isApproved = profileData?.profile?.verificationStatus === "approved";
   const isPending = profileData?.profile?.verificationStatus === "pending";
@@ -112,8 +118,8 @@ export function useBDShopPartnerAccess() {
     isRejected,
     isLoading,
     profile: profileData?.profile,
-    canAccessShopPartner: isBD && isShopPartner,
-    canAccessFullDashboard: isBD && isShopPartner && hasShopPartner && isApproved,
-    shouldRedirectToSetup: isBD && isShopPartner && hasShopPartner && isPending,
+    canAccessShopPartner: isBD && isShopPartnerRole,
+    canAccessFullDashboard: isBD && isShopPartnerRole && hasShopPartner && isApproved,
+    shouldRedirectToSetup: isBD && isShopPartnerRole && hasShopPartner && isPending,
   };
 }

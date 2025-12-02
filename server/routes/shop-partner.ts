@@ -43,8 +43,14 @@ const shopPartnerKycSchema = z.object({
 router.post("/register", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
+    const userRole = req.user?.role;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Allow both pending_shop_partner and shop_partner roles
+    if (userRole !== "pending_shop_partner" && userRole !== "shop_partner") {
+      return res.status(403).json({ error: "Only shop partners can access this endpoint" });
     }
 
     const user = await prisma.user.findUnique({
@@ -60,8 +66,14 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: "Shop Partner registration is only available in Bangladesh" });
     }
 
-    if (user.shopPartner) {
-      return res.status(400).json({ error: "You are already registered as a Shop Partner" });
+    // If user has final role (shop_partner), they can't re-register
+    if (user.role === "shop_partner" && user.shopPartner) {
+      return res.status(400).json({ error: "You are already approved as a Shop Partner" });
+    }
+
+    // For pending role, allow resubmission if profile exists but not yet approved
+    if (user.shopPartner && user.shopPartner.verificationStatus === "approved") {
+      return res.status(400).json({ error: "You are already approved as a Shop Partner" });
     }
 
     const parsed = shopPartnerRegisterSchema.safeParse(req.body);
@@ -74,8 +86,10 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
 
     const data = parsed.data;
 
-    const shopPartner = await prisma.shopPartner.create({
-      data: {
+    // Use upsert to handle both new registration and resubmission for pending roles
+    const shopPartner = await prisma.shopPartner.upsert({
+      where: { userId },
+      create: {
         id: randomUUID(),
         userId,
         shopName: data.shopName,
@@ -101,10 +115,37 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
         verificationStatus: "pending",
         countryCode: "BD",
       },
+      update: {
+        shopName: data.shopName,
+        shopType: data.shopType,
+        shopDescription: data.shopDescription,
+        shopAddress: data.shopAddress,
+        shopLat: data.shopLat,
+        shopLng: data.shopLng,
+        ownerName: data.ownerName,
+        fatherName: data.fatherName,
+        dateOfBirth: data.dateOfBirth,
+        presentAddress: data.presentAddress,
+        permanentAddress: data.permanentAddress,
+        nidNumber: data.nidNumber,
+        emergencyContactName: data.emergencyContactName,
+        emergencyContactPhone: data.emergencyContactPhone,
+        emergencyContactRelation: data.emergencyContactRelation,
+        tradeLicenseNumber: data.tradeLicenseNumber,
+        openingTime: data.openingTime || "09:00",
+        closingTime: data.closingTime || "21:00",
+        deliveryRadiusKm: data.deliveryRadiusKm || 5,
+        minOrderAmount: data.minOrderAmount,
+        verificationStatus: "pending",
+        rejectionReason: null,
+      },
     });
 
-    res.status(201).json({
-      message: "Shop Partner registration submitted successfully",
+    const isUpdate = user.shopPartner !== null;
+    res.status(isUpdate ? 200 : 201).json({
+      message: isUpdate 
+        ? "Shop Partner registration updated successfully" 
+        : "Shop Partner registration submitted successfully",
       shopPartner: {
         id: shopPartner.id,
         shopName: shopPartner.shopName,

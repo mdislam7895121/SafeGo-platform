@@ -46,8 +46,14 @@ const operatorKycSchema = z.object({
 router.post("/register", async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.userId;
+    const userRole = req.user?.role;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Allow both pending_ticket_operator and ticket_operator roles
+    if (userRole !== "pending_ticket_operator" && userRole !== "ticket_operator") {
+      return res.status(403).json({ error: "Only ticket operators can access this endpoint" });
     }
 
     const user = await prisma.user.findUnique({
@@ -63,8 +69,14 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ error: "Ticket/Rental Operator registration is only available in Bangladesh" });
     }
 
-    if (user.ticketOperator) {
-      return res.status(400).json({ error: "You are already registered as a Ticket/Rental Operator" });
+    // If user has final role (ticket_operator), they can't re-register
+    if (user.role === "ticket_operator" && user.ticketOperator) {
+      return res.status(400).json({ error: "You are already approved as a Ticket/Rental Operator" });
+    }
+
+    // For pending role, allow resubmission if profile exists but not yet approved
+    if (user.ticketOperator && user.ticketOperator.verificationStatus === "approved") {
+      return res.status(400).json({ error: "You are already approved as a Ticket/Rental Operator" });
     }
 
     const parsed = operatorRegisterSchema.safeParse(req.body);
@@ -77,8 +89,10 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
 
     const data = parsed.data;
 
-    const operator = await prisma.ticketOperator.create({
-      data: {
+    // Use upsert to handle both new registration and resubmission for pending roles
+    const operator = await prisma.ticketOperator.upsert({
+      where: { userId },
+      create: {
         id: randomUUID(),
         userId,
         operatorName: data.operatorName,
@@ -103,10 +117,36 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
         verificationStatus: "pending",
         countryCode: "BD",
       },
+      update: {
+        operatorName: data.operatorName,
+        operatorType: data.operatorType,
+        description: data.description,
+        officeAddress: data.officeAddress,
+        officeLat: data.officeLat,
+        officeLng: data.officeLng,
+        officePhone: data.officePhone,
+        officeEmail: data.officeEmail,
+        ownerName: data.ownerName,
+        fatherName: data.fatherName,
+        dateOfBirth: data.dateOfBirth,
+        presentAddress: data.presentAddress,
+        permanentAddress: data.permanentAddress,
+        nidNumber: data.nidNumber,
+        routePermitNumber: data.routePermitNumber,
+        routePermitExpiry: data.routePermitExpiry,
+        emergencyContactName: data.emergencyContactName,
+        emergencyContactPhone: data.emergencyContactPhone,
+        emergencyContactRelation: data.emergencyContactRelation,
+        verificationStatus: "pending",
+        rejectionReason: null,
+      },
     });
 
-    res.status(201).json({
-      message: "Ticket/Rental Operator registration submitted successfully",
+    const isUpdate = user.ticketOperator !== null;
+    res.status(isUpdate ? 200 : 201).json({
+      message: isUpdate 
+        ? "Ticket/Rental Operator registration updated successfully" 
+        : "Ticket/Rental Operator registration submitted successfully",
       operator: {
         id: operator.id,
         operatorName: operator.operatorName,

@@ -222,7 +222,7 @@ export default function TicketOperatorOnboarding() {
 
   const { data: profileData, isLoading: profileLoading } = useQuery<{ operator: any }>({
     queryKey: ["/api/ticket-operator/profile"],
-    enabled: !!user && user.role === "ticket_operator",
+    enabled: !!user && (user.role === "ticket_operator" || user.role === "pending_ticket_operator"),
     retry: false,
   });
 

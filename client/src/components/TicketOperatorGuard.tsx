@@ -13,9 +13,11 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
   const { user, isLoading: authLoading } = useAuth();
   const [location] = useLocation();
 
+  const isTicketOperatorRole = user?.role === "ticket_operator" || user?.role === "pending_ticket_operator";
+
   const { data: profileData, isLoading: profileLoading } = useQuery<{ operator: any }>({
     queryKey: ["/api/ticket-operator/profile"],
-    enabled: !!user && user.countryCode === "BD" && user.role === "ticket_operator",
+    enabled: !!user && user.countryCode === "BD" && isTicketOperatorRole,
     retry: false,
   });
 
@@ -36,7 +38,7 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
     return <Redirect to={getPostLoginPath(user)} />;
   }
 
-  if (user.role !== "ticket_operator") {
+  if (!isTicketOperatorRole) {
     console.warn("[TicketOperatorGuard] Wrong role accessing ticket_operator route, redirecting");
     return <Redirect to={getPostLoginPath(user)} />;
   }
@@ -81,13 +83,14 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
 export function useBDTicketOperatorAccess() {
   const { user } = useAuth();
   
+  const isTicketOperatorRole = user?.role === "ticket_operator" || user?.role === "pending_ticket_operator";
+
   const { data: profileData, isLoading } = useQuery<{ operator: any }>({
     queryKey: ["/api/ticket-operator/profile"],
-    enabled: !!user && user.countryCode === "BD" && user.role === "ticket_operator",
+    enabled: !!user && user.countryCode === "BD" && isTicketOperatorRole,
   });
 
   const isBD = user?.countryCode === "BD";
-  const isTicketOperator = user?.role === "ticket_operator";
   const hasOperator = !!profileData?.operator;
   const isApproved = profileData?.operator?.verificationStatus === "approved";
   const isPending = profileData?.operator?.verificationStatus === "pending" || 
@@ -102,8 +105,8 @@ export function useBDTicketOperatorAccess() {
     isRejected,
     isLoading,
     operator: profileData?.operator,
-    canAccessTicketOperator: isBD && isTicketOperator,
-    canAccessFullDashboard: isBD && isTicketOperator && hasOperator && isApproved,
-    shouldRedirectToSetup: isBD && isTicketOperator && hasOperator && isPending,
+    canAccessTicketOperator: isBD && isTicketOperatorRole,
+    canAccessFullDashboard: isBD && isTicketOperatorRole && hasOperator && isApproved,
+    shouldRedirectToSetup: isBD && isTicketOperatorRole && hasOperator && isPending,
   };
 }

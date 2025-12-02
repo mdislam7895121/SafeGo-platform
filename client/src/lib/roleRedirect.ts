@@ -3,6 +3,9 @@
  * 
  * This utility provides proper routing based on user role and verification status.
  * BD-specific roles (ticket_operator, shop_partner) require countryCode="BD".
+ * 
+ * Pending roles (pending_ticket_operator, pending_shop_partner) always route to onboarding
+ * until admin approval converts them to final roles.
  */
 
 interface UserForRedirect {
@@ -14,6 +17,22 @@ interface UserForRedirect {
 }
 
 /**
+ * Check if a role is a pending BD role that requires onboarding
+ */
+export function isPendingBDRole(role: string): boolean {
+  return role === "pending_ticket_operator" || role === "pending_shop_partner";
+}
+
+/**
+ * Get the final role from a pending role
+ */
+export function getFinalRoleFromPending(role: string): string | null {
+  if (role === "pending_ticket_operator") return "ticket_operator";
+  if (role === "pending_shop_partner") return "shop_partner";
+  return null;
+}
+
+/**
  * Get the correct post-login path based on user role and verification status.
  * 
  * Routing rules:
@@ -21,12 +40,10 @@ interface UserForRedirect {
  * - customer → /customer
  * - driver → /driver/map (Uber-style live map experience)
  * - restaurant → /restaurant
- * - ticket_operator (BD only):
- *   - approved → /ticket-operator/dashboard
- *   - pending/rejected → /ticket-operator/onboarding
- * - shop_partner (BD only):
- *   - approved → /shop-partner/dashboard
- *   - pending/rejected → /shop-partner/onboarding
+ * - pending_ticket_operator → /ticket-operator/onboarding (always)
+ * - pending_shop_partner → /shop-partner/onboarding (always)
+ * - ticket_operator (BD only, approved) → /ticket-operator/dashboard
+ * - shop_partner (BD only, approved) → /shop-partner/dashboard
  * - fallback → /customer
  */
 export function getPostLoginPath(user: UserForRedirect | null | undefined): string {
@@ -51,6 +68,12 @@ export function getPostLoginPath(user: UserForRedirect | null | undefined): stri
     case "restaurant":
       return "/restaurant";
 
+    case "pending_ticket_operator":
+      return "/ticket-operator/onboarding";
+
+    case "pending_shop_partner":
+      return "/shop-partner/onboarding";
+
     case "ticket_operator":
       if (countryCode !== "BD") {
         console.warn("[roleRedirect] ticket_operator role requires countryCode=BD, falling back to /customer");
@@ -59,7 +82,10 @@ export function getPostLoginPath(user: UserForRedirect | null | undefined): stri
       if (verificationStatus === "approved") {
         return "/ticket-operator/dashboard";
       }
-      return "/ticket-operator/onboarding";
+      if (verificationStatus === "rejected") {
+        return "/ticket-operator/onboarding";
+      }
+      return "/ticket-operator/setup";
 
     case "shop_partner":
       if (countryCode !== "BD") {
@@ -69,7 +95,10 @@ export function getPostLoginPath(user: UserForRedirect | null | undefined): stri
       if (verificationStatus === "approved") {
         return "/shop-partner/dashboard";
       }
-      return "/shop-partner/onboarding";
+      if (verificationStatus === "rejected") {
+        return "/shop-partner/onboarding";
+      }
+      return "/shop-partner/setup";
 
     default:
       console.warn(`[roleRedirect] Unknown role: ${role}, falling back to /customer`);
@@ -79,6 +108,7 @@ export function getPostLoginPath(user: UserForRedirect | null | undefined): stri
 
 /**
  * Check if a user has access to a specific route based on their role.
+ * Pending roles can access their corresponding onboarding routes.
  */
 export function canAccessRoute(user: UserForRedirect, routeRole: string): boolean {
   const { role, countryCode } = user;
@@ -87,8 +117,12 @@ export function canAccessRoute(user: UserForRedirect, routeRole: string): boolea
     return true;
   }
 
-  if (routeRole === "ticket_operator" || routeRole === "shop_partner") {
-    return role === routeRole && countryCode === "BD";
+  if (routeRole === "ticket_operator") {
+    return (role === "ticket_operator" || role === "pending_ticket_operator") && countryCode === "BD";
+  }
+
+  if (routeRole === "shop_partner") {
+    return (role === "shop_partner" || role === "pending_shop_partner") && countryCode === "BD";
   }
 
   return false;

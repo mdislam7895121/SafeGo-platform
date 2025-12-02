@@ -754,6 +754,15 @@ router.post("/kyc/approve", checkPermission(Permission.MANAGE_KYC), async (req: 
           isActive: true,
         },
       });
+
+      // Convert pending_shop_partner to shop_partner role
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user && user.role === "pending_shop_partner") {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { role: "shop_partner" },
+        });
+      }
     } else if (role === "ticket_operator") {
       const profile = await prisma.ticketOperator.findUnique({ where: { id: profileId } });
       if (!profile) {
@@ -769,6 +778,15 @@ router.post("/kyc/approve", checkPermission(Permission.MANAGE_KYC), async (req: 
           isActive: true,
         },
       });
+
+      // Convert pending_ticket_operator to ticket_operator role
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user && user.role === "pending_ticket_operator") {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { role: "ticket_operator" },
+        });
+      }
     } else {
       return res.status(400).json({ error: "Invalid role" });
     }
@@ -866,14 +884,18 @@ router.post("/kyc/reject", checkPermission(Permission.MANAGE_KYC), async (req: A
       }
       userId = profile.userId;
 
-      // Update profile
+      // Update profile with rejection reason
       await prisma.shopPartner.update({
         where: { id: profileId },
         data: {
           verificationStatus: "rejected",
           isActive: false,
+          rejectionReason: reason,
         },
       });
+
+      // Keep user role as pending_shop_partner to allow re-onboarding
+      // (role is not changed on rejection, user can resubmit onboarding)
     } else if (role === "ticket_operator") {
       const profile = await prisma.ticketOperator.findUnique({ where: { id: profileId } });
       if (!profile) {
@@ -881,14 +903,18 @@ router.post("/kyc/reject", checkPermission(Permission.MANAGE_KYC), async (req: A
       }
       userId = profile.userId;
 
-      // Update profile
+      // Update profile with rejection reason
       await prisma.ticketOperator.update({
         where: { id: profileId },
         data: {
           verificationStatus: "rejected",
           isActive: false,
+          rejectionReason: reason,
         },
       });
+
+      // Keep user role as pending_ticket_operator to allow re-onboarding
+      // (role is not changed on rejection, user can resubmit onboarding)
     } else {
       return res.status(400).json({ error: "Invalid role" });
     }

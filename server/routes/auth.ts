@@ -54,6 +54,8 @@ function clearRefreshTokenCookie(res: any): void {
 // ====================================================
 // POST /api/auth/signup
 // Create new user with role-specific profile
+// BD-only roles (ticket_operator, shop_partner) are assigned as pending_* 
+// until admin approval after onboarding completion
 // ====================================================
 router.post("/signup", async (req, res) => {
   try {
@@ -69,18 +71,18 @@ router.post("/signup", async (req, res) => {
     }
 
     // Default role to "driver" if not provided
-    const userRole = role || "driver";
+    const requestedRole = role || "driver";
 
-    // Validate role
+    // Validate role (accept both final and pending role names for BD roles)
     const validRoles = ["customer", "driver", "restaurant", "admin", "ticket_operator", "shop_partner"];
-    if (!validRoles.includes(userRole)) {
+    if (!validRoles.includes(requestedRole)) {
       return res.status(400).json({ error: "Invalid role. Must be: customer, driver, restaurant, admin, ticket_operator, or shop_partner" });
     }
 
     // BD-only role validation
     const bdOnlyRoles = ["ticket_operator", "shop_partner"];
-    if (bdOnlyRoles.includes(userRole) && countryCode !== "BD") {
-      return res.status(400).json({ error: `${userRole} role is only available in Bangladesh` });
+    if (bdOnlyRoles.includes(requestedRole) && countryCode !== "BD") {
+      return res.status(400).json({ error: `${requestedRole} role is only available in Bangladesh` });
     }
 
     // Check if user already exists
@@ -91,6 +93,15 @@ router.post("/signup", async (req, res) => {
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
+
+    // For BD-only roles, assign pending_* role instead of final role
+    // This ensures users must complete onboarding and get admin approval
+    let userRole = requestedRole;
+    if (requestedRole === "ticket_operator") {
+      userRole = "pending_ticket_operator";
+    } else if (requestedRole === "shop_partner") {
+      userRole = "pending_shop_partner";
+    }
 
     // Create user with appropriate profile
     const user = await prisma.user.create({
@@ -103,7 +114,7 @@ router.post("/signup", async (req, res) => {
     });
 
     // Create role-specific profile
-    if (userRole === "driver") {
+    if (requestedRole === "driver") {
       await prisma.driverProfile.create({
         data: {
           userId: user.id,
@@ -123,7 +134,7 @@ router.post("/signup", async (req, res) => {
           driverId: (await prisma.driverProfile.findUnique({ where: { userId: user.id } }))!.id,
         },
       });
-    } else if (userRole === "customer") {
+    } else if (requestedRole === "customer") {
       await prisma.customerProfile.create({
         data: {
           userId: user.id,
@@ -131,7 +142,7 @@ router.post("/signup", async (req, res) => {
           isVerified: false,
         },
       });
-    } else if (userRole === "restaurant") {
+    } else if (requestedRole === "restaurant") {
       await prisma.restaurantProfile.create({
         data: {
           userId: user.id,
@@ -147,35 +158,15 @@ router.post("/signup", async (req, res) => {
           restaurantId: (await prisma.restaurantProfile.findUnique({ where: { userId: user.id } }))!.id,
         },
       });
-    } else if (userRole === "admin") {
+    } else if (requestedRole === "admin") {
       await prisma.adminProfile.create({
         data: {
           userId: user.id,
         },
       });
-    } else if (userRole === "ticket_operator") {
-      await prisma.ticketOperator.create({
-        data: {
-          userId: user.id,
-          operatorName: email.split("@")[0],
-          operatorType: "both",
-          officeAddress: "",
-          verificationStatus: "pending",
-          isActive: false,
-        },
-      });
-    } else if (userRole === "shop_partner") {
-      await prisma.shopPartner.create({
-        data: {
-          userId: user.id,
-          shopName: email.split("@")[0],
-          shopType: "general_store",
-          shopAddress: "",
-          verificationStatus: "pending",
-          isActive: false,
-        },
-      });
     }
+    // Note: For pending_ticket_operator and pending_shop_partner, we don't create profiles
+    // during signup. Profiles are created during onboarding form submission.
 
     res.status(201).json({
       message: "User created successfully",
@@ -508,14 +499,15 @@ router.post("/login", async (req, res, next) => {
     }
 
     // Add BD role profile information for routing
-    if (user.role === 'ticket_operator' && user.ticketOperator) {
+    // Handle both final roles and pending roles for consistent profile data
+    if ((user.role === 'ticket_operator' || user.role === 'pending_ticket_operator') && user.ticketOperator) {
       response.user.profile = {
         verificationStatus: user.ticketOperator.verificationStatus,
         isActive: user.ticketOperator.isActive,
       };
     }
 
-    if (user.role === 'shop_partner' && user.shopPartner) {
+    if ((user.role === 'shop_partner' || user.role === 'pending_shop_partner') && user.shopPartner) {
       response.user.profile = {
         verificationStatus: user.shopPartner.verificationStatus,
         isActive: user.shopPartner.isActive,

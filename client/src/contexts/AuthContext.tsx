@@ -5,7 +5,7 @@ import { getPostLoginPath } from "@/lib/roleRedirect";
 interface User {
   id: string;
   email: string;
-  role: "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner";
+  role: "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner" | "pending_ticket_operator" | "pending_shop_partner";
   countryCode: "BD" | "US";
   profile?: any;
 }
