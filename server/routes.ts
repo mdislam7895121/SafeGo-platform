@@ -57,6 +57,9 @@ import phase5Routes from "./routes/phase5"; // Phase 5: Experience Intelligence 
 import phase6Routes from "./routes/phase6"; // Phase 6: Security Hardening & Deployment Readiness
 import securityRoutes from "./routes/securityRoutes"; // Phase 6B: Customer Security Features
 import adminSecurityRoutes from "./routes/adminSecurityRoutes"; // Phase 6B: Admin Security Features
+import shopPartnerRoutes from "./routes/shop-partner"; // Bangladesh Expansion: Shop Partners
+import ticketOperatorRoutes from "./routes/ticket-operator"; // Bangladesh Expansion: Ticket & Rental Operators
+import adminBdExpansionRoutes from "./routes/admin-bd-expansion"; // Bangladesh Expansion: Admin management
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -291,6 +294,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api", phase6Routes); // Phase 6: Security Hardening & Deployment Readiness (includes /health)
   app.use("/api/security", securityRoutes); // Phase 6B: Customer Security Features (SOS, device trust, privacy)
   app.use("/api/admin/security", adminSecurityRoutes); // Phase 6B: Admin Security Features (2FA, IP whitelist, breach response)
+
+  // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)
+  app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)
+  app.use("/api/ticket-operator", ticketOperatorRoutes); // Ticket & Rental Operator management (BD only)
+  app.use("/api/admin/bd-expansion", adminBdExpansionRoutes); // Admin management for BD expansion
 
   const httpServer = createServer(app);
   
