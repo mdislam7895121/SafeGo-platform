@@ -608,6 +608,70 @@ router.get("/kyc/pending", checkPermission(Permission.MANAGE_KYC), async (req: A
         verificationStatus: p.verificationStatus,
         createdAt: p.user.createdAt,
       }));
+    } else if (role === "shop_partner") {
+      const profiles = await prisma.shopPartner.findMany({
+        where: { 
+          verificationStatus: "pending",
+          user: { countryCode: "BD" },
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              countryCode: true,
+              createdAt: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+      pendingUsers = profiles.map((p) => ({
+        id: p.id,
+        userId: p.user.id,
+        email: p.user.email,
+        role: p.user.role,
+        countryCode: p.user.countryCode,
+        shopName: p.shopName,
+        shopType: p.shopType,
+        ownerName: `${p.user.firstName || ""} ${p.user.lastName || ""}`.trim() || p.shopName,
+        verificationStatus: p.verificationStatus,
+        createdAt: p.user.createdAt,
+      }));
+    } else if (role === "ticket_operator") {
+      const profiles = await prisma.ticketOperator.findMany({
+        where: { 
+          verificationStatus: "pending",
+          user: { countryCode: "BD" },
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              role: true,
+              countryCode: true,
+              createdAt: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      });
+      pendingUsers = profiles.map((p) => ({
+        id: p.id,
+        userId: p.user.id,
+        email: p.user.email,
+        role: p.user.role,
+        countryCode: p.user.countryCode,
+        operatorName: p.operatorName,
+        operatorType: p.operatorType,
+        ownerName: `${p.user.firstName || ""} ${p.user.lastName || ""}`.trim() || p.operatorName,
+        verificationStatus: p.verificationStatus,
+        createdAt: p.user.createdAt,
+      }));
     }
 
     res.json(pendingUsers);
@@ -677,6 +741,36 @@ router.post("/kyc/approve", checkPermission(Permission.MANAGE_KYC), async (req: 
           verificationStatus: "approved",
           isVerified: true,
           rejectionReason: null,
+        },
+      });
+    } else if (role === "shop_partner") {
+      const profile = await prisma.shopPartner.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Shop Partner profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.shopPartner.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "approved",
+          isActive: true,
+        },
+      });
+    } else if (role === "ticket_operator") {
+      const profile = await prisma.ticketOperator.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Ticket Operator profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.ticketOperator.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "approved",
+          isActive: true,
         },
       });
     } else {
@@ -767,6 +861,36 @@ router.post("/kyc/reject", checkPermission(Permission.MANAGE_KYC), async (req: A
           verificationStatus: "rejected",
           isVerified: false,
           rejectionReason: reason,
+        },
+      });
+    } else if (role === "shop_partner") {
+      const profile = await prisma.shopPartner.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Shop Partner profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.shopPartner.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "rejected",
+          isActive: false,
+        },
+      });
+    } else if (role === "ticket_operator") {
+      const profile = await prisma.ticketOperator.findUnique({ where: { id: profileId } });
+      if (!profile) {
+        return res.status(404).json({ error: "Ticket Operator profile not found" });
+      }
+      userId = profile.userId;
+
+      // Update profile
+      await prisma.ticketOperator.update({
+        where: { id: profileId },
+        data: {
+          verificationStatus: "rejected",
+          isActive: false,
         },
       });
     } else {
