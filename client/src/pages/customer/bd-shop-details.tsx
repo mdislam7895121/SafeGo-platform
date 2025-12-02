@@ -70,32 +70,30 @@ export default function BDShopDetails() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: shopData, isLoading: shopLoading } = useQuery<{ shop: any }>({
-    queryKey: ["/api/shops/bd", shopId],
-    enabled: !!shopId,
-  });
-
-  const { data: productsData, isLoading: productsLoading } = useQuery<{ products: any[] }>({
-    queryKey: ["/api/shops/bd", shopId, "products"],
+    queryKey: ["/api/bd/shops", shopId],
     enabled: !!shopId,
   });
 
   const shop = shopData?.shop;
-  const products = productsData?.products || [];
+  const products = shop?.products || [];
   const categories = Array.from(new Set(products.map((p: any) => p.category)));
 
   const filteredProducts = products.filter((p: any) => {
-    const matchesSearch = p.productName
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
+    const name = p.name || p.productName || "";
+    const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || p.category === selectedCategory;
-    return matchesSearch && matchesCategory && p.isActive;
+    const isActive = p.isActive !== false && p.inStock !== false;
+    return matchesSearch && matchesCategory && isActive;
   });
 
   const addToCart = (product: any) => {
+    const productName = product.name || product.productName;
+    const productPrice = product.discountPrice || product.price;
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
@@ -109,16 +107,16 @@ export default function BDShopDetails() {
         ...prev,
         {
           productId: product.id,
-          productName: product.productName,
-          price: Number(product.price),
+          productName,
+          price: Number(productPrice),
           quantity: 1,
-          imageUrl: product.imageUrl,
+          imageUrl: product.images?.[0] || product.imageUrl,
         },
       ];
     });
     toast({
       title: "কার্টে যোগ হয়েছে",
-      description: product.productName,
+      description: productName,
     });
   };
 
@@ -149,8 +147,8 @@ export default function BDShopDetails() {
   };
 
   const placeOrderMutation = useMutation({
-    mutationFn: async () => {
-      return apiRequest("/api/shops/bd/orders", {
+    mutationFn: async (deliveryAddress: string) => {
+      return apiRequest("/api/bd/orders", {
         method: "POST",
         body: JSON.stringify({
           shopId,
@@ -158,13 +156,15 @@ export default function BDShopDetails() {
             productId: item.productId,
             quantity: item.quantity,
           })),
+          deliveryAddress,
+          paymentMethod: "cash",
         }),
       });
     },
     onSuccess: () => {
       setCart([]);
       setIsCartOpen(false);
-      queryClient.invalidateQueries({ queryKey: ["/api/customer/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bd/orders"] });
       toast({
         title: "অর্ডার সফল!",
         description: "আপনার অর্ডার দেওয়া হয়েছে।",
@@ -315,13 +315,7 @@ export default function BDShopDetails() {
           </div>
         )}
 
-        {productsLoading ? (
-          <div className="grid grid-cols-2 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-48 w-full rounded-xl" />
-            ))}
-          </div>
-        ) : filteredProducts.length === 0 ? (
+        {filteredProducts.length === 0 ? (
           <div className="text-center py-12">
             <Store className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
             <p className="text-muted-foreground">কোন পণ্য পাওয়া যায়নি</p>
@@ -330,6 +324,9 @@ export default function BDShopDetails() {
           <div className="grid grid-cols-2 gap-4">
             {filteredProducts.map((product: any) => {
               const quantity = getItemQuantity(product.id);
+              const productName = product.name || product.productName;
+              const productImage = product.images?.[0] || product.imageUrl;
+              const productPrice = product.discountPrice || product.price;
               return (
                 <Card
                   key={product.id}
@@ -337,10 +334,10 @@ export default function BDShopDetails() {
                   data-testid={`card-product-${product.id}`}
                 >
                   <div className="aspect-square bg-muted relative">
-                    {product.imageUrl ? (
+                    {productImage ? (
                       <img
-                        src={product.imageUrl}
-                        alt={product.productName}
+                        src={productImage}
+                        alt={productName}
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -356,11 +353,11 @@ export default function BDShopDetails() {
                   </div>
                   <CardContent className="p-3">
                     <h3 className="font-medium text-sm line-clamp-2 min-h-10">
-                      {product.productName}
+                      {productName}
                     </h3>
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-lg font-bold text-primary">
-                        ৳{Number(product.price).toLocaleString("bn-BD")}
+                        ৳{Number(productPrice).toLocaleString("bn-BD")}
                       </p>
                       {quantity === 0 ? (
                         <Button
@@ -487,17 +484,42 @@ export default function BDShopDetails() {
               ))}
             </div>
             <div className="mt-6 space-y-4">
-              <div className="flex justify-between text-lg font-bold">
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  ডেলিভারি ঠিকানা
+                </label>
+                <Input
+                  placeholder="আপনার সম্পূর্ণ ঠিকানা লিখুন..."
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  className="h-12"
+                  data-testid="input-delivery-address"
+                />
+              </div>
+              <div className="flex justify-between py-2 border-t">
+                <span>সাবটোটাল</span>
+                <span>৳{cartTotal.toLocaleString("bn-BD")}</span>
+              </div>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>ডেলিভারি ফি</span>
+                <span>৳৫০</span>
+              </div>
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>সার্ভিস ফি (৫%)</span>
+                <span>৳{Math.round(cartTotal * 0.05).toLocaleString("bn-BD")}</span>
+              </div>
+              <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span>মোট</span>
                 <span className="text-primary">
-                  ৳{cartTotal.toLocaleString("bn-BD")}
+                  ৳{(cartTotal + 50 + Math.round(cartTotal * 0.05)).toLocaleString("bn-BD")}
                 </span>
               </div>
               <Button
                 size="lg"
                 className="w-full h-14 text-lg"
-                onClick={() => placeOrderMutation.mutate()}
-                disabled={placeOrderMutation.isPending}
+                onClick={() => placeOrderMutation.mutate(deliveryAddress)}
+                disabled={placeOrderMutation.isPending || !deliveryAddress.trim()}
                 data-testid="button-place-order"
               >
                 {placeOrderMutation.isPending ? (

@@ -503,6 +503,541 @@ router.get("/shops/:id", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ============================================
+// BD SHOP ORDERS ENDPOINTS
+// ============================================
+
+// Place a new shop order
+router.post("/orders", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "অননুমোদিত অ্যাক্সেস" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { customerProfile: true },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "এই সেবা শুধুমাত্র বাংলাদেশে উপলব্ধ" });
+    }
+
+    if (!user.customerProfile) {
+      return res.status(400).json({ error: "কাস্টমার প্রোফাইল পাওয়া যায়নি" });
+    }
+
+    const { shopId, items, deliveryAddress, deliveryLat, deliveryLng, deliveryInstructions, paymentMethod } = req.body;
+
+    if (!shopId || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "দোকান এবং পণ্য তথ্য প্রদান করুন" });
+    }
+
+    if (!deliveryAddress) {
+      return res.status(400).json({ error: "ডেলিভারি ঠিকানা প্রদান করুন" });
+    }
+
+    const validPaymentMethods = ["cash", "bkash", "nagad", "card"];
+    const finalPaymentMethod = validPaymentMethods.includes(paymentMethod) ? paymentMethod : "cash";
+
+    // Fetch the shop
+    const shop = await prisma.shopPartner.findUnique({
+      where: { id: shopId },
+    });
+
+    if (!shop) {
+      return res.status(404).json({ error: "দোকান পাওয়া যায়নি" });
+    }
+
+    if (!shop.isActive || shop.verificationStatus !== "approved") {
+      return res.status(400).json({ error: "এই দোকান থেকে অর্ডার করা যাচ্ছে না" });
+    }
+
+    // Fetch and validate all products
+    const productIds = items.map((item: { productId: string }) => item.productId);
+    const products = await prisma.shopProduct.findMany({
+      where: { id: { in: productIds }, shopPartnerId: shopId, isActive: true },
+    });
+
+    if (products.length !== productIds.length) {
+      return res.status(400).json({ error: "কিছু পণ্য পাওয়া যায়নি বা অপ্রাপ্য" });
+    }
+
+    // Calculate order totals
+    let subtotal = 0;
+    const orderItems: Array<{
+      productId: string;
+      productName: string;
+      productPrice: number;
+      quantity: number;
+      subtotal: number;
+    }> = [];
+
+    for (const item of items) {
+      const product = products.find((p) => p.id === item.productId);
+      if (!product) continue;
+
+      const quantity = Math.max(1, Math.min(item.quantity || 1, product.stockQuantity));
+      const price = Number(product.discountPrice || product.price);
+      const itemSubtotal = price * quantity;
+
+      if (product.stockQuantity < quantity) {
+        return res.status(400).json({ 
+          error: `${product.name} এর স্টক অপর্যাপ্ত। বর্তমানে ${product.stockQuantity}টি উপলব্ধ।` 
+        });
+      }
+
+      subtotal += itemSubtotal;
+      orderItems.push({
+        productId: product.id,
+        productName: product.name,
+        productPrice: price,
+        quantity,
+        subtotal: itemSubtotal,
+      });
+    }
+
+    // Check minimum order amount
+    if (shop.minOrderAmount && subtotal < Number(shop.minOrderAmount)) {
+      return res.status(400).json({ 
+        error: `ন্যূনতম অর্ডার ৳${Number(shop.minOrderAmount)} হতে হবে। বর্তমান অর্ডার ৳${subtotal}` 
+      });
+    }
+
+    // Calculate fees
+    const deliveryFee = 50; // Fixed delivery fee for BD
+    const serviceFee = Math.round(subtotal * 0.05); // 5% service fee
+    const totalAmount = subtotal + deliveryFee + serviceFee;
+
+    // Calculate commission
+    const commissionRate = Number(shop.commissionRate) / 100;
+    const safegoCommission = Math.round(subtotal * commissionRate);
+    const shopPayout = subtotal - safegoCommission;
+    const driverPayout = deliveryFee - 10; // SafeGo keeps ৳10 from delivery
+
+    // Generate order number
+    const orderNumber = `BD${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    // Create order and update stock in transaction
+    const order = await prisma.$transaction(async (tx) => {
+      // Create the order
+      const newOrder = await tx.productOrder.create({
+        data: {
+          id: randomUUID(),
+          orderNumber,
+          customerId: user.customerProfile!.id,
+          shopPartnerId: shopId,
+          deliveryAddress,
+          deliveryLat: deliveryLat || null,
+          deliveryLng: deliveryLng || null,
+          deliveryInstructions: deliveryInstructions || null,
+          subtotal,
+          deliveryFee,
+          serviceFee,
+          totalAmount,
+          safegoCommission,
+          shopPayout,
+          driverPayout,
+          paymentMethod: finalPaymentMethod,
+          paymentStatus: finalPaymentMethod === "cash" ? "pending" : "pending",
+          status: "placed",
+          statusHistory: JSON.stringify([
+            { status: "placed", timestamp: new Date().toISOString(), actor: "customer" },
+          ]),
+          estimatedDeliveryMinutes: (shop.avgPreparationMinutes || 30) + 20,
+        },
+      });
+
+      // Create order items
+      for (const item of orderItems) {
+        await tx.productOrderItem.create({
+          data: {
+            id: randomUUID(),
+            orderId: newOrder.id,
+            productId: item.productId,
+            productName: item.productName,
+            productPrice: item.productPrice,
+            quantity: item.quantity,
+            subtotal: item.subtotal,
+          },
+        });
+
+        // Decrement stock
+        await tx.shopProduct.update({
+          where: { id: item.productId },
+          data: {
+            stockQuantity: { decrement: item.quantity },
+            isInStock: {
+              set: true, // Will be recalculated
+            },
+          },
+        });
+      }
+
+      // Create linked delivery record
+      await tx.delivery.create({
+        data: {
+          id: randomUUID(),
+          customerId: user.customerProfile!.id,
+          pickupAddress: shop.shopAddress,
+          pickupLat: shop.shopLat || null,
+          pickupLng: shop.shopLng || null,
+          dropoffAddress: deliveryAddress,
+          dropoffLat: deliveryLat || null,
+          dropoffLng: deliveryLng || null,
+          serviceFare: deliveryFee,
+          safegoCommission: 10,
+          driverPayout,
+          paymentMethod: finalPaymentMethod,
+          status: "requested",
+          serviceType: "food",
+          countryCode: "BD",
+          shopPartnerId: shopId,
+          statusHistory: JSON.stringify([
+            { status: "requested", timestamp: new Date().toISOString(), actor: "system" },
+          ]),
+          updatedAt: new Date(),
+        },
+      });
+
+      // Update shop order count
+      await tx.shopPartner.update({
+        where: { id: shopId },
+        data: {
+          totalOrders: { increment: 1 },
+          // For cash orders, add to negative balance
+          ...(finalPaymentMethod === "cash" ? {
+            negativeBalance: { increment: safegoCommission },
+          } : {}),
+        },
+      });
+
+      return newOrder;
+    });
+
+    res.status(201).json({
+      message: "অর্ডার সফলভাবে দেওয়া হয়েছে",
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        totalAmount: Number(order.totalAmount),
+        paymentMethod: order.paymentMethod,
+        estimatedDeliveryMinutes: order.estimatedDeliveryMinutes,
+      },
+    });
+  } catch (error) {
+    console.error("BD shop order creation error:", error);
+    res.status(500).json({ error: "অর্ডার তৈরি করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Get customer's shop orders
+router.get("/orders", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "অননুমোদিত অ্যাক্সেস" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { customerProfile: true },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "এই সেবা শুধুমাত্র বাংলাদেশে উপলব্ধ" });
+    }
+
+    if (!user.customerProfile) {
+      return res.status(400).json({ error: "কাস্টমার প্রোফাইল পাওয়া যায়নি" });
+    }
+
+    const { status } = req.query;
+
+    const orders = await prisma.productOrder.findMany({
+      where: {
+        customerId: user.customerProfile.id,
+        ...(status && status !== "all" ? { status: status as any } : {}),
+      },
+      include: {
+        shopPartner: {
+          select: {
+            id: true,
+            shopName: true,
+            shopAddress: true,
+            shopLogo: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                images: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { placedAt: "desc" },
+    });
+
+    const formattedOrders = orders.map((order) => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      status: order.status,
+      statusLabel: getStatusLabel(order.status),
+      shopName: order.shopPartner.shopName,
+      shopAddress: order.shopPartner.shopAddress,
+      shopLogo: order.shopPartner.shopLogo,
+      deliveryAddress: order.deliveryAddress,
+      items: order.items.map((item) => ({
+        id: item.id,
+        productName: item.productName,
+        quantity: item.quantity,
+        price: Number(item.productPrice),
+        subtotal: Number(item.subtotal),
+        image: item.product.images ? (item.product.images as string[])[0] : null,
+      })),
+      subtotal: Number(order.subtotal),
+      deliveryFee: Number(order.deliveryFee),
+      serviceFee: order.serviceFee ? Number(order.serviceFee) : 0,
+      totalAmount: Number(order.totalAmount),
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      placedAt: order.placedAt,
+      estimatedDeliveryMinutes: order.estimatedDeliveryMinutes,
+      customerRating: order.customerRating,
+      customerFeedback: order.customerFeedback,
+    }));
+
+    res.json({ orders: formattedOrders });
+  } catch (error) {
+    console.error("BD shop orders fetch error:", error);
+    res.status(500).json({ error: "অর্ডার লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Get single order details
+router.get("/orders/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "অননুমোদিত অ্যাক্সেস" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { customerProfile: true },
+    });
+
+    if (!user || user.countryCode !== "BD" || !user.customerProfile) {
+      return res.status(403).json({ error: "এই সেবা শুধুমাত্র বাংলাদেশে উপলব্ধ" });
+    }
+
+    const { id } = req.params;
+
+    const order = await prisma.productOrder.findFirst({
+      where: {
+        id,
+        customerId: user.customerProfile.id,
+      },
+      include: {
+        shopPartner: {
+          select: {
+            id: true,
+            shopName: true,
+            shopAddress: true,
+            shopLogo: true,
+            shopLat: true,
+            shopLng: true,
+          },
+        },
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                name: true,
+                images: true,
+              },
+            },
+          },
+        },
+        driver: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true,
+            profilePhotoUrl: true,
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "অর্ডার পাওয়া যায়নি" });
+    }
+
+    res.json({
+      order: {
+        id: order.id,
+        orderNumber: order.orderNumber,
+        status: order.status,
+        statusLabel: getStatusLabel(order.status),
+        statusHistory: order.statusHistory,
+        shop: {
+          id: order.shopPartner.id,
+          name: order.shopPartner.shopName,
+          address: order.shopPartner.shopAddress,
+          logo: order.shopPartner.shopLogo,
+          lat: order.shopPartner.shopLat,
+          lng: order.shopPartner.shopLng,
+        },
+        driver: order.driver ? {
+          id: order.driver.id,
+          name: order.driver.fullName,
+          phone: order.driver.phoneNumber,
+          photo: order.driver.profilePhotoUrl,
+        } : null,
+        deliveryAddress: order.deliveryAddress,
+        deliveryLat: order.deliveryLat,
+        deliveryLng: order.deliveryLng,
+        items: order.items.map((item) => ({
+          id: item.id,
+          productName: item.productName,
+          quantity: item.quantity,
+          price: Number(item.productPrice),
+          subtotal: Number(item.subtotal),
+          image: item.product.images ? (item.product.images as string[])[0] : null,
+        })),
+        subtotal: Number(order.subtotal),
+        deliveryFee: Number(order.deliveryFee),
+        serviceFee: order.serviceFee ? Number(order.serviceFee) : 0,
+        discount: order.discount ? Number(order.discount) : 0,
+        totalAmount: Number(order.totalAmount),
+        paymentMethod: order.paymentMethod,
+        paymentStatus: order.paymentStatus,
+        placedAt: order.placedAt,
+        acceptedAt: order.acceptedAt,
+        readyForPickupAt: order.readyForPickupAt,
+        pickedUpAt: order.pickedUpAt,
+        deliveredAt: order.deliveredAt,
+        estimatedDeliveryMinutes: order.estimatedDeliveryMinutes,
+        customerRating: order.customerRating,
+        customerFeedback: order.customerFeedback,
+      },
+    });
+  } catch (error) {
+    console.error("BD shop order detail fetch error:", error);
+    res.status(500).json({ error: "অর্ডার তথ্য লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Rate a completed order
+router.patch("/orders/:id/rate", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "অননুমোদিত অ্যাক্সেস" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { customerProfile: true },
+    });
+
+    if (!user || user.countryCode !== "BD" || !user.customerProfile) {
+      return res.status(403).json({ error: "এই সেবা শুধুমাত্র বাংলাদেশে উপলব্ধ" });
+    }
+
+    const { id } = req.params;
+    const { rating, feedback } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: "রেটিং ১ থেকে ৫ এর মধ্যে হতে হবে" });
+    }
+
+    const order = await prisma.productOrder.findFirst({
+      where: {
+        id,
+        customerId: user.customerProfile.id,
+        status: "delivered",
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: "অর্ডার পাওয়া যায়নি বা রেটিং দেওয়া যাবে না" });
+    }
+
+    if (order.customerRating) {
+      return res.status(400).json({ error: "এই অর্ডারে ইতিমধ্যে রেটিং দেওয়া হয়েছে" });
+    }
+
+    // Update order with rating
+    const updatedOrder = await prisma.productOrder.update({
+      where: { id },
+      data: {
+        customerRating: rating,
+        customerFeedback: feedback || null,
+      },
+    });
+
+    // Update shop average rating
+    const shopOrders = await prisma.productOrder.findMany({
+      where: {
+        shopPartnerId: order.shopPartnerId,
+        customerRating: { not: null },
+      },
+      select: { customerRating: true },
+    });
+
+    const totalRatings = shopOrders.length;
+    const avgRating = shopOrders.reduce((sum, o) => sum + (o.customerRating || 0), 0) / totalRatings;
+
+    await prisma.shopPartner.update({
+      where: { id: order.shopPartnerId },
+      data: {
+        averageRating: Math.round(avgRating * 10) / 10,
+        totalRatings,
+      },
+    });
+
+    res.json({
+      message: "রেটিং সফলভাবে দেওয়া হয়েছে",
+      order: {
+        id: updatedOrder.id,
+        customerRating: updatedOrder.customerRating,
+        customerFeedback: updatedOrder.customerFeedback,
+      },
+    });
+  } catch (error) {
+    console.error("BD shop order rating error:", error);
+    res.status(500).json({ error: "রেটিং দিতে সমস্যা হয়েছে" });
+  }
+});
+
+// Helper function for status labels
+function getStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    placed: "অর্ডার পাঠানো হয়েছে",
+    accepted: "দোকান অর্ডার গ্রহণ করেছে",
+    preparing: "অর্ডার প্রস্তুত হচ্ছে",
+    ready_for_pickup: "ডেলিভারির জন্য প্রস্তুত",
+    picked_up: "ডেলিভারিম্যান পণ্য নিয়েছেন",
+    on_the_way: "ডেলিভারি পথে",
+    delivered: "ডেলিভারি সম্পন্ন",
+    cancelled_by_customer: "কাস্টমার বাতিল করেছেন",
+    cancelled_by_shop: "দোকান বাতিল করেছে",
+    cancelled_by_driver: "ড্রাইভার বাতিল করেছেন",
+    refunded: "টাকা ফেরত দেওয়া হয়েছে",
+  };
+  return labels[status] || status;
+}
+
 async function seedDemoRentalVehicles() {
   try {
     const approvedBDRentalVehicles = await prisma.rentalVehicle.count({
@@ -885,7 +1420,7 @@ async function seedDemoShops() {
         });
       }
 
-      await prisma.shopPartner.create({
+      const newShop = await prisma.shopPartner.create({
         data: {
           id: randomUUID(),
           userId: user.id,
@@ -915,12 +1450,102 @@ async function seedDemoShops() {
           closingTime: "21:00",
         },
       });
+
+      // Seed demo products for this shop
+      const demoProducts = getDemoProductsForShopType(shop.shopType);
+      for (const product of demoProducts) {
+        await prisma.shopProduct.create({
+          data: {
+            id: randomUUID(),
+            shopPartnerId: newShop.id,
+            name: product.name,
+            description: product.description,
+            category: product.category,
+            price: product.price,
+            unit: product.unit,
+            stockQuantity: product.stockQuantity,
+            isInStock: true,
+            isActive: true,
+          },
+        });
+      }
     }
 
-    console.log("[BD-Customer] Seeded demo shops");
+    console.log("[BD-Customer] Seeded demo shops with products");
   } catch (error) {
     console.error("[BD-Customer] Failed to seed demo shops:", error);
   }
+}
+
+function getDemoProductsForShopType(shopType: string) {
+  const productsByType: Record<string, Array<{ name: string; description: string; category: string; price: number; unit: string; stockQuantity: number }>> = {
+    grocery: [
+      { name: "চাল (মিনিকেট)", description: "উচ্চমানের মিনিকেট চাল - ১ কেজি", category: "চাল-ডাল", price: 85, unit: "কেজি", stockQuantity: 100 },
+      { name: "মসুর ডাল", description: "পরিষ্কার মসুর ডাল - ১ কেজি", category: "চাল-ডাল", price: 120, unit: "কেজি", stockQuantity: 80 },
+      { name: "সয়াবিন তেল (১ লিটার)", description: "রিফাইন্ড সয়াবিন তেল", category: "তেল", price: 180, unit: "লিটার", stockQuantity: 50 },
+      { name: "লবণ (১ কেজি)", description: "আয়োডিনযুক্ত খাবার লবণ", category: "মশলা", price: 35, unit: "প্যাকেট", stockQuantity: 200 },
+      { name: "চিনি (১ কেজি)", description: "সাদা দানাদার চিনি", category: "মশলা", price: 110, unit: "কেজি", stockQuantity: 60 },
+      { name: "আলু (১ কেজি)", description: "তাজা দেশি আলু", category: "সবজি", price: 40, unit: "কেজি", stockQuantity: 150 },
+    ],
+    electronics: [
+      { name: "মোবাইল চার্জার (ফাস্ট চার্জ)", description: "২৫ ওয়াট ফাস্ট চার্জিং অ্যাডাপ্টার", category: "এক্সেসরিজ", price: 450, unit: "পিস", stockQuantity: 30 },
+      { name: "ইয়ারফোন (ওয়্যার্ড)", description: "হাই-কোয়ালিটি ইয়ারফোন মাইক সহ", category: "এক্সেসরিজ", price: 250, unit: "পিস", stockQuantity: 40 },
+      { name: "মোবাইল কভার", description: "সিলিকন ব্যাক কভার", category: "এক্সেসরিজ", price: 150, unit: "পিস", stockQuantity: 100 },
+      { name: "স্ক্রিন প্রটেক্টর", description: "টেম্পার্ড গ্লাস স্ক্রিন প্রটেক্টর", category: "এক্সেসরিজ", price: 120, unit: "পিস", stockQuantity: 80 },
+      { name: "পাওয়ার ব্যাংক (১০০০০mAh)", description: "পোর্টেবল পাওয়ার ব্যাংক", category: "এক্সেসরিজ", price: 1200, unit: "পিস", stockQuantity: 20 },
+      { name: "USB ক্যাবল (টাইপ-সি)", description: "ফাস্ট চার্জিং USB ক্যাবল", category: "এক্সেসরিজ", price: 180, unit: "পিস", stockQuantity: 60 },
+    ],
+    pharmacy: [
+      { name: "প্যারাসিটামল (৫০০mg)", description: "জ্বর ও ব্যথা উপশমকারী - ১০ ট্যাবলেট", category: "ওষুধ", price: 15, unit: "স্ট্রিপ", stockQuantity: 200 },
+      { name: "অ্যান্টাসিড ট্যাবলেট", description: "গ্যাসট্রিক সমস্যার সমাধান - ১০ ট্যাবলেট", category: "ওষুধ", price: 25, unit: "স্ট্রিপ", stockQuantity: 150 },
+      { name: "ভিটামিন সি (৫০০mg)", description: "রোগ প্রতিরোধ ক্ষমতা বৃদ্ধি - ৩০ ট্যাবলেট", category: "সাপ্লিমেন্ট", price: 180, unit: "বোতল", stockQuantity: 50 },
+      { name: "স্যানিটাইজার (১০০ml)", description: "হ্যান্ড স্যানিটাইজার জেল", category: "স্বাস্থ্য পণ্য", price: 80, unit: "বোতল", stockQuantity: 100 },
+      { name: "মাস্ক (১০ পিস)", description: "সার্জিক্যাল মাস্ক - ৩ লেয়ার", category: "স্বাস্থ্য পণ্য", price: 50, unit: "প্যাকেট", stockQuantity: 200 },
+      { name: "ব্যান্ডেজ", description: "ফার্স্ট এইড ব্যান্ডেজ সেট", category: "স্বাস্থ্য পণ্য", price: 40, unit: "প্যাকেট", stockQuantity: 80 },
+    ],
+    fashion: [
+      { name: "পুরুষ টি-শার্ট", description: "কটন টি-শার্ট - বিভিন্ন সাইজ", category: "পুরুষ পোশাক", price: 350, unit: "পিস", stockQuantity: 40 },
+      { name: "পুরুষ পাঞ্জাবি", description: "সেমি সিল্ক পাঞ্জাবি", category: "পুরুষ পোশাক", price: 1200, unit: "পিস", stockQuantity: 20 },
+      { name: "মহিলা থ্রি-পিস", description: "কটন থ্রি-পিস সেট", category: "মহিলা পোশাক", price: 850, unit: "সেট", stockQuantity: 25 },
+      { name: "শাড়ি", description: "জর্জেট শাড়ি", category: "মহিলা পোশাক", price: 1500, unit: "পিস", stockQuantity: 15 },
+      { name: "জিন্স প্যান্ট", description: "ডেনিম জিন্স - বিভিন্ন সাইজ", category: "ইউনিসেক্স", price: 950, unit: "পিস", stockQuantity: 30 },
+      { name: "ওড়না", description: "কটন ওড়না - বিভিন্ন রং", category: "মহিলা পোশাক", price: 250, unit: "পিস", stockQuantity: 50 },
+    ],
+    beauty: [
+      { name: "ফেসওয়াশ (১০০ml)", description: "ক্লিনজিং ফেসওয়াশ", category: "স্কিনকেয়ার", price: 220, unit: "বোতল", stockQuantity: 60 },
+      { name: "ময়েশ্চারাইজার (৫০ml)", description: "ডেইলি ময়েশ্চারাইজিং ক্রিম", category: "স্কিনকেয়ার", price: 350, unit: "বোতল", stockQuantity: 40 },
+      { name: "সানস্ক্রিন (৫০ml)", description: "SPF 50 সানস্ক্রিন লোশন", category: "স্কিনকেয়ার", price: 450, unit: "বোতল", stockQuantity: 35 },
+      { name: "লিপস্টিক", description: "ম্যাট লিপস্টিক - বিভিন্ন শেড", category: "মেকআপ", price: 280, unit: "পিস", stockQuantity: 50 },
+      { name: "নেইলপলিশ", description: "লং লাস্টিং নেইলপলিশ", category: "মেকআপ", price: 120, unit: "পিস", stockQuantity: 80 },
+      { name: "শ্যাম্পু (২০০ml)", description: "অ্যান্টি-ড্যান্ড্রাফ শ্যাম্পু", category: "হেয়ারকেয়ার", price: 180, unit: "বোতল", stockQuantity: 45 },
+    ],
+    general_store: [
+      { name: "সাবান (৪ পিস)", description: "বাথ সোপ প্যাক", category: "বাথ", price: 120, unit: "প্যাকেট", stockQuantity: 100 },
+      { name: "ডিটারজেন্ট (১ কেজি)", description: "কাপড় ধোয়ার পাউডার", category: "হাউসহোল্ড", price: 180, unit: "প্যাকেট", stockQuantity: 80 },
+      { name: "টুথপেস্ট (১০০g)", description: "ফ্লোরাইড টুথপেস্ট", category: "পার্সোনাল কেয়ার", price: 85, unit: "টিউব", stockQuantity: 120 },
+      { name: "টিস্যু বক্স", description: "সফট টিস্যু - ১০০ শীট", category: "হাউসহোল্ড", price: 60, unit: "বক্স", stockQuantity: 150 },
+      { name: "বিস্কুট (২০০g)", description: "ক্রিম বিস্কুট", category: "স্ন্যাকস", price: 50, unit: "প্যাকেট", stockQuantity: 200 },
+      { name: "চা পাতা (২০০g)", description: "প্রিমিয়াম চা পাতা", category: "বেভারেজ", price: 140, unit: "প্যাকেট", stockQuantity: 70 },
+    ],
+    hardware: [
+      { name: "স্ক্রু সেট", description: "মিক্সড স্ক্রু সেট - ১০০ পিস", category: "ফিক্সচার", price: 150, unit: "সেট", stockQuantity: 50 },
+      { name: "হ্যামার", description: "স্টিল হেড হ্যামার", category: "টুলস", price: 250, unit: "পিস", stockQuantity: 30 },
+      { name: "ড্রিল বিট সেট", description: "HSS ড্রিল বিট সেট - ১০ পিস", category: "টুলস", price: 450, unit: "সেট", stockQuantity: 20 },
+      { name: "পেইন্ট ব্রাশ", description: "পেইন্ট ব্রাশ - মিডিয়াম", category: "পেইন্টিং", price: 80, unit: "পিস", stockQuantity: 60 },
+      { name: "ইলেকট্রিক টেপ", description: "ইনসুলেশন টেপ - ব্ল্যাক", category: "ইলেকট্রিক্যাল", price: 35, unit: "রোল", stockQuantity: 100 },
+      { name: "পাইপ ফিটিং", description: "পিভিসি পাইপ ফিটিং সেট", category: "প্লাম্বিং", price: 120, unit: "সেট", stockQuantity: 40 },
+    ],
+    books: [
+      { name: "বাংলা উপন্যাস", description: "জনপ্রিয় বাংলা উপন্যাস সংকলন", category: "বই", price: 350, unit: "পিস", stockQuantity: 30 },
+      { name: "ইংরেজি গ্রামার বই", description: "ইংরেজি শেখার সহায়ক বই", category: "বই", price: 280, unit: "পিস", stockQuantity: 40 },
+      { name: "নোটখাতা (২০০ পাতা)", description: "লাইনযুক্ত নোটখাতা", category: "স্টেশনারি", price: 80, unit: "পিস", stockQuantity: 100 },
+      { name: "বলপয়েন্ট কলম (১০ পিস)", description: "ব্লু বলপয়েন্ট কলম সেট", category: "স্টেশনারি", price: 60, unit: "প্যাকেট", stockQuantity: 150 },
+      { name: "পেন্সিল বক্স", description: "স্টুডেন্ট পেন্সিল বক্স", category: "স্টেশনারি", price: 120, unit: "পিস", stockQuantity: 80 },
+      { name: "কালার পেন্সিল সেট", description: "১২ কালার পেন্সিল সেট", category: "স্টেশনারি", price: 150, unit: "সেট", stockQuantity: 60 },
+    ],
+  };
+  
+  return productsByType[shopType] || productsByType.general_store;
 }
 
 async function seedDemoTicketListings() {

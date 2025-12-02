@@ -1,0 +1,280 @@
+SafeGo BD E-Shop Module – Complete customer demo + order flow
+Follow ALL SafeGo Master Rules and DO NOT break existing features.
+
+────────────────────────
+CONTEXT
+────────────────────────
+We already have:
+- Global roles: customer, driver, restaurant, admin
+- New BD roles: shop_partner (e-shop), ticket_operator
+- Core collections: rides, food_orders, deliveries
+- BD shop_partner onboarding UI and a BD shops customer page (/customer/bd-shops), but data loading and order flow are incomplete.
+
+Goal for this task:
+Make the BD E-Shop experience fully usable end-to-end for demo:
+- BD customer can discover shops, view products, add to cart, checkout, and see order status.
+- BD shop_partner can see and manage incoming orders.
+- Admin can see BD shop activity and still manage KYC, commission, and negative balances.
+All changes must be backward-compatible and must NOT break ride/eats/parcel or US flows.
+
+────────────────────────
+A) ROLE & ACCESS RULES (must enforce)
+────────────────────────
+1. Roles:
+   - customer
+   - driver
+   - restaurant
+   - admin
+   - shop_partner (BD only)
+   - ticket_operator (BD only)
+
+2. Access separation:
+   - BD customer:
+     - Can use ride/eats/parcel everywhere (as before).
+     - Can use BD shops at /customer/bd-shops only if countryCode === "BD".
+   - shop_partner:
+     - Can only access /shop-partner/* dashboard, onboarding, product, and order pages.
+     - Cannot see any customer sensitive KYC or other shops.
+   - driver:
+     - No access to shop_partner or ticket_operator dashboards.
+   - restaurant:
+     - Cannot see shops; only restaurant dashboard.
+   - admin:
+     - Full visibility with KYC + commission tools, but no ability to impersonate a user.
+
+3. Security:
+   - Customers must NOT see shop_partner KYC or documents.
+   - shop_partner must NOT see customer NID or sensitive info.
+   - Only admin can approve/ reject KYC, set commission, and block/unblock.
+   - Users can edit only their own profile.
+   - BD features must be guarded with countryCode === "BD".
+
+────────────────────────
+B) COLLECTIONS & DATA MODELS (do not break existing fields)
+────────────────────────
+Use the existing collections and ADD fields if needed (do not rename / remove):
+
+1. food_orders
+   - identity:
+     - id
+     - customer_id
+     - shop_id (new, for BD shops)
+     - restaurant_id (keep for existing eats; do not break)
+   - type:
+     - order_type: "restaurant" | "bd_shop"
+   - addresses + geo:
+     - pickup_address (shop address)
+     - pickup_lat, pickup_lng
+     - dropoff_address (customer)
+     - dropoff_lat, dropoff_lng
+   - pricing:
+     - subtotal_amount
+     - delivery_fee
+     - service_fee
+     - total_amount
+     - currency
+     - commission_amount (SafeGo commission)
+   - payment:
+     - payment_method: "cash" | "bkash" | "card_demo"
+     - payment_status: "pending" | "paid" | "failed"
+   - status flow (food):
+     - status: "placed" | "accepted" | "preparing" | "ready_for_pickup" | "picked_up" | "on_the_way" | "delivered" | "cancelled_by_customer" | "cancelled_by_shop" | "cancelled_by_admin"
+   - rating:
+     - customer_rating
+     - customer_feedback
+   - timestamps:
+     - created_at
+     - updated_at
+
+2. deliveries
+   - identity:
+     - id
+     - customer_id
+     - driver_id (nullable until assigned)
+     - shop_id (for BD e-shop deliveries)
+   - addresses + geo (must match food_orders)
+   - fees + commission:
+     - delivery_fee
+     - driver_payout
+     - safego_commission
+   - payment:
+     - payment_method (copy from order)
+   - status flow (parcel-like):
+     - status: "requested" | "searching_driver" | "accepted" | "picked_up" | "on_the_way" | "delivered" | "cancelled_by_customer" | "cancelled_by_driver" | "cancelled_by_admin"
+   - rating:
+     - customer_rating
+     - driver_rating
+   - timestamps.
+
+3. Commission & wallets (re-use current logic):
+   - When BD shop order is CASH:
+     - Customer pays full cash to driver at delivery.
+     - SafeGo commission_amount becomes negative balance in:
+       - driver_wallet_balance (for ride/delivery part)
+       - shop_partner_wallet_balance (for shop commission part).
+   - When payment is online:
+     - SafeGo keeps commission automatically (as existing).
+   - Admin can mark negative balances as settled.
+
+────────────────────────
+C) BD SHOP PARTNER – COMPLETION TASKS
+────────────────────────
+1. Fix onboarding data flow:
+   - Ensure step 1 (shop info + BD KYC fields) is stored in a single shop_partner profile record:
+     - shopName
+     - shopType ("grocery" | "electronics" | "fashion" | "pharmacy" | "general_store" | "books" | "other")
+     - shopAddress
+     - ownerName
+     - fatherName
+     - dateOfBirth
+     - presentAddress
+     - permanentAddress
+     - nidNumber
+     - emergencyContactName
+     - emergencyContactPhone
+   - Step 2 (settings: delivery distance, prep time, home delivery toggle) must extend the same record.
+   - Step 3 (logo/cover image + opening hours) must also extend the same record.
+   - When any step resubmits, validation errors should be shown inline in Bangla (not a raw JSON blob).
+
+2. Product management demo:
+   - For a newly approved shop_partner, seed 6 demo products into a `shop_products` table/collection without breaking restaurants:
+     - Example: চাল, ডাল, ভোজ্য তেল, মোবাইল কভার, ফেসওয়াশ, টুথপেস্ট.
+   - Allow shop_partner to:
+     - Create/update/delete products.
+     - Toggle availability.
+     - Set price, unit, stock, and optional photo.
+
+3. Orders tab for shop_partner:
+   - Add "অর্ডার" section with 2 tabs:
+     - নতুন অর্ডার
+     - সম্পন্ন অর্ডার
+   - Each order card:
+     - Customer name (or masked if needed)
+     - Address (short)
+     - Items summary
+     - Total and payment method
+   - Status actions (Bangla buttons):
+     - "অর্ডার গ্রহণ করুন" → status = accepted
+     - "প্রস্তুতি শুরু" → status = preparing
+     - "ডেলিভারির জন্য প্রস্তুত" → status = ready_for_pickup
+   - When marked "ready_for_pickup", update the linked delivery record status to "requested" so driver flow can pick it up later (do not build driver side now, just keep data consistent).
+
+────────────────────────
+D) BD CUSTOMER – E-SHOP EXPERIENCE
+────────────────────────
+Implement or fix the following:
+
+1. Shops list – /customer/bd-shops
+   - Backend endpoint (if missing or broken):
+     GET /api/bd/shops/list
+   - Returns only:
+     - Verified BD shops (shop_partner, is_verified === true)
+     - AND demo shops if DB is empty.
+   - Response fields:
+     - id, name, type, address, distance_km, rating, coverImage, productsCount.
+   - UI:
+     - Existing category filter buttons must filter by type.
+     - Search bar:
+       - Typing Bangla substring should filter list (client side).
+   - Error handling:
+     - If API fails, show a friendly message and fallback to demo shops instead of “লোড করতে সমস্যা”.
+
+2. Shop details & product list – /customer/bd-shops/[shopId]
+   - Show:
+     - Shop name, rating, delivery distance, Bangla address.
+     - Product grid with:
+       - name, unit, price, availability.
+       - +/- buttons to change quantity, and “কার্টে যোগ করুন” button.
+   - All interactive elements must have data-testid attributes for tests.
+
+3. Cart & checkout
+   - Cart drawer or page with:
+     - Items list
+     - Subtotal, delivery fee, service fee, total
+   - Checkout page:
+     - Delivery address (reuse existing address component; must support BD addresses).
+     - Payment method buttons (ক্যাশ, বিকাশ, কার্ড—card can be demo only).
+     - “অর্ডার কনফার্ম করুন” button.
+
+4. Order creation logic
+   - On confirm:
+     - Create a new `food_orders` record with:
+       - order_type = "bd_shop"
+       - customer_id, shop_id
+       - pickup/dropoff address + geo
+       - pricing, payment, status = "placed"
+       - commission_amount calculated from admin’s BD shop commission rate.
+     - Also create a linked `deliveries` record:
+       - customer_id, shop_id
+       - same addresses + geo
+       - delivery_fee, driver payout, safego_commission
+       - status = "requested"
+   - For demo:
+     - If no driver exists, leave driver_id = null.
+
+5. Customer order tracking
+   - Add a “আমার অর্ডার” section for BD e-shop under the customer app:
+     - Filter `food_orders` where order_type = "bd_shop".
+   - Show statuses with Bangla labels:
+     - placed → “অর্ডার পাঠানো হয়েছে”
+     - accepted → “দোকান অর্ডার গ্রহণ করেছে”
+     - preparing → “অর্ডার প্রস্তুত হচ্ছে”
+     - ready_for_pickup → “ডেলিভারির জন্য প্রস্তুত”
+     - picked_up → “ডেলিভারিম্যান পণ্য নিয়েছেন”
+     - on_the_way → “ডেলিভারি পথে”
+     - delivered → “ডেলিভারি সম্পন্ন”
+     - cancelled_* → appropriate Bangla text.
+   - Allow rating after delivered:
+     - 1–5 stars + short feedback.
+
+────────────────────────
+E) ADMIN – BD E-SHOP CONTROLS
+────────────────────────
+1. KYC Approvals
+   - Extend /admin/kyc to include a “Shop Partners” tab (if not already) with:
+     - country badge “BD”
+     - shopName, ownerName
+     - Approve / Reject with rejection_reason.
+   - Ensure that only approved shop_partner can appear in /customer/bd-shops.
+
+2. Commission & negative balances
+   - In Admin BD expansion or finance view, add a panel:
+     - Total BD shop orders
+     - Total BD shop commission
+     - Shop_partner negative wallet balances.
+   - Allow admin to:
+     - Mark balances as settled.
+     - Change BD shop commission rate (without changing restaurant commissions).
+
+────────────────────────
+F) STATUS FLOWS (must keep)
+────────────────────────
+Reconfirm and enforce:
+
+- Food (restaurant + bd_shop):
+  placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered or any cancelled_x
+
+- Deliveries (for bd_shop orders):
+  requested → searching_driver (future) → accepted → picked_up → on_the_way → delivered or cancelled_x
+
+Do NOT break existing restaurant or parcel flows.
+
+────────────────────────
+G) TEST PLAN (must run after implementation)
+────────────────────────
+1. Create BD customer, login, go to /customer/bd-shops:
+   - Shops list loads with demo shops.
+   - Clicking a shop shows products and cart works.
+2. Place a BD shop order (cash):
+   - food_orders record created with order_type = "bd_shop".
+   - deliveries record created and linked.
+3. Login as the same shop_partner:
+   - See the new order in “নতুন অর্ডার”.
+   - Change statuses and verify they update for the customer.
+4. Check Admin:
+   - See shop_partner and BD orders/commission in BD expansion or finance dashboard.
+5. Verify that:
+   - US customers and restaurants still work.
+   - Rides, Eats, Parcel flows remain unchanged.
+
+Implement all of the above in a single, coherent change set and keep everything backward-compatible.
