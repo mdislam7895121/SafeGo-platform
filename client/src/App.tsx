@@ -262,6 +262,7 @@ import AdminKycVerification from "@/pages/admin/kyc-verification";
 import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
 import AdminSystemHealth from "@/pages/admin/system-health";
+import AdminBDExpansionDashboard from "@/pages/admin/bd-expansion-dashboard";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -1940,6 +1941,13 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Fraud Alerts">
             <AdminFraudAlerts />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/bd-expansion">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="BD Expansion">
+            <AdminBDExpansionDashboard />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

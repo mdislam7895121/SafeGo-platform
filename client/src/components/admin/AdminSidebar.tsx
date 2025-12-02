@@ -14,6 +14,7 @@ import {
   Settings,
   ChevronLeft,
   LogOut,
+  Globe,
 } from "lucide-react";
 import {
   Sidebar,
@@ -96,6 +97,14 @@ const securityNavItems = [
     title: "Activity Logs",
     href: "/admin/activity-log",
     icon: ScrollText,
+  },
+];
+
+const regionalNavItems = [
+  {
+    title: "BD Expansion",
+    href: "/admin/bd-expansion",
+    icon: Globe,
   },
 ];
 
@@ -206,6 +215,19 @@ export function AdminSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {securityNavItems.map((item) => (
+                <NavItem key={item.href} item={item} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup className="mt-6">
+          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+            Regional
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {regionalNavItems.map((item) => (
                 <NavItem key={item.href} item={item} />
               ))}
             </SidebarMenu>

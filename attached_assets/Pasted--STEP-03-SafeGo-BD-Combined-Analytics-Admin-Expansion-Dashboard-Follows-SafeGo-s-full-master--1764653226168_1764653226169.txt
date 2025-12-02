@@ -1,0 +1,120 @@
+# STEP 03 — SafeGo BD Combined Analytics & Admin Expansion Dashboard
+# Follows SafeGo’s full master rules, non-breaking, BD-only expansion.
+
+===================================================
+A) BD-ONLY ANALYTICS MODULE (ADMIN PANEL)
+===================================================
+Create a new section under admin:
+   “Bangladesh Expansion Dashboard”
+
+Visible ONLY when admin.countryCode == "BD".
+
+Inside this panel, add 6 analytics blocks:
+
+1. Total BD Shop Partners
+   - count of verified shops
+   - pending shops
+   - rejected shops
+
+2. BD Ticket & Rental Operators
+   - verified operators
+   - pending operators
+   - total active routes
+   - total active rental vehicles
+
+3. BD Orders Overview
+   - total shop orders today
+   - delivered / pending / cancelled
+   - average delivery time
+   - top 10 shops by sales
+
+4. BD Ticket Bookings Overview
+   - total tickets booked today
+   - successful / cancelled
+   - top 10 routes by demand
+
+5. BD Rental Bookings Overview
+   - total bookings today
+   - completed / ongoing / cancelled
+   - top 10 rental vehicles by booking count
+
+6. BD Commission & Financials
+   - total commissions earned (shop)
+   - total commissions earned (ticket)
+   - total commissions earned (rental)
+   - outstanding negative balances:
+        - drivers
+        - restaurants
+        - shop partners
+        - ticket operators
+
+All charts must use existing API data.
+DO NOT create new backend endpoints.
+
+===================================================
+B) VISUALIZATION REQUIREMENTS
+===================================================
+Use simple, low-cost charts:
+- Bar chart
+- Line chart
+- Pie chart
+- Counters with icons
+
+Bangla text labels, examples:
+- "আজকের মোট অর্ডার"
+- "সফল বুকিং"
+- "কমিশন"
+- "নেতিবাচক ব্যালেন্স"
+
+===================================================
+C) ADMIN ACTIONS (BD-ONLY)
+===================================================
+Within the BD Expansion Dashboard, admin can:
+
+1. View all BD Shop Partners
+   - verify
+   - reject
+   - view shop storefront preview
+
+2. View Ticket & Rental Operators
+   - verify
+   - reject
+   - view route & rental list
+
+3. Commission Rate Panel
+   - set BD shop commission percentage
+   - set BD ticket commission percentage
+   - set BD rental commission percentage
+
+4. Negative Balance Settlement
+   - view negative balance by user
+   - mark as settled
+   - export list as CSV
+
+All must use existing /api/admin/bd-expansion/* routes.
+
+===================================================
+D) SECURITY RULES
+===================================================
+- US Admin must NOT see BD data.
+- BD Admin must NOT see US-only structures.
+- Keep total isolation between countries.
+- Do not modify verification logic.
+
+===================================================
+E) PERFORMANCE & RESPONSIVENESS
+===================================================
+- Charts must load asynchronously.
+- Use pagination for long lists.
+- Mobile-friendly layout.
+
+===================================================
+F) DO NOT CHANGE BACKEND
+===================================================
+Only frontend layer changes.
+No API structure changes.
+Reuse all existing BD expansion endpoints.
+
+===================================================
+END OF STEP 03
+===================================================
