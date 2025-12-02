@@ -1,0 +1,268 @@
+# SAFEGO GLOBAL — ADD CAPSULE-STYLE ROLE SELECTION AFTER SIGNUP
+# This change must be ADDITIVE, non-breaking, and respect ALL existing SafeGo rules.
+
+============================================================
+0) SAFEGO MASTER RULES (MUST PRESERVE)
+============================================================
+Core global roles (unchanged):
+1) customer
+2) driver
+3) restaurant
+4) admin
+
+BD-only business roles (already added, must be preserved):
+5) shop_partner        // BD small shop / e-store operator
+6) ticket_operator     // BD ticket & car rental operator
+
+Global services (must keep working):
+- Ride-hailing
+- Food delivery
+- Parcel delivery
+
+Collections that must NOT be broken:
+- rides
+- food_orders
+- deliveries
+
+Commission & payout rules remain:
+- CASH rides → driver keeps cash, SafeGo commission → negative driver_wallet_balance (settled weekly).
+- CASH food → restaurant keeps cash, SafeGo commission → negative restaurant_wallet.
+- CASH ticket (BD) → ticket_operator keeps cash, SafeGo commission → negative operator_wallet_balance.
+- ONLINE → SafeGo keeps commission automatically; partners get net.
+- Admin can settle & mark paid.
+
+Country-specific KYC (no schema changes):
+
+Bangladesh (BD):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number + front/back images
+- emergency_contact details
+- verification_status
+- is_verified
+
+United States (US):
+- date_of_birth
+- home_address
+- emergency_contact details
+- government_id_type
+- government_id_last4
+- (drivers) driver_license + image + expiry
+- (drivers) ssn_last4 (optional)
+- verification_status
+- is_verified
+
+Security rules (must keep working):
+- Customers cannot see driver, restaurant, shop_partner, or ticket_operator documents.
+- Drivers cannot see customer NID or sensitive info.
+- Shop partners cannot see restaurant or ticket operator internal data.
+- Ticket operators cannot see other operators’ internals.
+- Only admin can change pricing, commissions, verification, blocking.
+- Each user can update only their own profile.
+
+Status flows for rides/food/parcel must remain unchanged.
+
+============================================================
+1) GOAL
+============================================================
+Make signup easier for low-experience users by replacing the
+current role *dropdown* with a clear, capsule-style role selection
+screen — WITHOUT breaking any existing flows or APIs.
+
+Key idea:
+- Step 1: Global SafeGo signup (email, password, country).
+- Step 2: Role selection screen with big capsule buttons for each role.
+- Step 3+: Existing onboarding flows (KYC, documents, etc.).
+
+We must keep existing role IDs:
+- customer
+- driver
+- restaurant
+- shop_partner
+- ticket_operator
+(Admin signup remains separate / internal.)
+
+============================================================
+2) HIGH-LEVEL FLOW
+============================================================
+2.1 Keep the existing /signup route and backend behavior.
+Do NOT remove or break the current dropdown implementation.
+
+Instead:
+
+- After the user submits email + password + country (and any common fields),
+  move role selection to a second screen:
+
+  /signup/choose-role
+
+- On that screen, show capsule buttons for roles instead of a dropdown.
+
+- When a role is chosen, save it and continue to the proper onboarding.
+
+We should still support the old dropdown internally as a fallback
+(dev tools, tests), but for regular users we show the capsule view.
+
+============================================================
+3) CAPSULE ROLE SELECTION UI
+============================================================
+Create a new page/component, e.g.:
+
+  client/src/modules/auth/RoleSelectionCapsules.tsx
+
+Route:
+  /signup/choose-role
+
+This page assumes:
+- User is authenticated or has a temporary signup session.
+- We already know their countryCode (BD or US).
+
+Show a title and description (Bangla or English depending on locale), e.g.:
+
+- Title (Bangla first): "আপনি কোন ভাবে SafeGo ব্যবহার করতে চান?"
+- Subtitle: "একটি অপশন নির্বাচন করুন"
+
+Then show big capsule buttons:
+
+1) "Use services (Customer)"
+   - id: "customer"
+   - icon: car + food + box
+   - description: "রাইড, ফুড, ডেলিভারি ব্যবহার করতে চাই"
+
+2) "Drive & deliver (Driver)"
+   - id: "driver"
+   - description: "রাইড শেয়ার ও ফুড/পার্সেল ডেলিভারি করতে চাই"
+   - Internally still maps to role = "driver"
+   - Optionally add sub-toggles later
+     (ride / food / parcel preferences) using flags in driver profile
+     WITHOUT changing existing driver schema.
+
+3) "Restaurant operator"
+   - id: "restaurant"
+   - description: "নিজের রেস্টুরেন্ট SafeGo-তে চালাতে চাই"
+   - Maps to role = "restaurant"
+
+4) "eStore / Shop operator" (BD-only)
+   - id: "shop_partner"
+   - label: "ই-স্টোর / দোকানদার (Shop Partner)"
+   - description: "ছোট দোকান / ই-স্টোর SafeGo-তে চালাতে চাই"
+   - Visible ONLY when countryCode === "BD"
+   - Maps to role = "shop_partner"
+
+5) "Ticket & Rental operator" (BD-only)
+   - id: "ticket_operator"
+   - label: "টিকিট ও রেন্টাল অপারেটর (Ticket Operator)"
+   - description: "বাস টিকিট ও গাড়ি রেন্টাল পরিচালনা করতে চাই"
+   - Visible ONLY when countryCode === "BD"
+   - Maps to role = "ticket_operator"
+
+Admin role:
+- Do NOT show an "Admin" capsule.
+- Admin accounts are created/assigned via internal tools only.
+
+Interaction:
+- On tap, highlight the selected capsule.
+- "Continue" button at bottom:
+  - Enabled only when a capsule is selected.
+
+============================================================
+4) MAPPING CAPSULE → EXISTING FLOW
+============================================================
+When user confirms the selected capsule:
+
+- If customer:
+    role = "customer"
+    redirect to standard customer onboarding or /customer landing.
+
+- If driver:
+    role = "driver"
+    redirect to /driver/onboarding as currently implemented.
+
+- If restaurant:
+    role = "restaurant"
+    redirect to /restaurant/onboarding.
+
+- If shop_partner (BD-only):
+    role = "shop_partner"
+    redirect to /shop-partner/onboarding.
+
+- If ticket_operator (BD-only):
+    role = "ticket_operator"
+    redirect to /ticket-operator/onboarding.
+
+In all cases:
+- verification_status must start as "pending".
+- Existing KYC logic applies per country and role.
+
+The helper `getPostLoginPath` that was recently created
+should remain the source of truth for routing after login.
+
+============================================================
+5) COMPATIBILITY & FALLBACK
+============================================================
+We MUST NOT break existing tests or flows that use the dropdown.
+
+Implement role capsules as the *primary* UI for normal users, but:
+
+- Keep the dropdown in code behind a feature flag or in a secondary path.
+- If the capsules page fails for some reason, fallback to old /signup
+  with dropdown selection.
+
+Under the hood:
+- Role values stored in the DB must remain the same strings.
+- No schema or API changes for users table or auth.
+
+============================================================
+6) SECURITY & VISIBILITY RULES
+============================================================
+- BD-only roles (shop_partner, ticket_operator) must only appear in:
+  - BD country selection in signup (countryCode === "BD")
+  - BD-related admin sections
+- US users must not see BD-only capsules.
+- Role selection screen must be protected:
+  - Only accessible as part of signup/onboarding.
+  - Not accessible to already-onboarded, approved users.
+
+If a logged-in approved user somehow visits /signup/choose-role,
+redirect them to getPostLoginPath(currentUser).
+
+============================================================
+7) UX DETAILS (MOBILE-FIRST)
+============================================================
+- Capsules must be large, touch-friendly buttons.
+- Use icons (car, bike, store, bus) to make choices obvious.
+- On mobile:
+  - Stack capsules vertically with spacing.
+  - Make sure texts do NOT overlap.
+- On desktop:
+  - Grid layout 2–3 capsules per row.
+
+Suggested basic styles (pseudo):
+- display: flex / flex-wrap: wrap (no overlaps)
+- gap: 12–16px
+- border-radius for pill/capsule look
+- clear selected state (blue outline or filled background)
+
+============================================================
+8) NON-BREAKING FILE CHANGES (GUIDE)
+============================================================
+You MAY extend these kinds of files (example names):
+
+- client/src/modules/auth/Signup.tsx
+  - After initial user creation, redirect to /signup/choose-role.
+
+- client/src/modules/auth/RoleSelectionCapsules.tsx (NEW)
+  - Implements the capsule UI and role selection.
+
+- client/src/lib/roleRedirect.ts
+  - No breaking change; just reuse current logic after onboarding.
+
+Do NOT:
+- Rename existing roles or routes.
+- Change backend schemas.
+- Touch rides/food_orders/deliveries logic.
+
+============================================================
+END OF TASK
+============================================================

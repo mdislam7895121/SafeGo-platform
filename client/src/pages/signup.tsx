@@ -1,13 +1,15 @@
-import { useState, useMemo } from "react";
-import { Link } from "wouter";
+import { useState, useMemo, useEffect } from "react";
+import { Link, useLocation, Redirect } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSignup } from "@/contexts/SignupContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Car, Package, UtensilsCrossed, Ticket } from "lucide-react";
+import { getPostLoginPath } from "@/lib/roleRedirect";
+import { Car, Package, UtensilsCrossed, Loader2 } from "lucide-react";
 
 interface RoleOption {
   value: string;
@@ -30,14 +32,74 @@ export default function Signup() {
   const [role, setRole] = useState<string>("");
   const [countryCode, setCountryCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
-  const { signup } = useAuth();
+  const [useCapsuleFlow, setUseCapsuleFlow] = useState(true);
+  const { user, signup, isLoading: authLoading } = useAuth();
+  const { setPendingSignup } = useSignup();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const availableRoles = useMemo(() => {
     return ALL_ROLES.filter(r => !r.bdOnly || countryCode === "BD");
   }, [countryCode]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (!authLoading && user) {
+      setLocation(getPostLoginPath(user));
+    }
+  }, [user, authLoading, setLocation]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader-auth" />
+      </div>
+    );
+  }
+
+  if (user) {
+    return <Redirect to={getPostLoginPath(user)} />;
+  }
+
+  const handleSubmitCapsuleFlow = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!countryCode) {
+      toast({
+        title: "Missing information",
+        description: "Please select your country",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!email || !password) {
+      toast({
+        title: "Missing information",
+        description: "Please enter email and password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPendingSignup({
+      email,
+      password,
+      countryCode,
+    });
+
+    setLocation("/signup/choose-role");
+  };
+
+  const handleSubmitClassicFlow = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!role || !countryCode) {
@@ -68,10 +130,11 @@ export default function Signup() {
     }
   };
 
+  const handleSubmit = useCapsuleFlow ? handleSubmitCapsuleFlow : handleSubmitClassicFlow;
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8">
-        {/* Logo and branding */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <div className="flex gap-1">
@@ -84,7 +147,6 @@ export default function Signup() {
           <p className="text-muted-foreground mt-2">Join the global super-app platform</p>
         </div>
 
-        {/* Signup form */}
         <Card>
           <CardHeader>
             <CardTitle>Create account</CardTitle>
@@ -120,34 +182,6 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role">I want to</Label>
-                <Select 
-                  value={role} 
-                  onValueChange={(v) => {
-                    if (availableRoles.find(r => r.value === v)) {
-                      setRole(v);
-                    }
-                  }} 
-                  required
-                >
-                  <SelectTrigger id="role" data-testid="select-role">
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRoles.map((r) => (
-                      <SelectItem 
-                        key={r.value} 
-                        value={r.value}
-                        data-testid={`select-role-${r.value}`}
-                      >
-                        {r.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="country">Country</Label>
                 <Select 
                   value={countryCode} 
@@ -170,13 +204,43 @@ export default function Signup() {
                 </Select>
               </div>
 
+              {!useCapsuleFlow && (
+                <div className="space-y-2">
+                  <Label htmlFor="role">I want to</Label>
+                  <Select 
+                    value={role} 
+                    onValueChange={(v) => {
+                      if (availableRoles.find(r => r.value === v)) {
+                        setRole(v);
+                      }
+                    }} 
+                    required
+                  >
+                    <SelectTrigger id="role" data-testid="select-role">
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableRoles.map((r) => (
+                        <SelectItem 
+                          key={r.value} 
+                          value={r.value}
+                          data-testid={`select-role-${r.value}`}
+                        >
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <Button
                 type="submit"
                 className="w-full"
                 disabled={isLoading}
                 data-testid="button-signup"
               >
-                {isLoading ? "Creating account..." : "Create account"}
+                {isLoading ? "Creating account..." : useCapsuleFlow ? "Continue" : "Create account"}
               </Button>
             </form>
 
