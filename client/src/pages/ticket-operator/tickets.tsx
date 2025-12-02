@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -46,14 +48,19 @@ import {
   Loader2,
   ArrowLeftRight,
   ArrowRight,
+  Calendar,
+  Armchair,
+  Wallet,
 } from "lucide-react";
 import {
   RouteAutocomplete,
   PopularRoutes,
   CreateReverseRouteButton,
 } from "@/components/bd/RouteAutocomplete";
+import { TicketCreationForm } from "@/components/bd/TicketCreationForm";
 import { getRouteDetails } from "@/lib/bd-routes";
 import { searchBanglaWithFuzzy } from "@/lib/bangla-fuzzy";
+import { BUS_TYPES, formatCurrencyBangla, formatTimeBangla } from "@/lib/bd-ticket-types";
 
 const ticketSchema = z.object({
   routeName: z.string().min(2, "রুটের নাম লিখুন"),
@@ -94,7 +101,9 @@ const vehicleTypeLabels: Record<string, string> = {
 export default function TicketOperatorTickets() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEnhancedFormOpen, setIsEnhancedFormOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<TicketListing | null>(null);
+  const [activeTab, setActiveTab] = useState("all");
   const { toast } = useToast();
 
   const { data, isLoading } = useQuery<{ listings: TicketListing[] }>({
@@ -199,13 +208,50 @@ export default function TicketOperatorTickets() {
             <p className="text-muted-foreground">আপনার রুট ও টিকিট পরিচালনা করুন</p>
           </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="h-12" data-testid="button-add-ticket">
-                <Plus className="h-5 w-5 mr-2" />
-                টিকিট যোগ করুন
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <Dialog open={isEnhancedFormOpen} onOpenChange={setIsEnhancedFormOpen}>
+              <DialogTrigger asChild>
+                <Button className="h-12" data-testid="button-create-ticket-enhanced">
+                  <Plus className="h-5 w-5 mr-2" />
+                  নতুন টিকিট তৈরি করুন
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden p-0">
+                <DialogHeader className="p-6 pb-0">
+                  <DialogTitle className="flex items-center gap-2 text-xl">
+                    <Bus className="h-6 w-6 text-primary" />
+                    নতুন টিকিট তৈরি করুন
+                  </DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="max-h-[80vh] p-6 pt-4">
+                  <TicketCreationForm
+                    onSubmit={async (data) => {
+                      await createMutation.mutateAsync({
+                        routeName: data.routeName,
+                        vehicleType: data.busType,
+                        originCity: data.originCity,
+                        destinationCity: data.destinationCity,
+                        departureTime: data.schedule.departureTime,
+                        arrivalTime: data.schedule.arrivalTime,
+                        basePrice: data.calculatedFare,
+                        totalSeats: data.totalSeats,
+                      } as any);
+                      setIsEnhancedFormOpen(false);
+                    }}
+                    isSubmitting={createMutation.isPending}
+                    onCancel={() => setIsEnhancedFormOpen(false)}
+                  />
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="h-12" data-testid="button-add-ticket">
+                  <Plus className="h-5 w-5 mr-2" />
+                  দ্রুত যোগ
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>নতুন টিকিট যোগ করুন</DialogTitle>
@@ -418,7 +464,8 @@ export default function TicketOperatorTickets() {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
 
         <div className="relative">
