@@ -266,6 +266,20 @@ import AdminSystemHealth from "@/pages/admin/system-health";
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
 
+// Shop Partner pages (BD only)
+import { ShopPartnerLayout } from "@/layouts/ShopPartnerLayout";
+import ShopPartnerDashboard from "@/pages/shop-partner/dashboard";
+import ShopPartnerOnboarding from "@/pages/shop-partner/onboarding";
+import ShopPartnerProducts from "@/pages/shop-partner/products";
+import ShopPartnerProductForm from "@/pages/shop-partner/product-form";
+import ShopPartnerOrders from "@/pages/shop-partner/orders";
+import ShopPartnerWallet from "@/pages/shop-partner/wallet";
+import ShopPartnerSettings from "@/pages/shop-partner/settings";
+
+// Customer BD Shop pages
+import BDShops from "@/pages/customer/bd-shops";
+import BDShopDetails from "@/pages/customer/bd-shop-details";
+
 import NotFound from "@/pages/not-found";
 
 function HomeRedirect() {
@@ -1986,6 +2000,74 @@ function Router() {
       {/* Test routes - Development only */}
       <Route path="/test/driver-public-card">
         <TestDriverPublicCard />
+      </Route>
+
+      {/* Shop Partner Routes (BD only) */}
+      <Route path="/shop-partner/onboarding">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerOnboarding />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/shop-partner/products/new">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerLayout>
+            <ShopPartnerProductForm />
+          </ShopPartnerLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/shop-partner/products/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerLayout>
+            <ShopPartnerProductForm />
+          </ShopPartnerLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/shop-partner/products">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerLayout>
+            <ShopPartnerProducts />
+          </ShopPartnerLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/shop-partner/orders">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerLayout>
+            <ShopPartnerOrders />
+          </ShopPartnerLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/shop-partner/wallet">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerLayout>
+            <ShopPartnerWallet />
+          </ShopPartnerLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/shop-partner/settings">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerLayout>
+            <ShopPartnerSettings />
+          </ShopPartnerLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/shop-partner">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerLayout>
+            <ShopPartnerDashboard />
+          </ShopPartnerLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Customer BD Shop Routes */}
+      <Route path="/customer/bd-shop/:id">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <BDShopDetails />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/bd-shops">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <BDShops />
+        </ProtectedRoute>
       </Route>
 
       {/* 404 */}
