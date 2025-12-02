@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Store,
   Search,
@@ -82,13 +83,7 @@ export default function BDShops() {
       if (selectedType && selectedType !== "all") {
         params.set("shopType", selectedType);
       }
-      const response = await fetch(`/api/bd/shops?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch shops");
-      }
-      return response.json();
+      return apiRequest(`/api/bd/shops?${params.toString()}`);
     },
   });
 

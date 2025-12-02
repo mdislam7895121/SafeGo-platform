@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest } from "@/lib/queryClient";
 import {
   ChevronLeft,
   Search,
@@ -82,13 +83,7 @@ export default function BDRentalsPage() {
       if (selectedType && selectedType !== "all") {
         params.set("vehicleType", selectedType);
       }
-      const response = await fetch(`/api/bd/rentals?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch rentals");
-      }
-      return response.json();
+      return apiRequest(`/api/bd/rentals?${params.toString()}`);
     },
   });
 
