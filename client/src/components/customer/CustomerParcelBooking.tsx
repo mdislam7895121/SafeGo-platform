@@ -115,7 +115,7 @@ export function CustomerParcelBooking() {
   const fare = calculateEstimatedFare();
 
   const handleSubmit = async () => {
-    if (!pickupLocation || !dropoffLocation || !paymentMethod || !fare) {
+    if (!pickupLocation || !dropoffLocation || !paymentMethod || !fare || !parcelType || !deliverySpeed) {
       toast({
         title: "Missing information",
         description: "Please complete all required fields.",
@@ -127,7 +127,11 @@ export function CustomerParcelBooking() {
     setIsLoading(true);
 
     try {
-      const parcelDescription = `${parcelTypes.find(t => t.value === parcelType)?.label || parcelType}${parcelWeight ? ` - ${parcelWeight}kg` : ""}${parcelDetails ? ` - ${parcelDetails}` : ""}`;
+      // Build scheduled datetime if scheduling is enabled
+      let scheduledFor: string | null = null;
+      if (isScheduledPickup && scheduledDate && scheduledTime) {
+        scheduledFor = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+      }
       
       await apiRequest("/api/deliveries", {
         method: "POST",
@@ -139,15 +143,20 @@ export function CustomerParcelBooking() {
           dropoffAddress: dropoffLocation.address,
           dropoffLat: dropoffLocation.lat,
           dropoffLng: dropoffLocation.lng,
-          parcelDescription,
+          parcelType,
+          parcelWeightKg: parcelWeight ? parseFloat(parcelWeight) : null,
+          deliverySpeed,
           serviceFare: parseFloat(fare.formatted),
           paymentMethod: paymentMethod === "cash" ? "cash" : "online",
+          scheduledFor,
         }),
       });
 
       toast({
         title: "Delivery requested!",
-        description: "Searching for a nearby driver...",
+        description: isScheduledPickup 
+          ? `Scheduled for ${scheduledDate} at ${scheduledTime}` 
+          : "Searching for a nearby driver...",
       });
       
       setLocation("/customer/activity");
