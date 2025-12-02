@@ -299,6 +299,8 @@ import TicketOperatorProfile from "@/pages/ticket-operator/profile";
 // Customer BD Tickets & Rentals
 import BDTickets from "@/pages/customer/bd-tickets";
 import BDTicketSearch from "@/pages/bd/ticket-search";
+import BDSeatSelect from "@/pages/bd/seat-select";
+import BDTicketCheckout from "@/pages/bd/ticket-checkout";
 import BDTicketBooking from "@/pages/bd/ticket-booking";
 import BDBookingSuccess from "@/pages/bd/booking-success";
 
@@ -2128,6 +2130,14 @@ function Router() {
       {/* BD Ticket Search & Booking (Public) */}
       <Route path="/bd/ticket-search">
         <BDTicketSearch />
+      </Route>
+      
+      <Route path="/bd/seat-select">
+        <BDSeatSelect />
+      </Route>
+      
+      <Route path="/tickets/bd/checkout">
+        <BDTicketCheckout />
       </Route>
       
       <Route path="/bd/ticket-booking">
