@@ -680,24 +680,24 @@ html {
   transition: outline-offset 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Premium Admin Card Effects - Ultra-subtle light-base effect */
+/* Premium Admin Card Effects - Enhanced iOS-style floating effect */
 .premium-card {
   position: relative;
   
-  /* Card Material Lighting - floating surface effect */
+  /* Material Surface Look - premium gradient */
   background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.6),
-    rgba(245, 245, 245, 0.9)
+    160deg,
+    rgba(255, 255, 255, 0.75),
+    rgba(250, 250, 250, 0.95)
   ) !important;
   
-  /* Card Rim-Light - 1.5px outer rim glow hugging the border */
-  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.22));
+  /* Edge Rim-Light - highly visible but subtle thin glow */
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.32));
   
-  /* Ambient Base-Light Under The Card - soft elliptical glow */
+  /* Soft Under-Glow Base - elliptical floating effect */
   box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.08),
-    0 0 25px rgba(255, 255, 255, 0.18);
+    0 18px 38px rgba(0, 0, 0, 0.10),
+    0 0 40px rgba(255, 255, 255, 0.22);
   
   transition: 
     transform 300ms cubic-bezier(0.4, 0, 0.2, 1),
@@ -705,53 +705,53 @@ html {
     box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Hover Effect - Enhanced glow and elevation */
+/* Hover Effect - Enhanced glow and deeper elevation */
 .premium-card:hover {
-  transform: translateY(-3px);
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.28));
+  transform: translateY(-4px);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.42));
   box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.12),
-    0 0 35px rgba(255, 255, 255, 0.28);
+    0 22px 42px rgba(0, 0, 0, 0.14),
+    0 0 55px rgba(255, 255, 255, 0.28);
 }
 
 .premium-card:active {
-  transform: translateY(-1px);
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.18));
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.25));
   box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.06),
-    0 0 18px rgba(255, 255, 255, 0.12);
+    0 12px 28px rgba(0, 0, 0, 0.08),
+    0 0 30px rgba(255, 255, 255, 0.18);
 }
 
 /* Dark Mode - Premium card adjustments */
 .dark .premium-card {
   /* Dark material gradient background */
   background: linear-gradient(
-    145deg,
-    #1e1e1e,
-    #1a1a1a
+    160deg,
+    #222222,
+    #1b1b1b
   ) !important;
   
-  /* Rim Light - reduced for dark mode */
-  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.12));
+  /* Rim Light - adjusted for dark mode visibility */
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.18));
   
   /* Base Glow - adjusted for dark backgrounds */
   box-shadow:
-    0 12px 28px rgba(0, 0, 0, 0.45),
-    0 0 18px rgba(255, 255, 255, 0.08);
+    0 18px 35px rgba(0, 0, 0, 0.55),
+    0 0 28px rgba(255, 255, 255, 0.10);
 }
 
 .dark .premium-card:hover {
-  transform: translateY(-3px);
-  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.28));
+  transform: translateY(-4px);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.42));
   box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.12),
-    0 0 35px rgba(255, 255, 255, 0.28);
+    0 22px 42px rgba(0, 0, 0, 0.14),
+    0 0 55px rgba(255, 255, 255, 0.28);
 }
 
 .dark .premium-card:active {
-  transform: translateY(-1px);
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.18));
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.25));
   box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.06),
-    0 0 18px rgba(255, 255, 255, 0.12);
+    0 12px 28px rgba(0, 0, 0, 0.08),
+    0 0 30px rgba(255, 255, 255, 0.18);
 }

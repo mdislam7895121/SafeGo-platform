@@ -1,0 +1,63 @@
+TASK:
+Enhance the admin dashboard card glow further. Current glow is too soft and barely noticeable. Increase clarity, edge-light visibility, and add a more realistic floating effect without making the UI look neon or over-bright.
+
+GOAL:
+A very thin rim-light around the card + a soft natural light base underneath the card, so it feels gently elevated like premium iOS surfaces.
+
+REQUIREMENTS:
+1. Edge Rim-Light (Highly Visible but Subtle)
+   Apply this filter:
+     filter: drop-shadow(0 0 4px rgba(255,255,255,0.32));
+   Notes:
+   - Must be visible clearly.
+   - Must stay thin.
+   - Must NOT look like a border.
+
+2. Soft Under-Glow Base (Floating Effect)
+   Apply an elliptical glow underneath the card:
+     box-shadow:
+       0 18px 38px rgba(0,0,0,0.10),
+       0 0 40px rgba(255,255,255,0.22);
+   Notes:
+   - This creates the illusion that light is coming from beneath.
+   - Keep opacity balanced so the card feels floating.
+
+3. Material Surface Look
+   Enhance the gradient softly:
+     background: linear-gradient(
+       160deg,
+       rgba(255,255,255,0.75),
+       rgba(250,250,250,0.95)
+     );
+   Notes:
+   - This improves the premium feel.
+
+4. Hover Effect Upgrade
+   On hover:
+     transform: translateY(-4px);
+     filter: drop-shadow(0 0 6px rgba(255,255,255,0.42));
+     box-shadow:
+       0 22px 42px rgba(0,0,0,0.14),
+       0 0 55px rgba(255,255,255,0.28);
+
+5. Dark Mode Revision (Very Important)
+   Rim-light:
+     filter: drop-shadow(0 0 4px rgba(255,255,255,0.18));
+   Base glow:
+     box-shadow:
+       0 18px 35px rgba(0,0,0,0.55),
+       0 0 28px rgba(255,255,255,0.10);
+   Background:
+     background: linear-gradient(
+       160deg,
+       #222222,
+       #1b1b1b
+     );
+
+6. Do not modify spacing, padding, card titles, or any admin logic.  
+7. Only enhance visuals — zero functional changes.
+
+DELIVERABLES:
+- Updated CSS/Tailwind styles with stronger rim-light and base glow.
+- Apply globally to all admin dashboard cards.
+- Ensure equal visibility in both light mode and dark mode.
