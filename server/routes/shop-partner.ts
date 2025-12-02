@@ -2,8 +2,12 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { authenticateToken, AuthRequest } from "../middleware/auth";
 
 const router = Router();
+
+// Apply authentication middleware to all shop-partner routes
+router.use(authenticateToken);
 
 const shopPartnerRegisterSchema = z.object({
   shopName: z.string().min(2, "Shop name must be at least 2 characters"),
@@ -36,9 +40,9 @@ const shopPartnerKycSchema = z.object({
   shopBanner: z.string().url().optional(),
 });
 
-router.post("/register", async (req: Request, res: Response) => {
+router.post("/register", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -113,9 +117,9 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/kyc", async (req: Request, res: Response) => {
+router.post("/kyc", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -169,9 +173,9 @@ router.post("/kyc", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/profile", async (req: Request, res: Response) => {
+router.get("/profile", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -233,9 +237,9 @@ router.get("/profile", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/profile", async (req: Request, res: Response) => {
+router.patch("/profile", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -288,9 +292,9 @@ router.patch("/profile", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/dashboard", async (req: Request, res: Response) => {
+router.get("/dashboard", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -378,9 +382,9 @@ router.get("/dashboard", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/products", async (req: Request, res: Response) => {
+router.post("/products", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -457,9 +461,9 @@ router.post("/products", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/products", async (req: Request, res: Response) => {
+router.get("/products", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -516,9 +520,9 @@ router.get("/products", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/products/:productId", async (req: Request, res: Response) => {
+router.patch("/products/:productId", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     const { productId } = req.params;
 
     if (!userId) {
@@ -579,9 +583,9 @@ router.patch("/products/:productId", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/products/:productId", async (req: Request, res: Response) => {
+router.delete("/products/:productId", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     const { productId } = req.params;
 
     if (!userId) {
@@ -620,9 +624,9 @@ router.delete("/products/:productId", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/orders", async (req: Request, res: Response) => {
+router.get("/orders", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -685,9 +689,9 @@ router.get("/orders", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/orders/:orderId/status", async (req: Request, res: Response) => {
+router.patch("/orders/:orderId/status", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     const { orderId } = req.params;
     const { status } = req.body;
 
@@ -765,9 +769,9 @@ router.patch("/orders/:orderId/status", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/earnings", async (req: Request, res: Response) => {
+router.get("/earnings", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }

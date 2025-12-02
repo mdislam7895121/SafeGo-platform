@@ -2,8 +2,12 @@ import { Router, Request, Response } from "express";
 import { prisma } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { authenticateToken, AuthRequest } from "../middleware/auth";
 
 const router = Router();
+
+// Apply authentication middleware to all ticket-operator routes
+router.use(authenticateToken);
 
 const operatorRegisterSchema = z.object({
   operatorName: z.string().min(2, "Operator name must be at least 2 characters"),
@@ -39,9 +43,9 @@ const operatorKycSchema = z.object({
   })).optional(),
 });
 
-router.post("/register", async (req: Request, res: Response) => {
+router.post("/register", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -116,9 +120,9 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/kyc", async (req: Request, res: Response) => {
+router.post("/kyc", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -172,9 +176,9 @@ router.post("/kyc", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/profile", async (req: Request, res: Response) => {
+router.get("/profile", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -231,9 +235,9 @@ router.get("/profile", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/dashboard", async (req: Request, res: Response) => {
+router.get("/dashboard", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -349,9 +353,9 @@ router.get("/dashboard", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/tickets", async (req: Request, res: Response) => {
+router.post("/tickets", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -446,9 +450,9 @@ router.post("/tickets", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/tickets", async (req: Request, res: Response) => {
+router.get("/tickets", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -498,9 +502,9 @@ router.get("/tickets", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/ticket-bookings", async (req: Request, res: Response) => {
+router.get("/ticket-bookings", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -559,9 +563,9 @@ router.get("/ticket-bookings", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/ticket-bookings/:bookingId/status", async (req: Request, res: Response) => {
+router.patch("/ticket-bookings/:bookingId/status", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     const { bookingId } = req.params;
     const { status } = req.body;
 
@@ -637,9 +641,9 @@ router.patch("/ticket-bookings/:bookingId/status", async (req: Request, res: Res
   }
 });
 
-router.post("/vehicles", async (req: Request, res: Response) => {
+router.post("/vehicles", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -730,9 +734,9 @@ router.post("/vehicles", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/vehicles", async (req: Request, res: Response) => {
+router.get("/vehicles", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -785,9 +789,9 @@ router.get("/vehicles", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/rental-bookings", async (req: Request, res: Response) => {
+router.get("/rental-bookings", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -840,9 +844,9 @@ router.get("/rental-bookings", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/rental-bookings/:bookingId/status", async (req: Request, res: Response) => {
+router.patch("/rental-bookings/:bookingId/status", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     const { bookingId } = req.params;
     const { status, assignedDriverName, assignedDriverPhone } = req.body;
 
@@ -937,9 +941,9 @@ router.patch("/rental-bookings/:bookingId/status", async (req: Request, res: Res
   }
 });
 
-router.get("/earnings", async (req: Request, res: Response) => {
+router.get("/earnings", async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.userId;
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
