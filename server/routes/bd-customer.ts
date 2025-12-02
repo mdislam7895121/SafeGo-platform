@@ -507,63 +507,99 @@ router.get("/shops/:id", async (req: AuthRequest, res: Response) => {
 
 async function seedDemoRentalVehicles() {
   try {
-    const existingDemo = await prisma.ticketOperator.findFirst({
-      where: { operatorName: "SafeGo Demo Rentals BD" },
+    const approvedBDRentalVehicles = await prisma.rentalVehicle.count({
+      where: {
+        isActive: true,
+        operator: {
+          countryCode: "BD",
+          verificationStatus: "approved",
+          isActive: true,
+          operatorType: { in: ["rental", "both"] },
+        },
+      },
     });
 
-    if (existingDemo) {
+    if (approvedBDRentalVehicles > 0) {
       return;
     }
 
-    const demoUser = await prisma.user.findFirst({
-      where: { email: "demo-rental-operator@safego.bd" },
+    let existingDemo = await prisma.ticketOperator.findFirst({
+      where: { operatorName: "SafeGo Demo Rentals BD" },
     });
 
-    let userId: string;
-    if (!demoUser) {
-      const newUser = await prisma.user.create({
+    let operator: typeof existingDemo;
+
+    if (existingDemo) {
+      operator = await prisma.ticketOperator.update({
+        where: { id: existingDemo.id },
         data: {
-          id: randomUUID(),
-          email: "demo-rental-operator@safego.bd",
-          passwordHash: "demo-not-for-login",
-          role: "ticket_operator",
+          verificationStatus: "approved",
+          isActive: true,
+          operatorType: "rental",
           countryCode: "BD",
-          isDemo: true,
+          verifiedAt: new Date(),
         },
       });
-      userId = newUser.id;
-    } else {
-      userId = demoUser.id;
-    }
+      
+      const vehicleCount = await prisma.rentalVehicle.count({
+        where: { operatorId: existingDemo.id, isActive: true },
+      });
 
-    const operator = await prisma.ticketOperator.create({
-      data: {
-        id: randomUUID(),
-        userId,
-        operatorName: "SafeGo Demo Rentals BD",
-        operatorType: "rental",
-        description: "ঢাকায় বিশ্বস্ত রেন্টাল সেবা",
-        officeAddress: "গুলশান-১, ঢাকা-১২১২",
-        officeLat: 23.7808,
-        officeLng: 90.4175,
-        officePhone: "+8801700000001",
-        officeEmail: "demo@safego.bd",
-        ownerName: "ডেমো অপারেটর",
-        fatherName: "ডেমো পিতা",
-        dateOfBirth: new Date("1985-01-15"),
-        presentAddress: "গুলশান-১, ঢাকা",
-        permanentAddress: "গুলশান-১, ঢাকা",
-        nidNumber: "1234567890123",
-        emergencyContactName: "ডেমো ইমার্জেন্সি",
-        emergencyContactPhone: "+8801700000002",
-        verificationStatus: "approved",
-        verifiedAt: new Date(),
-        isActive: true,
-        countryCode: "BD",
-        averageRating: 4.5,
-        totalRatings: 125,
-      },
-    });
+      if (vehicleCount > 0) {
+        console.log("[BD-Customer] Demo rental operator activated with existing vehicles");
+        return;
+      }
+    } else {
+      const demoUser = await prisma.user.findFirst({
+        where: { email: "demo-rental-operator@safego.bd" },
+      });
+
+      let userId: string;
+      if (!demoUser) {
+        const newUser = await prisma.user.create({
+          data: {
+            id: randomUUID(),
+            email: "demo-rental-operator@safego.bd",
+            passwordHash: "demo-not-for-login",
+            role: "ticket_operator",
+            countryCode: "BD",
+            isDemo: true,
+          },
+        });
+        userId = newUser.id;
+      } else {
+        userId = demoUser.id;
+      }
+
+      operator = await prisma.ticketOperator.create({
+        data: {
+          id: randomUUID(),
+          userId,
+          operatorName: "SafeGo Demo Rentals BD",
+          operatorType: "rental",
+          description: "ঢাকায় বিশ্বস্ত রেন্টাল সেবা",
+          officeAddress: "গুলশান-১, ঢাকা-১২১২",
+          officeLat: 23.7808,
+          officeLng: 90.4175,
+          officePhone: "+8801700000001",
+          officeEmail: "demo@safego.bd",
+          ownerName: "ডেমো অপারেটর",
+          fatherName: "ডেমো পিতা",
+          dateOfBirth: new Date("1985-01-15"),
+          presentAddress: "গুলশান-১, ঢাকা",
+          permanentAddress: "গুলশান-১, ঢাকা",
+          nidNumber: "1234567890123",
+          emergencyContactName: "ডেমো ইমার্জেন্সি",
+          emergencyContactPhone: "+8801700000002",
+          verificationStatus: "approved",
+          verifiedAt: new Date(),
+          isActive: true,
+          countryCode: "BD",
+          averageRating: 4.5,
+          totalRatings: 125,
+        },
+      });
+    }
 
     const demoVehicles = [
       {
@@ -712,11 +748,41 @@ async function seedDemoRentalVehicles() {
 
 async function seedDemoShops() {
   try {
-    const existingDemo = await prisma.shopPartner.findFirst({
-      where: { shopName: "ডেমো মুদিখানা - গুলশান" },
+    const approvedBDShops = await prisma.shopPartner.count({
+      where: {
+        countryCode: "BD",
+        verificationStatus: "approved",
+        isActive: true,
+      },
     });
 
-    if (existingDemo) {
+    if (approvedBDShops > 0) {
+      return;
+    }
+
+    const nonApprovedBDShops = await prisma.shopPartner.findMany({
+      where: {
+        countryCode: "BD",
+        OR: [
+          { verificationStatus: { not: "approved" } },
+          { isActive: false },
+        ],
+      },
+    });
+
+    if (nonApprovedBDShops.length > 0) {
+      await prisma.shopPartner.updateMany({
+        where: {
+          countryCode: "BD",
+        },
+        data: {
+          verificationStatus: "approved",
+          isActive: true,
+          verifiedAt: new Date(),
+        },
+      });
+      
+      console.log("[BD-Customer] Activated existing demo shops to approved status");
       return;
     }
 
