@@ -1,0 +1,150 @@
+TASK:
+Upgrade ONLY the visual design of the Admin Dashboard stat cards (total users, total drivers, active drivers, customers, restaurants, etc.) to have a clearly visible, premium thin rim-light glow and a soft under-glow so that each card looks like it is floating on light.
+
+This is a PURE UI change:
+- No change to routes
+- No change to APIs
+- No change to database schemas
+- No change to SafeGo roles, security, or commission logic
+
+TARGET COMPONENT:
+Use the exact stat card component used on the admin dashboard home route (/admin), for example:
+- /components/admin/dashboard/StatCard.tsx
+or the equivalent React/Vue/Svelte component that renders each metric card.
+
+Do NOT apply glow on:
+- the entire page container
+- the grid wrapper
+- icon wrappers only
+
+The glow MUST be applied on the outermost card box that holds:
+
+- icon
+- main number (e.g., 144)
+- label (e.g., "Total Users")
+
+---
+
+STEP 1 – TAILWIND IMPLEMENTATION (PRIMARY)
+
+If the project uses Tailwind (which it does in SafeGo), update the stat card container div like this:
+
+1. Locate the JSX similar to:
+
+   <div className="...existing card classes...">
+     {icon}
+     <div>...</div>
+   </div>
+
+2. Replace ONLY the className of this outer card div with:
+
+   className="
+     relative group
+     rounded-2xl
+     bg-white/95
+     shadow-[0_10px_26px_rgba(15,23,42,0.08)]
+     overflow-hidden
+     transition-transform transition-shadow duration-300 ease-out
+     before:pointer-events-none before:absolute before:inset-0
+     before:rounded-2xl
+     before:shadow-[0_0_6px_rgba(255,255,255,0.34)]
+     after:pointer-events-none after:absolute
+     after:bottom-[-12px] after:left-1/2 after:-translate-x-1/2
+     after:w-[78%] after:h-[22px]
+     after:rounded-full
+     after:bg-[rgba(255,255,255,0.30)]
+     after:blur-xl
+     group-hover:-translate-y-1
+     group-hover:shadow-[0_20px_42px_rgba(15,23,42,0.16)]
+     group-hover:before:shadow-[0_0_10px_rgba(255,255,255,0.50)]
+     group-hover:after:bg-[rgba(255,255,255,0.45)]
+     dark:bg-[#101014]
+     dark:shadow-[0_18px_40px_rgba(0,0,0,0.70)]
+     dark:before:shadow-[0_0_5px_rgba(255,255,255,0.15)]
+     dark:after:bg-[rgba(255,255,255,0.12)]
+   "
+
+Notes:
+- “before” creates the thin rim-light around the card.
+- “after” creates the soft under-glow ellipse.
+- Hover slightly lifts the card and strengthens both lights.
+- This must be applied to ALL admin stat cards consistently.
+
+Do NOT touch the inner content (texts, icons, numbers).
+
+---
+
+STEP 2 – CSS FALLBACK (IF TAILWIND ARBITRARY VALUES ARE LIMITED)
+
+If arbitrary Tailwind values cause issues in this project, then:
+
+1. Give the stat card container a stable class name:
+
+   <div className="admin-stat-card">
+     ...
+   </div>
+
+2. Add the following CSS to a global admin stylesheet, for example:
+   /styles/admin.css or /app/admin/admin.css
+
+   .admin-stat-card {
+     position: relative;
+     border-radius: 16px;
+     background: linear-gradient(
+       155deg,
+       rgba(255, 255, 255, 0.92),
+       rgba(248, 248, 248, 0.98)
+     );
+     box-shadow:
+       0 10px 26px rgba(15, 23, 42, 0.08);
+     overflow: hidden;
+     transition: transform 0.25s ease-out,
+                 box-shadow 0.25s ease-out;
+   }
+
+   .admin-stat-card::before {
+     content: "";
+     position: absolute;
+     inset: 0;
+     border-radius: inherit;
+     pointer-events: none;
+     box-shadow: 0 0 6px rgba(255, 255, 255, 0.34);
+   }
+
+   .admin-stat-card::after {
+     content: "";
+     position: absolute;
+     left: 50%;
+     bottom: -12px;
+     transform: translateX(-50%);
+     width: 78%;
+     height: 22px;
+     border-radius: 999px;
+     background: rgba(255, 255, 255, 0.30);
+     filter: blur(14px);
+     pointer-events: none;
+   }
+
+   .admin-stat-card:hover {
+     transform: translateY(-4px);
+     box-shadow:
+       0 20px 42px rgba(15, 23, 42, 0.16);
+   }
+
+   .admin-stat-card:hover::before {
+     box-shadow: 0 0 10px rgba(255, 255, 255, 0.50);
+   }
+
+   .admin-stat-card:hover::after {
+     background: rgba(255, 255, 255, 0.45);
+   }
+
+   /* Dark mode variant if using a .dark class on html/body */
+   .dark .admin-stat-card {
+     background: linear-gradient(
+       155deg,
+       #141418,
+       #0f0f13
+     );
+     box-shadow:
+       0 18

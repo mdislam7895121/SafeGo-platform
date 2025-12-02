@@ -30,32 +30,35 @@ export function StatCard({
   return (
     <div
       className={cn(
-        // Base card container with glow effects
-        "group relative overflow-visible cursor-pointer",
-        "rounded-xl bg-white dark:bg-[#1e1e1e]",
+        // Base card container
+        "relative group cursor-pointer",
+        "rounded-2xl",
+        "bg-white/95",
         "min-h-[120px] sm:min-h-[110px]",
-        // Base shadow
-        "shadow-[0_12px_28px_rgba(0,0,0,0.08)]",
-        "dark:shadow-[0_16px_35px_rgba(0,0,0,0.55)]",
-        // Rim-light glow via before pseudo-element (MUST have content-[''] to render)
-        "before:content-[''] before:absolute before:inset-0 before:rounded-xl before:pointer-events-none",
-        "before:shadow-[0_0_6px_rgba(255,255,255,0.32)]",
-        "dark:before:shadow-[0_0_5px_rgba(255,255,255,0.14)]",
-        // Under-glow via after pseudo-element (MUST have content-[''] to render)
-        "after:content-[''] after:absolute after:bottom-[-12px] after:left-1/2 after:-translate-x-1/2",
-        "after:w-[80%] after:h-[20px] after:rounded-full",
-        "after:blur-xl after:pointer-events-none",
-        "after:bg-[rgba(255,255,255,0.25)]",
-        "dark:after:bg-[rgba(255,255,255,0.08)]",
+        "shadow-[0_10px_26px_rgba(15,23,42,0.08)]",
+        "overflow-hidden",
+        "transition-transform transition-shadow duration-300 ease-out",
+        // Rim-light glow via before pseudo-element
+        "before:content-[''] before:pointer-events-none before:absolute before:inset-0",
+        "before:rounded-2xl",
+        "before:shadow-[0_0_6px_rgba(255,255,255,0.34)]",
+        // Under-glow via after pseudo-element
+        "after:content-[''] after:pointer-events-none after:absolute",
+        "after:bottom-[-12px] after:left-1/2 after:-translate-x-1/2",
+        "after:w-[78%] after:h-[22px]",
+        "after:rounded-full",
+        "after:bg-[rgba(255,255,255,0.30)]",
+        "after:blur-xl",
         // Hover effects
-        "transition-all duration-300",
-        "hover:translate-y-[-4px]",
-        "hover:shadow-[0_22px_42px_rgba(0,0,0,0.14)]",
-        "dark:hover:shadow-[0_22px_42px_rgba(0,0,0,0.60)]",
-        "hover:before:shadow-[0_0_10px_rgba(255,255,255,0.45)]",
-        "dark:hover:before:shadow-[0_0_8px_rgba(255,255,255,0.22)]",
-        "hover:after:bg-[rgba(255,255,255,0.35)]",
-        "dark:hover:after:bg-[rgba(255,255,255,0.12)]",
+        "hover:-translate-y-1",
+        "hover:shadow-[0_20px_42px_rgba(15,23,42,0.16)]",
+        "hover:before:shadow-[0_0_10px_rgba(255,255,255,0.50)]",
+        "hover:after:bg-[rgba(255,255,255,0.45)]",
+        // Dark mode
+        "dark:bg-[#101014]",
+        "dark:shadow-[0_18px_40px_rgba(0,0,0,0.70)]",
+        "dark:before:shadow-[0_0_5px_rgba(255,255,255,0.15)]",
+        "dark:after:bg-[rgba(255,255,255,0.12)]",
         className
       )}
       data-testid={testId}
@@ -116,32 +119,35 @@ export function ManagementCard({
   return (
     <div
       className={cn(
-        // Base card container with glow effects
-        "group relative overflow-visible cursor-pointer",
-        "rounded-xl bg-white dark:bg-[#1e1e1e]",
+        // Base card container
+        "relative group cursor-pointer",
+        "rounded-2xl",
+        "bg-white/95",
         "min-h-[140px] sm:min-h-[160px]",
-        // Base shadow
-        "shadow-[0_12px_28px_rgba(0,0,0,0.08)]",
-        "dark:shadow-[0_16px_35px_rgba(0,0,0,0.55)]",
-        // Rim-light glow via before pseudo-element (MUST have content-[''] to render)
-        "before:content-[''] before:absolute before:inset-0 before:rounded-xl before:pointer-events-none",
-        "before:shadow-[0_0_6px_rgba(255,255,255,0.32)]",
-        "dark:before:shadow-[0_0_5px_rgba(255,255,255,0.14)]",
-        // Under-glow via after pseudo-element (MUST have content-[''] to render)
-        "after:content-[''] after:absolute after:bottom-[-12px] after:left-1/2 after:-translate-x-1/2",
-        "after:w-[80%] after:h-[20px] after:rounded-full",
-        "after:blur-xl after:pointer-events-none",
-        "after:bg-[rgba(255,255,255,0.25)]",
-        "dark:after:bg-[rgba(255,255,255,0.08)]",
+        "shadow-[0_10px_26px_rgba(15,23,42,0.08)]",
+        "overflow-hidden",
+        "transition-transform transition-shadow duration-300 ease-out",
+        // Rim-light glow via before pseudo-element
+        "before:content-[''] before:pointer-events-none before:absolute before:inset-0",
+        "before:rounded-2xl",
+        "before:shadow-[0_0_6px_rgba(255,255,255,0.34)]",
+        // Under-glow via after pseudo-element
+        "after:content-[''] after:pointer-events-none after:absolute",
+        "after:bottom-[-12px] after:left-1/2 after:-translate-x-1/2",
+        "after:w-[78%] after:h-[22px]",
+        "after:rounded-full",
+        "after:bg-[rgba(255,255,255,0.30)]",
+        "after:blur-xl",
         // Hover effects
-        "transition-all duration-300",
-        "hover:translate-y-[-4px]",
-        "hover:shadow-[0_22px_42px_rgba(0,0,0,0.14)]",
-        "dark:hover:shadow-[0_22px_42px_rgba(0,0,0,0.60)]",
-        "hover:before:shadow-[0_0_10px_rgba(255,255,255,0.45)]",
-        "dark:hover:before:shadow-[0_0_8px_rgba(255,255,255,0.22)]",
-        "hover:after:bg-[rgba(255,255,255,0.35)]",
-        "dark:hover:after:bg-[rgba(255,255,255,0.12)]",
+        "hover:-translate-y-1",
+        "hover:shadow-[0_20px_42px_rgba(15,23,42,0.16)]",
+        "hover:before:shadow-[0_0_10px_rgba(255,255,255,0.50)]",
+        "hover:after:bg-[rgba(255,255,255,0.45)]",
+        // Dark mode
+        "dark:bg-[#101014]",
+        "dark:shadow-[0_18px_40px_rgba(0,0,0,0.70)]",
+        "dark:before:shadow-[0_0_5px_rgba(255,255,255,0.15)]",
+        "dark:after:bg-[rgba(255,255,255,0.12)]",
         className
       )}
       data-testid={testId}
