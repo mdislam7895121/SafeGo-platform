@@ -1,0 +1,70 @@
+# SAFEGO BANGLADESH EXPANSION IMPLEMENTATION PROMPT
+
+Using the full SafeGo ruleset above, implement Bangladesh-only integration for:
+
+1. SafeGo Shop Partner  
+2. Ticket & Rental Operator  
+
+This implementation must be fully backward-compatible.  
+Do NOT rename or remove existing fields, APIs, or dashboard modules.
+
+===================================================
+TASK REQUIREMENTS:
+===================================================
+
+1. Add BOTH new roles to the BD onboarding system.  
+2. Create their full KYC flows (BD-only).  
+3. Create separate dashboards for:
+   - Shop Partner  
+   - Ticket & Rental Operator  
+
+4. Extend the database by ADDING these collections:
+   - product_orders  
+   - tickets  
+   - rentals  
+
+5. Extend existing collections with OPTIONAL FIELDS:
+   - rides.shop_partner_id  
+   - deliveries.shop_partner_id  
+   - deliveries.ticket_operator_id  
+   - deliveries.rental_operator_id  
+
+6. Implement commission engine logic:
+   - shop sales commission → auto to SafeGo  
+   - ticket commission → auto to SafeGo  
+   - rental commission → auto to SafeGo  
+   - cash handling rules in BD must follow existing SafeGo logic  
+
+7. Implement new status flows:
+   Shop Partner Orders:
+   placed → accepted → packing → ready_for_pickup  
+   → picked_up → on_the_way → delivered OR cancelled_x  
+
+   Ticket Booking:
+   booked → confirmed → completed OR cancelled_x  
+
+   Rental Booking:
+   requested → accepted → vehicle_assigned → in_use  
+   → returned → completed OR cancelled_x  
+
+8. Add NEW admin panel sections:
+   - Shop Partner Management  
+   - Ticket & Rental Operator Management  
+   - Commission setup  
+   - Verification queue  
+   - Negative balance view  
+   - Payout settlement  
+
+9. Add notifications:
+   - new shop order  
+   - ticket booking  
+   - rental confirmation  
+   - KYC approval/rejection  
+
+10. Ensure US market remains unchanged.  
+11. Ensure existing Customer/Driver/Restaurant/Admin logic is untouched.  
+12. Produce demo-ready seed data.  
+
+===================================================
+END OF IMPLEMENTATION PROMPT
+===================================================
