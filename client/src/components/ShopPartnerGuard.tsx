@@ -17,12 +17,21 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
 
   const isShopPartnerRole = user?.role === "shop_partner" || user?.role === "pending_shop_partner";
 
-  const { data: profileData, isLoading: profileLoading } = useQuery<{ profile: any }>({
+  const { data: profileData, isLoading: profileLoading, isError, error } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
     enabled: !!user && user.countryCode === "BD" && isShopPartnerRole,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401/403 auth errors
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    staleTime: 30000,
   });
 
-  if (authLoading || profileLoading) {
+  // Handle auth loading state only (short timeout)
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader-shop-partner" />
@@ -32,6 +41,26 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
 
   if (!user) {
     return <Redirect to="/login" />;
+  }
+
+  // Only show profile loading if auth is complete and query is actually running
+  if (profileLoading && !isError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader-shop-partner" />
+      </div>
+    );
+  }
+
+  // Handle API errors - treat 401/403 as "redirect to login", other errors as "no profile"
+  if (isError) {
+    const errorStatus = (error as any)?.status;
+    if (errorStatus === 401 || errorStatus === 403) {
+      console.warn("[ShopPartnerGuard] Auth error, redirecting to login");
+      return <Redirect to="/login" />;
+    }
+    // For other errors (404, 500, etc.), treat as no profile - redirect to onboarding
+    console.warn("[ShopPartnerGuard] API error, treating as no profile:", error);
   }
 
   if (user.countryCode !== "BD") {
@@ -99,13 +128,21 @@ export function useBDShopPartnerAccess() {
   
   const isShopPartnerRole = user?.role === "shop_partner" || user?.role === "pending_shop_partner";
 
-  const { data: profileData, isLoading } = useQuery<{ profile: any }>({
+  const { data: profileData, isLoading, isError } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
     enabled: !!user && user.countryCode === "BD" && isShopPartnerRole,
+    retry: (failureCount, error: any) => {
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    staleTime: 30000,
   });
 
   const isBD = user?.countryCode === "BD";
-  const hasShopPartner = !!profileData?.profile;
+  // If there's an error, treat as no profile
+  const hasShopPartner = !isError && !!profileData?.profile;
   const isApproved = profileData?.profile?.verificationStatus === "approved";
   const isPending = profileData?.profile?.verificationStatus === "pending";
   const isRejected = profileData?.profile?.verificationStatus === "rejected";
@@ -116,7 +153,8 @@ export function useBDShopPartnerAccess() {
     isApproved,
     isPending,
     isRejected,
-    isLoading,
+    isLoading: isLoading && !isError,
+    isError,
     profile: profileData?.profile,
     canAccessShopPartner: isBD && isShopPartnerRole,
     canAccessFullDashboard: isBD && isShopPartnerRole && hasShopPartner && isApproved,

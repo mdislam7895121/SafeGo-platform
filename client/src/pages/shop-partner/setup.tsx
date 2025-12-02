@@ -21,13 +21,22 @@ interface ShopPartnerProfile {
 }
 
 export default function ShopPartnerSetup() {
-  const { data: profileData, isLoading } = useQuery<{ profile: ShopPartnerProfile | null }>({
+  const { data: profileData, isLoading, isError, error } = useQuery<{ profile: ShopPartnerProfile | null }>({
     queryKey: ["/api/shop-partner/profile"],
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401/403 auth errors
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    staleTime: 30000,
   });
 
   const profile = profileData?.profile;
 
-  if (isLoading) {
+  // Handle loading state - but don't stay stuck on error
+  if (isLoading && !isError) {
     return (
       <div className="flex items-center justify-center min-h-screen p-4">
         <Card className="max-w-lg w-full">
@@ -41,6 +50,19 @@ export default function ShopPartnerSetup() {
     );
   }
 
+  // Handle auth errors - redirect to login
+  if (isError) {
+    const errorStatus = (error as any)?.status;
+    if (errorStatus === 401 || errorStatus === 403) {
+      console.warn("[ShopPartnerSetup] Auth error, redirecting to login");
+      return <Redirect to="/login" />;
+    }
+    // For other errors, redirect to onboarding to start fresh
+    console.warn("[ShopPartnerSetup] API error, redirecting to onboarding:", error);
+    return <Redirect to="/shop-partner/onboarding" />;
+  }
+
+  // No profile found - redirect to onboarding
   if (!profile) {
     return <Redirect to="/shop-partner/onboarding" />;
   }
