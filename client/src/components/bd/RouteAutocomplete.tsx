@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +47,9 @@ export function RouteAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const allCities = type === "origin" ? getUniqueOrigins() : getDestinationsForOrigin(originValue || "");
+  const allCities = useMemo(() => {
+    return type === "origin" ? getUniqueOrigins() : getDestinationsForOrigin(originValue || "");
+  }, [type, originValue]);
 
   useEffect(() => {
     if (searchQuery.trim() === "") {
