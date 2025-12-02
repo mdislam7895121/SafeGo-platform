@@ -447,6 +447,22 @@ function MapFollowDriver({
   return null;
 }
 
+// Fix map tile rendering when modal opens - simple version that invalidates once
+function MapInvalidateOnMount() {
+  const map = useMap();
+  
+  useEffect(() => {
+    // Invalidate after a short delay to ensure container is sized
+    const timeoutId = setTimeout(() => {
+      map.invalidateSize(true);
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [map]);
+  
+  return null;
+}
+
 function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];
   let index = 0, lat = 0, lng = 0;
@@ -2902,8 +2918,8 @@ export default function UnifiedBookingPage() {
 
                     {/* MOBILE: Mini Map Preview - Shows even before locations set */}
                     <div 
-                      className="md:hidden rounded-xl overflow-hidden border border-border relative"
-                      style={{ height: "180px" }}
+                      className="md:hidden rounded-xl overflow-hidden border border-border relative w-full"
+                      style={{ height: "200px" }}
                       data-testid="mobile-map-preview"
                     >
                       {isClient ? (
@@ -2928,27 +2944,25 @@ export default function UnifiedBookingPage() {
                               icon={customerLocationIcon}
                             />
                           )}
+                          {pickup && <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />}
+                          {dropoff && <Marker position={[dropoff.lat, dropoff.lng]} icon={dropoffIcon} />}
                         </MapContainer>
                       ) : (
                         <div className="h-full w-full bg-muted flex items-center justify-center">
                           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
                       )}
-                      <div 
-                        className="absolute inset-0 flex items-center justify-center cursor-pointer"
+                      {/* Expand button - positioned at bottom right */}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="absolute bottom-3 right-3 z-10 shadow-lg gap-2"
                         onClick={() => setIsMobileMapOpen(true)}
-                        style={{ background: "rgba(0,0,0,0.02)" }}
+                        data-testid="button-expand-map-mobile"
                       >
-                        <Button 
-                          variant="secondary" 
-                          size="sm" 
-                          className="shadow-lg gap-2"
-                          data-testid="button-expand-map-mobile"
-                        >
-                          <Maximize2 className="h-4 w-4" />
-                          <span>Expand map</span>
-                        </Button>
-                      </div>
+                        <Maximize2 className="h-4 w-4" />
+                        Expand map
+                      </Button>
                     </div>
 
                     {/* Car Categories Preview - Shows before locations are set */}
@@ -3752,11 +3766,11 @@ export default function UnifiedBookingPage() {
         </div>
       )}
 
-      {/* Mobile Map Overlay/Bottom Sheet */}
+      {/* Mobile Map Overlay/Bottom Sheet - Full screen modal */}
       {isMobileMapOpen && (
-        <div className="md:hidden fixed inset-0 z-50 bg-background/95 backdrop-blur-sm flex flex-col">
-          {/* Header with close button - changes based on ride status */}
-          <div className="flex items-center justify-between p-4 border-b">
+        <div className="md:hidden fixed inset-0 z-50 bg-background flex flex-col">
+          {/* Header with close button */}
+          <div className="flex-none h-14 flex items-center justify-between px-4 border-b bg-background">
             <div className="flex items-center gap-2">
               {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && (
                 <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
@@ -3777,8 +3791,8 @@ export default function UnifiedBookingPage() {
             </Button>
           </div>
           
-          {/* Map takes most of the screen */}
-          <div className="flex-1 relative">
+          {/* Map area - fills remaining space */}
+          <div className="flex-1 min-h-0 relative">
             {isClient && (
               <MapContainer
                 center={[mapCenter.lat, mapCenter.lng]}
@@ -3787,6 +3801,7 @@ export default function UnifiedBookingPage() {
                 zoomControl={true}
                 attributionControl={false}
               >
+                <MapInvalidateOnMount />
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   attribution='&copy; OpenStreetMap'
@@ -3875,8 +3890,8 @@ export default function UnifiedBookingPage() {
             )}
           </div>
           
-          {/* Bottom section - different content based on ride status */}
-          <div className="p-4 border-t bg-background">
+          {/* Bottom section - fixed at bottom, different content based on ride status */}
+          <div className="flex-none p-4 border-t bg-background">
             {/* Show driver info when tracking */}
             {(rideStatus === "DRIVER_ASSIGNED" || rideStatus === "TRIP_IN_PROGRESS") && driverInfo && (
               <div className="flex items-center gap-3 mb-3 p-3 bg-muted/30 rounded-xl">
