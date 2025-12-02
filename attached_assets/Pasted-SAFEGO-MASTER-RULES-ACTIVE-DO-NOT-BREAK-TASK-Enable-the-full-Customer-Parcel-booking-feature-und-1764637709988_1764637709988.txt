@@ -1,0 +1,100 @@
+SAFEGO MASTER RULES ACTIVE — DO NOT BREAK
+
+TASK:
+Enable the full Customer Parcel booking feature under /customer/parcel following SafeGo rules. Remove the “Coming soon…” placeholder and implement the complete parcel workflow.
+
+ROLES:
+Customer can:
+- create parcel delivery requests
+- set pickup & dropoff
+- select parcel type
+- choose delivery speed
+- see fare estimate
+- confirm booking
+- track driver (after accepted)
+- pay via CASH or ONLINE
+
+Driver cannot see this page. Admin has separate parcel management.
+
+MANDATORY IMPLEMENTATION:
+
+1. CUSTOMER PARCEL BOOKING UI (REPLACE “COMING SOON”)
+Create a new booking interface with:
+- Pickup address input (with geolocation + suggestions)
+- Dropoff address input (with geolocation + suggestions)
+- Parcel type dropdown:
+   • Documents
+   • Small Package
+   • Medium Box
+   • Large Box
+- Weight selector (optional, kg/lbs)
+- Delivery speed:
+   • Standard
+   • Express
+- Fare estimate (auto-calculated using existing pricing engine)
+- Confirm Parcel Delivery button
+
+2. STATUS FLOW (MUST MATCH SAFEGO RULES)
+requested
+→ searching_driver
+→ accepted
+→ picked_up
+→ on_the_way
+→ delivered
+OR:
+cancelled_by_customer
+cancelled_by_driver
+cancelled_by_admin
+
+3. COLLECTION (deliveries)
+Every new parcel request must save:
+- customer_id
+- driver_id (null until accepted)
+- parcel_type
+- pickup_address + geolocation
+- dropoff_address + geolocation
+- weight
+- delivery_speed
+- fare
+- payment_method
+- commission fields (same rules as rides/food)
+- timestamps for each status
+- rating & feedback after completed
+
+4. PAYMENT RULES (MANDATORY)
+If CASH:
+- Driver receives full cash
+- Commission added as negative driver_balance
+
+If ONLINE:
+- SafeGo keeps commission automatically
+
+5. DRIVER APP PARCEL TASKS (NO CROSS ROLE VIEW)
+Driver sees:
+- new parcel request
+- pickup → on the way → dropoff
+- can mark picked_up / delivered
+- cannot see customer KYC or sensitive info
+
+6. ADMIN PANEL (SEPARATE)
+Admin can:
+- see all parcel orders
+- manage driver payouts
+- manage parcel pricing
+- manage commission
+
+7. SECURITY RULES
+- Customer sees only their own parcel orders
+- Driver sees only assigned parcels
+- Admin sees everything
+- No access mix between roles
+
+UI STYLE:
+Use the same booking card style as Customer Ride & Food pages so design remains consistent. Do NOT break mobile layout.
+
+DELIVERABLES:
+- Fully functional Customer Parcel booking page
+- Connected to deliveries collection
+- Connected to driver request system
+- Uses existing SafeGo map engine + autocomplete
+- Replaces placeholder “Coming soon…”
