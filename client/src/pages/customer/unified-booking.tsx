@@ -45,6 +45,9 @@ import {
   CheckCircle2,
   AlertCircle,
   LogOut,
+  Bus,
+  Store,
+  CarFront,
 } from "lucide-react";
 
 type RideStatus = 
@@ -100,7 +103,7 @@ import { CustomerEatsHome } from "@/components/customer/CustomerEatsHome";
 import { useEatsCart } from "@/contexts/EatsCartContext";
 import { ShoppingCart } from "lucide-react";
 
-type ServiceType = "ride" | "eats" | "parcel";
+type ServiceType = "ride" | "eats" | "parcel" | "tickets" | "rental" | "shop";
 
 interface LocationData {
   address: string;
@@ -1835,26 +1838,63 @@ export default function UnifiedBookingPage() {
     setIsFollowingDriver(true);
   }, []);
 
-  const services = [
+  const isBDCustomer = user?.countryCode === "BD";
+  
+  const baseServices = [
     {
       id: "ride" as ServiceType,
       title: "SafeGo Ride",
       subtitle: "Point-to-point rides",
       icon: Car,
+      isExternal: false,
+      route: null,
     },
     {
       id: "eats" as ServiceType,
       title: "SafeGo Eats",
       subtitle: "Order from nearby restaurants",
       icon: UtensilsCrossed,
+      isExternal: false,
+      route: null,
     },
     {
       id: "parcel" as ServiceType,
       title: "SafeGo Parcel",
       subtitle: "Send packages and documents",
       icon: Package,
+      isExternal: false,
+      route: null,
     },
   ];
+  
+  const bdServices = [
+    {
+      id: "tickets" as ServiceType,
+      title: "টিকিট",
+      subtitle: "Bus, ferry, train tickets",
+      icon: Bus,
+      isExternal: true,
+      route: "/customer/bd-tickets",
+    },
+    {
+      id: "rental" as ServiceType,
+      title: "রেন্টাল",
+      subtitle: "Car and bike rentals",
+      icon: CarFront,
+      isExternal: true,
+      route: "/customer/bd-rentals",
+    },
+    {
+      id: "shop" as ServiceType,
+      title: "শপ",
+      subtitle: "Local shop deliveries",
+      icon: Store,
+      isExternal: true,
+      route: "/customer/bd-shops",
+    },
+  ];
+  
+  const services = isBDCustomer ? [...baseServices, ...bdServices] : baseServices;
 
   const userInitials = user?.email?.substring(0, 2).toUpperCase() || "SG";
 
@@ -1929,14 +1969,31 @@ export default function UnifiedBookingPage() {
 
             {/* Center: Service Switcher - Desktop Horizontal Tabs */}
             <nav className="hidden md:flex items-center" data-testid="desktop-service-switcher">
-              <div className="flex items-center bg-muted/60 rounded-full p-1">
+              <div className="flex items-center bg-muted/60 rounded-full p-1 gap-1">
                 {services.map((service) => {
                   const isActive = activeService === service.id;
                   const Icon = service.icon;
+                  const getServiceLabel = () => {
+                    switch (service.id) {
+                      case "ride": return "Ride";
+                      case "eats": return "Eats";
+                      case "parcel": return "Parcel";
+                      case "tickets": return "Tickets";
+                      case "rental": return "Rental";
+                      case "shop": return "Shop";
+                      default: return service.title;
+                    }
+                  };
                   return (
                     <button
                       key={service.id}
-                      onClick={() => setActiveService(service.id)}
+                      onClick={() => {
+                        if (service.isExternal && service.route) {
+                          setLocationRoute(service.route);
+                        } else {
+                          setActiveService(service.id);
+                        }
+                      }}
                       className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
                         isActive
                           ? "bg-foreground text-background shadow-sm"
@@ -1945,7 +2002,7 @@ export default function UnifiedBookingPage() {
                       data-testid={`service-tab-${service.id}`}
                     >
                       <Icon className="h-4 w-4" />
-                      <span>{service.id === "ride" ? "Ride" : service.id === "eats" ? "Eats" : "Parcel"}</span>
+                      <span>{getServiceLabel()}</span>
                     </button>
                   );
                 })}
@@ -1964,22 +2021,49 @@ export default function UnifiedBookingPage() {
                     {activeService === "ride" && <Car className="h-4 w-4" />}
                     {activeService === "eats" && <UtensilsCrossed className="h-4 w-4" />}
                     {activeService === "parcel" && <Package className="h-4 w-4" />}
-                    <span className="capitalize">{activeService}</span>
+                    {activeService === "tickets" && <Bus className="h-4 w-4" />}
+                    {activeService === "rental" && <CarFront className="h-4 w-4" />}
+                    {activeService === "shop" && <Store className="h-4 w-4" />}
+                    <span>
+                      {activeService === "ride" ? "Ride" : 
+                       activeService === "eats" ? "Eats" : 
+                       activeService === "parcel" ? "Parcel" :
+                       activeService === "tickets" ? "Tickets" :
+                       activeService === "rental" ? "Rental" :
+                       activeService === "shop" ? "Shop" : activeService}
+                    </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="center" className="w-48">
                   {services.map((service) => {
                     const Icon = service.icon;
+                    const getServiceLabel = () => {
+                      switch (service.id) {
+                        case "ride": return "Ride";
+                        case "eats": return "Eats";
+                        case "parcel": return "Parcel";
+                        case "tickets": return "Tickets";
+                        case "rental": return "Rental";
+                        case "shop": return "Shop";
+                        default: return service.title;
+                      }
+                    };
                     return (
                       <DropdownMenuItem 
                         key={service.id}
-                        onClick={() => setActiveService(service.id)}
+                        onClick={() => {
+                          if (service.isExternal && service.route) {
+                            setLocationRoute(service.route);
+                          } else {
+                            setActiveService(service.id);
+                          }
+                        }}
                         className={activeService === service.id ? "bg-muted" : ""}
                         data-testid={`mobile-service-${service.id}`}
                       >
                         <Icon className="h-4 w-4 mr-2" />
-                        {service.id === "ride" ? "Ride" : service.id === "eats" ? "Eats" : "Parcel"}
+                        {getServiceLabel()}
                       </DropdownMenuItem>
                     );
                   })}

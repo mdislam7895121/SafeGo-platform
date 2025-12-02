@@ -301,6 +301,7 @@ import TicketOperatorProfile from "@/pages/ticket-operator/profile";
 
 // Customer BD Tickets & Rentals
 import BDTickets from "@/pages/customer/bd-tickets";
+import BDRentals from "@/pages/customer/bd-rentals";
 import BDTicketSearch from "@/pages/bd/ticket-search";
 import BDSeatSelect from "@/pages/bd/seat-select";
 import BDTicketCheckout from "@/pages/bd/ticket-checkout";
@@ -2122,6 +2123,11 @@ function Router() {
       <Route path="/customer/bd-tickets">
         <ProtectedRoute allowedRoles={["customer"]}>
           <BDTickets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/bd-rentals">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <BDRentals />
         </ProtectedRoute>
       </Route>
       
