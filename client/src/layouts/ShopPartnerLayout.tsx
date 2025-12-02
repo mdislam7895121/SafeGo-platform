@@ -26,10 +26,10 @@ import {
   ShoppingCart,
   Wallet,
   Settings,
-  FileText,
   LogOut,
   Bell,
   HelpCircle,
+  User,
 } from "lucide-react";
 
 interface ShopPartnerLayoutProps {
@@ -62,10 +62,10 @@ const menuItems = [
     label: "wallet",
   },
   {
-    title: "কাগজপত্র",
-    url: "/shop-partner/documents",
-    icon: FileText,
-    label: "documents",
+    title: "প্রোফাইল",
+    url: "/shop-partner/profile",
+    icon: User,
+    label: "profile",
   },
   {
     title: "সেটিংস",

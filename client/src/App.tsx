@@ -268,13 +268,16 @@ import TestDriverPublicCard from "@/pages/test/driver-public-card";
 
 // Shop Partner pages (BD only)
 import { ShopPartnerLayout } from "@/layouts/ShopPartnerLayout";
+import { ShopPartnerGuard } from "@/components/ShopPartnerGuard";
 import ShopPartnerDashboard from "@/pages/shop-partner/dashboard";
 import ShopPartnerOnboarding from "@/pages/shop-partner/onboarding";
+import ShopPartnerSetup from "@/pages/shop-partner/setup";
 import ShopPartnerProducts from "@/pages/shop-partner/products";
 import ShopPartnerProductForm from "@/pages/shop-partner/product-form";
 import ShopPartnerOrders from "@/pages/shop-partner/orders";
 import ShopPartnerWallet from "@/pages/shop-partner/wallet";
 import ShopPartnerSettings from "@/pages/shop-partner/settings";
+import ShopPartnerProfile from "@/pages/shop-partner/profile";
 
 // Customer BD Shop pages
 import BDShops from "@/pages/customer/bd-shops";
@@ -2004,58 +2007,77 @@ function Router() {
 
       {/* Shop Partner Routes (BD only) */}
       <Route path="/shop-partner/onboarding">
-        <ProtectedRoute allowedRoles={["customer"]}>
+        <ShopPartnerGuard allowSetup>
           <ShopPartnerOnboarding />
-        </ProtectedRoute>
+        </ShopPartnerGuard>
+      </Route>
+      <Route path="/shop-partner/setup">
+        <ShopPartnerGuard allowSetup>
+          <ShopPartnerSetup />
+        </ShopPartnerGuard>
       </Route>
       <Route path="/shop-partner/products/new">
-        <ProtectedRoute allowedRoles={["customer"]}>
+        <ShopPartnerGuard>
           <ShopPartnerLayout>
             <ShopPartnerProductForm />
           </ShopPartnerLayout>
-        </ProtectedRoute>
+        </ShopPartnerGuard>
       </Route>
       <Route path="/shop-partner/products/:id">
-        <ProtectedRoute allowedRoles={["customer"]}>
+        <ShopPartnerGuard>
           <ShopPartnerLayout>
             <ShopPartnerProductForm />
           </ShopPartnerLayout>
-        </ProtectedRoute>
+        </ShopPartnerGuard>
       </Route>
       <Route path="/shop-partner/products">
-        <ProtectedRoute allowedRoles={["customer"]}>
+        <ShopPartnerGuard>
           <ShopPartnerLayout>
             <ShopPartnerProducts />
           </ShopPartnerLayout>
-        </ProtectedRoute>
+        </ShopPartnerGuard>
       </Route>
       <Route path="/shop-partner/orders">
-        <ProtectedRoute allowedRoles={["customer"]}>
+        <ShopPartnerGuard>
           <ShopPartnerLayout>
             <ShopPartnerOrders />
           </ShopPartnerLayout>
-        </ProtectedRoute>
+        </ShopPartnerGuard>
       </Route>
       <Route path="/shop-partner/wallet">
-        <ProtectedRoute allowedRoles={["customer"]}>
+        <ShopPartnerGuard>
           <ShopPartnerLayout>
             <ShopPartnerWallet />
           </ShopPartnerLayout>
-        </ProtectedRoute>
+        </ShopPartnerGuard>
       </Route>
       <Route path="/shop-partner/settings">
-        <ProtectedRoute allowedRoles={["customer"]}>
+        <ShopPartnerGuard>
           <ShopPartnerLayout>
             <ShopPartnerSettings />
           </ShopPartnerLayout>
-        </ProtectedRoute>
+        </ShopPartnerGuard>
       </Route>
-      <Route path="/shop-partner">
-        <ProtectedRoute allowedRoles={["customer"]}>
+      <Route path="/shop-partner/profile">
+        <ShopPartnerGuard>
+          <ShopPartnerLayout>
+            <ShopPartnerProfile />
+          </ShopPartnerLayout>
+        </ShopPartnerGuard>
+      </Route>
+      <Route path="/shop-partner/dashboard">
+        <ShopPartnerGuard>
           <ShopPartnerLayout>
             <ShopPartnerDashboard />
           </ShopPartnerLayout>
-        </ProtectedRoute>
+        </ShopPartnerGuard>
+      </Route>
+      <Route path="/shop-partner">
+        <ShopPartnerGuard>
+          <ShopPartnerLayout>
+            <ShopPartnerDashboard />
+          </ShopPartnerLayout>
+        </ShopPartnerGuard>
       </Route>
 
       {/* Customer BD Shop Routes */}
