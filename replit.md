@@ -60,6 +60,21 @@ The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with
     - **Security Infrastructure**: AES-256-GCM encryption with strict key validation (no fallback keys), per-operation random IVs, authenticated tags, and fail-fast behavior when ENCRYPTION_KEY is missing/invalid
     - **API Routes**: Customer-facing at /api/security/*, admin-only at /api/admin/security/*
     - **Critical Deployment Note**: ENCRYPTION_KEY environment variable (64-character hex string) MUST be set before production deployment
+*   **Bangladesh Expansion (BD-Only Roles)**: Two new BD-exclusive partner roles with complete KYC onboarding and commerce workflows:
+    - **SafeGo Shop Partner**: Product sales platform enabling local shops to list products and receive orders via SafeGo
+      - Full KYC onboarding with NID, trade license, MFS accounts (bKash, Nagad)
+      - Product catalog management (CRUD, inventory, categories)
+      - Order lifecycle: requested → confirmed → preparing → ready → picked_up → delivered
+      - Commission tracking with cash/online payment handling
+      - Wallet system with negative balance management for COD orders
+    - **SafeGo Ticket & Rental Operator**: Transportation and rental services
+      - Operator types: bus_company, ferry_company, train_operator, rental_service
+      - Ticket listings with seat capacity, route management, and booking workflow
+      - Vehicle rentals with daily rates, availability calendar, and booking lifecycle
+      - Separate commission rates for tickets vs rentals
+      - Status flows: Tickets (available → booked → confirmed → used), Rentals (available → booked → confirmed → active → completed)
+    - **Admin Management**: /api/admin/bd-expansion/* endpoints for verification, commission adjustment, and balance settlement
+    - **Country Enforcement**: All BD expansion routes validate countryCode="BD" for strict role isolation
 
 ## External Dependencies
 
