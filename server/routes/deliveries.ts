@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { prisma } from "../lib/prisma";
 import { authenticateToken, AuthRequest, requireUnlockedAccount } from "../middleware/auth";
 import { walletService } from "../services/walletService";
@@ -34,18 +35,56 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
       dropoffAddress,
       dropoffLat,
       dropoffLng,
-      parcelDescription,
+      parcelType,
+      parcelWeightKg,
+      deliverySpeed,
       serviceFare,
       paymentMethod,
+      scheduledFor,
     } = req.body;
 
-    // Validation
-    if (!pickupAddress || !pickupLat || !pickupLng || !dropoffAddress || !dropoffLat || !dropoffLng || !parcelDescription || !serviceFare || !paymentMethod) {
-      return res.status(400).json({ error: "All delivery details are required" });
+    // Validation - return 400 for missing required fields
+    const missingFields: string[] = [];
+    if (!pickupAddress) missingFields.push("pickupAddress");
+    if (pickupLat === undefined || pickupLat === null) missingFields.push("pickupLat");
+    if (pickupLng === undefined || pickupLng === null) missingFields.push("pickupLng");
+    if (!dropoffAddress) missingFields.push("dropoffAddress");
+    if (dropoffLat === undefined || dropoffLat === null) missingFields.push("dropoffLat");
+    if (dropoffLng === undefined || dropoffLng === null) missingFields.push("dropoffLng");
+    if (!parcelType) missingFields.push("parcelType");
+    if (!deliverySpeed) missingFields.push("deliverySpeed");
+    if (!serviceFare && serviceFare !== 0) missingFields.push("serviceFare");
+    if (!paymentMethod) missingFields.push("paymentMethod");
+
+    if (missingFields.length > 0) {
+      return res.status(400).json({ 
+        error: "Missing required fields", 
+        missingFields 
+      });
     }
 
+    // Validate payment method
     if (!["cash", "online"].includes(paymentMethod)) {
       return res.status(400).json({ error: "paymentMethod must be 'cash' or 'online'" });
+    }
+
+    // Validate parcel type - map to ParcelSizeCategory enum
+    const parcelSizeCategoryMap: Record<string, "small" | "medium" | "large" | "oversized"> = {
+      "documents": "small",
+      "small_package": "small",
+      "medium_box": "medium",
+      "large_box": "large",
+    };
+    const parcelSizeCategory = parcelSizeCategoryMap[parcelType];
+    if (!parcelSizeCategory) {
+      return res.status(400).json({ 
+        error: "Invalid parcelType. Must be one of: documents, small_package, medium_box, large_box" 
+      });
+    }
+
+    // Validate delivery speed
+    if (!["standard", "express"].includes(deliverySpeed)) {
+      return res.status(400).json({ error: "deliverySpeed must be 'standard' or 'express'" });
     }
 
     // Get customer profile
@@ -61,27 +100,45 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Customer must be verified to request deliveries" });
     }
 
-    // Calculate commission (20% for now - can be made configurable later)
+    // Calculate commission (20% - same as rides/food)
     const commissionRate = 0.20;
-    const safegoCommission = parseFloat(serviceFare) * commissionRate;
-    const driverPayout = parseFloat(serviceFare) - safegoCommission;
+    const fareAmount = parseFloat(serviceFare.toString());
+    const safegoCommission = fareAmount * commissionRate;
+    const driverPayout = fareAmount - safegoCommission;
 
-    // Create delivery
+    // Determine pickup type and scheduled time
+    const isScheduled = scheduledFor && scheduledFor !== null;
+    const pickupType = isScheduled ? "scheduled" : "immediate";
+    const scheduledPickupAt = isScheduled ? new Date(scheduledFor) : null;
+
+    // Generate unique ID
+    const deliveryId = randomUUID();
+    const now = new Date();
+
+    // Create delivery with all required SafeGo fields
     const delivery = await prisma.delivery.create({
       data: {
+        id: deliveryId,
         customerId: customerProfile.id,
+        driverId: null, // Set at driver acceptance
         pickupAddress,
         pickupLat: parseFloat(pickupLat.toString()),
         pickupLng: parseFloat(pickupLng.toString()),
         dropoffAddress,
         dropoffLat: parseFloat(dropoffLat.toString()),
         dropoffLng: parseFloat(dropoffLng.toString()),
-        parcelDescription,
-        serviceFare: parseFloat(serviceFare),
+        serviceFare: fareAmount,
         safegoCommission,
         driverPayout,
         paymentMethod,
         status: "requested",
+        serviceType: "parcel",
+        parcelSizeCategory,
+        parcelWeightKg: parcelWeightKg ? parseFloat(parcelWeightKg.toString()) : null,
+        pickupType,
+        scheduledPickupAt,
+        statusHistory: JSON.stringify([{ status: "requested", timestamp: now.toISOString(), actor: "customer" }]),
+        updatedAt: now,
       },
     });
 
@@ -91,10 +148,14 @@ router.post("/", requireUnlockedAccount, async (req: AuthRequest, res) => {
         id: delivery.id,
         pickupAddress: delivery.pickupAddress,
         dropoffAddress: delivery.dropoffAddress,
-        parcelDescription: delivery.parcelDescription,
+        parcelType,
+        parcelWeightKg: delivery.parcelWeightKg,
+        deliverySpeed,
         serviceFare: delivery.serviceFare,
         paymentMethod: delivery.paymentMethod,
         status: delivery.status,
+        pickupType: delivery.pickupType,
+        scheduledPickupAt: delivery.scheduledPickupAt,
         createdAt: delivery.createdAt,
       },
     });
