@@ -31,14 +31,23 @@ function SetupHeader() {
 }
 
 export default function TicketOperatorSetup() {
-  const { data: profileData, isLoading } = useQuery<{ operator: any }>({
+  const { data: profileData, isLoading, isError, error } = useQuery<{ operator: any }>({
     queryKey: ["/api/ticket-operator/profile"],
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401/403 auth errors
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    staleTime: 30000,
   });
 
   const operator = profileData?.operator;
   const status = operator?.verificationStatus;
 
-  if (isLoading) {
+  // Handle loading - but don't stay stuck on error
+  if (isLoading && !isError) {
     return (
       <div className="min-h-screen bg-background">
         <SetupHeader />
@@ -47,6 +56,23 @@ export default function TicketOperatorSetup() {
         </div>
       </div>
     );
+  }
+
+  // Handle auth errors - redirect to login
+  if (isError) {
+    const errorStatus = (error as any)?.status;
+    if (errorStatus === 401 || errorStatus === 403) {
+      console.warn("[TicketOperatorSetup] Auth error, redirecting to login");
+      return <Redirect to="/login" />;
+    }
+    // For other errors, redirect to onboarding
+    console.warn("[TicketOperatorSetup] API error, redirecting to onboarding:", error);
+    return <Redirect to="/ticket-operator/onboarding" />;
+  }
+
+  // No operator found - redirect to onboarding
+  if (!operator) {
+    return <Redirect to="/ticket-operator/onboarding" />;
   }
 
   if (status === "approved") {

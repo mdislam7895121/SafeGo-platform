@@ -220,10 +220,17 @@ export default function TicketOperatorOnboarding() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { data: profileData, isLoading: profileLoading } = useQuery<{ operator: any }>({
+  const { data: profileData, isLoading: profileLoading, isError, error } = useQuery<{ operator: any }>({
     queryKey: ["/api/ticket-operator/profile"],
     enabled: !!user && (user.role === "ticket_operator" || user.role === "pending_ticket_operator"),
-    retry: false,
+    retry: (failureCount, error: any) => {
+      // Don't retry on 401/403 auth errors
+      if (error?.status === 401 || error?.status === 403) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    staleTime: 30000,
   });
 
   const step1Form = useForm<Step1Data>({
@@ -305,7 +312,8 @@ export default function TicketOperatorOnboarding() {
     },
   });
 
-  if (profileLoading) {
+  // Handle loading - but don't stay stuck on error
+  if (profileLoading && !isError) {
     return (
       <div className="min-h-screen bg-background">
         <OnboardingHeader />
@@ -316,8 +324,19 @@ export default function TicketOperatorOnboarding() {
     );
   }
 
+  // Handle auth errors - redirect to login
+  if (isError) {
+    const errorStatus = (error as any)?.status;
+    if (errorStatus === 401 || errorStatus === 403) {
+      console.warn("[TicketOperatorOnboarding] Auth error, redirecting to login");
+      return <Redirect to="/login" />;
+    }
+    // For other errors, continue with the form (treat as no profile)
+    console.warn("[TicketOperatorOnboarding] API error, showing onboarding form:", error);
+  }
+
   const operator = profileData?.operator;
-  const hasProfile = !!operator;
+  const hasProfile = !isError && !!operator;
   const status = operator?.verificationStatus;
 
   if (hasProfile && status === "approved") {
