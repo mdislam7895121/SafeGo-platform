@@ -194,7 +194,7 @@ router.get("/:id", async (req: AuthRequest, res) => {
                 email: true,
               },
             },
-            vehicle: true,
+            vehicles: true,
           },
         },
       },
@@ -227,7 +227,7 @@ router.get("/:id", async (req: AuthRequest, res) => {
         },
         driver: delivery.driver ? {
           email: delivery.driver.user.email,
-          vehicle: delivery.driver.vehicle,
+          vehicles: delivery.driver.vehicles,
         } : null,
         pickupAddress: delivery.pickupAddress,
         pickupLat: delivery.pickupLat,
@@ -235,7 +235,8 @@ router.get("/:id", async (req: AuthRequest, res) => {
         dropoffAddress: delivery.dropoffAddress,
         dropoffLat: delivery.dropoffLat,
         dropoffLng: delivery.dropoffLng,
-        parcelDescription: delivery.parcelDescription,
+        parcelSizeCategory: delivery.parcelSizeCategory,
+        parcelWeightKg: delivery.parcelWeightKg,
         serviceFare: delivery.serviceFare,
         safegoCommission: delivery.safegoCommission,
         driverPayout: delivery.driverPayout,
@@ -243,10 +244,10 @@ router.get("/:id", async (req: AuthRequest, res) => {
         status: delivery.status,
         customerRating: delivery.customerRating,
         customerFeedback: delivery.customerFeedback,
-        driverRating: delivery.driverRating,
-        driverFeedback: delivery.driverFeedback,
+        pickupType: delivery.pickupType,
+        scheduledPickupAt: delivery.scheduledPickupAt,
         createdAt: delivery.createdAt,
-        completedAt: delivery.completedAt,
+        deliveredAt: delivery.deliveredAt,
       },
     });
   } catch (error) {
@@ -466,80 +467,74 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
       return res.status(400).json({ error: "Delivery has no assigned driver" });
     }
 
-    // Determine who is completing (customer or driver)
-    let updateData: any = {};
+    // Only customers can rate/complete deliveries (driver marks as delivered separately)
+    if (role !== "customer") {
+      return res.status(403).json({ error: "Only customers can rate and complete deliveries" });
+    }
 
-    if (role === "customer") {
-      const customerProfile = await prisma.customerProfile.findUnique({ where: { userId } });
-      if (delivery.customerId !== customerProfile?.id) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      updateData.customerRating = rating;
-      updateData.customerFeedback = feedback || null;
-    } else if (role === "driver") {
-      const driverProfile = await prisma.driverProfile.findUnique({ where: { userId } });
-      if (delivery.driverId !== driverProfile?.id) {
-        return res.status(403).json({ error: "Access denied" });
-      }
-      updateData.driverRating = rating;
-      updateData.driverFeedback = feedback || null;
-    } else {
-      return res.status(403).json({ error: "Only customer or driver can complete delivery" });
+    const customerProfile = await prisma.customerProfile.findUnique({ where: { userId } });
+    if (delivery.customerId !== customerProfile?.id) {
+      return res.status(403).json({ error: "Access denied" });
     }
 
     // Phase 2A: Single completion timestamp for consistency across all services
     const completionTimestamp = new Date();
     let driver: any = null;
 
-    // If both have rated, mark as completed and apply commission logic
-    if ((role === "customer" && delivery.driverRating) || (role === "driver" && delivery.customerRating)) {
-      updateData.status = "completed";
-      updateData.completedAt = completionTimestamp;
+    // Update with customer rating and mark as completed
+    let updateData: any = {
+      customerRating: rating,
+      customerFeedback: feedback || null,
+      status: "completed",
+      updatedAt: completionTimestamp,
+    };
 
-      // Apply commission logic for driver
-      driver = await prisma.driverProfile.findUnique({
-        where: { id: delivery.driverId },
-        include: { driverWallet: true, vehicle: true, stats: true, user: true },
-      });
+    // Apply commission logic for driver
+    driver = await prisma.driverProfile.findUnique({
+      where: { id: delivery.driverId },
+      include: { driverWallet: true, vehicles: true, stats: true, user: true },
+    });
 
-      if (driver) {
-        // Update driver stats
+    if (driver) {
+      // Update driver stats
+      if (driver.stats) {
         await prisma.driverStats.update({
-          where: { id: driver.stats!.id },
+          where: { id: driver.stats.id },
           data: {
             totalTrips: { increment: 1 },
-            rating: (parseFloat(driver.stats!.rating.toString()) * driver.stats!.totalTrips + rating) / (driver.stats!.totalTrips + 1),
+            rating: (parseFloat(driver.stats.rating.toString()) * driver.stats.totalTrips + rating) / (driver.stats.totalTrips + 1),
           },
         });
+      }
 
-        // Update vehicle earnings
+      // Update first vehicle earnings if available
+      if (driver.vehicles && driver.vehicles.length > 0) {
         await prisma.vehicle.update({
-          where: { id: driver.vehicle!.id },
+          where: { id: driver.vehicles[0].id },
           data: {
             totalEarnings: { increment: parseFloat(delivery.serviceFare.toString()) },
           },
         });
+      }
 
-        // Phase 2A: Settlement (auto-credit earnings + commission deduction)
-        // Runs BEFORE update to avoid double-processing on retry
-        try {
-          await settlementService.settleCompletedDelivery(delivery.id);
-        } catch (settlementError) {
-          console.error("Settlement error (non-blocking):", settlementError);
-          // Fallback to legacy wallet recording
-          await walletService.recordParcelDeliveryEarning(
-            delivery.driverId,
-            {
-              id: delivery.id,
-              serviceFare: delivery.serviceFare,
-              driverPayout: delivery.driverPayout,
-              safegoCommission: delivery.safegoCommission,
-              paymentMethod: delivery.paymentMethod as "cash" | "online",
-              pickupAddress: delivery.pickupAddress,
-              dropoffAddress: delivery.dropoffAddress,
-            }
-          );
-        }
+      // Phase 2A: Settlement (auto-credit earnings + commission deduction)
+      try {
+        await settlementService.settleCompletedDelivery(delivery.id);
+      } catch (settlementError) {
+        console.error("Settlement error (non-blocking):", settlementError);
+        // Fallback to legacy wallet recording
+        await walletService.recordParcelDeliveryEarning(
+          delivery.driverId,
+          {
+            id: delivery.id,
+            serviceFare: delivery.serviceFare,
+            driverPayout: delivery.driverPayout,
+            safegoCommission: delivery.safegoCommission,
+            paymentMethod: delivery.paymentMethod as "cash" | "online",
+            pickupAddress: delivery.pickupAddress,
+            dropoffAddress: delivery.dropoffAddress,
+          }
+        );
       }
     }
 
@@ -549,7 +544,7 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
       data: updateData,
     });
 
-    // Phase 2A: Evaluate incentives AFTER update (uses persisted completedAt timestamp)
+    // Phase 2A: Evaluate incentives AFTER update
     if (updateData.status === "completed" && driver) {
       try {
         const countryCode = driver.user.countryCode || "US";
@@ -558,7 +553,7 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
           serviceType: "parcel",
           entityId: delivery.id,
           countryCode,
-          tripTimestamp: updatedDelivery.completedAt ?? completionTimestamp,
+          tripTimestamp: completionTimestamp,
         });
       } catch (incentiveError) {
         console.error("Incentive evaluation error (non-blocking):", incentiveError);
@@ -566,7 +561,7 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
     }
 
     // Phase 2A: Process tip if customer provided one
-    if (role === "customer" && tipAmount && tipAmount > 0 && tipPaymentMethod) {
+    if (tipAmount && tipAmount > 0 && tipPaymentMethod) {
       try {
         await tipService.recordTip({
           entityId: delivery.id,
@@ -581,13 +576,12 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
     }
 
     res.json({
-      message: updateData.status === "completed" ? "Delivery completed successfully" : "Rating submitted successfully",
+      message: "Delivery completed successfully",
       delivery: {
         id: updatedDelivery.id,
         status: updatedDelivery.status,
         customerRating: updatedDelivery.customerRating,
-        driverRating: updatedDelivery.driverRating,
-        completedAt: updatedDelivery.completedAt,
+        customerFeedback: updatedDelivery.customerFeedback,
       },
     });
   } catch (error) {
