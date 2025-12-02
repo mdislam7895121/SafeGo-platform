@@ -238,39 +238,44 @@ router.get("/profile", async (req: AuthRequest, res: Response) => {
       },
     });
 
+    // Return null profile instead of 404 to allow frontend to redirect to setup
     if (!shopPartner) {
-      return res.status(404).json({ error: "Shop Partner profile not found" });
+      return res.json({ profile: null, shopPartner: null });
     }
 
+    const profileData = {
+      id: shopPartner.id,
+      shopName: shopPartner.shopName,
+      shopType: shopPartner.shopType,
+      shopDescription: shopPartner.shopDescription,
+      shopAddress: shopPartner.shopAddress,
+      shopLogo: shopPartner.shopLogo,
+      shopBanner: shopPartner.shopBanner,
+      verificationStatus: shopPartner.verificationStatus,
+      rejectionReason: shopPartner.rejectionReason,
+      isActive: shopPartner.isActive,
+      isOpen: shopPartner.isOpen,
+      openingTime: shopPartner.openingTime,
+      closingTime: shopPartner.closingTime,
+      deliveryRadiusKm: shopPartner.deliveryRadiusKm,
+      minOrderAmount: shopPartner.minOrderAmount,
+      commissionRate: shopPartner.commissionRate,
+      walletBalance: shopPartner.walletBalance,
+      negativeBalance: shopPartner.negativeBalance,
+      totalEarnings: shopPartner.totalEarnings,
+      pendingPayout: shopPartner.pendingPayout,
+      averageRating: shopPartner.averageRating,
+      totalRatings: shopPartner.totalRatings,
+      totalOrders: shopPartner.totalOrders,
+      productCount: shopPartner._count.products,
+      orderCount: shopPartner._count.orders,
+      recentProducts: shopPartner.products,
+    };
+
+    // Return both profile and shopPartner for backward compatibility
     res.json({
-      shopPartner: {
-        id: shopPartner.id,
-        shopName: shopPartner.shopName,
-        shopType: shopPartner.shopType,
-        shopDescription: shopPartner.shopDescription,
-        shopAddress: shopPartner.shopAddress,
-        shopLogo: shopPartner.shopLogo,
-        shopBanner: shopPartner.shopBanner,
-        verificationStatus: shopPartner.verificationStatus,
-        rejectionReason: shopPartner.rejectionReason,
-        isActive: shopPartner.isActive,
-        isOpen: shopPartner.isOpen,
-        openingTime: shopPartner.openingTime,
-        closingTime: shopPartner.closingTime,
-        deliveryRadiusKm: shopPartner.deliveryRadiusKm,
-        minOrderAmount: shopPartner.minOrderAmount,
-        commissionRate: shopPartner.commissionRate,
-        walletBalance: shopPartner.walletBalance,
-        negativeBalance: shopPartner.negativeBalance,
-        totalEarnings: shopPartner.totalEarnings,
-        pendingPayout: shopPartner.pendingPayout,
-        averageRating: shopPartner.averageRating,
-        totalRatings: shopPartner.totalRatings,
-        totalOrders: shopPartner.totalOrders,
-        productCount: shopPartner._count.products,
-        orderCount: shopPartner._count.orders,
-        recentProducts: shopPartner.products,
-      },
+      profile: profileData,
+      shopPartner: profileData,
     });
   } catch (error) {
     console.error("Shop Partner profile error:", error);
