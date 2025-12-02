@@ -1,0 +1,88 @@
+# SAFEGO BD — ADD "TICKET & RENTAL OPERATOR" AS SIGNUP ROLE
+# Follow ALL SafeGo master rules. Must be BD-only. No US impact.
+# Do NOT break existing roles, schemas, or onboarding flows.
+
+======================================================
+A) PURPOSE
+======================================================
+Enable the "Ticket & Rental Operator" role to appear
+in the signup role dropdown so BD users can register
+as ticket operators.
+
+This role already exists (dashboard, onboarding wizard,
+KYC, BD-only logic, route management, schedule builder).
+But it is not yet registered in the signup role selector.
+
+Your job is to add it safely.
+
+======================================================
+B) ROLE NAME + LABEL (BANGLA FRIENDLY)
+======================================================
+Internal role ID:
+  "ticket_operator"
+
+Signup dropdown label (Bangla-first):
+  "টিকিট ও রেন্টাল অপারেটর (Ticket Operator)"
+
+This must appear ONLY when:
+  countryCode === "BD"
+
+US customers must NEVER see this.
+
+======================================================
+C) WHERE TO REGISTER
+======================================================
+Add this role to the frontend signup role list:
+
+File to update (example):
+  client/src/modules/auth/Signup.tsx
+or the actual role registry file currently used.
+
+Add “ticket_operator” as a selectable role,
+with proper BD visibility guard.
+
+Do NOT remove or modify existing roles:
+- customer
+- driver
+- restaurant
+- admin
+
+======================================================
+D) ONBOARDING ROUTING
+======================================================
+When this role is selected and signup completes:
+
+Redirect to:
+  /ticket-operator/onboarding
+
+The existing 3-step BD onboarding wizard must load:
+1) Operator info
+2) Ticket settings
+3) Rental settings
+
+verification_status must default to "pending"
+until admin approves in:
+  /admin/bd-expansion/ticket-operators
+
+======================================================
+E) SECURITY RULES
+======================================================
+- Ticket operators cannot see customer sensitive data
+- Customers cannot see operator documents
+- Operators cannot access shop partner or restaurant routes
+- Only admin can approve/reject ticket operator KYC
+
+======================================================
+F) NO BREAKING CHANGES
+======================================================
+Do NOT:
+- modify backend schema
+- modify ride/food/parcel modules
+- modify customer/driver/restaurant signup logic
+- change any field names
+
+ONLY extend signup role list + routing.
+
+======================================================
+END OF TASK
+======================================================

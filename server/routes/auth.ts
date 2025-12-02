@@ -72,9 +72,14 @@ router.post("/signup", async (req, res) => {
     const userRole = role || "driver";
 
     // Validate role
-    const validRoles = ["customer", "driver", "restaurant", "admin"];
+    const validRoles = ["customer", "driver", "restaurant", "admin", "ticket_operator"];
     if (!validRoles.includes(userRole)) {
-      return res.status(400).json({ error: "Invalid role. Must be: customer, driver, restaurant, or admin" });
+      return res.status(400).json({ error: "Invalid role. Must be: customer, driver, restaurant, admin, or ticket_operator" });
+    }
+
+    // BD-only role validation
+    if (userRole === "ticket_operator" && countryCode !== "BD") {
+      return res.status(400).json({ error: "Ticket Operator role is only available in Bangladesh" });
     }
 
     // Check if user already exists
@@ -145,6 +150,17 @@ router.post("/signup", async (req, res) => {
       await prisma.adminProfile.create({
         data: {
           userId: user.id,
+        },
+      });
+    } else if (userRole === "ticket_operator") {
+      await prisma.ticketOperator.create({
+        data: {
+          userId: user.id,
+          operatorName: email.split("@")[0],
+          operatorType: "both",
+          officeAddress: "",
+          verificationStatus: "pending",
+          isActive: false,
         },
       });
     }

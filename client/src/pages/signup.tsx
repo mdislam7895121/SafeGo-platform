@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,21 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Car, Package, UtensilsCrossed } from "lucide-react";
+import { Car, Package, UtensilsCrossed, Ticket } from "lucide-react";
+
+interface RoleOption {
+  value: string;
+  label: string;
+  bdOnly?: boolean;
+}
+
+const ALL_ROLES: RoleOption[] = [
+  { value: "customer", label: "Use services (Customer)" },
+  { value: "driver", label: "Drive & deliver (Driver)" },
+  { value: "restaurant", label: "Manage restaurant (Restaurant)" },
+  { value: "ticket_operator", label: "টিকিট ও রেন্টাল অপারেটর (Ticket Operator)", bdOnly: true },
+  { value: "admin", label: "Manage platform (Admin)" },
+];
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -17,6 +31,10 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
   const { signup } = useAuth();
   const { toast } = useToast();
+
+  const availableRoles = useMemo(() => {
+    return ALL_ROLES.filter(r => !r.bdOnly || countryCode === "BD");
+  }, [countryCode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,28 +120,51 @@ export default function Signup() {
 
               <div className="space-y-2">
                 <Label htmlFor="role">I want to</Label>
-                <Select value={role} onValueChange={setRole} required>
+                <Select 
+                  value={role} 
+                  onValueChange={(v) => {
+                    if (availableRoles.find(r => r.value === v)) {
+                      setRole(v);
+                    }
+                  }} 
+                  required
+                >
                   <SelectTrigger id="role" data-testid="select-role">
                     <SelectValue placeholder="Select your role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="customer">Use services (Customer)</SelectItem>
-                    <SelectItem value="driver">Drive & deliver (Driver)</SelectItem>
-                    <SelectItem value="restaurant">Manage restaurant (Restaurant)</SelectItem>
-                    <SelectItem value="admin">Manage platform (Admin)</SelectItem>
+                    {availableRoles.map((r) => (
+                      <SelectItem 
+                        key={r.value} 
+                        value={r.value}
+                        data-testid={`select-role-${r.value}`}
+                      >
+                        {r.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="country">Country</Label>
-                <Select value={countryCode} onValueChange={setCountryCode} required>
+                <Select 
+                  value={countryCode} 
+                  onValueChange={(v) => {
+                    setCountryCode(v);
+                    const bdOnlyRole = ALL_ROLES.find(r => r.value === role && r.bdOnly);
+                    if (bdOnlyRole && v !== "BD") {
+                      setRole("");
+                    }
+                  }} 
+                  required
+                >
                   <SelectTrigger id="country" data-testid="select-country">
                     <SelectValue placeholder="Select your country" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="BD">🇧🇩 Bangladesh</SelectItem>
-                    <SelectItem value="US">🇺🇸 United States</SelectItem>
+                    <SelectItem value="BD" data-testid="select-country-bd">Bangladesh</SelectItem>
+                    <SelectItem value="US" data-testid="select-country-us">United States</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
