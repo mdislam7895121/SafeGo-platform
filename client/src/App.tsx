@@ -298,6 +298,9 @@ import TicketOperatorProfile from "@/pages/ticket-operator/profile";
 
 // Customer BD Tickets & Rentals
 import BDTickets from "@/pages/customer/bd-tickets";
+import BDTicketSearch from "@/pages/bd/ticket-search";
+import BDTicketBooking from "@/pages/bd/ticket-booking";
+import BDBookingSuccess from "@/pages/bd/booking-success";
 
 import NotFound from "@/pages/not-found";
 
@@ -2120,6 +2123,19 @@ function Router() {
         <ProtectedRoute allowedRoles={["customer"]}>
           <BDTickets />
         </ProtectedRoute>
+      </Route>
+      
+      {/* BD Ticket Search & Booking (Public) */}
+      <Route path="/bd/ticket-search">
+        <BDTicketSearch />
+      </Route>
+      
+      <Route path="/bd/ticket-booking">
+        <BDTicketBooking />
+      </Route>
+      
+      <Route path="/bd/booking-success">
+        <BDBookingSuccess />
       </Route>
 
       {/* Ticket Operator Routes (BD only) */}
