@@ -50,14 +50,26 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
     );
   }
 
-  // Handle API errors - 401/403 redirects to login, other errors treat as no profile
+  // Check routes first for error handling
+  const isOnboardingRoute = location.startsWith("/ticket-operator/onboarding");
+  const isSetupRoute = location.startsWith("/ticket-operator/setup");
+  const isSetupOrOnboardingRoute = isOnboardingRoute || isSetupRoute;
+
+  // Handle API errors - 401/403 redirects to login
   if (isError) {
     const errorStatus = (error as any)?.status;
     if (errorStatus === 401 || errorStatus === 403) {
       console.warn("[TicketOperatorGuard] Auth error, redirecting to login");
       return <Redirect to="/login" />;
     }
-    console.warn("[TicketOperatorGuard] API error, treating as no profile:", error);
+    // For non-auth errors: on setup/onboarding routes, show the form
+    // On other routes, show the page (don't kick users out on temporary API errors)
+    console.warn("[TicketOperatorGuard] API error, allowing access:", error);
+    if (allowSetup || isSetupOrOnboardingRoute) {
+      return <>{children}</>;
+    }
+    // For dashboard routes with API errors, still render (let page handle errors)
+    return <>{children}</>;
   }
 
   if (user.countryCode !== "BD") {
@@ -75,9 +87,6 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
   const isApproved = operator?.verificationStatus === "approved";
   const isPending = operator?.verificationStatus === "pending" || operator?.verificationStatus === "under_review";
   const isRejected = operator?.verificationStatus === "rejected";
-  const isOnboardingRoute = location.startsWith("/ticket-operator/onboarding");
-  const isSetupRoute = location.startsWith("/ticket-operator/setup");
-  const isSetupOrOnboardingRoute = isOnboardingRoute || isSetupRoute;
 
   if (hasProfile && isApproved) {
     if (isSetupOrOnboardingRoute) {
