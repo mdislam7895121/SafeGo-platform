@@ -30,14 +30,9 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "group relative overflow-visible cursor-pointer",
-        "rounded-[14px] border border-border/60",
-        "bg-gradient-to-br from-card via-card to-muted/20",
-        "dark:from-card dark:via-card dark:to-muted/10",
-        "shadow-sm hover:shadow-md active:shadow-sm",
-        "transition-all duration-300 ease-out",
-        "hover:-translate-y-1 hover:border-border",
-        "active:translate-y-0 active:scale-[0.98]",
+        "premium-card group relative overflow-visible cursor-pointer",
+        "rounded-[14px]",
+        "bg-card dark:bg-[#1e1e1e]",
         "min-h-[120px] sm:min-h-[110px]",
         className
       )}
@@ -99,14 +94,9 @@ export function ManagementCard({
   return (
     <div
       className={cn(
-        "group relative overflow-visible cursor-pointer",
-        "rounded-[14px] border border-border/60",
-        "bg-gradient-to-br from-card via-card to-muted/20",
-        "dark:from-card dark:via-card dark:to-muted/10",
-        "shadow-sm hover:shadow-md active:shadow-sm",
-        "transition-all duration-300 ease-out",
-        "hover:-translate-y-1 hover:border-border",
-        "active:translate-y-0 active:scale-[0.98]",
+        "premium-card group relative overflow-visible cursor-pointer",
+        "rounded-[14px]",
+        "bg-card dark:bg-[#1e1e1e]",
         "min-h-[140px] sm:min-h-[160px]",
         className
       )}
