@@ -241,16 +241,42 @@ export default function AdminKYC() {
 
       <div className="p-6">
         <Tabs defaultValue="driver" onValueChange={setSelectedRole}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="driver" data-testid="tab-driver">Drivers</TabsTrigger>
-            <TabsTrigger value="customer" data-testid="tab-customer">Customers</TabsTrigger>
-            <TabsTrigger value="restaurant" data-testid="tab-restaurant">Restaurants</TabsTrigger>
-            <TabsTrigger value="shop_partner" data-testid="tab-shop-partner">
-              <Store className="h-4 w-4 mr-1 hidden sm:inline" />
+          <TabsList className="flex flex-wrap gap-3 items-center h-auto p-2 w-full">
+            <TabsTrigger 
+              value="driver" 
+              data-testid="tab-driver"
+              className="min-w-max whitespace-nowrap px-4"
+            >
+              Drivers
+            </TabsTrigger>
+            <TabsTrigger 
+              value="customer" 
+              data-testid="tab-customer"
+              className="min-w-max whitespace-nowrap px-4"
+            >
+              Customers
+            </TabsTrigger>
+            <TabsTrigger 
+              value="restaurant" 
+              data-testid="tab-restaurant"
+              className="min-w-max whitespace-nowrap px-4"
+            >
+              Restaurants
+            </TabsTrigger>
+            <TabsTrigger 
+              value="shop_partner" 
+              data-testid="tab-shop-partner"
+              className="min-w-max whitespace-nowrap px-4"
+            >
+              <Store className="h-4 w-4 mr-1.5" />
               Shop Partners
             </TabsTrigger>
-            <TabsTrigger value="ticket_operator" data-testid="tab-ticket-operator">
-              <Bus className="h-4 w-4 mr-1 hidden sm:inline" />
+            <TabsTrigger 
+              value="ticket_operator" 
+              data-testid="tab-ticket-operator"
+              className="min-w-max whitespace-nowrap px-4"
+            >
+              <Bus className="h-4 w-4 mr-1.5" />
               Ticket Operators
             </TabsTrigger>
           </TabsList>
