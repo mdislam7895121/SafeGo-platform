@@ -24,6 +24,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -37,7 +44,16 @@ import {
   Clock,
   Users,
   Loader2,
+  ArrowLeftRight,
+  ArrowRight,
 } from "lucide-react";
+import {
+  RouteAutocomplete,
+  PopularRoutes,
+  CreateReverseRouteButton,
+} from "@/components/bd/RouteAutocomplete";
+import { getRouteDetails } from "@/lib/bd-routes";
+import { searchBanglaWithFuzzy } from "@/lib/bangla-fuzzy";
 
 const ticketSchema = z.object({
   routeName: z.string().min(2, "রুটের নাম লিখুন"),
@@ -154,12 +170,14 @@ export default function TicketOperatorTickets() {
     setIsDialogOpen(true);
   };
 
-  const filteredTickets = data?.listings?.filter(
-    (ticket) =>
-      ticket.routeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.originCity.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.destinationCity.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTickets = searchQuery.trim()
+    ? searchBanglaWithFuzzy(
+        data?.listings || [],
+        searchQuery,
+        (ticket) => [ticket.routeName, ticket.originCity, ticket.destinationCity],
+        0.4
+      )
+    : data?.listings;
 
   if (isLoading) {
     return (
@@ -213,43 +231,91 @@ export default function TicketOperatorTickets() {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="originCity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>শুরু</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="ঢাকা" 
-                              className="h-12"
-                              data-testid="input-origin"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <div className="space-y-4">
+                    <div className="flex items-end gap-2">
+                      <FormField
+                        control={form.control}
+                        name="originCity"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>শুরু (কোথা থেকে?)</FormLabel>
+                            <FormControl>
+                              <RouteAutocomplete
+                                type="origin"
+                                value={field.value}
+                                onChange={(value) => {
+                                  field.onChange(value);
+                                  const dest = form.getValues("destinationCity");
+                                  if (value && dest) {
+                                    const routeInfo = getRouteDetails(value, dest);
+                                    if (routeInfo) {
+                                      form.setValue("routeName", `${routeInfo.fromBn} - ${routeInfo.toBn}`);
+                                    }
+                                  }
+                                }}
+                                testIdPrefix="ticket"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                    <FormField
-                      control={form.control}
-                      name="destinationCity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>গন্তব্য</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="চট্টগ্রাম" 
-                              className="h-12"
-                              data-testid="input-destination"
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0 mb-0.5"
+                        onClick={() => {
+                          const origin = form.getValues("originCity");
+                          const dest = form.getValues("destinationCity");
+                          form.setValue("originCity", dest);
+                          form.setValue("destinationCity", origin);
+                          if (dest && origin) {
+                            form.setValue("routeName", `${dest} - ${origin}`);
+                          }
+                        }}
+                        data-testid="button-swap-cities"
+                      >
+                        <ArrowLeftRight className="h-4 w-4" />
+                      </Button>
+
+                      <FormField
+                        control={form.control}
+                        name="destinationCity"
+                        render={({ field }) => (
+                          <FormItem className="flex-1">
+                            <FormLabel>গন্তব্য (কোথায় যাবেন?)</FormLabel>
+                            <FormControl>
+                              <RouteAutocomplete
+                                type="destination"
+                                value={field.value}
+                                onChange={(value) => {
+                                  field.onChange(value);
+                                  const origin = form.getValues("originCity");
+                                  if (origin && value) {
+                                    const routeInfo = getRouteDetails(origin, value);
+                                    if (routeInfo) {
+                                      form.setValue("routeName", `${routeInfo.fromBn} - ${routeInfo.toBn}`);
+                                    }
+                                  }
+                                }}
+                                originValue={form.watch("originCity")}
+                                testIdPrefix="ticket"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <PopularRoutes
+                      onSelect={(from, to) => {
+                        form.setValue("originCity", from);
+                        form.setValue("destinationCity", to);
+                        form.setValue("routeName", `${from} - ${to}`);
+                      }}
                     />
                   </div>
 
@@ -434,6 +500,27 @@ export default function TicketOperatorTickets() {
                         }
                         data-testid={`switch-status-${ticket.id}`}
                       />
+                      <Button 
+                        size="icon" 
+                        variant="ghost"
+                        onClick={() => {
+                          form.reset({
+                            routeName: `${ticket.destinationCity} - ${ticket.originCity}`,
+                            vehicleType: ticket.vehicleType as any,
+                            originCity: ticket.destinationCity,
+                            destinationCity: ticket.originCity,
+                            departureTime: ticket.departureTime,
+                            arrivalTime: ticket.arrivalTime,
+                            basePrice: ticket.basePrice,
+                            totalSeats: ticket.totalSeats,
+                          });
+                          setIsDialogOpen(true);
+                        }}
+                        title="রিভার্স রুট তৈরি করুন"
+                        data-testid={`button-reverse-${ticket.id}`}
+                      >
+                        <ArrowLeftRight className="h-4 w-4" />
+                      </Button>
                       <Button 
                         size="icon" 
                         variant="ghost"

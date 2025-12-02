@@ -1,0 +1,97 @@
+# SAFEGO BD TICKET SYSTEM — TWO-WAY ROUTE INTEGRATION
+# THIS IS A BD-ONLY FEATURE. US MARKET MUST NOT BE IMPACTED.
+
+You must now update the BD Ticket & Rental Operator module so that
+EVERY coach route in the BD dataset automatically becomes TWO-WAY.
+
+===================================================
+TASK SUMMARY
+===================================================
+For every existing route:
+
+(Example)
+"ঢাকা → চট্টগ্রাম"
+
+You MUST create the reverse:
+"চট্টগ্রাম → ঢাকা"
+
+Apply this rule to ALL BD routes, including:
+- Dhaka → Chittagong region
+- Dhaka → Sylhet region
+- Dhaka → Rajshahi region
+- Dhaka → Khulna region
+- Dhaka → Barisal region
+- Dhaka → Rangpur region
+- Division-to-division routes
+- All district-to-district high demand routes
+- All tourist routes
+
+===================================================
+DATA STRUCTURE REQUIREMENTS
+===================================================
+Each route object must follow existing structure:
+
+{
+  "from": "CITY_A",
+  "to": "CITY_B",
+  "category": "Intercity" | "District" | "Tourist",
+  "bus_type": ["AC", "Non-AC", "Sleeper"],
+  "duration": "STRING",
+  "active": true
+}
+
+You must AUTO-GENERATE:
+
+{
+  "from": "CITY_B",
+  "to": "CITY_A",
+  "category": SAME,
+  "bus_type": SAME,
+  "duration": SAME,
+  "active": true
+}
+
+DO NOT MODIFY existing route objects.
+ONLY ADD these reverse routes.
+
+===================================================
+AUTO-SUGGEST & SEARCH
+===================================================
+Bangla fuzzy matching must work for both directions:
+Typing “ঢাকা” → show all routes FROM DHAKA  
+Typing “চট্টগ্রাম” → show all routes FROM CHITTAGONG (including return-to-Dhaka)
+
+Examples:
+“চট্রগ্রাম” → “চট্টগ্রাম”
+“সিলট” → “সিলেট”
+
+===================================================
+CUSTOMER APP
+===================================================
+The ticket search screen must show both:
+
+- ঢাকা → চট্টগ্রাম
+- চট্টগ্রাম → ঢাকা
+
+Operator must be able to publish tickets in both directions.
+
+===================================================
+ADMIN ANALYTICS
+===================================================
+All BD expansion analytics must count two-way routes:
+- Total BD bookings
+- Top routes
+- Revenue & commission breakdown
+- Route-wise demand
+
+===================================================
+RESTRICTIONS
+===================================================
+- BD-only (country == "BD")
+- US users must not see any of these
+- DO NOT change or break any backend API or existing SafeGo roles
+- This is 100% frontend + dataset logic only
+
+===================================================
+END OF TASK
+===================================================
