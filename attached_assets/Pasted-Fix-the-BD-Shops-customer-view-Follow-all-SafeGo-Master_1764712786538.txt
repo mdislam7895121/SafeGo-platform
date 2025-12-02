@@ -1,0 +1,96 @@
+Fix the BD Shops customer view. Follow all SafeGo Master Rules.
+
+──────────────────────────────
+PROBLEM
+──────────────────────────────
+On /customer/bd-shops the UI shows:
+“তথ্য লোড করতে সমস্যা হয়েছে”
+
+This means the BD Shops API is failing. Probably:
+- backend returned null/undefined
+- no demo shops seeded
+- role guard preventing customer access
+- wrong country filter
+- incorrect collection path
+- missing try/catch fallback
+
+──────────────────────────────
+REQUIRED FIXES (implement all)
+──────────────────────────────
+
+1. BACKEND FIX — BD SHOPS LIST API
+Create or repair endpoint:
+GET /api/bd/shops/list
+
+Return demo shop list for any BD customer.
+
+Return structure:
+[
+  {
+    id,
+    name,
+    type,          // grocery, electronics, fashion, pharmacy, general_store
+    address,
+    distance_km,
+    rating,
+    coverImage,
+    productsCount
+  }
+]
+
+2. DEMO DATA SEEDING
+Seed minimum 6 shops:
+
+- মুদি স্টোর (general_store)
+- মোবাইল শপ (electronics)
+- ফার্মেসি (pharmacy)
+- ফ্যাশন বুটিক (fashion)
+- সুপার শপ (grocery)
+- বইয়ের দোকান (books)
+
+Each must have:
+- name
+- type
+- address
+- distance_km (1–5 km)
+- rating (4.3–4.9)
+- cover image placeholder
+- at least 6 demo products per shop
+
+3. ROLE GUARD FIX
+Allow BD customers to access BD shops.
+
+Rules:
+- Only BD customers can use BD shops
+- Drivers, restaurants, ticket operators cannot
+- shop_partner can access only their own dashboard, not customer area
+
+Ensure:
+if user.role === "customer" AND user.country === "BD":
+    allow /customer/bd-shops
+
+4. ERROR HANDLING FIX
+If backend returns empty or throws error, UI must NOT break.
+
+UI should fallback to:
+- demoData if exists
+- or “No shops available” screen without error
+
+Remove the current hard “loading error”.
+
+5. PERFORMANCE
+Sort shops by:
+distance_km ASC
+
+6. TESTING STEPS (Agent must run)
+- Login as BD customer
+- Visit /customer/bd-shops
+- Demo shop list must load instantly
+- Each shop must open its products page
+- No error state should appear
+
+──────────────────────────────
+FINAL REQUIREMENT
+──────────────────────────────
+Deliver complete backend + frontend implementation in one go.  
+Do NOT break ride, eats, parcel, rental or ticket flows.

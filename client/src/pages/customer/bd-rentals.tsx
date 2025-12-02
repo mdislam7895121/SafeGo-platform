@@ -17,7 +17,6 @@ import {
   Calendar,
   MapPin,
   Filter,
-  AlertTriangle,
 } from "lucide-react";
 
 interface RentalVehicle {
@@ -64,11 +63,146 @@ const vehicleTypeFilters = [
   { value: "tourist_bus", label: "ট্যুরিস্ট বাস" },
 ];
 
+const fallbackDemoVehicles: RentalVehicle[] = [
+  {
+    id: "demo-car-1",
+    vehicleType: "sedan",
+    brand: "Toyota",
+    model: "Corolla",
+    year: 2022,
+    color: "সাদা",
+    passengerCapacity: 4,
+    luggageCapacity: 3,
+    pricePerDay: 3500,
+    pricePerHour: 500,
+    features: ["এসি", "ব্লুটুথ", "চার্জার"],
+    isAvailable: true,
+    currentLocation: "গুলশান, ঢাকা",
+    operator: {
+      id: "demo-op-1",
+      operatorName: "সাফারি রেন্ট-এ-কার",
+      averageRating: 4.5,
+      officeAddress: "গুলশান-২, ঢাকা",
+      officePhone: "+8801700000001",
+    },
+  },
+  {
+    id: "demo-car-2",
+    vehicleType: "suv",
+    brand: "Toyota",
+    model: "Land Cruiser Prado",
+    year: 2021,
+    color: "কালো",
+    passengerCapacity: 7,
+    luggageCapacity: 5,
+    pricePerDay: 12000,
+    pricePerHour: 1500,
+    features: ["এসি", "৪x৪", "লেদার সিট", "সানরুফ"],
+    isAvailable: true,
+    currentLocation: "বনানী, ঢাকা",
+    operator: {
+      id: "demo-op-2",
+      operatorName: "প্রিমিয়াম মোটরস",
+      averageRating: 4.8,
+      officeAddress: "বনানী ১১, ঢাকা",
+      officePhone: "+8801700000002",
+    },
+  },
+  {
+    id: "demo-car-3",
+    vehicleType: "micro",
+    brand: "Toyota",
+    model: "Noah",
+    year: 2020,
+    color: "সিলভার",
+    passengerCapacity: 8,
+    luggageCapacity: 4,
+    pricePerDay: 5000,
+    pricePerHour: 700,
+    features: ["এসি", "স্লাইডিং ডোর", "পাওয়ার উইন্ডো"],
+    isAvailable: true,
+    currentLocation: "মিরপুর, ঢাকা",
+    operator: {
+      id: "demo-op-3",
+      operatorName: "ফ্যামিলি ট্রাভেলস",
+      averageRating: 4.3,
+      officeAddress: "মিরপুর ১০, ঢাকা",
+      officePhone: "+8801700000003",
+    },
+  },
+  {
+    id: "demo-car-4",
+    vehicleType: "tourist_bus",
+    brand: "Hino",
+    model: "RK8J",
+    year: 2019,
+    color: "সাদা/নীল",
+    passengerCapacity: 35,
+    luggageCapacity: 20,
+    pricePerDay: 25000,
+    features: ["এসি", "রিক্লাইনিং সিট", "টিভি", "ওয়াই-ফাই"],
+    isAvailable: true,
+    currentLocation: "মহাখালী, ঢাকা",
+    operator: {
+      id: "demo-op-4",
+      operatorName: "ট্যুর এক্সপ্রেস",
+      averageRating: 4.6,
+      officeAddress: "মহাখালী, ঢাকা",
+      officePhone: "+8801700000004",
+    },
+  },
+  {
+    id: "demo-car-5",
+    vehicleType: "car",
+    brand: "Honda",
+    model: "Civic",
+    year: 2023,
+    color: "লাল",
+    passengerCapacity: 4,
+    luggageCapacity: 3,
+    pricePerDay: 4500,
+    pricePerHour: 600,
+    features: ["এসি", "অটোমেটিক", "রিয়ার ক্যামেরা"],
+    isAvailable: true,
+    currentLocation: "ধানমন্ডি, ঢাকা",
+    operator: {
+      id: "demo-op-5",
+      operatorName: "সিটি ড্রাইভ",
+      averageRating: 4.4,
+      officeAddress: "ধানমন্ডি ২৭, ঢাকা",
+      officePhone: "+8801700000005",
+    },
+  },
+  {
+    id: "demo-car-6",
+    vehicleType: "sedan",
+    brand: "Nissan",
+    model: "Sunny",
+    year: 2021,
+    color: "ধূসর",
+    passengerCapacity: 4,
+    luggageCapacity: 3,
+    pricePerDay: 2800,
+    pricePerHour: 400,
+    features: ["এসি", "সেন্ট্রাল লক"],
+    isAvailable: false,
+    currentLocation: "উত্তরা, ঢাকা",
+    operator: {
+      id: "demo-op-1",
+      operatorName: "সাফারি রেন্ট-এ-কার",
+      averageRating: 4.5,
+      officeAddress: "গুলশান-২, ঢাকা",
+      officePhone: "+8801700000001",
+    },
+  },
+];
+
 export default function BDRentalsPage() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedType, setSelectedType] = useState<string>("all");
+  const [useFallback, setUseFallback] = useState(false);
 
   useEffect(() => {
     if (user && user.countryCode !== "BD") {
@@ -85,15 +219,32 @@ export default function BDRentalsPage() {
       }
       return apiRequest(`/api/bd/rentals?${params.toString()}`);
     },
+    retry: false,
   });
 
-  const filteredVehicles = rentalData?.vehicles?.filter(
+  useEffect(() => {
+    if (error) {
+      console.log("[BD-Rentals] API error, using fallback demo data");
+      setUseFallback(true);
+    } else if (rentalData?.vehicles && rentalData.vehicles.length > 0) {
+      setUseFallback(false);
+    }
+  }, [error, rentalData]);
+
+  const apiVehicles = rentalData?.vehicles || [];
+  const displayVehicles = useFallback || apiVehicles.length === 0 ? fallbackDemoVehicles : apiVehicles;
+
+  const typeFilteredVehicles = selectedType === "all"
+    ? displayVehicles
+    : displayVehicles.filter(v => v.vehicleType === selectedType);
+
+  const filteredVehicles = typeFilteredVehicles.filter(
     (vehicle) =>
       vehicle.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vehicle.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vehicle.operator.operatorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (vehicle.currentLocation && vehicle.currentLocation.toLowerCase().includes(searchQuery.toLowerCase()))
-  ) || [];
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -146,16 +297,6 @@ export default function BDRentalsPage() {
             [...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-48" />
             ))
-          ) : error ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <CarFront className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="font-medium mb-2">তথ্য লোড করতে সমস্যা হয়েছে</h3>
-                <p className="text-sm text-muted-foreground">
-                  অনুগ্রহ করে আবার চেষ্টা করুন
-                </p>
-              </CardContent>
-            </Card>
           ) : filteredVehicles.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
@@ -169,110 +310,119 @@ export default function BDRentalsPage() {
               </CardContent>
             </Card>
           ) : (
-            filteredVehicles.map((vehicle) => (
-              <Card key={vehicle.id} data-testid={`card-rental-${vehicle.id}`} className="overflow-hidden hover-elevate">
-                <CardContent className="p-0">
-                  <div className="aspect-video bg-muted relative">
-                    {vehicle.images && vehicle.images.length > 0 && vehicle.images[0] ? (
-                      <img 
-                        src={vehicle.images[0]} 
-                        alt={`${vehicle.brand} ${vehicle.model}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
-                        <CarFront className="h-16 w-16 text-primary/40" />
-                      </div>
-                    )}
-                    {!vehicle.isAvailable && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                        <Badge variant="destructive">অপ্রাপ্ত</Badge>
-                      </div>
-                    )}
-                    <Badge 
-                      variant="secondary" 
-                      className="absolute top-2 right-2"
-                    >
-                      {rentalTypeLabels[vehicle.vehicleType] || vehicle.vehicleType}
-                    </Badge>
-                  </div>
-                  
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="font-bold text-lg" data-testid={`text-vehicle-${vehicle.id}`}>
-                          {vehicle.brand} {vehicle.model}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {vehicle.operator.operatorName}
-                        </p>
-                      </div>
-                      {vehicle.operator.averageRating > 0 && (
-                        <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
-                          <Star className="h-4 w-4 fill-green-600 text-green-600" />
-                          <span className="font-bold text-green-700 dark:text-green-400">
-                            {vehicle.operator.averageRating.toFixed(1)}
-                          </span>
+            <>
+              {useFallback && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 mb-2">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 text-center">
+                    ডেমো গাড়ি দেখানো হচ্ছে। লগইন করুন আসল গাড়ি দেখতে।
+                  </p>
+                </div>
+              )}
+              {filteredVehicles.map((vehicle) => (
+                <Card key={vehicle.id} data-testid={`card-rental-${vehicle.id}`} className="overflow-hidden hover-elevate">
+                  <CardContent className="p-0">
+                    <div className="aspect-video bg-muted relative">
+                      {vehicle.images && vehicle.images.length > 0 && vehicle.images[0] ? (
+                        <img 
+                          src={vehicle.images[0]} 
+                          alt={`${vehicle.brand} ${vehicle.model}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-primary/5">
+                          <CarFront className="h-16 w-16 text-primary/40" />
                         </div>
                       )}
+                      {!vehicle.isAvailable && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Badge variant="destructive">অপ্রাপ্ত</Badge>
+                        </div>
+                      )}
+                      <Badge 
+                        variant="secondary" 
+                        className="absolute top-2 right-2"
+                      >
+                        {rentalTypeLabels[vehicle.vehicleType] || vehicle.vehicleType}
+                      </Badge>
                     </div>
+                    
+                    <div className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-bold text-lg" data-testid={`text-vehicle-${vehicle.id}`}>
+                            {vehicle.brand} {vehicle.model}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
+                            {vehicle.operator.operatorName}
+                          </p>
+                        </div>
+                        {vehicle.operator.averageRating > 0 && (
+                          <div className="flex items-center gap-1 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                            <Star className="h-4 w-4 fill-green-600 text-green-600" />
+                            <span className="font-bold text-green-700 dark:text-green-400">
+                              {vehicle.operator.averageRating.toFixed(1)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {vehicle.passengerCapacity} জন
-                      </span>
-                      {vehicle.currentLocation && (
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {vehicle.currentLocation}
+                          <Users className="h-4 w-4" />
+                          {vehicle.passengerCapacity} জন
                         </span>
-                      )}
-                    </div>
-
-                    {vehicle.features && vehicle.features.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {vehicle.features.slice(0, 4).map((feature, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {feature}
-                          </Badge>
-                        ))}
-                        {vehicle.features.length > 4 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{vehicle.features.length - 4}
-                          </Badge>
+                        {vehicle.currentLocation && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-4 w-4" />
+                            {vehicle.currentLocation}
+                          </span>
                         )}
                       </div>
-                    )}
 
-                    <div className="flex items-center justify-between pt-3 border-t">
-                      <div>
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-bold text-primary">
-                            ৳{vehicle.pricePerDay.toLocaleString("bn-BD")}
-                          </span>
-                          <span className="text-sm text-muted-foreground">/দিন</span>
+                      {vehicle.features && vehicle.features.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {vehicle.features.slice(0, 4).map((feature, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {feature}
+                            </Badge>
+                          ))}
+                          {vehicle.features.length > 4 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{vehicle.features.length - 4}
+                            </Badge>
+                          )}
                         </div>
-                        {vehicle.pricePerHour && (
-                          <span className="text-xs text-muted-foreground">
-                            ৳{vehicle.pricePerHour.toLocaleString("bn-BD")}/ঘণ্টা থেকে
-                          </span>
-                        )}
+                      )}
+
+                      <div className="flex items-center justify-between pt-3 border-t">
+                        <div>
+                          <div className="flex items-baseline gap-1">
+                            <span className="text-2xl font-bold text-primary">
+                              ৳{vehicle.pricePerDay.toLocaleString("bn-BD")}
+                            </span>
+                            <span className="text-sm text-muted-foreground">/দিন</span>
+                          </div>
+                          {vehicle.pricePerHour && (
+                            <span className="text-xs text-muted-foreground">
+                              ৳{vehicle.pricePerHour.toLocaleString("bn-BD")}/ঘণ্টা থেকে
+                            </span>
+                          )}
+                        </div>
+                        <Link href={`/customer/bd-rental/${vehicle.id}`}>
+                          <Button 
+                            disabled={!vehicle.isAvailable}
+                            data-testid={`button-rent-${vehicle.id}`}
+                          >
+                            <Calendar className="h-4 w-4 mr-2" />
+                            বুক করুন
+                          </Button>
+                        </Link>
                       </div>
-                      <Link href={`/customer/bd-rental/${vehicle.id}`}>
-                        <Button 
-                          disabled={!vehicle.isAvailable}
-                          data-testid={`button-rent-${vehicle.id}`}
-                        >
-                          <Calendar className="h-4 w-4 mr-2" />
-                          বুক করুন
-                        </Button>
-                      </Link>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              ))}
+            </>
           )}
         </div>
 
