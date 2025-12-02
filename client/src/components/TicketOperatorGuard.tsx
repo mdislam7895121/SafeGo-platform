@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation, Redirect } from "wouter";
-import { Loader2, AlertCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { getPostLoginPath } from "@/lib/roleRedirect";
 
 interface TicketOperatorGuardProps {
@@ -13,9 +11,9 @@ interface TicketOperatorGuardProps {
 
 export function TicketOperatorGuard({ children, allowSetup = false }: TicketOperatorGuardProps) {
   const { user, isLoading: authLoading } = useAuth();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
 
-  const { data: profileData, isLoading: profileLoading, error } = useQuery<{ operator: any }>({
+  const { data: profileData, isLoading: profileLoading } = useQuery<{ operator: any }>({
     queryKey: ["/api/ticket-operator/profile"],
     enabled: !!user && user.countryCode === "BD" && user.role === "ticket_operator",
     retry: false,
@@ -48,46 +46,32 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
   const isApproved = operator?.verificationStatus === "approved";
   const isPending = operator?.verificationStatus === "pending" || operator?.verificationStatus === "under_review";
   const isRejected = operator?.verificationStatus === "rejected";
-  const isSetupRoute = location.startsWith("/ticket-operator/onboarding") || 
-                       location.startsWith("/ticket-operator/setup");
+  const isOnboardingRoute = location.startsWith("/ticket-operator/onboarding");
+  const isSetupRoute = location.startsWith("/ticket-operator/setup");
+  const isSetupOrOnboardingRoute = isOnboardingRoute || isSetupRoute;
 
-  // Approved users should go to dashboard, not onboarding/setup
-  if (hasProfile && isApproved && isSetupRoute) {
-    return <Redirect to="/ticket-operator/dashboard" />;
-  }
-
-  if (!hasProfile && allowSetup) {
+  if (hasProfile && isApproved) {
+    if (isSetupOrOnboardingRoute) {
+      return <Redirect to="/ticket-operator/dashboard" />;
+    }
     return <>{children}</>;
   }
 
-  if (!hasProfile && !isSetupRoute) {
-    return <Redirect to="/ticket-operator/onboarding" />;
-  }
-
-  if (hasProfile && isRejected && !isSetupRoute) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-4">
-        <Card className="max-w-md w-full text-center">
-          <CardContent className="p-8">
-            <AlertCircle className="h-16 w-16 mx-auto text-destructive mb-4" />
-            <h2 className="text-xl font-bold mb-2" data-testid="text-rejected">আবেদন প্রত্যাখ্যাত</h2>
-            <p className="text-muted-foreground mb-4">
-              {operator?.rejectionReason || "আপনার অপারেটর আবেদন প্রত্যাখ্যান করা হয়েছে।"}
-            </p>
-            <Button asChild data-testid="button-resubmit">
-              <a href="/ticket-operator/onboarding">পুনরায় আবেদন করুন</a>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (hasProfile && isPending && !isSetupRoute) {
+  if (hasProfile && (isPending || isRejected)) {
+    if (isSetupOrOnboardingRoute) {
+      return <>{children}</>;
+    }
     return <Redirect to="/ticket-operator/setup" />;
   }
 
-  if (hasProfile && !isApproved && !isPending && !isRejected && !isSetupRoute) {
+  if (allowSetup) {
+    return <>{children}</>;
+  }
+
+  if (!hasProfile) {
+    if (isOnboardingRoute) {
+      return <>{children}</>;
+    }
     return <Redirect to="/ticket-operator/onboarding" />;
   }
 

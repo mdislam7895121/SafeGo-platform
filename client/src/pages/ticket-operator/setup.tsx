@@ -1,8 +1,34 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, Clock, FileCheck, AlertCircle, CheckCircle } from "lucide-react";
-import { Link } from "wouter";
+import { Loader2, Clock, FileCheck, AlertCircle, CheckCircle, LogOut } from "lucide-react";
+import { Link, Redirect } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+
+function SetupHeader() {
+  const { logout } = useAuth();
+  
+  return (
+    <header className="sticky top-0 z-50 border-b bg-card">
+      <div className="flex h-14 items-center justify-between px-4">
+        <div>
+          <h1 className="text-lg font-bold" data-testid="text-header-title">
+            টিকিট ও রেন্টাল অপারেটর
+          </h1>
+          <p className="text-xs text-muted-foreground">SafeGo Bangladesh</p>
+        </div>
+        <Button 
+          variant="ghost" 
+          size="icon"
+          onClick={() => logout()}
+          data-testid="button-logout"
+        >
+          <LogOut className="h-5 w-5" />
+        </Button>
+      </div>
+    </header>
+  );
+}
 
 export default function TicketOperatorSetup() {
   const { data: profileData, isLoading } = useQuery<{ operator: any }>({
@@ -14,10 +40,17 @@ export default function TicketOperatorSetup() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader" />
+      <div className="min-h-screen bg-background">
+        <SetupHeader />
+        <div className="flex items-center justify-center p-4 min-h-[calc(100vh-3.5rem)]">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader" />
+        </div>
       </div>
     );
+  }
+
+  if (status === "approved") {
+    return <Redirect to="/ticket-operator/dashboard" />;
   }
 
   const statusConfig = {
@@ -25,15 +58,15 @@ export default function TicketOperatorSetup() {
       icon: Clock,
       iconColor: "text-orange-600",
       bgColor: "bg-orange-50 dark:bg-orange-950",
-      title: "আবেদন জমা হয়েছে",
-      description: "আপনার আবেদন সফলভাবে জমা হয়েছে। আমরা শীঘ্রই আপনার আবেদন পর্যালোচনা করব।",
+      title: "আবেদন পর্যালোচনাধীন",
+      description: "আপনার আবেদন সফলভাবে জমা হয়েছে। আমরা শীঘ্রই আপনার আবেদন পর্যালোচনা করব। সাধারণত ২৪-৪৮ ঘণ্টার মধ্যে সম্পন্ন হয়।",
     },
     under_review: {
       icon: FileCheck,
       iconColor: "text-blue-600",
       bgColor: "bg-blue-50 dark:bg-blue-950",
       title: "পর্যালোচনা চলছে",
-      description: "আপনার আবেদন এখন পর্যালোচনা করা হচ্ছে। সাধারণত ২৪-৪৮ ঘণ্টার মধ্যে সম্পন্ন হয়।",
+      description: "আপনার আবেদন এখন পর্যালোচনা করা হচ্ছে। অনুগ্রহ করে অপেক্ষা করুন।",
     },
     approved: {
       icon: CheckCircle,
@@ -55,73 +88,76 @@ export default function TicketOperatorSetup() {
   const Icon = config.icon;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-background">
-      <Card className="max-w-md w-full">
-        <CardContent className="p-8 text-center space-y-6">
-          <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center ${config.bgColor}`}>
-            <Icon className={`h-10 w-10 ${config.iconColor}`} />
-          </div>
-
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold" data-testid="text-status-title">
-              {config.title}
-            </h1>
-            <p className="text-muted-foreground" data-testid="text-status-description">
-              {config.description}
-            </p>
-          </div>
-
-          {operator && (
-            <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">অপারেটর নাম:</span>
-                <span className="font-medium" data-testid="text-operator-name">
-                  {operator.operatorName}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ধরণ:</span>
-                <span className="font-medium" data-testid="text-operator-type">
-                  {operator.operatorType === "ticket" ? "টিকিট" : 
-                   operator.operatorType === "rental" ? "রেন্টাল" : "টিকিট ও রেন্টাল"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">স্ট্যাটাস:</span>
-                <span className={`font-medium ${config.iconColor}`} data-testid="text-status">
-                  {status === "pending" ? "অপেক্ষমান" :
-                   status === "under_review" ? "পর্যালোচনা" :
-                   status === "approved" ? "অনুমোদিত" : "প্রত্যাখ্যাত"}
-                </span>
-              </div>
+    <div className="min-h-screen bg-background">
+      <SetupHeader />
+      <div className="flex items-center justify-center p-4 min-h-[calc(100vh-3.5rem)]">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-8 text-center space-y-6">
+            <div className={`mx-auto w-20 h-20 rounded-full flex items-center justify-center ${config.bgColor}`}>
+              <Icon className={`h-10 w-10 ${config.iconColor}`} />
             </div>
-          )}
 
-          <div className="space-y-3">
-            {status === "approved" && (
-              <Link href="/ticket-operator/dashboard">
-                <Button className="w-full h-12 text-base" data-testid="button-go-dashboard">
-                  ড্যাশবোর্ডে যান
-                </Button>
-              </Link>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold" data-testid="text-status-title">
+                {config.title}
+              </h1>
+              <p className="text-muted-foreground" data-testid="text-status-description">
+                {config.description}
+              </p>
+            </div>
+
+            {operator && (
+              <div className="bg-muted/50 rounded-lg p-4 text-left space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">অপারেটর নাম:</span>
+                  <span className="font-medium" data-testid="text-operator-name">
+                    {operator.operatorName}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">ধরণ:</span>
+                  <span className="font-medium" data-testid="text-operator-type">
+                    {operator.operatorType === "ticket" ? "টিকিট" : 
+                     operator.operatorType === "rental" ? "রেন্টাল" : "টিকিট ও রেন্টাল"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">স্ট্যাটাস:</span>
+                  <span className={`font-medium ${config.iconColor}`} data-testid="text-status">
+                    {status === "pending" ? "অপেক্ষমান" :
+                     status === "under_review" ? "পর্যালোচনা" :
+                     status === "approved" ? "অনুমোদিত" : "প্রত্যাখ্যাত"}
+                  </span>
+                </div>
+              </div>
             )}
 
-            {status === "rejected" && (
-              <Link href="/ticket-operator/onboarding">
-                <Button className="w-full h-12 text-base" data-testid="button-resubmit">
-                  পুনরায় আবেদন করুন
+            <div className="space-y-3">
+              {status === "approved" && (
+                <Link href="/ticket-operator/dashboard">
+                  <Button className="w-full h-12 text-base" data-testid="button-go-dashboard">
+                    ড্যাশবোর্ডে যান
+                  </Button>
+                </Link>
+              )}
+
+              {status === "rejected" && (
+                <Link href="/ticket-operator/onboarding">
+                  <Button className="w-full h-12 text-base" data-testid="button-resubmit">
+                    পুনরায় আবেদন করুন
+                  </Button>
+                </Link>
+              )}
+
+              <Link href="/">
+                <Button variant="outline" className="w-full h-12 text-base" data-testid="button-home">
+                  হোমে ফিরে যান
                 </Button>
               </Link>
-            )}
-
-            <Link href="/">
-              <Button variant="outline" className="w-full h-12 text-base" data-testid="button-home">
-                হোমে ফিরে যান
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
