@@ -378,16 +378,18 @@ export default function BDShopDetails() {
                             variant="outline"
                             className="h-8 w-8 rounded-full"
                             onClick={() => updateQuantity(product.id, -1)}
+                            data-testid={`button-decrease-${product.id}`}
                           >
                             <Minus className="h-4 w-4" />
                           </Button>
-                          <span className="w-6 text-center font-bold">
+                          <span className="w-6 text-center font-bold" data-testid={`text-quantity-${product.id}`}>
                             {quantity}
                           </span>
                           <Button
                             size="icon"
                             className="h-8 w-8 rounded-full"
                             onClick={() => updateQuantity(product.id, 1)}
+                            data-testid={`button-increase-${product.id}`}
                           >
                             <Plus className="h-4 w-4" />
                           </Button>
@@ -456,16 +458,18 @@ export default function BDShopDetails() {
                       variant="outline"
                       className="h-8 w-8 rounded-full"
                       onClick={() => updateQuantity(item.productId, -1)}
+                      data-testid={`button-cart-decrease-${item.productId}`}
                     >
                       <Minus className="h-4 w-4" />
                     </Button>
-                    <span className="w-6 text-center font-bold">
+                    <span className="w-6 text-center font-bold" data-testid={`text-cart-quantity-${item.productId}`}>
                       {item.quantity}
                     </span>
                     <Button
                       size="icon"
                       className="h-8 w-8 rounded-full"
                       onClick={() => updateQuantity(item.productId, 1)}
+                      data-testid={`button-cart-increase-${item.productId}`}
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
@@ -474,6 +478,7 @@ export default function BDShopDetails() {
                       variant="ghost"
                       className="h-8 w-8 text-destructive"
                       onClick={() => removeFromCart(item.productId)}
+                      data-testid={`button-cart-remove-${item.productId}`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

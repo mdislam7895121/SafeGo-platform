@@ -37,19 +37,30 @@ import {
   ChevronLeft,
   Check,
   Loader2,
+  ShoppingCart,
+  Smartphone,
+  Sparkles,
+  BookOpen,
+  Pill,
+  Plug,
+  Shirt,
+  UtensilsCrossed,
+  Wrench,
+  Box,
+  LucideIcon,
 } from "lucide-react";
 
-const shopTypes = [
-  { value: "grocery", label: "মুদিখানা", icon: "🛒" },
-  { value: "mobile", label: "মোবাইল দোকান", icon: "📱" },
-  { value: "cosmetics", label: "কসমেটিক্স", icon: "💄" },
-  { value: "stationery", label: "স্টেশনারি", icon: "📚" },
-  { value: "pharmacy", label: "ফার্মেসি", icon: "💊" },
-  { value: "electronics", label: "ইলেকট্রনিক্স", icon: "🔌" },
-  { value: "clothing", label: "পোশাক", icon: "👕" },
-  { value: "food", label: "খাবার", icon: "🍽️" },
-  { value: "hardware", label: "হার্ডওয়্যার", icon: "🔧" },
-  { value: "other", label: "অন্যান্য", icon: "📦" },
+const shopTypes: { value: string; label: string; icon: LucideIcon }[] = [
+  { value: "grocery", label: "মুদিখানা", icon: ShoppingCart },
+  { value: "mobile", label: "মোবাইল দোকান", icon: Smartphone },
+  { value: "cosmetics", label: "কসমেটিক্স", icon: Sparkles },
+  { value: "stationery", label: "স্টেশনারি", icon: BookOpen },
+  { value: "pharmacy", label: "ফার্মেসি", icon: Pill },
+  { value: "electronics", label: "ইলেকট্রনিক্স", icon: Plug },
+  { value: "clothing", label: "পোশাক", icon: Shirt },
+  { value: "food", label: "খাবার", icon: UtensilsCrossed },
+  { value: "hardware", label: "হার্ডওয়্যার", icon: Wrench },
+  { value: "other", label: "অন্যান্য", icon: Box },
 ];
 
 const productCategories = [
@@ -314,7 +325,7 @@ export default function ShopPartnerOnboarding() {
                               onClick={() => field.onChange(type.value)}
                               data-testid={`button-type-${type.value}`}
                             >
-                              <span className="text-xl">{type.icon}</span>
+                              <type.icon className="h-5 w-5" />
                               {type.label}
                             </Button>
                           ))}
