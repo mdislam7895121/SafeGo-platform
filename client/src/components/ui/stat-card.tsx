@@ -30,14 +30,37 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "premium-card group relative overflow-visible cursor-pointer",
-        "rounded-[14px]",
+        // Base card container with glow effects
+        "group relative overflow-visible cursor-pointer",
+        "rounded-xl bg-white dark:bg-[#1e1e1e]",
         "min-h-[120px] sm:min-h-[110px]",
+        // Base shadow
+        "shadow-[0_12px_28px_rgba(0,0,0,0.08)]",
+        "dark:shadow-[0_16px_35px_rgba(0,0,0,0.55)]",
+        // Rim-light glow via before pseudo-element (MUST have content-[''] to render)
+        "before:content-[''] before:absolute before:inset-0 before:rounded-xl before:pointer-events-none",
+        "before:shadow-[0_0_6px_rgba(255,255,255,0.32)]",
+        "dark:before:shadow-[0_0_5px_rgba(255,255,255,0.14)]",
+        // Under-glow via after pseudo-element (MUST have content-[''] to render)
+        "after:content-[''] after:absolute after:bottom-[-12px] after:left-1/2 after:-translate-x-1/2",
+        "after:w-[80%] after:h-[20px] after:rounded-full",
+        "after:blur-xl after:pointer-events-none",
+        "after:bg-[rgba(255,255,255,0.25)]",
+        "dark:after:bg-[rgba(255,255,255,0.08)]",
+        // Hover effects
+        "transition-all duration-300",
+        "hover:translate-y-[-4px]",
+        "hover:shadow-[0_22px_42px_rgba(0,0,0,0.14)]",
+        "dark:hover:shadow-[0_22px_42px_rgba(0,0,0,0.60)]",
+        "hover:before:shadow-[0_0_10px_rgba(255,255,255,0.45)]",
+        "dark:hover:before:shadow-[0_0_8px_rgba(255,255,255,0.22)]",
+        "hover:after:bg-[rgba(255,255,255,0.35)]",
+        "dark:hover:after:bg-[rgba(255,255,255,0.12)]",
         className
       )}
       data-testid={testId}
     >
-      <div className="p-4 sm:p-5">
+      <div className="relative z-10 p-4 sm:p-5">
         <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
           <div 
             className={cn(
@@ -93,14 +116,37 @@ export function ManagementCard({
   return (
     <div
       className={cn(
-        "premium-card group relative overflow-visible cursor-pointer",
-        "rounded-[14px]",
+        // Base card container with glow effects
+        "group relative overflow-visible cursor-pointer",
+        "rounded-xl bg-white dark:bg-[#1e1e1e]",
         "min-h-[140px] sm:min-h-[160px]",
+        // Base shadow
+        "shadow-[0_12px_28px_rgba(0,0,0,0.08)]",
+        "dark:shadow-[0_16px_35px_rgba(0,0,0,0.55)]",
+        // Rim-light glow via before pseudo-element (MUST have content-[''] to render)
+        "before:content-[''] before:absolute before:inset-0 before:rounded-xl before:pointer-events-none",
+        "before:shadow-[0_0_6px_rgba(255,255,255,0.32)]",
+        "dark:before:shadow-[0_0_5px_rgba(255,255,255,0.14)]",
+        // Under-glow via after pseudo-element (MUST have content-[''] to render)
+        "after:content-[''] after:absolute after:bottom-[-12px] after:left-1/2 after:-translate-x-1/2",
+        "after:w-[80%] after:h-[20px] after:rounded-full",
+        "after:blur-xl after:pointer-events-none",
+        "after:bg-[rgba(255,255,255,0.25)]",
+        "dark:after:bg-[rgba(255,255,255,0.08)]",
+        // Hover effects
+        "transition-all duration-300",
+        "hover:translate-y-[-4px]",
+        "hover:shadow-[0_22px_42px_rgba(0,0,0,0.14)]",
+        "dark:hover:shadow-[0_22px_42px_rgba(0,0,0,0.60)]",
+        "hover:before:shadow-[0_0_10px_rgba(255,255,255,0.45)]",
+        "dark:hover:before:shadow-[0_0_8px_rgba(255,255,255,0.22)]",
+        "hover:after:bg-[rgba(255,255,255,0.35)]",
+        "dark:hover:after:bg-[rgba(255,255,255,0.12)]",
         className
       )}
       data-testid={testId}
     >
-      <div className="p-4 sm:p-6">
+      <div className="relative z-10 p-4 sm:p-6">
         <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
           <div 
             className={cn(
