@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { Link } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,11 +14,6 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
-
-  const handleSignupClick = () => {
-    setLocation("/signup");
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,14 +105,13 @@ export default function Login() {
 
             <div className="mt-6 text-center text-sm py-3">
               <span>Don't have an account?</span>{" "}
-              <button
-                type="button"
-                onClick={handleSignupClick}
-                className="text-primary hover:underline font-medium inline-block py-2 px-2 min-h-[44px] touch-manipulation cursor-pointer bg-transparent border-none"
+              <Link
+                href="/signup"
+                className="text-primary hover:underline font-medium inline-block py-2 px-2 min-h-[44px] touch-manipulation cursor-pointer"
                 data-testid="link-signup"
               >
                 Sign up
-              </button>
+              </Link>
             </div>
           </CardContent>
         </Card>

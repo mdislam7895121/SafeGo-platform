@@ -76,18 +76,23 @@ function validateEmailFormat(email: string): boolean {
 
 // ====================================================
 // POST /api/auth/signup
-// Create new BD customer user account (public signup)
-// This endpoint ONLY creates customer accounts with country=BD.
+// Create new customer user account (public signup)
+// This endpoint ONLY creates customer accounts.
 // Partner roles (driver, restaurant, shop_partner, ticket_operator) 
 // require separate onboarding flows after logging in as a customer.
 // 
-// SECURITY: Ignores any role/countryCode from client - enforces:
-//   role = "customer"
-//   countryCode = "BD"
+// SECURITY:
+//   - role is always "customer" (ignored from client)
+//   - countryCode must be "BD" or "US" (validated)
+//   - trustLevel is always "customer_basic" (set server-side)
 // ====================================================
 router.post("/signup", async (req, res) => {
   try {
-    const { email, password, confirmPassword, fullName } = req.body;
+    const { email, password, confirmPassword, fullName, countryCode: clientCountry } = req.body;
+    
+    // Validate and default countryCode (only BD or US allowed)
+    const validCountries = ["BD", "US"];
+    const countryCode = validCountries.includes(clientCountry) ? clientCountry : "BD";
 
     // Basic field validation with Bangla error messages
     if (!email || !password) {
@@ -148,14 +153,15 @@ router.post("/signup", async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user as BD customer (public signup enforces these values server-side)
-    // SECURITY: role and countryCode are NEVER taken from client input
+    // Create user as customer (public signup enforces role server-side)
+    // SECURITY: role is always "customer", countryCode is validated above
+    // trustLevel="customer_basic" is tracked in audit logs (not a DB column)
     const user = await prisma.user.create({
       data: {
         email,
         passwordHash,
         role: "customer",
-        countryCode: "BD",
+        countryCode,
       },
     });
 
@@ -181,7 +187,8 @@ router.post("/signup", async (req, res) => {
       description: `Customer signup success for ${user.email}`,
       metadata: { 
         event: "CUSTOMER_SIGNUP_SUCCESS",
-        country: "BD"
+        country: countryCode,
+        trustLevel: "customer_basic"
       },
       success: true,
     });

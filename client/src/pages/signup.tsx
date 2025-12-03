@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
 import { Car, Package, UtensilsCrossed, Loader2, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
@@ -32,6 +33,7 @@ export default function Signup() {
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [countryCode, setCountryCode] = useState<"BD" | "US">("BD");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,12 +43,7 @@ export default function Signup() {
 
   const passwordStrength = validatePassword(password);
 
-  useEffect(() => {
-    if (!authLoading && user) {
-      setLocation(getPostLoginPath(user));
-    }
-  }, [user, authLoading, setLocation]);
-
+  // Show loading while auth is initializing
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -55,6 +52,7 @@ export default function Signup() {
     );
   }
 
+  // If already logged in, redirect to appropriate page using Redirect component
   if (user) {
     return <Redirect to={getPostLoginPath(user)} />;
   }
@@ -64,8 +62,8 @@ export default function Signup() {
 
     if (!email || !password || !confirmPassword) {
       toast({
-        title: "তথ্য অসম্পূর্ণ",
-        description: "সকল প্রয়োজনীয় ফিল্ড পূরণ করুন",
+        title: "Missing Information",
+        description: "Please fill in all required fields",
         variant: "destructive",
       });
       return;
@@ -74,8 +72,8 @@ export default function Signup() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       toast({
-        title: "ভুল ইমেইল",
-        description: "সঠিক ইমেইল ঠিকানা দিন",
+        title: "Invalid Email",
+        description: "Please enter a valid email address",
         variant: "destructive",
       });
       return;
@@ -83,8 +81,8 @@ export default function Signup() {
 
     if (!passwordStrength.isValid) {
       toast({
-        title: "দুর্বল পাসওয়ার্ড",
-        description: "পাসওয়ার্ড কমপক্ষে ৮ অক্ষর, একটি বড় হাতের অক্ষর, একটি ছোট হাতের অক্ষর এবং একটি সংখ্যা থাকতে হবে",
+        title: "Weak Password",
+        description: "Password must have at least 8 characters, one uppercase letter, one lowercase letter, and one number",
         variant: "destructive",
       });
       return;
@@ -92,8 +90,8 @@ export default function Signup() {
 
     if (password !== confirmPassword) {
       toast({
-        title: "পাসওয়ার্ড মিলছে না",
-        description: "উভয় পাসওয়ার্ড একই হতে হবে",
+        title: "Passwords Don't Match",
+        description: "Both password fields must be the same",
         variant: "destructive",
       });
       return;
@@ -111,6 +109,9 @@ export default function Signup() {
           password,
           confirmPassword,
           fullName: fullName.trim() || undefined,
+          role: "customer",
+          countryCode,
+          trustLevel: "customer_basic",
         }),
       });
 
@@ -118,10 +119,10 @@ export default function Signup() {
         const error = await response.json();
         
         if (error.code === "EMAIL_IN_USE") {
-          throw new Error(error.message || "এই ইমেইল দিয়ে আগে থেকেই একাউন্ট আছে।");
+          throw new Error("An account with this email already exists");
         }
         
-        throw new Error(error.message || error.error || "সাইনআপ ব্যর্থ হয়েছে");
+        throw new Error(error.error || error.message || "Signup failed");
       }
 
       const loginResponse = await fetch("/api/auth/login", {
@@ -136,8 +137,8 @@ export default function Signup() {
 
       if (!loginResponse.ok) {
         toast({
-          title: "অ্যাকাউন্ট তৈরি হয়েছে!",
-          description: "অ্যাকাউন্ট তৈরি হয়েছে। অনুগ্রহ করে সাইন ইন করুন।",
+          title: "Account Created!",
+          description: "Your account has been created. Please sign in.",
         });
         setLocation("/login");
         return;
@@ -149,8 +150,8 @@ export default function Signup() {
       localStorage.setItem("safego_user", JSON.stringify(loggedInUser));
 
       toast({
-        title: "স্বাগতম!",
-        description: "SafeGo-তে স্বাগতম। আপনার অ্যাকাউন্ট তৈরি হয়েছে।",
+        title: "Welcome!",
+        description: "Welcome to SafeGo. Your account has been created.",
       });
 
       const redirectPath = getPostLoginPath(loggedInUser);
@@ -158,7 +159,7 @@ export default function Signup() {
 
     } catch (error: any) {
       toast({
-        title: "সাইনআপ ব্যর্থ হয়েছে",
+        title: "Signup Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -180,25 +181,25 @@ export default function Signup() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight">SafeGo</h1>
           <p className="text-muted-foreground mt-2">
-            গ্লোবাল সুপার-অ্যাপ প্ল্যাটফর্মে যোগ দিন
+            Join the global super-app platform
           </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>অ্যাকাউন্ট তৈরি করুন</CardTitle>
+            <CardTitle>Create Account</CardTitle>
             <CardDescription>
-              রাইড, ফুড ও ডেলিভারি সেবা ব্যবহার করতে সাইন আপ করুন
+              Sign up for ride, food, and delivery services
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">ইমেইল *</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="আপনার ইমেইল"
+                  placeholder="Your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -208,11 +209,11 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="fullName">পুরো নাম (ঐচ্ছিক)</Label>
+                <Label htmlFor="fullName">Full Name (Optional)</Label>
                 <Input
                   id="fullName"
                   type="text"
-                  placeholder="আপনার পুরো নাম"
+                  placeholder="Your full name"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="h-12"
@@ -221,12 +222,25 @@ export default function Signup() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">পাসওয়ার্ড *</Label>
+                <Label htmlFor="country">Country *</Label>
+                <Select value={countryCode} onValueChange={(v) => setCountryCode(v as "BD" | "US")}>
+                  <SelectTrigger className="h-12" data-testid="select-country">
+                    <SelectValue placeholder="Select your country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BD">Bangladesh</SelectItem>
+                    <SelectItem value="US">United States</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password *</Label>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="শক্তিশালী পাসওয়ার্ড তৈরি করুন"
+                    placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -248,31 +262,31 @@ export default function Signup() {
                   <div className="space-y-1 text-xs">
                     <div className={`flex items-center gap-1 ${passwordStrength.hasMinLength ? "text-green-600" : "text-muted-foreground"}`}>
                       {passwordStrength.hasMinLength ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                      কমপক্ষে ৮ অক্ষর
+                      At least 8 characters
                     </div>
                     <div className={`flex items-center gap-1 ${passwordStrength.hasUppercase ? "text-green-600" : "text-muted-foreground"}`}>
                       {passwordStrength.hasUppercase ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                      একটি বড় হাতের অক্ষর (A-Z)
+                      One uppercase letter (A-Z)
                     </div>
                     <div className={`flex items-center gap-1 ${passwordStrength.hasLowercase ? "text-green-600" : "text-muted-foreground"}`}>
                       {passwordStrength.hasLowercase ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                      একটি ছোট হাতের অক্ষর (a-z)
+                      One lowercase letter (a-z)
                     </div>
                     <div className={`flex items-center gap-1 ${passwordStrength.hasNumber ? "text-green-600" : "text-muted-foreground"}`}>
                       {passwordStrength.hasNumber ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
-                      একটি সংখ্যা (0-9)
+                      One number (0-9)
                     </div>
                   </div>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">পাসওয়ার্ড নিশ্চিত করুন *</Label>
+                <Label htmlFor="confirmPassword">Confirm Password *</Label>
                 <div className="relative">
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
-                    placeholder="পাসওয়ার্ড পুনরায় লিখুন"
+                    placeholder="Re-enter your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -293,13 +307,13 @@ export default function Signup() {
                 {confirmPassword && password !== confirmPassword && (
                   <p className="text-xs text-red-500 flex items-center gap-1">
                     <XCircle className="h-3 w-3" />
-                    পাসওয়ার্ড মিলছে না
+                    Passwords do not match
                   </p>
                 )}
                 {confirmPassword && password === confirmPassword && confirmPassword.length > 0 && (
                   <p className="text-xs text-green-600 flex items-center gap-1">
                     <CheckCircle2 className="h-3 w-3" />
-                    পাসওয়ার্ড মিলেছে
+                    Passwords match
                   </p>
                 )}
               </div>
@@ -313,22 +327,22 @@ export default function Signup() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    অ্যাকাউন্ট তৈরি হচ্ছে...
+                    Creating account...
                   </>
                 ) : (
-                  "অ্যাকাউন্ট তৈরি করুন"
+                  "Create Account"
                 )}
               </Button>
 
               <p className="text-xs text-center text-muted-foreground">
-                সাইন আপ করে আপনি SafeGo-এর শর্তাবলী মেনে নিচ্ছেন।
+                By signing up, you agree to SafeGo's terms of service.
               </p>
             </form>
 
             <div className="mt-6 text-center text-sm">
-              ইতিমধ্যে অ্যাকাউন্ট আছে?{" "}
+              Already have an account?{" "}
               <Link href="/login" className="text-primary hover:underline font-medium" data-testid="link-login">
-                সাইন ইন করুন
+                Sign in
               </Link>
             </div>
           </CardContent>
