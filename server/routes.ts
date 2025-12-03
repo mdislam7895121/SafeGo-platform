@@ -127,6 +127,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public Eats endpoint for restaurant browsing (no auth required)
   app.use("/api/eats", eatsRoutes);
   
+  // Welcome message endpoint (authenticated - needs user role)
+  const { SettingsService } = await import("./utils/settings");
+  app.get("/api/welcome-message", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Get user's role
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+      });
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Get welcome message settings
+      const welcomeSettings = await SettingsService.getSection("welcomeMessage");
+      
+      // Map user role to welcome message role key
+      type WelcomeRole = "customer" | "driver" | "restaurant" | "shop_partner" | "ticket_operator" | "admin";
+      const roleMap: Record<string, WelcomeRole> = {
+        "customer": "customer",
+        "driver": "driver",
+        "restaurant": "restaurant",
+        "shop_partner": "shop_partner",
+        "ticket_operator": "ticket_operator",
+        "admin": "admin",
+        "super_admin": "admin",
+        // Pending roles map to their target role
+        "pending_driver": "driver",
+        "pending_restaurant": "restaurant",
+        "pending_shop_partner": "shop_partner",
+        "pending_ticket_operator": "ticket_operator",
+      };
+      
+      const roleKey = roleMap[user.role] || "customer";
+      const welcomeMessage = welcomeSettings[roleKey];
+      
+      if (!welcomeMessage || !welcomeMessage.enabled) {
+        return res.json({ enabled: false });
+      }
+      
+      res.json({
+        enabled: true,
+        title: welcomeMessage.title,
+        message: welcomeMessage.message,
+        ctaText: welcomeMessage.ctaText,
+        ctaHref: welcomeMessage.ctaHref,
+        variant: welcomeMessage.variant,
+        role: roleKey,
+      });
+    } catch (error) {
+      console.error("Get welcome message error:", error);
+      res.status(500).json({ error: "Failed to fetch welcome message" });
+    }
+  });
+  
   // D2: Public Driver Profile endpoint - uses driver_profile_id
   app.get("/api/driver/public-profile/:driver_profile_id", async (req, res) => {
     try {

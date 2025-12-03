@@ -6853,7 +6853,7 @@ router.put("/settings/:sectionKey", checkPermission(Permission.EDIT_SETTINGS), a
     if (!SettingsService.isValidSettingKey(sectionKey)) {
       return res.status(400).json({ 
         error: "Invalid section key",
-        validKeys: ["general", "kyc", "commission", "settlement", "notifications", "security"],
+        validKeys: ["general", "kyc", "commission", "settlement", "notifications", "security", "support", "welcomeMessage"],
       });
     }
 
