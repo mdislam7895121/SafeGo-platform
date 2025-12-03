@@ -7337,6 +7337,17 @@ enum TicketOperatorVerificationStatus {
   suspended
 }
 
+// Partner Status for staged onboarding (BD Partners)
+// Flow: draft → kyc_pending → setup_incomplete → ready_for_review → live | rejected
+enum PartnerStatus {
+  draft                   // Stage 1: Basic info submitted
+  kyc_pending             // Stage 2: KYC submitted, awaiting admin review
+  setup_incomplete        // KYC approved but setup not complete
+  ready_for_review        // Setup complete, awaiting final admin review
+  live                    // Approved and visible to customers
+  rejected                // Rejected by admin (needs resubmission)
+}
+
 enum RentalVehicleType {
   car
   micro
@@ -7393,9 +7404,17 @@ model ShopPartner {
   emergencyContactPhone   String?
   emergencyContactRelation String?
   
-  // Verification
+  // Stage 1 Light Form Fields
+  cityOrArea              String?                       // City/area for quick start
+  contactPhone            String?                       // Contact phone for partner
+  
+  // Verification & Partner Status
   verificationStatus      ShopPartnerVerificationStatus @default(pending)
+  partnerStatus           PartnerStatus                 @default(draft) // Staged onboarding status
   rejectionReason         String?
+  kycSubmittedAt          DateTime?                     // When KYC was submitted
+  kycApprovedAt           DateTime?                     // When KYC was approved
+  setupCompletedAt        DateTime?                     // When setup was completed
   verifiedAt              DateTime?
   verifiedBy              String?                       // Admin who verified
   
@@ -7431,6 +7450,7 @@ model ShopPartner {
   
   @@index([userId])
   @@index([verificationStatus])
+  @@index([partnerStatus])
   @@index([shopType])
   @@index([isActive])
   @@index([countryCode])
@@ -7636,9 +7656,17 @@ model TicketOperator {
   emergencyContactPhone   String?
   emergencyContactRelation String?
   
-  // Verification
+  // Stage 1 Light Form Fields
+  cityOrArea              String?                       // City/area for quick start
+  contactPhone            String?                       // Contact phone for partner
+  
+  // Verification & Partner Status
   verificationStatus      TicketOperatorVerificationStatus @default(pending)
+  partnerStatus           PartnerStatus                 @default(draft) // Staged onboarding status
   rejectionReason         String?
+  kycSubmittedAt          DateTime?                     // When KYC was submitted
+  kycApprovedAt           DateTime?                     // When KYC was approved
+  setupCompletedAt        DateTime?                     // When setup was completed
   verifiedAt              DateTime?
   verifiedBy              String?
   
@@ -7671,6 +7699,7 @@ model TicketOperator {
   
   @@index([userId])
   @@index([verificationStatus])
+  @@index([partnerStatus])
   @@index([operatorType])
   @@index([isActive])
   @@index([countryCode])

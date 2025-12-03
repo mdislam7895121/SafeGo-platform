@@ -1,0 +1,439 @@
+You are the SafeGo super-app development agent.  
+You MUST implement features in a single, production-ready pass with NO partial work.  
+Follow all SafeGo Master Rules below.
+
+====================================================
+[1. SAFEGO MASTER RULES – DO NOT BREAK]
+====================================================
+
+1. Roles (global, immutable)
+- customer
+- driver
+- restaurant
+- admin
+
+Bangladesh-only partner roles (additive, not replacing core roles):
+- shop_partner   (BD E-Shop / local stores)
+- ticket_operator (BD tickets + rentals)
+
+Each role MUST have:
+- its own signup / upgrade flow
+- its own KYC
+- its own dashboard
+- its own permissions / routes
+
+No role may see another role’s sensitive data.  
+No user may “jump” into a partner role without following the correct onboarding.
+
+2. Services (must always work)
+- Ride-hailing
+- Food delivery (Eats)
+- Parcel delivery
+
+Bangladesh expansions (must NOT break core services):
+- BD Shops (E-shop on top of Eats/deliveries)
+- BD Tickets (bus/launch/launch demo)
+- BD Rentals (car/micro/minibus etc. via ticket_operator)
+
+3. Country-specific KYC
+Bangladesh (BD) – for ANY partner-type role (driver, restaurant, shop_partner, ticket_operator):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image
+- nid_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status (pending/approved/rejected)
+- is_verified (boolean)
+
+United States (US):
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- Drivers only: driver_license_number, driver_license_image, driver_license_expiry, optional ssn_last4
+- verification_status, is_verified
+
+US users CANNOT see or use BD-only partner flows.  
+BD partner roles MUST obey BD KYC.
+
+4. Admin panel – mandatory abilities
+Admin must be able to:
+- view and filter by role: customer, driver, restaurant, shop_partner, ticket_operator
+- approve/reject KYC for all partner roles
+- see `verification_status`, `is_verified`, `partner_status`, `rejection_reason`
+- manage pricing, fees, commissions for rides/food/shops/tickets/rentals
+- block/unblock users and partners
+- inspect negative balances for driver_wallet and restaurant_wallet and shop_partner_wallet
+- see BD partner onboarding funnel (draft, kyc_pending, ready_for_review, live, rejected)
+
+5. Collections (must exist; only additive changes allowed)
+Core:
+- rides
+- food_orders
+- deliveries
+
+BD expansions (already or to be present):
+- shops (BD shops)
+- shop_products
+- shop_orders
+- tickets
+- rentals
+- partner_profiles (or equivalent structure)
+- kyc_requests
+- payouts
+- commissions
+- audit_logs
+
+You must NOT rename or remove existing fields, collections, routes.  
+You may ONLY add fields/endpoints in a backward-compatible way.
+
+6. Commission & payout rules (unchanged)
+- If customer pays CASH for ride/parcel:
+  - Driver receives full cash
+  - SafeGo commission becomes negative balance in driver_wallet_balance
+  - Driver must settle weekly; admin can mark settled
+- If customer pays CASH for food/shops:
+  - Restaurant/shop_partner gets all cash
+  - SafeGo commission becomes negative in restaurant_wallet or shop_partner_wallet
+- If payment is online:
+  - SafeGo automatically keeps commission and partner wallet reflects net
+- Admin can settle and mark balances as paid.
+
+7. Security rules & phases (must EXPLICITLY apply)
+Use these phases:
+
+- S1: Auth & RBAC
+  - All partner APIs require authenticated user.
+  - Roles enforced server-side (from JWT/session, NOT from request body).
+- S2: Validation & Sanitization
+  - All onboarding payloads are validated with schemas.
+  - Reject unknown/malformed values.
+- S3: Isolation
+  - Partner sees only their own shop/ticket data.
+  - Admin is the only role with cross-tenant visibility.
+- S4: Logging & Audit
+  - Key actions (role upgrade, KYC submit, approval/rejection) logged in audit_logs.
+- S5: Abuse Protection
+  - Rate-limit OTP and onboarding submissions.
+  - Prevent brute-force or enumeration of partner profiles.
+
+8. Status flows (must stay valid)
+Rides:
+- requested → searching_driver → accepted → driver_arriving → in_progress → completed OR cancelled_x
+
+Food:
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+Parcel:
+- requested → searching_driver → accepted → picked_up → on_the_way → delivered OR cancelled_x
+
+Shop orders (BD shops):
+- placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered OR cancelled_x
+
+Do NOT remove or change these statuses. You may only add metadata and UI around them.
+
+9. Onboarding – global rule
+- No partner/delivery/shop/ticket account is LIVE until:
+  - onboarding completed
+  - KYC submitted and approved
+- Access to dashboards must be controlled by clear statuses (draft, kyc_pending, etc.).
+
+10. Notifications (must remain or be extended)
+- Partner onboarding:
+  - “KYC submitted”
+  - “KYC approved/rejected”
+- Customer:
+  - order/ticket/rental status updates
+- Admin:
+  - new KYC waiting for approval
+  - risk alerts for suspicious partner behaviour
+
+====================================================
+[2. TASK: SIMPLE BUT HIGHLY SECURE BD PARTNER ONBOARDING ENGINE]
+====================================================
+
+GOAL:
+Make BD partner onboarding (shop_partner and ticket_operator) EASY for users but HIGHLY SECURE in the backend by:
+
+- Using a unified onboarding engine with clear statuses
+- Splitting the flow into light, understandable steps
+- Enforcing KYC before partner becomes LIVE
+- Keeping everything backward-compatible
+
+This replaces the current “all fields required at once” approach with a staged system, but without weakening security.
+
+====================================================
+2.1. New Partner Status Model (Backend)
+====================================================
+
+Implement a shared partner status model for BD roles:
+
+- `partner_status` enum (on a partner_profile / user_partner table):
+  - "draft"                // Step 1 basic info done
+  - "kyc_pending"          // Full KYC submitted, waiting admin review
+  - "setup_incomplete"     // KYC approved but shop/ticket setup not fully ready
+  - "ready_for_review"     // Merchant has completed setup, waiting final admin review
+  - "live"                 // Admin approved and visible to customers
+  - "rejected"             // Admin rejected (needs more info)
+- Do NOT remove any existing status fields; only ADD this if needed.
+
+Additionally, add a “trust tier” concept on user if not present:
+- `trust_level` enum:
+  - "guest" (no login, or not relevant for this task)
+  - "customer_basic"
+  - "customer_verified"
+
+BD partners MUST be at least `customer_basic` when upgrading to a partner.  
+Implement this as an additive field only; do NOT break existing login.
+
+====================================================
+2.2. Flows – Shop Partner & Ticket Operator
+====================================================
+
+Both roles use the SAME onboarding engine and UI pattern.
+
+ENTRY POINT:
+- From a logged-in BD customer:
+  - “Become a Shop Partner”
+  - “Become a Ticket & Rental Operator”
+
+When clicked:
+- Create or load a `partner_profile` for this user with:
+  - role: "shop_partner" OR "ticket_operator"
+  - country: "BD"
+  - partner_status: "draft" (if new)
+
+====================================================
+2.3. Stage 1 – EASY START (Draft creation)
+====================================================
+
+STEP 1 (VERY LIGHT FORM):
+Mandatory fields:
+- business_name (e.g. shop name, ticket counter name)
+- business_type (enum; for shop_partner: grocery/electronics/…; for ticket_operator: bus/launch/office_etc)
+- city_or_area (short text)
+- contact_phone (default to user’s phone but editable)
+
+Validation:
+- All required, but extremely short and simple.
+- If valid:
+  - Save to partner_profile
+  - Set partner_status = "draft"
+  - Redirect to a SIMPLE partner dashboard with a clear checklist.
+
+Partner Dashboard (Draft):
+- Top banner (Bangla):
+  - “অভিনন্দন! আপনি SafeGo পার্টনার হওয়ার পথে প্রথম ধাপ শেষ করেছেন। এখন বাকিগুলো ধীরে ধীরে সম্পন্ন করুন।”
+- Checklist items:
+  1. মালিকের তথ্য ও এনআইডি (KYC)
+  2. ঠিকানা ও জরুরি যোগাযোগ
+  3. দোকান/কাউন্টার সেটআপ (লোগো, ব্যনার, প্রোডাক্ট/রুট)
+- Each checklist item links to separate forms.
+
+Security:
+- Stage 1 alone NEVER makes the partner visible to customers.
+- No change in permissions yet; only partner dashboard.
+
+====================================================
+2.4. Stage 2 – Full BD KYC (High security)
+====================================================
+
+Create a unified KYC form for BD partners with these mandatory fields:
+- owner_name
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image
+- nid_back_image
+- emergency_contact_name
+- emergency_contact_phone
+
+Validation:
+- All must be non-empty (except where explicitly optional).
+- Date_of_birth must be valid date.
+- nid_number must match basic numeric pattern.
+- Images must pass file-type & size checks (reuse existing upload engine).
+
+Backend:
+- POST `/api/bd/partners/kyc` (or adapt to current structure)
+- Apply S1, S2, S3, S4:
+  - S1: Check authenticated user and BD country.
+  - S2: Validate payload with schema (Zod or equivalent).
+  - S3: Ensure only this user’s partner_profile is updated.
+  - S4: Log “KYC_SUBMITTED” in audit_logs with user_id, role, timestamp.
+
+State changes:
+- On successful submit:
+  - Save all KYC fields in `partner_profile` or `kyc_requests`.
+  - Set partner_status = "kyc_pending".
+
+Admin:
+- Add a “BD Partners – KYC Pending” tab:
+  - List all partner_profiles with partner_status = "kyc_pending".
+  - Show role, business_name, owner_name, city, and key KYC data.
+  - Admin can:
+    - Approve → partner_status = "setup_incomplete"
+    - Reject  → partner_status = "rejected" and set rejection_reason
+- On KYC approval/rejection:
+  - Send notification to partner (in-app + optional email/SMS).
+
+====================================================
+2.5. Stage 3 – Business Setup (Non-KYC but required for LIVE)
+====================================================
+
+For partner_status in {"setup_incomplete", "kyc_pending"} (but KYC approved required to move further):
+
+Shop Partner:
+- Form sections:
+  - Shop logo (image upload)
+  - Banner image
+  - Shop full address (for map and delivery)
+  - Opening hours
+  - At least 3 demo or real products (name, price, unit)
+
+Ticket Operator:
+- Form sections:
+  - Logo + photo (e.g. company logo)
+  - Counter / office address
+  - Main routes (route templates)
+  - Default commission rules (reusing existing global system, view-only if configured elsewhere)
+
+Validation:
+- For shop_partner to be considered setup-complete:
+  - logo present
+  - banner present
+  - shop full address present
+  - at least 3 products created
+- For ticket_operator:
+  - logo present
+  - address present
+  - at least 1 route template or schedule defined (even in demo mode)
+
+Backend:
+- When setup form is saved and passes validation:
+  - Set partner_status = "ready_for_review".
+
+====================================================
+2.6. Stage 4 – Final Admin Review → LIVE
+====================================================
+
+Admin UI:
+- New tab: “BD Partners – Ready for Review”
+  - Show:
+    - role (shop_partner / ticket_operator)
+    - business_name
+    - city
+    - KYC status (from previous stage)
+    - Setup completeness (products/routes present)
+- Admin actions:
+  - Approve → partner_status = "live"
+  - Reject → partner_status = "rejected", set rejection_reason
+
+Customer visibility:
+- Only partners with partner_status = "live" should:
+  - appear in `/customer/bd-shops` list (shop_partner)
+  - appear in ticket/rental search (ticket_operator)
+
+IMPORTANT:
+- Do NOT show any “draft/kyc_pending/setup_incomplete” partners to customers.
+
+====================================================
+2.7. Security & Abuse Protection
+====================================================
+
+Apply S1–S5:
+
+- S1: Auth & RBAC
+  - Only logged-in BD customers can start partner onboarding.
+  - Only admin can change partner_status between kyc_pending / ready_for_review / live / rejected.
+
+- S2: Validation
+  - Schema-validate all onboarding/KYC payloads.
+  - Hard reject missing NID or incomplete KYC when trying to move beyond Stage 2.
+
+- S3: Isolation
+  - A partner can only access their own partner_profile, shops, tickets.
+  - Implement per-user scoping in all queries.
+
+- S4: Audit logging
+  - Log:
+    - PARTNER_ONBOARDING_STARTED (when Stage 1 completed)
+    - PARTNER_KYC_SUBMITTED
+    - PARTNER_KYC_APPROVED / REJECTED
+    - PARTNER_READY_FOR_REVIEW
+    - PARTNER_LIVE / REJECTED_FINAL
+
+- S5: Rate limiting
+  - Limit how often:
+    - OTP can be requested
+    - KYC can be resubmitted
+
+====================================================
+2.8. UX REQUIREMENTS (Bangla for BD)
+====================================================
+
+All BD partner onboarding screens must:
+- Use Bangla labels and helper texts.
+- Show a clear progress indicator:
+  - Step 1: “শুরু”
+  - Step 2: “ডকুমেন্ট যাচাই”
+  - Step 3: “সেটআপ সম্পন্ন”
+- Show a checklist on the partner dashboard:
+  - With green check for completed tasks.
+  - With clear instructions for what’s left.
+
+Error messages must be human-readable Bangla, not raw JSON.
+
+====================================================
+2.9. DEMO & TESTING (MANDATORY)
+====================================================
+
+Implement a demo-friendly configuration:
+- Allow seeding 1–2 demo partners per role for local/staging.
+- Allow creating a real test partner with:
+  - role = shop_partner
+  - simple BD KYC
+  - minimal products
+
+You MUST run this full test scenario:
+
+1) As a BD customer:
+   - Start “Become a Shop Partner”.
+   - Complete Stage 1 (business_name, type, city, phone).
+   - Reach draft dashboard successfully.
+
+2) Complete KYC:
+   - Fill all KYC fields.
+   - Submit.
+   - Verify partner_status = "kyc_pending".
+
+3) As Admin:
+   - Approve KYC.
+   - See partner_status = "setup_incomplete".
+
+4) As partner:
+   - Add logo, banner, shop address, and at least 3 products.
+   - Submit setup; partner_status must become "ready_for_review".
+
+5) As Admin:
+   - Approve partner.
+   - partner_status = "live".
+
+6) As BD customer:
+   - Visit /customer/bd-shops.
+   - Confirm the new shop appears in the list and can be opened.
+
+Fix any bug you encounter, then re-run the scenario.  
+Only when ALL steps pass without errors, consider the task done.
+
+====================================================
+[END OF TASK]
+====================================================
