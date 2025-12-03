@@ -28,14 +28,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("safego_token");
-    const storedUser = localStorage.getItem("safego_user");
+    const validateSession = async () => {
+      const storedToken = localStorage.getItem("safego_token");
+      const storedUser = localStorage.getItem("safego_user");
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+      if (storedToken && storedUser) {
+        try {
+          // Validate the token with the backend
+          const response = await fetch("/api/auth/me", {
+            headers: {
+              "Authorization": `Bearer ${storedToken}`,
+            },
+            credentials: "include",
+          });
+
+          if (response.ok) {
+            // Token is valid, use the stored data
+            setToken(storedToken);
+            setUser(JSON.parse(storedUser));
+          } else {
+            // Token is invalid/expired, clear the stored data
+            localStorage.removeItem("safego_token");
+            localStorage.removeItem("safego_user");
+            setToken(null);
+            setUser(null);
+          }
+        } catch (error) {
+          // Network error, use stored data but mark as potentially stale
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        }
+      }
+      setIsLoading(false);
+    };
+
+    validateSession();
   }, []);
 
   const login = async (email: string, password: string) => {
