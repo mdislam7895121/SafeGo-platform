@@ -76,6 +76,7 @@ interface DriverInfo {
 }
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CustomerParcelBooking } from "@/components/customer/CustomerParcelBooking";
+import { ServiceSelectorGrid } from "@/components/customer/ServiceSelectorGrid";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1984,108 +1985,27 @@ export default function UnifiedBookingPage() {
               </div>
             </div>
 
-            {/* Center: Service Switcher - Desktop Horizontal Tabs */}
-            <nav className="hidden md:flex items-center" data-testid="desktop-service-switcher">
-              <div className="flex items-center bg-muted/60 rounded-full p-1 gap-1">
-                {services.map((service) => {
-                  const isActive = activeService === service.id;
-                  const Icon = service.icon;
-                  const getServiceLabel = () => {
-                    switch (service.id) {
-                      case "ride": return "Ride";
-                      case "eats": return "Eats";
-                      case "parcel": return "Parcel";
-                      case "tickets": return "Tickets";
-                      case "rental": return "Rental";
-                      case "shop": return "Shop";
-                      default: return service.title;
-                    }
-                  };
-                  return (
-                    <button
-                      key={service.id}
-                      onClick={() => {
-                        if (service.isExternal && service.route) {
-                          setLocationRoute(service.route);
-                        } else {
-                          setActiveService(service.id);
-                        }
-                      }}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                        isActive
-                          ? "bg-foreground text-background shadow-sm"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      }`}
-                      data-testid={`service-tab-${service.id}`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span>{getServiceLabel()}</span>
-                    </button>
-                  );
-                })}
+            {/* Center: Current Service Label - Shows active service (grid is now below content) */}
+            <div className="flex-1 flex justify-center">
+              <div 
+                className="flex items-center gap-2 px-4 py-2 rounded-full bg-muted/60"
+                data-testid="mobile-service-label"
+              >
+                {activeService === "ride" && <Car className="h-4 w-4" />}
+                {activeService === "eats" && <UtensilsCrossed className="h-4 w-4" />}
+                {activeService === "parcel" && <Package className="h-4 w-4" />}
+                {activeService === "tickets" && <Bus className="h-4 w-4" />}
+                {activeService === "rental" && <CarFront className="h-4 w-4" />}
+                {activeService === "shop" && <Store className="h-4 w-4" />}
+                <span className="text-sm font-medium">
+                  {activeService === "ride" ? "Ride" : 
+                   activeService === "eats" ? "Eats" : 
+                   activeService === "parcel" ? "Parcel" :
+                   activeService === "tickets" ? "Tickets" :
+                   activeService === "rental" ? "Rental" :
+                   activeService === "shop" ? "Shop" : activeService}
+                </span>
               </div>
-            </nav>
-
-            {/* Center: Service Switcher - Mobile Dropdown */}
-            <div className="md:hidden flex-1 flex justify-center">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="gap-2 px-4 rounded-full border-border"
-                    data-testid="mobile-service-dropdown"
-                  >
-                    {activeService === "ride" && <Car className="h-4 w-4" />}
-                    {activeService === "eats" && <UtensilsCrossed className="h-4 w-4" />}
-                    {activeService === "parcel" && <Package className="h-4 w-4" />}
-                    {activeService === "tickets" && <Bus className="h-4 w-4" />}
-                    {activeService === "rental" && <CarFront className="h-4 w-4" />}
-                    {activeService === "shop" && <Store className="h-4 w-4" />}
-                    <span>
-                      {activeService === "ride" ? "Ride" : 
-                       activeService === "eats" ? "Eats" : 
-                       activeService === "parcel" ? "Parcel" :
-                       activeService === "tickets" ? "Tickets" :
-                       activeService === "rental" ? "Rental" :
-                       activeService === "shop" ? "Shop" : activeService}
-                    </span>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="center" className="w-48">
-                  {services.map((service) => {
-                    const Icon = service.icon;
-                    const getServiceLabel = () => {
-                      switch (service.id) {
-                        case "ride": return "Ride";
-                        case "eats": return "Eats";
-                        case "parcel": return "Parcel";
-                        case "tickets": return "Tickets";
-                        case "rental": return "Rental";
-                        case "shop": return "Shop";
-                        default: return service.title;
-                      }
-                    };
-                    return (
-                      <DropdownMenuItem 
-                        key={service.id}
-                        onClick={() => {
-                          if (service.isExternal && service.route) {
-                            setLocationRoute(service.route);
-                          } else {
-                            setActiveService(service.id);
-                          }
-                        }}
-                        className={activeService === service.id ? "bg-muted" : ""}
-                        data-testid={`mobile-service-${service.id}`}
-                      >
-                        <Icon className="h-4 w-4 mr-2" />
-                        {getServiceLabel()}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
             </div>
 
             {/* Right: Navigation + Profile */}
@@ -2274,6 +2194,17 @@ export default function UnifiedBookingPage() {
         <div className="flex-1 lg:flex-none lg:w-[40%] lg:max-w-[480px] lg:flex-shrink-0 lg:border-r flex flex-col min-h-0 overflow-hidden">
           <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 lg:pb-4 min-h-0">
             
+            {/* Service Selector Grid - Always visible */}
+            <div data-testid="service-grid-section">
+              <p className="text-sm font-semibold mb-3">Explore services</p>
+              <ServiceSelectorGrid
+                activeService={activeService}
+                onChange={setActiveService}
+                onNavigate={setLocationRoute}
+                isBDCustomer={isBDCustomer}
+              />
+            </div>
+
             {activeService === "ride" && (
               <>
                 {/* Choose Ride View - Compact Header with Pickup/Dropoff */}

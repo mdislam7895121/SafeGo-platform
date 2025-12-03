@@ -1,0 +1,92 @@
+You are the SafeGo super-app development agent.
+
+TASK GOAL (THIS LOOP ONLY)
+=================================
+On the customer home page `/customer`, replace the current SERVICE DROPDOWN (Ride / Eats / Parcel / Tickets / Rental / Shop) with a modern **service card grid** that appears **right under the "Available rides" car list**.
+
+The new design must:
+- Keep all existing SafeGo behavior (map, ride list, prices, service switching).
+- Reuse the same internal service-switch logic the dropdown uses today.
+- Look visually modern: dynamic cards, thin glowing edges, bold labels.
+- Work on mobile and desktop.
+- Not break any existing routes or APIs.
+
+DO NOT modify login, signup, role, or backend business logic.
+Only change the FRONTEND service selector UI and its wiring.
+
+High-level behaviour
+=================================
+- We currently have a "service type" selector as a dropdown near the top (Ride / Eats / Parcel / Tickets / Rental / Shop).
+- We want to **remove that dropdown** from the top header and replace it with a **horizontal grid of cards** placed under the “Available rides” section, while keeping the same state and switching logic.
+
+Think of it as:
+- The service value (ride / eats / parcel / tickets / rental / shop) stays exactly the same internally.
+- Only the UI for choosing it is changed.
+
+1. FIND CURRENT IMPLEMENTATION
+=================================
+1. Locate the React/TypeScript component(s) that render the `/customer` page:
+   - Usually something like `CustomerHome`, `CustomerRootPage`, or similar under `client/src/.../customer`.
+2. Find:
+   - The current service dropdown (the one with items Ride, Eats, Parcel, Tickets, Rental, Shop).
+   - The state / context / hook that stores the active service (for example: `service`, `activeTab`, `selectedMode`, etc.).
+   - The function that runs when the service changes, for example:
+     - `handleServiceChange("ride")`
+     - or `setService("eats")`
+     - or a router-based handler that pushes a query string like `?mode=ride`.
+3. IMPORTANT:
+   - Do NOT change the underlying values for each service. The canonical keys must stay:
+     - `"ride"`, `"eats"`, `"parcel"`, `"tickets"`, `"rental"`, `"shop"`.
+   - We will just call the same handler from the new card UI.
+
+2. REMOVE DROPDOWN, KEEP LOGIC
+=================================
+1. In the header of `/customer`, **visually remove** the service dropdown component:
+   - Either delete the JSX for the dropdown, or replace it with a simple `current service` label if needed.
+   - Make sure you DO NOT delete:
+     - The state initialization for the service.
+     - The shared handler for switching service.
+   - We only remove the UI element, not the logic.
+
+2. Confirm after this that:
+   - The page still builds and renders.
+   - Internally, `activeService` (or similar) is still defined and used by:
+     - The "Available rides" / "Available shops" / etc.
+     - Any queries for rides, foods, parcels, tickets, rentals, shops.
+
+3. IMPLEMENT SERVICE CARD GRID COMPONENT
+=================================
+Create a reusable component, for example:
+
+   `ServiceGrid.tsx` or `ServiceSelectorGrid.tsx`
+
+Props (you can adjust names to fit existing style):
+
+   - `activeService: ServiceType`   // "ride" | "eats" | "parcel" | "tickets" | "rental" | "shop"
+   - `onChange(service: ServiceType): void`
+
+The component must render **six cards** representing the services:
+
+   1. Ride
+   2. Eats
+   3. Parcel
+   4. Tickets
+   5. Rental
+   6. Shop
+
+Each card definition (pseudo-code):
+
+```ts
+const serviceItems: Array<{
+  key: ServiceType;
+  label: string;
+  description: string;
+  icon: ReactNode; // use existing icon components if available
+}> = [
+  { key: "ride",    label: "Ride",    description: "Trips with drivers",      icon: <CarIcon /> },
+  { key: "eats",    label: "Eats",    description: "Food delivery",          icon: <ForkIcon /> },
+  { key: "parcel",  label: "Parcel",  description: "Send packages",          icon: <BoxIcon /> },
+  { key: "tickets", label: "Tickets", description: "Bus / launch tickets",   icon: <TicketIcon /> },
+  { key: "rental",  label: "Rental",  description: "Car & micro rentals",    icon: <CarRentalIcon /> },
+  { key: "shop",    label: "Shop",    description: "Local stores & grocery", icon: <ShopIcon /> },
+];
