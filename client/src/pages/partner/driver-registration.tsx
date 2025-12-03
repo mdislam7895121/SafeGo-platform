@@ -637,45 +637,45 @@ export default function DriverRegistration() {
                       />
                       <div className="space-y-2">
                         <Label>NID Front Image</Label>
-                        <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                          <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">Click to upload NID front</p>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            id="nid-front"
-                            onChange={(e) => setNidFrontFile(e.target.files?.[0] || null)}
-                            data-testid="input-nid-front"
-                          />
-                          <label htmlFor="nid-front">
-                            <Button type="button" variant="outline" size="sm" className="mt-2">
+                        <label htmlFor="nid-front" className="block cursor-pointer">
+                          <div className="border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors">
+                            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Click to upload NID front</p>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              id="nid-front"
+                              onChange={(e) => setNidFrontFile(e.target.files?.[0] || null)}
+                              data-testid="input-nid-front"
+                            />
+                            <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 mt-2">
                               Choose File
-                            </Button>
-                          </label>
-                          {nidFrontFile && <p className="text-sm mt-2">{nidFrontFile.name}</p>}
-                        </div>
+                            </span>
+                            {nidFrontFile && <p className="text-sm mt-2 text-primary font-medium">{nidFrontFile.name}</p>}
+                          </div>
+                        </label>
                       </div>
                       <div className="space-y-2">
                         <Label>NID Back Image</Label>
-                        <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                          <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">Click to upload NID back</p>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            id="nid-back"
-                            onChange={(e) => setNidBackFile(e.target.files?.[0] || null)}
-                            data-testid="input-nid-back"
-                          />
-                          <label htmlFor="nid-back">
-                            <Button type="button" variant="outline" size="sm" className="mt-2">
+                        <label htmlFor="nid-back" className="block cursor-pointer">
+                          <div className="border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors">
+                            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Click to upload NID back</p>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              id="nid-back"
+                              onChange={(e) => setNidBackFile(e.target.files?.[0] || null)}
+                              data-testid="input-nid-back"
+                            />
+                            <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 mt-2">
                               Choose File
-                            </Button>
-                          </label>
-                          {nidBackFile && <p className="text-sm mt-2">{nidBackFile.name}</p>}
-                        </div>
+                            </span>
+                            {nidBackFile && <p className="text-sm mt-2 text-primary font-medium">{nidBackFile.name}</p>}
+                          </div>
+                        </label>
                       </div>
                     </>
                   ) : (
@@ -708,24 +708,24 @@ export default function DriverRegistration() {
                       />
                       <div className="space-y-2">
                         <Label>Driver License Image</Label>
-                        <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                          <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground">Upload driver license photo</p>
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            id="license-image"
-                            onChange={(e) => setLicenseFile(e.target.files?.[0] || null)}
-                            data-testid="input-license-image"
-                          />
-                          <label htmlFor="license-image">
-                            <Button type="button" variant="outline" size="sm" className="mt-2">
+                        <label htmlFor="license-image" className="block cursor-pointer">
+                          <div className="border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors">
+                            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Upload driver license photo</p>
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              id="license-image"
+                              onChange={(e) => setLicenseFile(e.target.files?.[0] || null)}
+                              data-testid="input-license-image"
+                            />
+                            <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 mt-2">
                               Choose File
-                            </Button>
-                          </label>
-                          {licenseFile && <p className="text-sm mt-2">{licenseFile.name}</p>}
-                        </div>
+                            </span>
+                            {licenseFile && <p className="text-sm mt-2 text-primary font-medium">{licenseFile.name}</p>}
+                          </div>
+                        </label>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <FormField
