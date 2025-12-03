@@ -7514,15 +7514,25 @@ router.post("/registration/submit", async (req: AuthRequest, res) => {
 
     // Validate country-specific requirements
     if (isBD) {
-      if (!documents.nidNumber) {
-        return res.status(400).json({ error: "NID number is required for Bangladesh drivers" });
+      if (!documents.nidNumber || documents.nidNumber.trim().length < 10) {
+        return res.status(400).json({ 
+          error: "NID number is required for Bangladesh drivers",
+          errorBN: "সঠিক জাতীয় পরিচয়পত্র নম্বর প্রয়োজন"
+        });
       }
-      if (!personalInfo.fatherName) {
-        return res.status(400).json({ error: "Father's name is required for Bangladesh drivers" });
+      if (!personalInfo.fatherName || personalInfo.fatherName.trim().length < 2) {
+        return res.status(400).json({ 
+          error: "Father's name is required for Bangladesh drivers",
+          errorBN: "পিতার নাম প্রয়োজন"
+        });
       }
     } else {
-      if (!documents.driverLicenseNumber) {
-        return res.status(400).json({ error: "Driver license number is required" });
+      // US/International drivers require license info
+      if (!documents.driverLicenseNumber || documents.driverLicenseNumber.trim().length < 3) {
+        return res.status(400).json({ error: "Valid driver license number is required" });
+      }
+      if (!documents.driverLicenseExpiry) {
+        return res.status(400).json({ error: "Driver license expiry date is required" });
       }
     }
 

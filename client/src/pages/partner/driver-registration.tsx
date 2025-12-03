@@ -269,16 +269,36 @@ export default function DriverRegistration() {
         setFormData(prev => ({ ...prev, vehicleInfo: vehicleForm.getValues() }));
       }
     } else if (currentStep === 3) {
-      if (isBD && !documentsForm.getValues().nidNumber) {
-        toast({ title: "NID number is required", variant: "destructive" });
-        return;
-      }
-      if (!isBD && !documentsForm.getValues().driverLicenseNumber) {
-        toast({ title: "Driver license number is required", variant: "destructive" });
-        return;
+      const docs = documentsForm.getValues();
+      if (isBD) {
+        if (!docs.nidNumber || docs.nidNumber.trim().length < 10) {
+          toast({ 
+            title: "NID তথ্য প্রয়োজন", 
+            description: "সঠিক জাতীয় পরিচয়পত্র নম্বর লিখুন",
+            variant: "destructive" 
+          });
+          return;
+        }
+      } else {
+        if (!docs.driverLicenseNumber || docs.driverLicenseNumber.trim().length < 3) {
+          toast({ 
+            title: "Driver License Required", 
+            description: "Please enter a valid driver license number",
+            variant: "destructive" 
+          });
+          return;
+        }
+        if (!docs.driverLicenseExpiry) {
+          toast({ 
+            title: "License Expiry Required", 
+            description: "Please enter your license expiration date",
+            variant: "destructive" 
+          });
+          return;
+        }
       }
       isValid = true;
-      setFormData(prev => ({ ...prev, documents: documentsForm.getValues() }));
+      setFormData(prev => ({ ...prev, documents: docs }));
     } else if (currentStep === 4) {
       // Payout step - optional during registration, can be configured later
       isValid = true;
