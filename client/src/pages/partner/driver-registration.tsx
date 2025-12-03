@@ -280,10 +280,9 @@ export default function DriverRegistration() {
       isValid = true;
       setFormData(prev => ({ ...prev, documents: documentsForm.getValues() }));
     } else if (currentStep === 4) {
-      isValid = await payoutForm.trigger();
-      if (isValid) {
-        setFormData(prev => ({ ...prev, payout: payoutForm.getValues() }));
-      }
+      // Payout step - optional during registration, can be configured later
+      isValid = true;
+      setFormData(prev => ({ ...prev, payout: payoutForm.getValues() }));
     }
     
     if (isValid && currentStep < STEPS.length) {
@@ -300,11 +299,9 @@ export default function DriverRegistration() {
   const handleSubmit = () => {
     const submitData = {
       driverType,
-      countryCode,
-      ...formData.personalInfo,
-      ...formData.vehicleInfo,
-      ...formData.documents,
-      ...formData.payout,
+      personalInfo: formData.personalInfo,
+      vehicleInfo: formData.vehicleInfo,
+      documents: formData.documents,
     };
     submitMutation.mutate(submitData);
   };

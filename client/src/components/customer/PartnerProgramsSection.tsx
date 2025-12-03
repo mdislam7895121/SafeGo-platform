@@ -60,9 +60,13 @@ export function PartnerProgramsSection() {
     }
   };
 
+  const isBD = countryCode === "BD";
+  
+  // BD users use the BD-specific partner summary endpoint
+  // US users navigate directly to partner start pages
   const { data: partnerSummary, isLoading, error: summaryError } = useQuery<PartnerSummary>({
     queryKey: ["/api/bd/partner/summary"],
-    enabled: !!user,
+    enabled: !!user && isBD,
     retry: false,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
@@ -108,13 +112,39 @@ export function PartnerProgramsSection() {
     },
   });
 
+  // Get the destination URL for each partner type based on country
+  const getPartnerDestination = (kind: PartnerKind): string => {
+    switch (kind) {
+      case "driver_ride":
+        return "/partner/ride/start";
+      case "driver_delivery":
+        return "/partner/delivery/start";
+      case "restaurant":
+        return "/partner/restaurant/start";
+      case "shop_partner":
+        return "/shop-partner/onboarding";
+      case "ticket_operator":
+        return "/ticket-operator/onboarding";
+      default:
+        return "/customer";
+    }
+  };
+
   const handlePartnerClick = (kind: PartnerKind) => {
     if (needsLogin) {
       setLocation("/login?returnTo=/customer");
       return;
     }
-    setLoadingKind(kind);
-    startMutation.mutate(kind);
+    
+    // For BD users, use the start mutation for BD-specific tracking
+    // For US users, navigate directly to partner start pages
+    if (isBD) {
+      setLoadingKind(kind);
+      startMutation.mutate(kind);
+    } else {
+      // US users go directly to partner start pages
+      setLocation(getPartnerDestination(kind));
+    }
   };
 
   if (authLoading) {
@@ -161,7 +191,7 @@ export function PartnerProgramsSection() {
                 }}
               />
 
-              {status !== "not_started" && (
+              {isBD && status !== "not_started" && (
                 <span 
                   className={`absolute top-3 right-3 px-2 py-[2px] text-[12px] font-semibold rounded-full ${getStatusBadgeClass(status)}`}
                   data-testid={`partner-status-${item.kind}`}

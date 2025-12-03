@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 import { validateRestaurantKYC } from "../utils/kyc-validator";
 import { notifyFoodOrderStatusChange, notifyRestaurantIssueEscalated } from "../utils/notifications";
 import { prisma } from "../db";
@@ -17,7 +18,201 @@ import { dispatchFoodDelivery } from "../services/foodDeliveryDispatchService";
 
 const router = Router();
 
-// All routes require authentication and restaurant role
+// ====================================================
+// RESTAURANT REGISTRATION ENDPOINTS (PUBLIC - requires auth only)
+// ====================================================
+
+// Schema for restaurant registration submission
+const restaurantRegistrationSchema = z.object({
+  restaurantInfo: z.object({
+    restaurantName: z.string().min(2, "Restaurant name is required"),
+    cuisineType: z.string().min(1, "Cuisine type is required"),
+    address: z.string().min(5, "Address is required"),
+    cityCode: z.string().min(1, "City is required"),
+    description: z.string().optional(),
+    phone: z.string().min(10, "Phone number is required"),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+  }),
+  documents: z.object({
+    businessLicenseNumber: z.string().optional(),
+    nidNumber: z.string().optional(),
+    governmentIdType: z.string().optional(),
+    governmentIdLast4: z.string().optional(),
+    taxIdLast4: z.string().optional(),
+  }),
+  kyc: z.object({
+    ownerName: z.string().min(2, "Owner name is required"),
+    dateOfBirth: z.string().min(1, "Date of birth is required"),
+    emergencyContactName: z.string().optional(),
+    emergencyContactPhone: z.string().optional(),
+    fatherName: z.string().optional(),
+    presentAddress: z.string().optional(),
+    permanentAddress: z.string().optional(),
+  }),
+});
+
+// GET /api/restaurant/registration/status - Get registration status (requires auth only)
+router.get("/registration/status", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { restaurantProfile: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (!user.restaurantProfile) {
+      return res.json({
+        profile: null,
+        message: "No restaurant registration found",
+      });
+    }
+
+    const profile = user.restaurantProfile;
+
+    res.json({
+      profile: {
+        id: profile.id,
+        restaurantName: profile.restaurantName,
+        verificationStatus: profile.verificationStatus,
+        isActive: profile.isActive,
+        cuisineType: profile.cuisineType,
+        address: profile.address,
+        phone: profile.phone,
+      },
+    });
+  } catch (error) {
+    console.error("Restaurant registration status error:", error);
+    res.status(500).json({ error: "Failed to get registration status" });
+  }
+});
+
+// POST /api/restaurant/registration/submit - Submit restaurant registration (requires auth only)
+router.post("/registration/submit", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { restaurantProfile: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const parsed = restaurantRegistrationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: parsed.error.errors,
+      });
+    }
+
+    const { restaurantInfo, documents, kyc } = parsed.data;
+    const isBD = user.countryCode === "BD";
+
+    // Validate country-specific requirements
+    if (isBD) {
+      if (!documents.nidNumber) {
+        return res.status(400).json({ error: "NID number is required for Bangladesh restaurants" });
+      }
+    }
+
+    // Use transaction for atomic operation
+    const result = await prisma.$transaction(async (tx) => {
+      let restaurantProfile = user.restaurantProfile;
+
+      if (restaurantProfile) {
+        // Update existing profile
+        restaurantProfile = await tx.restaurantProfile.update({
+          where: { id: restaurantProfile.id },
+          data: {
+            restaurantName: restaurantInfo.restaurantName,
+            cuisineType: restaurantInfo.cuisineType,
+            address: restaurantInfo.address,
+            cityCode: restaurantInfo.cityCode,
+            description: restaurantInfo.description || null,
+            phone: restaurantInfo.phone,
+            lat: restaurantInfo.lat || null,
+            lng: restaurantInfo.lng || null,
+            businessLicenseNumber: documents.businessLicenseNumber || null,
+            nidNumber: documents.nidNumber || null,
+            ownerName: kyc.ownerName,
+            ownerDateOfBirth: new Date(kyc.dateOfBirth),
+            fatherName: kyc.fatherName || null,
+            presentAddress: kyc.presentAddress || null,
+            permanentAddress: kyc.permanentAddress || null,
+            verificationStatus: "pending",
+            countryCode: user.countryCode,
+          },
+        });
+      } else {
+        // Create new profile
+        restaurantProfile = await tx.restaurantProfile.create({
+          data: {
+            id: randomUUID(),
+            userId,
+            restaurantName: restaurantInfo.restaurantName,
+            cuisineType: restaurantInfo.cuisineType,
+            address: restaurantInfo.address,
+            cityCode: restaurantInfo.cityCode,
+            description: restaurantInfo.description || null,
+            phone: restaurantInfo.phone,
+            lat: restaurantInfo.lat || null,
+            lng: restaurantInfo.lng || null,
+            businessLicenseNumber: documents.businessLicenseNumber || null,
+            nidNumber: documents.nidNumber || null,
+            ownerName: kyc.ownerName,
+            ownerDateOfBirth: new Date(kyc.dateOfBirth),
+            fatherName: kyc.fatherName || null,
+            presentAddress: kyc.presentAddress || null,
+            permanentAddress: kyc.permanentAddress || null,
+            verificationStatus: "pending",
+            countryCode: user.countryCode,
+            isActive: false,
+          },
+        });
+      }
+
+      // Update user role to pending restaurant
+      await tx.user.update({
+        where: { id: userId },
+        data: { role: "pending_restaurant" },
+      });
+
+      return restaurantProfile;
+    });
+
+    res.json({
+      success: true,
+      message: isBD 
+        ? "রেস্টুরেন্ট আবেদন জমা হয়েছে। অনুমোদনের জন্য অপেক্ষা করুন।"
+        : "Restaurant application submitted. Please wait for approval.",
+      profile: {
+        id: result.id,
+        restaurantName: result.restaurantName,
+        verificationStatus: result.verificationStatus,
+      },
+    });
+  } catch (error) {
+    console.error("Restaurant registration submit error:", error);
+    res.status(500).json({ error: "Failed to submit restaurant registration" });
+  }
+});
+
+// All remaining routes require authentication and restaurant role
 router.use(authenticateToken);
 router.use(requireRole(["restaurant"]));
 

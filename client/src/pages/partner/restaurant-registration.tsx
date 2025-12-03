@@ -327,13 +327,9 @@ export default function RestaurantRegistration() {
     if (!isValid) return;
 
     const submitData = {
-      countryCode,
-      ...formData.restaurantInfo,
-      ...formData.menuSetup,
-      ...formData.photos,
-      ...formData.documents,
-      ...formData.payout,
-      ...kycForm.getValues(),
+      restaurantInfo: formData.restaurantInfo,
+      documents: formData.documents,
+      kyc: kycForm.getValues(),
     };
     submitMutation.mutate(submitData);
   };

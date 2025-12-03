@@ -3,11 +3,80 @@ import { prisma } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { uploadShopImage, getFileUrl } from "../middleware/upload";
 
 const router = Router();
 
 // Apply authentication middleware to all ticket-operator routes
 router.use(authenticateToken);
+
+// POST /api/ticket-operator/upload-image - Upload images for ticket operator onboarding
+router.post("/upload-image", (req: AuthRequest, res, next) => {
+  uploadShopImage(req, res, (err) => {
+    if (err) {
+      console.error("Ticket operator image upload error:", err);
+      return res.status(400).json({ 
+        error: "ছবি আপলোড ব্যর্থ হয়েছে",
+        errorEn: err.message || "Failed to upload image"
+      });
+    }
+    next();
+  });
+}, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user?.userId;
+    const file = req.file;
+
+    if (!userId) {
+      return res.status(401).json({ 
+        error: "সেশন শেষ হয়ে গেছে। পুনরায় লগইন করুন।",
+        errorEn: "Session expired. Please login again." 
+      });
+    }
+
+    if (!file) {
+      return res.status(400).json({ 
+        error: "কোন ফাইল পাওয়া যায়নি",
+        errorEn: "No file provided"
+      });
+    }
+
+    // Validate image type from query param
+    const imageType = req.query.type as string;
+    const validTypes = ["logo", "nid_front", "nid_back", "route_permit", "vehicle_doc"];
+    if (!imageType || !validTypes.includes(imageType)) {
+      return res.status(400).json({ 
+        error: "অবৈধ ছবির ধরণ",
+        errorEn: "Invalid image type. Must be 'logo', 'nid_front', 'nid_back', 'route_permit', or 'vehicle_doc'"
+      });
+    }
+
+    // Generate the URL for the uploaded file
+    const fileUrl = getFileUrl(file.filename);
+
+    const messages: Record<string, string> = {
+      logo: "লোগো আপলোড সফল হয়েছে",
+      nid_front: "NID সামনের ছবি আপলোড সফল হয়েছে",
+      nid_back: "NID পেছনের ছবি আপলোড সফল হয়েছে",
+      route_permit: "রুট পারমিট আপলোড সফল হয়েছে",
+      vehicle_doc: "গাড়ির ডকুমেন্ট আপলোড সফল হয়েছে"
+    };
+
+    res.json({
+      success: true,
+      url: fileUrl,
+      type: imageType,
+      filename: file.filename,
+      message: messages[imageType] || "আপলোড সফল হয়েছে"
+    });
+  } catch (error) {
+    console.error("Ticket operator image upload error:", error);
+    res.status(500).json({ 
+      error: "ছবি আপলোড ব্যর্থ হয়েছে",
+      errorEn: "Failed to upload image"
+    });
+  }
+});
 
 const operatorRegisterSchema = z.object({
   operatorName: z.string().min(2, "Operator name must be at least 2 characters"),
