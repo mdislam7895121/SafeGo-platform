@@ -4797,9 +4797,8 @@ router.post("/wallet/cash-out", async (req: AuthRequest, res) => {
       });
     }
 
-    // Create manual payout request using WalletPayoutService
-    const { WalletPayoutService } = await import("../services/payoutService");
-    const payoutService = new WalletPayoutService();
+    // Create manual payout request using PayoutService
+    const { payoutService } = await import("../services/payoutService");
 
     const payout = await payoutService.createWalletPayout({
       ownerId: driverProfile.id,
