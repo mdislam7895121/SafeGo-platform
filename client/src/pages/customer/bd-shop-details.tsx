@@ -61,6 +61,8 @@ interface CartItem {
   price: number;
   quantity: number;
   imageUrl?: string;
+  stockQuantity?: number;
+  hasUnlimitedStock?: boolean;
 }
 
 export default function BDShopDetails() {
@@ -94,12 +96,25 @@ export default function BDShopDetails() {
   const addToCart = (product: any) => {
     const productName = product.name || product.productName;
     const productPrice = product.discountPrice || product.price;
+    const stockQty = product.stockQuantity ?? 0;
+    const hasUnlimited = product.hasUnlimitedStock ?? false;
+    const maxQty = hasUnlimited ? 99 : stockQty;
+
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
+        const newQty = existing.quantity + 1;
+        if (!hasUnlimited && newQty > maxQty) {
+          toast({
+            title: "স্টক সীমা",
+            description: `সর্বোচ্চ ${maxQty}টি যোগ করা যায়`,
+            variant: "destructive",
+          });
+          return prev;
+        }
         return prev.map((item) =>
           item.productId === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: newQty }
             : item
         );
       }
@@ -111,6 +126,8 @@ export default function BDShopDetails() {
           price: Number(productPrice),
           quantity: 1,
           imageUrl: product.images?.[0] || product.imageUrl,
+          stockQuantity: stockQty,
+          hasUnlimitedStock: hasUnlimited,
         },
       ];
     });
@@ -123,11 +140,16 @@ export default function BDShopDetails() {
   const updateQuantity = (productId: string, delta: number) => {
     setCart((prev) => {
       return prev
-        .map((item) =>
-          item.productId === productId
-            ? { ...item, quantity: Math.max(0, item.quantity + delta) }
-            : item
-        )
+        .map((item) => {
+          if (item.productId !== productId) return item;
+          const newQty = item.quantity + delta;
+          if (newQty <= 0) return { ...item, quantity: 0 };
+          const maxQty = item.hasUnlimitedStock ? 99 : (item.stockQuantity ?? 0);
+          if (!item.hasUnlimitedStock && newQty > maxQty) {
+            return { ...item, quantity: maxQty };
+          }
+          return { ...item, quantity: newQty };
+        })
         .filter((item) => item.quantity > 0);
     });
   };
@@ -327,10 +349,17 @@ export default function BDShopDetails() {
               const productName = product.name || product.productName;
               const productImage = product.images?.[0] || product.imageUrl;
               const productPrice = product.discountPrice || product.price;
+              const originalPrice = product.price;
+              const hasDiscount = product.discountPrice && product.discountPrice < product.price;
+              const inStock = product.inStock !== false;
+              const hasUnlimited = product.hasUnlimitedStock ?? false;
+              const stockQty = product.stockQuantity ?? 0;
+              const lowStock = !hasUnlimited && stockQty > 0 && stockQty <= 10;
+              
               return (
                 <Card
                   key={product.id}
-                  className="overflow-hidden"
+                  className={`overflow-hidden ${!inStock ? 'opacity-60' : ''}`}
                   data-testid={`card-product-${product.id}`}
                 >
                   <Link href={`/customer/bd-product/${product.id}`}>
@@ -347,8 +376,29 @@ export default function BDShopDetails() {
                         </div>
                       )}
                       {quantity > 0 && (
-                        <Badge className="absolute top-2 right-2">
+                        <Badge className="absolute top-2 right-2" data-testid={`badge-quantity-${product.id}`}>
                           {quantity}
+                        </Badge>
+                      )}
+                      {!inStock && (
+                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                          <Badge variant="destructive">স্টকে নেই</Badge>
+                        </div>
+                      )}
+                      {inStock && lowStock && (
+                        <Badge 
+                          variant="secondary" 
+                          className="absolute top-2 left-2 bg-amber-500/90 text-white"
+                        >
+                          মাত্র {stockQty}টি
+                        </Badge>
+                      )}
+                      {product.isFeatured && (
+                        <Badge 
+                          variant="secondary" 
+                          className="absolute bottom-2 left-2 bg-primary/90 text-primary-foreground"
+                        >
+                          জনপ্রিয়
                         </Badge>
                       )}
                     </div>
@@ -359,43 +409,58 @@ export default function BDShopDetails() {
                         {productName}
                       </h3>
                     </Link>
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-lg font-bold text-primary">
-                        ৳{Number(productPrice).toLocaleString("bn-BD")}
-                      </p>
-                      {quantity === 0 ? (
-                        <Button
-                          size="icon"
-                          className="h-9 w-9 rounded-full"
-                          onClick={() => addToCart(product)}
-                          data-testid={`button-add-${product.id}`}
-                        >
-                          <Plus className="h-5 w-5" />
-                        </Button>
-                      ) : (
-                        <div className="flex items-center gap-1">
+                    <div className="flex flex-col gap-1 mt-2">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-lg font-bold text-primary">
+                          ৳{Number(productPrice).toLocaleString("bn-BD")}
+                        </p>
+                        {hasDiscount && (
+                          <p className="text-xs text-muted-foreground line-through">
+                            ৳{Number(originalPrice).toLocaleString("bn-BD")}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        {product.unit && (
+                          <span className="text-xs text-muted-foreground">/{product.unit}</span>
+                        )}
+                        {!inStock ? (
+                          <Badge variant="outline" className="text-xs">স্টকে নেই</Badge>
+                        ) : quantity === 0 ? (
                           <Button
                             size="icon"
-                            variant="outline"
-                            className="h-8 w-8 rounded-full"
-                            onClick={() => updateQuantity(product.id, -1)}
-                            data-testid={`button-decrease-${product.id}`}
+                            className="h-9 w-9 rounded-full"
+                            onClick={() => addToCart(product)}
+                            data-testid={`button-add-${product.id}`}
                           >
-                            <Minus className="h-4 w-4" />
+                            <Plus className="h-5 w-5" />
                           </Button>
-                          <span className="w-6 text-center font-bold" data-testid={`text-quantity-${product.id}`}>
-                            {quantity}
-                          </span>
-                          <Button
-                            size="icon"
-                            className="h-8 w-8 rounded-full"
-                            onClick={() => updateQuantity(product.id, 1)}
-                            data-testid={`button-increase-${product.id}`}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 rounded-full"
+                              onClick={() => updateQuantity(product.id, -1)}
+                              data-testid={`button-decrease-${product.id}`}
+                            >
+                              <Minus className="h-4 w-4" />
+                            </Button>
+                            <span className="w-6 text-center font-bold" data-testid={`text-quantity-${product.id}`}>
+                              {quantity}
+                            </span>
+                            <Button
+                              size="icon"
+                              className="h-8 w-8 rounded-full"
+                              onClick={() => updateQuantity(product.id, 1)}
+                              disabled={!hasUnlimited && quantity >= stockQty}
+                              data-testid={`button-increase-${product.id}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
