@@ -648,45 +648,45 @@ export default function RestaurantRegistration() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <Label>Restaurant Logo (Optional)</Label>
-                      <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                        <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">Upload your restaurant logo</p>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          className="hidden" 
-                          id="logo-upload"
-                          onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
-                          data-testid="input-logo"
-                        />
-                        <label htmlFor="logo-upload">
-                          <Button type="button" variant="outline" size="sm" className="mt-2">
+                      <label htmlFor="logo-upload" className="block cursor-pointer">
+                        <div className="border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors">
+                          <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground">Upload your restaurant logo</p>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            id="logo-upload"
+                            onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                            data-testid="input-logo"
+                          />
+                          <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 mt-2">
                             Choose File
-                          </Button>
-                        </label>
-                        {logoFile && <p className="text-sm mt-2">{logoFile.name}</p>}
-                      </div>
+                          </span>
+                          {logoFile && <p className="text-sm mt-2 text-primary font-medium">{logoFile.name}</p>}
+                        </div>
+                      </label>
                     </div>
                     <div className="space-y-2">
                       <Label>Cover Photo (Optional)</Label>
-                      <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                        <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                        <p className="text-sm text-muted-foreground">Upload a cover photo for your restaurant</p>
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          className="hidden" 
-                          id="cover-upload"
-                          onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                          data-testid="input-cover"
-                        />
-                        <label htmlFor="cover-upload">
-                          <Button type="button" variant="outline" size="sm" className="mt-2">
+                      <label htmlFor="cover-upload" className="block cursor-pointer">
+                        <div className="border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors">
+                          <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground">Upload a cover photo for your restaurant</p>
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            id="cover-upload"
+                            onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                            data-testid="input-cover"
+                          />
+                          <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 mt-2">
                             Choose File
-                          </Button>
-                        </label>
-                        {coverFile && <p className="text-sm mt-2">{coverFile.name}</p>}
-                      </div>
+                          </span>
+                          {coverFile && <p className="text-sm mt-2 text-primary font-medium">{coverFile.name}</p>}
+                        </div>
+                      </label>
                     </div>
                   </div>
                 </form>
@@ -711,24 +711,24 @@ export default function RestaurantRegistration() {
                   />
                   <div className="space-y-2">
                     <Label>Business License Document (Optional)</Label>
-                    <div className="border-2 border-dashed rounded-lg p-6 text-center">
-                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">Upload business license</p>
-                      <input 
-                        type="file" 
-                        accept="image/*,.pdf" 
-                        className="hidden" 
-                        id="license-upload"
-                        onChange={(e) => setLicenseFile(e.target.files?.[0] || null)}
-                        data-testid="input-license-doc"
-                      />
-                      <label htmlFor="license-upload">
-                        <Button type="button" variant="outline" size="sm" className="mt-2">
+                    <label htmlFor="license-upload" className="block cursor-pointer">
+                      <div className="border-2 border-dashed rounded-lg p-6 text-center hover-elevate transition-colors">
+                        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">Upload business license</p>
+                        <input 
+                          type="file" 
+                          accept="image/*,.pdf" 
+                          className="hidden" 
+                          id="license-upload"
+                          onChange={(e) => setLicenseFile(e.target.files?.[0] || null)}
+                          data-testid="input-license-doc"
+                        />
+                        <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 mt-2">
                           Choose File
-                        </Button>
-                      </label>
-                      {licenseFile && <p className="text-sm mt-2">{licenseFile.name}</p>}
-                    </div>
+                        </span>
+                        {licenseFile && <p className="text-sm mt-2 text-primary font-medium">{licenseFile.name}</p>}
+                      </div>
+                    </label>
                   </div>
                   {!isBD && (
                     <FormField
@@ -921,39 +921,39 @@ export default function RestaurantRegistration() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>NID Front Image</Label>
-                          <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              className="hidden" 
-                              id="nid-front"
-                              onChange={(e) => setNidFrontFile(e.target.files?.[0] || null)}
-                            />
-                            <label htmlFor="nid-front">
-                              <Button type="button" variant="outline" size="sm">
+                          <label htmlFor="nid-front" className="block cursor-pointer">
+                            <div className="border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors">
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                id="nid-front"
+                                onChange={(e) => setNidFrontFile(e.target.files?.[0] || null)}
+                              />
+                              <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
                                 Upload Front
-                              </Button>
-                            </label>
-                            {nidFrontFile && <p className="text-xs mt-1">{nidFrontFile.name}</p>}
-                          </div>
+                              </span>
+                              {nidFrontFile && <p className="text-xs mt-1 text-primary font-medium">{nidFrontFile.name}</p>}
+                            </div>
+                          </label>
                         </div>
                         <div className="space-y-2">
                           <Label>NID Back Image</Label>
-                          <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                            <input 
-                              type="file" 
-                              accept="image/*" 
-                              className="hidden" 
-                              id="nid-back"
-                              onChange={(e) => setNidBackFile(e.target.files?.[0] || null)}
-                            />
-                            <label htmlFor="nid-back">
-                              <Button type="button" variant="outline" size="sm">
+                          <label htmlFor="nid-back" className="block cursor-pointer">
+                            <div className="border-2 border-dashed rounded-lg p-4 text-center hover-elevate transition-colors">
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                id="nid-back"
+                                onChange={(e) => setNidBackFile(e.target.files?.[0] || null)}
+                              />
+                              <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2">
                                 Upload Back
-                              </Button>
-                            </label>
-                            {nidBackFile && <p className="text-xs mt-1">{nidBackFile.name}</p>}
-                          </div>
+                              </span>
+                              {nidBackFile && <p className="text-xs mt-1 text-primary font-medium">{nidBackFile.name}</p>}
+                            </div>
+                          </label>
                         </div>
                       </div>
                       <FormField
