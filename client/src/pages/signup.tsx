@@ -9,38 +9,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
-import { Car, Package, UtensilsCrossed, Loader2 } from "lucide-react";
-
-interface RoleOption {
-  value: string;
-  label: string;
-  bdOnly?: boolean;
-}
-
-const ALL_ROLES: RoleOption[] = [
-  { value: "customer", label: "Use services (Customer)" },
-  { value: "driver", label: "Drive & deliver (Driver)" },
-  { value: "restaurant", label: "Manage restaurant (Restaurant)" },
-  { value: "shop_partner", label: "দোকানদার (Shop Partner)", bdOnly: true },
-  { value: "ticket_operator", label: "টিকিট ও রেন্টাল অপারেটর (Ticket Operator)", bdOnly: true },
-  { value: "admin", label: "Manage platform (Admin)" },
-];
+import { Car, Package, UtensilsCrossed, Loader2, Globe } from "lucide-react";
 
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<string>("");
   const [countryCode, setCountryCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
-  const [useCapsuleFlow, setUseCapsuleFlow] = useState(true);
-  const { user, signup, isLoading: authLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { setPendingSignup } = useSignup();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  const availableRoles = useMemo(() => {
-    return ALL_ROLES.filter(r => !r.bdOnly || countryCode === "BD");
-  }, [countryCode]);
+  const isBD = countryCode === "BD";
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -60,7 +41,7 @@ export default function Signup() {
     return <Redirect to={getPostLoginPath(user)} />;
   }
 
-  const handleSubmitCapsuleFlow = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!countryCode) {
@@ -74,8 +55,8 @@ export default function Signup() {
 
     if (!email || !password) {
       toast({
-        title: "Missing information",
-        description: "Please enter email and password",
+        title: isBD ? "তথ্য অসম্পূর্ণ" : "Missing information",
+        description: isBD ? "ইমেইল এবং পাসওয়ার্ড দিন" : "Please enter email and password",
         variant: "destructive",
       });
       return;
@@ -83,8 +64,18 @@ export default function Signup() {
 
     if (password.length < 6) {
       toast({
-        title: "Password too short",
-        description: "Password must be at least 6 characters",
+        title: isBD ? "পাসওয়ার্ড ছোট" : "Password too short",
+        description: isBD ? "পাসওয়ার্ড কমপক্ষে ৬ অক্ষর হতে হবে" : "Password must be at least 6 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: isBD ? "ভুল ইমেইল" : "Invalid email",
+        description: isBD ? "সঠিক ইমেইল ঠিকানা দিন" : "Please enter a valid email address",
         variant: "destructive",
       });
       return;
@@ -99,39 +90,6 @@ export default function Signup() {
     setLocation("/signup/choose-role");
   };
 
-  const handleSubmitClassicFlow = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!role || !countryCode) {
-      toast({
-        title: "Missing information",
-        description: "Please select both role and country",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      await signup(email, password, role, countryCode);
-      toast({
-        title: "Account created!",
-        description: "Welcome to SafeGo. Complete your profile to get started.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Signup failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSubmit = useCapsuleFlow ? handleSubmitCapsuleFlow : handleSubmitClassicFlow;
-
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8">
@@ -144,110 +102,101 @@ export default function Signup() {
             </div>
           </div>
           <h1 className="text-4xl font-bold tracking-tight">SafeGo</h1>
-          <p className="text-muted-foreground mt-2">Join the global super-app platform</p>
+          <p className="text-muted-foreground mt-2">
+            {isBD ? "গ্লোবাল সুপার-অ্যাপ প্ল্যাটফর্মে যোগ দিন" : "Join the global super-app platform"}
+          </p>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Create account</CardTitle>
-            <CardDescription>Sign up to start using SafeGo services</CardDescription>
+            <CardTitle>{isBD ? "অ্যাকাউন্ট তৈরি করুন" : "Create account"}</CardTitle>
+            <CardDescription>
+              {isBD ? "SafeGo সেবা ব্যবহার করতে সাইন আপ করুন" : "Sign up to start using SafeGo services"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="country" className="flex items-center gap-2">
+                  <Globe className="h-4 w-4" />
+                  {isBD ? "দেশ" : "Country"}
+                </Label>
+                <Select 
+                  value={countryCode} 
+                  onValueChange={setCountryCode} 
+                  required
+                >
+                  <SelectTrigger id="country" className="h-12" data-testid="select-country">
+                    <SelectValue placeholder={isBD ? "আপনার দেশ নির্বাচন করুন" : "Select your country"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BD" data-testid="select-country-bd">
+                      <span className="flex items-center gap-2">
+                        🇧🇩 Bangladesh / বাংলাদেশ
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="US" data-testid="select-country-us">
+                      <span className="flex items-center gap-2">
+                        🇺🇸 United States
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">{isBD ? "ইমেইল" : "Email"}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={isBD ? "আপনার ইমেইল" : "you@example.com"}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="h-12"
                   data-testid="input-email"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">{isBD ? "পাসওয়ার্ড" : "Password"}</Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a strong password"
+                  placeholder={isBD ? "শক্তিশালী পাসওয়ার্ড তৈরি করুন" : "Create a strong password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
+                  className="h-12"
                   data-testid="input-password"
                 />
+                <p className="text-xs text-muted-foreground">
+                  {isBD ? "কমপক্ষে ৬ অক্ষর" : "At least 6 characters"}
+                </p>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="country">Country</Label>
-                <Select 
-                  value={countryCode} 
-                  onValueChange={(v) => {
-                    setCountryCode(v);
-                    const bdOnlyRole = ALL_ROLES.find(r => r.value === role && r.bdOnly);
-                    if (bdOnlyRole && v !== "BD") {
-                      setRole("");
-                    }
-                  }} 
-                  required
-                >
-                  <SelectTrigger id="country" data-testid="select-country">
-                    <SelectValue placeholder="Select your country" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BD" data-testid="select-country-bd">Bangladesh</SelectItem>
-                    <SelectItem value="US" data-testid="select-country-us">United States</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {!useCapsuleFlow && (
-                <div className="space-y-2">
-                  <Label htmlFor="role">I want to</Label>
-                  <Select 
-                    value={role} 
-                    onValueChange={(v) => {
-                      if (availableRoles.find(r => r.value === v)) {
-                        setRole(v);
-                      }
-                    }} 
-                    required
-                  >
-                    <SelectTrigger id="role" data-testid="select-role">
-                      <SelectValue placeholder="Select your role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableRoles.map((r) => (
-                        <SelectItem 
-                          key={r.value} 
-                          value={r.value}
-                          data-testid={`select-role-${r.value}`}
-                        >
-                          {r.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
 
               <Button
                 type="submit"
-                className="w-full"
-                disabled={isLoading}
+                className="w-full h-12 text-base"
+                disabled={isLoading || !countryCode}
                 data-testid="button-signup"
               >
-                {isLoading ? "Creating account..." : useCapsuleFlow ? "Continue" : "Create account"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isBD ? "অপেক্ষা করুন..." : "Please wait..."}
+                  </>
+                ) : (
+                  isBD ? "এগিয়ে যান" : "Continue"
+                )}
               </Button>
             </form>
 
             <div className="mt-6 text-center text-sm">
-              Already have an account?{" "}
-              <Link href="/login" className="text-primary hover:underline" data-testid="link-login">
-                Sign in
+              {isBD ? "ইতিমধ্যে অ্যাকাউন্ট আছে?" : "Already have an account?"}{" "}
+              <Link href="/login" className="text-primary hover:underline font-medium" data-testid="link-login">
+                {isBD ? "সাইন ইন করুন" : "Sign in"}
               </Link>
             </div>
           </CardContent>

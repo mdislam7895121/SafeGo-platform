@@ -14,7 +14,8 @@ import {
   Bike,
   Check,
   ArrowLeft,
-  Loader2
+  Loader2,
+  Clock
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ interface RoleCapsule {
   descriptionEn: string;
   icons: React.ReactNode;
   bdOnly?: boolean;
+  usComingSoon?: boolean;
 }
 
 const ROLE_CAPSULES: RoleCapsule[] = [
@@ -55,6 +57,7 @@ const ROLE_CAPSULES: RoleCapsule[] = [
         <Bike className="h-6 w-6" />
       </div>
     ),
+    usComingSoon: true,
   },
   {
     id: "restaurant",
@@ -63,6 +66,7 @@ const ROLE_CAPSULES: RoleCapsule[] = [
     descriptionBn: "নিজের রেস্টুরেন্ট SafeGo-তে চালাতে চাই",
     descriptionEn: "I want to run my restaurant on SafeGo",
     icons: <UtensilsCrossed className="h-6 w-6" />,
+    usComingSoon: true,
   },
   {
     id: "shop_partner",
@@ -77,8 +81,8 @@ const ROLE_CAPSULES: RoleCapsule[] = [
     id: "ticket_operator",
     labelBn: "টিকিট ও রেন্টাল অপারেটর",
     labelEn: "Ticket & Rental Operator",
-    descriptionBn: "বাস টিকিট ও গাড়ি রেন্টাল পরিচালনা করতে চাই",
-    descriptionEn: "I want to manage bus tickets and car rentals",
+    descriptionBn: "বাস/ফেরি টিকিট ও গাড়ি রেন্টাল পরিচালনা করতে চাই",
+    descriptionEn: "I want to manage bus/ferry tickets and car rentals",
     icons: <Bus className="h-6 w-6" />,
     bdOnly: true,
   },
@@ -96,7 +100,10 @@ export default function SignupRoleSelection() {
   const isBD = countryCode === "BD";
 
   const availableRoles = useMemo(() => {
-    return ROLE_CAPSULES.filter(r => !r.bdOnly || isBD);
+    return ROLE_CAPSULES.filter(r => {
+      if (r.bdOnly && !isBD) return false;
+      return true;
+    });
   }, [isBD]);
 
   useEffect(() => {
@@ -121,6 +128,22 @@ export default function SignupRoleSelection() {
   if (!pendingSignup) {
     return <Redirect to="/signup" />;
   }
+
+  const isRoleDisabled = (role: RoleCapsule) => {
+    if (!isBD && role.usComingSoon) return true;
+    return false;
+  };
+
+  const handleRoleClick = (role: RoleCapsule) => {
+    if (isRoleDisabled(role)) {
+      toast({
+        title: "Coming soon",
+        description: `${role.labelEn} will be available in the United States soon. For now, you can sign up as a Customer.`,
+      });
+      return;
+    }
+    setSelectedRole(role.id);
+  };
 
   const handleContinue = async () => {
     if (!selectedRole) {
@@ -149,7 +172,14 @@ export default function SignupRoleSelection() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || "Signup failed");
+        const errorMessage = error.error || "Signup failed";
+        
+        if (errorMessage.includes("already exists")) {
+          throw new Error(isBD 
+            ? "এই ইমেইল দিয়ে SafeGo অ্যাকাউন্ট আছে। অনুগ্রহ করে সাইন ইন করুন।" 
+            : "You already have a SafeGo account with this email. Please sign in instead.");
+        }
+        throw new Error(errorMessage);
       }
 
       clearPendingSignup();
@@ -165,7 +195,9 @@ export default function SignupRoleSelection() {
       });
 
       if (!loginResponse.ok) {
-        throw new Error("Account created but login failed. Please try logging in.");
+        throw new Error(isBD 
+          ? "অ্যাকাউন্ট তৈরি হয়েছে কিন্তু লগইন ব্যর্থ। অনুগ্রহ করে সাইন ইন করুন।"
+          : "Account created but login failed. Please try logging in.");
       }
 
       const { token, user: loggedInUser } = await loginResponse.json();
@@ -201,7 +233,7 @@ export default function SignupRoleSelection() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="flex items-center gap-4 p-4 border-b">
+      <header className="flex items-center gap-4 p-4 border-b sticky top-0 bg-background z-10">
         <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
           <ArrowLeft className="h-5 w-5" />
         </Button>
@@ -223,48 +255,63 @@ export default function SignupRoleSelection() {
           </div>
 
           <div className="grid gap-3 md:gap-4">
-            {availableRoles.map((role) => (
-              <button
-                key={role.id}
-                type="button"
-                onClick={() => setSelectedRole(role.id)}
-                className={cn(
-                  "relative flex items-start gap-4 p-4 md:p-5 rounded-2xl border-2 text-left transition-all",
-                  "hover-elevate active-elevate-2",
-                  selectedRole === role.id
-                    ? "border-primary bg-primary/5"
-                    : "border-border bg-card"
-                )}
-                data-testid={`capsule-role-${role.id}`}
-              >
-                <div className={cn(
-                  "flex items-center justify-center w-12 h-12 rounded-xl shrink-0",
-                  selectedRole === role.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                )}>
-                  {role.icons}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-base md:text-lg">
-                      {isBD ? role.labelBn : role.labelEn}
-                    </span>
-                    {role.bdOnly && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                        BD
+            {availableRoles.map((role) => {
+              const disabled = isRoleDisabled(role);
+              return (
+                <button
+                  key={role.id}
+                  type="button"
+                  onClick={() => handleRoleClick(role)}
+                  className={cn(
+                    "relative flex items-start gap-4 p-4 md:p-5 rounded-2xl border-2 text-left transition-all",
+                    disabled 
+                      ? "opacity-60 cursor-not-allowed bg-muted/50 border-border"
+                      : "hover-elevate active-elevate-2",
+                    !disabled && selectedRole === role.id
+                      ? "border-primary bg-primary/5"
+                      : !disabled && "border-border bg-card"
+                  )}
+                  data-testid={`capsule-role-${role.id}`}
+                >
+                  <div className={cn(
+                    "flex items-center justify-center w-12 h-12 rounded-xl shrink-0",
+                    disabled
+                      ? "bg-muted text-muted-foreground"
+                      : selectedRole === role.id 
+                        ? "bg-primary text-primary-foreground" 
+                        : "bg-muted text-muted-foreground"
+                  )}>
+                    {role.icons}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-base md:text-lg">
+                        {isBD ? role.labelBn : role.labelEn}
                       </span>
-                    )}
+                      {role.bdOnly && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          BD
+                        </span>
+                      )}
+                      {disabled && (
+                        <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          Coming soon
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {isBD ? role.descriptionBn : role.descriptionEn}
+                    </p>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {isBD ? role.descriptionBn : role.descriptionEn}
-                  </p>
-                </div>
-                {selectedRole === role.id && (
-                  <div className="absolute top-4 right-4 flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground">
-                    <Check className="h-4 w-4" />
-                  </div>
-                )}
-              </button>
-            ))}
+                  {!disabled && selectedRole === role.id && (
+                    <div className="absolute top-4 right-4 flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground">
+                      <Check className="h-4 w-4" />
+                    </div>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           <div className="pt-4">

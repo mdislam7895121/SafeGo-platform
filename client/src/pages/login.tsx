@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Car, Package, UtensilsCrossed, Shield } from "lucide-react";
+import { Car, Package, UtensilsCrossed, Shield, Loader2 } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -39,7 +39,6 @@ export default function Login() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-8">
-        {/* Logo and branding */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <div className="flex gap-1">
@@ -52,7 +51,6 @@ export default function Login() {
           <p className="text-muted-foreground mt-2">Your global super-app platform</p>
         </div>
 
-        {/* Login form */}
         <Card>
           <CardHeader>
             <CardTitle>Welcome back</CardTitle>
@@ -69,6 +67,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  className="h-12"
                   data-testid="input-email"
                 />
               </div>
@@ -82,30 +81,41 @@ export default function Login() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  className="h-12"
                   data-testid="input-password"
                 />
               </div>
 
               <Button
                 type="submit"
-                className="w-full"
+                className="w-full h-12 text-base"
                 disabled={isLoading}
                 data-testid="button-login"
               >
-                {isLoading ? "Signing in..." : "Sign in"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  "Sign in"
+                )}
               </Button>
             </form>
 
             <div className="mt-6 text-center text-sm">
               Don't have an account?{" "}
-              <Link href="/signup" className="text-primary hover:underline" data-testid="link-signup">
+              <Link 
+                href="/signup" 
+                className="text-primary hover:underline font-medium" 
+                data-testid="link-signup"
+              >
                 Sign up
               </Link>
             </div>
           </CardContent>
         </Card>
 
-        {/* Role indicators */}
         <div className="grid grid-cols-2 gap-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <Car className="h-4 w-4" />

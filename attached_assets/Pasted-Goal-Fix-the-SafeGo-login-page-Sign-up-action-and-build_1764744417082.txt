@@ -1,0 +1,110 @@
+Goal: Fix the SafeGo login page "Sign up" action and build a complete, publish-ready signup entry flow for all public roles (customer and partners), following SafeGo's company rules.
+
+You must complete everything end-to-end in a single cycle so that a new user can sign up and reach the correct onboarding screen without errors.
+
+Scope:
+
+1) Diagnose and fix the /login "Sign up" / "Sign up" link
+
+- Locate the login page component (e.g. client/src/pages/login.tsx or similar).
+- Find the "Don't have an account? Sign up" text.
+- Verify:
+  - The "Sign up" element is a proper link or button.
+  - It is wired to the front-end router (no missing href, no dead onClick).
+- Fix so that:
+  - On desktop click and mobile tap, the user is navigated to a dedicated signup entry route (e.g. /signup).
+  - There is no JavaScript error or blocked navigation.
+  - The element is accessible (role="link"/"button", keyboard focus works).
+
+2) Implement a proper /signup entry route (global signup hub)
+
+Create or fix a dedicated signup entry page, e.g. /signup, that:
+
+- Uses the existing SafeGo design system (same typography, spacing, and button style as /login).
+- Asks for:
+  - Country: Bangladesh (BD) and United States (US) as primary options.
+  - Role: Customer, Driver, Shop Partner, Ticket Operator, Rental Partner.
+- Enforces SafeGo global logic:
+  - For BD:
+    - Customer → allowed
+    - Driver (ride/parcel) → allowed, route to driver onboarding
+    - Shop Partner → allowed, route to /shop-partner/onboarding
+    - Ticket Operator → allowed, route to ticket onboarding
+    - Rental Partner → allowed, route to BD rental onboarding
+  - For US:
+    - Customer → allowed now
+    - All partner roles (driver, shop, ticket, rental) should show "Coming soon" and be disabled.
+- Make sure labels and helper texts are shown in Bengali for BD and English for US where appropriate, matching existing localization style.
+
+3) Route wiring from /signup to each onboarding flow
+
+Wire the signup choices to the correct routes:
+
+- BD Customer:
+  - If the user is new → start BD customer experience (e.g. /customer/bd-start or the main /customer home with demo content).
+- US Customer:
+  - Route to US customer onboarding/home.
+- BD Driver:
+  - Route to /driver/onboarding (or the existing driver signup start route).
+- BD Shop Partner:
+  - Route to /shop-partner/onboarding (the multi-stage form you already built).
+- BD Ticket Operator:
+  - Route to ticket operator onboarding route.
+- BD Rental Partner:
+  - Route to rental partner onboarding route.
+
+When navigating:
+- Preserve the JWT/auth context if the user is already logged-in (e.g. clicking "Become a partner" while logged in).
+- If the user is not logged in, ensure that the signup flow first collects email + password and then continues to the role onboarding (reuse existing auth backend, do not duplicate).
+
+4) Handle existing users and security
+
+Implement robust backend checks so that:
+
+- If an email already has a SafeGo account:
+  - The signup attempt for the same email returns a clear error:
+    - English: "You already have a SafeGo account with this email. Please sign in instead."
+    - Bengali equivalent for BD flows.
+- If a logged-in user tries to create another account for the same email, prevent duplicate records.
+- Ensure that role assignments are controlled:
+  - Do not automatically grant admin or internal roles from this public signup screen.
+  - Only allow: customer, driver, shop_partner, ticket_operator, rental_partner based on country rules above.
+- Make sure all validation is done server-side:
+  - Required fields present.
+  - Email format valid.
+  - Password meets existing SafeGo password policy.
+
+5) Mobile-first and UX validation
+
+- Test and fix the signup flow on:
+  - iPhone (Safari) and Android (Chrome) using the preview domain.
+- Requirements:
+  - The "Sign up" link on /login is easily tappable.
+  - The /signup screen fits on small mobile screens without horizontal scrolling.
+  - Country/role buttons are large and thumb-friendly.
+  - Navigation from /login → /signup → onboarding works with no blank screens or infinite spinners.
+
+6) Regression checks
+
+- Make sure existing login behavior is unchanged:
+  - /login sign-in for existing users still works.
+  - JWT/session handling is untouched except where strictly necessary.
+- Confirm that:
+  - BD E-shop flows (shop partner onboarding, ticket operator onboarding, rental partner onboarding) are still working when reached via the new /signup flow.
+  - No console errors appear in browser devtools when using the login and signup flow.
+
+7) Final deliverable
+
+- The application must be publish-ready:
+  - A new user can:
+    1) Open /login
+    2) Tap "Sign up"
+    3) Choose country and role
+    4) Complete account creation
+    5) Land on the correct onboarding/home screen without any errors.
+- Provide a short summary in the Agent log of:
+  - What was broken in the /login "Sign up" logic.
+  - What routes and components were added or modified.
+  - How the final signup entry flow works for BD and US.
+
+Complete all of this in one loop. Do not leave partial fixes or TODO comments.
