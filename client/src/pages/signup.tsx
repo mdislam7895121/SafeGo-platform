@@ -193,7 +193,7 @@ export default function Signup() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
                 <Label htmlFor="email">Email *</Label>
                 <Input
@@ -202,7 +202,6 @@ export default function Signup() {
                   placeholder="Your email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
                   className="h-12"
                   data-testid="input-email"
                 />
@@ -243,7 +242,6 @@ export default function Signup() {
                     placeholder="Create a strong password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    required
                     className="h-12 pr-10"
                     data-testid="input-password"
                   />
@@ -289,7 +287,6 @@ export default function Signup() {
                     placeholder="Re-enter your password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
                     className="h-12 pr-10"
                     data-testid="input-confirm-password"
                   />

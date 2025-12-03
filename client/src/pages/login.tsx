@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,13 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  // Clear any stale auth data when landing on login page
+  useEffect(() => {
+    localStorage.removeItem("safego_token");
+    localStorage.removeItem("safego_user");
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,15 +110,17 @@ export default function Login() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm py-3">
-              <span>Don't have an account?</span>{" "}
-              <Link
-                href="/signup"
-                className="text-primary hover:underline font-medium inline-block py-2 px-2 min-h-[44px] touch-manipulation cursor-pointer"
-                data-testid="link-signup"
+            <div className="mt-6 text-center">
+              <p className="text-sm mb-3">Don't have an account?</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12"
+                onClick={() => setLocation("/signup")}
+                data-testid="button-goto-signup"
               >
-                Sign up
-              </Link>
+                Create Account
+              </Button>
             </div>
           </CardContent>
         </Card>
