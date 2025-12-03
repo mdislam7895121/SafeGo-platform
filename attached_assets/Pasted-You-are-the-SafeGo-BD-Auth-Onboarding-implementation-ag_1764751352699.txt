@@ -1,0 +1,345 @@
+You are the SafeGo BD Auth & Onboarding implementation agent.
+
+You MUST:
+- Implement everything in ONE production-ready pass.
+- Leave NO partial work, NO TODOs, NO half-fixed flows.
+- Keep ALL existing roles and BD partner onboarding flows working.
+
+This task is focused on:
+- Bangladesh customer signup + login
+- Bangladesh partner onboarding entry (shop_partner, ticket_operator)
+- Fixing the broken "Sign up" link on /login
+- Ensuring roles are preserved and used correctly
+
+====================================================
+[1. GLOBAL SAFEGO RULES — NON-NEGOTIABLE]
+====================================================
+
+1. Roles (must NOT be removed or broken)
+Core global roles:
+- customer
+- driver
+- restaurant
+- admin
+
+Bangladesh partner roles (additive):
+- shop_partner        // BD E-Shop / local stores
+- ticket_operator     // BD tickets + rentals
+
+Rules:
+- These roles MUST continue to exist in the backend types/models and auth logic.
+- You may NOT delete, rename, or collapse them.
+- You may NOT let the client set arbitrary role values in signup payloads.
+- Roles must be derived from server-side logic and stored in the user record / JWT.
+
+2. Auth rule (company policy)
+- There is ONLY ONE public signup flow.
+- That signup flow creates ONLY a **customer** account.
+- No one can sign up directly as shop_partner, ticket_operator, driver, or restaurant.
+- All partner roles are created/linked later via onboarding flows AFTER login.
+
+3. Country separation (for this task)
+- Focus is Bangladesh (BD) users.
+- You must NOT break US or other country logic that already exists.
+- If a piece of code is global (multi-country), keep it backward-compatible and additive.
+
+4. BD partner onboarding (given, must remain)
+- /shop-partner/onboarding and related flows are already implemented in stages.
+- Do NOT break existing shop_partner and ticket_operator onboarding.
+- Do NOT change BD KYC rules; they remain as already defined in the codebase.
+
+5. Security phases (you MUST apply these to any new/modified endpoint)
+- S1: Auth & RBAC — read role from JWT/session, never from request body.
+- S2: Validation & Sanitization — validate all inputs with schema (Zod or equivalent).
+- S3: Isolation — a partner only sees their own data; admin is the only cross-tenant role.
+- S4: Logging & Audit — log important events (signup, role upgrade, KYC submit, approvals).
+- S5: Abuse Protection — basic rate limiting & safe error responses.
+
+====================================================
+[2. PROBLEM SUMMARY — WHAT IS BROKEN]
+====================================================
+
+From the product owner’s manual testing:
+
+1) On the SafeGo /login page:
+   - There is a text link: “Don’t have an account? Sign up”.
+   - Tapping/clicking “Sign up” does NOTHING. No navigation, no signup form.
+   - This is true on mobile preview and desktop preview.
+
+2) You previously simplified the backend signup logic and said:
+   - “I’ve completed the customer-only signup flow.”
+   - “The signup endpoint now only creates customer accounts…”
+   But:
+   - The frontend still does not navigate to a working /signup page.
+   - The product owner cannot create ANY new account, so partner onboarding cannot even start.
+
+3) There is a risk that you changed role validation (server/routes/auth.ts) in a way that:
+   - Conceptually removed or ignored other roles.
+   - Confused the product owner (“এখানে তো মনে হচ্ছে রোল গুলো বাদ দিয়ে দিয়েছে”).
+   This must be fixed:
+   - All roles stay in the system.
+   - Only the PUBLIC SIGNUP ENTRY is restricted to customer.
+
+Your job is to:
+- Audit and fully fix the BD customer signup + login system.
+- Ensure the Sign up link works and the full flow is testable TODAY.
+- Keep all existing roles and BD partner onboarding intact.
+
+====================================================
+[3. HIGH-LEVEL GOAL]
+====================================================
+
+Implement a SIMPLE but SECURE Bangladesh customer auth flow:
+
+- /login:
+  - Works for all existing accounts (any role).
+  - “Sign up” link correctly opens a BD customer signup page.
+
+- /signup:
+  - Public page, no role selection.
+  - Creates a BD customer account only.
+  - Validates input and shows human-friendly errors (Bangla where appropriate).
+  - On success, logs the user in and redirects to the correct BD customer home.
+
+- Partner onboarding:
+  - shop_partner and ticket_operator onboarding MUST require login.
+  - They always use the logged-in customer account as the base identity.
+  - No duplication of user records.
+
+====================================================
+[4. STEP-BY-STEP IMPLEMENTATION PLAN]
+====================================================
+
+Follow these steps in order. Do not skip any.
+
+----------------------------------
+STEP 1 — AUDIT CURRENT AUTH CODE
+----------------------------------
+
+1. Locate the frontend auth pages:
+   - Find the login page component (for example):
+     - client/src/pages/login.tsx
+     OR
+     - client/src/app/(public)/login/page.tsx
+     OR similar.
+   - Find any existing signup page or components:
+     - search for “Sign up”, “signup”, “signupForm”, etc.
+
+2. Locate backend routes & auth logic:
+   - server/routes/auth.ts (already mentioned in your previous run).
+   - Any auth controller/service files that implement signup/login.
+   - User model / types where `role`, `country`, `verification_status`, etc. are defined.
+
+3. Confirm:
+   - What route the Sign up link currently points to (href or onClick).
+   - What POST endpoint the signup form (if it exists) uses.
+   - How the user record is created: which fields are set (role, country, etc.).
+
+Do NOT modify anything until you understand the current wiring.
+
+----------------------------------
+STEP 2 — DEFINE THE CORRECT BD CUSTOMER SIGNUP FLOW
+----------------------------------
+
+You must implement this behaviour:
+
+1. /login page:
+   - Shows email + password fields for existing users.
+   - Error handling for wrong credentials (in Bangla if BD-specific messages are used).
+   - At the bottom: text “Don’t have an account? Sign up”.
+   - This text MUST:
+     - Be a clickable element:
+       - Either <Link href="/signup">Sign up</Link>
+       - Or a button that uses router.push("/signup").
+     - Work on mobile and desktop.
+
+2. /signup page:
+   - Public page, no authentication required.
+   - Fields:
+     - email (input type="email", required)
+     - password (required, min length 8)
+     - confirmPassword (required, must match password)
+     - optional: fullName (or displayName) if the existing schema supports it.
+   - For BD context:
+     - Either use an existing country field or set a default:
+       - country = "BD" (or the appropriate constant).
+   - Validation:
+     - Client-side:
+       - Required fields, email format, password match.
+       - Show Bangla messages if the rest of the BD customer UI is in Bangla.
+     - Server-side (see Step 3).
+
+3. UX:
+   - On success:
+     - Automatically log the user in (save token/session).
+     - Redirect them to the BD customer home or landing page:
+       - e.g. /customer/home, /customer/bd-home, or the existing route used.
+
+----------------------------------
+STEP 3 — BACKEND SIGNUP ENDPOINT (CUSTOMER-ONLY)
+----------------------------------
+
+Implement or fix the backend signup endpoint as follows.
+
+1. Endpoint:
+   - Reuse the existing signup route in server/routes/auth.ts (e.g. POST /api/auth/signup).
+   - Do NOT change its URL in a way that breaks existing code unless you also update all callers.
+
+2. Behaviour:
+   - Accept payload: { email, password, fullName? }
+   - S2 Validation:
+     - Ensure email is valid and not empty.
+     - Ensure password meets minimum complexity (at least length 8).
+   - Check for existing user with same email:
+     - If exists, return 400 with error like:
+       - { error: "EMAIL_IN_USE", message: "এই ইমেইল দিয়ে আগে থেকেই একাউন্ট আছে।" }
+   - Hash password (reuse existing utility).
+   - Create user record:
+     - role: "customer"          // hard-coded, do NOT take from client
+     - country: "BD"
+     - trust_level: "customer_basic" (if supported; otherwise ignore)
+     - Any other required default fields (profile, wallet, etc.)
+
+3. Response:
+   - Generate JWT / session exactly as existing login code expects.
+   - Return user object with at least: id, email, role, country.
+
+4. Security (S1, S2, S4):
+   - Do NOT allow client to send a `role` field; ignore or strip if present.
+   - Log a “CUSTOMER_SIGNUP_SUCCESS” event to audit_logs with user_id and country.
+
+----------------------------------
+STEP 4 — LOGIN ENDPOINT & ROLE PRESERVATION
+----------------------------------
+
+1. Make sure the login endpoint:
+   - Accepts email + password.
+   - Looks up the user by email.
+   - Verifies password.
+   - Returns JWT/session with:
+     - user_id
+     - role
+     - country
+     - any flags used elsewhere (verification_status, is_verified, etc.)
+
+2. IMPORTANT: Role handling
+   - Ensure the User model still supports:
+     - "customer", "driver", "restaurant", "admin", "shop_partner", "ticket_operator".
+   - If previous changes simplified role handling too much, restore these roles in:
+     - TypeScript enums/types
+     - Mongoose/Prisma schemas (whatever ORM is used)
+     - Any RBAC middleware.
+
+3. Do NOT:
+   - Remove role-specific dashboards or routing.
+   - Change any existing admin or partner routes.
+
+----------------------------------
+STEP 5 — POST-LOGIN REDIRECT LOGIC (BD FOCUS)
+----------------------------------
+
+Implement or confirm a central post-login redirect function, e.g.:
+
+- If user.role === "customer":
+  - Redirect to BD customer home page (whatever route already exists).
+
+- If user.role === "shop_partner":
+  - If partner onboarding is incomplete / partner_status != "live":
+    - Redirect to /shop-partner/onboarding.
+  - Else:
+    - Redirect to shop partner dashboard.
+
+- If user.role === "ticket_operator":
+  - Similar behaviour: onboarding or dashboard, using existing routes.
+
+- If user.role === "admin":
+  - Redirect to admin dashboard.
+
+This logic must NOT be in the login UI; it should be in a shared auth handler or hook that runs after successful login based on the user object.
+
+----------------------------------
+STEP 6 — ENSURE PARTNER ONBOARDING USES LOGGED-IN CUSTOMER ACCOUNT
+----------------------------------
+
+1. /shop-partner/onboarding and any /ticket-partner or /ticket-operator routes:
+   - MUST require authentication:
+     - If not logged in, redirect to /login.
+
+2. When a logged-in BD customer starts “Become a Shop Partner” or “Become a Ticket Operator”:
+   - Reuse that existing user account.
+   - Create or link a partner_profile with:
+     - user_id = current user
+     - role = "shop_partner" or "ticket_operator"
+     - country = "BD"
+     - partner_status starting from "draft" as already defined in the onboarding engine.
+
+3. Do NOT create a second user with the same email for partner roles.
+4. Ensure any BD KYC fields remain exactly as already designed in the project.
+5. The staged onboarding engine you already implemented must continue to work unchanged.
+
+----------------------------------
+STEP 7 — UX & ERROR MESSAGES (BD)
+----------------------------------
+
+For BD customer signup:
+
+1. Client-side messages:
+   - Use Bangla for field errors consistent with other BD pages. Examples:
+     - “ইমেইল লিখুন”
+     - “পাসওয়ার্ড কমপক্ষে ৮ অক্ষরের হতে হবে”
+     - “দুইটি পাসওয়ার্ড মিলছে না”
+
+2. Server errors:
+   - Email already in use → show friendly Bangla text instead of raw JSON.
+
+3. Do NOT leak internal details (no stack traces in the UI).
+
+----------------------------------
+STEP 8 — FULL END-TO-END TEST (MANDATORY)
+----------------------------------
+
+You MUST manually run this scenario in the dev environment and fix any bug you encounter.
+
+1) From a logged-out state:
+   - Visit /login.
+   - Click “Sign up”.
+   - Confirm navigation to /signup.
+
+2) On /signup:
+   - Enter a brand-new email (not in DB).
+   - Enter valid password + confirmPassword.
+   - Submit.
+   - Confirm:
+     - Request hits the signup endpoint.
+     - User is created in DB with:
+       - role = "customer"
+       - country = "BD"
+     - Token/session is created.
+     - Browser is redirected to BD customer home.
+
+3) Logout (if logout button exists), then:
+   - Log back in with same email + password.
+   - Confirm login works and redirect uses the role properly.
+
+4) While logged in as this customer:
+   - Start “Become a Shop Partner”.
+   - Confirm:
+     - You can access /shop-partner/onboarding.
+     - The onboarding uses the same account (no second user).
+     - Previously working stages (shop info, KYC, delivery, logo/banner uploads) still work.
+
+5) Regression checks:
+   - Confirm existing shop_partner accounts can still log in.
+   - Confirm ticket_operator and admin accounts (if seeded) still work.
+   - Confirm no role enums or auth checks are broken.
+
+Only when ALL of these steps pass without errors may you consider this task complete.
+
+====================================================
+[9. OUTPUT REQUIREMENTS]
+====================================================
+
+When you finish, provide:
+- A short summary of the code changes (files touched + what changed).
+- Confirmation that you successfully ran the full end-to-end test scenario above.
+- Any follow-up technical notes the architect should know (but do NOT leave work for later).
