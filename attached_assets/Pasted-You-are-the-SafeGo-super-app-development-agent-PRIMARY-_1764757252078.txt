@@ -1,0 +1,56 @@
+You are the SafeGo super-app development agent.
+
+PRIMARY GOAL (single, complete task):
+Fix the LOGIN FLOW so that AFTER a successful login:
+- The user is redirected AWAY from `/login` to the correct home/dashboard.
+- The success toast remains.
+- Wrong credentials still show a clear error in Bangla.
+You must implement this end-to-end (frontend + any small backend adjustments) in ONE production-ready pass without breaking existing features.
+
+Context from current behavior (must use this):
+- When user enters correct email/password and presses "Sign in":
+  - A toast appears: “Welcome back! You’ve successfully logged in.”
+  - But the browser URL remains `/login` and the login form stays visible.
+  - This means: the backend login API is working, but the frontend is not navigating away.
+
+Global SafeGo rules you MUST NOT break:
+- Roles: customer, driver, restaurant, admin, shop_partner, ticket_operator.
+- BD/US logic, KYC, partner onboarding, etc. must remain intact.
+- Signup uses “customer-only signup” rule: signup creates only customer accounts. Partner roles are upgraded later via onboarding.
+- Do NOT rename/remove existing DB collections, fields, or API routes. Only additive and compatible changes are allowed.
+
+==================================================
+1. ANALYZE CURRENT LOGIN IMPLEMENTATION
+==================================================
+
+1. Open the frontend code for the `/login` page (the screen shown in the screenshot with:
+   - Title: "Welcome back"
+   - Email + Password fields
+   - Buttons: "Sign in", "Create Account").
+
+2. Find the form submit handler and document what it currently does:
+   - Does it call `fetch('/api/auth/login', ...)` or similar directly?
+   - Or does it call some `AuthContext.login` / `useAuth().login` or similar helper?
+
+3. Inspect the Auth system:
+   - Find the AuthContext or global auth provider (e.g., `AuthContext.tsx`, `useAuth.ts`, `authStore`, etc.).
+   - Note how:
+     - tokens/sessions are stored (cookie / localStorage / memory),
+     - `user` and `isAuthenticated` are stored,
+     - any existing redirect helper is implemented (for signup or other flows).
+
+You MUST keep the existing auth storage mechanism. Do not invent a new one.
+
+==================================================
+2. CREATE A SINGLE STANDARD LOGIN HELPER
+==================================================
+
+If a unified login helper does NOT already exist, create one (or complete the existing one) in the Auth context or an auth service file:
+
+```ts
+async function login(email: string, password: string): Promise<User> {
+  // 1) Call backend login endpoint
+  // 2) On success: set auth state (token + user)
+  // 3) Return the user object to the caller
+  // 4) On failure: throw a typed error with a message
+}

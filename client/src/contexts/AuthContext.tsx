@@ -48,20 +48,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.error || "Login failed");
+      throw new Error(error.error || "Invalid credentials");
     }
 
     const data = await response.json();
-    setToken(data.token);
-    setUser(data.user);
+    
+    // Store auth data FIRST before any state updates
     localStorage.setItem("safego_token", data.token);
     localStorage.setItem("safego_user", JSON.stringify(data.user));
+    
+    // Update React state
+    setToken(data.token);
+    setUser(data.user);
 
-    // Role-based redirect using helper (accounts for verification status for BD roles)
-    setTimeout(() => {
-      const targetPath = getPostLoginPath(data.user);
-      setLocation(targetPath);
-    }, 0);
+    // Role-based redirect using full page navigation for reliability
+    const targetPath = getPostLoginPath(data.user);
+    window.location.href = targetPath;
   };
 
   const signup = async (email: string, password: string, role: string, countryCode: string) => {

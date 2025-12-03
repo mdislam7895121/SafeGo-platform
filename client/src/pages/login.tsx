@@ -1,26 +1,35 @@
-import { useState, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { useState } from "react";
+import { useLocation, Redirect } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { getPostLoginPath } from "@/lib/roleRedirect";
 import { Car, Package, UtensilsCrossed, Shield, Loader2 } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
-  // Clear any stale auth data when landing on login page
-  useEffect(() => {
-    localStorage.removeItem("safego_token");
-    localStorage.removeItem("safego_user");
-  }, []);
+  // Show loading while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" data-testid="loader-auth" />
+      </div>
+    );
+  }
+
+  // If already logged in, redirect to appropriate dashboard
+  if (user) {
+    return <Redirect to={getPostLoginPath(user)} />;
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,10 +41,15 @@ export default function Login() {
         title: "Welcome back!",
         description: "You've successfully logged in.",
       });
+      // Redirect is handled by AuthContext.login()
     } catch (error: any) {
+      // Show error in Bangla for BD users, English fallback
+      const errorMessage = error.message === "Invalid credentials" 
+        ? "ভুল ইমেইল অথবা পাসওয়ার্ড। আবার চেষ্টা করুন।"
+        : error.message || "লগইন ব্যর্থ হয়েছে";
       toast({
-        title: "Login failed",
-        description: error.message,
+        title: "লগইন ব্যর্থ",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
