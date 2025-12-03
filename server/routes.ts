@@ -63,6 +63,7 @@ import shopPartnerRoutes from "./routes/shop-partner"; // Bangladesh Expansion: 
 import ticketOperatorRoutes from "./routes/ticket-operator"; // Bangladesh Expansion: Ticket & Rental Operators
 import adminBdExpansionRoutes from "./routes/admin-bd-expansion"; // Bangladesh Expansion: Admin management
 import bdCustomerRoutes from "./routes/bd-customer"; // Bangladesh Expansion: Customer BD services
+import partnerRegistrationRoutes from "./routes/partner-registration"; // Partner Registration for drivers & restaurants
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -303,6 +304,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ticket-operator", ticketOperatorRoutes); // Ticket & Rental Operator management (BD only)
   app.use("/api/admin/bd-expansion", adminBdExpansionRoutes); // Admin management for BD expansion
   app.use("/api/bd", bdCustomerRoutes); // Customer BD services (rentals, shops)
+  app.use("/api", partnerRegistrationRoutes); // Partner Registration for drivers & restaurants
 
   // Partner Profile Endpoint - used by partner start pages
   app.get("/api/partner/profile", authenticateToken, async (req: AuthRequest, res) => {

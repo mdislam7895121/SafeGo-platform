@@ -188,31 +188,14 @@ export default function RestaurantStart() {
           </CardContent>
         </Card>
 
-        <Card className="mt-6 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-          <CardContent className="p-4 flex items-start gap-3">
-            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium text-blue-900 dark:text-blue-100">Coming Soon</p>
-              <p className="text-sm text-blue-700 dark:text-blue-300">
-                Restaurant partner registration will be available soon. We're expanding SafeGo Eats to your area.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
         <div className="mt-8 text-center">
           <Button 
             size="lg" 
             className="w-full sm:w-auto px-12"
-            onClick={() => {
-              toast({
-                title: "Coming Soon",
-                description: "Restaurant registration is coming soon. We'll notify you when SafeGo Eats is ready in your area.",
-              });
-            }}
+            onClick={() => setLocation("/partner/restaurant/register")}
             data-testid="button-start-onboarding"
           >
-            {hasExistingProfile && currentStep > 0 ? "Continue Application" : "Join Waitlist"}
+            {hasExistingProfile && currentStep > 0 ? "Continue Application" : "Start Application"}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
           <p className="text-sm text-muted-foreground mt-4">

@@ -317,6 +317,8 @@ import BDBookingSuccess from "@/pages/bd/booking-success";
 import RideDriverStart from "@/pages/partner/ride-start";
 import DeliveryDriverStart from "@/pages/partner/delivery-start";
 import RestaurantStart from "@/pages/partner/restaurant-start";
+import DriverRegistration from "@/pages/partner/driver-registration";
+import RestaurantRegistration from "@/pages/partner/restaurant-registration";
 import ShopPartnerStart from "@/pages/partner/shop-start";
 import TicketOperatorStart from "@/pages/partner/ticket-start";
 
@@ -2242,6 +2244,18 @@ function Router() {
             <TicketOperatorDashboard />
           </TicketOperatorLayout>
         </TicketOperatorGuard>
+      </Route>
+
+      {/* Partner Registration Flows */}
+      <Route path="/partner/driver/register">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <DriverRegistration />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/partner/restaurant/register">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RestaurantRegistration />
+        </ProtectedRoute>
       </Route>
 
       {/* Partner Onboarding Start Pages */}
