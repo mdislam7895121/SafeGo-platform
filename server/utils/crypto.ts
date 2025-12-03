@@ -6,10 +6,13 @@ const AUTH_TAG_LENGTH = 16;
 const SALT_LENGTH = 32;
 
 function getEncryptionKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key) {
+  const rawKey = process.env.ENCRYPTION_KEY;
+  if (!rawKey) {
     throw new Error('ENCRYPTION_KEY environment variable is not set');
   }
+  
+  // Trim any accidental whitespace from the key (common copy-paste issue)
+  const key = rawKey.trim();
   
   const keyBuffer = Buffer.from(key, 'hex');
   if (keyBuffer.length !== 32) {

@@ -54,11 +54,14 @@ function validateJwtSecret(): string | null {
  * - crypto.ts: expects 64 hex characters (32 bytes)
  */
 function validateEncryptionKey(): string | null {
-  const key = process.env.ENCRYPTION_KEY;
+  const rawKey = process.env.ENCRYPTION_KEY;
   
-  if (!key || key.trim() === "") {
+  if (!rawKey || rawKey.trim() === "") {
     return "ENCRYPTION_KEY is required for encrypting sensitive data (NID, SSN, bank accounts, 2FA secrets)";
   }
+  
+  // Trim any accidental whitespace from the key (common copy-paste issue)
+  const key = rawKey.trim();
   
   // Check if it's hex format (crypto.ts requirement)
   const isHexFormat = /^[0-9a-fA-F]{64}$/.test(key);

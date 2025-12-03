@@ -10,17 +10,25 @@ const AUTH_TAG_LENGTH = 16; // GCM auth tag length
  * Fails fast if not properly configured
  */
 function getKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
+  const rawKey = process.env.ENCRYPTION_KEY;
   
-  if (!key) {
+  if (!rawKey) {
     throw new Error("ENCRYPTION_KEY environment variable is required for NID encryption");
   }
   
-  if (key.length !== 32) {
-    throw new Error(`ENCRYPTION_KEY must be exactly 32 bytes, got ${key.length} bytes`);
-  }
+  // Trim any accidental whitespace from the key (common copy-paste issue)
+  const key = rawKey.trim();
   
-  return Buffer.from(key, "utf-8");
+  // Support both 32-byte UTF-8 and 64-char hex formats
+  if (key.length === 64 && /^[0-9a-fA-F]+$/.test(key)) {
+    // 64 hex characters = 32 bytes
+    return Buffer.from(key, "hex");
+  } else if (key.length === 32) {
+    // 32-byte UTF-8 string
+    return Buffer.from(key, "utf-8");
+  } else {
+    throw new Error(`ENCRYPTION_KEY must be exactly 32 bytes (UTF-8) or 64 hex characters, got ${key.length} characters`);
+  }
 }
 
 /**

@@ -12,15 +12,18 @@ function getEncryptionKey(): Buffer {
     return cachedKey;
   }
 
-  const keyEnv = process.env.ENCRYPTION_KEY;
+  const rawKeyEnv = process.env.ENCRYPTION_KEY;
   
-  if (!keyEnv) {
+  if (!rawKeyEnv) {
     throw new Error(
       '[SecureEncryption] CRITICAL: ENCRYPTION_KEY environment variable is not set. ' +
       'This is required for Phase 6B security features. ' +
       'Please set a 64-character hex string (256-bit key) in your secrets.'
     );
   }
+
+  // Trim any accidental whitespace from the key (common copy-paste issue)
+  const keyEnv = rawKeyEnv.trim();
 
   if (keyEnv.length === 64 && /^[0-9a-fA-F]+$/.test(keyEnv)) {
     cachedKey = Buffer.from(keyEnv, 'hex');
