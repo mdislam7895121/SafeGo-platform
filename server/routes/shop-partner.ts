@@ -129,8 +129,8 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Allow both pending_shop_partner and shop_partner roles
-    if (userRole !== "pending_shop_partner" && userRole !== "shop_partner") {
+    // Allow customer (during onboarding), pending_shop_partner, and shop_partner roles
+    if (!["customer", "pending_shop_partner", "shop_partner"].includes(userRole || "")) {
       return res.status(403).json({ error: "Only shop partners can access this endpoint" });
     }
 
