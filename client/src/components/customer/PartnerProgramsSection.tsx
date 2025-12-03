@@ -1,52 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Car, Truck, UtensilsCrossed, Store, Ticket, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
-
-type PartnerKind = "driver_ride" | "driver_delivery" | "restaurant" | "shop_partner" | "ticket_operator";
-
-interface PartnerItem {
-  kind: PartnerKind;
-  title: string;
-  description: string;
-  icon: typeof Car;
-}
-
-const partnerItems: PartnerItem[] = [
-  {
-    kind: "driver_ride",
-    title: "রাইড শেয়ার ড্রাইভার",
-    description: "যাত্রী নিয়ে শহরের ভেতরে যাতায়াত সেবা দিন।",
-    icon: Car,
-  },
-  {
-    kind: "driver_delivery",
-    title: "ডেলিভারি ড্রাইভার",
-    description: "খাবার ও পার্সেল ডেলিভারি করে আয় করুন।",
-    icon: Truck,
-  },
-  {
-    kind: "restaurant",
-    title: "রেস্টুরেন্ট পার্টনার",
-    description: "SafeGo দিয়ে আপনার খাবার অনলাইনে বিক্রি করুন।",
-    icon: UtensilsCrossed,
-  },
-  {
-    kind: "shop_partner",
-    title: "দোকান পার্টনার",
-    description: "মুদিখানা, ইলেকট্রনিক্স বা অন্যান্য দোকান অনলাইনে তুলুন।",
-    icon: Store,
-  },
-  {
-    kind: "ticket_operator",
-    title: "টিকিট ও রেন্টাল অপারেটর",
-    description: "বাস, লঞ্চ ও গাড়ি ভাড়া ও কল সেন্টার পরিচালনা করুন।",
-    icon: Ticket,
-  },
-];
+import { getPartnerTexts, getFilteredPartnerCards, PartnerKind } from "@/config/partnerCardTexts";
 
 type PartnerStatus = "not_started" | "draft" | "kyc_pending" | "setup_incomplete" | "ready_for_review" | "live" | "rejected";
 
@@ -76,45 +35,31 @@ const getStatusBadgeClass = (status: PartnerStatus): string => {
   }
 };
 
-const getStatusLabel = (status: PartnerStatus): string => {
-  switch (status) {
-    case "not_started":
-      return "শুরু করুন";
-    case "draft":
-      return "খসড়া";
-    case "kyc_pending":
-      return "KYC পেন্ডিং";
-    case "setup_incomplete":
-      return "সেটআপ অসম্পূর্ণ";
-    case "ready_for_review":
-      return "রিভিউ পেন্ডিং";
-    case "live":
-      return "সক্রিয়";
-    case "rejected":
-      return "বাতিল";
-    default:
-      return "";
-  }
-};
-
-const getButtonLabel = (status: PartnerStatus): string => {
-  switch (status) {
-    case "not_started":
-      return "শুরু করুন";
-    case "live":
-      return "ড্যাশবোর্ড দেখুন";
-    default:
-      return "চালিয়ে যান";
-  }
-};
-
 export function PartnerProgramsSection() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [loadingKind, setLoadingKind] = useState<PartnerKind | null>(null);
   const { user, isLoading: authLoading } = useAuth();
 
-  // Only fetch partner summary if user is logged in
+  const countryCode = user?.countryCode || "US";
+  const texts = getPartnerTexts(countryCode);
+  const partnerCards = getFilteredPartnerCards(countryCode);
+
+  const getStatusLabel = (status: PartnerStatus): string => {
+    return texts.statusLabels[status] || "";
+  };
+
+  const getButtonLabel = (status: PartnerStatus): string => {
+    switch (status) {
+      case "not_started":
+        return texts.statusLabels.not_started;
+      case "live":
+        return countryCode === "BD" ? "ড্যাশবোর্ড দেখুন" : "View Dashboard";
+      default:
+        return countryCode === "BD" ? "চালিয়ে যান" : "Continue";
+    }
+  };
+
   const { data: partnerSummary, isLoading, error: summaryError } = useQuery<PartnerSummary>({
     queryKey: ["/api/bd/partner/summary"],
     enabled: !!user,
@@ -124,10 +69,7 @@ export function PartnerProgramsSection() {
     staleTime: 60000,
   });
 
-  // If the summary query failed with auth error, user's session is expired
   const isSessionExpired = summaryError && (summaryError as any)?.status === 403;
-  
-  // Determine if user needs to login
   const needsLogin = !user || isSessionExpired;
 
   const startMutation = useMutation({
@@ -146,18 +88,19 @@ export function PartnerProgramsSection() {
     },
     onError: (error: any) => {
       const status = error?.status || 500;
-      let message = "সিস্টেমে সমস্যা হচ্ছে, আবার চেষ্টা করুন।";
+      let message = countryCode === "BD" 
+        ? "সিস্টেমে সমস্যা হচ্ছে, আবার চেষ্টা করুন।"
+        : "System error, please try again.";
       
       if (status === 401 || status === 403) {
-        // Redirect to login for auth errors
         setLocation("/login?returnTo=/customer");
         return;
       } else if (status === 400 || status === 422) {
-        message = error?.message || "অনুরোধে সমস্যা হয়েছে।";
+        message = error?.message || (countryCode === "BD" ? "অনুরোধে সমস্যা হয়েছে।" : "Request failed.");
       }
       
       toast({
-        title: "ত্রুটি",
+        title: countryCode === "BD" ? "ত্রুটি" : "Error",
         description: message,
         variant: "destructive",
       });
@@ -166,7 +109,6 @@ export function PartnerProgramsSection() {
   });
 
   const handlePartnerClick = (kind: PartnerKind) => {
-    // If user needs to login, redirect to login
     if (needsLogin) {
       setLocation("/login?returnTo=/customer");
       return;
@@ -175,7 +117,6 @@ export function PartnerProgramsSection() {
     startMutation.mutate(kind);
   };
 
-  // Show loading state only while checking auth (not while fetching partner data)
   if (authLoading) {
     return (
       <div className="mt-6 flex items-center justify-center py-8">
@@ -186,13 +127,13 @@ export function PartnerProgramsSection() {
 
   return (
     <div className="mt-6" data-testid="partner-programs-section">
-      <h3 className="text-lg font-bold text-foreground">SafeGo Partner Programs</h3>
+      <h3 className="text-lg font-bold text-foreground">{texts.sectionTitle}</h3>
       <p className="text-sm text-muted-foreground mt-1">
-        আপনার SafeGo একাউন্ট থেকে আয় করতে চাইলে নিচের যেকোনো অপশন নির্বাচন করুন।
+        {texts.masterTagline}
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-        {partnerItems.map((item) => {
+        {partnerCards.map((item) => {
           const Icon = item.icon;
           const summary = partnerSummary?.[item.kind];
           const status: PartnerStatus = summary?.status || "not_started";
@@ -204,7 +145,6 @@ export function PartnerProgramsSection() {
               className="relative bg-white dark:bg-card rounded-xl p-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
               data-testid={`partner-card-${item.kind}`}
             >
-              {/* Left glow */}
               <div 
                 className="absolute left-0 top-0 h-full w-[2px] rounded-l-xl"
                 style={{
@@ -213,7 +153,6 @@ export function PartnerProgramsSection() {
                 }}
               />
               
-              {/* Right glow */}
               <div 
                 className="absolute right-0 top-0 h-full w-[2px] rounded-r-xl"
                 style={{
@@ -222,7 +161,6 @@ export function PartnerProgramsSection() {
                 }}
               />
 
-              {/* Status Badge */}
               {status !== "not_started" && (
                 <span 
                   className={`absolute top-3 right-3 px-2 py-[2px] text-[12px] font-semibold rounded-full ${getStatusBadgeClass(status)}`}
@@ -232,22 +170,18 @@ export function PartnerProgramsSection() {
                 </span>
               )}
 
-              {/* Icon */}
               <div className="mb-3">
                 <Icon className="h-10 w-10 text-[#007BFF]" />
               </div>
 
-              {/* Title */}
               <h4 className="text-[17px] font-bold text-gray-900 dark:text-foreground">
                 {item.title}
               </h4>
 
-              {/* Description */}
               <p className="text-[14px] text-gray-500 dark:text-muted-foreground mt-1">
                 {item.description}
               </p>
 
-              {/* Action Button */}
               <button
                 onClick={() => handlePartnerClick(item.kind)}
                 disabled={isItemLoading}
@@ -260,7 +194,7 @@ export function PartnerProgramsSection() {
                 {isItemLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin mx-auto" />
                 ) : needsLogin ? (
-                  "লগইন করে শুরু করুন"
+                  texts.loginButtonText
                 ) : (
                   getButtonLabel(status)
                 )}

@@ -1,18 +1,18 @@
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
-  Car, Bike, UtensilsCrossed, Store, Bus, 
   ArrowRight, Loader2, Sparkles, MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { getPartnerTexts, getFilteredPartnerCards, PartnerCardText, PartnerKind } from "@/config/partnerCardTexts";
 
 interface PartnerOption {
   id: string;
-  role: "ride_driver" | "delivery_driver" | "restaurant" | "shop_partner" | "ticket_operator";
-  icon: typeof Car;
+  role: PartnerKind;
+  icon: typeof import("lucide-react").Car;
   title: string;
   subtitle: string;
   buttonText: string;
@@ -20,55 +20,35 @@ interface PartnerOption {
   bdOnly?: boolean;
 }
 
-const partnerOptions: PartnerOption[] = [
-  {
-    id: "ride-driver",
-    role: "ride_driver",
-    icon: Car,
-    title: "Ride Driver",
-    subtitle: "Earn by giving safe rides",
-    buttonText: "Become a Ride Driver",
-    route: "/partner/ride/start",
-  },
-  {
-    id: "delivery-driver",
-    role: "delivery_driver",
-    icon: Bike,
-    title: "Delivery Driver",
-    subtitle: "Deliver food and parcels",
-    buttonText: "Become a Delivery Driver",
-    route: "/partner/delivery/start",
-  },
-  {
-    id: "restaurant",
-    role: "restaurant",
-    icon: UtensilsCrossed,
-    title: "Restaurant Partner",
-    subtitle: "Join SafeGo Eats",
-    buttonText: "Open Restaurant Dashboard",
-    route: "/partner/restaurant/start",
-  },
-  {
-    id: "shop-partner",
-    role: "shop_partner",
-    icon: Store,
-    title: "Shop Partner",
-    subtitle: "Sell products on SafeGo Shops",
-    buttonText: "Become Shop Partner",
-    route: "/partner/shop/start",
-    bdOnly: true,
-  },
-  {
-    id: "ticket-operator",
-    role: "ticket_operator",
-    icon: Bus,
-    title: "Tickets & Rentals",
-    subtitle: "Manage routes, schedules and rentals",
-    buttonText: "Become Operator",
-    route: "/partner/ticket/start",
-    bdOnly: true,
-  },
-];
+function getPartnerRoute(kind: PartnerKind): string {
+  switch (kind) {
+    case "driver_ride":
+      return "/partner/ride/start";
+    case "driver_delivery":
+      return "/partner/delivery/start";
+    case "restaurant":
+      return "/partner/restaurant/start";
+    case "shop_partner":
+      return "/partner/shop/start";
+    case "ticket_operator":
+      return "/partner/ticket/start";
+    default:
+      return "/customer";
+  }
+}
+
+function cardToOption(card: PartnerCardText): PartnerOption {
+  return {
+    id: card.kind.replace("_", "-"),
+    role: card.kind,
+    icon: card.icon,
+    title: card.title,
+    subtitle: card.description,
+    buttonText: card.buttonText,
+    route: getPartnerRoute(card.kind),
+    bdOnly: card.bdOnly,
+  };
+}
 
 interface PartnerCardProps {
   option: PartnerOption;
@@ -142,20 +122,17 @@ export function PartnerUpgradeHub() {
   
   const countryCode = user?.countryCode || "US";
   const isBD = countryCode === "BD";
+  const texts = getPartnerTexts(countryCode);
   
-  const filteredOptions = partnerOptions.filter(option => {
-    if (option.bdOnly && !isBD) {
-      return false;
-    }
-    return true;
-  });
+  const filteredCards = getFilteredPartnerCards(countryCode);
+  const filteredOptions = filteredCards.map(cardToOption);
 
   if (isAuthLoading) {
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-2 mb-4">
           <Sparkles className="h-5 w-5 text-primary" />
-          <h2 className="text-xl font-bold">Become a Partner</h2>
+          <h2 className="text-xl font-bold">{texts.sectionTitle}</h2>
         </div>
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" data-testid="loader-partner-hub" />
@@ -183,17 +160,19 @@ export function PartnerUpgradeHub() {
       return { ...response, partnerType: data.partnerType, fallbackRoute: data.fallbackRoute };
     },
     onSuccess: (data) => {
-      const option = partnerOptions.find(o => o.role === data.partnerType);
+      const option = filteredOptions.find(o => o.role === data.partnerType);
       toast({
-        title: "Partner onboarding started",
-        description: data.message || `You're now starting the ${option?.title || 'partner'} onboarding process.`,
+        title: isBD ? "পার্টনার অনবোর্ডিং শুরু হয়েছে" : "Partner onboarding started",
+        description: data.message || (isBD 
+          ? `আপনি এখন ${option?.title || 'পার্টনার'} অনবোর্ডিং প্রক্রিয়া শুরু করছেন।`
+          : `You're now starting the ${option?.title || 'partner'} onboarding process.`),
       });
       setLocation(data.nextStepUrl || data.fallbackRoute);
     },
     onError: (error: Error) => {
       toast({
-        title: "Could not start onboarding",
-        description: error.message || "Please try again.",
+        title: isBD ? "অনবোর্ডিং শুরু করা যায়নি" : "Could not start onboarding",
+        description: error.message || (isBD ? "আবার চেষ্টা করুন।" : "Please try again."),
         variant: "destructive",
       });
     },
@@ -207,14 +186,11 @@ export function PartnerUpgradeHub() {
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <Sparkles className="h-5 w-5 text-primary" />
-        <h2 className="text-xl font-bold">Become a Partner</h2>
+        <h2 className="text-xl font-bold">{texts.sectionTitle}</h2>
       </div>
       
       <p className="text-sm text-muted-foreground mb-6">
-        {isBD 
-          ? "Expand your opportunities with SafeGo. Join as a partner and start earning."
-          : "Join the SafeGo network as a partner and unlock new income opportunities."
-        }
+        {texts.masterTagline}
       </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
