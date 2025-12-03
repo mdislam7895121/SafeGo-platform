@@ -248,9 +248,12 @@ export default function BDExpansionDashboard() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto">
+        <TabsList className="grid w-full grid-cols-3 md:grid-cols-6 h-auto">
           <TabsTrigger value="overview" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground" data-testid="tab-overview">
             সারাংশ
+          </TabsTrigger>
+          <TabsTrigger value="onboarding" data-testid="tab-onboarding">
+            অনবোর্ডিং
           </TabsTrigger>
           <TabsTrigger value="shops" data-testid="tab-shops">
             শপ পার্টনার
@@ -280,6 +283,10 @@ export default function BDExpansionDashboard() {
             totalTicketBookings={totalTicketBookings}
             totalRentalBookings={totalRentalBookings}
           />
+        </TabsContent>
+
+        <TabsContent value="onboarding">
+          <StagedOnboardingTab />
         </TabsContent>
 
         <TabsContent value="shops">
@@ -1532,6 +1539,480 @@ function SettlementsTab({ negativeData, isLoading }: { negativeData: NegativeBal
               data-testid="button-confirm-settle"
             >
               {settleMutation.isPending ? "প্রক্রিয়াধীন..." : "সেটেল করুন"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+interface StagedPartner {
+  id: string;
+  shopName?: string;
+  operatorName?: string;
+  ownerName?: string;
+  phoneNumber?: string;
+  partnerStatus: string;
+  verificationStatus: string;
+  rejectionReason?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  cityOrArea?: string;
+  operatorType?: string;
+  user: { email: string };
+  type: "shop" | "operator";
+}
+
+interface StagedOnboardingStats {
+  shops: {
+    draft: number;
+    kyc_pending: number;
+    setup_incomplete: number;
+    ready_for_review: number;
+    live: number;
+    rejected: number;
+  };
+  operators: {
+    draft: number;
+    kyc_pending: number;
+    setup_incomplete: number;
+    ready_for_review: number;
+    live: number;
+    rejected: number;
+  };
+}
+
+const partnerStatusLabels: Record<string, string> = {
+  draft: "ড্রাফট",
+  kyc_pending: "KYC অপেক্ষমান",
+  setup_incomplete: "সেটআপ অসম্পূর্ণ",
+  ready_for_review: "পর্যালোচনার জন্য",
+  live: "লাইভ",
+  rejected: "প্রত্যাখ্যাত"
+};
+
+const partnerStatusColors: Record<string, string> = {
+  draft: "secondary",
+  kyc_pending: "default",
+  setup_incomplete: "secondary",
+  ready_for_review: "default",
+  live: "default",
+  rejected: "destructive"
+};
+
+function StagedOnboardingTab() {
+  const [statusFilter, setStatusFilter] = useState<string>("kyc_pending");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [selectedPartner, setSelectedPartner] = useState<StagedPartner | null>(null);
+  const [actionDialog, setActionDialog] = useState<{ 
+    type: "kyc_approve" | "kyc_reject" | "setup_approve" | "setup_return" | "final_approve" | "final_reject"; 
+    partner: StagedPartner 
+  } | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const { toast } = useToast();
+
+  const { data: stats, isLoading: statsLoading } = useQuery<StagedOnboardingStats>({
+    queryKey: ["/api/admin/bd-expansion/staged-onboarding/stats"],
+  });
+
+  const { data: partners, isLoading: partnersLoading, refetch } = useQuery<StagedPartner[]>({
+    queryKey: ["/api/admin/bd-expansion/staged-onboarding/partners", { status: statusFilter, type: typeFilter }],
+  });
+
+  const actionMutation = useMutation({
+    mutationFn: async ({ partnerId, partnerType, action, reason }: { 
+      partnerId: string; 
+      partnerType: "shop" | "operator"; 
+      action: string;
+      reason?: string;
+    }) => {
+      const baseUrl = partnerType === "shop" 
+        ? `/api/admin/bd-expansion/shop-partners/${partnerId}` 
+        : `/api/admin/bd-expansion/ticket-operators/${partnerId}`;
+      
+      let endpoint = "";
+      let body: any = {};
+      
+      switch(action) {
+        case "kyc_approve":
+          endpoint = `${baseUrl}/kyc-approve`;
+          break;
+        case "kyc_reject":
+          endpoint = `${baseUrl}/kyc-reject`;
+          body = { reason };
+          break;
+        case "setup_approve":
+          endpoint = `${baseUrl}/setup-approve`;
+          break;
+        case "setup_return":
+          endpoint = `${baseUrl}/setup-return`;
+          body = { reason };
+          break;
+        case "final_approve":
+          endpoint = `${baseUrl}/final-approve`;
+          break;
+        case "final_reject":
+          endpoint = `${baseUrl}/final-reject`;
+          body = { reason };
+          break;
+      }
+      
+      return apiRequest(endpoint, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bd-expansion/staged-onboarding"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/bd-expansion/bd-expansion/stats"] });
+      refetch();
+      toast({ title: "সফল", description: "অ্যাকশন সম্পন্ন হয়েছে" });
+      setActionDialog(null);
+      setRejectionReason("");
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "ত্রুটি", 
+        description: error?.message || "অ্যাকশন ব্যর্থ হয়েছে", 
+        variant: "destructive" 
+      });
+    }
+  });
+
+  const handleAction = () => {
+    if (!actionDialog) return;
+    actionMutation.mutate({
+      partnerId: actionDialog.partner.id,
+      partnerType: actionDialog.partner.type,
+      action: actionDialog.type,
+      reason: rejectionReason || undefined
+    });
+  };
+
+  const getStatusCount = (status: string) => {
+    if (!stats) return 0;
+    if (typeFilter === "shop") return stats.shops[status as keyof typeof stats.shops] || 0;
+    if (typeFilter === "operator") return stats.operators[status as keyof typeof stats.operators] || 0;
+    return (stats.shops[status as keyof typeof stats.shops] || 0) + (stats.operators[status as keyof typeof stats.operators] || 0);
+  };
+
+  const statusTabs = [
+    { value: "kyc_pending", label: "KYC অপেক্ষমান", icon: Clock, color: "text-blue-600" },
+    { value: "setup_incomplete", label: "সেটআপ অসম্পূর্ণ", icon: AlertTriangle, color: "text-orange-600" },
+    { value: "ready_for_review", label: "পর্যালোচনা", icon: Eye, color: "text-purple-600" },
+    { value: "rejected", label: "প্রত্যাখ্যাত", icon: XCircle, color: "text-red-600" },
+    { value: "live", label: "লাইভ", icon: CheckCircle, color: "text-green-600" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {statusTabs.map((tab) => {
+          const Icon = tab.icon;
+          const count = getStatusCount(tab.value);
+          return (
+            <button
+              key={tab.value}
+              onClick={() => setStatusFilter(tab.value)}
+              className={`p-4 rounded-lg border transition-all ${
+                statusFilter === tab.value 
+                  ? "bg-primary/10 border-primary" 
+                  : "hover-elevate"
+              }`}
+              data-testid={`filter-${tab.value}`}
+            >
+              <div className="flex items-center gap-2">
+                <Icon className={`h-5 w-5 ${tab.color}`} />
+                <span className="font-medium text-sm">{tab.label}</span>
+              </div>
+              <p className={`text-2xl font-bold mt-2 ${tab.color}`}>
+                {count}
+              </p>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div className="flex gap-2">
+          <Button
+            variant={typeFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTypeFilter("all")}
+            data-testid="filter-type-all"
+          >
+            সব ({stats ? (stats.shops[statusFilter as keyof typeof stats.shops] || 0) + (stats.operators[statusFilter as keyof typeof stats.operators] || 0) : 0})
+          </Button>
+          <Button
+            variant={typeFilter === "shop" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTypeFilter("shop")}
+            data-testid="filter-type-shop"
+          >
+            <Store className="h-4 w-4 mr-1" />
+            শপ ({stats?.shops[statusFilter as keyof typeof stats.shops] || 0})
+          </Button>
+          <Button
+            variant={typeFilter === "operator" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setTypeFilter("operator")}
+            data-testid="filter-type-operator"
+          >
+            <Ticket className="h-4 w-4 mr-1" />
+            টিকিট/রেন্টাল ({stats?.operators[statusFilter as keyof typeof stats.operators] || 0})
+          </Button>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetch()}
+          data-testid="button-refresh-onboarding"
+        >
+          <RefreshCw className="h-4 w-4 mr-1" />
+          রিফ্রেশ
+        </Button>
+      </div>
+
+      {(statsLoading || partnersLoading) ? (
+        <div className="space-y-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {partners?.map((partner) => (
+            <Card key={`${partner.type}-${partner.id}`} className="hover-elevate" data-testid={`card-partner-${partner.id}`}>
+              <CardContent className="p-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center ${
+                      partner.type === "shop" ? "bg-blue-50 dark:bg-blue-950" : "bg-purple-50 dark:bg-purple-950"
+                    }`}>
+                      {partner.type === "shop" ? (
+                        <Store className="h-6 w-6 text-blue-600" />
+                      ) : (
+                        <Ticket className="h-6 w-6 text-purple-600" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold">
+                          {partner.shopName || partner.operatorName}
+                        </h3>
+                        <Badge variant="outline" className="text-xs">
+                          {partner.type === "shop" ? "শপ" : partner.operatorType || "অপারেটর"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {partner.ownerName} - {partner.phoneNumber}
+                      </p>
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        <Badge variant={partnerStatusColors[partner.partnerStatus] as any}>
+                          {partnerStatusLabels[partner.partnerStatus]}
+                        </Badge>
+                        {partner.cityOrArea && (
+                          <Badge variant="outline" className="text-xs">
+                            {partner.cityOrArea}
+                          </Badge>
+                        )}
+                      </div>
+                      {partner.rejectionReason && (
+                        <p className="text-xs text-red-600 mt-1">
+                          কারণ: {partner.rejectionReason}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedPartner(partner)}
+                      data-testid={`button-view-partner-${partner.id}`}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      দেখুন
+                    </Button>
+
+                    {partner.partnerStatus === "kyc_pending" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => setActionDialog({ type: "kyc_approve", partner })}
+                          data-testid={`button-kyc-approve-${partner.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          KYC অনুমোদন
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setActionDialog({ type: "kyc_reject", partner })}
+                          data-testid={`button-kyc-reject-${partner.id}`}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          প্রত্যাখ্যান
+                        </Button>
+                      </>
+                    )}
+
+                    {partner.partnerStatus === "setup_incomplete" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActionDialog({ type: "setup_return", partner })}
+                        data-testid={`button-setup-return-${partner.id}`}
+                      >
+                        <AlertTriangle className="h-4 w-4 mr-1" />
+                        রিটার্ন
+                      </Button>
+                    )}
+
+                    {partner.partnerStatus === "ready_for_review" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => setActionDialog({ type: "final_approve", partner })}
+                          data-testid={`button-final-approve-${partner.id}`}
+                        >
+                          <CheckCircle className="h-4 w-4 mr-1" />
+                          লাইভ করুন
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setActionDialog({ type: "final_reject", partner })}
+                          data-testid={`button-final-reject-${partner.id}`}
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          প্রত্যাখ্যান
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+
+          {partners?.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>এই ক্যাটাগরিতে কোনো পার্টনার নেই</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <Dialog open={!!actionDialog} onOpenChange={() => { setActionDialog(null); setRejectionReason(""); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {actionDialog?.type === "kyc_approve" && "KYC অনুমোদন"}
+              {actionDialog?.type === "kyc_reject" && "KYC প্রত্যাখ্যান"}
+              {actionDialog?.type === "setup_approve" && "সেটআপ অনুমোদন"}
+              {actionDialog?.type === "setup_return" && "সেটআপ রিটার্ন"}
+              {actionDialog?.type === "final_approve" && "চূড়ান্ত অনুমোদন (লাইভ)"}
+              {actionDialog?.type === "final_reject" && "চূড়ান্ত প্রত্যাখ্যান"}
+            </DialogTitle>
+            <DialogDescription>
+              {actionDialog?.partner.shopName || actionDialog?.partner.operatorName} - এই অ্যাকশন নিশ্চিত করুন
+            </DialogDescription>
+          </DialogHeader>
+
+          {(actionDialog?.type === "kyc_reject" || actionDialog?.type === "setup_return" || actionDialog?.type === "final_reject") && (
+            <div className="space-y-2">
+              <Label>কারণ *</Label>
+              <Textarea
+                value={rejectionReason}
+                onChange={(e) => setRejectionReason(e.target.value)}
+                placeholder="কারণ লিখুন..."
+                data-testid="input-action-reason"
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setActionDialog(null); setRejectionReason(""); }} data-testid="button-cancel-action">
+              বাতিল
+            </Button>
+            <Button
+              variant={actionDialog?.type.includes("reject") || actionDialog?.type === "setup_return" ? "destructive" : "default"}
+              onClick={handleAction}
+              disabled={
+                actionMutation.isPending || 
+                ((actionDialog?.type === "kyc_reject" || actionDialog?.type === "setup_return" || actionDialog?.type === "final_reject") && !rejectionReason)
+              }
+              data-testid="button-confirm-action"
+            >
+              {actionMutation.isPending ? "প্রক্রিয়াধীন..." : "নিশ্চিত"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedPartner} onOpenChange={() => setSelectedPartner(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedPartner?.type === "shop" ? (
+                <Store className="h-5 w-5 text-blue-600" />
+              ) : (
+                <Ticket className="h-5 w-5 text-purple-600" />
+              )}
+              {selectedPartner?.shopName || selectedPartner?.operatorName}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedPartner?.type === "shop" ? "শপ পার্টনার বিবরণ" : "টিকিট/রেন্টাল অপারেটর বিবরণ"}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">মালিকের নাম</p>
+                <p className="font-medium">{selectedPartner?.ownerName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">ফোন</p>
+                <p className="font-medium">{selectedPartner?.phoneNumber}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">ইমেইল</p>
+                <p className="font-medium">{selectedPartner?.user.email}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">এলাকা</p>
+                <p className="font-medium">{selectedPartner?.cityOrArea || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">স্ট্যাটাস</p>
+                <Badge variant={partnerStatusColors[selectedPartner?.partnerStatus || "draft"] as any}>
+                  {partnerStatusLabels[selectedPartner?.partnerStatus || "draft"]}
+                </Badge>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">তৈরির তারিখ</p>
+                <p className="font-medium">
+                  {selectedPartner?.createdAt ? new Date(selectedPartner.createdAt).toLocaleDateString("bn-BD") : "-"}
+                </p>
+              </div>
+            </div>
+
+            {selectedPartner?.rejectionReason && (
+              <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                <p className="text-sm text-red-700 dark:text-red-300">
+                  <strong>প্রত্যাখ্যানের কারণ:</strong> {selectedPartner.rejectionReason}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedPartner(null)} data-testid="button-close-details">
+              বন্ধ করুন
             </Button>
           </DialogFooter>
         </DialogContent>

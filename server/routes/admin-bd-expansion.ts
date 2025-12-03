@@ -1327,4 +1327,754 @@ router.patch("/ticket-operators/:id/reject", async (req: Request, res: Response)
   }
 });
 
+router.get("/staged-onboarding/stats", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const [shopStats, operatorStats] = await Promise.all([
+      prisma.shopPartner.groupBy({
+        by: ["partnerStatus"],
+        _count: true,
+      }),
+      prisma.ticketOperator.groupBy({
+        by: ["partnerStatus"],
+        _count: true,
+      }),
+    ]);
+
+    const statusOptions = ["draft", "kyc_pending", "setup_incomplete", "ready_for_review", "live", "rejected"];
+    
+    const shopCounts: Record<string, number> = {};
+    const operatorCounts: Record<string, number> = {};
+    
+    statusOptions.forEach(s => {
+      shopCounts[s] = 0;
+      operatorCounts[s] = 0;
+    });
+    
+    shopStats.forEach(item => {
+      if (item.partnerStatus) {
+        shopCounts[item.partnerStatus] = item._count;
+      }
+    });
+    
+    operatorStats.forEach(item => {
+      if (item.partnerStatus) {
+        operatorCounts[item.partnerStatus] = item._count;
+      }
+    });
+
+    res.json({
+      shops: shopCounts,
+      operators: operatorCounts,
+    });
+  } catch (error) {
+    console.error("Admin staged onboarding stats error:", error);
+    res.status(500).json({ error: "Failed to fetch stats" });
+  }
+});
+
+router.get("/staged-onboarding/partners", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const { status, type } = req.query;
+    
+    const partners: any[] = [];
+    
+    if (type !== "operator") {
+      const shops = await prisma.shopPartner.findMany({
+        where: status ? { partnerStatus: status as string } : undefined,
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        include: {
+          user: { select: { email: true } },
+        },
+      });
+      
+      shops.forEach(shop => {
+        partners.push({
+          ...shop,
+          type: "shop",
+        });
+      });
+    }
+    
+    if (type !== "shop") {
+      const operators = await prisma.ticketOperator.findMany({
+        where: status ? { partnerStatus: status as string } : undefined,
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        include: {
+          user: { select: { email: true } },
+        },
+      });
+      
+      operators.forEach(op => {
+        partners.push({
+          ...op,
+          type: "operator",
+        });
+      });
+    }
+    
+    partners.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    res.json(partners.slice(0, 50));
+  } catch (error) {
+    console.error("Admin staged onboarding partners error:", error);
+    res.status(500).json({ error: "Failed to fetch partners" });
+  }
+});
+
+router.post("/shop-partners/:id/kyc-approve", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const shop = await prisma.shopPartner.findUnique({ where: { id } });
+    if (!shop) {
+      return res.status(404).json({ error: "Shop partner not found" });
+    }
+
+    if (shop.partnerStatus !== "kyc_pending") {
+      return res.status(400).json({ error: "Shop partner is not in KYC pending status" });
+    }
+
+    const updated = await prisma.shopPartner.update({
+      where: { id },
+      data: {
+        partnerStatus: "setup_incomplete",
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "SHOP_PARTNER_KYC_APPROVED",
+        entityType: "shop_partner",
+        entityId: id,
+        description: `Admin approved KYC for ${shop.shopName}`,
+        metadata: { shopName: shop.shopName },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "KYC approved successfully",
+      shop: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin KYC approve error:", error);
+    res.status(500).json({ error: "Failed to approve KYC" });
+  }
+});
+
+router.post("/shop-partners/:id/kyc-reject", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const shop = await prisma.shopPartner.findUnique({ where: { id } });
+    if (!shop) {
+      return res.status(404).json({ error: "Shop partner not found" });
+    }
+
+    const updated = await prisma.shopPartner.update({
+      where: { id },
+      data: {
+        partnerStatus: "rejected",
+        verificationStatus: "rejected",
+        rejectionReason: reason,
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "SHOP_PARTNER_KYC_REJECTED",
+        entityType: "shop_partner",
+        entityId: id,
+        description: `Admin rejected KYC for ${shop.shopName}: ${reason}`,
+        metadata: { shopName: shop.shopName, reason },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "KYC rejected",
+      shop: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin KYC reject error:", error);
+    res.status(500).json({ error: "Failed to reject KYC" });
+  }
+});
+
+router.post("/shop-partners/:id/setup-return", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const shop = await prisma.shopPartner.findUnique({ where: { id } });
+    if (!shop) {
+      return res.status(404).json({ error: "Shop partner not found" });
+    }
+
+    const updated = await prisma.shopPartner.update({
+      where: { id },
+      data: {
+        rejectionReason: reason || "সেটআপ সম্পূর্ণ করুন",
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "SHOP_PARTNER_SETUP_RETURNED",
+        entityType: "shop_partner",
+        entityId: id,
+        description: `Admin returned setup for ${shop.shopName}`,
+        metadata: { shopName: shop.shopName, reason },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Setup returned for revision",
+      shop: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin setup return error:", error);
+    res.status(500).json({ error: "Failed to return setup" });
+  }
+});
+
+router.post("/shop-partners/:id/final-approve", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const shop = await prisma.shopPartner.findUnique({ where: { id } });
+    if (!shop) {
+      return res.status(404).json({ error: "Shop partner not found" });
+    }
+
+    if (shop.partnerStatus !== "ready_for_review") {
+      return res.status(400).json({ error: "Shop partner is not ready for final review" });
+    }
+
+    const updated = await prisma.shopPartner.update({
+      where: { id },
+      data: {
+        partnerStatus: "live",
+        verificationStatus: "approved",
+        isActive: true,
+        rejectionReason: null,
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "SHOP_PARTNER_FINAL_APPROVED",
+        entityType: "shop_partner",
+        entityId: id,
+        description: `Admin approved ${shop.shopName} to go LIVE`,
+        metadata: { shopName: shop.shopName },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Shop partner is now LIVE!",
+      shop: { id: updated.id, partnerStatus: updated.partnerStatus, isActive: updated.isActive },
+    });
+  } catch (error) {
+    console.error("Admin final approve error:", error);
+    res.status(500).json({ error: "Failed to approve" });
+  }
+});
+
+router.post("/shop-partners/:id/final-reject", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const shop = await prisma.shopPartner.findUnique({ where: { id } });
+    if (!shop) {
+      return res.status(404).json({ error: "Shop partner not found" });
+    }
+
+    const updated = await prisma.shopPartner.update({
+      where: { id },
+      data: {
+        partnerStatus: "rejected",
+        verificationStatus: "rejected",
+        rejectionReason: reason,
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "SHOP_PARTNER_FINAL_REJECTED",
+        entityType: "shop_partner",
+        entityId: id,
+        description: `Admin rejected ${shop.shopName}: ${reason}`,
+        metadata: { shopName: shop.shopName, reason },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Shop partner rejected",
+      shop: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin final reject error:", error);
+    res.status(500).json({ error: "Failed to reject" });
+  }
+});
+
+router.post("/ticket-operators/:id/kyc-approve", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({ where: { id } });
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator not found" });
+    }
+
+    if (operator.partnerStatus !== "kyc_pending") {
+      return res.status(400).json({ error: "Operator is not in KYC pending status" });
+    }
+
+    const updated = await prisma.ticketOperator.update({
+      where: { id },
+      data: {
+        partnerStatus: "setup_incomplete",
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "TICKET_OPERATOR_KYC_APPROVED",
+        entityType: "ticket_operator",
+        entityId: id,
+        description: `Admin approved KYC for ${operator.operatorName}`,
+        metadata: { operatorName: operator.operatorName },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "KYC approved successfully",
+      operator: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin KYC approve error:", error);
+    res.status(500).json({ error: "Failed to approve KYC" });
+  }
+});
+
+router.post("/ticket-operators/:id/kyc-reject", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({ where: { id } });
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator not found" });
+    }
+
+    const updated = await prisma.ticketOperator.update({
+      where: { id },
+      data: {
+        partnerStatus: "rejected",
+        verificationStatus: "rejected",
+        rejectionReason: reason,
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "TICKET_OPERATOR_KYC_REJECTED",
+        entityType: "ticket_operator",
+        entityId: id,
+        description: `Admin rejected KYC for ${operator.operatorName}: ${reason}`,
+        metadata: { operatorName: operator.operatorName, reason },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "KYC rejected",
+      operator: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin KYC reject error:", error);
+    res.status(500).json({ error: "Failed to reject KYC" });
+  }
+});
+
+router.post("/ticket-operators/:id/setup-return", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({ where: { id } });
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator not found" });
+    }
+
+    const updated = await prisma.ticketOperator.update({
+      where: { id },
+      data: {
+        rejectionReason: reason || "সেটআপ সম্পূর্ণ করুন",
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "TICKET_OPERATOR_SETUP_RETURNED",
+        entityType: "ticket_operator",
+        entityId: id,
+        description: `Admin returned setup for ${operator.operatorName}`,
+        metadata: { operatorName: operator.operatorName, reason },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Setup returned for revision",
+      operator: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin setup return error:", error);
+    res.status(500).json({ error: "Failed to return setup" });
+  }
+});
+
+router.post("/ticket-operators/:id/final-approve", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({ where: { id } });
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator not found" });
+    }
+
+    if (operator.partnerStatus !== "ready_for_review") {
+      return res.status(400).json({ error: "Operator is not ready for final review" });
+    }
+
+    const updated = await prisma.ticketOperator.update({
+      where: { id },
+      data: {
+        partnerStatus: "live",
+        verificationStatus: "approved",
+        isActive: true,
+        rejectionReason: null,
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "TICKET_OPERATOR_FINAL_APPROVED",
+        entityType: "ticket_operator",
+        entityId: id,
+        description: `Admin approved ${operator.operatorName} to go LIVE`,
+        metadata: { operatorName: operator.operatorName },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Ticket operator is now LIVE!",
+      operator: { id: updated.id, partnerStatus: updated.partnerStatus, isActive: updated.isActive },
+    });
+  } catch (error) {
+    console.error("Admin final approve error:", error);
+    res.status(500).json({ error: "Failed to approve" });
+  }
+});
+
+router.post("/ticket-operators/:id/final-reject", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const adminUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { adminProfile: true },
+    });
+
+    if (!adminUser?.adminProfile || adminUser.role !== "admin") {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    if (!reason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({ where: { id } });
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator not found" });
+    }
+
+    const updated = await prisma.ticketOperator.update({
+      where: { id },
+      data: {
+        partnerStatus: "rejected",
+        verificationStatus: "rejected",
+        rejectionReason: reason,
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: adminUser.email || "unknown",
+        actorRole: "admin",
+        actionType: "TICKET_OPERATOR_FINAL_REJECTED",
+        entityType: "ticket_operator",
+        entityId: id,
+        description: `Admin rejected ${operator.operatorName}: ${reason}`,
+        metadata: { operatorName: operator.operatorName, reason },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "Ticket operator rejected",
+      operator: { id: updated.id, partnerStatus: updated.partnerStatus },
+    });
+  } catch (error) {
+    console.error("Admin final reject error:", error);
+    res.status(500).json({ error: "Failed to reject" });
+  }
+});
+
 export default router;

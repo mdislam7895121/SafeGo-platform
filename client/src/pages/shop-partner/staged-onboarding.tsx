@@ -94,8 +94,8 @@ const stage2Schema = z.object({
 });
 
 const stage3Schema = z.object({
-  logo: z.string().url("দোকানের লোগো আপলোড করুন"),
-  banner: z.string().url().optional(),
+  shopLogo: z.string().url("দোকানের লোগো আপলোড করুন"),
+  shopBanner: z.string().url("দোকানের ব্যানার আপলোড করুন"),
   shopAddress: z.string().min(5, "দোকানের সম্পূর্ণ ঠিকানা লিখুন"),
 });
 
@@ -823,8 +823,8 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
   const form = useForm<Stage3Data>({
     resolver: zodResolver(stage3Schema),
     defaultValues: {
-      logo: "",
-      banner: "",
+      shopLogo: "",
+      shopBanner: "",
       shopAddress: "",
     },
   });
@@ -855,7 +855,7 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
 
   const handleImageUpload = async (file: File, type: "logo" | "banner") => {
     const setUploading = type === "logo" ? setLogoUploading : setBannerUploading;
-    const fieldName = type;
+    const fieldName = type === "logo" ? "shopLogo" : "shopBanner";
 
     if (!file.type.startsWith("image/")) {
       toast({
@@ -883,7 +883,7 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
       }
 
       const data = await response.json();
-      form.setValue(fieldName, data.url);
+      form.setValue(fieldName as any, data.url);
       
       toast({
         title: "সফল!",
@@ -904,8 +904,8 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
     mutation.mutate(data);
   };
 
-  const logoValue = form.watch("logo");
-  const bannerValue = form.watch("banner");
+  const logoValue = form.watch("shopLogo");
+  const bannerValue = form.watch("shopBanner");
   const productCount = status.checklist.productCount || 0;
   const requiredProducts = status.checklist.requiredProducts || 3;
 
