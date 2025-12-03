@@ -275,6 +275,7 @@ import { ShopPartnerLayout } from "@/layouts/ShopPartnerLayout";
 import { ShopPartnerGuard } from "@/components/ShopPartnerGuard";
 import ShopPartnerDashboard from "@/pages/shop-partner/dashboard";
 import ShopPartnerOnboarding from "@/pages/shop-partner/onboarding";
+import ShopPartnerStagedOnboarding from "@/pages/shop-partner/staged-onboarding";
 import ShopPartnerSetup from "@/pages/shop-partner/setup";
 import ShopPartnerProducts from "@/pages/shop-partner/products";
 import ShopPartnerProductForm from "@/pages/shop-partner/product-form";
@@ -293,6 +294,7 @@ import { TicketOperatorGuard } from "@/components/TicketOperatorGuard";
 import { TicketOperatorLayout } from "@/layouts/TicketOperatorLayout";
 import TicketOperatorDashboard from "@/pages/ticket-operator/dashboard";
 import TicketOperatorOnboarding from "@/pages/ticket-operator/onboarding";
+import TicketOperatorStagedOnboarding from "@/pages/ticket-operator/staged-onboarding";
 import TicketOperatorSetup from "@/pages/ticket-operator/setup";
 import TicketOperatorTickets from "@/pages/ticket-operator/tickets";
 import TicketOperatorRentals from "@/pages/ticket-operator/rentals";
@@ -2034,6 +2036,11 @@ function Router() {
       </Route>
 
       {/* Shop Partner Routes (BD only) */}
+      <Route path="/shop-partner/staged-onboarding">
+        <ShopPartnerGuard allowSetup>
+          <ShopPartnerStagedOnboarding />
+        </ShopPartnerGuard>
+      </Route>
       <Route path="/shop-partner/onboarding">
         <ShopPartnerGuard allowSetup>
           <ShopPartnerOnboarding />
@@ -2157,6 +2164,11 @@ function Router() {
       </Route>
 
       {/* Ticket Operator Routes (BD only) */}
+      <Route path="/ticket-operator/staged-onboarding">
+        <TicketOperatorGuard allowSetup>
+          <TicketOperatorStagedOnboarding />
+        </TicketOperatorGuard>
+      </Route>
       <Route path="/ticket-operator/onboarding">
         <TicketOperatorGuard allowSetup>
           <TicketOperatorOnboarding />
