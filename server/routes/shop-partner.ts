@@ -34,8 +34,9 @@ router.post("/upload-image", (req: AuthRequest, res: Response) => {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      // Allow both pending_shop_partner and shop_partner roles
-      if (userRole !== "pending_shop_partner" && userRole !== "shop_partner") {
+      // Allow customer (during onboarding), pending_shop_partner, and shop_partner roles
+      // Customers can upload during the staged onboarding process before their role is upgraded
+      if (!["customer", "pending_shop_partner", "shop_partner"].includes(userRole || "")) {
         return res.status(403).json({ error: "Only shop partners can upload images" });
       }
 
@@ -49,22 +50,30 @@ router.post("/upload-image", (req: AuthRequest, res: Response) => {
 
       // Validate image type from query param
       const imageType = req.query.type as string;
-      if (!imageType || !["logo", "banner"].includes(imageType)) {
+      const validTypes = ["logo", "banner", "nid_front", "nid_back"];
+      if (!imageType || !validTypes.includes(imageType)) {
         return res.status(400).json({ 
           error: "অবৈধ ছবির ধরণ",
-          errorEn: "Invalid image type. Must be 'logo' or 'banner'"
+          errorEn: "Invalid image type. Must be 'logo', 'banner', 'nid_front', or 'nid_back'"
         });
       }
 
       // Generate the URL for the uploaded file
       const fileUrl = getFileUrl(file.filename);
 
+      const messages: Record<string, string> = {
+        logo: "লোগো আপলোড সফল হয়েছে",
+        banner: "ব্যানার আপলোড সফল হয়েছে",
+        nid_front: "NID সামনের ছবি আপলোড সফল হয়েছে",
+        nid_back: "NID পেছনের ছবি আপলোড সফল হয়েছে"
+      };
+
       res.json({
         success: true,
         url: fileUrl,
         type: imageType,
         filename: file.filename,
-        message: imageType === "logo" ? "লোগো আপলোড সফল হয়েছে" : "ব্যানার আপলোড সফল হয়েছে"
+        message: messages[imageType] || "আপলোড সফল হয়েছে"
       });
     } catch (error) {
       console.error("Shop image upload error:", error);
