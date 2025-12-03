@@ -537,12 +537,9 @@ export default function AdminDriverDetails() {
   // Fetch NID (admin-only, secure endpoint)
   const fetchNidMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", `/api/admin/drivers/${driverId}/nid`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch NID");
-      }
-      const data = await response.json();
+      const data = await apiRequest(`/api/admin/drivers/${driverId}/nid`, {
+        method: "GET",
+      });
       return data.nid;
     },
     onSuccess: (data) => {
@@ -565,12 +562,11 @@ export default function AdminDriverDetails() {
         }
       });
 
-      const response = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/profile`, payload);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update profile");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/drivers/${driverId}/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
     onSuccess: () => {
       toast({ title: "Profile updated successfully" });
@@ -599,12 +595,9 @@ export default function AdminDriverDetails() {
   // Fetch SSN (admin-only, secure endpoint)
   const fetchSSNMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", `/api/admin/drivers/${driverId}/ssn`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch SSN");
-      }
-      const data = await response.json();
+      const data = await apiRequest(`/api/admin/drivers/${driverId}/ssn`, {
+        method: "GET",
+      });
       return data.maskedSSN;
     },
     onSuccess: (data) => {
@@ -642,12 +635,11 @@ export default function AdminDriverDetails() {
         }
       });
 
-      const response = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/usa-profile`, payload);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update USA profile");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/drivers/${driverId}/usa-profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
     onSuccess: () => {
       toast({ title: "USA profile updated successfully" });
@@ -776,12 +768,11 @@ export default function AdminDriverDetails() {
       if (data.dmvInspectionExpiry) payload.dmvInspectionExpiry = data.dmvInspectionExpiry;
       if (data.dmvInspectionImageUrl) payload.dmvInspectionImageUrl = data.dmvInspectionImageUrl;
 
-      const response = await apiRequest("PATCH", `/api/admin/drivers/${driverId}/vehicle`, payload);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update vehicle");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/drivers/${driverId}/vehicle`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
     onSuccess: () => {
       toast({ title: "Vehicle information updated successfully" });
@@ -825,16 +816,15 @@ export default function AdminDriverDetails() {
       const vehicleId = driver?.vehicle?.id;
       if (!vehicleId) throw new Error("No vehicle found");
 
-      const response = await apiRequest("PATCH", `/api/admin/vehicles/${vehicleId}/category-approval`, {
-        approved,
-        vehicleCategory: category,
-        rejectionReason,
+      return await apiRequest(`/api/admin/vehicles/${vehicleId}/category-approval`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          approved,
+          vehicleCategory: category,
+          rejectionReason,
+        }),
       });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update vehicle category");
-      }
-      return response.json();
     },
     onSuccess: (_, variables) => {
       const message = variables.approved 
@@ -878,12 +868,10 @@ export default function AdminDriverDetails() {
       const vehicleId = driver?.vehicle?.id;
       if (!vehicleId) throw new Error("No vehicle found");
 
-      const response = await apiRequest("PATCH", `/api/admin/vehicles/${vehicleId}/reset-preferences`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to reset category preferences");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/vehicles/${vehicleId}/reset-preferences`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({ title: "Category preferences reset to default (all eligible categories enabled)" });
@@ -2002,7 +1990,9 @@ export default function AdminDriverDetails() {
                                 size="sm"
                                 onClick={async () => {
                                   try {
-                                    await apiRequest("POST", `/api/admin/drivers/${driverId}/payout-accounts/${account.id}/set-default`);
+                                    await apiRequest(`/api/admin/drivers/${driverId}/payout-accounts/${account.id}/set-default`, {
+                                      method: "POST",
+                                    });
                                     queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}/payout-accounts`] });
                                     toast({ title: "Default payout account updated" });
                                   } catch (error: any) {
@@ -3392,7 +3382,11 @@ export default function AdminDriverDetails() {
                     payload.stripeAccountId = payoutForm.stripeAccountId;
                   }
 
-                  await apiRequest("POST", `/api/admin/drivers/${driverId}/payout-accounts`, payload);
+                  await apiRequest(`/api/admin/drivers/${driverId}/payout-accounts`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
                   queryClient.invalidateQueries({ queryKey: [`/api/admin/drivers/${driverId}/payout-accounts`] });
                   toast({ title: "Payout account created successfully" });
                   setShowPayoutDialog(false);
