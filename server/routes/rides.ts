@@ -248,7 +248,8 @@ router.get("/:id", async (req: AuthRequest, res) => {
                 email: true,
               },
             },
-            vehicle: true,
+            vehicles: true,
+            driverStats: true,
           },
         },
       },
@@ -281,22 +282,25 @@ router.get("/:id", async (req: AuthRequest, res) => {
         customer: {
           email: ride.customer.user.email,
         },
-        driver: ride.driver ? {
-          id: ride.driver.id,
-          firstName: ride.driver.firstName,
-          lastName: ride.driver.lastName || undefined,
-          phone: ride.driver.phone || undefined,
-          rating: ride.driver.rating ? Number(ride.driver.rating) : undefined,
-          photoUrl: ride.driver.photoUrl || undefined,
-          currentLat: ride.driver.currentLat ? Number(ride.driver.currentLat) : undefined,
-          currentLng: ride.driver.currentLng ? Number(ride.driver.currentLng) : undefined,
-          lastLocationUpdate: ride.driver.lastLocationUpdate || undefined,
-          vehicleMake: ride.driver.vehicle?.make || undefined,
-          vehicleModel: ride.driver.vehicle?.model || undefined,
-          vehicleColor: ride.driver.vehicle?.color || undefined,
-          vehicleYear: ride.driver.vehicle?.year || undefined,
-          licensePlate: ride.driver.vehicle?.licensePlate || undefined,
-        } : null,
+        driver: ride.driver ? (() => {
+          const primaryVehicle = ride.driver.vehicles?.find(v => v.isPrimary) || ride.driver.vehicles?.[0];
+          return {
+            id: ride.driver.id,
+            firstName: ride.driver.firstName,
+            lastName: ride.driver.lastName || undefined,
+            phone: ride.driver.phoneNumber || undefined,
+            rating: ride.driver.driverStats?.riderRatingAvg ? Number(ride.driver.driverStats.riderRatingAvg) : undefined,
+            photoUrl: ride.driver.profilePhotoUrl || undefined,
+            currentLat: ride.driver.currentLat ? Number(ride.driver.currentLat) : undefined,
+            currentLng: ride.driver.currentLng ? Number(ride.driver.currentLng) : undefined,
+            lastLocationUpdate: ride.driver.lastLocationUpdate || undefined,
+            vehicleMake: primaryVehicle?.make || undefined,
+            vehicleModel: primaryVehicle?.vehicleModel || undefined,
+            vehicleColor: primaryVehicle?.color || undefined,
+            vehicleYear: primaryVehicle?.year || undefined,
+            licensePlate: primaryVehicle?.licensePlate || undefined,
+          };
+        })() : null,
         pickupAddress: ride.pickupAddress,
         pickupLat: ride.pickupLat,
         pickupLng: ride.pickupLng,
@@ -350,7 +354,7 @@ router.patch("/:id/accept", async (req: AuthRequest, res) => {
 
     const driverProfile = await prisma.driverProfile.findUnique({
       where: { userId },
-      include: { vehicle: true },
+      include: { vehicles: true },
     });
 
     if (!driverProfile) {
@@ -361,7 +365,8 @@ router.patch("/:id/accept", async (req: AuthRequest, res) => {
       return res.status(403).json({ error: "Driver must be verified to accept rides" });
     }
 
-    if (!driverProfile.vehicle || !driverProfile.vehicle.isOnline) {
+    const primaryVehicle = driverProfile.vehicles?.find(v => v.isPrimary) || driverProfile.vehicles?.[0];
+    if (!primaryVehicle || !primaryVehicle.isOnline) {
       return res.status(403).json({ error: "Driver must be online to accept rides" });
     }
 
@@ -390,14 +395,18 @@ router.patch("/:id/accept", async (req: AuthRequest, res) => {
     });
 
     // Create notification for customer
-    await prisma.notification.create({
-      data: {
-        userId: (await prisma.customerProfile.findUnique({ where: { id: ride.customerId }, include: { user: true } }))!.userId,
-        type: "ride_update",
-        title: "Driver Found!",
-        body: `Your ride has been accepted. Driver is on the way.`,
-      },
-    });
+    const customerProfile = await prisma.customerProfile.findUnique({ where: { id: ride.customerId }, include: { user: true } });
+    if (customerProfile) {
+      await prisma.notification.create({
+        data: {
+          id: crypto.randomUUID(),
+          userId: customerProfile.userId,
+          type: "ride_update",
+          title: "Driver Found!",
+          body: `Your ride has been accepted. Driver is on the way.`,
+        },
+      });
+    }
 
     res.json({
       message: "Ride accepted successfully",
@@ -463,6 +472,7 @@ router.patch("/:id/status", async (req: AuthRequest, res) => {
     if (recipientUserId) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: recipientUserId,
           type: "ride_update",
           title: "Ride Status Updated",
@@ -554,26 +564,32 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
       // Apply commission logic
       driver = await prisma.driverProfile.findUnique({
         where: { id: ride.driverId },
-        include: { driverWallet: true, vehicle: true, stats: true, user: true },
+        include: { driverWallet: true, vehicles: true, driverStats: true, user: true },
       });
 
       if (driver) {
+        const primaryVehicle = driver.vehicles?.find((v: any) => v.isPrimary) || driver.vehicles?.[0];
+
         // Update driver stats
-        await prisma.driverStats.update({
-          where: { id: driver.stats!.id },
-          data: {
-            totalTrips: { increment: 1 },
-            rating: (parseFloat(driver.stats!.rating.toString()) * driver.stats!.totalTrips + rating) / (driver.stats!.totalTrips + 1),
-          },
-        });
+        if (driver.driverStats) {
+          await prisma.driverStats.update({
+            where: { id: driver.driverStats.id },
+            data: {
+              totalTrips: { increment: 1 },
+              riderRatingAvg: (parseFloat(driver.driverStats.riderRatingAvg?.toString() || "0") * driver.driverStats.totalTrips + rating) / (driver.driverStats.totalTrips + 1),
+            },
+          });
+        }
 
         // Update vehicle earnings
-        await prisma.vehicle.update({
-          where: { id: driver.vehicle!.id },
-          data: {
-            totalEarnings: { increment: parseFloat(ride.serviceFare.toString()) },
-          },
-        });
+        if (primaryVehicle) {
+          await prisma.vehicle.update({
+            where: { id: primaryVehicle.id },
+            data: {
+              totalEarnings: { increment: parseFloat(ride.serviceFare.toString()) },
+            },
+          });
+        }
 
         // Phase 2A: Settlement (auto-credit earnings + commission deduction)
         // Runs BEFORE update to avoid double-processing on retry
@@ -598,11 +614,12 @@ router.post("/:id/complete", async (req: AuthRequest, res) => {
 
         // Legacy promotion bonuses (D5) - kept for backward compatibility
         try {
-          await promotionBonusService.evaluateDriverBonuses({
+          await promotionBonusService.evaluateAndAwardBonuses({
             driverId: ride.driverId,
             tripId: ride.id,
             tripType: "ride",
             earnings: parseFloat(ride.driverPayout.toString()),
+            countryCode: driver.user?.countryCode || "US",
           });
         } catch (bonusError) {
           console.error("Promotion bonus evaluation error (non-blocking):", bonusError);
@@ -691,11 +708,11 @@ router.post("/:id/chat", async (req: AuthRequest, res) => {
     }
 
     // Verify sender is participant
-    let senderType: "customer" | "driver";
+    let senderRole: "customer" | "driver";
     if (role === "customer" && ride.customer.userId === userId) {
-      senderType = "customer";
+      senderRole = "customer";
     } else if (role === "driver" && ride.driver?.userId === userId) {
-      senderType = "driver";
+      senderRole = "driver";
     } else {
       return res.status(403).json({ error: "Access denied" });
     }
@@ -707,8 +724,10 @@ router.post("/:id/chat", async (req: AuthRequest, res) => {
 
     const chatMessage = await prisma.rideChatMessage.create({
       data: {
+        id: crypto.randomUUID(),
         rideId: id,
-        senderType,
+        senderId: userId,
+        senderRole,
         message: message.trim(),
       },
     });
@@ -717,7 +736,7 @@ router.post("/:id/chat", async (req: AuthRequest, res) => {
       message: "Message sent",
       chatMessage: {
         id: chatMessage.id,
-        senderType: chatMessage.senderType,
+        senderRole: chatMessage.senderRole,
         message: chatMessage.message,
         createdAt: chatMessage.createdAt,
       },
@@ -767,10 +786,10 @@ router.get("/:id/chat", async (req: AuthRequest, res) => {
     res.json({
       messages: messages.map((m) => ({
         id: m.id,
-        senderType: m.senderType,
+        senderRole: m.senderRole,
         message: m.message,
         createdAt: m.createdAt,
-        senderName: m.senderType === "customer" ? ride.customer.fullName : ride.driver?.firstName,
+        senderName: m.senderRole === "customer" ? ride.customer.fullName : ride.driver?.firstName,
       })),
     });
   } catch (error) {
@@ -854,17 +873,18 @@ router.post("/:id/cancel", async (req: AuthRequest, res) => {
       }
     }
 
-    // Create cancellation record
-    await prisma.rideCancellation.create({
-      data: {
-        rideId: id,
-        cancelledBy,
-        reason: validatedData.reason,
-        notes: validatedData.notes,
-        cancellationFee,
-        feeWaivedReason,
-      },
-    });
+    // TODO: RideCancellation model needs to be added to schema
+    // For now, cancellation details are tracked via ride status update
+    // await prisma.rideCancellation.create({
+    //   data: {
+    //     rideId: id,
+    //     cancelledBy,
+    //     reason: validatedData.reason,
+    //     notes: validatedData.notes,
+    //     cancellationFee,
+    //     feeWaivedReason,
+    //   },
+    // });
 
     // Update ride status
     const updatedRide = await prisma.ride.update({
@@ -879,6 +899,7 @@ router.post("/:id/cancel", async (req: AuthRequest, res) => {
     if (notifyUserId) {
       await prisma.notification.create({
         data: {
+          id: crypto.randomUUID(),
           userId: notifyUserId,
           type: "ride_update",
           title: cancelledBy === "customer" ? "Ride Cancelled" : "Ride Cancelled by Driver",
@@ -951,10 +972,10 @@ router.get("/:id/chat", async (req: AuthRequest, res) => {
     res.json({
       messages: messages.map((msg) => ({
         id: msg.id,
-        senderType: msg.senderType,
+        senderRole: msg.senderRole,
         message: msg.message,
         createdAt: msg.createdAt.toISOString(),
-        senderName: msg.senderType === "customer" ? ride.customer.fullName : ride.driver?.fullName,
+        senderName: msg.senderRole === "customer" ? ride.customer.fullName : (ride.driver?.firstName || 'Driver'),
       })),
     });
   } catch (error) {
@@ -1030,11 +1051,11 @@ router.post("/:id/rate", async (req: AuthRequest, res) => {
         where: { id },
         data: {
           customerRating: validatedData.rating,
-          customerComment: validatedData.comment,
+          customerFeedback: validatedData.comment,
         },
       });
 
-      // Update driver's average rating
+      // Update driver's average rating via DriverStats
       if (ride.driverId) {
         const driverRatings = await prisma.ride.findMany({
           where: { 
@@ -1046,9 +1067,9 @@ router.post("/:id/rate", async (req: AuthRequest, res) => {
         
         const avgRating = driverRatings.reduce((sum, r) => sum + (r.customerRating || 0), 0) / driverRatings.length;
         
-        await prisma.driverProfile.update({
-          where: { id: ride.driverId },
-          data: { rating: avgRating },
+        await prisma.driverStats.updateMany({
+          where: { driverId: ride.driverId },
+          data: { riderRatingAvg: avgRating },
         });
       }
     } else if (isDriver) {
@@ -1061,7 +1082,7 @@ router.post("/:id/rate", async (req: AuthRequest, res) => {
         where: { id },
         data: {
           driverRating: validatedData.rating,
-          driverComment: validatedData.comment,
+          driverFeedback: validatedData.comment,
         },
       });
     }
@@ -1130,23 +1151,23 @@ router.get("/:id/receipt", async (req: AuthRequest, res) => {
       const baseFare = Number(ride.serviceFare) || 0;
       const surge = Number(ride.surgeMultiplier) || 1;
       const tip = Number(ride.tipAmount) || 0;
-      const discount = Number(ride.discountAmount) || 0;
-      const subtotal = baseFare;
-      const total = (subtotal * surge) + tip - discount;
+      const discountAmt = Number(ride.discountAmount) || 0;
+      const subtotalAmt = baseFare;
+      const totalAmt = (subtotalAmt * surge) + tip - discountAmt;
 
       receipt = await prisma.rideReceipt.create({
         data: {
+          id: crypto.randomUUID(),
           rideId: id,
           baseFare: new Prisma.Decimal(baseFare),
           distanceFare: new Prisma.Decimal(0),
           timeFare: new Prisma.Decimal(0),
-          surgeFee: new Prisma.Decimal((subtotal * surge) - subtotal),
+          surgeFare: new Prisma.Decimal((subtotalAmt * surge) - subtotalAmt),
           tipAmount: new Prisma.Decimal(tip),
-          discount: new Prisma.Decimal(discount),
-          total: new Prisma.Decimal(total),
+          discountAmount: new Prisma.Decimal(discountAmt),
+          subtotal: new Prisma.Decimal(subtotalAmt),
+          totalFare: new Prisma.Decimal(totalAmt),
           currency: "USD",
-          paymentMethod: ride.paymentMethod || "card",
-          paymentStatus: "completed",
         },
       });
     }
@@ -1158,13 +1179,11 @@ router.get("/:id/receipt", async (req: AuthRequest, res) => {
         baseFare: Number(receipt.baseFare),
         distanceFare: Number(receipt.distanceFare),
         timeFare: Number(receipt.timeFare),
-        surgeFee: Number(receipt.surgeFee),
+        surgeFare: Number(receipt.surgeFare),
         tipAmount: Number(receipt.tipAmount),
-        discount: Number(receipt.discount),
-        total: Number(receipt.total),
+        discountAmount: Number(receipt.discountAmount),
+        totalFare: Number(receipt.totalFare),
         currency: receipt.currency,
-        paymentMethod: receipt.paymentMethod,
-        paymentStatus: receipt.paymentStatus,
         createdAt: receipt.createdAt.toISOString(),
       },
       ride: {
@@ -1176,12 +1195,7 @@ router.get("/:id/receipt", async (req: AuthRequest, res) => {
         distanceMiles: ride.distanceMiles,
         durationMinutes: ride.durationMinutes,
         driver: ride.driver ? {
-          name: ride.driver.fullName,
-          rating: ride.driver.rating,
-          vehicle: ride.driver.vehicleMake && ride.driver.vehicleModel 
-            ? `${ride.driver.vehicleMake} ${ride.driver.vehicleModel}`
-            : null,
-          licensePlate: ride.driver.licensePlate,
+          name: `${ride.driver.firstName || ''} ${ride.driver.lastName || ''}`.trim() || 'Driver',
         } : null,
       },
     });
@@ -1269,18 +1283,20 @@ router.patch("/:id/destination", async (req: AuthRequest, res) => {
     try {
       await prisma.rideStatusEvent.create({
         data: {
+          id: crypto.randomUUID(),
           rideId: id,
-          status: "destination_changed",
-          changedBy: "customer",
-          changedByActorId: ride.customerId,
-          metadata: JSON.stringify({
+          fromStatus: ride.status,
+          toStatus: "destination_changed",
+          changedBy: ride.customerId,
+          changedByRole: "customer",
+          metadata: {
             originalDropoff,
             newDropoff: {
               address: validatedData.dropoffAddress,
               lat: validatedData.dropoffLat,
               lng: validatedData.dropoffLng,
             },
-          }),
+          },
         },
       });
     } catch (eventError) {
@@ -1297,6 +1313,7 @@ router.patch("/:id/destination", async (req: AuthRequest, res) => {
       if (driver) {
         await prisma.notification.create({
           data: {
+            id: crypto.randomUUID(),
             userId: driver.userId,
             type: "ride_update",
             title: "Destination Changed",
@@ -1396,12 +1413,14 @@ router.get("/:id/live-tracking", async (req: AuthRequest, res) => {
           id: true,
           firstName: true,
           lastName: true,
-          phone: true,
-          rating: true,
-          photoUrl: true,
+          phoneNumber: true,
+          profilePhotoUrl: true,
           currentLat: true,
           currentLng: true,
           lastLocationUpdate: true,
+          driverStats: {
+            select: { riderRatingAvg: true },
+          },
         },
       });
 
@@ -1410,8 +1429,8 @@ router.get("/:id/live-tracking", async (req: AuthRequest, res) => {
           id: driver.id,
           firstName: driver.firstName,
           lastName: driver.lastName,
-          rating: driver.rating ? Number(driver.rating) : null,
-          photoUrl: driver.photoUrl,
+          rating: driver.driverStats?.riderRatingAvg ? Number(driver.driverStats.riderRatingAvg) : null,
+          photoUrl: driver.profilePhotoUrl,
         };
 
         // Get latest location from RideLiveLocation table
