@@ -333,7 +333,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             select: {
               id: true,
               verificationStatus: true,
-              serviceTypes: true,
             },
           });
           if (driverProfile) {
