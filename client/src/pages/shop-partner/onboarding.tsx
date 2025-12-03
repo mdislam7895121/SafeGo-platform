@@ -337,10 +337,11 @@ export default function ShopPartnerOnboarding() {
     const setUrl = type === "logo" ? setLogoUrl : setBannerUrl;
     const setPreview = type === "logo" ? setLogoPreview : setBannerPreview;
 
-    if (!file.type.startsWith("image/")) {
+    const validTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!file.type.startsWith("image/") || !validTypes.includes(file.type.toLowerCase())) {
       toast({
         title: "ত্রুটি",
-        description: "শুধুমাত্র ছবি ফাইল গ্রহণযোগ্য",
+        description: "শুধুমাত্র ছবি আপলোড করতে পারবেন।",
         variant: "destructive",
       });
       return;
@@ -349,7 +350,7 @@ export default function ShopPartnerOnboarding() {
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "ত্রুটি",
-        description: "ফাইলের আকার ৫ মেগাবাইটের বেশি হতে পারবে না",
+        description: "ফাইল সাইজ ৫ এমবি'র বেশি হতে পারবে না।",
         variant: "destructive",
       });
       return;
@@ -375,7 +376,7 @@ export default function ShopPartnerOnboarding() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "আপলোড ব্যর্থ হয়েছে");
+        throw new Error(errorData.error || "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।");
       }
 
       const data = await response.json();
@@ -389,11 +390,41 @@ export default function ShopPartnerOnboarding() {
       setPreview(null);
       toast({
         title: "ত্রুটি",
-        description: error.message || "ছবি আপলোড ব্যর্থ হয়েছে",
+        description: error.message || "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
         variant: "destructive",
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoPreview(null);
+    setLogoUrl(null);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveBanner = () => {
+    setBannerPreview(null);
+    setBannerUrl(null);
+    if (bannerInputRef.current) {
+      bannerInputRef.current.value = "";
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent, type: "logo" | "banner") => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      handleImageUpload(file, type);
     }
   };
 
@@ -515,12 +546,25 @@ export default function ShopPartnerOnboarding() {
       countryCode: "BD",
     };
     
-    if (logoUrl) {
-      fullData.shopLogo = logoUrl;
+    if (!logoUrl) {
+      toast({
+        title: "ত্রুটি",
+        description: "দোকানের লোগো আপলোড করুন",
+        variant: "destructive",
+      });
+      return;
     }
-    if (bannerUrl) {
-      fullData.shopBanner = bannerUrl;
+    if (!bannerUrl) {
+      toast({
+        title: "ত্রুটি",
+        description: "দোকানের ব্যানার আপলোড করুন",
+        variant: "destructive",
+      });
+      return;
     }
+
+    fullData.shopLogo = logoUrl;
+    fullData.shopBanner = bannerUrl;
 
     const missingFields = [];
     if (!fullData.shopName) missingFields.push("দোকানের নাম");
@@ -1080,7 +1124,7 @@ export default function ShopPartnerOnboarding() {
                 <input
                   type="file"
                   ref={logoInputRef}
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/*"
                   capture="environment"
                   onChange={handleLogoChange}
                   className="hidden"
@@ -1089,7 +1133,7 @@ export default function ShopPartnerOnboarding() {
                 <input
                   type="file"
                   ref={bannerInputRef}
-                  accept="image/jpeg,image/png,image/webp"
+                  accept="image/*"
                   capture="environment"
                   onChange={handleBannerChange}
                   className="hidden"
@@ -1100,12 +1144,18 @@ export default function ShopPartnerOnboarding() {
                   <form onSubmit={step3Form.handleSubmit(handleStep3Submit)} className="space-y-5">
                     <div className="bg-muted/30 rounded-lg p-4 space-y-4">
                       <p className="text-sm text-muted-foreground">
-                        আপনার দোকানের ছবি যোগ করুন (ঐচ্ছিক)। এটি গ্রাহকদের আপনার দোকান চিনতে সাহায্য করবে।
+                        আপনার দোকানের লোগো ও ব্যানার আপলোড করুন। এটি গ্রাহকদের আপনার দোকান চিনতে সাহায্য করবে।
                       </p>
                       
                       <div>
-                        <p className="text-base font-medium mb-3">দোকানের লোগো</p>
-                        <div className="flex items-center gap-4">
+                        <p className="text-base font-medium mb-3">
+                          দোকানের লোগো <span className="text-destructive">*</span>
+                        </p>
+                        <div 
+                          className="flex items-center gap-4"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, "logo")}
+                        >
                           {logoPreview ? (
                             <div className="relative h-20 w-20 rounded-xl overflow-hidden border-2 border-primary">
                               <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
@@ -1116,7 +1166,10 @@ export default function ShopPartnerOnboarding() {
                               )}
                             </div>
                           ) : (
-                            <div className="h-20 w-20 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
+                            <div 
+                              className="h-20 w-20 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
+                              onClick={() => logoInputRef.current?.click()}
+                            >
                               <ImageIcon className="h-8 w-8 text-muted-foreground" />
                             </div>
                           )}
@@ -1141,14 +1194,30 @@ export default function ShopPartnerOnboarding() {
                                 </>
                               ) : (
                                 <>
-                                  <Camera className="h-5 w-5 mr-2" />
-                                  লোগো তুলুন
+                                  <Upload className="h-5 w-5 mr-2" />
+                                  লোগো আপলোড
                                 </>
                               )}
                             </Button>
-                            {logoUrl && (
-                              <span className="text-xs text-green-600 flex items-center gap-1">
-                                <Check className="h-3 w-3" /> আপলোড সফল
+                            {logoUrl ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-green-600 flex items-center gap-1">
+                                  <Check className="h-3 w-3" /> আপলোড সফল
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs text-destructive hover:text-destructive"
+                                  onClick={handleRemoveLogo}
+                                  data-testid="button-remove-logo"
+                                >
+                                  মুছুন
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                JPG, PNG, WebP (সর্বোচ্চ ৫ এমবি)
                               </span>
                             )}
                           </div>
@@ -1156,8 +1225,14 @@ export default function ShopPartnerOnboarding() {
                       </div>
 
                       <div>
-                        <p className="text-base font-medium mb-3">দোকানের ব্যানার</p>
-                        <div className="flex items-center gap-4">
+                        <p className="text-base font-medium mb-3">
+                          দোকানের ব্যানার <span className="text-destructive">*</span>
+                        </p>
+                        <div 
+                          className="flex items-center gap-4"
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, "banner")}
+                        >
                           {bannerPreview ? (
                             <div className="relative h-16 w-32 rounded-xl overflow-hidden border-2 border-primary">
                               <img src={bannerPreview} alt="Banner" className="h-full w-full object-cover" />
@@ -1168,7 +1243,10 @@ export default function ShopPartnerOnboarding() {
                               )}
                             </div>
                           ) : (
-                            <div className="h-16 w-32 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
+                            <div 
+                              className="h-16 w-32 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
+                              onClick={() => bannerInputRef.current?.click()}
+                            >
                               <ImageIcon className="h-6 w-6 text-muted-foreground" />
                             </div>
                           )}
@@ -1193,14 +1271,30 @@ export default function ShopPartnerOnboarding() {
                                 </>
                               ) : (
                                 <>
-                                  <Camera className="h-5 w-5 mr-2" />
-                                  ব্যানার তুলুন
+                                  <Upload className="h-5 w-5 mr-2" />
+                                  ব্যানার আপলোড
                                 </>
                               )}
                             </Button>
-                            {bannerUrl && (
-                              <span className="text-xs text-green-600 flex items-center gap-1">
-                                <Check className="h-3 w-3" /> আপলোড সফল
+                            {bannerUrl ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-green-600 flex items-center gap-1">
+                                  <Check className="h-3 w-3" /> আপলোড সফল
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 text-xs text-destructive hover:text-destructive"
+                                  onClick={handleRemoveBanner}
+                                  data-testid="button-remove-banner"
+                                >
+                                  মুছুন
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">
+                                JPG, PNG, WebP (সর্বোচ্চ ৫ এমবি)
                               </span>
                             )}
                           </div>
@@ -1219,7 +1313,8 @@ export default function ShopPartnerOnboarding() {
                      step1Data.permanentAddress && 
                      step1Data.nidNumber && 
                      step1Data.emergencyContactName && 
-                     step1Data.emergencyContactPhone ? (
+                     step1Data.emergencyContactPhone &&
+                     logoUrl && bannerUrl ? (
                       <div className="bg-green-50 dark:bg-green-950/30 rounded-xl p-4 border border-green-200 dark:border-green-800">
                         <div className="flex items-start gap-3">
                           <Check className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
@@ -1242,7 +1337,9 @@ export default function ShopPartnerOnboarding() {
                               তথ্য অসম্পূর্ণ!
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              দয়া করে আগের ধাপগুলো সম্পূর্ণ করুন
+                              {!logoUrl || !bannerUrl 
+                                ? "দোকানের লোগো ও ব্যানার আপলোড করুন"
+                                : "দয়া করে আগের ধাপগুলো সম্পূর্ণ করুন"}
                             </p>
                           </div>
                         </div>
@@ -1265,7 +1362,7 @@ export default function ShopPartnerOnboarding() {
                         type="submit"
                         size="lg"
                         className="h-14 flex-1"
-                        disabled={isPending || !step1Data || !step2Data}
+                        disabled={isPending || !step1Data || !step2Data || !logoUrl || !bannerUrl}
                         data-testid="button-submit"
                       >
                         {isPending ? (

@@ -1,0 +1,64 @@
+SafeGo – Fix Shop Partner Logo/Banner Image Upload (One-shot, production-ready)
+
+Goal:
+Restore full image upload experience for shop logo and banner so it works in one go on iOS, Android and desktop, following all existing SafeGo rules. Do not leave anything partial.
+
+Requirements:
+
+1) Restore 3-way picker for both logo and banner
+- For both fields show the standard OS menu:
+  - Pick from gallery
+  - Pick file
+  - Take photo (camera)
+- Use a single <input type="file"> per field with:
+  - accept="image/*"
+  - capture="environment"
+- On mobile (iOS/Android) we MUST see gallery + file + camera options.
+- On desktop we MUST see file picker (and keep drag-and-drop support if available).
+
+2) Frontend behaviour (logo + banner)
+- On file select:
+  - Show loading state and then preview.
+  - Store URL + file meta in onboarding state (e.g. onboarding.shop.logoUrl / bannerUrl).
+- Allow remove/replace:
+  - “Remove image” button resets that field and lets user pick again.
+- Validation:
+  - Max 5MB file size.
+  - Allowed types: jpg, jpeg, png, webp.
+- Bangla error messages:
+  - Size: “ফাইল সাইজ ৫ এমবি’র বেশি হতে পারবে না।”
+  - Type: “শুধুমাত্র ছবি আপলোড করতে পারবেন।”
+  - Generic fail: “আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।”
+
+3) Backend integration
+- Implement/confirm endpoints:
+  - POST /api/upload/shop-logo
+  - POST /api/upload/shop-banner
+- Each returns JSON: { url, fileId, width, height }.
+- Frontend saves this into the onboarding store and uses url for preview and final submission.
+
+4) Step 3 completion logic
+- Step 3 “all data complete” state must only be true if:
+  - valid logo upload is present AND
+  - valid banner upload is present.
+- Final submit of onboarding must send both logo and banner URLs and all KYC+delivery fields.
+
+5) Regression protection
+- Do NOT remove the 3-way picker behaviour in future edits.
+- Add basic tests/checks so that:
+  - File inputs keep accept="image/*".
+  - Max size and type validation stay in place.
+  - Bangla errors still show for invalid files.
+
+6) Testing (must be done by you)
+- Test full flow for a new BD shop partner:
+  - Fill shop info, KYC, delivery, upload logo + banner, submit successfully.
+- Test from:
+  - Mobile preview (simulating iOS/Android).
+  - Desktop preview.
+- Confirm:
+  - 3-option picker shows on mobile.
+  - Preview, remove and re-upload works.
+  - Oversized or wrong-type files show correct Bangla errors.
+
+Implement all of this now in a single complete change-set and only then report success.
