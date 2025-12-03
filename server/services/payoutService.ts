@@ -415,6 +415,18 @@ export class PayoutService {
   }
 
   /**
+   * List payout accounts for an owner
+   */
+  async listPayoutAccounts(ownerType: "driver" | "restaurant" | "shop_partner", ownerId: string) {
+    const accounts = await prisma.payoutAccount.findMany({
+      where: { ownerId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return accounts;
+  }
+
+  /**
    * Get payout statistics for an owner
    */
   async getPayoutStats(ownerId: string, ownerType: WalletOwnerType) {

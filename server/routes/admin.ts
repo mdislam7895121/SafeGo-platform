@@ -3332,14 +3332,15 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
           orderBy: { createdAt: "desc" },
           take: 10,
         },
-        complaints: {
+        reviews: {
           select: {
             id: true,
-            reason: true,
-            status: true,
+            rating: true,
+            comment: true,
             createdAt: true,
           },
           orderBy: { createdAt: "desc" },
+          take: 10,
         },
         menuItems: {
           select: {
