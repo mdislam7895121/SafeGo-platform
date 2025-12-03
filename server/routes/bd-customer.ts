@@ -2018,4 +2018,215 @@ async function seedDemoTicketListings() {
   }
 }
 
+// ====================================================
+// Partner Program Routes (BD Only)
+// ====================================================
+
+type PartnerKind = "driver_ride" | "driver_delivery" | "restaurant" | "shop_partner" | "ticket_operator";
+
+const validPartnerKinds: PartnerKind[] = [
+  "driver_ride",
+  "driver_delivery",
+  "restaurant",
+  "shop_partner",
+  "ticket_operator",
+];
+
+// GET /api/bd/partner/summary
+// Get partner status summary for all partner types
+router.get("/partner/summary", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "লগইন করুন" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "এই সেবা শুধুমাত্র বাংলাদেশে উপলব্ধ" });
+    }
+
+    // Check each partner type status
+    const summary: Record<string, { status: string; label: string }> = {};
+
+    // Driver (Ride) - Check DriverProfile with serviceType
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+    });
+
+    if (driverProfile) {
+      if (driverProfile.verificationStatus === "approved") {
+        summary.driver_ride = { status: "live", label: "সক্রিয়" };
+      } else if (driverProfile.verificationStatus === "pending") {
+        summary.driver_ride = { status: "kyc_pending", label: "KYC পেন্ডিং" };
+      } else if (driverProfile.verificationStatus === "rejected") {
+        summary.driver_ride = { status: "rejected", label: "বাতিল" };
+      } else {
+        summary.driver_ride = { status: "draft", label: "খসড়া" };
+      }
+      // Check if they do delivery too
+      if (driverProfile.serviceTypes?.includes("delivery")) {
+        summary.driver_delivery = summary.driver_ride;
+      }
+    }
+
+    // Restaurant Partner
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+    });
+
+    if (restaurantProfile) {
+      if (restaurantProfile.verificationStatus === "approved") {
+        summary.restaurant = { status: "live", label: "সক্রিয়" };
+      } else if (restaurantProfile.verificationStatus === "pending") {
+        summary.restaurant = { status: "kyc_pending", label: "KYC পেন্ডিং" };
+      } else if (restaurantProfile.verificationStatus === "rejected") {
+        summary.restaurant = { status: "rejected", label: "বাতিল" };
+      } else {
+        summary.restaurant = { status: "draft", label: "খসড়া" };
+      }
+    }
+
+    // Shop Partner
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (shopPartner) {
+      if (shopPartner.verificationStatus === "approved") {
+        summary.shop_partner = { status: "live", label: "সক্রিয়" };
+      } else if (shopPartner.verificationStatus === "pending") {
+        summary.shop_partner = { status: "kyc_pending", label: "KYC পেন্ডিং" };
+      } else if (shopPartner.verificationStatus === "rejected") {
+        summary.shop_partner = { status: "rejected", label: "বাতিল" };
+      } else {
+        summary.shop_partner = { status: "draft", label: "খসড়া" };
+      }
+    }
+
+    // Ticket Operator
+    const ticketOperator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (ticketOperator) {
+      if (ticketOperator.verificationStatus === "approved") {
+        summary.ticket_operator = { status: "live", label: "সক্রিয়" };
+      } else if (ticketOperator.verificationStatus === "pending") {
+        summary.ticket_operator = { status: "kyc_pending", label: "KYC পেন্ডিং" };
+      } else if (ticketOperator.verificationStatus === "rejected") {
+        summary.ticket_operator = { status: "rejected", label: "বাতিল" };
+      } else {
+        summary.ticket_operator = { status: "draft", label: "খসড়া" };
+      }
+    }
+
+    res.json(summary);
+  } catch (error) {
+    console.error("Partner summary error:", error);
+    res.status(500).json({ error: "সিস্টেমে সমস্যা হচ্ছে, আবার চেষ্টা করুন।" });
+  }
+});
+
+// POST /api/bd/partner/start
+// Start or continue partner onboarding
+router.post("/partner/start", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "লগইন করুন" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "এই সেবা শুধুমাত্র বাংলাদেশে উপলব্ধ" });
+    }
+
+    const { partnerKind } = req.body;
+
+    if (!partnerKind || !validPartnerKinds.includes(partnerKind)) {
+      return res.status(400).json({ error: "অবৈধ পার্টনার ধরন" });
+    }
+
+    // Log the onboarding start
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        userId,
+        action: "PARTNER_ONBOARDING_STARTED",
+        resourceType: "partner",
+        resourceId: partnerKind,
+        metadata: {
+          partnerKind,
+          country: "BD",
+          timestamp: new Date().toISOString(),
+        },
+        ipAddress: req.ip || "unknown",
+      },
+    });
+
+    // Determine redirect URL based on partner kind
+    let nextUrl = "/";
+
+    switch (partnerKind) {
+      case "driver_ride":
+      case "driver_delivery":
+        // Check if driver profile exists
+        const existingDriver = await prisma.driverProfile.findUnique({
+          where: { userId },
+        });
+        if (existingDriver?.verificationStatus === "approved") {
+          nextUrl = "/partner/driver/dashboard";
+        } else {
+          nextUrl = "/partner/ride-start";
+        }
+        break;
+
+      case "restaurant":
+        const existingRestaurant = await prisma.restaurantProfile.findUnique({
+          where: { userId },
+        });
+        if (existingRestaurant?.verificationStatus === "approved") {
+          nextUrl = "/restaurant/dashboard";
+        } else {
+          nextUrl = "/restaurant/onboarding";
+        }
+        break;
+
+      case "shop_partner":
+        const existingShop = await prisma.shopPartner.findUnique({
+          where: { userId },
+        });
+        if (existingShop?.verificationStatus === "approved") {
+          nextUrl = "/shop-partner/dashboard";
+        } else {
+          nextUrl = "/shop-partner/onboarding";
+        }
+        break;
+
+      case "ticket_operator":
+        const existingOperator = await prisma.ticketOperator.findUnique({
+          where: { userId },
+        });
+        if (existingOperator?.verificationStatus === "approved") {
+          nextUrl = "/ticket-operator/dashboard";
+        } else {
+          nextUrl = "/ticket-operator/onboarding";
+        }
+        break;
+    }
+
+    res.json({ success: true, nextUrl });
+  } catch (error) {
+    console.error("Partner start error:", error);
+    res.status(500).json({ error: "সিস্টেমে সমস্যা হচ্ছে, আবার চেষ্টা করুন।" });
+  }
+});
+
 export default router;

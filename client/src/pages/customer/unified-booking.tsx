@@ -77,6 +77,7 @@ interface DriverInfo {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CustomerParcelBooking } from "@/components/customer/CustomerParcelBooking";
 import { ServiceSelectorGrid } from "@/components/customer/ServiceSelectorGrid";
+import { PartnerProgramsSection } from "@/components/customer/PartnerProgramsSection";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -2193,18 +2194,6 @@ export default function UnifiedBookingPage() {
       <div className="flex-1 overflow-hidden flex flex-col lg:flex-row min-h-0">
         <div className="flex-1 lg:flex-none lg:w-[40%] lg:max-w-[480px] lg:flex-shrink-0 lg:border-r flex flex-col min-h-0 overflow-hidden">
           <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-28 lg:pb-4 min-h-0">
-            
-            {/* Service Selector Grid - Always visible */}
-            <div data-testid="service-grid-section">
-              <p className="text-sm font-semibold mb-3">Explore services</p>
-              <ServiceSelectorGrid
-                activeService={activeService}
-                onChange={setActiveService}
-                onNavigate={setLocationRoute}
-                isBDCustomer={isBDCustomer}
-              />
-            </div>
-
             {activeService === "ride" && (
               <>
                 {/* Choose Ride View - Compact Header with Pickup/Dropoff */}
@@ -2932,6 +2921,22 @@ export default function UnifiedBookingPage() {
                         })}
                       </div>
                     </div>
+
+                    {/* Service Selector Grid - Below car cards */}
+                    <div data-testid="service-grid-section">
+                      <p className="text-sm font-semibold mb-3">Explore services</p>
+                      <ServiceSelectorGrid
+                        activeService={activeService}
+                        onChange={setActiveService}
+                        onNavigate={setLocationRoute}
+                        isBDCustomer={isBDCustomer}
+                      />
+                    </div>
+
+                    {/* Partner Programs Section - BD Only */}
+                    {isBDCustomer && (
+                      <PartnerProgramsSection />
+                    )}
                   </>
                 )}
 
