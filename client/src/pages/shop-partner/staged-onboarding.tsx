@@ -819,6 +819,8 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
   const [, navigate] = useLocation();
   const [logoUploading, setLogoUploading] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   const form = useForm<Stage3Data>({
     resolver: zodResolver(stage3Schema),
@@ -855,17 +857,30 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
 
   const handleImageUpload = async (file: File, type: "logo" | "banner") => {
     const setUploading = type === "logo" ? setLogoUploading : setBannerUploading;
+    const setPreview = type === "logo" ? setLogoPreview : setBannerPreview;
     const fieldName = type === "logo" ? "shopLogo" : "shopBanner";
 
-    if (!file.type.startsWith("image/")) {
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
       toast({
         title: "ত্রুটি",
-        description: "শুধুমাত্র ছবি আপলোড করতে পারবেন।",
+        description: "শুধুমাত্র JPG, PNG বা WebP ফরম্যাট সমর্থিত।",
         variant: "destructive",
       });
       return;
     }
 
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "ত্রুটি",
+        description: "ছবির সাইজ ৫ মেগাবাইটের কম হতে হবে।",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const localPreviewUrl = URL.createObjectURL(file);
+    setPreview(localPreviewUrl);
     setUploading(true);
 
     try {
@@ -879,20 +894,23 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
       });
 
       if (!response.ok) {
-        throw new Error("আপলোড ব্যর্থ হয়েছে।");
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "আপলোড ব্যর্থ হয়েছে।");
       }
 
       const data = await response.json();
-      form.setValue(fieldName as any, data.url);
+      form.setValue(fieldName as keyof Stage3Data, data.url, { shouldValidate: true });
+      form.clearErrors(fieldName as keyof Stage3Data);
       
       toast({
         title: "সফল!",
         description: `${type === "logo" ? "লোগো" : "ব্যানার"} আপলোড হয়েছে`,
       });
-    } catch (error) {
+    } catch (error: any) {
+      setPreview(null);
       toast({
         title: "ত্রুটি",
-        description: "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+        description: error.message || "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
         variant: "destructive",
       });
     } finally {
@@ -900,7 +918,22 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
     }
   };
 
+  const handleRemoveImage = (type: "logo" | "banner") => {
+    const setPreview = type === "logo" ? setLogoPreview : setBannerPreview;
+    const fieldName = type === "logo" ? "shopLogo" : "shopBanner";
+    setPreview(null);
+    form.setValue(fieldName as keyof Stage3Data, "");
+  };
+
   const onSubmit = (data: Stage3Data) => {
+    if (!data.shopLogo || !data.shopBanner) {
+      toast({
+        title: "তথ্য অসম্পূর্ণ!",
+        description: "দোকানের লোগো ও ব্যানার আপলোড করুন।",
+        variant: "destructive",
+      });
+      return;
+    }
     mutation.mutate(data);
   };
 
@@ -908,6 +941,8 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
   const bannerValue = form.watch("shopBanner");
   const productCount = status.checklist.productCount || 0;
   const requiredProducts = status.checklist.requiredProducts || 3;
+  const isUploading = logoUploading || bannerUploading;
+  const imagesComplete = !!logoValue && !!bannerValue;
 
   return (
     <div className="space-y-6">
@@ -959,66 +994,147 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">দোকানের লোগো *</label>
-                  <div className="border-2 border-dashed rounded-lg p-4 text-center aspect-square flex items-center justify-center">
-                    {logoValue ? (
-                      <div className="space-y-2">
-                        <CheckCircle2 className="h-8 w-8 mx-auto text-green-600" />
-                        <p className="text-sm text-green-600">আপলোড সম্পন্ন</p>
+                  <div className={`border-2 border-dashed rounded-lg p-3 text-center aspect-square flex flex-col items-center justify-center relative overflow-hidden ${logoValue ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"}`}>
+                    {(logoValue || logoPreview) ? (
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={logoPreview || logoValue} 
+                          alt="Logo preview" 
+                          className="w-full h-full object-cover rounded-md"
+                        />
+                        {logoUploading && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md">
+                            <Loader2 className="h-6 w-6 animate-spin text-white" />
+                          </div>
+                        )}
+                        {logoValue && !logoUploading && (
+                          <div className="absolute top-1 right-1 flex gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="secondary"
+                              className="h-6 w-6 rounded-full"
+                              onClick={() => handleRemoveImage("logo")}
+                              data-testid="button-remove-logo"
+                            >
+                              <span className="sr-only">Remove</span>
+                              ×
+                            </Button>
+                          </div>
+                        )}
+                        {logoValue && !logoUploading && (
+                          <div className="absolute bottom-1 left-1">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 bg-white rounded-full" />
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <label className="cursor-pointer">
+                      <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full">
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) handleImageUpload(file, "logo");
                           }}
                           disabled={logoUploading}
+                          data-testid="input-logo-file"
                         />
                         {logoUploading ? (
-                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-xs text-muted-foreground">আপলোড হচ্ছে...</p>
+                          </div>
                         ) : (
-                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                              <Camera className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm font-medium">লোগো তুলুন</p>
+                            <p className="text-xs text-muted-foreground">বা গ্যালারি থেকে</p>
+                          </div>
                         )}
-                        <p className="text-sm mt-2">লোগো আপলোড</p>
                       </label>
                     )}
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">ব্যানার ছবি (ঐচ্ছিক)</label>
-                  <div className="border-2 border-dashed rounded-lg p-4 text-center aspect-square flex items-center justify-center">
-                    {bannerValue ? (
-                      <div className="space-y-2">
-                        <CheckCircle2 className="h-8 w-8 mx-auto text-green-600" />
-                        <p className="text-sm text-green-600">আপলোড সম্পন্ন</p>
+                  <label className="text-sm font-medium">ব্যানার ছবি *</label>
+                  <div className={`border-2 border-dashed rounded-lg p-3 text-center aspect-square flex flex-col items-center justify-center relative overflow-hidden ${bannerValue ? "border-green-500 bg-green-50 dark:bg-green-950/20" : "border-border"}`}>
+                    {(bannerValue || bannerPreview) ? (
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={bannerPreview || bannerValue} 
+                          alt="Banner preview" 
+                          className="w-full h-full object-cover rounded-md"
+                        />
+                        {bannerUploading && (
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-md">
+                            <Loader2 className="h-6 w-6 animate-spin text-white" />
+                          </div>
+                        )}
+                        {bannerValue && !bannerUploading && (
+                          <div className="absolute top-1 right-1 flex gap-1">
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="secondary"
+                              className="h-6 w-6 rounded-full"
+                              onClick={() => handleRemoveImage("banner")}
+                              data-testid="button-remove-banner"
+                            >
+                              <span className="sr-only">Remove</span>
+                              ×
+                            </Button>
+                          </div>
+                        )}
+                        {bannerValue && !bannerUploading && (
+                          <div className="absolute bottom-1 left-1">
+                            <CheckCircle2 className="h-5 w-5 text-green-600 bg-white rounded-full" />
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <label className="cursor-pointer">
+                      <label className="cursor-pointer flex flex-col items-center justify-center w-full h-full">
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) handleImageUpload(file, "banner");
                           }}
                           disabled={bannerUploading}
+                          data-testid="input-banner-file"
                         />
                         {bannerUploading ? (
-                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                            <p className="text-xs text-muted-foreground">আপলোড হচ্ছে...</p>
+                          </div>
                         ) : (
-                          <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                              <Camera className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                            <p className="text-sm font-medium">ব্যানার তুলুন</p>
+                            <p className="text-xs text-muted-foreground">বা গ্যালারি থেকে</p>
+                          </div>
                         )}
-                        <p className="text-sm mt-2">ব্যানার আপলোড</p>
                       </label>
                     )}
                   </div>
                 </div>
               </div>
+
+              {imagesComplete && (
+                <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                  <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
+                  <p className="text-sm text-green-700 dark:text-green-400">সকল ছবি আপলোড সম্পন্ন!</p>
+                </div>
+              )}
 
               <FormField
                 control={form.control}
@@ -1041,7 +1157,7 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
               <Button 
                 type="submit" 
                 className="w-full h-12 text-base"
-                disabled={mutation.isPending || productCount < requiredProducts || !logoValue}
+                disabled={mutation.isPending || isUploading || productCount < requiredProducts || !imagesComplete}
                 data-testid="button-submit-stage3"
               >
                 {mutation.isPending ? (
@@ -1049,9 +1165,14 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     জমা হচ্ছে...
                   </>
+                ) : isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ছবি আপলোড হচ্ছে...
+                  </>
                 ) : (
                   <>
-                    সেটআপ সম্পন্ন করুন
+                    আবেদন জমা দিন
                     <CheckCircle2 className="ml-2 h-5 w-5" />
                   </>
                 )}
@@ -1060,6 +1181,12 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
               {productCount < requiredProducts && (
                 <p className="text-sm text-center text-orange-600">
                   সম্পন্ন করতে কমপক্ষে {requiredProducts}টি পণ্য যোগ করুন
+                </p>
+              )}
+
+              {productCount >= requiredProducts && !imagesComplete && !isUploading && (
+                <p className="text-sm text-center text-orange-600">
+                  দোকানের লোগো ও ব্যানার আপলোড করুন
                 </p>
               )}
             </form>

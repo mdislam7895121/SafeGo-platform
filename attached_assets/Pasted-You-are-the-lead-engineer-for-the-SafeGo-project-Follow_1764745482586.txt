@@ -1,0 +1,221 @@
+You are the lead engineer for the SafeGo project.  
+Follow ALL existing SafeGo master rules strictly:
+
+1) Core roles (must always remain consistent)
+   - Customer
+   - Driver
+   - Restaurant Partner (SafeGo Eats)
+   - Shop Partner (E-Shop / BD Shops)
+   - Admin panel must fully manage all 4 roles.
+
+2) Global platform logic
+   - Ride, food, parcel, and e-shop flows must all be internally consistent.
+   - Country-aware flows: BD vs US have different KYC, legal text, and availability.
+   - All changes must be non-breaking and production-ready: when you touch a feature, you must finish the entire flow end-to-end so it is immediately usable for real users and demo users.
+
+3) KYC & onboarding rules
+   - BD partners (drivers, restaurants, shops, ticket operators) must have KYC fields stored and validated in the backend.
+   - Customers have light-weight signup (email + strong password for now) with proper security rules.
+   - For partners, onboarding must be:
+     Step 1: Business info
+     Step 2: Delivery / service settings (if applicable)
+     Step 3: Media (logo, banner, etc.)
+     Step 4 (if defined): Terms / confirmation
+   - Onboarding flows must:
+     - Show clear progress indicators.
+     - Validate all required fields in the backend using the schema, and in the frontend using the same field names.
+     - Never allow a half-completed partner record that blocks login or causes confusing errors.
+
+4) Collections and commission logic (keep consistent)
+   - Core collections: rides, food_orders, deliveries, shops, shop_products, payouts, commissions, tickets (for ticket operators), etc.
+   - When you change any partner-side onboarding, make sure the data is compatible with:
+     - Admin user management
+     - Listing in the correct customer views (BD Shops, Rentals, Tickets, etc.)
+     - Future commission and payout logic (no dummy shape that will break later).
+
+5) Security rules (must always be respected)
+   - Never trust client-side values; validate everything in the backend.
+   - Authorization must ensure:
+     - Only the logged-in partner can update their own shop/restaurant/driver profile.
+     - Customers can only view public data (no private KYC details).
+   - All partner uploads (logo, banner) must be:
+     - Type-checked (JPG/PNG/WebP).
+     - Size-limited (5MB max as currently configured).
+     - Stored in a safe bucket / storage with non-guessable URLs.
+   - JWT auth must be used consistently; do not add extra DB lookups for simple checks if JWT already contains what you need.
+
+6) Status flows and demo behavior
+   - For demo mode / guest users, show demo data clearly labeled as demo.
+   - For logged-in BD customers, show real data coming from the real partner records, filtered by status (e.g., shop approved, active, inStock, canOrder, etc.).
+   - Never leave a flow in a state where the user sees “incomplete information” even after they filled everything correctly.
+
+7) Implementation principle
+   - Every task must be implemented start-to-finish in one loop:
+     - Backend schema + controllers/routes
+     - Frontend UI + state management
+     - Validation + error handling
+     - Demo data seeding (if needed)
+     - Full manual test of the real user flow.
+   - Do not stop at “looks OK” – you must test as a real BD Shop Partner and as an Admin and as a Customer.
+
+------------------------------------------------
+TASK: Fix the Bangladesh Shop Partner onboarding Stage 3 image upload and validation, and make the whole Shop Partner onboarding flow fully working in one go.
+
+User context:
+- URL: /shop-partner/onboarding
+- Role: shop_partner (Bangladesh)
+- Steps:
+  1) Shop information (shopName, shopType, shopAddress, owner KYC, etc.)
+  2) Delivery settings (homeDelivery toggle, radius, preparation time)
+  3) Shop media: logo + banner, with a green “All information complete!” message and a final submit button (in Bangla: "আবেদন জমা দিন").
+
+Current problems observed by the product owner (on mobile browser):
+1) Stage 3 image buttons:
+   - The buttons currently behave like “only take camera picture”.
+   - Previously there were three clear options: 
+     - select existing photo
+     - select file
+     - take picture
+   - Now it feels harder for Bangladeshi partners to upload images, especially if the shop already has stored photos in the gallery or files app.
+
+2) Upload + validation mismatch:
+   - The partner fills all data in Steps 1 and 2.
+   - In Step 3 they select a logo and a banner; thumbnails show up, but:
+     - A red error message “তথ্য অসম্পূর্ণ! দোকানের লোগো ও ব্যানার আপলোড করুন” still appears sometimes.
+     - Submission fails or behaves inconsistently.
+   - Sometimes UI says “Uploading…” under the images and never transitions to the final success state — the form thinks data is incomplete even though images look attached.
+
+3) The owner wants this flow to be production-ready:
+   - A real BD shop owner should be able to complete all steps in one sitting on a mobile phone.
+   - After successful submission:
+     - The shop_partner onboarding should be marked as complete.
+     - Their shop record should be visible to Admin in the panel with all fields (including logo + banner URLs).
+     - Once approved / visible in BD shops, customers should see the correct logo and banner (or shop avatar) in /customer/bd-shops and in /customer/bd-shop/:id.
+
+Your job is to completely fix this, end-to-end, without breaking anything else.
+
+具体 requirements:
+
+A) FRONTEND – Stage 3 image upload UX and behavior
+1. File input behavior on mobile:
+   - For both “shop logo” and “shop banner”:
+     - Use a standard file input that allows:
+       - picking from gallery/photo library
+       - picking from files
+       - taking a new picture
+     - DO NOT force camera-only mode. If you are using `capture` attributes (e.g. `capture="environment"`), remove them so that iOS/Android show the default chooser (photo library / take photo / browse).
+   - Keep the visible buttons in Bangla:
+     - “লোগো তুলুন” / “ব্যানার তুলুন” but make sure they actually open the generic file chooser.
+
+2. Upload flow and state:
+   - On file selection:
+     - Immediately start upload to the backend or storage service.
+     - Show a clear “Uploading…” state with a spinner and disable the final submit button until both uploads either succeed or fail.
+   - On success:
+     - Show the thumbnail image.
+     - Store the final URL (string) in the form state using the EXACT field names expected by the backend schema (for example: `shopLogo` and `shopBanner` or whatever the current Zod schema uses).
+     - Remove any previous validation error related to logo/banner.
+
+   - On failure (network error, wrong file type, too large, etc.):
+     - Show a Bangla error message explaining the reason (for example:
+       - “ছবির সাইজ ৫ মেগাবাইটের কম হতে হবে।”
+       - “শুধু JPG, PNG বা WebP ফরম্যাট সমর্থিত।”)
+     - Do NOT mark the step as complete.
+     - Allow the user to try again.
+
+3. Validation display:
+   - The red error “তথ্য অসম্পূর্ণ! দোকানের লোগো ও ব্যানার আপলোড করুন” must only appear when:
+     - The user tries to submit Step 3 AND
+     - Either `shopLogo` OR `shopBanner` is missing/empty.
+   - If both fields are properly set, the error must never appear.
+   - If the user corrects the issue by uploading both images, the error must automatically disappear without page reload.
+
+B) BACKEND – schema, validation, and integration
+1. Inspect the current Shop Partner onboarding payload and Zod (or similar) schema:
+   - Confirm the exact keys used for logo and banner (e.g. `shopLogo`, `shopBanner`).
+   - Make sure the frontend uses these exact same keys when sending the final POST/PUT request.
+   - The schema should:
+     - require non-empty string URLs for both logo and banner
+     - enforce size/type constraints at the upload layer (not via magic values)
+
+2. Fix any mismatched field names:
+   - If the error details previously showed something like:
+     - `path: ["logo"]` or `["banner"]`
+     - while the schema expects `shopLogo` / `shopBanner` or vice-versa
+   - Normalize this so both backend and frontend use the same names and validations.
+
+3. Final submission endpoint:
+   - Ensure the final “submit application” request for Step 3:
+     - Validates all three stages’ data (shop info, KYC, delivery settings, media).
+     - Saves the complete Shop record in the database with:
+       - shopName
+       - shopType
+       - shopAddress
+       - ownerName, fatherName, dateOfBirth, NID, presentAddress, permanentAddress
+       - emergencyContactName, emergencyContactPhone
+       - delivery radius/settings
+       - shopLogo URL
+       - shopBanner URL
+       - status fields (e.g., `pending_approval` or similar)
+       - country: BD
+
+   - Do not perform extra DB lookups that are unnecessary if the JWT already identifies the shop_partner user.
+
+C) ADMIN PANEL INTEGRATION
+1. Admin user management:
+   - Make sure the new shop_partner appears correctly in the Admin “Users” / “Partners” list with:
+     - role: shop_partner
+     - country: BD
+     - reference to the created shop record.
+
+2. Admin shops list:
+   - Ensure there is a way for Admin to see the BD shops created by this onboarding:
+     - Display shop name, type, address, and status.
+     - Show the logo thumbnail and (optionally) banner preview.
+
+3. Status flow:
+   - After submission, the default status might be `pending_review` or similar.
+   - Once the Admin marks it as approved/active, the shop must appear in:
+     - /customer/bd-shops
+     - /customer/bd-shop/:id
+   - Customers should see either:
+     - the uploaded logo and banner
+     - or reasonable fallbacks (first letter avatar) if missing.
+
+D) CUSTOMER VIEW VERIFICATION (BD E-Shop)
+1. For a newly created and approved BD shop:
+   - Confirm that it appears in /customer/bd-shops under the correct category (e.g., মুদি, ফার্মেসি, বই, etc.).
+   - Clicking the shop should open /customer/bd-shop/:id:
+     - show logo/banner as configured
+     - show basic info (address, delivery time, etc.)
+   - Ensure no “no products found” error is caused solely by this change. (Product listing is separate, but your changes must not break it.)
+
+E) TEST PLAN (you must actually execute these steps)
+1. Create a brand-new test user with role customer → then upgrade / onboard as shop_partner (BD).
+2. Complete the onboarding on mobile-sized viewport:
+   - Fill Step 1 (shop info + KYC) with realistic Bangla+English values.
+   - Fill Step 2 (delivery settings).
+   - In Step 3:
+     - Upload a small JPG logo from gallery.
+     - Upload a small JPG banner from gallery.
+     - Verify:
+       - Both thumbnails show correctly.
+       - No red error is visible.
+       - Final submit (“আবেদন জমা দিন”) works and shows a success message only once, with no leftover error toasts.
+3. Log into Admin:
+   - Confirm the new shop_partner user and shop record exist and look correct.
+4. As a BD customer:
+   - Go to /customer/bd-shops and locate the new shop (after setting a suitable status for visibility).
+   - Open the shop details page and confirm logo/banner show correctly.
+
+F) CONSTRAINTS
+- Do NOT change any US flows, KYC, or non-BD shop logic.
+- Do NOT simplify security: all server-side validation must stay in place or be improved.
+- Do NOT leave partial fixes: this feature must be fully usable by a real BD shop owner after your changes.
+
+When you are done:
+- Summarize exactly what changed:
+  - files edited, schemas updated, API endpoints touched
+  - how the file input behaves now on mobile
+  - how validation and error messages behave
+- Confirm that you have run through the complete Shop Partner onboarding flow yourself and that it succeeds end-to-end without any leftover “incomplete information” errors.
