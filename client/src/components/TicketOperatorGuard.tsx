@@ -14,6 +14,7 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
   const [location] = useLocation();
 
   const isTicketOperatorRole = user?.role === "ticket_operator" || user?.role === "pending_ticket_operator";
+  const isCustomerRole = user?.role === "customer";
 
   const { data: profileData, isLoading: profileLoading, isError, error } = useQuery<{ operator: any }>({
     queryKey: ["/api/ticket-operator/profile"],
@@ -77,9 +78,16 @@ export function TicketOperatorGuard({ children, allowSetup = false }: TicketOper
     return <Redirect to={getPostLoginPath(user)} />;
   }
 
-  if (!isTicketOperatorRole) {
+  // Allow customers to access onboarding route - they will be upgraded to pending_ticket_operator after first submission
+  if (!isTicketOperatorRole && !isCustomerRole) {
     console.warn("[TicketOperatorGuard] Wrong role accessing ticket_operator route, redirecting");
     return <Redirect to={getPostLoginPath(user)} />;
+  }
+
+  // Customers can only access the onboarding page
+  if (isCustomerRole && !isOnboardingRoute) {
+    console.warn("[TicketOperatorGuard] Customer trying to access non-onboarding route, redirecting");
+    return <Redirect to="/ticket-operator/onboarding" />;
   }
 
   const operator = profileData?.operator;

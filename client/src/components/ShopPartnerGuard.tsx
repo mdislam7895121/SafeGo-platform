@@ -16,6 +16,7 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
   const [location] = useLocation();
 
   const isShopPartnerRole = user?.role === "shop_partner" || user?.role === "pending_shop_partner";
+  const isCustomerRole = user?.role === "customer";
 
   const { data: profileData, isLoading: profileLoading, isError, error } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
@@ -68,9 +69,18 @@ export function ShopPartnerGuard({ children, allowSetup = false }: ShopPartnerGu
     return <Redirect to={getPostLoginPath(user)} />;
   }
 
-  if (!isShopPartnerRole) {
+  const isOnboardingRoute = location.startsWith("/shop-partner/onboarding");
+  
+  // Allow customers to access onboarding route - they will be upgraded to pending_shop_partner after first submission
+  if (!isShopPartnerRole && !isCustomerRole) {
     console.warn("[ShopPartnerGuard] Wrong role accessing shop_partner route, redirecting");
     return <Redirect to={getPostLoginPath(user)} />;
+  }
+
+  // Customers can only access the onboarding page
+  if (isCustomerRole && !isOnboardingRoute) {
+    console.warn("[ShopPartnerGuard] Customer trying to access non-onboarding route, redirecting");
+    return <Redirect to="/shop-partner/onboarding" />;
   }
 
   const profile = profileData?.profile;

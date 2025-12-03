@@ -1,15 +1,15 @@
-import { useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
   Bike, ArrowLeft, CheckCircle2, Clock, FileText, 
-  ShieldCheck, Loader2, ArrowRight, Package
+  ShieldCheck, Loader2, ArrowRight, Package, Info
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
 
 interface PartnerProfile {
   id: string;
@@ -23,6 +23,7 @@ interface PartnerProfile {
 export default function DeliveryDriverStart() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   
   const { data: partnerData, isLoading } = useQuery<{ profile: PartnerProfile | null }>({
     queryKey: ["/api/partner/profile", "delivery_driver"],
@@ -185,14 +186,31 @@ export default function DeliveryDriverStart() {
           </CardContent>
         </Card>
 
+        <Card className="mt-6 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+          <CardContent className="p-4 flex items-start gap-3">
+            <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium text-blue-900 dark:text-blue-100">Coming Soon</p>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Delivery driver registration will be available soon. We're preparing the onboarding system for your city.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="mt-8 text-center">
           <Button 
             size="lg" 
             className="w-full sm:w-auto px-12"
-            onClick={() => setLocation("/driver/onboarding")}
+            onClick={() => {
+              toast({
+                title: "Coming Soon",
+                description: "Delivery driver registration is coming soon. We'll notify you when it's ready.",
+              });
+            }}
             data-testid="button-start-onboarding"
           >
-            {hasExistingProfile && currentStep > 0 ? "Continue Application" : "Start Application"}
+            {hasExistingProfile && currentStep > 0 ? "Continue Application" : "Join Waitlist"}
             <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
           <p className="text-sm text-muted-foreground mt-4">
