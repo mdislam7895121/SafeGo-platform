@@ -275,8 +275,14 @@ export default function ShopPartnerOnboarding() {
       emergencyContactName: "",
       emergencyContactPhone: "",
     },
-    mode: "onChange",
+    mode: "all",
   });
+
+  useEffect(() => {
+    if (savedState.step1) {
+      step1Form.trigger();
+    }
+  }, []);
 
   const step2Form = useForm<Step2Data>({
     resolver: zodResolver(step2Schema),
