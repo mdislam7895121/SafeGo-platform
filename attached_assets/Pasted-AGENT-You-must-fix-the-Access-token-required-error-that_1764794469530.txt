@@ -1,0 +1,261 @@
+AGENT:
+
+You must fix the “Access token required” error that occurs when a partner tries to upload logo or banner on Step 3 (Photos & Branding) of the shop/restaurant onboarding, and you MUST do it while respecting ALL SafeGo master rules and keeping the system fully backward compatible.
+
+==================================================
+A) SAFEGO MASTER RULES (ALWAYS APPLY)
+==================================================
+
+1) ROLES (4 distinct roles, never mixed)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+   Each role has:
+   - its own signup/onboarding
+   - its own KYC (BD vs US)
+   - its own dashboard
+   - its own permissions and status flows
+
+2) GLOBAL SERVICES
+   SafeGo supports 3 core services:
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+3) COUNTRY-SPECIFIC KYC (MANDATORY)
+
+   Bangladesh (BD):
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID_number
+   - NID_front_image
+   - NID_back_image
+   - emergency_contact_name
+   - emergency_contact_phone
+   - verification_status
+   - is_verified
+
+   United States (US):
+   - date_of_birth
+   - home_address
+   - emergency_contact_name
+   - emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - (drivers) driver_license_number + image + expiry
+   - (drivers) ssn_last4 (optional)
+   - verification_status
+   - is_verified
+
+4) ADMIN PANEL (must not break)
+   - verify customers, drivers, restaurants
+   - approve/reject KYC with rejection_reason
+   - update pricing, fees, commissions
+   - block/unblock users
+   - manage payouts
+   - view driver and restaurant negative balances
+
+5) MANDATORY COLLECTIONS
+   - rides
+   - food_orders
+   - deliveries
+   Each includes:
+   - identity fields (customer_id, driver_id, restaurant_id)
+   - pickup/dropoff addresses + geolocation
+   - fees + commission
+   - payment details
+   - timestamps
+   - full status flow
+   - rating and feedback
+
+6) COMMISSION & PAYOUT LOGIC
+   - CASH ride: driver keeps cash; SafeGo commission becomes negative driver_wallet_balance; weekly settlement.
+   - CASH food order: restaurant keeps cash; commission becomes negative restaurant_wallet.
+   - ONLINE: SafeGo keeps commission automatically.
+   - Admin can settle balances and mark as paid.
+
+7) SECURITY RULES
+   - Customers cannot see driver documents.
+   - Drivers cannot see customer NID or sensitive ID info.
+   - Restaurants cannot see other restaurants.
+   - Only Admin can change pricing, commissions, verification, blocking.
+   - Users can update only their own profile.
+
+8) STATUS FLOWS (do not change)
+   Rides: requested → searching_driver → accepted → driver_arriving → in_progress → completed / cancelled_x
+   Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered / cancelled_x
+   Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered / cancelled_x
+
+9) ONBOARDING RULES
+   - Signup is customer-only.
+   - Drivers and restaurants are created only via partner onboarding after login.
+   - verification_status starts as "pending", access is limited until Admin approval.
+
+10) NOTIFICATIONS
+   - ride/order/parcel updates
+   - verification approval/rejection
+   - important admin notifications
+
+==================================================
+B) CURRENT BUG – “Access token required” ON UPLOAD
+==================================================
+
+Context from real screen:
+- Route: /partner/... onboarding
+- Step 3: Shop/restaurant “Photos & Branding”
+- Fields: upload logo, upload banner (JPG/PNG/WebP)
+- When clicking upload and selecting a file, a red error toast appears:
+  - Title: error (in Bangla)
+  - Message: “Access token required”
+
+This means:
+- The upload API endpoint for logo/banner either:
+  - is being called without Authorization header, OR
+  - is using an expired/invalid token, OR
+  - is not correctly wired to the logged-in partner session.
+- The UI is not handling 401 errors gracefully and shows a generic toast instead of asking the user to sign in again.
+
+Your task:
+Fix the file upload flow so that:
+- authenticated partners can upload logo/banner successfully,
+- unauthorized users are redirected to login,
+- no generic “access token required” toast is shown.
+
+==================================================
+C) REQUIRED BEHAVIOR (AFTER FIX)
+==================================================
+
+1) For a logged-in partner (restaurant/shop) on onboarding Step 3:
+   - When they upload a logo or banner:
+     - The frontend sends the request with the correct Authorization token (Bearer token or session header).
+     - Backend validates the token and links upload to the correct restaurant/shop profile.
+     - File is stored securely (e.g. storage bucket / object store).
+     - The UI shows success state (preview image, no red error).
+
+2) For an expired or missing token:
+   - Backend returns 401 Unauthorized with a clear error code like:
+     - code: "AUTH_REQUIRED" or "TOKEN_EXPIRED"
+   - Frontend behavior:
+     - Do NOT just show a cryptic “Access token required” toast.
+     - Instead:
+       - show a clear message: "Your session has expired. Please sign in again."
+       - automatically redirect to login, preserving returnTo to the current onboarding step.
+   - After re-login, user returns to the same onboarding step and can retry upload.
+
+3) For users not logged in:
+   - Upload buttons must be disabled OR trigger login flow first.
+   - No attempt to call upload API without auth.
+
+==================================================
+D) FRONTEND IMPLEMENTATION STEPS
+==================================================
+
+1) Audit upload components:
+   - Locate components for Step 3 (“Photos & Branding”) in partner onboarding:
+     - e.g. PartnerPhotosBrandingStep, ShopPhotosStep, RestaurantBrandingStep.
+   - Identify the upload function(s) for:
+     - logo upload
+     - banner upload
+
+2) Ensure each upload call:
+   - Uses the same auth mechanism as the rest of the partner dashboard.
+   - Attaches Authorization header with the current access token:
+       Authorization: Bearer <token>
+   - Uses multipart/form-data or your existing upload abstraction.
+
+3) Centralize auth:
+   - If you use a `fetchWithAuth` / `apiClient` wrapper, ensure logo/banner uploads go through it instead of raw fetch.
+   - This avoids missing headers.
+
+4) Handle 401/403 errors:
+   - In the upload error handler, detect auth-related errors:
+       if (status === 401 || error.code === "AUTH_REQUIRED" || error.code === "TOKEN_EXPIRED"):
+          - show friendly message: "Session expired. Please sign in again."
+          - trigger logout + redirect to login with:
+              returnTo = current partner onboarding route + step.
+   - Only show a generic technical toast for real server errors (5xx), not for auth issues.
+
+5) Keep UI state:
+   - When redirecting to login due to token expiry:
+       - Preserve step number (e.g. step=3) in the return URL.
+       - On return, reopen same onboarding step with previously saved data where possible.
+
+==================================================
+E) BACKEND IMPLEMENTATION STEPS
+==================================================
+
+1) Audit upload endpoints:
+   - Find routes that receive logo and banner uploads for partners, e.g.:
+     POST /api/partner/shops/:id/logo
+     POST /api/partner/shops/:id/banner
+     POST /api/partner/restaurants/:id/logo
+     POST /api/partner/restaurants/:id/banner
+
+2) Ensure:
+   - They all require authenticated user.
+   - They extract user_id / customer_id from the access token.
+   - They verify that this user actually owns the target restaurant/shop ID (no cross-account upload).
+   - They return standardized error responses:
+       - 401 with code "AUTH_REQUIRED" or "TOKEN_EXPIRED" when no/invalid token.
+       - 403 if the user is authenticated but not allowed to modify this entity.
+
+3) Do NOT change database schema:
+   - If logo_url / banner_url fields already exist on the restaurant/shop model, reuse them.
+   - Only add missing fields if necessary; never rename or remove existing ones.
+
+4) Security:
+   - Validate file types (JPG/PNG/WebP only).
+   - Enforce max size limit (e.g. 5 MB) as already indicated in the UI.
+   - Store files in a secure storage bucket, not in public, guessable paths.
+   - Store only the URL/path in the DB, not the raw file.
+
+==================================================
+F) ROLE & SECURITY CHECKS FOR UPLOAD
+==================================================
+
+- Only the owner partner (restaurant or shop) and Admin can change logo and banner.
+- Customers or drivers must not be able to hit these endpoints.
+- For BD vs US:
+   - Same upload logic; only surrounding KYC fields differ.
+- Logging:
+   - Do NOT log full auth tokens.
+   - Log only minimal info for debugging (user_id, restaurant_id, error code).
+
+==================================================
+G) NON-BREAKING REQUIREMENTS
+==================================================
+
+While fixing this bug you MUST:
+- Not rename or remove any existing API endpoints, DB fields, or routes.
+- Not change any existing ride/food/parcel logic, collections, or commission rules.
+- Only ADD or fix:
+   - auth headers on upload calls
+   - better error handling
+   - small backend auth checks for uploads.
+- Ensure Admin, driver, customer dashboards continue to work exactly as before.
+
+==================================================
+H) ACCEPTANCE CRITERIA (SELF-TEST)
+==================================================
+
+1) Logged-in restaurant/shop partner:
+   - Goes to onboarding Step 3.
+   - Uploads logo and banner successfully.
+   - Sees preview thumbnails; DB gets updated logo_url/banner_url.
+   - No "Access token required" error appears.
+
+2) Expired token:
+   - Manually simulate token expiry.
+   - On upload, backend returns 401 with proper code.
+   - Frontend shows "Session expired. Please sign in again." and redirects to login.
+   - After login, user returns to same onboarding step and can upload.
+
+3) Not logged in:
+   - Directly opening the onboarding URL:
+     → redirects to login BEFORE showing upload UI.
+
+4) No other SafeGo features break:
+   - rides, food_orders, deliveries, Admin panel, KYC flows, commissions, payouts all continue to work.

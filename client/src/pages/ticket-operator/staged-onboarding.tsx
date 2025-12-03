@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, uploadWithAuth } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Bus,
@@ -524,27 +524,26 @@ function Stage2Form({ onSuccess }: { onSuccess: () => void }) {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`/api/ticket-operator/upload-image?type=${type}`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("আপলোড ব্যর্থ হয়েছে।");
-      }
-
-      const data = await response.json();
+      const data = await uploadWithAuth(`/api/ticket-operator/upload-image?type=${type}`, formData);
       form.setValue(fieldName as any, data.url);
       
       toast({
         title: "সফল!",
         description: "ছবি আপলোড হয়েছে",
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status === 401 || error.message?.includes("token")) {
+        toast({
+          title: "সেশন শেষ",
+          description: "আপনার সেশন শেষ হয়ে গেছে। পুনরায় লগইন করুন।",
+          variant: "destructive",
+        });
+        window.location.href = "/login?returnTo=/ticket-operator/onboarding";
+        return;
+      }
       toast({
         title: "ত্রুটি",
-        description: "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+        description: error.message || "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
         variant: "destructive",
       });
     } finally {
@@ -890,27 +889,26 @@ function Stage3Setup({ status, onComplete }: { status: OnboardingStatus; onCompl
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`/api/ticket-operator/upload-image?type=logo`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("আপলোড ব্যর্থ হয়েছে।");
-      }
-
-      const data = await response.json();
+      const data = await uploadWithAuth(`/api/ticket-operator/upload-image?type=logo`, formData);
       form.setValue("logo", data.url);
       
       toast({
         title: "সফল!",
         description: "লোগো আপলোড হয়েছে",
       });
-    } catch (error) {
+    } catch (error: any) {
+      if (error.status === 401 || error.message?.includes("token")) {
+        toast({
+          title: "সেশন শেষ",
+          description: "আপনার সেশন শেষ হয়ে গেছে। পুনরায় লগইন করুন।",
+          variant: "destructive",
+        });
+        window.location.href = "/login?returnTo=/ticket-operator/onboarding";
+        return;
+      }
       toast({
         title: "ত্রুটি",
-        description: "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
+        description: error.message || "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
         variant: "destructive",
       });
     } finally {

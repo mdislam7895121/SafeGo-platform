@@ -18,7 +18,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, uploadWithAuth } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   Store,
@@ -368,18 +368,7 @@ export default function ShopPartnerOnboarding() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`/api/shop-partner/upload-image?type=${type}`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।");
-      }
-
-      const data = await response.json();
+      const data = await uploadWithAuth(`/api/shop-partner/upload-image?type=${type}`, formData);
       setUrl(data.url);
       
       toast({
@@ -388,6 +377,15 @@ export default function ShopPartnerOnboarding() {
       });
     } catch (error: any) {
       setPreview(null);
+      if (error.status === 401 || error.message?.includes("token")) {
+        toast({
+          title: "সেশন শেষ",
+          description: "আপনার সেশন শেষ হয়ে গেছে। পুনরায় লগইন করুন।",
+          variant: "destructive",
+        });
+        window.location.href = "/login?returnTo=/shop-partner/onboarding";
+        return;
+      }
       toast({
         title: "ত্রুটি",
         description: error.message || "আপলোড ব্যর্থ হয়েছে। আবার চেষ্টা করুন।",
