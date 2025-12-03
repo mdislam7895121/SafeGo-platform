@@ -116,11 +116,11 @@ export default function AdminRestaurantSettings() {
   // Override mutation
   const overrideMutation = useMutation({
     mutationFn: async ({ action, reason }: { action: string; reason: string }) => {
-      const res = await apiRequest("POST", `/api/admin/restaurants/${restaurantId}/settings/override`, {
-        action,
-        reason,
+      return await apiRequest(`/api/admin/restaurants/${restaurantId}/settings/override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reason }),
       });
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/restaurants/${restaurantId}/settings`] });

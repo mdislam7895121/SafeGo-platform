@@ -133,7 +133,11 @@ export default function AdminReferralSettingsEdit() {
         payload.endAt = new Date(values.endAt).toISOString();
       }
 
-      return apiRequest("PATCH", `/api/admin/referral-settings/${id}`, payload);
+      return apiRequest(`/api/admin/referral-settings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/referral-settings"] });

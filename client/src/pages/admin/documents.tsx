@@ -284,7 +284,9 @@ export default function AdminDocumentCenter() {
   // Approve mutation
   const approveMutation = useMutation({
     mutationFn: async ({ type, id }: { type: string; id: string }) => {
-      return apiRequest("POST", `/api/admin/documents/${type}/${id}/approve`);
+      return apiRequest(`/api/admin/documents/${type}/${id}/approve`, {
+        method: "POST",
+      });
     },
     onSuccess: () => {
       toast({
@@ -306,7 +308,11 @@ export default function AdminDocumentCenter() {
   // Reject mutation
   const rejectMutation = useMutation({
     mutationFn: async ({ type, id, reason }: { type: string; id: string; reason?: string }) => {
-      return apiRequest("POST", `/api/admin/documents/${type}/${id}/reject`, { reason });
+      return apiRequest(`/api/admin/documents/${type}/${id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
     },
     onSuccess: () => {
       toast({
@@ -345,10 +351,10 @@ export default function AdminDocumentCenter() {
       status: string; 
       rejectionReason?: string 
     }) => {
-      return apiRequest("POST", `/api/admin/documents/drivers/${driverId}/status`, { 
-        documentType, 
-        status, 
-        rejectionReason 
+      return apiRequest(`/api/admin/documents/drivers/${driverId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ documentType, status, rejectionReason }),
       });
     },
     onSuccess: (_, variables) => {
@@ -371,7 +377,9 @@ export default function AdminDocumentCenter() {
   // D7: Approve all documents mutation
   const approveAllDocsMutation = useMutation({
     mutationFn: async (driverId: string) => {
-      return apiRequest("POST", `/api/admin/documents/drivers/${driverId}/approve-all`);
+      return apiRequest(`/api/admin/documents/drivers/${driverId}/approve-all`, {
+        method: "POST",
+      });
     },
     onSuccess: () => {
       toast({

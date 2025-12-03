@@ -78,7 +78,11 @@ export default function RestaurantDetails() {
   });
 
   const suspendMutation = useMutation({
-    mutationFn: () => apiRequest("PATCH", `/api/admin/restaurants/${restaurantId}/suspend`, { reason: suspensionReason }),
+    mutationFn: () => apiRequest(`/api/admin/restaurants/${restaurantId}/suspend`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: suspensionReason }),
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/restaurants/${restaurantId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
@@ -92,7 +96,10 @@ export default function RestaurantDetails() {
   });
 
   const unsuspendMutation = useMutation({
-    mutationFn: () => apiRequest("PATCH", `/api/admin/restaurants/${restaurantId}/unsuspend`, {}),
+    mutationFn: () => apiRequest(`/api/admin/restaurants/${restaurantId}/unsuspend`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/restaurants/${restaurantId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
@@ -104,7 +111,10 @@ export default function RestaurantDetails() {
   });
 
   const blockMutation = useMutation({
-    mutationFn: () => apiRequest("PATCH", `/api/admin/restaurants/${restaurantId}/block`, {}),
+    mutationFn: () => apiRequest(`/api/admin/restaurants/${restaurantId}/block`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/restaurants/${restaurantId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
@@ -117,7 +127,10 @@ export default function RestaurantDetails() {
   });
 
   const unblockMutation = useMutation({
-    mutationFn: () => apiRequest("PATCH", `/api/admin/restaurants/${restaurantId}/unblock`, {}),
+    mutationFn: () => apiRequest(`/api/admin/restaurants/${restaurantId}/unblock`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+    }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/admin/restaurants/${restaurantId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
@@ -409,7 +422,9 @@ export default function RestaurantDetails() {
                             size="sm"
                             onClick={async () => {
                               try {
-                                await apiRequest("POST", `/api/admin/restaurants/${restaurantId}/payout-accounts/${account.id}/set-default`);
+                                await apiRequest(`/api/admin/restaurants/${restaurantId}/payout-accounts/${account.id}/set-default`, {
+                                  method: "POST",
+                                });
                                 queryClient.invalidateQueries({ queryKey: [`/api/admin/restaurants/${restaurantId}/payout-accounts`] });
                                 toast({ title: "Default payout account updated" });
                               } catch (error: any) {

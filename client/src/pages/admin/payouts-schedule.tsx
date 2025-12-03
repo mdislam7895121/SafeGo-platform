@@ -66,8 +66,11 @@ export default function AdminPayoutsSchedule() {
   // Schedule payout mutation
   const scheduleMutation = useMutation({
     mutationFn: async (data: SchedulePayoutForm) => {
-      const res = await apiRequest("POST", "/api/admin/payouts/schedule", data);
-      return res.json();
+      return await apiRequest("/api/admin/payouts/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: (result) => {
       toast({

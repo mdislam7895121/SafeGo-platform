@@ -85,8 +85,11 @@ export default function AdminPayoutsManual() {
   // Manual payout mutation
   const manualPayoutMutation = useMutation({
     mutationFn: async (data: { walletId: string; amount: number; reason?: string }) => {
-      const res = await apiRequest("POST", "/api/admin/payouts/run-manual", data);
-      return res.json();
+      return await apiRequest("/api/admin/payouts/run-manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: (result) => {
       toast({

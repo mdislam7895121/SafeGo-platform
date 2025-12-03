@@ -16,8 +16,11 @@ export function usePromoCalculation(
       if (!request) {
         throw new Error("No request provided");
       }
-      const response = await apiRequest("POST", "/api/promos/calculate", request);
-      return response.json();
+      return await apiRequest("/api/promos/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
+      });
     },
     enabled: enabled && !!request && request.originalFare > 0,
     staleTime: 30 * 1000,

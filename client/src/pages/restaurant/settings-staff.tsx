@@ -112,19 +112,22 @@ export default function SettingsStaff() {
   const inviteStaffMutation = useMutation({
     mutationFn: async (data: InviteStaffFormValues) => {
       const { canEditCategories, canEditItems, canToggleAvailability, canUseBulkTools, canViewAnalytics, canViewPayouts, canManageOrders, ...staffInfo } = data;
-      const response = await apiRequest("POST", "/api/restaurant/staff", {
-        ...staffInfo,
-        permissions: {
-          canEditCategories,
-          canEditItems,
-          canToggleAvailability,
-          canUseBulkTools,
-          canViewAnalytics,
-          canViewPayouts,
-          canManageOrders,
-        },
+      return await apiRequest("/api/restaurant/staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...staffInfo,
+          permissions: {
+            canEditCategories,
+            canEditItems,
+            canToggleAvailability,
+            canUseBulkTools,
+            canViewAnalytics,
+            canViewPayouts,
+            canManageOrders,
+          },
+        }),
       });
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/staff"] });
@@ -151,10 +154,11 @@ export default function SettingsStaff() {
 
   const updatePermissionsMutation = useMutation({
     mutationFn: async ({ id, permissions }: { id: string; permissions: EditPermissionsFormValues }) => {
-      const response = await apiRequest("PATCH", `/api/restaurant/staff/${id}`, {
-        permissions,
+      return await apiRequest(`/api/restaurant/staff/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ permissions }),
       });
-      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/staff"] });
@@ -177,10 +181,11 @@ export default function SettingsStaff() {
   // Toggle staff active status mutation
   const toggleStaffMutation = useMutation({
     mutationFn: async ({ id, staffActive }: { id: string; staffActive: boolean }) => {
-      const response = await apiRequest("PATCH", `/api/restaurant/staff/${id}`, {
-        staffActive,
+      return await apiRequest(`/api/restaurant/staff/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ staffActive }),
       });
-      return response.json();
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/staff"] });
@@ -201,8 +206,9 @@ export default function SettingsStaff() {
   // Delete (deactivate) staff mutation
   const deleteStaffMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("DELETE", `/api/restaurant/staff/${id}`, {});
-      return response.json();
+      return await apiRequest(`/api/restaurant/staff/${id}`, {
+        method: "DELETE",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/restaurant/staff"] });

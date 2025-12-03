@@ -89,8 +89,10 @@ export default function AdminPayouts() {
   // Approve payout mutation
   const approveMutation = useMutation({
     mutationFn: async (payoutId: string) => {
-      const res = await apiRequest("PUT", `/api/admin/payouts/${payoutId}/approve`, {});
-      return res.json();
+      return await apiRequest(`/api/admin/payouts/${payoutId}/approve`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({
@@ -118,8 +120,11 @@ export default function AdminPayouts() {
   // Reject payout mutation
   const rejectMutation = useMutation({
     mutationFn: async ({ payoutId, reason }: { payoutId: string; reason: string }) => {
-      const res = await apiRequest("PUT", `/api/admin/payouts/${payoutId}/reject`, { reason });
-      return res.json();
+      return await apiRequest(`/api/admin/payouts/${payoutId}/reject`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
     },
     onSuccess: () => {
       toast({

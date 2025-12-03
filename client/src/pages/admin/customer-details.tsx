@@ -134,12 +134,11 @@ export default function CustomerDetails() {
   // Suspend mutation
   const suspendMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/suspend`, { reason: suspensionReason });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to suspend customer");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/customers/${customerId}/suspend`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: suspensionReason }),
+      });
     },
     onSuccess: () => {
       toast({ title: "Customer suspended successfully" });
@@ -157,12 +156,10 @@ export default function CustomerDetails() {
   // Unsuspend mutation
   const unsuspendMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/unsuspend`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to unsuspend customer");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/customers/${customerId}/unsuspend`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({ title: "Customer suspension lifted successfully" });
@@ -178,12 +175,10 @@ export default function CustomerDetails() {
   // Block mutation
   const blockMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/block`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to block customer");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/customers/${customerId}/block`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({ title: "Customer blocked successfully" });
@@ -200,12 +195,10 @@ export default function CustomerDetails() {
   // Unblock mutation
   const unblockMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/unblock`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to unblock customer");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/customers/${customerId}/unblock`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+      });
     },
     onSuccess: () => {
       toast({ title: "Customer unblocked successfully" });
@@ -222,12 +215,9 @@ export default function CustomerDetails() {
   // Fetch NID (admin-only, secure endpoint)
   const fetchNidMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("GET", `/api/admin/customers/${customerId}/nid`);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to fetch NID");
-      }
-      const data = await response.json();
+      const data = await apiRequest(`/api/admin/customers/${customerId}/nid`, {
+        method: "GET",
+      });
       return data.nid;
     },
     onSuccess: (data) => {
@@ -250,12 +240,11 @@ export default function CustomerDetails() {
         }
       });
 
-      const response = await apiRequest("PATCH", `/api/admin/customers/${customerId}/profile`, payload);
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update profile");
-      }
-      return response.json();
+      return await apiRequest(`/api/admin/customers/${customerId}/profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
     onSuccess: () => {
       toast({ title: "Profile updated successfully" });

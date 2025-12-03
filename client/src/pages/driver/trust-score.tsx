@@ -212,8 +212,9 @@ export default function DriverTrustScore() {
 
   const recalculateMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/driver/trust-score/recalculate", {});
-      return response.json();
+      return await apiRequest("/api/driver/trust-score/recalculate", {
+        method: "POST",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/driver/trust-score"] });

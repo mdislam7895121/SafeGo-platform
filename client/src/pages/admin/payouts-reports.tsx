@@ -85,8 +85,9 @@ export default function AdminPayoutsReports() {
         params.append("countryCode", countryFilter.toUpperCase());
       }
 
-      const res = await apiRequest("GET", `/api/admin/payouts/reconciliation?${params.toString()}`, undefined);
-      return res.json();
+      return await apiRequest(`/api/admin/payouts/reconciliation?${params.toString()}`, {
+        method: "GET",
+      });
     },
     onSuccess: (data: ReconciliationReport) => {
       toast({

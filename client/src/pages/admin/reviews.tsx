@@ -141,8 +141,10 @@ export default function AdminReviews() {
     setIsSubmitting(true);
 
     try {
-      await apiRequest("POST", `/api/admin/reviews/${selectedReview.id}/${moderationAction}`, {
-        reason: reason.trim() || undefined,
+      await apiRequest(`/api/admin/reviews/${selectedReview.id}/${moderationAction}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason.trim() || undefined }),
       });
 
       toast({

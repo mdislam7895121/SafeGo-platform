@@ -180,17 +180,25 @@ export default function CustomerRegister() {
 
     try {
       // Step 1: Create user account
-      const signupResponse = await apiRequest("POST", "/api/auth/signup", {
-        email: formData.email,
-        password: formData.password,
-        role: "customer",
-        countryCode: formData.countryCode,
+      const signupResponse = await apiRequest("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          role: "customer",
+          countryCode: formData.countryCode,
+        }),
       });
 
       // Step 2: Login to get token
-      const loginResponse: any = await apiRequest("POST", "/api/auth/login", {
-        email: formData.email,
-        password: formData.password,
+      const loginResponse: any = await apiRequest("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+        }),
       });
 
       // Store token
@@ -223,7 +231,11 @@ export default function CustomerRegister() {
         profileData.governmentIdLast4 = formData.governmentIdLast4;
       }
 
-      await apiRequest("PATCH", "/api/customer/profile", profileData);
+      await apiRequest("/api/customer/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileData),
+      });
 
       toast({
         title: "Registration successful!",

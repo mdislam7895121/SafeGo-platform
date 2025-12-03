@@ -138,7 +138,11 @@ export default function AdminOpportunityBonusesEdit() {
         payload.notes = values.notes;
       }
 
-      return apiRequest("PATCH", `/api/admin/opportunity-settings/${id}`, payload);
+      return apiRequest(`/api/admin/opportunity-settings/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/opportunity-settings"] });

@@ -206,8 +206,11 @@ export default function AdminSettlement() {
   // Settlement mutation
   const settleMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/admin/settle-wallet", data);
-      return res.json();
+      return await apiRequest("/api/admin/settle-wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: (data) => {
       toast({
@@ -238,8 +241,11 @@ export default function AdminSettlement() {
   // Batch creation mutation
   const createBatchMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/admin/payout-batches", data);
-      return res.json();
+      return await apiRequest("/api/admin/payout-batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
     },
     onSuccess: (data) => {
       toast({
