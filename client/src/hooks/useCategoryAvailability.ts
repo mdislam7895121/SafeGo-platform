@@ -136,9 +136,9 @@ export function useCategoryAvailability({
     setError(null);
 
     try {
-      const response = await apiRequest<APIAvailabilityResponse>(
+      const response = await apiRequest(
         `/api/customer/ride-options/availability?pickupLat=${pickupLat}&pickupLng=${pickupLng}`
-      );
+      ) as APIAvailabilityResponse;
 
       const newAvailability = new Map<VehicleCategoryId, CategoryAvailability>();
       

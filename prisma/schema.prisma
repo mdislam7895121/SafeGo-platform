@@ -340,6 +340,7 @@ model CustomerProfile {
   productOrders         ProductOrder[]           // Shop orders placed by customer
   ticketBookings        TicketBooking[]          // Ticket bookings
   rentalBookings        RentalBooking[]          // Rental bookings
+  mobileWallets         CustomerMobileWallet[]   // BD mobile wallet payment methods (bKash, Nagad)
 
   @@index([cityCode])
   @@map("customer_profiles")
@@ -5748,6 +5749,35 @@ model MobileWalletConfig {
   @@unique([countryCode, provider])
   @@index([countryCode, isEnabled])
   @@map("mobile_wallet_configs")
+}
+
+// ============================================================
+// Phase 4 Part 2B: Customer Mobile Wallet (BD only)
+// ============================================================
+
+model CustomerMobileWallet {
+  id                    String                @id @default(uuid())
+  
+  customerId            String
+  customer              CustomerProfile       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  brand                 MobileWalletBrand     // bkash, nagad, upay, rocket
+  walletPhoneMasked     String                // Masked phone for display: 018****5678
+  walletPhoneEncrypted  String                // AES-256-GCM encrypted full phone
+  accountName           String?
+  
+  isDefault             Boolean               @default(false)
+  isVerified            Boolean               @default(false)
+  status                String                @default("active") // active, inactive, removed
+  
+  lastUsedAt            DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  
+  @@unique([customerId, brand, walletPhoneMasked])
+  @@index([customerId, status])
+  @@index([brand])
+  @@map("customer_mobile_wallets")
 }
 
 // ============================================================

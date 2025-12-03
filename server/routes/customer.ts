@@ -2453,10 +2453,13 @@ router.post("/partner/initialize", async (req: AuthRequest, res) => {
     // Create audit log for partner initialization attempt
     await prisma.auditLog.create({
       data: {
-        userId,
-        action: "PARTNER_UPGRADE_INITIALIZED",
+        actorId: userId,
+        actorEmail: user.email || "unknown",
+        actorRole: user.role,
+        actionType: "PARTNER_UPGRADE_INITIALIZED",
         entityType: "user",
         entityId: userId,
+        description: `User initialized partner upgrade to ${partnerType}`,
         metadata: {
           partnerType,
           countryCode: user.countryCode,
@@ -2535,11 +2538,11 @@ router.get("/partner/status", async (req: AuthRequest, res) => {
     }
 
     // Check for any existing partner profiles
-    const [driverProfile, restaurantProfile, shopPartnerProfile, ticketOperatorProfile] = await Promise.all([
+    const [driverProfile, restaurantProfile, shopPartner, ticketOperator] = await Promise.all([
       prisma.driverProfile.findUnique({ where: { userId }, select: { id: true, verificationStatus: true } }),
       prisma.restaurantProfile.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
-      prisma.shopPartnerProfile.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
-      prisma.ticketOperatorProfile.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
+      prisma.shopPartner.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
+      prisma.ticketOperator.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
     ]);
 
     // Determine available partner types based on country
@@ -2555,11 +2558,11 @@ router.get("/partner/status", async (req: AuthRequest, res) => {
     if (restaurantProfile) {
       existingPartners.push({ type: "restaurant", status: restaurantProfile.verificationStatus });
     }
-    if (shopPartnerProfile) {
-      existingPartners.push({ type: "shop_partner", status: shopPartnerProfile.verificationStatus });
+    if (shopPartner) {
+      existingPartners.push({ type: "shop_partner", status: shopPartner.verificationStatus });
     }
-    if (ticketOperatorProfile) {
-      existingPartners.push({ type: "ticket_operator", status: ticketOperatorProfile.verificationStatus });
+    if (ticketOperator) {
+      existingPartners.push({ type: "ticket_operator", status: ticketOperator.verificationStatus });
     }
 
     res.json({
