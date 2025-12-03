@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CustomerBackButton } from "@/components/customer/CustomerBackButton";
 import {
-  ChevronLeft,
   Search,
   Bus,
   Train,
@@ -105,11 +105,11 @@ export default function BDTicketsPage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-card">
         <div className="flex h-14 items-center gap-4 px-4">
-          <Link href="/customer">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+          <CustomerBackButton
+            fallbackRoute="/customer"
+            fallbackTab="tickets"
+            label="ফিরে যান"
+          />
           <div className="flex-1">
             <h1 className="text-lg font-bold" data-testid="text-title">
               টিকিট ও রেন্টাল

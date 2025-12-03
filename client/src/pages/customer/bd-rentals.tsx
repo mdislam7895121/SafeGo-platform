@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
+import { CustomerBackButton } from "@/components/customer/CustomerBackButton";
 import {
-  ChevronLeft,
   Search,
   CarFront,
   Users,
@@ -250,11 +250,11 @@ export default function BDRentalsPage() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 border-b bg-card">
         <div className="flex h-14 items-center gap-4 px-4">
-          <Link href="/customer">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+          <CustomerBackButton
+            fallbackRoute="/customer"
+            fallbackTab="rental"
+            label="ফিরে যান"
+          />
           <div className="flex-1">
             <h1 className="text-lg font-bold" data-testid="text-title">
               গাড়ি রেন্টাল

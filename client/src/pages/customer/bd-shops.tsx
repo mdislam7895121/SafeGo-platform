@@ -9,13 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest } from "@/lib/queryClient";
+import { CustomerBackButton } from "@/components/customer/CustomerBackButton";
 import {
   Store,
   Search,
   MapPin,
   Clock,
   Star,
-  ChevronLeft,
   ShoppingBag,
 } from "lucide-react";
 
@@ -257,11 +257,11 @@ export default function BDShops() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b">
         <div className="flex items-center gap-3 p-4">
-          <Link href="/customer">
-            <Button variant="ghost" size="icon" data-testid="button-back">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+          <CustomerBackButton
+            fallbackRoute="/customer"
+            fallbackTab="shop"
+            label="ফিরে যান"
+          />
           <div className="flex-1">
             <h1 className="text-xl font-bold">দোকান</h1>
             <p className="text-sm text-muted-foreground">
