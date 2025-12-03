@@ -25,7 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, uploadWithAuth } from "@/lib/queryClient";
 import { Package, Camera, ChevronLeft, Loader2, Check, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -77,8 +77,36 @@ export default function ProductForm() {
   const productId = params?.id;
   const isEdit = productId && productId !== "new";
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const handleImageUpload = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const result = await uploadWithAuth("/api/shop-partner/upload-image?type=product", formData);
+      
+      if (result?.url) {
+        setImageUrl(result.url);
+        toast({
+          title: "সফল!",
+          description: "পণ্যের ছবি আপলোড হয়েছে।",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "ত্রুটি",
+        description: error.message || "ছবি আপলোড ব্যর্থ হয়েছে।",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const { data: existingProduct, isLoading: productLoading } = useQuery<{ product: any }>({
     queryKey: ["/api/shop-partner/products", productId],
@@ -101,15 +129,17 @@ export default function ProductForm() {
     if (existingProduct?.product) {
       const p = existingProduct.product;
       form.reset({
-        productName: p.productName,
+        productName: p.name || p.productName,
         price: Number(p.price),
         category: p.category,
         description: p.description || "",
         unit: p.unit || "piece",
         stockQuantity: p.stockQuantity || undefined,
       });
-      if (p.imageUrl) {
-        setImagePreview(p.imageUrl);
+      const existingImageUrl = p.images?.[0] || p.imageUrl;
+      if (existingImageUrl) {
+        setImagePreview(existingImageUrl);
+        setImageUrl(existingImageUrl);
       }
     }
   }, [existingProduct, form]);
@@ -162,7 +192,16 @@ export default function ProductForm() {
   });
 
   const handleSubmit = (data: any) => {
-    saveMutation.mutate(data);
+    const submitData = {
+      name: data.productName,
+      price: data.price,
+      category: data.category,
+      description: data.description,
+      unit: data.unit,
+      stockQuantity: data.stockQuantity || 0,
+      images: imageUrl ? [imageUrl] : [],
+    };
+    saveMutation.mutate(submitData);
   };
 
   if (isEdit && productLoading) {
@@ -269,8 +308,13 @@ export default function ProductForm() {
                 <Label className="text-base mb-3 block">পণ্যের ছবি</Label>
                 <div className="flex items-center gap-4">
                   {imagePreview ? (
-                    <div className="h-24 w-24 rounded-xl overflow-hidden border-2 border-dashed">
+                    <div className="h-24 w-24 rounded-xl overflow-hidden border-2 border-dashed relative">
                       <img src={imagePreview} alt="Product" className="h-full w-full object-cover" />
+                      {imageUrl && (
+                        <div className="absolute bottom-1 right-1 bg-green-500 rounded-full p-0.5">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="h-24 w-24 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
@@ -281,29 +325,46 @@ export default function ProductForm() {
                     type="button"
                     variant="outline"
                     className="h-14 text-base"
+                    disabled={isUploading}
                     onClick={() => {
                       const input = document.createElement("input");
                       input.type = "file";
                       input.accept = "image/*";
                       input.capture = "environment";
-                      input.onchange = (e: any) => {
+                      input.onchange = async (e: any) => {
                         const file = e.target.files?.[0];
                         if (file) {
                           const reader = new FileReader();
-                          reader.onload = (e) => {
-                            setImagePreview(e.target?.result as string);
+                          reader.onload = (evt) => {
+                            setImagePreview(evt.target?.result as string);
                           };
                           reader.readAsDataURL(file);
+                          await handleImageUpload(file);
                         }
                       };
                       input.click();
                     }}
                     data-testid="button-upload-image"
                   >
-                    <Camera className="h-5 w-5 mr-2" />
-                    ছবি তুলুন
+                    {isUploading ? (
+                      <>
+                        <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                        আপলোড হচ্ছে...
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="h-5 w-5 mr-2" />
+                        ছবি তুলুন
+                      </>
+                    )}
                   </Button>
                 </div>
+                {imageUrl && (
+                  <p className="text-sm text-green-600 mt-2 flex items-center gap-1">
+                    <Check className="h-4 w-4" />
+                    ছবি আপলোড সম্পন্ন
+                  </p>
+                )}
               </div>
 
               <FormField

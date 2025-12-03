@@ -50,11 +50,11 @@ router.post("/upload-image", (req: AuthRequest, res: Response) => {
 
       // Validate image type from query param
       const imageType = req.query.type as string;
-      const validTypes = ["logo", "banner", "nid_front", "nid_back"];
+      const validTypes = ["logo", "banner", "nid_front", "nid_back", "product", "trade_license"];
       if (!imageType || !validTypes.includes(imageType)) {
         return res.status(400).json({ 
           error: "অবৈধ ছবির ধরণ",
-          errorEn: "Invalid image type. Must be 'logo', 'banner', 'nid_front', or 'nid_back'"
+          errorEn: "Invalid image type. Must be 'logo', 'banner', 'nid_front', 'nid_back', 'product', or 'trade_license'"
         });
       }
 
@@ -65,7 +65,9 @@ router.post("/upload-image", (req: AuthRequest, res: Response) => {
         logo: "লোগো আপলোড সফল হয়েছে",
         banner: "ব্যানার আপলোড সফল হয়েছে",
         nid_front: "NID সামনের ছবি আপলোড সফল হয়েছে",
-        nid_back: "NID পেছনের ছবি আপলোড সফল হয়েছে"
+        nid_back: "NID পেছনের ছবি আপলোড সফল হয়েছে",
+        product: "পণ্যের ছবি আপলোড সফল হয়েছে",
+        trade_license: "ট্রেড লাইসেন্স আপলোড সফল হয়েছে"
       };
 
       res.json({

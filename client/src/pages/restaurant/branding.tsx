@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, uploadWithAuth } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Upload, Save, Palette, Eye } from "lucide-react";
+import { Upload, Save, Palette, Eye, Loader2, Camera, Check, X } from "lucide-react";
 
 interface RestaurantBranding {
   id: string;
@@ -30,13 +30,13 @@ export default function RestaurantBrandingPage() {
   const [primaryColor, setPrimaryColor] = useState("");
   const [secondaryColor, setSecondaryColor] = useState("");
   const [themeMode, setThemeMode] = useState<string>("light");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [coverUploading, setCoverUploading] = useState(false);
 
-  // Fetch branding settings
   const { data: branding, isLoading } = useQuery<RestaurantBranding>({
     queryKey: ["/api/restaurant/branding"],
   });
 
-  // Update state when branding data is loaded
   useEffect(() => {
     if (branding) {
       setLogoUrl(branding.logoUrl || "");
@@ -47,7 +47,49 @@ export default function RestaurantBrandingPage() {
     }
   }, [branding]);
 
-  // Update branding mutation
+  const handleImageUpload = async (file: File, type: "logo" | "cover") => {
+    const setUploading = type === "logo" ? setLogoUploading : setCoverUploading;
+    const setUrl = type === "logo" ? setLogoUrl : setCoverPhotoUrl;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const result = await uploadWithAuth(`/api/restaurant/upload-image?type=${type}`, formData);
+      
+      if (result?.url) {
+        setUrl(result.url);
+        queryClient.invalidateQueries({ queryKey: ["/api/restaurant/branding"] });
+        toast({
+          title: "Upload Successful",
+          description: `${type === "logo" ? "Logo" : "Cover photo"} uploaded successfully.`,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const triggerFileUpload = (type: "logo" | "cover") => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.onchange = async (e: any) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        await handleImageUpload(file, type);
+      }
+    };
+    input.click();
+  };
+
   const updateBrandingMutation = useMutation({
     mutationFn: async (data: any) => {
       return await apiRequest("/api/restaurant/branding", {
@@ -118,7 +160,6 @@ export default function RestaurantBrandingPage() {
 
       <form onSubmit={handleSubmit}>
         <div className="space-y-6">
-          {/* Logo & Cover Photo */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -130,59 +171,105 @@ export default function RestaurantBrandingPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="logoUrl">Restaurant Logo URL</Label>
-                <Input
-                  id="logoUrl"
-                  type="url"
-                  placeholder="https://example.com/logo.png"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  data-testid="input-logo-url"
-                />
-                {logoUrl && (
-                  <div className="mt-2">
-                    <img
-                      src={logoUrl}
-                      alt="Logo preview"
-                      className="h-20 w-20 object-contain border rounded-md"
-                      data-testid="img-logo-preview"
-                    />
+              <div className="space-y-3">
+                <Label>Restaurant Logo</Label>
+                <div className="flex items-start gap-4">
+                  {logoUrl ? (
+                    <div className="relative h-24 w-24 rounded-lg overflow-hidden border-2 border-dashed">
+                      <img
+                        src={logoUrl}
+                        alt="Logo preview"
+                        className="h-full w-full object-cover"
+                        data-testid="img-logo-preview"
+                      />
+                      <div className="absolute bottom-1 right-1 bg-green-500 rounded-full p-0.5">
+                        <Check className="h-3 w-3 text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-24 w-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50">
+                      <Camera className="h-10 w-10 text-muted-foreground" />
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={logoUploading}
+                      onClick={() => triggerFileUpload("logo")}
+                      data-testid="button-upload-logo"
+                    >
+                      {logoUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          {logoUrl ? "Change Logo" : "Upload Logo"}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      Square image, min 200x200px
+                    </p>
                   </div>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Recommended: Square image, min 200x200px
-                </p>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="coverPhotoUrl">Cover Photo URL</Label>
-                <Input
-                  id="coverPhotoUrl"
-                  type="url"
-                  placeholder="https://example.com/cover.jpg"
-                  value={coverPhotoUrl}
-                  onChange={(e) => setCoverPhotoUrl(e.target.value)}
-                  data-testid="input-cover-url"
-                />
-                {coverPhotoUrl && (
-                  <div className="mt-2">
-                    <img
-                      src={coverPhotoUrl}
-                      alt="Cover preview"
-                      className="h-32 w-full object-cover border rounded-md"
-                      data-testid="img-cover-preview"
-                    />
+              <div className="space-y-3">
+                <Label>Cover Photo</Label>
+                <div className="flex flex-col gap-4">
+                  {coverPhotoUrl ? (
+                    <div className="relative h-40 w-full rounded-lg overflow-hidden border-2 border-dashed">
+                      <img
+                        src={coverPhotoUrl}
+                        alt="Cover preview"
+                        className="h-full w-full object-cover"
+                        data-testid="img-cover-preview"
+                      />
+                      <div className="absolute bottom-2 right-2 bg-green-500 rounded-full p-0.5">
+                        <Check className="h-3 w-3 text-white" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-40 w-full rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50">
+                      <div className="text-center">
+                        <Camera className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">No cover photo</p>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={coverUploading}
+                      onClick={() => triggerFileUpload("cover")}
+                      data-testid="button-upload-cover"
+                    >
+                      {coverUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          {coverPhotoUrl ? "Change Cover" : "Upload Cover"}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-sm text-muted-foreground">
+                      16:9 aspect ratio, min 1200x675px
+                    </p>
                   </div>
-                )}
-                <p className="text-sm text-muted-foreground">
-                  Recommended: 16:9 aspect ratio, min 1200x675px
-                </p>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Theme Colors */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -226,14 +313,14 @@ export default function RestaurantBrandingPage() {
                     <Input
                       id="secondaryColor"
                       type="color"
-                      value={secondaryColor || "#000000"}
+                      value={secondaryColor || "#666666"}
                       onChange={(e) => setSecondaryColor(e.target.value)}
                       className="w-16 h-10"
                       data-testid="input-secondary-color"
                     />
                     <Input
                       type="text"
-                      placeholder="#000000"
+                      placeholder="#666666"
                       value={secondaryColor}
                       onChange={(e) => setSecondaryColor(e.target.value)}
                       pattern="^#[0-9A-Fa-f]{6}$"
@@ -241,75 +328,60 @@ export default function RestaurantBrandingPage() {
                     />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Accent color (hex code)
+                    Accent and secondary elements (hex code)
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Eye className="h-5 w-5" />
+                Theme Mode
+              </CardTitle>
+              <CardDescription>
+                Choose the display mode for your restaurant page
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-2">
-                <Label htmlFor="themeMode">Theme Mode</Label>
+                <Label htmlFor="themeMode">Display Mode</Label>
                 <Select value={themeMode} onValueChange={setThemeMode}>
                   <SelectTrigger data-testid="select-theme-mode">
                     <SelectValue placeholder="Select theme mode" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="auto">Auto (System)</SelectItem>
+                    <SelectItem value="light">Light Mode</SelectItem>
+                    <SelectItem value="dark">Dark Mode</SelectItem>
+                    <SelectItem value="system">System Default</SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-sm text-muted-foreground">
-                  Default theme for your restaurant pages
+                  This affects how your restaurant page appears to customers
                 </p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Preview */}
-          {(primaryColor || secondaryColor) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="h-5 w-5" />
-                  Color Preview
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  {primaryColor && (
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-medium">Primary Color</p>
-                      <div
-                        className="h-20 rounded-md border"
-                        style={{ backgroundColor: primaryColor }}
-                        data-testid="preview-primary-color"
-                      />
-                    </div>
-                  )}
-                  {secondaryColor && (
-                    <div className="flex-1 space-y-2">
-                      <p className="text-sm font-medium">Secondary Color</p>
-                      <div
-                        className="h-20 rounded-md border"
-                        style={{ backgroundColor: secondaryColor }}
-                        data-testid="preview-secondary-color"
-                      />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-3">
-            <Button
-              type="submit"
+          <div className="flex justify-end">
+            <Button 
+              type="submit" 
               disabled={updateBrandingMutation.isPending}
               data-testid="button-save-branding"
             >
-              <Save className="h-4 w-4 mr-2" />
-              {updateBrandingMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateBrandingMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Changes
+                </>
+              )}
             </Button>
           </div>
         </div>

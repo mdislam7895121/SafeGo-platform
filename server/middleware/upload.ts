@@ -153,3 +153,12 @@ export const uploadShopImage = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit for shop images
   },
 }).single("file");
+
+// Upload configuration for restaurant branding and gallery images
+export const uploadRestaurantImage = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 8 * 1024 * 1024, // 8MB limit for restaurant images
+  },
+}).single("file");

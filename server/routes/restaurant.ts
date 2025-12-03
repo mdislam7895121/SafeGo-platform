@@ -6,7 +6,7 @@ import { validateRestaurantKYC } from "../utils/kyc-validator";
 import { notifyFoodOrderStatusChange, notifyRestaurantIssueEscalated } from "../utils/notifications";
 import { prisma } from "../db";
 import { auditMenuAction, getClientIp, EntityType, logAuditEvent, ActionType } from "../utils/audit";
-import { uploadMenuItemImage, getFileUrl } from "../middleware/upload";
+import { uploadMenuItemImage, uploadRestaurantImage, getFileUrl, deleteFile } from "../middleware/upload";
 import {
   isRestaurantOwner,
   getStaffForOwner,
@@ -4256,6 +4256,122 @@ router.patch("/branding", requireKYCCompletion, requireOwnerRole, async (req: Au
       return res.status(400).json({ error: "Invalid branding data", details: error.errors });
     }
     res.status(500).json({ error: error.message || "Failed to update branding settings" });
+  }
+});
+
+// POST /api/restaurant/upload-image - Upload branding/gallery images (OWNER only)
+router.post("/upload-image", requireKYCCompletion, requireOwnerRole, (req: AuthRequest, res, next) => {
+  uploadRestaurantImage(req, res, (err) => {
+    if (err) {
+      console.error("Restaurant image upload error:", err);
+      return res.status(400).json({ 
+        error: err.message || "Failed to upload image",
+        errorCode: "UPLOAD_FAILED"
+      });
+    }
+    next();
+  });
+}, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ 
+        error: "No file provided",
+        errorCode: "NO_FILE"
+      });
+    }
+
+    // Validate image type from query param
+    const imageType = req.query.type as string;
+    const validTypes = ["logo", "cover", "gallery", "menu_item"];
+    if (!imageType || !validTypes.includes(imageType)) {
+      return res.status(400).json({ 
+        error: "Invalid image type",
+        errorCode: "INVALID_TYPE",
+        validTypes
+      });
+    }
+
+    const restaurantProfile = await prisma.restaurantProfile.findUnique({
+      where: { userId },
+      select: { id: true, user: { select: { email: true } } },
+    });
+
+    if (!restaurantProfile) {
+      return res.status(404).json({ error: "Restaurant profile not found" });
+    }
+
+    // Generate the URL for the uploaded file
+    const fileUrl = getFileUrl(file.filename);
+
+    const messages: Record<string, string> = {
+      logo: "Logo uploaded successfully",
+      cover: "Cover photo uploaded successfully",
+      gallery: "Gallery image uploaded successfully",
+      menu_item: "Menu item image uploaded successfully"
+    };
+
+    // If this is a logo or cover, update branding
+    if (imageType === "logo" || imageType === "cover") {
+      const updateField = imageType === "logo" ? "logoUrl" : "coverPhotoUrl";
+      
+      // Get existing branding to clean up old file
+      const existingBranding = await prisma.restaurantBranding.findUnique({
+        where: { restaurantId: restaurantProfile.id },
+        select: { logoUrl: true, coverPhotoUrl: true }
+      });
+
+      const oldUrl = existingBranding?.[updateField as keyof typeof existingBranding];
+      if (oldUrl && typeof oldUrl === 'string') {
+        try {
+          const oldFilename = oldUrl.split('/').pop();
+          if (oldFilename) {
+            deleteFile(oldFilename);
+          }
+        } catch (err) {
+          console.error("Failed to delete old branding file:", err);
+        }
+      }
+
+      // Create or update branding
+      await prisma.restaurantBranding.upsert({
+        where: { restaurantId: restaurantProfile.id },
+        create: {
+          restaurantId: restaurantProfile.id,
+          [updateField]: fileUrl,
+        },
+        update: {
+          [updateField]: fileUrl,
+        },
+      });
+    }
+
+    // Audit log
+    await logAuditEvent({
+      entityType: EntityType.RESTAURANT,
+      entityId: restaurantProfile.id,
+      userId,
+      action: ActionType.CREATE,
+      details: `Uploaded ${imageType} image`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json({
+      success: true,
+      url: fileUrl,
+      type: imageType,
+      filename: file.filename,
+      message: messages[imageType]
+    });
+  } catch (error: any) {
+    console.error("Restaurant image upload error:", error);
+    res.status(500).json({ 
+      error: "Failed to upload image",
+      errorCode: "SERVER_ERROR"
+    });
   }
 });
 
