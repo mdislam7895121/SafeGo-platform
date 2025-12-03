@@ -125,6 +125,24 @@ interface SupportSettings {
   businessHoursEnd: string;
 }
 
+interface RoleWelcomeMessage {
+  enabled: boolean;
+  title: string;
+  message: string;
+  ctaText?: string;
+  ctaHref?: string;
+  variant: "default" | "primary" | "gradient";
+}
+
+interface WelcomeMessageSettings {
+  customer: RoleWelcomeMessage;
+  driver: RoleWelcomeMessage;
+  restaurant: RoleWelcomeMessage;
+  shop_partner: RoleWelcomeMessage;
+  ticket_operator: RoleWelcomeMessage;
+  admin: RoleWelcomeMessage;
+}
+
 interface AllSettings {
   general: GeneralSettings;
   kyc: KYCSettings;
@@ -133,6 +151,7 @@ interface AllSettings {
   notifications: NotificationSettings;
   security: SecuritySettings;
   support: SupportSettings;
+  welcomeMessage: WelcomeMessageSettings;
 }
 
 export default function AdminSettings() {
@@ -153,6 +172,7 @@ export default function AdminSettings() {
   const [notifications, setNotifications] = useState<NotificationSettings | null>(null);
   const [security, setSecurity] = useState<SecuritySettings | null>(null);
   const [support, setSupport] = useState<SupportSettings | null>(null);
+  const [welcomeMessage, setWelcomeMessage] = useState<WelcomeMessageSettings | null>(null);
 
   // Initialize state when settings load
   if (settings && !general) {
@@ -173,6 +193,8 @@ export default function AdminSettings() {
       businessHoursStart: "09:00",
       businessHoursEnd: "17:00",
     });
+    // Set welcome message settings
+    setWelcomeMessage(settings.welcomeMessage);
   }
 
   // Update mutation
@@ -241,6 +263,12 @@ export default function AdminSettings() {
     }
   };
 
+  const handleSaveWelcomeMessage = () => {
+    if (welcomeMessage) {
+      updateMutation.mutate({ section: "welcomeMessage", data: welcomeMessage });
+    }
+  };
+
   if (isLoading || !general || !kyc || !commission || !settlement || !notifications || !security) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -283,6 +311,7 @@ export default function AdminSettings() {
           <TabsTrigger value="notifications" data-testid="tab-notifications" className="whitespace-nowrap flex-shrink-0">Notifications</TabsTrigger>
           <TabsTrigger value="security" data-testid="tab-security" className="whitespace-nowrap flex-shrink-0">Security</TabsTrigger>
           <TabsTrigger value="support" data-testid="tab-support" className="whitespace-nowrap flex-shrink-0">Support</TabsTrigger>
+          <TabsTrigger value="welcomeMessage" data-testid="tab-welcome-message" className="whitespace-nowrap flex-shrink-0">Welcome Message</TabsTrigger>
         </TabsList>
 
         {/* General Tab */}
