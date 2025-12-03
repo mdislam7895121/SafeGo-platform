@@ -286,6 +286,7 @@ import ShopPartnerProfile from "@/pages/shop-partner/profile";
 // Customer BD Shop pages
 import BDShops from "@/pages/customer/bd-shops";
 import BDShopDetails from "@/pages/customer/bd-shop-details";
+import BDProductDetails from "@/pages/customer/bd-product-details";
 
 // Ticket Operator pages (BD only)
 import { TicketOperatorGuard } from "@/components/TicketOperatorGuard";
@@ -2108,6 +2109,9 @@ function Router() {
       </Route>
 
       {/* Customer BD Shop Routes */}
+      <Route path="/customer/bd-product/:id">
+        <BDProductDetails />
+      </Route>
       <Route path="/customer/bd-shop/:id">
         <ProtectedRoute allowedRoles={["customer"]}>
           <BDShopDetails />

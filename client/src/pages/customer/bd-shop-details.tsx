@@ -333,28 +333,32 @@ export default function BDShopDetails() {
                   className="overflow-hidden"
                   data-testid={`card-product-${product.id}`}
                 >
-                  <div className="aspect-square bg-muted relative">
-                    {productImage ? (
-                      <img
-                        src={productImage}
-                        alt={productName}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center">
-                        <Image className="h-12 w-12 text-muted-foreground" />
-                      </div>
-                    )}
-                    {quantity > 0 && (
-                      <Badge className="absolute top-2 right-2">
-                        {quantity}
-                      </Badge>
-                    )}
-                  </div>
+                  <Link href={`/customer/bd-product/${product.id}`}>
+                    <div className="aspect-square bg-muted relative">
+                      {productImage ? (
+                        <img
+                          src={productImage}
+                          alt={productName}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <Image className="h-12 w-12 text-muted-foreground" />
+                        </div>
+                      )}
+                      {quantity > 0 && (
+                        <Badge className="absolute top-2 right-2">
+                          {quantity}
+                        </Badge>
+                      )}
+                    </div>
+                  </Link>
                   <CardContent className="p-3">
-                    <h3 className="font-medium text-sm line-clamp-2 min-h-10">
-                      {productName}
-                    </h3>
+                    <Link href={`/customer/bd-product/${product.id}`}>
+                      <h3 className="font-medium text-sm line-clamp-2 min-h-10 hover:text-primary transition-colors">
+                        {productName}
+                      </h3>
+                    </Link>
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-lg font-bold text-primary">
                         ৳{Number(productPrice).toLocaleString("bn-BD")}
