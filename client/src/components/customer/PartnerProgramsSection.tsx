@@ -4,6 +4,7 @@ import { Car, Truck, UtensilsCrossed, Store, Ticket, Loader2 } from "lucide-reac
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/contexts/AuthContext";
 
 type PartnerKind = "driver_ride" | "driver_delivery" | "restaurant" | "shop_partner" | "ticket_operator";
 
@@ -111,9 +112,12 @@ export function PartnerProgramsSection() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [loadingKind, setLoadingKind] = useState<PartnerKind | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
 
+  // Only fetch partner summary if user is logged in
   const { data: partnerSummary, isLoading } = useQuery<PartnerSummary>({
     queryKey: ["/api/bd/partner/summary"],
+    enabled: !!user,
   });
 
   const startMutation = useMutation({
@@ -131,7 +135,9 @@ export function PartnerProgramsSection() {
       let message = "সিস্টেমে সমস্যা হচ্ছে, আবার চেষ্টা করুন।";
       
       if (status === 401 || status === 403) {
-        message = "লগইন করুন বা এই সেবা আপনার অঞ্চলের জন্য নয়।";
+        // Redirect to login for auth errors
+        setLocation("/login?returnTo=/customer");
+        return;
       } else if (status === 400 || status === 422) {
         message = error?.message || "অনুরোধে সমস্যা হয়েছে।";
       }
@@ -146,11 +152,17 @@ export function PartnerProgramsSection() {
   });
 
   const handlePartnerClick = (kind: PartnerKind) => {
+    // If user is not logged in, redirect to login
+    if (!user) {
+      setLocation("/login?returnTo=/customer");
+      return;
+    }
     setLoadingKind(kind);
     startMutation.mutate(kind);
   };
 
-  if (isLoading) {
+  // Show loading state while checking auth or fetching data
+  if (authLoading || (user && isLoading)) {
     return (
       <div className="mt-6 flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -233,6 +245,8 @@ export function PartnerProgramsSection() {
               >
                 {isItemLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin mx-auto" />
+                ) : !user ? (
+                  "লগইন করে শুরু করুন"
                 ) : (
                   getButtonLabel(status)
                 )}
