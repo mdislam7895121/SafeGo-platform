@@ -103,11 +103,11 @@ export default function Login() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm">
-              Don't have an account?{" "}
+            <div className="mt-6 text-center text-sm py-3">
+              <span>Don't have an account?</span>{" "}
               <Link 
                 href="/signup" 
-                className="text-primary hover:underline font-medium" 
+                className="text-primary hover:underline font-medium inline-block py-2 px-2 min-h-[44px] min-w-[44px] touch-manipulation"
                 data-testid="link-signup"
               >
                 Sign up
