@@ -321,7 +321,7 @@ export default function Signup() {
               <Button
                 type="submit"
                 className="w-full h-12 text-base"
-                disabled={isLoading || !passwordStrength.isValid || password !== confirmPassword}
+                disabled={isLoading || !email || !passwordStrength.isValid || password !== confirmPassword}
                 data-testid="button-signup"
               >
                 {isLoading ? (
@@ -333,6 +333,15 @@ export default function Signup() {
                   "Create Account"
                 )}
               </Button>
+
+              {/* Show why button is disabled */}
+              {!isLoading && (!email || !passwordStrength.isValid || password !== confirmPassword) && (
+                <p className="text-xs text-muted-foreground text-center">
+                  {!email ? "Enter your email to continue" : 
+                   !passwordStrength.isValid ? "Complete all password requirements above" :
+                   "Passwords must match"}
+                </p>
+              )}
 
               <p className="text-xs text-center text-muted-foreground">
                 By signing up, you agree to SafeGo's terms of service.
