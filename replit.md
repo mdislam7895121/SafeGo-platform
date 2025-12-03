@@ -83,6 +83,12 @@ The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with
     - **Audit Logging**: CUSTOMER_SIGNUP_SUCCESS event logged with country="BD" metadata
     - **Partner Upgrade Flow**: Logged-in customers can upgrade to shop_partner or ticket_operator via /shop-partner/onboarding or /ticket-operator/onboarding
     - **Role Preservation**: All existing roles (customer, driver, restaurant, admin, shop_partner, ticket_operator) remain intact
+*   **Partner Onboarding System Audit (December 2025)**: Complete audit and fix of partner onboarding flows:
+    - **BD Partner Flows (Functional)**: Shop Partner and Ticket Operator registration flows work - customer → pending_{role} → {role}
+    - **Guard Updates**: ShopPartnerGuard and TicketOperatorGuard updated to allow BD customers accessing onboarding routes (/shop-partner/onboarding, /ticket-operator/onboarding)
+    - **Coming Soon Flows**: Ride driver, delivery driver, and restaurant partner registration show "Coming Soon" messaging - requires future architecture for role upgrade from existing signup flow
+    - **Mobile/Desktop Responsive**: All partner start pages use max-w-2xl layouts with responsive grids
+    - **API Endpoints**: /api/bd/partner/summary, /api/bd/partner/start, /api/partner/profile all functional for 5 partner types
 
 ## External Dependencies
 
