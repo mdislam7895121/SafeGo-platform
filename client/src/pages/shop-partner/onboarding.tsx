@@ -346,10 +346,10 @@ export default function ShopPartnerOnboarding() {
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "ত্রুটি",
-        description: "ফাইলের আকার ২ মেগাবাইটের বেশি হতে পারবে না",
+        description: "ফাইলের আকার ৫ মেগাবাইটের বেশি হতে পারবে না",
         variant: "destructive",
       });
       return;

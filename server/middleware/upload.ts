@@ -150,6 +150,6 @@ export const uploadShopImage = multer({
   storage,
   fileFilter: imageFileFilter,
   limits: {
-    fileSize: 2 * 1024 * 1024, // 2MB limit for shop images
+    fileSize: 5 * 1024 * 1024, // 5MB limit for shop images
   },
 }).single("file");
