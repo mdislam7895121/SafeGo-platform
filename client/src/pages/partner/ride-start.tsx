@@ -192,15 +192,16 @@ export default function RideDriverStart() {
         </Card>
 
         <div className="mt-8 text-center">
-          <Button 
-            size="lg" 
-            className="w-full sm:w-auto px-12"
-            onClick={() => setLocation("/partner/driver/register?type=ride")}
-            data-testid="button-start-onboarding"
-          >
-            {hasExistingProfile && currentStep > 0 ? "Continue Application" : "Start Application"}
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+          <Link href="/partner/driver/register?type=ride">
+            <Button 
+              size="lg" 
+              className="w-full sm:w-auto px-12"
+              data-testid="button-start-onboarding"
+            >
+              {hasExistingProfile && currentStep > 0 ? "Continue Application" : "Start Application"}
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
           <p className="text-sm text-muted-foreground mt-4">
             Typical approval time: 24-48 hours after document submission
           </p>
