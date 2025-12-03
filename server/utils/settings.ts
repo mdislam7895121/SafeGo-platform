@@ -127,6 +127,24 @@ export interface SupportSettings {
   requireAdminApprovalForFileUploads: boolean;
 }
 
+export interface RoleWelcomeMessage {
+  enabled: boolean;
+  title: string;
+  message: string;
+  ctaText?: string;
+  ctaHref?: string;
+  variant: "default" | "primary" | "gradient";
+}
+
+export interface WelcomeMessageSettings {
+  customer: RoleWelcomeMessage;
+  driver: RoleWelcomeMessage;
+  restaurant: RoleWelcomeMessage;
+  shop_partner: RoleWelcomeMessage;
+  ticket_operator: RoleWelcomeMessage;
+  admin: RoleWelcomeMessage;
+}
+
 export interface AllSettings {
   general: GeneralSettings;
   kyc: KYCSettings;
@@ -135,6 +153,7 @@ export interface AllSettings {
   notifications: NotificationSettings;
   security: SecuritySettings;
   support: SupportSettings;
+  welcomeMessage: WelcomeMessageSettings;
 }
 
 // Zod validation schemas for each section
@@ -267,6 +286,24 @@ const supportSettingsSchema = z.object({
   requireAdminApprovalForFileUploads: z.boolean(),
 });
 
+const roleWelcomeMessageSchema = z.object({
+  enabled: z.boolean(),
+  title: z.string().min(1, "Title is required").max(100, "Title must be 100 characters or less"),
+  message: z.string().min(1, "Message is required").max(500, "Message must be 500 characters or less"),
+  ctaText: z.string().max(50, "CTA text must be 50 characters or less").optional(),
+  ctaHref: z.string().optional(),
+  variant: z.enum(["default", "primary", "gradient"]),
+});
+
+const welcomeMessageSettingsSchema = z.object({
+  customer: roleWelcomeMessageSchema,
+  driver: roleWelcomeMessageSchema,
+  restaurant: roleWelcomeMessageSchema,
+  shop_partner: roleWelcomeMessageSchema,
+  ticket_operator: roleWelcomeMessageSchema,
+  admin: roleWelcomeMessageSchema,
+});
+
 // Map section keys to their validation schemas
 const sectionSchemas: Record<keyof AllSettings, z.ZodSchema> = {
   general: generalSettingsSchema,
@@ -276,6 +313,7 @@ const sectionSchemas: Record<keyof AllSettings, z.ZodSchema> = {
   notifications: notificationSettingsSchema,
   security: securitySettingsSchema,
   support: supportSettingsSchema,
+  welcomeMessage: welcomeMessageSettingsSchema,
 };
 
 // Validation function for settings payload
@@ -417,6 +455,56 @@ const DEFAULT_SETTINGS: AllSettings = {
     },
     autoCloseInactiveDays: 30,
     requireAdminApprovalForFileUploads: false,
+  },
+  welcomeMessage: {
+    customer: {
+      enabled: true,
+      title: "Welcome to SafeGo!",
+      message: "We're thrilled to have you here. Book your first ride and enjoy safe, reliable transportation at your fingertips.",
+      ctaText: "Book a Ride",
+      ctaHref: "/customer",
+      variant: "gradient",
+    },
+    driver: {
+      enabled: true,
+      title: "Welcome, Driver Partner!",
+      message: "Thank you for joining SafeGo. Complete your profile setup to start earning with flexible hours.",
+      ctaText: "Complete Setup",
+      ctaHref: "/driver/getting-started",
+      variant: "primary",
+    },
+    restaurant: {
+      enabled: true,
+      title: "Welcome to SafeGo Eats!",
+      message: "Start reaching more customers today. Set up your menu and watch your orders grow.",
+      ctaText: "Set Up Menu",
+      ctaHref: "/restaurant/menu",
+      variant: "gradient",
+    },
+    shop_partner: {
+      enabled: true,
+      title: "Welcome, Shop Partner!",
+      message: "Get your products in front of thousands of customers. Set up your shop and start selling.",
+      ctaText: "Add Products",
+      ctaHref: "/shop-partner/products",
+      variant: "primary",
+    },
+    ticket_operator: {
+      enabled: true,
+      title: "Welcome, Transport Partner!",
+      message: "Manage your tickets and rentals easily. Start listing your services to reach more travelers.",
+      ctaText: "Add Listings",
+      ctaHref: "/ticket-operator/listings",
+      variant: "primary",
+    },
+    admin: {
+      enabled: true,
+      title: "Welcome to Admin Dashboard",
+      message: "Manage platform operations, monitor performance, and ensure smooth service delivery.",
+      ctaText: "View Dashboard",
+      ctaHref: "/admin",
+      variant: "default",
+    },
   },
 };
 
@@ -577,7 +665,7 @@ export function getDefaultSection<K extends keyof AllSettings>(
 
 // Validation helpers
 export function isValidSettingKey(key: string): key is keyof AllSettings {
-  return ["general", "kyc", "commission", "settlement", "notifications", "security", "support"].includes(key);
+  return ["general", "kyc", "commission", "settlement", "notifications", "security", "support", "welcomeMessage"].includes(key);
 }
 
 export const SettingsService = {
