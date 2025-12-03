@@ -504,6 +504,97 @@ router.get("/shops/:id", async (req: AuthRequest, res: Response) => {
 });
 
 // ============================================
+// BD PRODUCT DETAILS ENDPOINT (Public for browsing)
+// ============================================
+
+router.get("/products/:id", async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.userId;
+
+    const product = await prisma.shopProduct.findUnique({
+      where: { id },
+      include: {
+        shopPartner: {
+          select: {
+            id: true,
+            shopName: true,
+            shopType: true,
+            shopAddress: true,
+            shopLogo: true,
+            averageRating: true,
+            totalRatings: true,
+            isOpen: true,
+            openingTime: true,
+            closingTime: true,
+            minOrderAmount: true,
+            user: {
+              select: {
+                isDemo: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "পণ্য পাওয়া যায়নি" });
+    }
+
+    if (!product.isActive) {
+      return res.status(404).json({ error: "পণ্যটি বর্তমানে অপ্রাপ্য" });
+    }
+
+    const isDemo = product.shopPartner.user?.isDemo === true;
+
+    let isAuthenticated = false;
+    let isBDCustomer = false;
+    if (userId) {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+      isAuthenticated = !!user;
+      isBDCustomer = user?.countryCode === "BD";
+    }
+
+    res.json({
+      product: {
+        id: product.id,
+        shopId: product.shopPartnerId,
+        shopName: product.shopPartner.shopName,
+        shopType: product.shopPartner.shopType,
+        shopAddress: product.shopPartner.shopAddress,
+        shopLogo: product.shopPartner.shopLogo,
+        shopRating: product.shopPartner.averageRating || 0,
+        shopIsOpen: product.shopPartner.isOpen,
+        name: product.name,
+        description: product.description,
+        category: product.category,
+        subcategory: product.subcategory,
+        price: Number(product.price),
+        discountPrice: product.discountPrice ? Number(product.discountPrice) : null,
+        discountPercent: product.discountPercent,
+        images: product.images || [],
+        unit: product.unit || "পিস",
+        weight: product.weight ? Number(product.weight) : null,
+        inStock: product.isInStock && product.stockQuantity > 0,
+        stockQuantity: product.stockQuantity,
+        isFeatured: product.isFeatured,
+        minOrderAmount: product.shopPartner.minOrderAmount ? Number(product.shopPartner.minOrderAmount) : null,
+        demo: isDemo,
+        isAuthenticated,
+        isBDCustomer,
+        canOrder: isAuthenticated && isBDCustomer && product.isInStock && product.stockQuantity > 0,
+      },
+    });
+  } catch (error) {
+    console.error("BD product detail fetch error:", error);
+    res.status(500).json({ error: "পণ্যের তথ্য লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// ============================================
 // BD SHOP ORDERS ENDPOINTS
 // ============================================
 

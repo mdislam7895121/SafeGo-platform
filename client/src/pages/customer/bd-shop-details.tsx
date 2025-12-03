@@ -81,7 +81,7 @@ export default function BDShopDetails() {
 
   const shop = shopData?.shop;
   const products = shop?.products || [];
-  const categories = Array.from(new Set(products.map((p: any) => p.category)));
+  const categories = Array.from(new Set(products.map((p: any) => p.category as string))) as string[];
 
   const filteredProducts = products.filter((p: any) => {
     const name = p.name || p.productName || "";
