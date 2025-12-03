@@ -577,22 +577,131 @@ router.get("/shops/:id", async (req: AuthRequest, res: Response) => {
         deliveryEnabled: shop.isOpen,
         deliveryRadius: shop.deliveryRadiusKm,
         minOrderAmount: shop.minOrderAmount ? Number(shop.minOrderAmount) : null,
-        products: shop.products.map((p) => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          price: Number(p.price),
-          discountPrice: p.discountPrice ? Number(p.discountPrice) : null,
-          category: p.category,
-          images: p.images,
-          inStock: p.isInStock,
-          stockQuantity: p.stockQuantity,
-        })),
+        products: shop.products.map((p) => {
+          const hasUnlimitedStock = p.stockQuantity === null || p.stockQuantity === undefined;
+          const stockQuantityNum = p.stockQuantity ?? 0;
+          const inStock = p.isInStock && (hasUnlimitedStock || stockQuantityNum > 0);
+          return {
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            price: Number(p.price),
+            discountPrice: p.discountPrice ? Number(p.discountPrice) : null,
+            discountPercent: p.discountPercent,
+            category: p.category,
+            subcategory: p.subcategory,
+            images: p.images || [],
+            unit: p.unit || "পিস",
+            inStock,
+            stockQuantity: hasUnlimitedStock ? 999999 : stockQuantityNum,
+            hasUnlimitedStock,
+            isFeatured: p.isFeatured,
+          };
+        }),
       },
     });
   } catch (error) {
     console.error("BD shop detail fetch error:", error);
     res.status(500).json({ error: "Failed to fetch shop details" });
+  }
+});
+
+// Get products for a specific shop (dedicated endpoint)
+router.get("/shops/:id/products", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "This feature is only available in Bangladesh" });
+    }
+
+    const { id } = req.params;
+    const { category, search, featured } = req.query;
+
+    const shop = await prisma.shopPartner.findUnique({
+      where: { id },
+      include: { user: { select: { isDemo: true } } },
+    });
+
+    if (!shop) {
+      return res.status(404).json({ error: "Shop not found" });
+    }
+
+    const isDemo = shop.user.isDemo || false;
+
+    // Build product filters
+    const where: any = {
+      shopPartnerId: id,
+      isActive: true,
+    };
+
+    if (category && typeof category === "string") {
+      where.category = category;
+    }
+
+    if (search && typeof search === "string") {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { description: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    if (featured === "true") {
+      where.isFeatured = true;
+    }
+
+    const products = await prisma.shopProduct.findMany({
+      where,
+      orderBy: [{ isFeatured: "desc" }, { createdAt: "desc" }],
+    });
+
+    const formattedProducts = products.map((p) => {
+      const hasUnlimitedStock = p.stockQuantity === null || p.stockQuantity === undefined;
+      const stockQuantityNum = p.stockQuantity ?? 0;
+      const inStock = p.isInStock && (hasUnlimitedStock || stockQuantityNum > 0);
+      // Demo products can always be ordered for testing
+      const canOrder = isDemo ? true : inStock;
+
+      return {
+        id: p.id,
+        shopId: p.shopPartnerId,
+        name: p.name,
+        description: p.description,
+        price: Number(p.price),
+        discountPrice: p.discountPrice ? Number(p.discountPrice) : null,
+        discountPercent: p.discountPercent,
+        category: p.category,
+        subcategory: p.subcategory,
+        images: p.images || [],
+        unit: p.unit || "পিস",
+        weight: p.weight ? Number(p.weight) : null,
+        inStock,
+        stockQuantity: hasUnlimitedStock ? 999999 : stockQuantityNum,
+        hasUnlimitedStock,
+        isFeatured: p.isFeatured,
+        demo: isDemo,
+        canOrder,
+      };
+    });
+
+    res.json({
+      shopId: id,
+      shopName: shop.shopName,
+      shopType: shop.shopType,
+      isDemo,
+      products: formattedProducts,
+      categories: Array.from(new Set(products.map((p) => p.category).filter(Boolean))),
+    });
+  } catch (error) {
+    console.error("BD shop products fetch error:", error);
+    res.status(500).json({ error: "Failed to fetch shop products" });
   }
 });
 
@@ -1635,6 +1744,22 @@ function getDemoProductsForShopType(shopType: string) {
       { name: "বলপয়েন্ট কলম (১০ পিস)", description: "ব্লু বলপয়েন্ট কলম সেট", category: "স্টেশনারি", price: 60, unit: "প্যাকেট", stockQuantity: 150 },
       { name: "পেন্সিল বক্স", description: "স্টুডেন্ট পেন্সিল বক্স", category: "স্টেশনারি", price: 120, unit: "পিস", stockQuantity: 80 },
       { name: "কালার পেন্সিল সেট", description: "১২ কালার পেন্সিল সেট", category: "স্টেশনারি", price: 150, unit: "সেট", stockQuantity: 60 },
+    ],
+    sports: [
+      { name: "ক্রিকেট ব্যাট", description: "কাশ্মীর উইলো ক্রিকেট ব্যাট", category: "ক্রিকেট", price: 1800, unit: "পিস", stockQuantity: 15 },
+      { name: "ক্রিকেট বল (লেদার)", description: "রেড লেদার ক্রিকেট বল", category: "ক্রিকেট", price: 450, unit: "পিস", stockQuantity: 40 },
+      { name: "ফুটবল", description: "FIFA স্ট্যান্ডার্ড ফুটবল সাইজ ৫", category: "ফুটবল", price: 950, unit: "পিস", stockQuantity: 25 },
+      { name: "ব্যাডমিন্টন র‌্যাকেট সেট", description: "২টি র‌্যাকেট ও শাটলকক সহ", category: "ব্যাডমিন্টন", price: 650, unit: "সেট", stockQuantity: 20 },
+      { name: "টেবিল টেনিস র‌্যাকেট সেট", description: "২টি র‌্যাকেট ও বল সহ", category: "টেবিল টেনিস", price: 450, unit: "সেট", stockQuantity: 30 },
+      { name: "স্পোর্টস সু", description: "রানিং স্পোর্টস সু - বিভিন্ন সাইজ", category: "ফুটওয়্যার", price: 1500, unit: "জোড়া", stockQuantity: 20 },
+    ],
+    other: [
+      { name: "গিফট বক্স", description: "ডেকোরেটিভ গিফট বক্স - মিডিয়াম", category: "গিফট", price: 150, unit: "পিস", stockQuantity: 60 },
+      { name: "ফ্লাওয়ার বুকে", description: "আর্টিফিশিয়াল ফ্লাওয়ার বুকে", category: "ফ্লাওয়ার", price: 350, unit: "পিস", stockQuantity: 30 },
+      { name: "ফটো ফ্রেম (৮x১০)", description: "কাঠের ফটো ফ্রেম", category: "হোম ডেকর", price: 250, unit: "পিস", stockQuantity: 40 },
+      { name: "ওয়াল ক্লক", description: "ডিজাইনার ওয়াল ক্লক", category: "হোম ডেকর", price: 550, unit: "পিস", stockQuantity: 25 },
+      { name: "ক্যান্ডেল সেট", description: "সুগন্ধি ক্যান্ডেল সেট - ৩ পিস", category: "হোম ডেকর", price: 180, unit: "সেট", stockQuantity: 50 },
+      { name: "প্ল্যান্ট পট", description: "সিরামিক প্ল্যান্ট পট - স্মল", category: "গার্ডেনিং", price: 220, unit: "পিস", stockQuantity: 45 },
     ],
   };
   
