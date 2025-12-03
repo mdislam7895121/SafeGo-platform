@@ -115,10 +115,14 @@ export function PartnerProgramsSection() {
   const { user, isLoading: authLoading } = useAuth();
 
   // Only fetch partner summary if user is logged in
-  const { data: partnerSummary, isLoading } = useQuery<PartnerSummary>({
+  const { data: partnerSummary, isLoading, error: summaryError } = useQuery<PartnerSummary>({
     queryKey: ["/api/bd/partner/summary"],
     enabled: !!user,
+    retry: false,
   });
+
+  // If the summary query failed with auth error, user's session is expired
+  const isSessionExpired = summaryError && (summaryError as any)?.status === 403;
 
   const startMutation = useMutation({
     mutationFn: async (partnerKind: PartnerKind) => {
@@ -152,8 +156,8 @@ export function PartnerProgramsSection() {
   });
 
   const handlePartnerClick = (kind: PartnerKind) => {
-    // If user is not logged in, redirect to login
-    if (!user) {
+    // If user is not logged in or session expired, redirect to login
+    if (!user || isSessionExpired) {
       setLocation("/login?returnTo=/customer");
       return;
     }
@@ -245,7 +249,7 @@ export function PartnerProgramsSection() {
               >
                 {isItemLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                ) : !user ? (
+                ) : (!user || isSessionExpired) ? (
                   "লগইন করে শুরু করুন"
                 ) : (
                   getButtonLabel(status)
