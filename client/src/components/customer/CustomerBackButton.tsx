@@ -9,6 +9,7 @@ interface CustomerBackButtonProps {
   fallbackRoute?: string;
   fallbackTab?: CustomerServiceTab;
   onBack?: () => boolean | void;
+  useHistoryBack?: boolean;
   label?: string;
   className?: string;
 }
@@ -17,6 +18,7 @@ export function CustomerBackButton({
   fallbackRoute = "/customer",
   fallbackTab,
   onBack,
+  useHistoryBack = false,
   label = "Back",
   className,
 }: CustomerBackButtonProps) {
@@ -30,17 +32,9 @@ export function CustomerBackButton({
       }
     }
 
-    try {
-      if (window.history.length > 1) {
-        const currentPath = window.location.pathname;
-        
-        if (currentPath.startsWith("/customer")) {
-          window.history.back();
-          return;
-        }
-      }
-    } catch (error) {
-      console.error("[CustomerBackButton] History navigation failed:", error);
+    if (useHistoryBack && window.history.length > 1) {
+      window.history.back();
+      return;
     }
 
     let targetRoute = fallbackRoute;
