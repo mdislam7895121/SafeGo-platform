@@ -76,71 +76,114 @@ function validateEmailFormat(email: string): boolean {
 
 // ====================================================
 // POST /api/auth/signup
-// Create new customer user account (public signup)
-// This endpoint ONLY creates customer accounts. Partner roles (driver, 
-// restaurant, shop_partner, ticket_operator) require separate onboarding
-// flows after logging in as a customer.
+// Create new BD customer user account (public signup)
+// This endpoint ONLY creates customer accounts with country=BD.
+// Partner roles (driver, restaurant, shop_partner, ticket_operator) 
+// require separate onboarding flows after logging in as a customer.
+// 
+// SECURITY: Ignores any role/countryCode from client - enforces:
+//   role = "customer"
+//   countryCode = "BD"
 // ====================================================
 router.post("/signup", async (req, res) => {
   try {
-    const { email, password, confirmPassword, countryCode } = req.body;
+    const { email, password, confirmPassword, fullName } = req.body;
 
-    // Basic field validation
+    // Basic field validation with Bangla error messages
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+      return res.status(400).json({ 
+        code: "MISSING_FIELDS",
+        error: "Email and password are required",
+        message: "ইমেইল এবং পাসওয়ার্ড প্রয়োজন।"
+      });
     }
 
     // Confirm password is required for web signup
     if (!confirmPassword) {
-      return res.status(400).json({ error: "Please confirm your password" });
+      return res.status(400).json({ 
+        code: "MISSING_CONFIRM_PASSWORD",
+        error: "Please confirm your password",
+        message: "অনুগ্রহ করে পাসওয়ার্ড নিশ্চিত করুন।"
+      });
     }
 
     // Email format validation
     if (!validateEmailFormat(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address" });
+      return res.status(400).json({ 
+        code: "INVALID_EMAIL",
+        error: "Please enter a valid email address",
+        message: "সঠিক ইমেইল ঠিকানা দিন।"
+      });
     }
 
     // Strong password validation
     const passwordValidation = validatePasswordStrength(password);
     if (!passwordValidation.isValid) {
-      return res.status(400).json({ error: passwordValidation.error });
+      return res.status(400).json({ 
+        code: "WEAK_PASSWORD",
+        error: passwordValidation.error,
+        message: "পাসওয়ার্ড কমপক্ষে ৮ অক্ষর, একটি বড় হাতের অক্ষর, একটি ছোট হাতের অক্ষর এবং একটি সংখ্যা থাকতে হবে।"
+      });
     }
 
     // Confirm password must match
     if (password !== confirmPassword) {
-      return res.status(400).json({ error: "Passwords do not match" });
+      return res.status(400).json({ 
+        code: "PASSWORD_MISMATCH",
+        error: "Passwords do not match",
+        message: "পাসওয়ার্ড মিলছে না।"
+      });
     }
 
-    if (!countryCode || !["BD", "US"].includes(countryCode)) {
-      return res.status(400).json({ error: "Valid countryCode (BD or US) is required" });
-    }
-
-    // Check if user already exists
+    // Check if user already exists - return Bangla error
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: "User with this email already exists" });
+      return res.status(400).json({ 
+        code: "EMAIL_IN_USE",
+        error: "User with this email already exists",
+        message: "এই ইমেইল দিয়ে আগে থেকেই একাউন্ট আছে।"
+      });
     }
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user as customer (public signup only creates customer accounts)
+    // Create user as BD customer (public signup enforces these values server-side)
+    // SECURITY: role and countryCode are NEVER taken from client input
     const user = await prisma.user.create({
       data: {
         email,
         passwordHash,
         role: "customer",
-        countryCode,
+        countryCode: "BD",
       },
     });
 
-    // Create customer profile
+    // Create customer profile with optional fullName
     await prisma.customerProfile.create({
       data: {
         userId: user.id,
         verificationStatus: "pending",
         isVerified: false,
+        fullName: fullName?.trim() || null,
       },
+    });
+
+    // Audit log for successful customer signup
+    await logAuditEvent({
+      actorId: user.id,
+      actorEmail: user.email,
+      actorRole: "customer",
+      ipAddress: getClientIp(req),
+      actionType: ActionType.CREATE,
+      entityType: EntityType.CUSTOMER,
+      entityId: user.id,
+      description: `Customer signup success for ${user.email}`,
+      metadata: { 
+        event: "CUSTOMER_SIGNUP_SUCCESS",
+        country: "BD"
+      },
+      success: true,
     });
 
     res.status(201).json({
@@ -154,7 +197,11 @@ router.post("/signup", async (req, res) => {
     });
   } catch (error) {
     console.error("Signup error:", error);
-    res.status(500).json({ error: "Failed to create user" });
+    res.status(500).json({ 
+      code: "SERVER_ERROR",
+      error: "Failed to create user",
+      message: "একাউন্ট তৈরি করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।"
+    });
   }
 });
 

@@ -75,6 +75,14 @@ The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with
       - Status flows: Tickets (available → booked → confirmed → used), Rentals (available → booked → confirmed → active → completed)
     - **Admin Management**: /api/admin/bd-expansion/* endpoints for verification, commission adjustment, and balance settlement
     - **Country Enforcement**: All BD expansion routes validate countryCode="BD" for strict role isolation
+*   **BD Customer Signup System (December 2025)**: Production-ready customer-only signup flow for Bangladesh:
+    - **Public Routes**: /login and /signup only (customer-only public signup)
+    - **Signup Page**: BD-only (no country selector), optional fullName field, password strength validation with Bangla UX, auto-login after signup → redirect to /customer
+    - **Backend Security**: POST /api/auth/signup enforces role="customer" and countryCode="BD" server-side, ignores any role/countryCode from client
+    - **Bangla Error Messages**: All validation errors use Bangla messages with error codes (EMAIL_IN_USE, PASSWORD_MISMATCH, etc.)
+    - **Audit Logging**: CUSTOMER_SIGNUP_SUCCESS event logged with country="BD" metadata
+    - **Partner Upgrade Flow**: Logged-in customers can upgrade to shop_partner or ticket_operator via /shop-partner/onboarding or /ticket-operator/onboarding
+    - **Role Preservation**: All existing roles (customer, driver, restaurant, admin, shop_partner, ticket_operator) remain intact
 
 ## External Dependencies
 
