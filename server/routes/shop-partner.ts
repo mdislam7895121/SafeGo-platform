@@ -3,11 +3,78 @@ import { prisma } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { authenticateToken, AuthRequest } from "../middleware/auth";
+import { uploadShopImage, getFileUrl } from "../middleware/upload";
 
 const router = Router();
 
 // Apply authentication middleware to all shop-partner routes
 router.use(authenticateToken);
+
+// Shop image upload endpoint - must be before other routes
+router.post("/upload-image", (req: AuthRequest, res: Response) => {
+  uploadShopImage(req, res, async (err: any) => {
+    try {
+      if (err) {
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({ 
+            error: "ফাইলের আকার ২ মেগাবাইটের বেশি হতে পারবে না",
+            errorEn: "File size exceeds 2MB limit"
+          });
+        }
+        return res.status(400).json({ 
+          error: err.message || "ফাইল আপলোড ব্যর্থ হয়েছে",
+          errorEn: err.message || "File upload failed"
+        });
+      }
+
+      const userId = req.user?.userId;
+      const userRole = req.user?.role;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      // Allow both pending_shop_partner and shop_partner roles
+      if (userRole !== "pending_shop_partner" && userRole !== "shop_partner") {
+        return res.status(403).json({ error: "Only shop partners can upload images" });
+      }
+
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ 
+          error: "কোনো ফাইল নির্বাচন করা হয়নি",
+          errorEn: "No file provided"
+        });
+      }
+
+      // Validate image type from query param
+      const imageType = req.query.type as string;
+      if (!imageType || !["logo", "banner"].includes(imageType)) {
+        return res.status(400).json({ 
+          error: "অবৈধ ছবির ধরণ",
+          errorEn: "Invalid image type. Must be 'logo' or 'banner'"
+        });
+      }
+
+      // Generate the URL for the uploaded file
+      const fileUrl = getFileUrl(file.filename);
+
+      res.json({
+        success: true,
+        url: fileUrl,
+        type: imageType,
+        filename: file.filename,
+        message: imageType === "logo" ? "লোগো আপলোড সফল হয়েছে" : "ব্যানার আপলোড সফল হয়েছে"
+      });
+    } catch (error) {
+      console.error("Shop image upload error:", error);
+      res.status(500).json({ 
+        error: "ছবি আপলোড ব্যর্থ হয়েছে",
+        errorEn: "Failed to upload image"
+      });
+    }
+  });
+});
 
 const shopPartnerRegisterSchema = z.object({
   shopName: z.string().min(2, "দোকানের নাম কমপক্ষে ২ অক্ষরের হতে হবে"),
@@ -32,6 +99,10 @@ const shopPartnerRegisterSchema = z.object({
   closingTime: z.string().optional(),
   deliveryRadiusKm: z.number().optional(),
   minOrderAmount: z.number().optional(),
+  deliveryEnabled: z.boolean().optional(),
+  preparationTime: z.number().optional(),
+  shopLogo: z.string().optional(),
+  shopBanner: z.string().optional(),
 });
 
 const shopPartnerKycSchema = z.object({
@@ -114,6 +185,10 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
         closingTime: data.closingTime || "21:00",
         deliveryRadiusKm: data.deliveryRadiusKm || 5,
         minOrderAmount: data.minOrderAmount,
+        deliveryEnabled: data.deliveryEnabled ?? true,
+        preparationTime: data.preparationTime || 20,
+        shopLogo: data.shopLogo,
+        shopBanner: data.shopBanner,
         verificationStatus: "pending",
         countryCode: "BD",
       },
@@ -138,6 +213,10 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
         closingTime: data.closingTime || "21:00",
         deliveryRadiusKm: data.deliveryRadiusKm || 5,
         minOrderAmount: data.minOrderAmount,
+        deliveryEnabled: data.deliveryEnabled ?? true,
+        preparationTime: data.preparationTime || 20,
+        shopLogo: data.shopLogo,
+        shopBanner: data.shopBanner,
         verificationStatus: "pending",
         rejectionReason: null,
       },

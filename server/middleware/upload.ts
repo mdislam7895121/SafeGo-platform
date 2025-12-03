@@ -144,3 +144,12 @@ export function deleteFile(filename: string): void {
     fs.unlinkSync(filePath);
   }
 }
+
+// Upload configuration for shop partner images (logo and banner)
+export const uploadShopImage = multer({
+  storage,
+  fileFilter: imageFileFilter,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB limit for shop images
+  },
+}).single("file");
