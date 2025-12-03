@@ -2252,7 +2252,17 @@ function Router() {
           <DriverRegistration />
         </ProtectedRoute>
       </Route>
+      <Route path="/partner/driver-registration">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <DriverRegistration />
+        </ProtectedRoute>
+      </Route>
       <Route path="/partner/restaurant/register">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RestaurantRegistration />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/partner/restaurant-registration">
         <ProtectedRoute allowedRoles={["customer"]}>
           <RestaurantRegistration />
         </ProtectedRoute>
