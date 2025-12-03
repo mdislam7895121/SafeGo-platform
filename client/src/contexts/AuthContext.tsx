@@ -34,8 +34,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (storedToken && storedUser) {
         try {
-          // Validate the token with the backend
-          const response = await fetch("/api/auth/me", {
+          // Validate the token with the backend (works for ALL user types)
+          const response = await fetch("/api/auth/validate", {
             headers: {
               "Authorization": `Bearer ${storedToken}`,
             },

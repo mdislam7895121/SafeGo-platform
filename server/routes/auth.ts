@@ -683,4 +683,27 @@ router.get("/me", authenticateToken, loadAdminProfile, async (req: AuthRequest, 
   }
 });
 
+// ====================================================
+// GET /api/auth/validate
+// Simple token validation for ALL user types (customer, driver, restaurant, admin, etc.)
+// Used by frontend to check if session is still valid on page load
+// ====================================================
+router.get("/validate", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    // authenticateToken already verified the token
+    // If we reach here, the token is valid
+    const { userId, role, countryCode } = req.user as JWTPayload;
+    
+    res.json({
+      valid: true,
+      userId,
+      role,
+      countryCode,
+    });
+  } catch (error) {
+    console.error("Token validation error:", error);
+    res.status(401).json({ valid: false, error: "Invalid token" });
+  }
+});
+
 export default router;
