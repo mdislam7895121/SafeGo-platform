@@ -1,0 +1,317 @@
+You are working on the SafeGo global super-app.
+
+Task: Implement a consistent, safe, non-breaking BACK navigation system for all customer-facing service cards and booking flows (Ride, Food, Parcel, etc.) on the /customer app.
+
+You must follow ALL SafeGo master rules below and then implement the back buttons end-to-end in a single coherent update.
+
+==================================================
+A) SAFEGO MASTER RULES (MUST ALWAYS BE RESPECTED)
+==================================================
+
+1) Roles (4 distinct roles, never mixed)
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   Each role has its own:
+   - signup/onboarding requirements
+   - KYC/verification logic
+   - dashboard and navigation
+   - permissions and allowed actions
+   - status flows
+
+   No shared dashboard, no mixed access.
+
+2) Global services
+   SafeGo supports 3 core services worldwide:
+   - Ride-hailing
+   - Food delivery
+   - Parcel/Delivery
+
+   All UX and navigation decisions must work for all three services.
+
+3) Country-specific KYC (BD vs US – branching is mandatory)
+
+   For Bangladesh (BD):
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID_number
+   - NID_front_image
+   - NID_back_image
+   - emergency_contact_name
+   - emergency_contact_phone
+   - verification_status ("pending" | "approved" | "rejected")
+   - is_verified (boolean)
+
+   For United States (US):
+   - date_of_birth
+   - home_address
+   - emergency_contact_name
+   - emergency_contact_phone
+   - government_id_type
+   - government_id_last4
+   - (drivers) driver_license_number + driver_license_image + driver_license_expiry
+   - (drivers) ssn_last4 (optional)
+   - verification_status
+   - is_verified
+
+4) Admin panel capabilities (must remain working)
+   - Verify customers, drivers, restaurants
+   - Approve/reject KYC with rejection_reason
+   - Update pricing, fees, commissions
+   - Block/unblock any user
+   - Manage payouts and settlements
+   - View driver negative balances
+   - View restaurant negative balances
+
+5) Mandatory collections
+   - rides
+   - food_orders
+   - deliveries
+
+   Each collection includes:
+   - customer_id, driver_id, restaurant_id (where applicable)
+   - pickup and dropoff addresses
+   - geolocation coordinates (lat, lng)
+   - base fare, fees, commission
+   - payment method + transaction info for online payments
+   - timestamps for each status
+   - full status flow
+   - rating and feedback
+
+6) Commission & payout rules
+   - CASH ride:
+       Driver gets all cash; SafeGo commission is tracked as negative driver_wallet_balance.
+       Driver must settle weekly (or configured period).
+   - CASH food order:
+       Restaurant keeps cash; SafeGo commission is tracked as negative restaurant_wallet.
+   - ONLINE payments:
+       SafeGo keeps commission; partners receive net payout.
+   - Admin can settle balances and mark them as paid.
+
+7) Security rules
+   - Customers cannot view driver documents (NID, license, etc.).
+   - Drivers cannot view customer NID or other sensitive ID info.
+   - Restaurant cannot view other restaurants.
+   - Only Admin can:
+       change pricing,
+       change commission,
+       change verification status,
+       block/unblock users.
+   - Users can only update their own profile.
+   - Do not expose sensitive details in navigation or error messages.
+
+8) Status flows (must stay intact)
+
+   Ride:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin.
+
+   Food:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin.
+
+   Parcel:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin.
+
+9) Onboarding (multi-step, role-specific)
+   - Customer signup:
+       basic info → address → KYC (country-specific) → emergency contact
+       verification_status = "pending"; is_verified = false.
+       High-risk actions blocked until admin approval.
+   - Drivers and Restaurants:
+       created later via separate onboarding flows AFTER login.
+       Must link to a customer account.
+
+10) Notifications
+   - New ride alerts for drivers
+   - Food order status updates
+   - Parcel delivery updates
+   - Verification approved/rejected alerts
+   - Important admin notifications
+
+==================================================
+B) CURRENT UX PROBLEM – MISSING BACK BUTTONS
+==================================================
+
+Observed (real screen example):
+- Route: /customer
+- Tab: Parcel
+- Screen: Parcel booking form
+  - Pickup Details (address, sender name, phone)
+  - Delivery Details (address, receiver name, phone)
+  - A "Continue" button at the bottom
+- There is NO clear, consistent BACK button on this service screen to return to:
+  - the previous step, OR
+  - the main customer services / landing screen.
+
+The same issue appears (or may appear) on:
+- Ride booking flows
+- Food ordering flows
+- Other service cards and step-based flows.
+
+This traps the user inside a flow and forces them to use browser back or URL changes, which is bad UX.
+
+Your job is to design and implement a CONSISTENT BACK NAVIGATION pattern for ALL customer service flows without breaking any backend logic or existing status flows.
+
+==================================================
+C) DESIGN REQUIREMENTS FOR BACK NAVIGATION
+==================================================
+
+1) Scope – which screens must be audited
+   Perform a full audit of ALL customer-facing service flows, including at least:
+   - Ride booking:
+       /customer/ride, trip selection, vehicle type selection, fare confirmation, etc.
+   - Food:
+       /customer/food, restaurant list, menu, cart, checkout.
+   - Parcel:
+       /customer/parcel (current screenshot), pickup/delivery details, confirmation.
+   - Any additional customer services (Rentals, Shop, etc. if present).
+
+2) Back button behavior rules
+   - On every intermediate “service screen” or “step card” shown from /customer:
+       - There must be a clearly visible BACK control.
+   - The BACK button:
+       - Must be visually consistent across all services.
+       - Must be in a predictable position (top-left of content area is recommended).
+       - Must have accessible label text ("Back" or localized equivalent).
+   - The button must follow correct history:
+       - If the user came from the /customer landing page → navigate back to /customer with the same selected main tab they had.
+       - If the user is in a multi-step flow (Step 2/3, etc.) → go back to the previous step within that flow first.
+
+3) Visual design requirements
+   - Mobile:
+       - Put the Back button in the content header area above the form/cards (not inside browser chrome).
+       - Use an icon + text pattern (e.g., "‹ Back").
+   - Desktop:
+       - Same placement but aligned with existing layout.
+       - Must not break current responsive layout.
+   - Maintain the existing look & feel of SafeGo customer app (typography, padding, etc.).
+
+4) Navigation logic
+   Implement a small and reusable navigation helper, for example:
+
+   - A `CustomerBackButton` component that:
+       - Accepts props like:
+           - `fallbackRoute` (e.g. "/customer")
+           - `fallbackTab` (e.g. "ride" | "parcel" | "food")
+       - Uses the app router history when possible.
+       - If history depth is insufficient or user came directly via deep link:
+           - Falls back to the provided route + tab.
+
+   - Make sure this helper:
+       - Works consistently for Ride, Food, Parcel flows.
+       - Does NOT interfere with admin, driver, or restaurant apps.
+
+5) State preservation
+   - When going back from a service flow to /customer:
+       - Preserve the selected main tab (Ride, Parcel, Food, etc.).
+       - If technically feasible, preserve partially filled form data using your existing state management (e.g. store in context or local state) so users do not lose progress accidentally.
+   - This must be done in a way that does not leak sensitive KYC data and does not break security rules.
+
+==================================================
+D) IMPLEMENTATION STEPS (DO THESE IN ORDER)
+==================================================
+
+1) Create shared Back button component
+   - New reusable component, e.g. `CustomerBackButton`.
+   - Responsibilities:
+       - Render a back arrow icon + localized label text.
+       - On click:
+           - If there is a previous in-app route in history:
+             - Navigate back using router.goBack().
+           - Otherwise:
+             - Navigate to `fallbackRoute` with optional query/param for tab.
+   - Expose props:
+       - `fallbackRoute: string` (required)
+       - `fallbackTab?: "ride" | "parcel" | "food" | "rentals" | "shop" | "partner"`
+       - `className?: string` (for styling).
+   - This component must ONLY be used in the customer app; not in admin/driver/restaurant areas.
+
+2) Wire Back buttons into major service entry screens
+   For each of the following screens (names are examples, adjust to your codebase):
+
+   - `CustomerParcelScreen` (like the screenshot)
+       - Insert `CustomerBackButton` at the top of the content area.
+       - Use: fallbackRoute = "/customer", fallbackTab = "parcel".
+
+   - `CustomerRideBookingScreen`
+       - Add the same back button.
+       - fallbackRoute = "/customer", fallbackTab = "ride".
+
+   - `CustomerFoodHomeScreen` / `CustomerFoodCheckoutScreen`
+       - Add back button(s) with fallbackTab = "food".
+       - In multi-step checkouts:
+           - Step 2 (payment) should navigate back to Step 1 (cart) first.
+           - Only from Step 1 should it go back to /customer.
+
+   - Any other customer service screens (rentals, shop, partner entry forms):
+       - Add the same component with appropriate fallbackTab.
+
+3) Multi-step flow handling
+   - For flows with internal steps, use BOTH:
+       - A “Back to previous step” using your internal step state handler.
+       - When at the first step of the flow:
+           - The Back button should navigate to /customer (correct tab).
+   - Ensure that going back does NOT accidentally change ride/food/parcel status in the database; status transitions only occur on explicit confirmation actions like "Confirm ride" or "Place order".
+
+4) Localization
+   - Ensure button label text uses the existing i18n/localization system.
+   - For Bangla customer UI, label should be the localized version of “Back”.
+   - For English, simply “Back”.
+
+5) Error handling and logging
+   - Back button itself should not trigger API calls.
+   - It should not display generic “system error” toasts.
+   - If navigation fails for any reason:
+       - Log the error to console or application logger.
+       - Redirect safely to /customer as final fallback.
+
+==================================================
+E) SECURITY & SAFEGO SECURITY ROADMAP PHASE
+==================================================
+
+Apply SafeGo Security Roadmap – UX Hardening Phase:
+- Goal: prevent users from getting stuck and forcing manual URL manipulation.
+- Ensure that:
+   - No back button reveals internal URLs or IDs in the button label.
+   - Navigation does not bypass KYC or verification checks.
+   - Driver/restaurant/admin routes remain unreachable from customer Back buttons.
+
+==================================================
+F) NON-BREAKING GUARANTEES
+==================================================
+
+While implementing this feature you MUST:
+- NOT rename or remove existing routes, APIs, or schema fields.
+- Only ADD:
+   - the new `CustomerBackButton` component (or equivalent),
+   - small, isolated UI changes to customer service screens,
+   - minimal navigation helpers.
+- NOT modify any commission logic, collections, or status flows.
+- NOT change admin, driver, or restaurant dashboards.
+
+==================================================
+G) ACCEPTANCE CRITERIA (YOU MUST SELF-TEST)
+==================================================
+
+1) From /customer, tap:
+   - Ride → arrives at ride booking form with a visible Back button.
+   - Parcel → arrives at parcel form (pickup/delivery details) with a visible Back button.
+   - Food → arrives at food home/restaurant list with a visible Back button.
+
+2) On all these screens:
+   - Back button works on mobile and desktop.
+   - Back returns to /customer, preserving the tab and not showing errors.
+
+3) In multi-step flows:
+   - Back navigates step-by-step backwards.
+   - Only from the first step does Back return to /customer.
+
+4) No “system error” toast appears due to using the Back button.
+
+5) All existing SafeGo features (rides, food_orders, deliveries, admin panel, KYC, payouts, etc.) continue to work exactly as before.

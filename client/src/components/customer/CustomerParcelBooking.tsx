@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Package, MapPin, Navigation, Scale, Ruler, Tag, Loader2, Calendar, Clock, User, Phone, CreditCard, Wallet, Banknote, ChevronRight, Zap, Truck, Info } from "lucide-react";
+import { Package, MapPin, Navigation, Scale, Ruler, Tag, Loader2, Calendar, Clock, User, Phone, CreditCard, Wallet, Banknote, ChevronRight, ChevronLeft, Zap, Truck, Info } from "lucide-react";
+import { CustomerBackButton } from "./CustomerBackButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,11 @@ const paymentMethods = [
   { value: "online", label: "Pay Online", description: "Card or SafeGo Wallet", icon: CreditCard },
 ];
 
-export function CustomerParcelBooking() {
+interface CustomerParcelBookingProps {
+  onBack?: () => void;
+}
+
+export function CustomerParcelBooking({ onBack }: CustomerParcelBookingProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -67,6 +72,17 @@ export function CustomerParcelBooking() {
   const [scheduledTime, setScheduledTime] = useState("");
 
   const [step, setStep] = useState<"locations" | "details" | "payment">("locations");
+
+  const handleStepBack = () => {
+    if (step === "payment") {
+      setStep("details");
+      return true;
+    } else if (step === "details") {
+      setStep("locations");
+      return true;
+    }
+    return false;
+  };
 
   const calculateEstimatedFare = useCallback(() => {
     if (!pickupLocation || !dropoffLocation) return null;
@@ -174,6 +190,30 @@ export function CustomerParcelBooking() {
 
   return (
     <div className="space-y-4 p-1">
+      {/* Back Button Header */}
+      <div className="flex items-center gap-2 pb-2">
+        <CustomerBackButton
+          fallbackRoute="/customer"
+          fallbackTab="parcel"
+          onBack={() => {
+            const steppedBack = handleStepBack();
+            if (steppedBack) return true;
+            if (onBack) {
+              onBack();
+              return true;
+            }
+            return false;
+          }}
+          label={step === "locations" ? "Back" : step === "details" ? "Pickup & Delivery" : "Package Details"}
+        />
+        <div className="flex-1 text-center">
+          <span className="text-sm text-muted-foreground">
+            Step {step === "locations" ? "1" : step === "details" ? "2" : "3"} of 3
+          </span>
+        </div>
+        <div className="w-16" />
+      </div>
+
       {step === "locations" && (
         <div className="space-y-4">
           <Card>
