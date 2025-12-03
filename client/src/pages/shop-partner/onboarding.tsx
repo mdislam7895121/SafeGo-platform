@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, Redirect } from "wouter";
 import { useForm } from "react-hook-form";
@@ -47,6 +47,8 @@ import {
   Clock,
   AlertCircle,
   ImageIcon,
+  Upload,
+  RefreshCw,
 } from "lucide-react";
 
 const STORAGE_KEY = "safego_shop_partner_onboarding";
@@ -247,6 +249,13 @@ export default function ShopPartnerOnboarding() {
   const [step2Data, setStep2Data] = useState<Step2Data | null>(savedState.step2 || null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const { data: profileData, isLoading: profileLoading, isError, error } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
@@ -322,6 +331,91 @@ export default function ShopPartnerOnboarding() {
       clearSavedState();
     },
   });
+
+  const handleImageUpload = async (file: File, type: "logo" | "banner") => {
+    const setUploading = type === "logo" ? setLogoUploading : setBannerUploading;
+    const setUrl = type === "logo" ? setLogoUrl : setBannerUrl;
+    const setPreview = type === "logo" ? setLogoPreview : setBannerPreview;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "ত্রুটি",
+        description: "শুধুমাত্র ছবি ফাইল গ্রহণযোগ্য",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "ত্রুটি",
+        description: "ফাইলের আকার ২ মেগাবাইটের বেশি হতে পারবে না",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`/api/shop-partner/upload-image?type=${type}`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "আপলোড ব্যর্থ হয়েছে");
+      }
+
+      const data = await response.json();
+      setUrl(data.url);
+      
+      toast({
+        title: "সফল!",
+        description: type === "logo" ? "লোগো আপলোড হয়েছে" : "ব্যানার আপলোড হয়েছে",
+      });
+    } catch (error: any) {
+      setPreview(null);
+      toast({
+        title: "ত্রুটি",
+        description: error.message || "ছবি আপলোড ব্যর্থ হয়েছে",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file, "logo");
+    }
+    if (logoInputRef.current) {
+      logoInputRef.current.value = "";
+    }
+  };
+
+  const handleBannerChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleImageUpload(file, "banner");
+    }
+    if (bannerInputRef.current) {
+      bannerInputRef.current.value = "";
+    }
+  };
 
   if (profileLoading && !isError) {
     return (
@@ -415,18 +509,17 @@ export default function ShopPartnerOnboarding() {
       emergencyContactName: step1Data.emergencyContactName?.trim(),
       emergencyContactPhone: step1Data.emergencyContactPhone?.trim(),
       deliveryRadiusKm: step2Data.deliveryRadius,
-      deliveryEnabled: step2Data.deliveryEnabled ?? true,
-      preparationTime: step2Data.preparationTime || 20,
+      avgPreparationMinutes: step2Data.preparationTime || 30,
       openingTime: "09:00",
       closingTime: "21:00",
       countryCode: "BD",
     };
     
-    if (logoPreview) {
-      fullData.shopLogo = logoPreview;
+    if (logoUrl) {
+      fullData.shopLogo = logoUrl;
     }
-    if (bannerPreview) {
-      fullData.shopBanner = bannerPreview;
+    if (bannerUrl) {
+      fullData.shopBanner = bannerUrl;
     }
 
     const missingFields = [];
@@ -984,6 +1077,25 @@ export default function ShopPartnerOnboarding() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                <input
+                  type="file"
+                  ref={logoInputRef}
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  onChange={handleLogoChange}
+                  className="hidden"
+                  data-testid="input-logo-file"
+                />
+                <input
+                  type="file"
+                  ref={bannerInputRef}
+                  accept="image/jpeg,image/png,image/webp"
+                  capture="environment"
+                  onChange={handleBannerChange}
+                  className="hidden"
+                  data-testid="input-banner-file"
+                />
+                
                 <Form {...step3Form}>
                   <form onSubmit={step3Form.handleSubmit(handleStep3Submit)} className="space-y-5">
                     <div className="bg-muted/30 rounded-lg p-4 space-y-4">
@@ -995,39 +1107,51 @@ export default function ShopPartnerOnboarding() {
                         <p className="text-base font-medium mb-3">দোকানের লোগো</p>
                         <div className="flex items-center gap-4">
                           {logoPreview ? (
-                            <div className="h-20 w-20 rounded-xl overflow-hidden border-2 border-primary">
+                            <div className="relative h-20 w-20 rounded-xl overflow-hidden border-2 border-primary">
                               <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
+                              {logoUrl && (
+                                <div className="absolute bottom-0 right-0 bg-green-500 rounded-tl-lg p-0.5">
+                                  <Check className="h-3 w-3 text-white" />
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="h-20 w-20 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
                               <ImageIcon className="h-8 w-8 text-muted-foreground" />
                             </div>
                           )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-12"
-                            onClick={() => {
-                              const input = document.createElement("input");
-                              input.type = "file";
-                              input.accept = "image/*";
-                              input.onchange = (e: any) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (e) => {
-                                    setLogoPreview(e.target?.result as string);
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              };
-                              input.click();
-                            }}
-                            data-testid="button-upload-logo"
-                          >
-                            <Camera className="h-5 w-5 mr-2" />
-                            লোগো তুলুন
-                          </Button>
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-12"
+                              onClick={() => logoInputRef.current?.click()}
+                              disabled={logoUploading}
+                              data-testid="button-upload-logo"
+                            >
+                              {logoUploading ? (
+                                <>
+                                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                  আপলোড হচ্ছে...
+                                </>
+                              ) : logoPreview ? (
+                                <>
+                                  <RefreshCw className="h-5 w-5 mr-2" />
+                                  পরিবর্তন করুন
+                                </>
+                              ) : (
+                                <>
+                                  <Camera className="h-5 w-5 mr-2" />
+                                  লোগো তুলুন
+                                </>
+                              )}
+                            </Button>
+                            {logoUrl && (
+                              <span className="text-xs text-green-600 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> আপলোড সফল
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -1035,39 +1159,51 @@ export default function ShopPartnerOnboarding() {
                         <p className="text-base font-medium mb-3">দোকানের ব্যানার</p>
                         <div className="flex items-center gap-4">
                           {bannerPreview ? (
-                            <div className="h-16 w-32 rounded-xl overflow-hidden border-2 border-primary">
+                            <div className="relative h-16 w-32 rounded-xl overflow-hidden border-2 border-primary">
                               <img src={bannerPreview} alt="Banner" className="h-full w-full object-cover" />
+                              {bannerUrl && (
+                                <div className="absolute bottom-0 right-0 bg-green-500 rounded-tl-lg p-0.5">
+                                  <Check className="h-3 w-3 text-white" />
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="h-16 w-32 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
                               <ImageIcon className="h-6 w-6 text-muted-foreground" />
                             </div>
                           )}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-12"
-                            onClick={() => {
-                              const input = document.createElement("input");
-                              input.type = "file";
-                              input.accept = "image/*";
-                              input.onchange = (e: any) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (e) => {
-                                    setBannerPreview(e.target?.result as string);
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              };
-                              input.click();
-                            }}
-                            data-testid="button-upload-banner"
-                          >
-                            <Camera className="h-5 w-5 mr-2" />
-                            ব্যানার তুলুন
-                          </Button>
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-12"
+                              onClick={() => bannerInputRef.current?.click()}
+                              disabled={bannerUploading}
+                              data-testid="button-upload-banner"
+                            >
+                              {bannerUploading ? (
+                                <>
+                                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                  আপলোড হচ্ছে...
+                                </>
+                              ) : bannerPreview ? (
+                                <>
+                                  <RefreshCw className="h-5 w-5 mr-2" />
+                                  পরিবর্তন করুন
+                                </>
+                              ) : (
+                                <>
+                                  <Camera className="h-5 w-5 mr-2" />
+                                  ব্যানার তুলুন
+                                </>
+                              )}
+                            </Button>
+                            {bannerUrl && (
+                              <span className="text-xs text-green-600 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> আপলোড সফল
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
