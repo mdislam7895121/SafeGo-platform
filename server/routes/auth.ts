@@ -51,38 +51,68 @@ function clearRefreshTokenCookie(res: any): void {
   res.clearCookie('safego_refresh_token', { path: '/api/auth' });
 }
 
+// Password strength validation helper
+function validatePasswordStrength(password: string): { isValid: boolean; error: string | null } {
+  if (password.length < 8) {
+    return { isValid: false, error: "Password must be at least 8 characters long" };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { isValid: false, error: "Password must contain at least one uppercase letter" };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { isValid: false, error: "Password must contain at least one lowercase letter" };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { isValid: false, error: "Password must contain at least one number" };
+  }
+  return { isValid: true, error: null };
+}
+
+// Email format validation helper
+function validateEmailFormat(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+
 // ====================================================
 // POST /api/auth/signup
-// Create new user with role-specific profile
-// BD-only roles (ticket_operator, shop_partner) are assigned as pending_* 
-// until admin approval after onboarding completion
+// Create new customer user account (public signup)
+// This endpoint ONLY creates customer accounts. Partner roles (driver, 
+// restaurant, shop_partner, ticket_operator) require separate onboarding
+// flows after logging in as a customer.
 // ====================================================
 router.post("/signup", async (req, res) => {
   try {
-    const { email, password, role, countryCode } = req.body;
+    const { email, password, confirmPassword, countryCode } = req.body;
 
-    // Validation
+    // Basic field validation
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
+    // Confirm password is required for web signup
+    if (!confirmPassword) {
+      return res.status(400).json({ error: "Please confirm your password" });
+    }
+
+    // Email format validation
+    if (!validateEmailFormat(email)) {
+      return res.status(400).json({ error: "Please enter a valid email address" });
+    }
+
+    // Strong password validation
+    const passwordValidation = validatePasswordStrength(password);
+    if (!passwordValidation.isValid) {
+      return res.status(400).json({ error: passwordValidation.error });
+    }
+
+    // Confirm password must match
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: "Passwords do not match" });
+    }
+
     if (!countryCode || !["BD", "US"].includes(countryCode)) {
       return res.status(400).json({ error: "Valid countryCode (BD or US) is required" });
-    }
-
-    // Default role to "driver" if not provided
-    const requestedRole = role || "driver";
-
-    // Validate role (accept both final and pending role names for BD roles)
-    const validRoles = ["customer", "driver", "restaurant", "admin", "ticket_operator", "shop_partner"];
-    if (!validRoles.includes(requestedRole)) {
-      return res.status(400).json({ error: "Invalid role. Must be: customer, driver, restaurant, admin, ticket_operator, or shop_partner" });
-    }
-
-    // BD-only role validation
-    const bdOnlyRoles = ["ticket_operator", "shop_partner"];
-    if (bdOnlyRoles.includes(requestedRole) && countryCode !== "BD") {
-      return res.status(400).json({ error: `${requestedRole} role is only available in Bangladesh` });
     }
 
     // Check if user already exists
@@ -94,79 +124,24 @@ router.post("/signup", async (req, res) => {
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // For BD-only roles, assign pending_* role instead of final role
-    // This ensures users must complete onboarding and get admin approval
-    let userRole = requestedRole;
-    if (requestedRole === "ticket_operator") {
-      userRole = "pending_ticket_operator";
-    } else if (requestedRole === "shop_partner") {
-      userRole = "pending_shop_partner";
-    }
-
-    // Create user with appropriate profile
+    // Create user as customer (public signup only creates customer accounts)
     const user = await prisma.user.create({
       data: {
         email,
         passwordHash,
-        role: userRole,
+        role: "customer",
         countryCode,
       },
     });
 
-    // Create role-specific profile
-    if (requestedRole === "driver") {
-      await prisma.driverProfile.create({
-        data: {
-          userId: user.id,
-          verificationStatus: "pending",
-          isVerified: false,
-        },
-      });
-
-      await prisma.driverStats.create({
-        data: {
-          driverId: (await prisma.driverProfile.findUnique({ where: { userId: user.id } }))!.id,
-        },
-      });
-
-      await prisma.driverWallet.create({
-        data: {
-          driverId: (await prisma.driverProfile.findUnique({ where: { userId: user.id } }))!.id,
-        },
-      });
-    } else if (requestedRole === "customer") {
-      await prisma.customerProfile.create({
-        data: {
-          userId: user.id,
-          verificationStatus: "pending",
-          isVerified: false,
-        },
-      });
-    } else if (requestedRole === "restaurant") {
-      await prisma.restaurantProfile.create({
-        data: {
-          userId: user.id,
-          restaurantName: email.split("@")[0], // Default name, can be updated later
-          address: "", // To be filled during onboarding
-          verificationStatus: "pending",
-          isVerified: false,
-        },
-      });
-
-      await prisma.restaurantWallet.create({
-        data: {
-          restaurantId: (await prisma.restaurantProfile.findUnique({ where: { userId: user.id } }))!.id,
-        },
-      });
-    } else if (requestedRole === "admin") {
-      await prisma.adminProfile.create({
-        data: {
-          userId: user.id,
-        },
-      });
-    }
-    // Note: For pending_ticket_operator and pending_shop_partner, we don't create profiles
-    // during signup. Profiles are created during onboarding form submission.
+    // Create customer profile
+    await prisma.customerProfile.create({
+      data: {
+        userId: user.id,
+        verificationStatus: "pending",
+        isVerified: false,
+      },
+    });
 
     res.status(201).json({
       message: "User created successfully",

@@ -8,7 +8,8 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { NotificationSoundProvider } from "@/contexts/NotificationSoundContext";
 import { EatsCartProvider } from "@/contexts/EatsCartContext";
-import { SignupProvider } from "@/contexts/SignupContext";
+// SignupProvider removed - new customer signup flow is single-step and doesn't need context
+// import { SignupProvider } from "@/contexts/SignupContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useToast } from "@/hooks/use-toast";
 import { getPostLoginPath } from "@/lib/roleRedirect";
@@ -16,8 +17,9 @@ import { getPostLoginPath } from "@/lib/roleRedirect";
 // Auth pages
 import Login from "@/pages/login";
 import Signup from "@/pages/signup";
-import SignupRoleSelection from "@/pages/signup-role-selection";
-import CustomerRegister from "@/pages/customer-register";
+// Legacy imports kept for reference but routes now redirect to /signup
+// import SignupRoleSelection from "@/pages/signup-role-selection";
+// import CustomerRegister from "@/pages/customer-register";
 
 // Customer pages
 // NOTE: CustomerHome and RideRequest are LEGACY - now using UnifiedBooking
@@ -338,8 +340,14 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/auth/login" component={Login} />
       <Route path="/signup" component={Signup} />
-      <Route path="/signup/choose-role" component={SignupRoleSelection} />
-      <Route path="/customer-register" component={CustomerRegister} />
+      {/* Legacy role selection route - redirect to main signup (role selection removed) */}
+      <Route path="/signup/choose-role">
+        <Redirect to="/signup" />
+      </Route>
+      {/* Legacy customer register route - redirect to main signup */}
+      <Route path="/customer-register">
+        <Redirect to="/signup" />
+      </Route>
 
       {/* Customer routes - NEW UNIFIED BOOKING DESIGN */}
       <Route path="/customer">
@@ -2267,17 +2275,15 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <NotificationSoundProvider>
-          <SignupProvider>
-            <AuthProvider>
-              <EatsCartProvider>
-                <TooltipProvider>
-                  <Toaster />
-                  <AccountLockedHandler />
-                  <Router />
-                </TooltipProvider>
-              </EatsCartProvider>
-            </AuthProvider>
-          </SignupProvider>
+          <AuthProvider>
+            <EatsCartProvider>
+              <TooltipProvider>
+                <Toaster />
+                <AccountLockedHandler />
+                <Router />
+              </TooltipProvider>
+            </EatsCartProvider>
+          </AuthProvider>
         </NotificationSoundProvider>
       </ThemeProvider>
     </QueryClientProvider>
