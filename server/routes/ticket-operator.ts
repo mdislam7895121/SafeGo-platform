@@ -1083,4 +1083,439 @@ router.get("/earnings", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ===================================================
+// STAGED ONBOARDING ENDPOINTS (BD Partner Engine)
+// ===================================================
+
+// Stage 1: Light Form Schema - Easy Start
+const stage1OperatorSchema = z.object({
+  operatorName: z.string().min(2, "অপারেটরের নাম কমপক্ষে ২ অক্ষরের হতে হবে"),
+  operatorType: z.enum(["ticket", "rental", "both"], {
+    errorMap: () => ({ message: "অপারেটর ধরণ নির্বাচন করুন" }),
+  }),
+  cityOrArea: z.string().min(2, "এলাকা/শহরের নাম লিখুন"),
+  contactPhone: z.string().min(10, "সঠিক ফোন নম্বর লিখুন"),
+});
+
+// Stage 2: Full KYC Schema - High Security
+const stage2OperatorKycSchema = z.object({
+  ownerName: z.string().min(2, "মালিকের নাম লিখুন"),
+  fatherName: z.string().min(2, "পিতার নাম লিখুন"),
+  dateOfBirth: z.string().min(1, "জন্ম তারিখ নির্বাচন করুন").transform((val) => new Date(val)),
+  presentAddress: z.string().min(5, "বর্তমান ঠিকানা লিখুন"),
+  permanentAddress: z.string().min(5, "স্থায়ী ঠিকানা লিখুন"),
+  nidNumber: z.string().min(10, "সঠিক জাতীয় পরিচয়পত্র নম্বর লিখুন").regex(/^[0-9]{10,17}$/, "জাতীয় পরিচয়পত্র নম্বর শুধুমাত্র সংখ্যা হতে হবে"),
+  nidFrontImage: z.string().url("NID সামনের ছবি আপলোড করুন"),
+  nidBackImage: z.string().url("NID পেছনের ছবি আপলোড করুন"),
+  emergencyContactName: z.string().min(2, "জরুরি যোগাযোগের নাম লিখুন"),
+  emergencyContactPhone: z.string().min(10, "জরুরি যোগাযোগের ফোন নম্বর লিখুন"),
+  routePermitNumber: z.string().optional(),
+  routePermitImage: z.string().url().optional(),
+});
+
+// Stage 3: Business Setup Schema
+const stage3OperatorSetupSchema = z.object({
+  logo: z.string().url("অপারেটরের লোগো আপলোড করুন"),
+  officeAddress: z.string().min(5, "অফিসের সম্পূর্ণ ঠিকানা লিখুন"),
+  officePhone: z.string().min(10, "অফিসের ফোন নম্বর লিখুন"),
+  officeEmail: z.string().email().optional(),
+});
+
+// Get onboarding status and checklist
+router.get("/onboarding-status", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { countryCode: true, role: true },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "Ticket/Rental Operator is only available in Bangladesh" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+      include: {
+        _count: { select: { ticketListings: true, rentalVehicles: true } },
+      },
+    });
+
+    if (!operator) {
+      return res.json({
+        hasProfile: false,
+        partnerStatus: null,
+        checklist: {
+          stage1Complete: false,
+          stage2Complete: false,
+          stage3Complete: false,
+        },
+        nextStep: "stage1",
+        message: "টিকেট/রেন্টাল অপারেটর হতে প্রথম ধাপ শুরু করুন",
+      });
+    }
+
+    // Check completion status for each stage
+    const stage1Complete = !!(operator.operatorName && operator.operatorType && operator.cityOrArea);
+    const stage2Complete = !!(
+      operator.ownerName &&
+      operator.fatherName &&
+      operator.dateOfBirth &&
+      operator.presentAddress &&
+      operator.permanentAddress &&
+      operator.nidNumber &&
+      operator.nidFrontImage &&
+      operator.nidBackImage &&
+      operator.emergencyContactName &&
+      operator.emergencyContactPhone
+    );
+    
+    // Stage 3 requirement: logo + (1+ route for ticket OR 1+ vehicle for rental)
+    const hasListings = operator._count.ticketListings >= 1 || operator._count.rentalVehicles >= 1;
+    const stage3Complete = !!(operator.logo && operator.officeAddress && hasListings);
+
+    // Determine next step
+    let nextStep = "complete";
+    if (!stage1Complete) {
+      nextStep = "stage1";
+    } else if (!stage2Complete) {
+      nextStep = "stage2";
+    } else if (operator.partnerStatus === "kyc_pending") {
+      nextStep = "waiting_kyc_approval";
+    } else if (operator.partnerStatus === "setup_incomplete" && !stage3Complete) {
+      nextStep = "stage3";
+    } else if (operator.partnerStatus === "ready_for_review") {
+      nextStep = "waiting_final_approval";
+    } else if (operator.partnerStatus === "rejected") {
+      nextStep = "rejected";
+    } else if (operator.partnerStatus === "live") {
+      nextStep = "complete";
+    }
+
+    res.json({
+      hasProfile: true,
+      partnerStatus: operator.partnerStatus,
+      verificationStatus: operator.verificationStatus,
+      rejectionReason: operator.rejectionReason,
+      checklist: {
+        stage1Complete,
+        stage2Complete,
+        stage3Complete,
+        ticketListingCount: operator._count.ticketListings,
+        rentalVehicleCount: operator._count.rentalVehicles,
+        requiredListings: 1,
+      },
+      nextStep,
+      profile: {
+        id: operator.id,
+        operatorName: operator.operatorName,
+        operatorType: operator.operatorType,
+        cityOrArea: operator.cityOrArea,
+        isActive: operator.isActive,
+      },
+    });
+  } catch (error) {
+    console.error("Get onboarding status error:", error);
+    res.status(500).json({ error: "Failed to fetch onboarding status" });
+  }
+});
+
+// Stage 1: Easy Start - Create draft profile
+router.post("/stages/1", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Allow customer, pending_ticket_operator, or ticket_operator roles
+    if (!["customer", "pending_ticket_operator", "ticket_operator"].includes(userRole || "")) {
+      return res.status(403).json({ error: "Invalid role for ticket operator onboarding" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { ticketOperator: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.countryCode !== "BD") {
+      return res.status(403).json({ error: "Ticket/Rental Operator is only available in Bangladesh" });
+    }
+
+    // Check if already live
+    if (user.ticketOperator?.partnerStatus === "live") {
+      return res.status(400).json({ error: "আপনি ইতিমধ্যে একজন অনুমোদিত অপারেটর" });
+    }
+
+    const parsed = stage1OperatorSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.errors 
+      });
+    }
+
+    const data = parsed.data;
+
+    // Create or update operator with Stage 1 data
+    const operator = await prisma.ticketOperator.upsert({
+      where: { userId },
+      create: {
+        id: randomUUID(),
+        userId,
+        operatorName: data.operatorName,
+        operatorType: data.operatorType,
+        cityOrArea: data.cityOrArea,
+        contactPhone: data.contactPhone,
+        officeAddress: data.cityOrArea, // Temporary, will be updated in Stage 3
+        officePhone: data.contactPhone,
+        partnerStatus: "draft",
+        verificationStatus: "pending",
+        countryCode: "BD",
+      },
+      update: {
+        operatorName: data.operatorName,
+        operatorType: data.operatorType,
+        cityOrArea: data.cityOrArea,
+        contactPhone: data.contactPhone,
+      },
+    });
+
+    // Update user role to pending_ticket_operator if they're a customer
+    if (user.role === "customer") {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { role: "pending_ticket_operator" },
+      });
+    }
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: user.email || "unknown",
+        actorRole: user.role || "pending_ticket_operator",
+        actionType: "TICKET_OPERATOR_STAGE1_SUBMITTED",
+        entityType: "ticket_operator",
+        entityId: operator.id,
+        description: `Ticket Operator Stage 1 submitted: ${data.operatorName}`,
+        metadata: { operatorName: data.operatorName, operatorType: data.operatorType, cityOrArea: data.cityOrArea },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "অভিনন্দন! প্রথম ধাপ সম্পন্ন হয়েছে।",
+      operator: {
+        id: operator.id,
+        operatorName: operator.operatorName,
+        partnerStatus: operator.partnerStatus,
+      },
+      nextStep: "stage2",
+    });
+  } catch (error) {
+    console.error("Stage 1 error:", error);
+    res.status(500).json({ error: "প্রথম ধাপ জমা দিতে সমস্যা হয়েছে" });
+  }
+});
+
+// Stage 2: Full KYC Submission
+router.post("/stages/2", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Please complete Stage 1 first" });
+    }
+
+    // Only allow if in draft or rejected status
+    if (!["draft", "rejected"].includes(operator.partnerStatus)) {
+      return res.status(400).json({ 
+        error: "KYC already submitted or not in valid state",
+        currentStatus: operator.partnerStatus,
+      });
+    }
+
+    const parsed = stage2OperatorKycSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.errors 
+      });
+    }
+
+    const data = parsed.data;
+
+    // Update with KYC data and move to kyc_pending
+    const updated = await prisma.ticketOperator.update({
+      where: { id: operator.id },
+      data: {
+        ownerName: data.ownerName,
+        fatherName: data.fatherName,
+        dateOfBirth: data.dateOfBirth,
+        presentAddress: data.presentAddress,
+        permanentAddress: data.permanentAddress,
+        nidNumber: data.nidNumber,
+        nidFrontImage: data.nidFrontImage,
+        nidBackImage: data.nidBackImage,
+        emergencyContactName: data.emergencyContactName,
+        emergencyContactPhone: data.emergencyContactPhone,
+        routePermitNumber: data.routePermitNumber,
+        routePermitImage: data.routePermitImage,
+        partnerStatus: "kyc_pending",
+        verificationStatus: "under_review",
+        kycSubmittedAt: new Date(),
+        rejectionReason: null,
+      },
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: user?.email || "unknown",
+        actorRole: user?.role || "pending_ticket_operator",
+        actionType: "TICKET_OPERATOR_KYC_SUBMITTED",
+        entityType: "ticket_operator",
+        entityId: operator.id,
+        description: `Ticket Operator KYC submitted: ${data.ownerName}`,
+        metadata: { ownerName: data.ownerName, nidLastFour: data.nidNumber.slice(-4) },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "KYC তথ্য জমা হয়েছে। অনুমোদনের জন্য অপেক্ষা করুন।",
+      operator: {
+        id: updated.id,
+        operatorName: updated.operatorName,
+        partnerStatus: updated.partnerStatus,
+      },
+      nextStep: "waiting_kyc_approval",
+    });
+  } catch (error) {
+    console.error("Stage 2 KYC error:", error);
+    res.status(500).json({ error: "KYC জমা দিতে সমস্যা হয়েছে" });
+  }
+});
+
+// Stage 3: Business Setup Completion
+router.post("/stages/3", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+      include: { _count: { select: { ticketListings: true, rentalVehicles: true } } },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Please complete Stage 1 and 2 first" });
+    }
+
+    // Only allow if KYC approved (setup_incomplete status)
+    if (operator.partnerStatus !== "setup_incomplete") {
+      return res.status(400).json({ 
+        error: "KYC must be approved before completing setup",
+        currentStatus: operator.partnerStatus,
+      });
+    }
+
+    const parsed = stage3OperatorSetupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.errors 
+      });
+    }
+
+    const data = parsed.data;
+
+    // Check if minimum listings/vehicles exist based on operator type
+    const hasListings = operator._count.ticketListings >= 1 || operator._count.rentalVehicles >= 1;
+    if (!hasListings) {
+      return res.status(400).json({ 
+        error: operator.operatorType === "rental" 
+          ? "কমপক্ষে ১টি রেন্টাল গাড়ি যোগ করুন" 
+          : "কমপক্ষে ১টি টিকেট রুট যোগ করুন",
+        ticketListings: operator._count.ticketListings,
+        rentalVehicles: operator._count.rentalVehicles,
+        required: 1,
+      });
+    }
+
+    // Update with setup data and move to ready_for_review
+    const updated = await prisma.ticketOperator.update({
+      where: { id: operator.id },
+      data: {
+        logo: data.logo,
+        officeAddress: data.officeAddress,
+        officePhone: data.officePhone,
+        officeEmail: data.officeEmail,
+        partnerStatus: "ready_for_review",
+        setupCompletedAt: new Date(),
+      },
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: user?.email || "unknown",
+        actorRole: user?.role || "pending_ticket_operator",
+        actionType: "TICKET_OPERATOR_SETUP_COMPLETED",
+        entityType: "ticket_operator",
+        entityId: operator.id,
+        description: `Ticket Operator setup completed: ${operator.operatorName}`,
+        metadata: { 
+          officeAddress: data.officeAddress, 
+          ticketListings: operator._count.ticketListings,
+          rentalVehicles: operator._count.rentalVehicles 
+        },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "সেটআপ সম্পন্ন! চূড়ান্ত অনুমোদনের জন্য অপেক্ষা করুন।",
+      operator: {
+        id: updated.id,
+        operatorName: updated.operatorName,
+        partnerStatus: updated.partnerStatus,
+      },
+      nextStep: "waiting_final_approval",
+    });
+  } catch (error) {
+    console.error("Stage 3 setup error:", error);
+    res.status(500).json({ error: "সেটআপ সম্পন্ন করতে সমস্যা হয়েছে" });
+  }
+});
+
 export default router;
