@@ -2412,4 +2412,166 @@ router.get("/delivery-addresses", async (req: AuthRequest, res) => {
   }
 });
 
+// ====================================================
+// POST /api/customer/partner/initialize
+// Initialize partner profile for role upgrade
+// ====================================================
+const partnerInitializeSchema = z.object({
+  partnerType: z.enum(["ride_driver", "delivery_driver", "restaurant", "shop_partner", "ticket_operator"]),
+});
+
+router.post("/partner/initialize", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+    const body = partnerInitializeSchema.parse(req.body);
+    const { partnerType } = body;
+
+    // Get user with country code
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, countryCode: true, role: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Verify user is still a customer
+    if (user.role !== "customer") {
+      return res.status(400).json({ error: "Only customers can upgrade to partner roles" });
+    }
+
+    // Validate country-specific partner types
+    const bdOnlyPartners = ["shop_partner", "ticket_operator"];
+    if (bdOnlyPartners.includes(partnerType) && user.countryCode !== "BD") {
+      return res.status(400).json({ 
+        error: "This partner type is only available in Bangladesh",
+        code: "COUNTRY_NOT_SUPPORTED" 
+      });
+    }
+
+    // Create audit log for partner initialization attempt
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: "PARTNER_UPGRADE_INITIALIZED",
+        entityType: "user",
+        entityId: userId,
+        metadata: {
+          partnerType,
+          countryCode: user.countryCode,
+          trustLevel: "customer_basic",
+          step: "initialization",
+        },
+      },
+    });
+
+    // Return next steps based on partner type
+    let nextStepUrl = "";
+    let requiredDocuments: string[] = [];
+    
+    switch (partnerType) {
+      case "ride_driver":
+        nextStepUrl = "/driver/onboarding";
+        requiredDocuments = user.countryCode === "BD" 
+          ? ["NID", "Driver License", "Vehicle Registration", "Police Clearance"]
+          : ["Driver License", "Vehicle Registration", "Insurance", "Background Check"];
+        break;
+      case "delivery_driver":
+        nextStepUrl = "/driver/onboarding";
+        requiredDocuments = user.countryCode === "BD"
+          ? ["NID", "Driver License"]
+          : ["Driver License", "Background Check"];
+        break;
+      case "restaurant":
+        nextStepUrl = "/restaurant/onboarding";
+        requiredDocuments = user.countryCode === "BD"
+          ? ["Trade License", "NID", "Food Safety Certificate"]
+          : ["Business License", "Food Handler Permit", "Tax ID"];
+        break;
+      case "shop_partner":
+        nextStepUrl = "/shop-partner/onboarding";
+        requiredDocuments = ["NID", "Trade License", "MFS Account"];
+        break;
+      case "ticket_operator":
+        nextStepUrl = "/ticket-operator/onboarding";
+        requiredDocuments = ["NID", "Trade License", "Operator License", "MFS Account"];
+        break;
+    }
+
+    res.json({
+      success: true,
+      partnerType,
+      countryCode: user.countryCode,
+      nextStepUrl,
+      requiredDocuments,
+      message: "Partner upgrade initialized. Complete onboarding to activate your partner account.",
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid partner type", details: error.errors });
+    }
+    console.error("[Customer] Error initializing partner:", error);
+    res.status(500).json({ error: error.message || "Failed to initialize partner upgrade" });
+  }
+});
+
+// ====================================================
+// GET /api/customer/partner/status
+// Get current partner upgrade status
+// ====================================================
+router.get("/partner/status", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Get user with country code
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, countryCode: true, role: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check for any existing partner profiles
+    const [driverProfile, restaurantProfile, shopPartnerProfile, ticketOperatorProfile] = await Promise.all([
+      prisma.driverProfile.findUnique({ where: { userId }, select: { id: true, verificationStatus: true } }),
+      prisma.restaurantProfile.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
+      prisma.shopPartnerProfile.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
+      prisma.ticketOperatorProfile.findFirst({ where: { userId }, select: { id: true, verificationStatus: true } }),
+    ]);
+
+    // Determine available partner types based on country
+    const availablePartnerTypes = user.countryCode === "BD"
+      ? ["ride_driver", "delivery_driver", "restaurant", "shop_partner", "ticket_operator"]
+      : ["ride_driver", "delivery_driver", "restaurant"];
+
+    // Build existing partner status
+    const existingPartners: { type: string; status: string }[] = [];
+    if (driverProfile) {
+      existingPartners.push({ type: "driver", status: driverProfile.verificationStatus });
+    }
+    if (restaurantProfile) {
+      existingPartners.push({ type: "restaurant", status: restaurantProfile.verificationStatus });
+    }
+    if (shopPartnerProfile) {
+      existingPartners.push({ type: "shop_partner", status: shopPartnerProfile.verificationStatus });
+    }
+    if (ticketOperatorProfile) {
+      existingPartners.push({ type: "ticket_operator", status: ticketOperatorProfile.verificationStatus });
+    }
+
+    res.json({
+      currentRole: user.role,
+      countryCode: user.countryCode,
+      availablePartnerTypes,
+      existingPartners,
+    });
+  } catch (error: any) {
+    console.error("[Customer] Error getting partner status:", error);
+    res.status(500).json({ error: error.message || "Failed to get partner status" });
+  }
+});
+
 export default router;

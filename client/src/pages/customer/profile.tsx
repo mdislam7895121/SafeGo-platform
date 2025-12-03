@@ -6,6 +6,7 @@ import {
   Edit, Star, Clock, Home, Briefcase, Heart, Bell, Globe, CheckCircle2, Headphones,
   X, Save, Loader2, Plus, Lock, Unlock, ShieldAlert, AlertTriangle, Car, Bookmark
 } from "lucide-react";
+import { PartnerUpgradeHub } from "@/components/customer/PartnerUpgradeHub";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -831,6 +832,13 @@ export default function CustomerProfile() {
                 </div>
               </Button>
             </Link>
+          </CardContent>
+        </Card>
+
+        {/* Partner Upgrade Hub Section */}
+        <Card data-testid="section-partner-upgrade-hub">
+          <CardContent className="p-6">
+            <PartnerUpgradeHub />
           </CardContent>
         </Card>
       </div>

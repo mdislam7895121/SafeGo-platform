@@ -313,6 +313,13 @@ import BDTicketCheckout from "@/pages/bd/ticket-checkout";
 import BDTicketBooking from "@/pages/bd/ticket-booking";
 import BDBookingSuccess from "@/pages/bd/booking-success";
 
+// Partner Onboarding Start Pages
+import RideDriverStart from "@/pages/partner/ride-start";
+import DeliveryDriverStart from "@/pages/partner/delivery-start";
+import RestaurantStart from "@/pages/partner/restaurant-start";
+import ShopPartnerStart from "@/pages/partner/shop-start";
+import TicketOperatorStart from "@/pages/partner/ticket-start";
+
 import NotFound from "@/pages/not-found";
 
 function HomeRedirect() {
@@ -2235,6 +2242,33 @@ function Router() {
             <TicketOperatorDashboard />
           </TicketOperatorLayout>
         </TicketOperatorGuard>
+      </Route>
+
+      {/* Partner Onboarding Start Pages */}
+      <Route path="/partner/ride/start">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RideDriverStart />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/partner/delivery/start">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <DeliveryDriverStart />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/partner/restaurant/start">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <RestaurantStart />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/partner/shop/start">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <ShopPartnerStart />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/partner/ticket/start">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <TicketOperatorStart />
+        </ProtectedRoute>
       </Route>
 
       {/* 404 */}
