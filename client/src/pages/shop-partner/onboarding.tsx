@@ -402,23 +402,32 @@ export default function ShopPartnerOnboarding() {
       return;
     }
 
-    const fullData = {
-      shopName: step1Data.shopName,
+    const fullData: Record<string, any> = {
+      shopName: step1Data.shopName?.trim(),
       shopType: step1Data.shopType,
-      shopAddress: step1Data.shopAddress,
-      ownerName: step1Data.ownerName,
-      fatherName: step1Data.fatherName,
+      shopAddress: step1Data.shopAddress?.trim(),
+      ownerName: step1Data.ownerName?.trim(),
+      fatherName: step1Data.fatherName?.trim(),
       dateOfBirth: step1Data.dateOfBirth,
-      presentAddress: step1Data.presentAddress,
-      permanentAddress: step1Data.permanentAddress,
-      nidNumber: step1Data.nidNumber,
-      emergencyContactName: step1Data.emergencyContactName,
-      emergencyContactPhone: step1Data.emergencyContactPhone,
+      presentAddress: step1Data.presentAddress?.trim(),
+      permanentAddress: step1Data.permanentAddress?.trim(),
+      nidNumber: step1Data.nidNumber?.trim(),
+      emergencyContactName: step1Data.emergencyContactName?.trim(),
+      emergencyContactPhone: step1Data.emergencyContactPhone?.trim(),
       deliveryRadiusKm: step2Data.deliveryRadius,
+      deliveryEnabled: step2Data.deliveryEnabled ?? true,
+      preparationTime: step2Data.preparationTime || 20,
       openingTime: "09:00",
       closingTime: "21:00",
       countryCode: "BD",
     };
+    
+    if (logoPreview) {
+      fullData.shopLogo = logoPreview;
+    }
+    if (bannerPreview) {
+      fullData.shopBanner = bannerPreview;
+    }
 
     const missingFields = [];
     if (!fullData.shopName) missingFields.push("দোকানের নাম");
@@ -436,9 +445,10 @@ export default function ShopPartnerOnboarding() {
     if (missingFields.length > 0) {
       toast({
         title: "অসম্পূর্ণ তথ্য",
-        description: "দয়া করে সব তথ্য পূরণ করুন।",
+        description: `অসম্পূর্ণ: ${missingFields.slice(0, 3).join(", ")}${missingFields.length > 3 ? "..." : ""}`,
         variant: "destructive",
       });
+      setStep(1);
       return;
     }
 
@@ -451,11 +461,42 @@ export default function ShopPartnerOnboarding() {
       navigate("/shop-partner/setup");
     } catch (error: any) {
       let errorMessage = "দোকান নিবন্ধন ব্যর্থ হয়েছে";
-      if (error?.message?.includes("Validation failed")) {
-        errorMessage = "দয়া করে সব তথ্য পূরণ করুন।";
+      let fieldErrorMessages: string[] = [];
+      
+      const fieldNameMap: Record<string, string> = {
+        shopName: "দোকানের নাম",
+        shopType: "দোকানের ধরণ",
+        shopAddress: "দোকানের ঠিকানা",
+        ownerName: "মালিকের নাম",
+        fatherName: "পিতার নাম",
+        dateOfBirth: "জন্ম তারিখ",
+        presentAddress: "বর্তমান ঠিকানা",
+        permanentAddress: "স্থায়ী ঠিকানা",
+        nidNumber: "জাতীয় পরিচয়পত্র নম্বর",
+        emergencyContactName: "জরুরি যোগাযোগের নাম",
+        emergencyContactPhone: "জরুরি যোগাযোগের ফোন",
+      };
+      
+      if (error?.details && Array.isArray(error.details)) {
+        fieldErrorMessages = error.details.map((e: any) => {
+          const field = e.path?.[0] || "";
+          const banglaName = fieldNameMap[field] || field;
+          return `${banglaName}: ${e.message || "ত্রুটি"}`;
+        });
+        if (fieldErrorMessages.length > 0) {
+          errorMessage = fieldErrorMessages.slice(0, 3).join(", ");
+          if (fieldErrorMessages.length > 3) {
+            errorMessage += `... এবং আরও ${fieldErrorMessages.length - 3}টি ত্রুটি`;
+          }
+        }
+        setStep(1);
+      } else if (error?.message?.includes("Validation failed")) {
+        errorMessage = "দয়া করে সব তথ্য সঠিকভাবে পূরণ করুন।";
+        setStep(1);
       } else if (error?.message) {
         errorMessage = error.message;
       }
+      
       toast({
         title: "ত্রুটি",
         description: errorMessage,
@@ -471,6 +512,29 @@ export default function ShopPartnerOnboarding() {
   const isPending = registerMutation.isPending;
   const step1Valid = step1Form.formState.isValid;
   const step1Dirty = step1Form.formState.isDirty || !!savedState.step1;
+
+  const isStep1Complete = !!(
+    step1Data &&
+    step1Data.shopName?.trim() &&
+    step1Data.shopType &&
+    step1Data.shopAddress?.trim() &&
+    step1Data.ownerName?.trim() &&
+    step1Data.fatherName?.trim() &&
+    step1Data.dateOfBirth &&
+    step1Data.presentAddress?.trim() &&
+    step1Data.permanentAddress?.trim() &&
+    step1Data.nidNumber?.trim() &&
+    step1Data.emergencyContactName?.trim() &&
+    step1Data.emergencyContactPhone?.trim()
+  );
+  const isStep2Complete = !!step2Data;
+
+  const getStepStatus = (stepNum: number): "complete" | "current" | "pending" => {
+    if (stepNum === 1 && isStep1Complete && step > 1) return "complete";
+    if (stepNum === 2 && isStep2Complete && step > 2 && isStep1Complete) return "complete";
+    if (stepNum === step) return "current";
+    return "pending";
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -490,25 +554,29 @@ export default function ShopPartnerOnboarding() {
           </div>
 
           <div className="flex items-center justify-center gap-2 mb-6">
-            {[1, 2, 3].map((s) => (
-              <div key={s} className={`flex items-center ${s < 3 ? "flex-1" : ""}`}>
-                <div
-                  className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
-                    s < step
-                      ? "bg-green-500 text-white"
-                      : s === step
-                      ? "bg-primary text-primary-foreground scale-110"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                  data-testid={`step-indicator-${s}`}
-                >
-                  {s < step ? <Check className="h-5 w-5" /> : s}
+            {[1, 2, 3].map((s) => {
+              const status = getStepStatus(s);
+              const lineComplete = (s === 1 && isStep1Complete) || (s === 2 && isStep1Complete && isStep2Complete);
+              return (
+                <div key={s} className={`flex items-center ${s < 3 ? "flex-1" : ""}`}>
+                  <div
+                    className={`h-10 w-10 rounded-full flex items-center justify-center font-bold text-lg transition-all ${
+                      status === "complete"
+                        ? "bg-green-500 text-white"
+                        : status === "current"
+                        ? "bg-primary text-primary-foreground scale-110"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                    data-testid={`step-indicator-${s}`}
+                  >
+                    {status === "complete" ? <Check className="h-5 w-5" /> : s}
+                  </div>
+                  {s < 3 && (
+                    <div className={`flex-1 h-1 mx-2 rounded ${lineComplete ? "bg-green-500" : "bg-muted"}`} />
+                  )}
                 </div>
-                {s < 3 && (
-                  <div className={`flex-1 h-1 mx-2 rounded ${s < step ? "bg-green-500" : "bg-muted"}`} />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {step === 1 && (
@@ -1004,19 +1072,46 @@ export default function ShopPartnerOnboarding() {
                       </div>
                     </div>
 
-                    <div className="bg-green-50 dark:bg-green-950/30 rounded-xl p-4 border border-green-200 dark:border-green-800">
-                      <div className="flex items-start gap-3">
-                        <Check className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                            সব তথ্য সম্পূর্ণ!
-                          </p>
-                          <p className="text-sm text-green-700 dark:text-green-300">
-                            আবেদন জমা দিতে নিচের বাটনে ক্লিক করুন
-                          </p>
+                    {step1Data && step2Data && 
+                     step1Data.shopName && 
+                     step1Data.shopType && 
+                     step1Data.shopAddress && 
+                     step1Data.ownerName && 
+                     step1Data.fatherName && 
+                     step1Data.dateOfBirth && 
+                     step1Data.presentAddress && 
+                     step1Data.permanentAddress && 
+                     step1Data.nidNumber && 
+                     step1Data.emergencyContactName && 
+                     step1Data.emergencyContactPhone ? (
+                      <div className="bg-green-50 dark:bg-green-950/30 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                        <div className="flex items-start gap-3">
+                          <Check className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                              সব তথ্য সম্পূর্ণ!
+                            </p>
+                            <p className="text-sm text-green-700 dark:text-green-300">
+                              আবেদন জমা দিতে নিচের বাটনে ক্লিক করুন
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="bg-destructive/10 rounded-xl p-4 border border-destructive/30">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-destructive">
+                              তথ্য অসম্পূর্ণ!
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              দয়া করে আগের ধাপগুলো সম্পূর্ণ করুন
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex gap-3 pt-4">
                       <Button
