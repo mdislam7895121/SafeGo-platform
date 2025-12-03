@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Clock, Filter, Search, RefreshCw, UtensilsCrossed, Heart } from "lucide-react";
 import { CustomerHomeButton } from "./EatsNavigation";
+import { CustomerBackButton } from "./CustomerBackButton";
 import { RestaurantListMobile } from "./RestaurantListMobile";
 import { RestaurantGridDesktop } from "./RestaurantGridDesktop";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -41,7 +42,11 @@ const CUISINE_TYPES = [
   { value: "Desserts", label: "Desserts" },
 ];
 
-export function CustomerEatsHome() {
+interface CustomerEatsHomeProps {
+  onBack?: () => void;
+}
+
+export function CustomerEatsHome({ onBack }: CustomerEatsHomeProps) {
   const [sortBy, setSortBy] = useState<string>("name");
   const [cuisineType, setCuisineType] = useState<string>("all");
   const [openNow, setOpenNow] = useState<boolean>(false);
@@ -155,6 +160,17 @@ export function CustomerEatsHome() {
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="flex items-center justify-between px-4 pt-3 pb-1 bg-background">
         <div className="flex items-center gap-2">
+          <CustomerBackButton
+            fallbackRoute="/customer"
+            fallbackTab="eats"
+            onBack={() => {
+              if (onBack) {
+                onBack();
+                return true;
+              }
+              return false;
+            }}
+          />
           <UtensilsCrossed className="h-5 w-5 text-primary" />
           <h1 className="text-lg font-semibold">SafeGo Eats</h1>
         </div>

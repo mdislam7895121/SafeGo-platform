@@ -3505,11 +3505,11 @@ export default function UnifiedBookingPage() {
             )}
 
             {activeService === "eats" && (
-              <CustomerEatsHome />
+              <CustomerEatsHome onBack={() => setActiveService("ride")} />
             )}
 
             {activeService === "parcel" && (
-              <CustomerParcelBooking />
+              <CustomerParcelBooking onBack={() => setActiveService("ride")} />
             )}
           </div>
           
