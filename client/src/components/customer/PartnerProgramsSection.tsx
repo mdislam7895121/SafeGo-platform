@@ -119,10 +119,16 @@ export function PartnerProgramsSection() {
     queryKey: ["/api/bd/partner/summary"],
     enabled: !!user,
     retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    staleTime: 60000,
   });
 
   // If the summary query failed with auth error, user's session is expired
   const isSessionExpired = summaryError && (summaryError as any)?.status === 403;
+  
+  // Determine if user needs to login
+  const needsLogin = !user || isSessionExpired;
 
   const startMutation = useMutation({
     mutationFn: async (partnerKind: PartnerKind) => {
@@ -156,8 +162,8 @@ export function PartnerProgramsSection() {
   });
 
   const handlePartnerClick = (kind: PartnerKind) => {
-    // If user is not logged in or session expired, redirect to login
-    if (!user || isSessionExpired) {
+    // If user needs to login, redirect to login
+    if (needsLogin) {
       setLocation("/login?returnTo=/customer");
       return;
     }
@@ -165,8 +171,8 @@ export function PartnerProgramsSection() {
     startMutation.mutate(kind);
   };
 
-  // Show loading state while checking auth or fetching data
-  if (authLoading || (user && isLoading)) {
+  // Show loading state only while checking auth (not while fetching partner data)
+  if (authLoading) {
     return (
       <div className="mt-6 flex items-center justify-center py-8">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -249,7 +255,7 @@ export function PartnerProgramsSection() {
               >
                 {isItemLoading ? (
                   <Loader2 className="h-4 w-4 animate-spin mx-auto" />
-                ) : (!user || isSessionExpired) ? (
+                ) : needsLogin ? (
                   "লগইন করে শুরু করুন"
                 ) : (
                   getButtonLabel(status)
