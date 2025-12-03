@@ -89,25 +89,35 @@ export default function BDShopDetails() {
     const name = p.name || p.productName || "";
     const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = !selectedCategory || p.category === selectedCategory;
-    const isActive = p.isActive !== false && p.inStock !== false;
+    const isActive = p.isActive !== false;
     return matchesSearch && matchesCategory && isActive;
   });
 
+  const UNLIMITED_STOCK_SENTINEL = 999999;
+  
   const addToCart = (product: any) => {
     const productName = product.name || product.productName;
     const productPrice = product.discountPrice || product.price;
-    const stockQty = product.stockQuantity ?? 0;
     const hasUnlimited = product.hasUnlimitedStock ?? false;
-    const maxQty = hasUnlimited ? 99 : stockQty;
+    const stockQty = hasUnlimited ? UNLIMITED_STOCK_SENTINEL : (product.stockQuantity ?? 0);
+    
+    if (!hasUnlimited && stockQty <= 0) {
+      toast({
+        title: "স্টকে নেই",
+        description: "এই পণ্য বর্তমানে স্টকে নেই",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
         const newQty = existing.quantity + 1;
-        if (!hasUnlimited && newQty > maxQty) {
+        if (!hasUnlimited && newQty > stockQty) {
           toast({
             title: "স্টক সীমা",
-            description: `সর্বোচ্চ ${maxQty}টি যোগ করা যায়`,
+            description: `সর্বোচ্চ ${stockQty}টি যোগ করা যায়`,
             variant: "destructive",
           });
           return prev;
@@ -144,8 +154,13 @@ export default function BDShopDetails() {
           if (item.productId !== productId) return item;
           const newQty = item.quantity + delta;
           if (newQty <= 0) return { ...item, quantity: 0 };
-          const maxQty = item.hasUnlimitedStock ? 99 : (item.stockQuantity ?? 0);
+          const maxQty = item.hasUnlimitedStock ? UNLIMITED_STOCK_SENTINEL : (item.stockQuantity ?? 0);
           if (!item.hasUnlimitedStock && newQty > maxQty) {
+            toast({
+              title: "স্টক সীমা",
+              description: `সর্বোচ্চ ${maxQty}টি যোগ করা যায়`,
+              variant: "destructive",
+            });
             return { ...item, quantity: maxQty };
           }
           return { ...item, quantity: newQty };
@@ -535,6 +550,7 @@ export default function BDShopDetails() {
                       size="icon"
                       className="h-8 w-8 rounded-full"
                       onClick={() => updateQuantity(item.productId, 1)}
+                      disabled={!item.hasUnlimitedStock && item.quantity >= (item.stockQuantity ?? 0)}
                       data-testid={`button-cart-increase-${item.productId}`}
                     >
                       <Plus className="h-4 w-4" />
