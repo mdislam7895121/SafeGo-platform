@@ -46,6 +46,7 @@ import {
   LogOut,
   Clock,
   AlertCircle,
+  ImageIcon,
 } from "lucide-react";
 
 const STORAGE_KEY = "safego_shop_partner_onboarding";
@@ -64,6 +65,9 @@ const shopTypes: { value: string; label: string; icon: LucideIcon }[] = [
 ];
 
 const step1Schema = z.object({
+  shopName: z.string().min(2, "দোকানের নাম কমপক্ষে ২ অক্ষরের হতে হবে"),
+  shopType: z.string().min(1, "দোকানের ধরণ নির্বাচন করুন"),
+  shopAddress: z.string().min(5, "দোকানের ঠিকানা লিখুন"),
   ownerName: z.string().min(2, "মালিকের নাম লিখুন"),
   fatherName: z.string().min(2, "পিতার নাম লিখুন"),
   dateOfBirth: z.string().min(1, "জন্ম তারিখ নির্বাচন করুন"),
@@ -81,9 +85,8 @@ const step2Schema = z.object({
 });
 
 const step3Schema = z.object({
-  shopName: z.string().min(2, "দোকানের নাম লিখুন"),
-  shopType: z.string().min(1, "দোকানের ধরণ নির্বাচন করুন"),
-  shopAddress: z.string().min(5, "দোকানের ঠিকানা লিখুন"),
+  shopLogo: z.string().optional(),
+  shopBanner: z.string().optional(),
 });
 
 type Step1Data = z.infer<typeof step1Schema>;
@@ -243,6 +246,7 @@ export default function ShopPartnerOnboarding() {
   const [step1Data, setStep1Data] = useState<Step1Data | null>(savedState.step1 || null);
   const [step2Data, setStep2Data] = useState<Step2Data | null>(savedState.step2 || null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   const { data: profileData, isLoading: profileLoading, isError, error } = useQuery<{ profile: any }>({
     queryKey: ["/api/shop-partner/profile"],
@@ -259,6 +263,9 @@ export default function ShopPartnerOnboarding() {
   const step1Form = useForm<Step1Data>({
     resolver: zodResolver(step1Schema),
     defaultValues: savedState.step1 || {
+      shopName: "",
+      shopType: "",
+      shopAddress: "",
       ownerName: "",
       fatherName: "",
       dateOfBirth: "",
@@ -268,6 +275,7 @@ export default function ShopPartnerOnboarding() {
       emergencyContactName: "",
       emergencyContactPhone: "",
     },
+    mode: "onChange",
   });
 
   const step2Form = useForm<Step2Data>({
@@ -282,9 +290,8 @@ export default function ShopPartnerOnboarding() {
   const step3Form = useForm<Step3Data>({
     resolver: zodResolver(step3Schema),
     defaultValues: savedState.step3 || {
-      shopName: "",
-      shopType: "",
-      shopAddress: "",
+      shopLogo: "",
+      shopBanner: "",
     },
   });
 
@@ -347,7 +354,7 @@ export default function ShopPartnerOnboarding() {
     setStep(2);
     toast({
       title: "সফল!",
-      description: "ব্যক্তিগত তথ্য সংরক্ষিত হয়েছে",
+      description: "দোকান ও ব্যক্তিগত তথ্য সংরক্ষিত হয়েছে",
     });
   };
 
@@ -390,13 +397,44 @@ export default function ShopPartnerOnboarding() {
     }
 
     const fullData = {
-      ...step1Data,
-      ...data,
+      shopName: step1Data.shopName,
+      shopType: step1Data.shopType,
+      shopAddress: step1Data.shopAddress,
+      ownerName: step1Data.ownerName,
+      fatherName: step1Data.fatherName,
+      dateOfBirth: step1Data.dateOfBirth,
+      presentAddress: step1Data.presentAddress,
+      permanentAddress: step1Data.permanentAddress,
+      nidNumber: step1Data.nidNumber,
+      emergencyContactName: step1Data.emergencyContactName,
+      emergencyContactPhone: step1Data.emergencyContactPhone,
       deliveryRadiusKm: step2Data.deliveryRadius,
       openingTime: "09:00",
       closingTime: "21:00",
       countryCode: "BD",
     };
+
+    const missingFields = [];
+    if (!fullData.shopName) missingFields.push("দোকানের নাম");
+    if (!fullData.shopType) missingFields.push("দোকানের ধরণ");
+    if (!fullData.shopAddress) missingFields.push("দোকানের ঠিকানা");
+    if (!fullData.ownerName) missingFields.push("মালিকের নাম");
+    if (!fullData.fatherName) missingFields.push("পিতার নাম");
+    if (!fullData.dateOfBirth) missingFields.push("জন্ম তারিখ");
+    if (!fullData.presentAddress) missingFields.push("বর্তমান ঠিকানা");
+    if (!fullData.permanentAddress) missingFields.push("স্থায়ী ঠিকানা");
+    if (!fullData.nidNumber) missingFields.push("জাতীয় পরিচয়পত্র নম্বর");
+    if (!fullData.emergencyContactName) missingFields.push("জরুরি যোগাযোগের নাম");
+    if (!fullData.emergencyContactPhone) missingFields.push("জরুরি যোগাযোগের ফোন");
+
+    if (missingFields.length > 0) {
+      toast({
+        title: "অসম্পূর্ণ তথ্য",
+        description: "দয়া করে সব তথ্য পূরণ করুন।",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
       await registerMutation.mutateAsync(fullData);
@@ -406,7 +444,12 @@ export default function ShopPartnerOnboarding() {
       });
       navigate("/shop-partner/setup");
     } catch (error: any) {
-      const errorMessage = error.message || "দোকান নিবন্ধন ব্যর্থ হয়েছে";
+      let errorMessage = "দোকান নিবন্ধন ব্যর্থ হয়েছে";
+      if (error?.message?.includes("Validation failed")) {
+        errorMessage = "দয়া করে সব তথ্য পূরণ করুন।";
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
       toast({
         title: "ত্রুটি",
         description: errorMessage,
@@ -420,11 +463,13 @@ export default function ShopPartnerOnboarding() {
   };
 
   const isPending = registerMutation.isPending;
+  const step1Valid = step1Form.formState.isValid;
+  const step1Dirty = step1Form.formState.isDirty || !!savedState.step1;
 
   return (
     <div className="min-h-screen bg-background">
       <OnboardingHeader />
-      <div className="p-4">
+      <div className="p-4 pb-24">
         <div className="max-w-lg mx-auto space-y-6">
           <div className="text-center space-y-2">
             <div className="h-16 w-16 rounded-2xl bg-primary mx-auto mb-4 flex items-center justify-center">
@@ -464,187 +509,273 @@ export default function ShopPartnerOnboarding() {
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-3 text-xl">
-                  <User className="h-6 w-6 text-primary" />
-                  ধাপ ১: ব্যক্তিগত তথ্য ও KYC
+                  <Store className="h-6 w-6 text-primary" />
+                  ধাপ ১: দোকান ও ব্যক্তিগত তথ্য
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <Form {...step1Form}>
                   <form onSubmit={step1Form.handleSubmit(handleStep1Submit)} className="space-y-4">
-                    <FormField
-                      control={step1Form.control}
-                      name="ownerName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">মালিকের নাম *</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="আপনার পূর্ণ নাম"
-                              className="h-12 text-base"
-                              data-testid="input-owner-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="fatherName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">পিতার নাম *</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="পিতার পূর্ণ নাম"
-                              className="h-12 text-base"
-                              data-testid="input-father-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="dateOfBirth"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">জন্ম তারিখ *</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="date"
-                              className="h-12 text-base"
-                              data-testid="input-dob"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="nidNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base flex items-center gap-2">
-                            <IdCard className="h-4 w-4" />
-                            জাতীয় পরিচয়পত্র নম্বর *
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="১০-১৭ সংখ্যার NID নম্বর"
-                              className="h-12 text-base"
-                              data-testid="input-nid"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="presentAddress"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">বর্তমান ঠিকানা *</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="সম্পূর্ণ বর্তমান ঠিকানা"
-                              className="min-h-20 text-base resize-none"
-                              data-testid="input-present-address"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="permanentAddress"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">স্থায়ী ঠিকানা *</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="সম্পূর্ণ স্থায়ী ঠিকানা"
-                              className="min-h-20 text-base resize-none"
-                              data-testid="input-permanent-address"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="border-t pt-4">
-                      <p className="text-sm font-medium text-muted-foreground mb-4">জরুরি যোগাযোগ</p>
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+                      <p className="text-sm font-semibold text-primary flex items-center gap-2">
+                        <Store className="h-4 w-4" />
+                        দোকানের তথ্য
+                      </p>
                       
-                      <div className="grid gap-4">
-                        <FormField
-                          control={step1Form.control}
-                          name="emergencyContactName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-base">জরুরি যোগাযোগের নাম *</FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  placeholder="জরুরি যোগাযোগের নাম"
-                                  className="h-12 text-base"
-                                  data-testid="input-emergency-name"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                      <FormField
+                        control={step1Form.control}
+                        name="shopName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">দোকানের নাম *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="যেমন: রহিম স্টোর"
+                                className="h-12 text-base"
+                                data-testid="input-shop-name"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                        <FormField
-                          control={step1Form.control}
-                          name="emergencyContactPhone"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-base flex items-center gap-2">
-                                <Phone className="h-4 w-4" />
-                                জরুরি যোগাযোগের ফোন *
-                              </FormLabel>
-                              <FormControl>
-                                <Input
-                                  {...field}
-                                  type="tel"
-                                  placeholder="০১XXXXXXXXX"
-                                  className="h-12 text-base"
-                                  data-testid="input-emergency-phone"
-                                />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      </div>
+                      <FormField
+                        control={step1Form.control}
+                        name="shopType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">দোকানের ধরণ *</FormLabel>
+                            <div className="grid grid-cols-2 gap-2">
+                              {shopTypes.map((type) => (
+                                <Button
+                                  key={type.value}
+                                  type="button"
+                                  variant={field.value === type.value ? "default" : "outline"}
+                                  className="h-12 justify-start gap-2 text-sm"
+                                  onClick={() => field.onChange(type.value)}
+                                  data-testid={`button-type-${type.value}`}
+                                >
+                                  <type.icon className="h-4 w-4" />
+                                  {type.label}
+                                </Button>
+                              ))}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={step1Form.control}
+                        name="shopAddress"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base flex items-center gap-2">
+                              <MapPin className="h-4 w-4" />
+                              দোকানের ঠিকানা *
+                            </FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder="সম্পূর্ণ দোকানের ঠিকানা"
+                                className="min-h-16 text-base resize-none"
+                                data-testid="input-shop-address"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+                      <p className="text-sm font-semibold text-primary flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        মালিকের তথ্য (KYC)
+                      </p>
+                      
+                      <FormField
+                        control={step1Form.control}
+                        name="ownerName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">মালিকের নাম *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="আপনার পূর্ণ নাম"
+                                className="h-12 text-base"
+                                data-testid="input-owner-name"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={step1Form.control}
+                        name="fatherName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">পিতার নাম *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="পিতার পূর্ণ নাম"
+                                className="h-12 text-base"
+                                data-testid="input-father-name"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={step1Form.control}
+                        name="dateOfBirth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">জন্ম তারিখ *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="date"
+                                className="h-12 text-base"
+                                data-testid="input-dob"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={step1Form.control}
+                        name="nidNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base flex items-center gap-2">
+                              <IdCard className="h-4 w-4" />
+                              জাতীয় পরিচয়পত্র নম্বর *
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="১০-১৭ সংখ্যার NID নম্বর"
+                                className="h-12 text-base"
+                                data-testid="input-nid"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={step1Form.control}
+                        name="presentAddress"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">বর্তমান ঠিকানা *</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder="সম্পূর্ণ বর্তমান ঠিকানা"
+                                className="min-h-16 text-base resize-none"
+                                data-testid="input-present-address"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={step1Form.control}
+                        name="permanentAddress"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">স্থায়ী ঠিকানা *</FormLabel>
+                            <FormControl>
+                              <Textarea
+                                {...field}
+                                placeholder="সম্পূর্ণ স্থায়ী ঠিকানা"
+                                className="min-h-16 text-base resize-none"
+                                data-testid="input-permanent-address"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+                      <p className="text-sm font-semibold text-primary flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        জরুরি যোগাযোগ
+                      </p>
+                      
+                      <FormField
+                        control={step1Form.control}
+                        name="emergencyContactName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">জরুরি যোগাযোগের নাম *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                placeholder="জরুরি যোগাযোগের নাম"
+                                className="h-12 text-base"
+                                data-testid="input-emergency-name"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={step1Form.control}
+                        name="emergencyContactPhone"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-base">জরুরি যোগাযোগের ফোন *</FormLabel>
+                            <FormControl>
+                              <Input
+                                {...field}
+                                type="tel"
+                                placeholder="০১XXXXXXXXX"
+                                className="h-12 text-base"
+                                data-testid="input-emergency-phone"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
 
                     <Button
                       type="submit"
                       size="lg"
                       className="w-full h-14 text-lg mt-6"
+                      disabled={!step1Valid}
                       data-testid="button-next-step1"
                     >
                       পরবর্তী
                       <ChevronRight className="h-5 w-5 ml-2" />
                     </Button>
+                    
+                    {!step1Valid && step1Dirty && (
+                      <p className="text-sm text-destructive text-center">
+                        দয়া করে সব প্রয়োজনীয় তথ্য পূরণ করুন
+                      </p>
+                    )}
                   </form>
                 </Form>
               </CardContent>
@@ -774,118 +905,110 @@ export default function ShopPartnerOnboarding() {
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-3 text-xl">
-                  <Store className="h-6 w-6 text-primary" />
-                  ধাপ ৩: দোকানের তথ্য
+                  <Camera className="h-6 w-6 text-primary" />
+                  ধাপ ৩: দোকানের ছবি ও জমা
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <Form {...step3Form}>
                   <form onSubmit={step3Form.handleSubmit(handleStep3Submit)} className="space-y-5">
-                    <FormField
-                      control={step3Form.control}
-                      name="shopName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">দোকানের নাম *</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              placeholder="যেমন: রহিম স্টোর"
-                              className="h-12 text-base"
-                              data-testid="input-shop-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="bg-muted/30 rounded-lg p-4 space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        আপনার দোকানের ছবি যোগ করুন (ঐচ্ছিক)। এটি গ্রাহকদের আপনার দোকান চিনতে সাহায্য করবে।
+                      </p>
+                      
+                      <div>
+                        <p className="text-base font-medium mb-3">দোকানের লোগো</p>
+                        <div className="flex items-center gap-4">
+                          {logoPreview ? (
+                            <div className="h-20 w-20 rounded-xl overflow-hidden border-2 border-primary">
+                              <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="h-20 w-20 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
+                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                            </div>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-12"
+                            onClick={() => {
+                              const input = document.createElement("input");
+                              input.type = "file";
+                              input.accept = "image/*";
+                              input.onchange = (e: any) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (e) => {
+                                    setLogoPreview(e.target?.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              };
+                              input.click();
+                            }}
+                            data-testid="button-upload-logo"
+                          >
+                            <Camera className="h-5 w-5 mr-2" />
+                            লোগো তুলুন
+                          </Button>
+                        </div>
+                      </div>
 
-                    <FormField
-                      control={step3Form.control}
-                      name="shopType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">দোকানের ধরণ *</FormLabel>
-                          <div className="grid grid-cols-2 gap-2">
-                            {shopTypes.map((type) => (
-                              <Button
-                                key={type.value}
-                                type="button"
-                                variant={field.value === type.value ? "default" : "outline"}
-                                className="h-14 justify-start gap-3 text-base"
-                                onClick={() => field.onChange(type.value)}
-                                data-testid={`button-type-${type.value}`}
-                              >
-                                <type.icon className="h-5 w-5" />
-                                {type.label}
-                              </Button>
-                            ))}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                      <div>
+                        <p className="text-base font-medium mb-3">দোকানের ব্যানার</p>
+                        <div className="flex items-center gap-4">
+                          {bannerPreview ? (
+                            <div className="h-16 w-32 rounded-xl overflow-hidden border-2 border-primary">
+                              <img src={bannerPreview} alt="Banner" className="h-full w-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="h-16 w-32 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
+                              <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                            </div>
+                          )}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-12"
+                            onClick={() => {
+                              const input = document.createElement("input");
+                              input.type = "file";
+                              input.accept = "image/*";
+                              input.onchange = (e: any) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (e) => {
+                                    setBannerPreview(e.target?.result as string);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              };
+                              input.click();
+                            }}
+                            data-testid="button-upload-banner"
+                          >
+                            <Camera className="h-5 w-5 mr-2" />
+                            ব্যানার তুলুন
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
 
-                    <FormField
-                      control={step3Form.control}
-                      name="shopAddress"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-base">দোকানের ঠিকানা *</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="সম্পূর্ণ দোকানের ঠিকানা"
-                              className="min-h-20 text-base resize-none"
-                              data-testid="input-shop-address"
-                            />
-                          </FormControl>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            <MapPin className="inline h-3 w-3 mr-1" />
-                            গ্রাহকরা এই ঠিকানায় আপনার দোকান খুঁজে পাবেন
+                    <div className="bg-green-50 dark:bg-green-950/30 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                      <div className="flex items-start gap-3">
+                        <Check className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                            সব তথ্য সম্পূর্ণ!
                           </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div>
-                      <p className="text-base font-medium mb-3">দোকানের লোগো (ঐচ্ছিক)</p>
-                      <div className="flex items-center gap-4">
-                        {logoPreview ? (
-                          <div className="h-20 w-20 rounded-xl overflow-hidden border-2 border-dashed">
-                            <img src={logoPreview} alt="Logo" className="h-full w-full object-cover" />
-                          </div>
-                        ) : (
-                          <div className="h-20 w-20 rounded-xl border-2 border-dashed flex items-center justify-center bg-muted/50">
-                            <Camera className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-12"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/*";
-                            input.onchange = (e: any) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const reader = new FileReader();
-                                reader.onload = (e) => {
-                                  setLogoPreview(e.target?.result as string);
-                                };
-                                reader.readAsDataURL(file);
-                              }
-                            };
-                            input.click();
-                          }}
-                          data-testid="button-upload-logo"
-                        >
-                          <Camera className="h-5 w-5 mr-2" />
-                          ছবি তুলুন
-                        </Button>
+                          <p className="text-sm text-green-700 dark:text-green-300">
+                            আবেদন জমা দিতে নিচের বাটনে ক্লিক করুন
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -905,7 +1028,7 @@ export default function ShopPartnerOnboarding() {
                         type="submit"
                         size="lg"
                         className="h-14 flex-1"
-                        disabled={isPending}
+                        disabled={isPending || !step1Data || !step2Data}
                         data-testid="button-submit"
                       >
                         {isPending ? (
