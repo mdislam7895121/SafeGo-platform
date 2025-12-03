@@ -71,13 +71,15 @@ export default function OnboardingOverviewPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [countryFilter, setCountryFilter] = useState("all");
 
+  const summaryUrl = `/api/admin/onboarding/summary${countryFilter !== "all" ? `?countryCode=${countryFilter}` : ""}`;
   const { data: summaryData, isLoading: summaryLoading, refetch: refetchSummary } = useQuery<OnboardingSummary>({
-    queryKey: ["/api/admin/onboarding/summary", countryFilter !== "all" ? `?countryCode=${countryFilter}` : ""],
+    queryKey: [summaryUrl],
     refetchInterval: 30000,
   });
 
+  const pendingUrl = `/api/admin/onboarding/pending${activeTab !== "all" ? `?type=${activeTab}` : ""}`;
   const { data: pendingData, isLoading: pendingLoading, refetch: refetchPending } = useQuery<PendingData>({
-    queryKey: ["/api/admin/onboarding/pending", activeTab !== "all" ? `?type=${activeTab}` : ""],
+    queryKey: [pendingUrl],
     refetchInterval: 15000,
   });
 
