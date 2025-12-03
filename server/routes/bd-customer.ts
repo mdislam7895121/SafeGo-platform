@@ -2172,19 +2172,29 @@ router.post("/partner/start", async (req: AuthRequest, res: Response) => {
     });
 
     // Determine redirect URL based on partner kind
+    // URLs must match frontend routes in App.tsx
     let nextUrl = "/";
 
     switch (partnerKind) {
       case "driver_ride":
-      case "driver_delivery":
-        // Check if driver profile exists
-        const existingDriver = await prisma.driverProfile.findUnique({
+        const existingRideDriver = await prisma.driverProfile.findUnique({
           where: { userId },
         });
-        if (existingDriver?.verificationStatus === "approved") {
-          nextUrl = "/partner/driver/dashboard";
+        if (existingRideDriver?.verificationStatus === "approved") {
+          nextUrl = "/driver/map";
         } else {
-          nextUrl = "/partner/ride-start";
+          nextUrl = "/partner/ride/start";
+        }
+        break;
+
+      case "driver_delivery":
+        const existingDeliveryDriver = await prisma.driverProfile.findUnique({
+          where: { userId },
+        });
+        if (existingDeliveryDriver?.verificationStatus === "approved") {
+          nextUrl = "/driver/food-deliveries";
+        } else {
+          nextUrl = "/partner/delivery/start";
         }
         break;
 
@@ -2193,9 +2203,9 @@ router.post("/partner/start", async (req: AuthRequest, res: Response) => {
           where: { userId },
         });
         if (existingRestaurant?.verificationStatus === "approved") {
-          nextUrl = "/restaurant/dashboard";
+          nextUrl = "/restaurant";
         } else {
-          nextUrl = "/restaurant/onboarding";
+          nextUrl = "/partner/restaurant/start";
         }
         break;
 
@@ -2206,7 +2216,7 @@ router.post("/partner/start", async (req: AuthRequest, res: Response) => {
         if (existingShop?.verificationStatus === "approved") {
           nextUrl = "/shop-partner/dashboard";
         } else {
-          nextUrl = "/shop-partner/onboarding";
+          nextUrl = "/partner/shop/start";
         }
         break;
 
@@ -2217,7 +2227,7 @@ router.post("/partner/start", async (req: AuthRequest, res: Response) => {
         if (existingOperator?.verificationStatus === "approved") {
           nextUrl = "/ticket-operator/dashboard";
         } else {
-          nextUrl = "/ticket-operator/onboarding";
+          nextUrl = "/partner/ticket/start";
         }
         break;
     }

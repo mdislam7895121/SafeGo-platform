@@ -2,6 +2,8 @@ import type { Express, Request, Response } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { rateLimitPayout, rateLimitSupport, rateLimitSensitive } from "./middleware/rateLimit";
+import { authenticateToken, AuthRequest } from "./middleware/auth";
+import { prisma } from "./db";
 import { initStripe } from "./services/stripeInit";
 import { StripeWebhookHandler } from "./services/stripeWebhookHandler";
 import authRoutes from "./routes/auth";
@@ -301,6 +303,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/ticket-operator", ticketOperatorRoutes); // Ticket & Rental Operator management (BD only)
   app.use("/api/admin/bd-expansion", adminBdExpansionRoutes); // Admin management for BD expansion
   app.use("/api/bd", bdCustomerRoutes); // Customer BD services (rentals, shops)
+
+  // Partner Profile Endpoint - used by partner start pages
+  app.get("/api/partner/profile", authenticateToken, async (req: AuthRequest, res) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const roleType = req.query.roleType as string || req.query["0"] as string;
+
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, countryCode: true, role: true },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      let profile: any = null;
+
+      switch (roleType) {
+        case "ride_driver":
+        case "delivery_driver":
+          const driverProfile = await prisma.driverProfile.findUnique({
+            where: { userId },
+            select: {
+              id: true,
+              verificationStatus: true,
+              serviceTypes: true,
+            },
+          });
+          if (driverProfile) {
+            profile = {
+              id: driverProfile.id,
+              role: roleType,
+              country: user.countryCode,
+              partnerStatus: driverProfile.verificationStatus,
+              trustLevel: "partner_basic",
+              onboardingStep: driverProfile.verificationStatus === "pending" ? 1 : 0,
+            };
+          }
+          break;
+
+        case "restaurant":
+          const restaurantProfile = await prisma.restaurantProfile.findFirst({
+            where: { userId },
+            select: {
+              id: true,
+              verificationStatus: true,
+            },
+          });
+          if (restaurantProfile) {
+            profile = {
+              id: restaurantProfile.id,
+              role: "restaurant",
+              country: user.countryCode,
+              partnerStatus: restaurantProfile.verificationStatus,
+              trustLevel: "partner_basic",
+              onboardingStep: restaurantProfile.verificationStatus === "pending" ? 1 : 0,
+            };
+          }
+          break;
+
+        case "shop_partner":
+          const shopPartner = await prisma.shopPartner.findUnique({
+            where: { userId },
+            select: {
+              id: true,
+              verificationStatus: true,
+              shopName: true,
+            },
+          });
+          if (shopPartner) {
+            profile = {
+              id: shopPartner.id,
+              role: "shop_partner",
+              country: user.countryCode,
+              partnerStatus: shopPartner.verificationStatus,
+              trustLevel: "partner_basic",
+              onboardingStep: shopPartner.verificationStatus === "pending" ? 1 : 0,
+              businessInfo: {
+                businessName: shopPartner.shopName,
+              },
+            };
+          }
+          break;
+
+        case "ticket_operator":
+          const ticketOperator = await prisma.ticketOperator.findUnique({
+            where: { userId },
+            select: {
+              id: true,
+              verificationStatus: true,
+              operatorName: true,
+            },
+          });
+          if (ticketOperator) {
+            profile = {
+              id: ticketOperator.id,
+              role: "ticket_operator",
+              country: user.countryCode,
+              partnerStatus: ticketOperator.verificationStatus,
+              trustLevel: "partner_basic",
+              onboardingStep: ticketOperator.verificationStatus === "pending" ? 1 : 0,
+              businessInfo: {
+                businessName: ticketOperator.operatorName,
+              },
+            };
+          }
+          break;
+      }
+
+      res.json({ profile });
+    } catch (error: any) {
+      console.error("[Partner] Error getting profile:", error);
+      res.status(500).json({ error: error.message || "Failed to get partner profile" });
+    }
+  });
 
   const httpServer = createServer(app);
   

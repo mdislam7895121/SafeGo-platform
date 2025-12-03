@@ -1,0 +1,70 @@
+AGENT: Full system audit and fix required.
+
+Issue:
+When user taps any Partner card (Ride Driver, Delivery Driver, Restaurant Partner), the app shows “System error, try again”. This means the Partner onboarding routes are not mapped correctly and the backend is rejecting the request.
+
+You must now:
+
+1) Perform a full audit of all partner navigation routes:
+   - /partner/ride-driver
+   - /partner/delivery-driver
+   - /partner/restaurant
+   These must be separate pages, not under /customer.
+
+2) Ensure that tapping any Partner card does NOT open any customer route. 
+   Customer screens and Partner screens must never mix.
+
+3) Implement full SafeGo role logic:
+   Customer signup only creates customer accounts.
+   Partner roles (driver_ride, driver_delivery, restaurant) start onboarding only AFTER login.
+
+4) Implement country-specific onboarding requirements:
+   For BD:
+     father_name
+     date_of_birth
+     present_address
+     permanent_address
+     NID number + front/back images
+     emergency_contact
+     verification_status
+     is_verified
+   For US:
+     date_of_birth
+     home_address
+     government_id_type
+     government_id_last4
+     driver_license + image + expiry (for drivers)
+     ssn_last4 (optional)
+     emergency_contact
+     verification_status
+     is_verified
+
+   Each onboarding flow must validate these fields before moving to next step.
+
+5) Add correct redirects:
+   When tapping a Partner card:
+     → Check if user is logged in as customer.
+     → If not, redirect to /login?returnTo=partner.
+     → If logged in, open the correct onboarding page immediately.
+
+6) Add proper error handling UI:
+   Show correct onboarding errors, not “system error”.
+   Example:
+     “Please complete your partner onboarding first.”
+
+7) Test all partner cards:
+   - Ride Driver → should open Ride Driver Onboarding
+   - Delivery Driver → should open Delivery Driver Onboarding
+   - Restaurant Partner → should open Restaurant Onboarding
+
+8) All changes must be non-breaking:
+   No existing fields can be renamed or removed.
+   Only add missing onboarding routes and logic.
+
+9) After implementing:
+   Run full QA on:
+     Customer → Partner onboarding
+     Partner dashboard access
+     Admin verification flows for all three roles.
+
+This must be completed end-to-end in one pass.
