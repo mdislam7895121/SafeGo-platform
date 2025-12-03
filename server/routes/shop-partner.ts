@@ -17,8 +17,8 @@ router.post("/upload-image", (req: AuthRequest, res: Response) => {
       if (err) {
         if (err.code === "LIMIT_FILE_SIZE") {
           return res.status(400).json({ 
-            error: "ফাইলের আকার ২ মেগাবাইটের বেশি হতে পারবে না",
-            errorEn: "File size exceeds 2MB limit"
+            error: "ফাইলের আকার ৫ মেগাবাইটের বেশি হতে পারবে না",
+            errorEn: "File size exceeds 5MB limit"
           });
         }
         return res.status(400).json({ 
