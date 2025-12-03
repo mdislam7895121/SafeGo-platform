@@ -159,6 +159,11 @@ router.post('/driver/registration/submit', authenticateToken, async (req: AuthRe
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
     const existingProfile = await prisma.driverProfile.findUnique({
       where: { userId },
     });
@@ -209,7 +214,9 @@ router.post('/driver/registration/submit', authenticateToken, async (req: AuthRe
         vehicleModel: `${validatedData.vehicleMake || ''} ${validatedData.vehicleModel}`.trim(),
         vehiclePlate: validatedData.vehiclePlate,
         isPrimary: true,
-        status: 'PENDING',
+        year: validatedData.vehicleYear ? parseInt(validatedData.vehicleYear) : null,
+        color: validatedData.vehicleColor || null,
+        updatedAt: new Date(),
       },
     });
 
@@ -225,7 +232,7 @@ router.post('/driver/registration/submit', authenticateToken, async (req: AuthRe
       data: {
         id: crypto.randomUUID(),
         actorId: userId,
-        actorEmail: req.user?.email || 'unknown',
+        actorEmail: user?.email || 'unknown',
         actorRole: 'customer',
         actionType: 'DRIVER_REGISTRATION_SUBMITTED',
         entityType: 'driver_profile',
@@ -287,6 +294,11 @@ router.post('/restaurant/registration/submit', authenticateToken, async (req: Au
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+
     const existingProfile = await prisma.restaurantProfile.findUnique({
       where: { userId },
     });
@@ -347,7 +359,7 @@ router.post('/restaurant/registration/submit', authenticateToken, async (req: Au
       data: {
         id: crypto.randomUUID(),
         actorId: userId,
-        actorEmail: req.user?.email || 'unknown',
+        actorEmail: user?.email || 'unknown',
         actorRole: 'customer',
         actionType: 'RESTAURANT_REGISTRATION_SUBMITTED',
         entityType: 'restaurant_profile',
