@@ -1,0 +1,205 @@
+AGENT:
+
+Your next task is to complete the FULL ADMIN OVERSIGHT SYSTEM so that the SafeGo admin can see, review, verify, and manage EVERY user and EVERY partner role from one place, with complete accuracy and without breaking any existing SafeGo rules.
+
+This is mandatory for SafeGo’s readiness.
+
+===========================================
+A) ADMIN MUST BE ABLE TO SEE ALL ROLES
+===========================================
+
+Create/complete the following admin views:
+
+1. Customers List
+   - customer_id
+   - name
+   - phone/email
+   - country
+   - created_at
+   - verification_status (if any)
+   - option to block/unblock
+   - open detailed customer profile
+
+2. Drivers List
+   - driver_id
+   - driver type: ride / delivery / both
+   - country (BD / US)
+   - is_verified
+   - vehicle info
+   - submitted documents (license/NID)
+   - view uploaded images (thumbnail)
+   - block/unblock
+   - open full driver profile + KYC
+
+3. Restaurant Partners
+   - restaurant_id
+   - restaurant name
+   - owner info
+   - onboarding progress (step-by-step)
+   - KYC documents (logo, banner, license, NID, etc.)
+   - view menu items
+   - block/unblock, approve/reject
+
+4. Shop Partners (BD only)
+   - shop_id
+   - shop name
+   - category
+   - owner info
+   - branding (logo/banner)
+   - product list + product images
+   - KYC docs
+   - approve/reject
+
+5. Tickets Partners (BD only)
+   - operator_id
+   - company name
+   - route info
+   - branding/media
+   - KYC docs
+   - approve/reject
+
+===========================================
+B) ADMIN MUST SEE ALL ONBOARDING STATUS
+===========================================
+
+Add an “Onboarding Overview” screen:
+
+- Pending Drivers
+- Pending Restaurants
+- Pending Shops
+- Pending Ticket Operators
+- Pending Delivery Drivers
+- Rejected Applications (with rejection_reason)
+- Approved Partners (active)
+
+Admin must be able to click any partner and see:
+
+- full onboarding data
+- all uploaded documents
+- KYC fields
+- approval history
+- timestamps
+
+===========================================
+C) ADMIN APPROVAL SYSTEM (MANDATORY)
+===========================================
+
+Admin can:
+
+1. Approve partner
+   - Set verification_status = "approved"
+   - Set is_verified = true
+   - Trigger success notification
+
+2. Reject partner
+   - Require a rejection_reason
+   - Set verification_status = "rejected"
+   - Trigger rejection notification
+
+3. Ask for resubmission (optional but useful)
+
+4. Block/Unblock partner
+   - block_status toggle
+   - block_reason optional
+   - Partners should NOT be able to access dashboards when blocked
+
+===========================================
+D) ADMIN VIEW OF FILE UPLOADS
+===========================================
+
+Admin must be able to preview all uploaded images:
+
+- Driver: license/NID/vehicle photos
+- Restaurant: logo, banner, menu item images
+- Shop: logo, banner, product images
+- Ticket operator: branding + NIC/license documents
+
+Show secure preview (thumbnail) with full-size modal view.
+
+Admin cannot download raw files; only view.
+
+===========================================
+E) ADMIN VIEW OF BUSINESS OPERATIONS
+===========================================
+
+Admin must see:
+
+1. All rides (rides collection)
+   - ride_id
+   - customer
+   - driver
+   - fare
+   - commission
+   - payment_type
+   - status flow timeline
+   - rating
+
+2. All food orders (food_orders)
+   - order_id
+   - restaurant
+   - customer
+   - driver
+   - total
+   - commission
+   - payment_type
+   - order timeline
+
+3. All deliveries (deliveries)
+   - delivery_id
+   - sender/receiver
+   - driver
+   - fees
+   - commission
+   - status timeline
+
+===========================================
+F) ADMIN VIEW OF FINANCIALS
+===========================================
+
+Admin must be able to see:
+
+1. Driver wallet balance (including negative balance)
+2. Restaurant wallet balance (including negative balance)
+3. Shop wallet balance (if applicable)
+4. Payout requests
+5. Settlement history
+6. Commission configuration screen
+
+===========================================
+G) PERMISSIONS & SECURITY
+===========================================
+
+Strict rules:
+
+- Only Admin can:
+  - approve/reject
+  - change commissions
+  - change verification_status
+  - block/unblock users
+  - view sensitive KYC documents
+
+- No partner can see other partner data.
+- No customer can see any partner data.
+- No one can alter system pricing except admin.
+
+===========================================
+H) SELF-TESTS YOU MUST RUN
+===========================================
+
+You must verify the following as part of completion:
+
+1. Driver creates partner account → Admin sees pending driver → Admin approves → Driver dashboard unlocks.
+
+2. Restaurant onboarding → branding upload → menu setup → Admin sees restaurant → Admin approves → Restaurant dashboard unlocks.
+
+3. Shop partner → product images → Admin views all images → Admin approves → Shop dashboard unlocks.
+
+4. Ticket partner → Admin sees documents → approves → dashboard unlocks.
+
+5. All rejection flows work and show rejection_reason.
+
+6. Blocking any user instantly removes their access.
+
+7. Admin can see all live rides, food orders, and deliveries.
+
+After all tests pass, confirm the entire admin oversight system is complete and stable.

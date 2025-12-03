@@ -252,6 +252,11 @@ import AdminSupportTicketDetail from "@/pages/admin/support-ticket-detail";
 import AdminOperationsDashboard from "@/pages/admin/operations-dashboard";
 import AdminRevenueAnalytics from "@/pages/admin/revenue-analytics";
 import AdminFraudAlerts from "@/pages/admin/fraud-alerts";
+import AdminOnboardingOverview from "@/pages/admin/onboarding-overview";
+import AdminShopPartners from "@/pages/admin/shop-partners";
+import AdminShopPartnerDetails from "@/pages/admin/shop-partner-details";
+import AdminTicketOperators from "@/pages/admin/ticket-operators";
+import AdminTicketOperatorDetails from "@/pages/admin/ticket-operator-details";
 import AdminSupportHub from "@/pages/admin-portal/support-hub";
 import AdminSupportHelp from "@/pages/admin-portal/support-help";
 import AdminSupportArticle from "@/pages/admin-portal/support-article";
@@ -1965,6 +1970,41 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Fraud Alerts">
             <AdminFraudAlerts />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/onboarding-overview">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Onboarding Overview">
+            <AdminOnboardingOverview />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/shop-partners/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Shop Partner Details">
+            <AdminShopPartnerDetails />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/shop-partners">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Shop Partners">
+            <AdminShopPartners />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ticket-operators/:id">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ticket Operator Details">
+            <AdminTicketOperatorDetails />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/ticket-operators">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Ticket Operators">
+            <AdminTicketOperators />
           </AdminLayout>
         </ProtectedRoute>
       </Route>

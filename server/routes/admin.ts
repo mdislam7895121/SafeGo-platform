@@ -13524,4 +13524,674 @@ router.delete("/mobile-wallets/config/:id", checkPermission(Permission.MANAGE_SE
   }
 });
 
+// ============================================================
+// ADMIN OVERSIGHT SYSTEM - Onboarding Overview Dashboard
+// ============================================================
+
+// GET /api/admin/onboarding/summary - Get aggregated onboarding stats across all partner types
+router.get("/onboarding/summary", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode } = req.query;
+    const countryFilter = countryCode ? { user: { countryCode: countryCode as string } } : {};
+
+    // Driver stats
+    const driverStats = await prisma.driverProfile.groupBy({
+      by: ['verificationStatus'],
+      _count: { id: true },
+      where: countryFilter,
+    });
+
+    // Restaurant stats
+    const restaurantStats = await prisma.restaurantProfile.groupBy({
+      by: ['verificationStatus'],
+      _count: { id: true },
+    });
+
+    // Shop Partner stats (BD only)
+    const shopStats = await prisma.shopPartner.groupBy({
+      by: ['verificationStatus'],
+      _count: { id: true },
+    });
+
+    // Ticket Operator stats (BD only)
+    const ticketStats = await prisma.ticketOperator.groupBy({
+      by: ['verificationStatus'],
+      _count: { id: true },
+    });
+
+    // Helper to convert groupBy result to status counts
+    const toStatusCounts = (stats: any[]) => {
+      const counts = { pending: 0, approved: 0, rejected: 0, suspended: 0, total: 0 };
+      stats.forEach((s) => {
+        const status = s.verificationStatus?.toLowerCase() || 'pending';
+        if (status === 'pending' || status === 'pending_review') counts.pending += s._count.id;
+        else if (status === 'approved' || status === 'verified') counts.approved += s._count.id;
+        else if (status === 'rejected') counts.rejected += s._count.id;
+        else if (status === 'suspended') counts.suspended += s._count.id;
+        counts.total += s._count.id;
+      });
+      return counts;
+    };
+
+    res.json({
+      success: true,
+      summary: {
+        drivers: toStatusCounts(driverStats),
+        restaurants: toStatusCounts(restaurantStats),
+        shopPartners: toStatusCounts(shopStats),
+        ticketOperators: toStatusCounts(ticketStats),
+      },
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.error("Onboarding summary error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch onboarding summary" });
+  }
+});
+
+// GET /api/admin/onboarding/pending - Get all pending partner applications
+router.get("/onboarding/pending", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { type, limit = 50 } = req.query;
+    const take = Math.min(parseInt(limit as string) || 50, 100);
+
+    const pendingStatuses = ['pending', 'pending_review', 'PENDING', 'PENDING_REVIEW'];
+
+    // Get pending drivers
+    const pendingDrivers = (!type || type === 'driver') ? await prisma.driverProfile.findMany({
+      where: { verificationStatus: { in: pendingStatuses } },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, countryCode: true, createdAt: true } },
+        vehicles: { take: 1 },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    }) : [];
+
+    // Get pending restaurants
+    const pendingRestaurants = (!type || type === 'restaurant') ? await prisma.restaurantProfile.findMany({
+      where: { verificationStatus: { in: pendingStatuses } },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, countryCode: true, createdAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    }) : [];
+
+    // Get pending shop partners
+    const pendingShops = (!type || type === 'shop') ? await prisma.shopPartner.findMany({
+      where: { verificationStatus: { in: pendingStatuses } },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, countryCode: true, createdAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    }) : [];
+
+    // Get pending ticket operators
+    const pendingTickets = (!type || type === 'ticket') ? await prisma.ticketOperator.findMany({
+      where: { verificationStatus: { in: pendingStatuses } },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, countryCode: true, createdAt: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    }) : [];
+
+    res.json({
+      success: true,
+      pending: {
+        drivers: pendingDrivers.map(d => ({
+          id: d.id,
+          type: 'driver',
+          driverType: d.driverType,
+          name: d.user.fullName || `${d.firstName || ''} ${d.lastName || ''}`.trim(),
+          email: d.user.email,
+          country: d.user.countryCode,
+          status: d.verificationStatus,
+          hasVehicle: d.vehicles.length > 0,
+          createdAt: d.createdAt,
+        })),
+        restaurants: pendingRestaurants.map(r => ({
+          id: r.id,
+          type: 'restaurant',
+          name: r.name,
+          email: r.user.email,
+          country: r.user.countryCode,
+          status: r.verificationStatus,
+          hasLogo: !!r.logoUrl,
+          createdAt: r.createdAt,
+        })),
+        shopPartners: pendingShops.map(s => ({
+          id: s.id,
+          type: 'shop',
+          name: s.shopName,
+          email: s.user.email,
+          country: 'BD',
+          status: s.verificationStatus,
+          createdAt: s.createdAt,
+        })),
+        ticketOperators: pendingTickets.map(t => ({
+          id: t.id,
+          type: 'ticket',
+          name: t.operatorName,
+          operatorType: t.operatorType,
+          email: t.user.email,
+          country: 'BD',
+          status: t.verificationStatus,
+          createdAt: t.createdAt,
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error("Pending applications error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch pending applications" });
+  }
+});
+
+// GET /api/admin/customers - Get all customers with filtering
+router.get("/customers", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { search, page = 1, limit = 20, status, countryCode } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    const where: any = {
+      role: 'customer',
+    };
+
+    if (search) {
+      where.OR = [
+        { email: { contains: search as string, mode: 'insensitive' } },
+        { fullName: { contains: search as string, mode: 'insensitive' } },
+        { phone: { contains: search as string } },
+      ];
+    }
+
+    if (status === 'blocked') {
+      where.isBlocked = true;
+    } else if (status === 'active') {
+      where.isBlocked = false;
+    }
+
+    if (countryCode) {
+      where.countryCode = countryCode as string;
+    }
+
+    const [customers, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          phone: true,
+          countryCode: true,
+          isBlocked: true,
+          blockReason: true,
+          createdAt: true,
+          lastLoginAt: true,
+          emailVerified: true,
+          phoneVerified: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      customers,
+      pagination: {
+        page: parseInt(page as string),
+        limit: take,
+        total,
+        pages: Math.ceil(total / take),
+      },
+    });
+  } catch (error: any) {
+    console.error("Customers list error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch customers" });
+  }
+});
+
+// GET /api/admin/customers/:id - Get customer details
+router.get("/customers/:id", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const customer = await prisma.user.findUnique({
+      where: { id, role: 'customer' },
+      include: {
+        deliveryAddresses: true,
+        savedPlaces: true,
+        paymentMethods: { select: { id: true, type: true, lastFour: true, isDefault: true, createdAt: true } },
+        rideRatings: { take: 5, orderBy: { createdAt: 'desc' } },
+        _count: {
+          select: {
+            ridesAsCustomer: true,
+            foodOrders: true,
+            parcelsAsSender: true,
+          },
+        },
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Customer not found" });
+    }
+
+    res.json({ success: true, customer });
+  } catch (error: any) {
+    console.error("Customer details error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch customer details" });
+  }
+});
+
+// PUT /api/admin/customers/:id/block - Block/unblock customer
+router.put("/customers/:id/block", checkPermission(Permission.MANAGE_DRIVER_STATUS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { isBlocked, blockReason } = req.body;
+
+    const customer = await prisma.user.update({
+      where: { id, role: 'customer' },
+      data: {
+        isBlocked: !!isBlocked,
+        blockReason: isBlocked ? blockReason : null,
+      },
+    });
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: isBlocked ? ActionType.BLOCK_USER : ActionType.UNBLOCK_USER,
+      entityType: EntityType.CUSTOMER,
+      entityId: id,
+      description: isBlocked ? `Blocked customer: ${blockReason || 'No reason provided'}` : 'Unblocked customer',
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, customer });
+  } catch (error: any) {
+    console.error("Customer block error:", error);
+    res.status(500).json({ error: error.message || "Failed to update customer" });
+  }
+});
+
+// GET /api/admin/shop-partners - Get all shop partners with filtering
+router.get("/shop-partners", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { search, page = 1, limit = 20, status } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { shopName: { contains: search as string, mode: 'insensitive' } },
+        { ownerName: { contains: search as string, mode: 'insensitive' } },
+        { user: { email: { contains: search as string, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (status) {
+      where.verificationStatus = status as string;
+    }
+
+    const [shopPartners, total] = await Promise.all([
+      prisma.shopPartner.findMany({
+        where,
+        include: {
+          user: { select: { id: true, email: true, fullName: true, isBlocked: true } },
+          _count: { select: { products: true, orders: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.shopPartner.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      shopPartners,
+      pagination: {
+        page: parseInt(page as string),
+        limit: take,
+        total,
+        pages: Math.ceil(total / take),
+      },
+    });
+  } catch (error: any) {
+    console.error("Shop partners list error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch shop partners" });
+  }
+});
+
+// GET /api/admin/shop-partners/:id - Get shop partner details
+router.get("/shop-partners/:id", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true } },
+        products: { take: 20, orderBy: { createdAt: 'desc' } },
+        orders: { take: 10, orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop partner not found" });
+    }
+
+    res.json({ success: true, shopPartner });
+  } catch (error: any) {
+    console.error("Shop partner details error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch shop partner details" });
+  }
+});
+
+// PUT /api/admin/shop-partners/:id/status - Update shop partner verification status
+router.put("/shop-partners/:id/status", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    if (status === 'rejected' && !rejectionReason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const shopPartner = await prisma.shopPartner.update({
+      where: { id },
+      data: {
+        verificationStatus: status,
+        rejectionReason: status === 'rejected' ? rejectionReason : null,
+        verifiedAt: status === 'approved' ? new Date() : null,
+      },
+      include: { user: true },
+    });
+
+    // Update user role if approved
+    if (status === 'approved') {
+      await prisma.user.update({
+        where: { id: shopPartner.userId },
+        data: { role: 'shop_partner' },
+      });
+    }
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.RESTAURANT,
+      entityId: id,
+      description: `Shop partner ${status}: ${rejectionReason || 'Approved'}`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, shopPartner });
+  } catch (error: any) {
+    console.error("Shop partner status error:", error);
+    res.status(500).json({ error: error.message || "Failed to update shop partner status" });
+  }
+});
+
+// GET /api/admin/ticket-operators - Get all ticket operators with filtering
+router.get("/ticket-operators", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { search, page = 1, limit = 20, status, operatorType } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { operatorName: { contains: search as string, mode: 'insensitive' } },
+        { user: { email: { contains: search as string, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (status) {
+      where.verificationStatus = status as string;
+    }
+
+    if (operatorType) {
+      where.operatorType = operatorType as string;
+    }
+
+    const [ticketOperators, total] = await Promise.all([
+      prisma.ticketOperator.findMany({
+        where,
+        include: {
+          user: { select: { id: true, email: true, fullName: true, isBlocked: true } },
+          _count: { select: { routes: true, vehicles: true, ticketBookings: true, rentalBookings: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.ticketOperator.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      ticketOperators,
+      pagination: {
+        page: parseInt(page as string),
+        limit: take,
+        total,
+        pages: Math.ceil(total / take),
+      },
+    });
+  } catch (error: any) {
+    console.error("Ticket operators list error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch ticket operators" });
+  }
+});
+
+// GET /api/admin/ticket-operators/:id - Get ticket operator details
+router.get("/ticket-operators/:id", checkPermission(Permission.VIEW_ALL_DRIVERS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const ticketOperator = await prisma.ticketOperator.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true } },
+        routes: { take: 20, orderBy: { createdAt: 'desc' } },
+        vehicles: { take: 20, orderBy: { createdAt: 'desc' } },
+        ticketBookings: { take: 10, orderBy: { createdAt: 'desc' } },
+        rentalBookings: { take: 10, orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!ticketOperator) {
+      return res.status(404).json({ error: "Ticket operator not found" });
+    }
+
+    res.json({ success: true, ticketOperator });
+  } catch (error: any) {
+    console.error("Ticket operator details error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch ticket operator details" });
+  }
+});
+
+// PUT /api/admin/ticket-operators/:id/status - Update ticket operator verification status
+router.put("/ticket-operators/:id/status", checkPermission(Permission.APPROVE_REJECT_DOCUMENTS), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status, rejectionReason } = req.body;
+
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ error: "Invalid status" });
+    }
+
+    if (status === 'rejected' && !rejectionReason) {
+      return res.status(400).json({ error: "Rejection reason is required" });
+    }
+
+    const ticketOperator = await prisma.ticketOperator.update({
+      where: { id },
+      data: {
+        verificationStatus: status,
+        rejectionReason: status === 'rejected' ? rejectionReason : null,
+        verifiedAt: status === 'approved' ? new Date() : null,
+      },
+      include: { user: true },
+    });
+
+    // Update user role if approved
+    if (status === 'approved') {
+      await prisma.user.update({
+        where: { id: ticketOperator.userId },
+        data: { role: 'ticket_operator' },
+      });
+    }
+
+    await logAuditEvent({
+      adminId: req.adminUser!.id,
+      actionType: ActionType.UPDATE_STATUS,
+      entityType: EntityType.RESTAURANT,
+      entityId: id,
+      description: `Ticket operator ${status}: ${rejectionReason || 'Approved'}`,
+      clientIp: getClientIp(req),
+    });
+
+    res.json({ success: true, ticketOperator });
+  } catch (error: any) {
+    console.error("Ticket operator status error:", error);
+    res.status(500).json({ error: error.message || "Failed to update ticket operator status" });
+  }
+});
+
+// GET /api/admin/operations/rides - Get all rides with filtering
+router.get("/operations/rides", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { page = 1, limit = 20, status, dateFrom, dateTo } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    const where: any = {};
+    if (status) where.status = status as string;
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom as string);
+      if (dateTo) where.createdAt.lte = new Date(dateTo as string);
+    }
+
+    const [rides, total] = await Promise.all([
+      prisma.ride.findMany({
+        where,
+        include: {
+          customer: { select: { id: true, fullName: true, email: true } },
+          driver: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.ride.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      rides,
+      pagination: { page: parseInt(page as string), limit: take, total, pages: Math.ceil(total / take) },
+    });
+  } catch (error: any) {
+    console.error("Operations rides error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch rides" });
+  }
+});
+
+// GET /api/admin/operations/food-orders - Get all food orders with filtering
+router.get("/operations/food-orders", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { page = 1, limit = 20, status, dateFrom, dateTo } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    const where: any = {};
+    if (status) where.status = status as string;
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom as string);
+      if (dateTo) where.createdAt.lte = new Date(dateTo as string);
+    }
+
+    const [orders, total] = await Promise.all([
+      prisma.foodOrder.findMany({
+        where,
+        include: {
+          customer: { select: { id: true, fullName: true, email: true } },
+          restaurant: { select: { id: true, name: true } },
+          driver: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.foodOrder.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      orders,
+      pagination: { page: parseInt(page as string), limit: take, total, pages: Math.ceil(total / take) },
+    });
+  } catch (error: any) {
+    console.error("Operations food orders error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch food orders" });
+  }
+});
+
+// GET /api/admin/operations/deliveries - Get all parcel deliveries with filtering
+router.get("/operations/deliveries", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const { page = 1, limit = 20, status, dateFrom, dateTo } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+    const take = Math.min(parseInt(limit as string) || 20, 100);
+
+    const where: any = {};
+    if (status) where.status = status as string;
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom as string);
+      if (dateTo) where.createdAt.lte = new Date(dateTo as string);
+    }
+
+    const [deliveries, total] = await Promise.all([
+      prisma.parcel.findMany({
+        where,
+        include: {
+          sender: { select: { id: true, fullName: true, email: true } },
+          driver: { select: { id: true, firstName: true, lastName: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      prisma.parcel.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      deliveries,
+      pagination: { page: parseInt(page as string), limit: take, total, pages: Math.ceil(total / take) },
+    });
+  } catch (error: any) {
+    console.error("Operations deliveries error:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch deliveries" });
+  }
+});
+
 export default router;

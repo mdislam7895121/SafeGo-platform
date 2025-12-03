@@ -97,6 +97,15 @@ export default function AdminHome() {
 
   const adminSections = [
     {
+      name: "Onboarding Overview",
+      icon: UserPlus,
+      href: "/admin/onboarding-overview",
+      description: "Review and approve all partner applications",
+      color: "text-emerald-600",
+      bgColor: "bg-emerald-50 dark:bg-emerald-950",
+      badge: stats?.pendingDrivers ? (stats.pendingDrivers + (stats.pendingRestaurants || 0)) : undefined,
+    },
+    {
       name: "Notification Center",
       icon: Bell,
       href: "/admin/notifications",
@@ -136,6 +145,22 @@ export default function AdminHome() {
       description: "View, block, and manage all customers",
       color: "text-cyan-600",
       bgColor: "bg-cyan-50 dark:bg-cyan-950",
+    },
+    {
+      name: "Shop Partners",
+      icon: Store,
+      href: "/admin/shop-partners",
+      description: "Manage Bangladesh shop partner accounts",
+      color: "text-pink-600",
+      bgColor: "bg-pink-50 dark:bg-pink-950",
+    },
+    {
+      name: "Ticket Operators",
+      icon: Sparkles,
+      href: "/admin/ticket-operators",
+      description: "Manage Bangladesh transportation operators",
+      color: "text-teal-600",
+      bgColor: "bg-teal-50 dark:bg-teal-950",
     },
     {
       name: "Complaints",
