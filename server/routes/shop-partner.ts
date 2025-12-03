@@ -968,4 +968,433 @@ router.get("/earnings", async (req: AuthRequest, res: Response) => {
   }
 });
 
+// ===================================================
+// STAGED ONBOARDING ENDPOINTS (BD Partner Engine)
+// ===================================================
+
+// Stage 1: Light Form Schema - Easy Start
+const stage1Schema = z.object({
+  shopName: z.string().min(2, "দোকানের নাম কমপক্ষে ২ অক্ষরের হতে হবে"),
+  shopType: z.enum(["grocery", "electronics", "fashion", "pharmacy", "general_store", "hardware", "beauty", "books", "sports", "other"], {
+    errorMap: () => ({ message: "দোকানের ধরণ নির্বাচন করুন" }),
+  }),
+  cityOrArea: z.string().min(2, "এলাকা/শহরের নাম লিখুন"),
+  contactPhone: z.string().min(10, "সঠিক ফোন নম্বর লিখুন"),
+});
+
+// Stage 2: Full KYC Schema - High Security
+const stage2KycSchema = z.object({
+  ownerName: z.string().min(2, "মালিকের নাম লিখুন"),
+  fatherName: z.string().min(2, "পিতার নাম লিখুন"),
+  dateOfBirth: z.string().min(1, "জন্ম তারিখ নির্বাচন করুন").transform((val) => new Date(val)),
+  presentAddress: z.string().min(5, "বর্তমান ঠিকানা লিখুন"),
+  permanentAddress: z.string().min(5, "স্থায়ী ঠিকানা লিখুন"),
+  nidNumber: z.string().min(10, "সঠিক জাতীয় পরিচয়পত্র নম্বর লিখুন").regex(/^[0-9]{10,17}$/, "জাতীয় পরিচয়পত্র নম্বর শুধুমাত্র সংখ্যা হতে হবে"),
+  nidFrontImage: z.string().url("NID সামনের ছবি আপলোড করুন"),
+  nidBackImage: z.string().url("NID পেছনের ছবি আপলোড করুন"),
+  emergencyContactName: z.string().min(2, "জরুরি যোগাযোগের নাম লিখুন"),
+  emergencyContactPhone: z.string().min(10, "জরুরি যোগাযোগের ফোন নম্বর লিখুন"),
+});
+
+// Stage 3: Business Setup Schema
+const stage3SetupSchema = z.object({
+  shopLogo: z.string().url("দোকানের লোগো আপলোড করুন"),
+  shopBanner: z.string().url("দোকানের ব্যানার আপলোড করুন"),
+  shopAddress: z.string().min(5, "দোকানের সম্পূর্ণ ঠিকানা লিখুন"),
+  openingTime: z.string().optional(),
+  closingTime: z.string().optional(),
+  deliveryRadiusKm: z.number().min(1).max(50).optional(),
+});
+
+// Get onboarding status and checklist
+router.get("/onboarding-status", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { countryCode: true, role: true },
+    });
+
+    if (!user || user.countryCode !== "BD") {
+      return res.status(403).json({ error: "Shop Partner is only available in Bangladesh" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+      include: {
+        _count: { select: { products: true } },
+      },
+    });
+
+    if (!shopPartner) {
+      return res.json({
+        hasProfile: false,
+        partnerStatus: null,
+        checklist: {
+          stage1Complete: false,
+          stage2Complete: false,
+          stage3Complete: false,
+        },
+        nextStep: "stage1",
+        message: "শপ পার্টনার হতে প্রথম ধাপ শুরু করুন",
+      });
+    }
+
+    // Check completion status for each stage
+    const stage1Complete = !!(shopPartner.shopName && shopPartner.shopType && shopPartner.cityOrArea);
+    const stage2Complete = !!(
+      shopPartner.ownerName &&
+      shopPartner.fatherName &&
+      shopPartner.dateOfBirth &&
+      shopPartner.presentAddress &&
+      shopPartner.permanentAddress &&
+      shopPartner.nidNumber &&
+      shopPartner.nidFrontImage &&
+      shopPartner.nidBackImage &&
+      shopPartner.emergencyContactName &&
+      shopPartner.emergencyContactPhone
+    );
+    const stage3Complete = !!(
+      shopPartner.shopLogo &&
+      shopPartner.shopBanner &&
+      shopPartner.shopAddress &&
+      shopPartner._count.products >= 3
+    );
+
+    // Determine next step
+    let nextStep = "complete";
+    if (!stage1Complete) {
+      nextStep = "stage1";
+    } else if (!stage2Complete) {
+      nextStep = "stage2";
+    } else if (shopPartner.partnerStatus === "kyc_pending") {
+      nextStep = "waiting_kyc_approval";
+    } else if (shopPartner.partnerStatus === "setup_incomplete" && !stage3Complete) {
+      nextStep = "stage3";
+    } else if (shopPartner.partnerStatus === "ready_for_review") {
+      nextStep = "waiting_final_approval";
+    } else if (shopPartner.partnerStatus === "rejected") {
+      nextStep = "rejected";
+    } else if (shopPartner.partnerStatus === "live") {
+      nextStep = "complete";
+    }
+
+    res.json({
+      hasProfile: true,
+      partnerStatus: shopPartner.partnerStatus,
+      verificationStatus: shopPartner.verificationStatus,
+      rejectionReason: shopPartner.rejectionReason,
+      checklist: {
+        stage1Complete,
+        stage2Complete,
+        stage3Complete,
+        productCount: shopPartner._count.products,
+        requiredProducts: 3,
+      },
+      nextStep,
+      profile: {
+        id: shopPartner.id,
+        shopName: shopPartner.shopName,
+        shopType: shopPartner.shopType,
+        cityOrArea: shopPartner.cityOrArea,
+        isActive: shopPartner.isActive,
+      },
+    });
+  } catch (error) {
+    console.error("Get onboarding status error:", error);
+    res.status(500).json({ error: "Failed to fetch onboarding status" });
+  }
+});
+
+// Stage 1: Easy Start - Create draft profile
+router.post("/stages/1", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const userRole = req.user?.role;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Allow customer, pending_shop_partner, or shop_partner roles
+    if (!["customer", "pending_shop_partner", "shop_partner"].includes(userRole || "")) {
+      return res.status(403).json({ error: "Invalid role for shop partner onboarding" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { shopPartner: true },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (user.countryCode !== "BD") {
+      return res.status(403).json({ error: "Shop Partner is only available in Bangladesh" });
+    }
+
+    // Check if already live
+    if (user.shopPartner?.partnerStatus === "live") {
+      return res.status(400).json({ error: "আপনি ইতিমধ্যে একজন অনুমোদিত শপ পার্টনার" });
+    }
+
+    const parsed = stage1Schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.errors 
+      });
+    }
+
+    const data = parsed.data;
+
+    // Create or update shop partner with Stage 1 data
+    const shopPartner = await prisma.shopPartner.upsert({
+      where: { userId },
+      create: {
+        id: randomUUID(),
+        userId,
+        shopName: data.shopName,
+        shopType: data.shopType,
+        cityOrArea: data.cityOrArea,
+        contactPhone: data.contactPhone,
+        shopAddress: data.cityOrArea, // Temporary, will be updated in Stage 3
+        partnerStatus: "draft",
+        verificationStatus: "pending",
+        countryCode: "BD",
+      },
+      update: {
+        shopName: data.shopName,
+        shopType: data.shopType,
+        cityOrArea: data.cityOrArea,
+        contactPhone: data.contactPhone,
+        // Don't change partnerStatus if already beyond draft
+        ...(user.shopPartner?.partnerStatus === "draft" || !user.shopPartner ? {} : {}),
+      },
+    });
+
+    // Update user role to pending_shop_partner if they're a customer
+    if (user.role === "customer") {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { role: "pending_shop_partner" },
+      });
+    }
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: user.email || "unknown",
+        actorRole: user.role || "pending_shop_partner",
+        actionType: "SHOP_PARTNER_STAGE1_SUBMITTED",
+        entityType: "shop_partner",
+        entityId: shopPartner.id,
+        description: `Shop Partner Stage 1 submitted: ${data.shopName}`,
+        metadata: { shopName: data.shopName, shopType: data.shopType, cityOrArea: data.cityOrArea },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "অভিনন্দন! প্রথম ধাপ সম্পন্ন হয়েছে।",
+      shopPartner: {
+        id: shopPartner.id,
+        shopName: shopPartner.shopName,
+        partnerStatus: shopPartner.partnerStatus,
+      },
+      nextStep: "stage2",
+    });
+  } catch (error) {
+    console.error("Stage 1 error:", error);
+    res.status(500).json({ error: "প্রথম ধাপ জমা দিতে সমস্যা হয়েছে" });
+  }
+});
+
+// Stage 2: Full KYC Submission
+router.post("/stages/2", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Please complete Stage 1 first" });
+    }
+
+    // Only allow if in draft or rejected status
+    if (!["draft", "rejected"].includes(shopPartner.partnerStatus)) {
+      return res.status(400).json({ 
+        error: "KYC already submitted or not in valid state",
+        currentStatus: shopPartner.partnerStatus,
+      });
+    }
+
+    const parsed = stage2KycSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.errors 
+      });
+    }
+
+    const data = parsed.data;
+
+    // Update with KYC data and move to kyc_pending
+    const updated = await prisma.shopPartner.update({
+      where: { id: shopPartner.id },
+      data: {
+        ownerName: data.ownerName,
+        fatherName: data.fatherName,
+        dateOfBirth: data.dateOfBirth,
+        presentAddress: data.presentAddress,
+        permanentAddress: data.permanentAddress,
+        nidNumber: data.nidNumber,
+        nidFrontImage: data.nidFrontImage,
+        nidBackImage: data.nidBackImage,
+        emergencyContactName: data.emergencyContactName,
+        emergencyContactPhone: data.emergencyContactPhone,
+        partnerStatus: "kyc_pending",
+        verificationStatus: "under_review",
+        kycSubmittedAt: new Date(),
+        rejectionReason: null,
+      },
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: user?.email || "unknown",
+        actorRole: user?.role || "pending_shop_partner",
+        actionType: "SHOP_PARTNER_KYC_SUBMITTED",
+        entityType: "shop_partner",
+        entityId: shopPartner.id,
+        description: `Shop Partner KYC submitted: ${data.ownerName}`,
+        metadata: { ownerName: data.ownerName, nidLastFour: data.nidNumber.slice(-4) },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "KYC তথ্য জমা হয়েছে। অনুমোদনের জন্য অপেক্ষা করুন।",
+      shopPartner: {
+        id: updated.id,
+        shopName: updated.shopName,
+        partnerStatus: updated.partnerStatus,
+      },
+      nextStep: "waiting_kyc_approval",
+    });
+  } catch (error) {
+    console.error("Stage 2 KYC error:", error);
+    res.status(500).json({ error: "KYC জমা দিতে সমস্যা হয়েছে" });
+  }
+});
+
+// Stage 3: Business Setup Completion
+router.post("/stages/3", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+      include: { _count: { select: { products: true } } },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Please complete Stage 1 and 2 first" });
+    }
+
+    // Only allow if KYC approved (setup_incomplete status)
+    if (shopPartner.partnerStatus !== "setup_incomplete") {
+      return res.status(400).json({ 
+        error: "KYC must be approved before completing setup",
+        currentStatus: shopPartner.partnerStatus,
+      });
+    }
+
+    const parsed = stage3SetupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parsed.error.errors 
+      });
+    }
+
+    const data = parsed.data;
+
+    // Check if minimum products exist
+    if (shopPartner._count.products < 3) {
+      return res.status(400).json({ 
+        error: "কমপক্ষে ৩টি প্রোডাক্ট যোগ করুন",
+        currentProducts: shopPartner._count.products,
+        requiredProducts: 3,
+      });
+    }
+
+    // Update with setup data and move to ready_for_review
+    const updated = await prisma.shopPartner.update({
+      where: { id: shopPartner.id },
+      data: {
+        shopLogo: data.shopLogo,
+        shopBanner: data.shopBanner,
+        shopAddress: data.shopAddress,
+        openingTime: data.openingTime || "09:00",
+        closingTime: data.closingTime || "21:00",
+        deliveryRadiusKm: data.deliveryRadiusKm || 5,
+        partnerStatus: "ready_for_review",
+        setupCompletedAt: new Date(),
+      },
+    });
+
+    // Audit log
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true, role: true } });
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: user?.email || "unknown",
+        actorRole: user?.role || "pending_shop_partner",
+        actionType: "SHOP_PARTNER_SETUP_COMPLETED",
+        entityType: "shop_partner",
+        entityId: shopPartner.id,
+        description: `Shop Partner setup completed: ${shopPartner.shopName}`,
+        metadata: { shopAddress: data.shopAddress, productCount: shopPartner._count.products },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "সেটআপ সম্পন্ন! চূড়ান্ত অনুমোদনের জন্য অপেক্ষা করুন।",
+      shopPartner: {
+        id: updated.id,
+        shopName: updated.shopName,
+        partnerStatus: updated.partnerStatus,
+      },
+      nextStep: "waiting_final_approval",
+    });
+  } catch (error) {
+    console.error("Stage 3 setup error:", error);
+    res.status(500).json({ error: "সেটআপ সম্পন্ন করতে সমস্যা হয়েছে" });
+  }
+});
+
 export default router;
