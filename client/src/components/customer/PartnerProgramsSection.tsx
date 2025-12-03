@@ -132,8 +132,12 @@ export function PartnerProgramsSection() {
 
   const startMutation = useMutation({
     mutationFn: async (partnerKind: PartnerKind) => {
-      const response = await apiRequest("POST", "/api/bd/partner/start", { partnerKind });
-      return response.json();
+      const response = await apiRequest("/api/bd/partner/start", {
+        method: "POST",
+        body: JSON.stringify({ partnerKind }),
+        headers: { "Content-Type": "application/json" },
+      });
+      return response;
     },
     onSuccess: (data) => {
       if (data.nextUrl) {

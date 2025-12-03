@@ -2060,16 +2060,16 @@ router.get("/partner/summary", async (req: AuthRequest, res: Response) => {
     if (driverProfile) {
       if (driverProfile.verificationStatus === "approved") {
         summary.driver_ride = { status: "live", label: "সক্রিয়" };
+        summary.driver_delivery = { status: "live", label: "সক্রিয়" };
       } else if (driverProfile.verificationStatus === "pending") {
         summary.driver_ride = { status: "kyc_pending", label: "KYC পেন্ডিং" };
+        summary.driver_delivery = { status: "kyc_pending", label: "KYC পেন্ডিং" };
       } else if (driverProfile.verificationStatus === "rejected") {
         summary.driver_ride = { status: "rejected", label: "বাতিল" };
+        summary.driver_delivery = { status: "rejected", label: "বাতিল" };
       } else {
         summary.driver_ride = { status: "draft", label: "খসড়া" };
-      }
-      // Check if they do delivery too
-      if (driverProfile.serviceTypes?.includes("delivery")) {
-        summary.driver_delivery = summary.driver_ride;
+        summary.driver_delivery = { status: "draft", label: "খসড়া" };
       }
     }
 
@@ -2158,10 +2158,13 @@ router.post("/partner/start", async (req: AuthRequest, res: Response) => {
     await prisma.auditLog.create({
       data: {
         id: randomUUID(),
-        userId,
-        action: "PARTNER_ONBOARDING_STARTED",
-        resourceType: "partner",
-        resourceId: partnerKind,
+        actorId: userId,
+        actorEmail: user.email,
+        actorRole: user.role,
+        actionType: "PARTNER_ONBOARDING_STARTED",
+        entityType: "partner",
+        entityId: partnerKind,
+        description: `Started partner onboarding for ${partnerKind} in BD`,
         metadata: {
           partnerKind,
           country: "BD",
