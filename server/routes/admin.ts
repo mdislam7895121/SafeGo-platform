@@ -3336,7 +3336,7 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
           select: {
             id: true,
             rating: true,
-            comment: true,
+            reviewText: true,
             createdAt: true,
           },
           orderBy: { createdAt: "desc" },
@@ -3402,7 +3402,7 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
       totalRevenue,
       totalCommission,
       recentOrders: restaurant.foodOrders,
-      complaints: restaurant.complaints,
+      reviews: restaurant.reviews,
       menuStats,
       createdAt: restaurant.createdAt,
       accountCreated: restaurant.user.createdAt,
