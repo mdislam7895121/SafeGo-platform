@@ -6858,6 +6858,81 @@ import { SettingsService, validateSettingsPayload } from "../utils/settings";
 import { getEnvironmentConfig, getEnvironmentIndicator, getEnvironmentConfigSummary } from "../config/environmentConfig";
 
 // ====================================================
+// GET /api/admin/access-governance
+// Get RBAC roles, permissions, and scope data for visualization
+// ====================================================
+router.get("/access-governance", checkPermission(Permission.VIEW_DASHBOARD), async (_req: AuthRequest, res) => {
+  try {
+    const { AdminRole, Permission: PermissionEnum, getRolePermissions, roleHierarchy, getRoleDescription } = await import("../utils/permissions");
+    
+    const roles = Object.values(AdminRole).map(role => {
+      const permissions = getRolePermissions(role);
+      const hierarchy = roleHierarchy[role as keyof typeof roleHierarchy] || { level: 0, canManage: [], scope: 'global' };
+      
+      return {
+        id: role,
+        name: role,
+        displayName: role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        description: getRoleDescription ? getRoleDescription(role) : `${role} role`,
+        level: hierarchy.level,
+        scope: hierarchy.scope,
+        canManage: hierarchy.canManage,
+        permissions: Array.from(permissions),
+        permissionCount: permissions.size,
+      };
+    });
+
+    const allPermissions = Object.values(PermissionEnum);
+    
+    const permissionCategories = [
+      { name: "Dashboard & Analytics", permissions: allPermissions.filter(p => p.includes('VIEW_DASHBOARD') || p.includes('ANALYTICS') || p.includes('MONITORING')) },
+      { name: "User Management", permissions: allPermissions.filter(p => p.includes('USER') || p.includes('DRIVER') || p.includes('CUSTOMER') || p.includes('RESTAURANT')) },
+      { name: "KYC & Compliance", permissions: allPermissions.filter(p => p.includes('KYC') || p.includes('DOCUMENT') || p.includes('IDENTITY') || p.includes('DUPLICATE')) },
+      { name: "Support", permissions: allPermissions.filter(p => p.includes('SUPPORT') || p.includes('TICKET') || p.includes('DISPUTE')) },
+      { name: "Finance & Payouts", permissions: allPermissions.filter(p => p.includes('PAYOUT') || p.includes('WALLET') || p.includes('COMMISSION') || p.includes('SETTLEMENT') || p.includes('REFUND')) },
+      { name: "Security & Audit", permissions: allPermissions.filter(p => p.includes('AUDIT') || p.includes('SECURITY') || p.includes('ROLE') || p.includes('ADMIN') || p.includes('PERMISSION') || p.includes('EMERGENCY') || p.includes('IMPERSONATE')) },
+      { name: "Operations", permissions: allPermissions.filter(p => p.includes('PARCEL') || p.includes('DISPATCH') || p.includes('LIVE_MAP') || p.includes('REALTIME')) },
+      { name: "Risk & Safety", permissions: allPermissions.filter(p => p.includes('RISK') || p.includes('SAFETY') || p.includes('FRAUD') || p.includes('SUSPICIOUS')) },
+      { name: "Communication", permissions: allPermissions.filter(p => p.includes('BROADCAST') || p.includes('NOTIFICATION') || p.includes('MESSAGE')) },
+      { name: "Feature Management", permissions: allPermissions.filter(p => p.includes('FEATURE') || p.includes('CONFIG') || p.includes('SETTING')) },
+    ];
+
+    const supportedCountries = await prisma.user.groupBy({
+      by: ['country'],
+      where: { country: { not: null } },
+      _count: { id: true },
+    });
+
+    const adminsByRole = await prisma.adminProfile.groupBy({
+      by: ['adminRole'],
+      _count: { id: true },
+    });
+
+    const adminsByCountry = await prisma.adminProfile.groupBy({
+      by: ['countryCode'],
+      where: { countryCode: { not: null } },
+      _count: { id: true },
+    });
+
+    res.json({
+      roles: roles.sort((a, b) => a.level - b.level),
+      allPermissions,
+      permissionCategories,
+      stats: {
+        totalRoles: roles.length,
+        totalPermissions: allPermissions.length,
+        supportedCountries: supportedCountries.map(c => ({ code: c.country, userCount: c._count.id })),
+        adminsByRole: adminsByRole.map(a => ({ role: a.adminRole, count: a._count.id })),
+        adminsByCountry: adminsByCountry.map(a => ({ country: a.countryCode, count: a._count.id })),
+      },
+    });
+  } catch (error) {
+    console.error("Get access governance error:", error);
+    res.status(500).json({ error: "Failed to fetch access governance data" });
+  }
+});
+
+// ====================================================
 // GET /api/admin/environment
 // Get current environment configuration (for admin UI)
 // ====================================================

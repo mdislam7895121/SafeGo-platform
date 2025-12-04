@@ -5,7 +5,7 @@ import {
   ArrowLeft, Shield, Users, Key, Lock, Unlock, 
   ChevronDown, ChevronRight, Search, Filter,
   Globe, Building2, MapPin, AlertTriangle, CheckCircle,
-  Eye, Edit, Trash2, UserCog, Settings, History
+  Eye, Edit, Trash2, UserCog, Settings, History, Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,135 +33,45 @@ interface RoleDefinition {
   displayName: string;
   description: string;
   level: number;
-  color: string;
-  permissions: string[];
   scope: 'global' | 'country' | 'regional';
+  permissions: string[];
+  permissionCount: number;
   canManage: string[];
 }
 
-const ROLE_HIERARCHY: RoleDefinition[] = [
-  {
-    id: "SUPER_ADMIN",
-    name: "SUPER_ADMIN",
-    displayName: "Super Admin",
-    description: "Full system access with all permissions",
-    level: 1,
-    color: "bg-red-500",
-    permissions: ["ALL_PERMISSIONS"],
-    scope: "global",
-    canManage: ["ADMIN", "COUNTRY_ADMIN", "REGIONAL_MANAGER", "OPERATIONS_MANAGER", "SUPPORT_MANAGER", "SUPPORT_AGENT", "FINANCE_MANAGER"]
-  },
-  {
-    id: "ADMIN",
-    name: "ADMIN",
-    displayName: "Admin",
-    description: "Platform administration with extensive permissions",
-    level: 2,
-    color: "bg-orange-500",
-    permissions: ["VIEW_DASHBOARD", "MANAGE_USERS", "VIEW_AUDIT_LOG", "MANAGE_DRIVERS", "MANAGE_CUSTOMERS", "MANAGE_RESTAURANTS", "MANAGE_KYC", "VIEW_ANALYTICS", "MANAGE_SUPPORT"],
-    scope: "global",
-    canManage: ["COUNTRY_ADMIN", "REGIONAL_MANAGER", "OPERATIONS_MANAGER", "SUPPORT_MANAGER", "SUPPORT_AGENT"]
-  },
-  {
-    id: "COUNTRY_ADMIN",
-    name: "COUNTRY_ADMIN",
-    displayName: "Country Admin",
-    description: "Country-level administration and oversight",
-    level: 3,
-    color: "bg-yellow-500",
-    permissions: ["VIEW_DASHBOARD", "MANAGE_DRIVERS", "MANAGE_CUSTOMERS", "MANAGE_RESTAURANTS", "MANAGE_KYC", "VIEW_COUNTRY_ANALYTICS", "MANAGE_REGIONAL_TEAMS"],
-    scope: "country",
-    canManage: ["REGIONAL_MANAGER", "OPERATIONS_MANAGER", "SUPPORT_MANAGER", "SUPPORT_AGENT"]
-  },
-  {
-    id: "REGIONAL_MANAGER",
-    name: "REGIONAL_MANAGER",
-    displayName: "Regional Manager",
-    description: "Regional operations and team management",
-    level: 4,
-    color: "bg-green-500",
-    permissions: ["VIEW_DASHBOARD", "MANAGE_DRIVERS", "VIEW_REGIONAL_ANALYTICS", "MANAGE_LOCAL_SUPPORT"],
-    scope: "regional",
-    canManage: ["OPERATIONS_MANAGER", "SUPPORT_AGENT"]
-  },
-  {
-    id: "OPERATIONS_MANAGER",
-    name: "OPERATIONS_MANAGER",
-    displayName: "Operations Manager",
-    description: "Day-to-day operations oversight",
-    level: 5,
-    color: "bg-blue-500",
-    permissions: ["VIEW_DASHBOARD", "VIEW_DRIVERS", "VIEW_ORDERS", "MANAGE_DISPATCH"],
-    scope: "regional",
-    canManage: []
-  },
-  {
-    id: "SUPPORT_MANAGER",
-    name: "SUPPORT_MANAGER",
-    displayName: "Support Manager",
-    description: "Customer support team management",
-    level: 5,
-    color: "bg-purple-500",
-    permissions: ["VIEW_DASHBOARD", "MANAGE_SUPPORT_CONVERSATIONS", "ASSIGN_TICKETS", "VIEW_SUPPORT_ANALYTICS"],
-    scope: "country",
-    canManage: ["SUPPORT_AGENT"]
-  },
-  {
-    id: "SUPPORT_AGENT",
-    name: "SUPPORT_AGENT",
-    displayName: "Support Agent",
-    description: "Frontline customer support",
-    level: 6,
-    color: "bg-indigo-500",
-    permissions: ["VIEW_SUPPORT_CONVERSATIONS", "REPLY_TO_TICKETS", "VIEW_USER_INFO"],
-    scope: "regional",
-    canManage: []
-  },
-  {
-    id: "FINANCE_MANAGER",
-    name: "FINANCE_MANAGER",
-    displayName: "Finance Manager",
-    description: "Financial operations and reporting",
-    level: 4,
-    color: "bg-emerald-500",
-    permissions: ["VIEW_DASHBOARD", "VIEW_PAYOUTS", "PROCESS_PAYOUTS", "VIEW_FINANCIAL_REPORTS", "MANAGE_COMMISSIONS"],
-    scope: "global",
-    canManage: []
-  }
-];
+interface PermissionCategory {
+  name: string;
+  permissions: string[];
+}
 
-const PERMISSION_CATEGORIES = [
-  {
-    name: "Dashboard & Analytics",
-    permissions: ["VIEW_DASHBOARD", "VIEW_ANALYTICS", "VIEW_COUNTRY_ANALYTICS", "VIEW_REGIONAL_ANALYTICS", "VIEW_SUPPORT_ANALYTICS", "VIEW_FINANCIAL_REPORTS", "EXPORT_ANALYTICS"]
-  },
-  {
-    name: "User Management",
-    permissions: ["VIEW_USERS", "MANAGE_USERS", "VIEW_DRIVERS", "MANAGE_DRIVERS", "MANAGE_CUSTOMERS", "MANAGE_RESTAURANTS"]
-  },
-  {
-    name: "KYC & Compliance",
-    permissions: ["VIEW_KYC", "MANAGE_KYC", "APPROVE_KYC", "REJECT_KYC", "VIEW_DOCUMENTS", "MANAGE_DOCUMENT_REVIEW"]
-  },
-  {
-    name: "Support",
-    permissions: ["VIEW_SUPPORT_CONVERSATIONS", "REPLY_TO_TICKETS", "MANAGE_SUPPORT_CONVERSATIONS", "ASSIGN_TICKETS", "VIEW_USER_INFO"]
-  },
-  {
-    name: "Finance & Payouts",
-    permissions: ["VIEW_PAYOUTS", "PROCESS_PAYOUTS", "MANAGE_COMMISSIONS", "VIEW_WALLET_SUMMARY", "PROCESS_WALLET_SETTLEMENT"]
-  },
-  {
-    name: "Security & Audit",
-    permissions: ["VIEW_AUDIT_LOG", "VIEW_SECURITY_SETTINGS", "MANAGE_ROLES", "CREATE_ADMIN", "EDIT_ADMIN", "VIEW_ADMIN_LIST"]
-  },
-  {
-    name: "Operations",
-    permissions: ["VIEW_ORDERS", "MANAGE_DISPATCH", "VIEW_LIVE_MAP", "VIEW_REALTIME_MONITORING"]
-  }
-];
+interface GovernanceStats {
+  totalRoles: number;
+  totalPermissions: number;
+  supportedCountries: { code: string; userCount: number }[];
+  adminsByRole: { role: string; count: number }[];
+  adminsByCountry: { country: string; count: number }[];
+}
 
-function RoleHierarchyTree() {
+interface GovernanceData {
+  roles: RoleDefinition[];
+  allPermissions: string[];
+  permissionCategories: PermissionCategory[];
+  stats: GovernanceStats;
+}
+
+const roleColors: Record<string, string> = {
+  SUPER_ADMIN: "bg-red-500",
+  ADMIN: "bg-orange-500",
+  COUNTRY_ADMIN: "bg-yellow-500",
+  CITY_ADMIN: "bg-green-500",
+  COMPLIANCE_ADMIN: "bg-blue-500",
+  SUPPORT_ADMIN: "bg-purple-500",
+  FINANCE_ADMIN: "bg-emerald-500",
+  RISK_ADMIN: "bg-pink-500",
+  READONLY_ADMIN: "bg-gray-500",
+};
+
+function RoleHierarchyTree({ roles }: { roles: RoleDefinition[] }) {
   const [expandedRoles, setExpandedRoles] = useState<Set<string>>(new Set(["SUPER_ADMIN", "ADMIN"]));
   
   const toggleRole = (roleId: string) => {
@@ -176,13 +86,14 @@ function RoleHierarchyTree() {
 
   const renderRole = (role: RoleDefinition, depth: number = 0) => {
     const isExpanded = expandedRoles.has(role.id);
-    const managedRoles = ROLE_HIERARCHY.filter(r => role.canManage.includes(r.id));
+    const managedRoles = roles.filter(r => role.canManage.includes(r.id));
     const hasChildren = managedRoles.length > 0;
+    const roleColor = roleColors[role.id] || "bg-gray-500";
 
     return (
       <div key={role.id} style={{ marginLeft: depth * 24 }} className="mb-2">
         <Collapsible open={isExpanded} onOpenChange={() => hasChildren && toggleRole(role.id)}>
-          <Card className="border-l-4" style={{ borderLeftColor: role.color.replace('bg-', '').includes('-') ? `var(--${role.color.replace('bg-', '')})` : undefined }}>
+          <Card className="border-l-4" style={{ borderLeftColor: roleColor.replace('bg-', '').includes('-') ? `var(--${roleColor.replace('bg-', '')})` : undefined }}>
             <CollapsibleTrigger asChild>
               <CardHeader className="py-3 px-4 cursor-pointer hover-elevate">
                 <div className="flex items-center gap-3">
@@ -191,9 +102,9 @@ function RoleHierarchyTree() {
                   ) : (
                     <div className="w-4" />
                   )}
-                  <div className={`w-3 h-3 rounded-full ${role.color}`} />
+                  <div className={`w-3 h-3 rounded-full ${roleColor}`} />
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-semibold">{role.displayName}</span>
                       <Badge variant="outline" className="text-xs">
                         Level {role.level}
@@ -209,11 +120,11 @@ function RoleHierarchyTree() {
                       <TooltipTrigger>
                         <Badge variant="outline" className="gap-1">
                           <Key className="h-3 w-3" />
-                          {role.permissions.length}
+                          {role.permissionCount}
                         </Badge>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{role.permissions.length} permissions</p>
+                        <p>{role.permissionCount} permissions</p>
                       </TooltipContent>
                     </Tooltip>
                     {managedRoles.length > 0 && (
@@ -257,7 +168,7 @@ function RoleHierarchyTree() {
                       <div className="flex flex-wrap gap-1">
                         {managedRoles.map(r => (
                           <Badge key={r.id} variant="outline" className="text-xs gap-1">
-                            <div className={`w-2 h-2 rounded-full ${r.color}`} />
+                            <div className={`w-2 h-2 rounded-full ${roleColors[r.id] || 'bg-gray-500'}`} />
                             {r.displayName}
                           </Badge>
                         ))}
@@ -274,7 +185,7 @@ function RoleHierarchyTree() {
     );
   };
 
-  const topLevelRoles = ROLE_HIERARCHY.filter(r => r.level === 1);
+  const topLevelRoles = roles.filter(r => r.level === 1);
 
   return (
     <div className="space-y-2">
@@ -283,200 +194,216 @@ function RoleHierarchyTree() {
   );
 }
 
-function PermissionMatrix() {
-  const [searchQuery, setSearchQuery] = useState("");
+function PermissionMatrix({ roles, categories }: { roles: RoleDefinition[]; categories: PermissionCategory[] }) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const filteredCategories = selectedCategory === "all" 
-    ? PERMISSION_CATEGORIES 
-    : PERMISSION_CATEGORIES.filter(c => c.name === selectedCategory);
+    ? categories 
+    : categories.filter(c => c.name === selectedCategory);
 
-  const hasPermission = (roleId: string, permission: string): boolean => {
-    const role = ROLE_HIERARCHY.find(r => r.id === roleId);
-    if (!role) return false;
-    if (role.permissions.includes("ALL_PERMISSIONS")) return true;
-    return role.permissions.includes(permission);
-  };
+  const allPermissionsInCategories = filteredCategories.flatMap(c => c.permissions);
+  const filteredPermissions = searchQuery
+    ? allPermissionsInCategories.filter(p => p.toLowerCase().includes(searchQuery.toLowerCase()))
+    : allPermissionsInCategories;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search permissions..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-10"
             data-testid="input-search-permissions"
           />
         </div>
         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-permission-category">
-            <SelectValue placeholder="All categories" />
+          <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-category">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue placeholder="Filter by category" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
-            {PERMISSION_CATEGORIES.map(cat => (
+            {categories.map(cat => (
               <SelectItem key={cat.name} value={cat.name}>{cat.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      <ScrollArea className="h-[500px]">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
-            <thead className="sticky top-0 bg-background z-10">
-              <tr className="border-b">
-                <th className="text-left p-2 font-medium min-w-[200px]">Permission</th>
-                {ROLE_HIERARCHY.map(role => (
-                  <th key={role.id} className="p-2 text-center">
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <div className={`w-6 h-6 rounded-full ${role.color} mx-auto flex items-center justify-center text-white text-xs font-bold`}>
-                          {role.displayName.charAt(0)}
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{role.displayName}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCategories.map(category => (
-                <>
-                  <tr key={category.name} className="bg-muted/30">
-                    <td colSpan={ROLE_HIERARCHY.length + 1} className="p-2 font-semibold text-sm">
-                      {category.name}
+      <Card>
+        <ScrollArea className="h-[500px]">
+          <div className="min-w-[800px]">
+            <table className="w-full">
+              <thead className="sticky top-0 bg-card z-10">
+                <tr className="border-b">
+                  <th className="text-left p-3 font-medium">Permission</th>
+                  {roles.slice(0, 6).map(role => (
+                    <th key={role.id} className="p-3 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className={`w-3 h-3 rounded-full ${roleColors[role.id] || 'bg-gray-500'}`} />
+                        <span className="text-xs font-medium">{role.displayName.split(' ')[0]}</span>
+                      </div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPermissions.slice(0, 50).map((permission, idx) => (
+                  <tr key={permission} className={idx % 2 === 0 ? "bg-muted/30" : ""}>
+                    <td className="p-3 text-sm">
+                      {permission.replace(/_/g, ' ').toLowerCase()}
                     </td>
-                  </tr>
-                  {category.permissions
-                    .filter(p => !searchQuery || p.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map(permission => (
-                      <tr key={permission} className="border-b hover:bg-muted/20">
-                        <td className="p-2 text-sm">
-                          {permission.replace(/_/g, ' ').toLowerCase()}
-                        </td>
-                        {ROLE_HIERARCHY.map(role => (
-                          <td key={`${role.id}-${permission}`} className="p-2 text-center">
-                            {hasPermission(role.id, permission) ? (
-                              <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
-                            ) : (
-                              <div className="h-4 w-4 mx-auto text-muted-foreground">-</div>
-                            )}
-                          </td>
-                        ))}
-                      </tr>
+                    {roles.slice(0, 6).map(role => (
+                      <td key={role.id} className="p-3 text-center">
+                        {role.permissions.includes(permission) ? (
+                          <CheckCircle className="h-4 w-4 text-green-500 mx-auto" />
+                        ) : (
+                          <div className="h-4 w-4 mx-auto rounded-full border border-muted-foreground/30" />
+                        )}
+                      </td>
                     ))}
-                </>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </ScrollArea>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredPermissions.length > 50 && (
+              <div className="p-4 text-center text-sm text-muted-foreground">
+                Showing 50 of {filteredPermissions.length} permissions
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </Card>
     </div>
   );
 }
 
-function ScopeMap() {
+function CountryScopeMap({ stats }: { stats: GovernanceStats }) {
+  const countries = stats.supportedCountries || [];
+  const adminsByCountry = stats.adminsByCountry || [];
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-blue-500" />
-              <CardTitle className="text-lg">Global Scope</CardTitle>
-            </div>
-            <CardDescription>Access across all countries and regions</CardDescription>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Countries Active
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {ROLE_HIERARCHY.filter(r => r.scope === "global").map(role => (
-                <div key={role.id} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${role.color}`} />
-                  <span className="text-sm">{role.displayName}</span>
-                </div>
-              ))}
-            </div>
+            <div className="text-3xl font-bold">{countries.length}</div>
+            <p className="text-sm text-muted-foreground">With registered users</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-yellow-500" />
-              <CardTitle className="text-lg">Country Scope</CardTitle>
-            </div>
-            <CardDescription>Access limited to assigned country</CardDescription>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Total Admins
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {ROLE_HIERARCHY.filter(r => r.scope === "country").map(role => (
-                <div key={role.id} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${role.color}`} />
-                  <span className="text-sm">{role.displayName}</span>
-                </div>
-              ))}
+            <div className="text-3xl font-bold">
+              {stats.adminsByRole?.reduce((sum, r) => sum + r.count, 0) || 0}
             </div>
+            <p className="text-sm text-muted-foreground">Across all roles</p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="pb-2">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-green-500" />
-              <CardTitle className="text-lg">Regional Scope</CardTitle>
-            </div>
-            <CardDescription>Access limited to assigned region/city</CardDescription>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Country Admins
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {ROLE_HIERARCHY.filter(r => r.scope === "regional").map(role => (
-                <div key={role.id} className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${role.color}`} />
-                  <span className="text-sm">{role.displayName}</span>
-                </div>
-              ))}
-            </div>
+            <div className="text-3xl font-bold">{adminsByCountry.length}</div>
+            <p className="text-sm text-muted-foreground">Country-scoped admins</p>
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Scope Inheritance</CardTitle>
-          <CardDescription>How data access flows through scope levels</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <MapPin className="h-5 w-5" />
+            Geographic Distribution
+          </CardTitle>
+          <CardDescription>User and admin distribution by country</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center gap-4 py-4">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mb-2 mx-auto">
-                <Globe className="h-8 w-8 text-blue-500" />
-              </div>
-              <span className="text-sm font-medium">Global</span>
-              <p className="text-xs text-muted-foreground">All data</p>
+          <ScrollArea className="h-[300px]">
+            <div className="space-y-3">
+              {countries.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  No country data available yet
+                </div>
+              ) : (
+                countries.map(country => {
+                  const adminCount = adminsByCountry.find(a => a.country === country.code)?.count || 0;
+                  return (
+                    <div key={country.code} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-6 bg-muted rounded flex items-center justify-center text-xs font-medium">
+                          {country.code || 'N/A'}
+                        </div>
+                        <div>
+                          <div className="font-medium">{country.code || 'Unknown'}</div>
+                          <div className="text-sm text-muted-foreground">{country.userCount} users</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {adminCount > 0 && (
+                          <Badge variant="outline" className="gap-1">
+                            <UserCog className="h-3 w-3" />
+                            {adminCount} admins
+                          </Badge>
+                        )}
+                        <Badge variant={country.userCount > 100 ? "default" : "secondary"}>
+                          {country.userCount > 100 ? "Active" : "Growing"}
+                        </Badge>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
-            <ChevronRight className="h-6 w-6 text-muted-foreground" />
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mb-2 mx-auto">
-                <Building2 className="h-8 w-8 text-yellow-500" />
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Admin Role Distribution
+          </CardTitle>
+          <CardDescription>Number of admins per role</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {stats.adminsByRole?.map(item => (
+              <div key={item.role} className="p-3 rounded-lg bg-muted/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className={`w-2 h-2 rounded-full ${roleColors[item.role] || 'bg-gray-500'}`} />
+                  <span className="text-sm font-medium">
+                    {item.role.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                </div>
+                <div className="text-2xl font-bold">{item.count}</div>
               </div>
-              <span className="text-sm font-medium">Country</span>
-              <p className="text-xs text-muted-foreground">Country data</p>
-            </div>
-            <ChevronRight className="h-6 w-6 text-muted-foreground" />
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mb-2 mx-auto">
-                <MapPin className="h-8 w-8 text-green-500" />
+            ))}
+            {(!stats.adminsByRole || stats.adminsByRole.length === 0) && (
+              <div className="col-span-full text-center text-muted-foreground py-4">
+                No admin data available yet
               </div>
-              <span className="text-sm font-medium">Regional</span>
-              <p className="text-xs text-muted-foreground">Region data</p>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -484,143 +411,139 @@ function ScopeMap() {
   );
 }
 
-export default function AccessGovernancePage() {
-  const { data: adminStats } = useQuery({
-    queryKey: ["/api/admin/staff/stats"],
-    enabled: false
+export default function AdminAccessGovernance() {
+  const { data, isLoading, error } = useQuery<GovernanceData>({
+    queryKey: ['/api/admin/access-governance'],
   });
 
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading access governance data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="p-6">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Error Loading Data
+            </CardTitle>
+            <CardDescription>
+              Failed to load access governance data. Please try again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => window.location.reload()} data-testid="button-retry">
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background pb-6">
-      <div className="bg-primary text-primary-foreground px-4 sm:px-6 md:px-8 py-5 sm:py-6 rounded-b-2xl sm:rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <Link href="/admin">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-primary-foreground hover:bg-primary-foreground/10 h-10 w-10"
-              data-testid="button-back"
-            >
+    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Link href="/admin/dashboard">
+            <Button variant="ghost" size="icon" data-testid="button-back">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
               <Shield className="h-6 w-6" />
               Access Governance
             </h1>
-            <p className="text-xs sm:text-sm opacity-90">Role hierarchy, permissions, and access control</p>
+            <p className="text-muted-foreground">
+              Role hierarchy, permissions, and scope management
+            </p>
           </div>
         </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-blue-500/20">
-                <Users className="h-4 w-4 text-blue-300" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary-foreground">{ROLE_HIERARCHY.length}</p>
-                <p className="text-xs text-primary-foreground/80">Roles</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-green-500/20">
-                <Key className="h-4 w-4 text-green-300" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary-foreground">{PERMISSION_CATEGORIES.reduce((acc, cat) => acc + cat.permissions.length, 0)}</p>
-                <p className="text-xs text-primary-foreground/80">Permissions</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-yellow-500/20">
-                <Globe className="h-4 w-4 text-yellow-300" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary-foreground">3</p>
-                <p className="text-xs text-primary-foreground/80">Scope Levels</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-primary-foreground/10 border-primary-foreground/20">
-            <CardContent className="p-3 flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-purple-500/20">
-                <Lock className="h-4 w-4 text-purple-300" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-primary-foreground">6</p>
-                <p className="text-xs text-primary-foreground/80">Hierarchy Levels</p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="gap-1">
+            <Users className="h-3 w-3" />
+            {data.stats.totalRoles} Roles
+          </Badge>
+          <Badge variant="outline" className="gap-1">
+            <Key className="h-3 w-3" />
+            {data.stats.totalPermissions} Permissions
+          </Badge>
+          <Badge variant="outline" className="gap-1">
+            <Globe className="h-3 w-3" />
+            {data.stats.supportedCountries?.length || 0} Countries
+          </Badge>
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 md:px-8 py-6">
-        <Tabs defaultValue="hierarchy" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="hierarchy" data-testid="tab-hierarchy">
-              <Users className="h-4 w-4 mr-2" />
-              Role Hierarchy
-            </TabsTrigger>
-            <TabsTrigger value="matrix" data-testid="tab-matrix">
-              <Key className="h-4 w-4 mr-2" />
-              Permission Matrix
-            </TabsTrigger>
-            <TabsTrigger value="scope" data-testid="tab-scope">
-              <Globe className="h-4 w-4 mr-2" />
-              Scope Map
-            </TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="hierarchy" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="hierarchy" className="gap-2" data-testid="tab-hierarchy">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Role Hierarchy</span>
+            <span className="sm:hidden">Roles</span>
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="gap-2" data-testid="tab-permissions">
+            <Key className="h-4 w-4" />
+            <span className="hidden sm:inline">Permission Matrix</span>
+            <span className="sm:hidden">Perms</span>
+          </TabsTrigger>
+          <TabsTrigger value="scope" className="gap-2" data-testid="tab-scope">
+            <Globe className="h-4 w-4" />
+            <span className="hidden sm:inline">Country Scope</span>
+            <span className="sm:hidden">Scope</span>
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="hierarchy">
-            <Card>
-              <CardHeader>
-                <CardTitle>Role Hierarchy</CardTitle>
-                <CardDescription>
-                  Visual representation of admin roles and their management capabilities
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <RoleHierarchyTree />
-              </CardContent>
-            </Card>
-          </TabsContent>
+        <TabsContent value="hierarchy" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Role Hierarchy Tree
+              </CardTitle>
+              <CardDescription>
+                Visual representation of admin roles and their management capabilities. 
+                Data is fetched live from the RBAC system.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <RoleHierarchyTree roles={data.roles} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="matrix">
-            <Card>
-              <CardHeader>
-                <CardTitle>Permission Matrix</CardTitle>
-                <CardDescription>
-                  Complete mapping of permissions across all roles
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PermissionMatrix />
-              </CardContent>
-            </Card>
-          </TabsContent>
+        <TabsContent value="permissions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                Permission Matrix
+              </CardTitle>
+              <CardDescription>
+                Shows which permissions are granted to each role. 
+                Data reflects the current RBAC configuration.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PermissionMatrix roles={data.roles} categories={data.permissionCategories} />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          <TabsContent value="scope">
-            <Card>
-              <CardHeader>
-                <CardTitle>Access Scope Map</CardTitle>
-                <CardDescription>
-                  Geographic and organizational access boundaries
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScopeMap />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+        <TabsContent value="scope" className="space-y-4">
+          <CountryScopeMap stats={data.stats} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

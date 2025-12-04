@@ -664,3 +664,34 @@ export function getAdminCapabilities(adminUser: AdminUser | null | undefined): s
 
   return Array.from(permissions);
 }
+
+export const roleHierarchy: Record<AdminRole, { level: number; canManage: AdminRole[]; scope: 'global' | 'country' | 'regional' }> = {
+  [AdminRole.SUPER_ADMIN]: { level: 1, canManage: [AdminRole.ADMIN, AdminRole.COUNTRY_ADMIN, AdminRole.CITY_ADMIN, AdminRole.COMPLIANCE_ADMIN, AdminRole.SUPPORT_ADMIN, AdminRole.FINANCE_ADMIN, AdminRole.RISK_ADMIN, AdminRole.READONLY_ADMIN], scope: 'global' },
+  [AdminRole.ADMIN]: { level: 2, canManage: [AdminRole.COUNTRY_ADMIN, AdminRole.CITY_ADMIN, AdminRole.SUPPORT_ADMIN, AdminRole.READONLY_ADMIN], scope: 'global' },
+  [AdminRole.COUNTRY_ADMIN]: { level: 3, canManage: [AdminRole.CITY_ADMIN, AdminRole.SUPPORT_ADMIN, AdminRole.READONLY_ADMIN], scope: 'country' },
+  [AdminRole.CITY_ADMIN]: { level: 4, canManage: [AdminRole.SUPPORT_ADMIN, AdminRole.READONLY_ADMIN], scope: 'regional' },
+  [AdminRole.COMPLIANCE_ADMIN]: { level: 3, canManage: [], scope: 'global' },
+  [AdminRole.SUPPORT_ADMIN]: { level: 5, canManage: [AdminRole.READONLY_ADMIN], scope: 'country' },
+  [AdminRole.FINANCE_ADMIN]: { level: 4, canManage: [], scope: 'global' },
+  [AdminRole.RISK_ADMIN]: { level: 4, canManage: [], scope: 'global' },
+  [AdminRole.READONLY_ADMIN]: { level: 6, canManage: [], scope: 'regional' },
+};
+
+export function getRoleDescription(role: AdminRole): string {
+  const descriptions: Record<AdminRole, string> = {
+    [AdminRole.SUPER_ADMIN]: 'Full system access with all permissions across all countries and services',
+    [AdminRole.ADMIN]: 'Platform administration with extensive permissions for general management',
+    [AdminRole.COUNTRY_ADMIN]: 'Country-level administration and oversight for a specific region',
+    [AdminRole.CITY_ADMIN]: 'City-level management with local operations focus',
+    [AdminRole.COMPLIANCE_ADMIN]: 'KYC verification, document review, and regulatory compliance',
+    [AdminRole.SUPPORT_ADMIN]: 'Customer and driver support, ticket management, and escalations',
+    [AdminRole.FINANCE_ADMIN]: 'Financial operations, payouts, commissions, and settlements',
+    [AdminRole.RISK_ADMIN]: 'Fraud detection, risk assessment, and safety monitoring',
+    [AdminRole.READONLY_ADMIN]: 'View-only access for monitoring and reporting purposes',
+  };
+  return descriptions[role] || `${role} role`;
+}
+
+export function getRolePermissions(role: AdminRole): Set<Permission> {
+  return rolePermissions[role] || new Set();
+}
