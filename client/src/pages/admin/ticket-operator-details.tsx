@@ -47,13 +47,10 @@ interface TicketOperatorDetails {
   emergencyContactRelation?: string;
   officeAddress?: string;
   officeEmail?: string;
-  bkashNumber?: string;
-  nagadNumber?: string;
-  tradeLicenseNumber?: string;
   countryCode?: string;
   createdAt: string;
   verifiedAt?: string;
-  user: { id: string; email: string; fullName?: string; isBlocked: boolean; createdAt: string; countryCode?: string };
+  user: { id: string; email: string; isBlocked: boolean; createdAt: string; countryCode?: string };
   routes: Array<{ id: string; origin: string; destination: string; price: number; departureTime?: string; isActive: boolean; createdAt?: string }>;
   vehicles: Array<{ id: string; vehicleType: string; registrationNumber: string; seatCapacity?: number; dailyRate?: number; isAvailable: boolean; createdAt?: string }>;
   ticketBookings: Array<{ id: string; bookingNumber?: string; status: string; totalAmount: number; createdAt: string }>;
@@ -295,13 +292,8 @@ export default function TicketOperatorDetailsPage() {
                       <span className="text-muted-foreground">Rental Commission</span>
                       <p className="font-medium">{operator.rentalCommissionRate}%</p>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">bKash</span>
-                      <p className="font-medium">{operator.bkashNumber || 'Not linked'}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Nagad</span>
-                      <p className="font-medium">{operator.nagadNumber || 'Not linked'}</p>
+                    <div className="col-span-2 text-muted-foreground">
+                      Payout accounts are managed separately.
                     </div>
                   </div>
                 </CardContent>
@@ -324,9 +316,9 @@ export default function TicketOperatorDetailsPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Trade License Number</Label>
+                    <Label>Route Permit Number</Label>
                     <div className="p-3 rounded-lg bg-muted">
-                      <p className="font-mono">{operator.tradeLicenseNumber || 'Not provided'}</p>
+                      <p className="font-mono">{operator.routePermitNumber || 'Not provided'}</p>
                     </div>
                   </div>
                   {operator.bannerUrl && (

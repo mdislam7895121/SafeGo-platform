@@ -13875,7 +13875,7 @@ router.get("/shop-partners", checkPermission(Permission.VIEW_ALL_DRIVERS), async
       prisma.shopPartner.findMany({
         where,
         include: {
-          user: { select: { id: true, email: true, fullName: true, isBlocked: true } },
+          user: { select: { id: true, email: true, isBlocked: true } },
           _count: { select: { products: true, orders: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -13909,7 +13909,7 @@ router.get("/shop-partners/:id", checkPermission(Permission.VIEW_ALL_DRIVERS), a
     const shopPartner = await prisma.shopPartner.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true, countryCode: true } },
+        user: { select: { id: true, email: true, isBlocked: true, createdAt: true, countryCode: true } },
         products: { 
           take: 20, 
           orderBy: { createdAt: 'desc' },
@@ -13945,7 +13945,7 @@ router.get("/shop-partners/:id", checkPermission(Permission.VIEW_ALL_DRIVERS), a
     const formattedShopPartner = {
       id: shopPartner.id,
       shopName: shopPartner.shopName,
-      ownerName: shopPartner.ownerName || shopPartner.user.fullName || 'N/A',
+      ownerName: shopPartner.ownerName || shopPartner.user.email.split('@')[0] || 'N/A',
       phoneNumber: shopPartner.contactPhone || '',
       verificationStatus: shopPartner.verificationStatus,
       rejectionReason: shopPartner.rejectionReason,
@@ -14072,7 +14072,7 @@ router.get("/ticket-operators", checkPermission(Permission.VIEW_ALL_DRIVERS), as
       prisma.ticketOperator.findMany({
         where,
         include: {
-          user: { select: { id: true, email: true, fullName: true, isBlocked: true } },
+          user: { select: { id: true, email: true, isBlocked: true } },
           _count: { select: { ticketListings: true, rentalVehicles: true, ticketBookings: true, rentalBookings: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -14106,7 +14106,7 @@ router.get("/ticket-operators/:id", checkPermission(Permission.VIEW_ALL_DRIVERS)
     const ticketOperator = await prisma.ticketOperator.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true, countryCode: true } },
+        user: { select: { id: true, email: true, isBlocked: true, createdAt: true, countryCode: true } },
         ticketListings: { 
           take: 20, 
           orderBy: { createdAt: 'desc' },

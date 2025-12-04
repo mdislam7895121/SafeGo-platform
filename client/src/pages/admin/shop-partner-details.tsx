@@ -44,12 +44,10 @@ interface ShopPartnerDetails {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
-  bkashNumber?: string;
-  nagadNumber?: string;
   countryCode?: string;
   createdAt: string;
   verifiedAt?: string;
-  user: { id: string; email: string; fullName?: string; isBlocked: boolean; createdAt: string; countryCode?: string };
+  user: { id: string; email: string; isBlocked: boolean; createdAt: string; countryCode?: string };
   products: Array<{ id: string; name: string; price: number; imageUrl?: string; isAvailable: boolean; createdAt: string }>;
   orders: Array<{ id: string; orderNumber?: string; status: string; totalAmount: number; createdAt: string }>;
 }
@@ -260,15 +258,8 @@ export default function ShopPartnerDetailsPage() {
                     <span className="text-muted-foreground">Commission Rate:</span>
                     <span className="font-medium ml-2">{shop.commissionRate}%</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">bKash</span>
-                      <p className="font-medium">{shop.bkashNumber || 'Not linked'}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Nagad</span>
-                      <p className="font-medium">{shop.nagadNumber || 'Not linked'}</p>
-                    </div>
+                  <div className="text-sm text-muted-foreground">
+                    Payout accounts are managed separately.
                   </div>
                 </CardContent>
               </Card>

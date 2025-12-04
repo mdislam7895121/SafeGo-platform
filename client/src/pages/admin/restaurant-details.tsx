@@ -80,7 +80,7 @@ interface RestaurantDetails {
   ownerRole?: string;
   createdAt: string;
   accountCreated: string;
-  user?: { id: string; email: string; fullName?: string; countryCode?: string; isBlocked: boolean; createdAt: string };
+  user?: { id: string; email: string; countryCode?: string; isBlocked: boolean; createdAt: string };
 }
 
 export default function RestaurantDetails() {
