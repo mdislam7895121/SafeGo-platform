@@ -13,6 +13,73 @@ router.use(requireAdmin());
 router.use(loadAdminProfile);
 
 // ====================================================
+// ADMIN CAPABILITIES & RBAC ROUTES
+// ====================================================
+
+/**
+ * Get current admin's capabilities for role-aware navigation
+ * Returns role, permissions, and navigation access
+ */
+router.get("/capabilities", async (req: AuthRequest, res) => {
+  try {
+    // Use req.adminUser set by loadAdminProfile middleware
+    const adminUser = (req as any).adminUser;
+    if (!adminUser || !adminUser.adminProfile) {
+      return res.status(403).json({ error: "Admin profile not found" });
+    }
+
+    const permissions: string[] = adminUser.permissions || [];
+    const adminRole = adminUser.adminProfile.adminRole;
+
+    // Define navigation sections based on permissions
+    const navigation = {
+      dashboard: permissions.includes(Permission.VIEW_DASHBOARD),
+      peopleKyc: permissions.includes(Permission.VIEW_PEOPLE_CENTER),
+      safetyCenter: permissions.includes(Permission.VIEW_RISK_CENTER) || permissions.includes(Permission.VIEW_SAFETY_EVENTS),
+      featureFlags: permissions.includes(Permission.VIEW_FEATURE_FLAGS),
+      wallets: permissions.includes(Permission.VIEW_WALLET_SUMMARY),
+      payouts: permissions.includes(Permission.VIEW_PAYOUTS),
+      analytics: permissions.includes(Permission.VIEW_ANALYTICS_DASHBOARD),
+      settings: permissions.includes(Permission.VIEW_SETTINGS),
+      auditLog: permissions.includes(Permission.VIEW_AUDIT_LOG),
+      fraudAlerts: permissions.includes(Permission.VIEW_FRAUD_ALERTS),
+      support: permissions.includes(Permission.VIEW_SUPPORT_CONVERSATIONS),
+      disputes: permissions.includes(Permission.VIEW_DISPUTES),
+    };
+
+    // Define action capabilities
+    const actions = {
+      canManagePeople: permissions.includes(Permission.MANAGE_PEOPLE_CENTER),
+      canBulkKyc: permissions.includes(Permission.BULK_KYC_OPERATIONS),
+      canManageRiskCases: permissions.includes(Permission.MANAGE_RISK_CASES),
+      canResolveRiskCases: permissions.includes(Permission.RESOLVE_RISK_CASES),
+      canManageSafetyAlerts: permissions.includes(Permission.MANAGE_SAFETY_ALERTS),
+      canBlockUserSafety: permissions.includes(Permission.BLOCK_USER_SAFETY),
+      canManageFeatureFlags: permissions.includes(Permission.MANAGE_FEATURE_FLAGS),
+      canProcessWalletSettlement: permissions.includes(Permission.PROCESS_WALLET_SETTLEMENT),
+      canProcessPayouts: permissions.includes(Permission.PROCESS_PAYOUTS),
+      canManageFraudAlerts: permissions.includes(Permission.MANAGE_FRAUD_ALERTS),
+      canResolveFraudAlerts: permissions.includes(Permission.RESOLVE_FRAUD_ALERTS),
+      canEditSettings: permissions.includes(Permission.EDIT_SETTINGS),
+      canManageDisputes: permissions.includes(Permission.MANAGE_DISPUTES),
+      canProcessRefunds: permissions.includes(Permission.PROCESS_REFUNDS),
+    };
+
+    res.json({
+      role: adminRole,
+      permissions,
+      navigation,
+      actions,
+      isSuperAdmin: adminRole === "SUPER_ADMIN",
+      isActive: adminUser.adminProfile.isActive !== false,
+    });
+  } catch (error) {
+    console.error("Error fetching admin capabilities:", error);
+    res.status(500).json({ error: "Failed to fetch admin capabilities" });
+  }
+});
+
+// ====================================================
 // PEOPLE & KYC CENTER ROUTES
 // ====================================================
 
@@ -45,7 +112,7 @@ function calculateRestaurantKycCompleteness(r: any): number {
   return Math.round((filled / fields.length) * 100);
 }
 
-router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/people-kyc", checkPermission(Permission.VIEW_PEOPLE_CENTER), async (req: AuthRequest, res) => {
   try {
     const query = PeopleKycQuerySchema.parse(req.query);
     const { role, country, verification, status, search, page, limit } = query;
@@ -339,7 +406,7 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
 });
 
 // Get profile details
-router.get("/people-kyc/:role/:id", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/people-kyc/:role/:id", checkPermission(Permission.VIEW_PEOPLE_CENTER), async (req: AuthRequest, res) => {
   try {
     const { role, id } = req.params;
 
@@ -479,7 +546,7 @@ const RiskEventQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).optional().default(20),
 });
 
-router.get("/risk-events", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/risk-events", checkPermission(Permission.VIEW_RISK_CENTER), async (req: AuthRequest, res) => {
   try {
     const query = RiskEventQuerySchema.parse(req.query);
     const { severity, category, source, acknowledged, page, limit } = query;
@@ -521,7 +588,7 @@ const RiskCaseQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).optional().default(20),
 });
 
-router.get("/risk-cases", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/risk-cases", checkPermission(Permission.VIEW_RISK_CENTER), async (req: AuthRequest, res) => {
   try {
     const query = RiskCaseQuerySchema.parse(req.query);
     const { status, severity, page, limit } = query;
@@ -558,7 +625,7 @@ router.get("/risk-cases", checkPermission(Permission.VIEW_DASHBOARD), async (req
   }
 });
 
-router.get("/risk-cases/:id", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/risk-cases/:id", checkPermission(Permission.VIEW_RISK_CENTER), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     
@@ -606,7 +673,7 @@ const UpdateRiskCaseSchema = z.object({
   actionsTaken: z.array(z.string()).optional(),
 });
 
-router.patch("/risk-cases/:id", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
+router.patch("/risk-cases/:id", checkPermission(Permission.MANAGE_RISK_CASES), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const data = UpdateRiskCaseSchema.parse(req.body);
@@ -621,16 +688,27 @@ router.patch("/risk-cases/:id", checkPermission(Permission.MANAGE_USER_STATUS), 
       data: updateData,
     });
 
-    // Log audit event
+    // Log audit event with specific action type
+    const actionType = data.status === "resolved" 
+      ? ActionType.RISK_CASE_RESOLVED 
+      : data.status === "escalated" 
+        ? ActionType.RISK_CASE_ESCALATED 
+        : ActionType.RISK_CASE_UPDATED;
+        
     await logAuditEvent({
       actorId: req.user?.userId || null,
-      actorEmail: req.adminProfile?.email || "unknown",
+      actorEmail: (req as any).adminUser?.email || "unknown",
       actorRole: "admin",
-      actionType: ActionType.UPDATE,
-      entityType: EntityType.SETTINGS,
+      actionType,
+      entityType: EntityType.RISK_CASE,
       entityId: id,
       description: `Updated risk case status to ${data.status}`,
       ipAddress: getClientIp(req),
+      metadata: { 
+        newStatus: data.status, 
+        resolutionNotes: data.resolutionNotes,
+        actionsTaken: data.actionsTaken 
+      },
     });
 
     res.json(riskCase);
@@ -645,7 +723,7 @@ const AddCaseNoteSchema = z.object({
   isInternal: z.boolean().optional().default(true),
 });
 
-router.post("/risk-cases/:id/notes", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
+router.post("/risk-cases/:id/notes", checkPermission(Permission.MANAGE_RISK_CASES), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const data = AddCaseNoteSchema.parse(req.body);
@@ -654,9 +732,25 @@ router.post("/risk-cases/:id/notes", checkPermission(Permission.MANAGE_USER_STAT
       data: {
         riskCaseId: id,
         adminId: req.user?.userId || "unknown",
-        adminEmail: req.adminProfile?.email || "unknown",
+        adminEmail: (req as any).adminUser?.email || "unknown",
         content: data.content,
         isInternal: data.isInternal,
+      },
+    });
+
+    // Log audit event for case note
+    await logAuditEvent({
+      actorId: req.user?.userId || null,
+      actorEmail: (req as any).adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: ActionType.RISK_CASE_NOTE_ADDED,
+      entityType: EntityType.RISK_CASE,
+      entityId: id,
+      description: `Added note to risk case`,
+      ipAddress: getClientIp(req),
+      metadata: { 
+        noteId: note.id,
+        isInternal: data.isInternal 
       },
     });
 
@@ -668,7 +762,7 @@ router.post("/risk-cases/:id/notes", checkPermission(Permission.MANAGE_USER_STAT
 });
 
 // Safety stats for dashboard
-router.get("/safety-stats", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/safety-stats", checkPermission(Permission.VIEW_SAFETY_EVENTS), async (req: AuthRequest, res) => {
   try {
     const [
       totalEvents,
@@ -702,7 +796,7 @@ router.get("/safety-stats", checkPermission(Permission.VIEW_DASHBOARD), async (r
 // FEATURE FLAGS ROUTES
 // ====================================================
 
-router.get("/feature-flags", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRequest, res) => {
+router.get("/feature-flags", checkPermission(Permission.VIEW_FEATURE_FLAGS), async (req: AuthRequest, res) => {
   try {
     const flags = await prisma.featureFlag.findMany({
       orderBy: { createdAt: "desc" },
@@ -714,7 +808,7 @@ router.get("/feature-flags", checkPermission(Permission.VIEW_SETTINGS), async (r
   }
 });
 
-router.get("/feature-flags/:id", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRequest, res) => {
+router.get("/feature-flags/:id", checkPermission(Permission.VIEW_FEATURE_FLAGS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const flag = await prisma.featureFlag.findUnique({ where: { id } });
@@ -741,7 +835,7 @@ const CreateFeatureFlagSchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
-router.post("/feature-flags", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+router.post("/feature-flags", checkPermission(Permission.MANAGE_FEATURE_FLAGS), async (req: AuthRequest, res) => {
   try {
     const data = CreateFeatureFlagSchema.parse(req.body);
 
@@ -760,13 +854,19 @@ router.post("/feature-flags", checkPermission(Permission.EDIT_SETTINGS), async (
 
     await logAuditEvent({
       actorId: req.user?.userId || null,
-      actorEmail: req.adminProfile?.email || "unknown",
+      actorEmail: (req as any).adminUser?.email || "unknown",
       actorRole: "admin",
-      actionType: ActionType.CREATE,
-      entityType: EntityType.SETTINGS,
+      actionType: ActionType.FEATURE_FLAG_CREATED,
+      entityType: EntityType.FEATURE_FLAG,
       entityId: flag.id,
       description: `Created feature flag: ${data.key}`,
       ipAddress: getClientIp(req),
+      metadata: { 
+        key: data.key, 
+        countryScope: data.countryScope,
+        isEnabled: data.isEnabled,
+        rolloutPercentage: data.rolloutPercentage 
+      },
     });
 
     res.status(201).json(flag);
@@ -786,7 +886,7 @@ const UpdateFeatureFlagSchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
-router.patch("/feature-flags/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+router.patch("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FLAGS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const data = UpdateFeatureFlagSchema.parse(req.body);
@@ -801,13 +901,17 @@ router.patch("/feature-flags/:id", checkPermission(Permission.EDIT_SETTINGS), as
 
     await logAuditEvent({
       actorId: req.user?.userId || null,
-      actorEmail: req.adminProfile?.email || "unknown",
+      actorEmail: (req as any).adminUser?.email || "unknown",
       actorRole: "admin",
-      actionType: ActionType.UPDATE,
-      entityType: EntityType.SETTINGS,
+      actionType: ActionType.FEATURE_FLAG_UPDATED,
+      entityType: EntityType.FEATURE_FLAG,
       entityId: id,
       description: `Updated feature flag: ${flag.key}`,
       ipAddress: getClientIp(req),
+      metadata: { 
+        key: flag.key,
+        changes: data 
+      },
     });
 
     res.json(flag);
@@ -817,7 +921,7 @@ router.patch("/feature-flags/:id", checkPermission(Permission.EDIT_SETTINGS), as
   }
 });
 
-router.delete("/feature-flags/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
+router.delete("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FLAGS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -830,13 +934,17 @@ router.delete("/feature-flags/:id", checkPermission(Permission.EDIT_SETTINGS), a
 
     await logAuditEvent({
       actorId: req.user?.userId || null,
-      actorEmail: req.adminProfile?.email || "unknown",
+      actorEmail: (req as any).adminUser?.email || "unknown",
       actorRole: "admin",
-      actionType: ActionType.DELETE,
-      entityType: EntityType.SETTINGS,
+      actionType: ActionType.FEATURE_FLAG_DELETED,
+      entityType: EntityType.FEATURE_FLAG,
       entityId: id,
       description: `Deleted feature flag: ${flag.key}`,
       ipAddress: getClientIp(req),
+      metadata: { 
+        key: flag.key,
+        wasEnabled: flag.isEnabled 
+      },
     });
 
     res.json({ success: true });

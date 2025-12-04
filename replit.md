@@ -66,7 +66,43 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 7. **Admin RBAC** - No admin user creation, role assignment UI, IP whitelist management
 
 **Implementation Priority:**
-- Phase 1 (Critical): People/KYC Center, Safety Center, Feature Flags
+- Phase 1 (Critical): People/KYC Center, Safety Center, Feature Flags ✅ COMPLETED
 - Phase 2 (High): Pricing Engine, Support/Refund Center, Admin RBAC
 - Phase 3 (Medium): Wallet Console, Country Config, Policy/Legal
 - Phase 4 (Enhancement): Advanced analytics, Automation Dashboard
+
+## RBAC v2 Implementation (December 2024)
+
+### 8 Admin Role System
+The platform now implements comprehensive Role-Based Access Control with 8 distinct admin roles:
+
+| Role | Description | Key Permissions |
+|------|-------------|-----------------|
+| SUPER_ADMIN | Full system access | All permissions |
+| ADMIN | General management | View-only access to most areas |
+| COUNTRY_ADMIN | Regional operations | KYC, settlements, regional analytics |
+| CITY_ADMIN | City-level management | Local operations, basic monitoring |
+| COMPLIANCE_ADMIN | KYC & Legal | Full KYC/People center, fraud management |
+| SUPPORT_ADMIN | Customer support | Disputes, refunds, escalations |
+| FINANCE_ADMIN | Financial operations | Wallets, payouts, commissions |
+| RISK_ADMIN | Safety & Security | Risk cases, safety alerts, fraud monitoring |
+| READONLY_ADMIN | View-only access | Read-only on all features |
+
+### New Permissions (19 added)
+- **Risk Center**: VIEW_RISK_CENTER, MANAGE_RISK_CASES, RESOLVE_RISK_CASES
+- **Safety Center**: VIEW_SAFETY_EVENTS, MANAGE_SAFETY_ALERTS, BLOCK_USER_SAFETY
+- **Feature Flags**: VIEW_FEATURE_FLAGS, MANAGE_FEATURE_FLAGS
+- **System Config**: VIEW_SYSTEM_CONFIG, MANAGE_SYSTEM_CONFIG
+- **People Center**: VIEW_PEOPLE_CENTER, MANAGE_PEOPLE_CENTER, BULK_KYC_OPERATIONS
+- **Disputes**: VIEW_DISPUTES, MANAGE_DISPUTES, PROCESS_REFUNDS, ESCALATE_DISPUTES
+- **Notifications**: SEND_BROADCAST, MANAGE_NOTIFICATIONS
+
+### Key Files
+- `server/utils/permissions.ts` - Permission enum and role mappings
+- `server/middleware/authz.ts` - Authorization middleware (checkPermission, checkAnyPermission, checkAllPermissions, checkAdminRole)
+- `server/routes/admin-phase1.ts` - Phase 1 admin routes with RBAC protection
+- `client/src/hooks/useAdminCapabilities.ts` - Frontend capabilities hook
+- `client/src/components/admin/AdminSidebar.tsx` - Role-aware navigation
+
+### API Endpoints
+- `GET /api/admin-phase1/capabilities` - Returns current admin's role, permissions, navigation access, and action capabilities

@@ -12,9 +12,12 @@ import {
   ShieldAlert,
   ScrollText,
   Settings,
-  ChevronLeft,
   LogOut,
   Globe,
+  UserCog,
+  Flag,
+  Scale,
+  type LucideIcon,
 } from "lucide-react";
 import {
   Sidebar,
@@ -33,86 +36,127 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAdminCapabilities, hasNavAccess } from "@/hooks/useAdminCapabilities";
 import { cn } from "@/lib/utils";
 
-const mainNavItems = [
+interface NavItem {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+  navKey?: string;
+}
+
+const mainNavItems: NavItem[] = [
   {
     title: "Dashboard",
     href: "/admin",
     icon: LayoutDashboard,
+    navKey: "dashboard",
+  },
+  {
+    title: "People & KYC",
+    href: "/admin/people-kyc",
+    icon: UserCog,
+    navKey: "peopleKyc",
   },
   {
     title: "Users",
     href: "/admin/users",
     icon: Users,
+    navKey: "dashboard",
   },
   {
     title: "Drivers",
     href: "/admin/drivers",
     icon: Car,
+    navKey: "dashboard",
   },
   {
     title: "Restaurants",
     href: "/admin/restaurants",
     icon: UtensilsCrossed,
+    navKey: "dashboard",
   },
   {
     title: "Parcels",
     href: "/admin/parcels",
     icon: Package,
+    navKey: "dashboard",
   },
 ];
 
-const managementNavItems = [
+const managementNavItems: NavItem[] = [
   {
     title: "KYC Approvals",
     href: "/admin/kyc",
     icon: Shield,
+    navKey: "peopleKyc",
   },
   {
     title: "Wallets",
     href: "/admin/wallets",
     icon: Wallet,
+    navKey: "wallets",
   },
   {
     title: "Payouts",
     href: "/admin/payouts",
     icon: HandCoins,
+    navKey: "payouts",
   },
 ];
 
-const securityNavItems = [
+const securityNavItems: NavItem[] = [
+  {
+    title: "Safety Center",
+    href: "/admin/safety-center",
+    icon: ShieldAlert,
+    navKey: "safetyCenter",
+  },
   {
     title: "Fraud Alerts",
     href: "/admin/fraud-alerts",
     icon: AlertTriangle,
+    navKey: "fraudAlerts",
   },
   {
     title: "Threat Center",
     href: "/admin/security-center",
-    icon: ShieldAlert,
+    icon: Shield,
+    navKey: "safetyCenter",
   },
   {
     title: "Activity Logs",
     href: "/admin/activity-log",
     icon: ScrollText,
+    navKey: "auditLog",
   },
 ];
 
-const regionalNavItems = [
+const configNavItems: NavItem[] = [
   {
-    title: "BD Expansion",
-    href: "/admin/bd-expansion",
-    icon: Globe,
+    title: "Feature Flags",
+    href: "/admin/feature-flags",
+    icon: Flag,
+    navKey: "featureFlags",
   },
-];
-
-const systemNavItems = [
   {
     title: "Settings",
     href: "/admin/settings",
     icon: Settings,
+    navKey: "settings",
+  },
+];
+
+const regionalNavItems: NavItem[] = [
+  {
+    title: "BD Expansion",
+    href: "/admin/bd-expansion",
+    icon: Globe,
+    navKey: "dashboard",
   },
 ];
 
@@ -120,6 +164,7 @@ export function AdminSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const { state } = useSidebar();
+  const { data: capabilities, isLoading: capabilitiesLoading } = useAdminCapabilities();
   
   const adminName = user?.email?.split("@")[0] || "Admin";
   const initials = adminName
@@ -136,8 +181,21 @@ export function AdminSidebar() {
     return location.startsWith(href);
   };
 
-  const NavItem = ({ item }: { item: { title: string; href: string; icon: any } }) => {
+  const shouldShowItem = (item: NavItem): boolean => {
+    if (!item.navKey) return true;
+    if (capabilitiesLoading) return true;
+    if (!capabilities) return true;
+    if (capabilities.isSuperAdmin) return true;
+    return hasNavAccess(capabilities, item.navKey as keyof typeof capabilities.navigation);
+  };
+
+  const NavItem = ({ item }: { item: NavItem }) => {
     const active = isActive(item.href);
+    
+    if (!shouldShowItem(item)) {
+      return null;
+    }
+
     return (
       <SidebarMenuItem>
         <SidebarMenuButton
@@ -156,6 +214,38 @@ export function AdminSidebar() {
         </SidebarMenuButton>
       </SidebarMenuItem>
     );
+  };
+
+  const getRoleBadgeVariant = (role: string): "default" | "secondary" | "destructive" | "outline" => {
+    switch (role) {
+      case "SUPER_ADMIN": return "destructive";
+      case "ADMIN": return "default";
+      case "RISK_ADMIN": return "secondary";
+      case "COMPLIANCE_ADMIN": return "secondary";
+      case "FINANCE_ADMIN": return "secondary";
+      default: return "outline";
+    }
+  };
+
+  const getRoleLabel = (role: string): string => {
+    const labels: Record<string, string> = {
+      SUPER_ADMIN: "Super Admin",
+      ADMIN: "Admin",
+      COUNTRY_ADMIN: "Country Admin",
+      CITY_ADMIN: "City Admin",
+      RISK_ADMIN: "Risk Admin",
+      COMPLIANCE_ADMIN: "Compliance",
+      SUPPORT_ADMIN: "Support",
+      FINANCE_ADMIN: "Finance",
+      READONLY_ADMIN: "Read Only",
+    };
+    return labels[role] || role;
+  };
+
+  const renderNavGroup = (items: NavItem[]) => {
+    const visibleItems = items.filter(shouldShowItem);
+    if (visibleItems.length === 0) return null;
+    return visibleItems.map((item) => <NavItem key={item.href} item={item} />);
   };
 
   return (
@@ -188,64 +278,62 @@ export function AdminSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
-                <NavItem key={item.href} item={item} />
-              ))}
+              {renderNavGroup(mainNavItems)}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup className="mt-6">
-          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
-            Management
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {managementNavItems.map((item) => (
-                <NavItem key={item.href} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {renderNavGroup(managementNavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Management
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(managementNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup className="mt-6">
-          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
-            Security
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {securityNavItems.map((item) => (
-                <NavItem key={item.href} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {renderNavGroup(securityNavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Security
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(securityNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup className="mt-6">
-          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
-            Regional
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {regionalNavItems.map((item) => (
-                <NavItem key={item.href} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {renderNavGroup(configNavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Configuration
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(configNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
-        <SidebarGroup className="mt-6">
-          <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
-            System
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {systemNavItems.map((item) => (
-                <NavItem key={item.href} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {renderNavGroup(regionalNavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Regional
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(regionalNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-4 border-t">
@@ -265,9 +353,21 @@ export function AdminSidebar() {
             <span className="text-sm font-medium leading-tight truncate">
               {adminName}
             </span>
-            <span className="text-[10px] text-muted-foreground leading-tight">
-              Administrator
-            </span>
+            {capabilitiesLoading ? (
+              <Skeleton className="h-3 w-16 mt-1" />
+            ) : capabilities ? (
+              <Badge 
+                variant={getRoleBadgeVariant(capabilities.role)} 
+                className="text-[9px] py-0 px-1.5 mt-0.5 w-fit"
+                data-testid="badge-admin-role"
+              >
+                {getRoleLabel(capabilities.role)}
+              </Badge>
+            ) : (
+              <span className="text-[10px] text-muted-foreground leading-tight">
+                Administrator
+              </span>
+            )}
           </div>
         </div>
         <Button

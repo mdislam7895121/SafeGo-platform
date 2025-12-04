@@ -295,11 +295,122 @@ export function checkPermission(permission: string) {
     }
 
     // Check if user has the required permission
-    if (req.user.permissions && !req.user.permissions.includes(permission)) {
-      res.status(403).json({ error: 'Insufficient permissions' });
+    if (!req.user.permissions || !req.user.permissions.includes(permission)) {
+      res.status(403).json({ 
+        error: 'Insufficient permissions',
+        required: permission 
+      });
       return;
     }
 
     next();
   };
+}
+
+/**
+ * Middleware to check if admin user has ALL of the specified permissions
+ */
+export function checkAllPermissions(...permissions: string[]) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const userPermissions = req.user.permissions || [];
+    const missingPermissions = permissions.filter(p => !userPermissions.includes(p));
+
+    if (missingPermissions.length > 0) {
+      res.status(403).json({ 
+        error: 'Insufficient permissions',
+        missing: missingPermissions 
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Middleware to check if admin user has ANY of the specified permissions
+ */
+export function checkAnyPermission(...permissions: string[]) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    const userPermissions = req.user.permissions || [];
+    const hasAnyPermission = permissions.some(p => userPermissions.includes(p));
+
+    if (!hasAnyPermission) {
+      res.status(403).json({ 
+        error: 'Insufficient permissions',
+        requiredAny: permissions 
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Middleware to check if admin user has a specific admin role
+ */
+export function checkAdminRole(...allowedRoles: string[]) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    if (req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Admin access required' });
+      return;
+    }
+
+    if (!req.user.adminRole || !allowedRoles.includes(req.user.adminRole)) {
+      res.status(403).json({ 
+        error: 'Insufficient role privileges',
+        requiredRoles: allowedRoles 
+      });
+      return;
+    }
+
+    next();
+  };
+}
+
+/**
+ * Check permission in route handler (not middleware)
+ * Returns true/false for conditional logic
+ */
+export function hasPermission(req: AuthenticatedRequest, permission: string): boolean {
+  if (!req.user || req.user.role !== 'admin') {
+    return false;
+  }
+  return req.user.permissions?.includes(permission) ?? false;
+}
+
+/**
+ * Check any permission in route handler
+ */
+export function hasAnyPermission(req: AuthenticatedRequest, ...permissions: string[]): boolean {
+  if (!req.user || req.user.role !== 'admin') {
+    return false;
+  }
+  return permissions.some(p => req.user!.permissions?.includes(p) ?? false);
 }
