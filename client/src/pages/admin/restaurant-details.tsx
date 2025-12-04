@@ -49,7 +49,7 @@ interface RestaurantDetails {
   totalRevenue: number;
   totalCommission: number;
   recentOrders: any[];
-  complaints: any[];
+  reviews: any[];
   menuStats?: MenuStats;
   createdAt: string;
   accountCreated: string;
@@ -471,28 +471,28 @@ export default function RestaurantDetails() {
           </CardContent>
         </Card>
 
-        {/* Complaints */}
-        {restaurant.complaints && restaurant.complaints.length > 0 && (
+        {/* Reviews */}
+        {restaurant.reviews && restaurant.reviews.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5" />
-                Complaints ({restaurant.complaints.length})
+                Recent Reviews ({restaurant.reviews.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {restaurant.complaints.map((complaint) => (
-                  <div key={complaint.id} className="border rounded-lg p-3">
+                {restaurant.reviews.map((review: any) => (
+                  <div key={review.id} className="border rounded-lg p-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-medium">{complaint.reason}</p>
+                        <p className="font-medium">{review.reviewText || 'No comment'}</p>
                         <p className="text-sm text-muted-foreground">
-                          {format(new Date(complaint.createdAt), "PPp")}
+                          {format(new Date(review.createdAt), "PPp")}
                         </p>
                       </div>
-                      <Badge variant={complaint.status === "open" ? "destructive" : "secondary"}>
-                        {complaint.status}
+                      <Badge variant="secondary">
+                        {review.rating} / 5
                       </Badge>
                     </div>
                   </div>

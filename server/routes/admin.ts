@@ -13880,9 +13880,31 @@ router.get("/shop-partners/:id", checkPermission(Permission.VIEW_ALL_DRIVERS), a
     const shopPartner = await prisma.shopPartner.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true } },
-        products: { take: 20, orderBy: { createdAt: 'desc' } },
-        orders: { take: 10, orderBy: { createdAt: 'desc' } },
+        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true, countryCode: true } },
+        products: { 
+          take: 20, 
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            images: true,
+            isActive: true,
+            isInStock: true,
+            createdAt: true,
+          }
+        },
+        orders: { 
+          take: 10, 
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            orderNumber: true,
+            status: true,
+            totalAmount: true,
+            createdAt: true,
+          }
+        },
       },
     });
 
@@ -13890,7 +13912,55 @@ router.get("/shop-partners/:id", checkPermission(Permission.VIEW_ALL_DRIVERS), a
       return res.status(404).json({ error: "Shop partner not found" });
     }
 
-    res.json({ success: true, shopPartner });
+    // Format response to match frontend expected interface
+    const formattedShopPartner = {
+      id: shopPartner.id,
+      shopName: shopPartner.shopName,
+      ownerName: shopPartner.ownerName || shopPartner.user.fullName || 'N/A',
+      phoneNumber: shopPartner.contactPhone || '',
+      verificationStatus: shopPartner.verificationStatus,
+      rejectionReason: shopPartner.rejectionReason,
+      commissionRate: Number(shopPartner.commissionRate),
+      walletBalance: Number(shopPartner.walletBalance),
+      negativeBalance: Number(shopPartner.negativeBalance),
+      logoUrl: shopPartner.shopLogo,
+      bannerUrl: shopPartner.shopBanner,
+      category: shopPartner.shopType,
+      address: shopPartner.shopAddress,
+      nidNumber: shopPartner.nidNumber,
+      nidFrontImage: shopPartner.nidFrontImage,
+      nidBackImage: shopPartner.nidBackImage,
+      tradeLicenseNumber: shopPartner.tradeLicenseNumber,
+      tradeLicenseImage: shopPartner.tradeLicenseImage,
+      fatherName: shopPartner.fatherName,
+      dateOfBirth: shopPartner.dateOfBirth,
+      presentAddress: shopPartner.presentAddress,
+      permanentAddress: shopPartner.permanentAddress,
+      emergencyContactName: shopPartner.emergencyContactName,
+      emergencyContactPhone: shopPartner.emergencyContactPhone,
+      emergencyContactRelation: shopPartner.emergencyContactRelation,
+      countryCode: shopPartner.countryCode,
+      createdAt: shopPartner.createdAt,
+      verifiedAt: shopPartner.verifiedAt,
+      user: shopPartner.user,
+      products: shopPartner.products.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: Number(p.price),
+        imageUrl: Array.isArray(p.images) ? p.images[0] : null,
+        isAvailable: p.isActive && p.isInStock,
+        createdAt: p.createdAt,
+      })),
+      orders: shopPartner.orders.map(o => ({
+        id: o.id,
+        orderNumber: o.orderNumber,
+        status: o.status,
+        totalAmount: Number(o.totalAmount),
+        createdAt: o.createdAt,
+      })),
+    };
+
+    res.json({ success: true, shopPartner: formattedShopPartner });
   } catch (error: any) {
     console.error("Shop partner details error:", error);
     res.status(500).json({ error: error.message || "Failed to fetch shop partner details" });
@@ -13974,7 +14044,7 @@ router.get("/ticket-operators", checkPermission(Permission.VIEW_ALL_DRIVERS), as
         where,
         include: {
           user: { select: { id: true, email: true, fullName: true, isBlocked: true } },
-          _count: { select: { routes: true, vehicles: true, ticketBookings: true, rentalBookings: true } },
+          _count: { select: { ticketListings: true, rentalVehicles: true, ticketBookings: true, rentalBookings: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -14007,11 +14077,56 @@ router.get("/ticket-operators/:id", checkPermission(Permission.VIEW_ALL_DRIVERS)
     const ticketOperator = await prisma.ticketOperator.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true } },
-        routes: { take: 20, orderBy: { createdAt: 'desc' } },
-        vehicles: { take: 20, orderBy: { createdAt: 'desc' } },
-        ticketBookings: { take: 10, orderBy: { createdAt: 'desc' } },
-        rentalBookings: { take: 10, orderBy: { createdAt: 'desc' } },
+        user: { select: { id: true, email: true, fullName: true, isBlocked: true, createdAt: true, countryCode: true } },
+        ticketListings: { 
+          take: 20, 
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            routeName: true,
+            originCity: true,
+            destinationCity: true,
+            basePrice: true,
+            departureTime: true,
+            isActive: true,
+            createdAt: true,
+          }
+        },
+        rentalVehicles: { 
+          take: 20, 
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            vehicleType: true,
+            registrationNumber: true,
+            seatCapacity: true,
+            dailyRate: true,
+            isAvailable: true,
+            createdAt: true,
+          }
+        },
+        ticketBookings: { 
+          take: 10, 
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            bookingNumber: true,
+            status: true,
+            totalAmount: true,
+            createdAt: true,
+          }
+        },
+        rentalBookings: { 
+          take: 10, 
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            bookingNumber: true,
+            status: true,
+            totalAmount: true,
+            createdAt: true,
+          }
+        },
       },
     });
 
@@ -14019,7 +14134,77 @@ router.get("/ticket-operators/:id", checkPermission(Permission.VIEW_ALL_DRIVERS)
       return res.status(404).json({ error: "Ticket operator not found" });
     }
 
-    res.json({ success: true, ticketOperator });
+    // Format response to match frontend expected interface
+    const formattedOperator = {
+      id: ticketOperator.id,
+      operatorName: ticketOperator.operatorName,
+      operatorType: ticketOperator.operatorType,
+      phoneNumber: ticketOperator.officePhone || ticketOperator.contactPhone || '',
+      verificationStatus: ticketOperator.verificationStatus,
+      rejectionReason: ticketOperator.rejectionReason,
+      ticketCommissionRate: Number(ticketOperator.ticketCommissionRate),
+      rentalCommissionRate: Number(ticketOperator.rentalCommissionRate),
+      walletBalance: Number(ticketOperator.walletBalance),
+      negativeBalance: Number(ticketOperator.negativeBalance),
+      logoUrl: ticketOperator.logo,
+      bannerUrl: null, // No banner field in schema
+      nidNumber: ticketOperator.nidNumber,
+      nidFrontImage: ticketOperator.nidFrontImage,
+      nidBackImage: ticketOperator.nidBackImage,
+      ownerName: ticketOperator.ownerName,
+      fatherName: ticketOperator.fatherName,
+      dateOfBirth: ticketOperator.dateOfBirth,
+      presentAddress: ticketOperator.presentAddress,
+      permanentAddress: ticketOperator.permanentAddress,
+      routePermitNumber: ticketOperator.routePermitNumber,
+      routePermitImage: ticketOperator.routePermitImage,
+      routePermitExpiry: ticketOperator.routePermitExpiry,
+      emergencyContactName: ticketOperator.emergencyContactName,
+      emergencyContactPhone: ticketOperator.emergencyContactPhone,
+      emergencyContactRelation: ticketOperator.emergencyContactRelation,
+      officeAddress: ticketOperator.officeAddress,
+      officeEmail: ticketOperator.officeEmail,
+      countryCode: ticketOperator.countryCode,
+      createdAt: ticketOperator.createdAt,
+      verifiedAt: ticketOperator.verifiedAt,
+      user: ticketOperator.user,
+      // Map ticketListings to routes for frontend compatibility
+      routes: ticketOperator.ticketListings.map(r => ({
+        id: r.id,
+        origin: r.originCity,
+        destination: r.destinationCity,
+        price: Number(r.basePrice),
+        departureTime: r.departureTime,
+        isActive: r.isActive,
+        createdAt: r.createdAt,
+      })),
+      // Map rentalVehicles to vehicles for frontend compatibility
+      vehicles: ticketOperator.rentalVehicles.map(v => ({
+        id: v.id,
+        vehicleType: v.vehicleType,
+        registrationNumber: v.registrationNumber,
+        seatCapacity: v.seatCapacity,
+        dailyRate: v.dailyRate ? Number(v.dailyRate) : null,
+        isAvailable: v.isAvailable,
+        createdAt: v.createdAt,
+      })),
+      ticketBookings: ticketOperator.ticketBookings.map(b => ({
+        id: b.id,
+        bookingNumber: b.bookingNumber,
+        status: b.status,
+        totalAmount: Number(b.totalAmount),
+        createdAt: b.createdAt,
+      })),
+      rentalBookings: ticketOperator.rentalBookings.map(b => ({
+        id: b.id,
+        bookingNumber: b.bookingNumber,
+        status: b.status,
+        totalAmount: Number(b.totalAmount),
+        createdAt: b.createdAt,
+      })),
+    };
+
+    res.json({ success: true, ticketOperator: formattedOperator });
   } catch (error: any) {
     console.error("Ticket operator details error:", error);
     res.status(500).json({ error: error.message || "Failed to fetch ticket operator details" });
