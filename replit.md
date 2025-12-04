@@ -22,6 +22,15 @@ The frontend utilizes React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS 3, T
     *   **Parcel Delivery**: Scheduled pickup, Proof-of-Delivery photos, and size/weight-based dynamic pricing.
 *   **Loyalty & Incentives**: SafeGo Points System (gamified), Opportunity Bonus Management System, and Driver Incentive Engine.
 *   **Real-Time & Optimization**: AI Marketplace Balancer, Real-Time Dispatch System (WebSocket-based, proximity matching), and Experience Intelligence with real-time ETA refinement, dynamic routing optimization, and smart personalized push notifications.
+*   **Profit-Focused Automation Systems** (8 services with comprehensive admin visibility):
+    *   **Auto Assignment Engine**: Proximity-based partner assignment with verification status, performance score, and cancellation history weighting
+    *   **Surge Pricing Automation**: Real-time demand/supply analysis with configurable multipliers, peak hours, and weekend/festival bonuses
+    *   **Auto Settlement Service**: Weekly commission settlement with cash recovery, negative balance management, and auto freeze/unfreeze
+    *   **Recommendation Engine**: AI-powered personalized suggestions for rides, restaurants, shops, rentals, and tickets
+    *   **Dynamic Pricing Service**: Time-based, demand-based, and festival/weekend-based price optimization
+    *   **Performance Scoring Service**: Automated driver/partner scoring with tier system (platinum/gold/silver/bronze/warning/suspended)
+    *   **Auto Cancellation Service**: Driver cooldowns, customer penalty windows, and restaurant/shop delay compensation
+    *   **Auto Payout Service**: Risk-based payout processing with auto-approval thresholds, fraud detection, and admin override
 *   **Regional Expansion (Bangladesh)**: Specific roles (SafeGo Shop Partner, SafeGo Ticket & Rental Operator) with complete KYC, product/order management, wallet, payout systems, and customer-only signup flow with Bangla UX and error messages.
 *   **Regulatory Compliance**: NYC TLC regulatory compliance including minimum pay enforcement, fees, surcharges, tolls, and report generation.
 *   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, Zod schema validation, atomic transactions, and consistent error handling.

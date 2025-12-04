@@ -8022,3 +8022,35 @@ model RentalBooking {
   @@index([bookingNumber])
   @@map("rental_bookings")
 }
+
+// ===================================================
+// AUTOMATION SYSTEM LOGS
+// ===================================================
+model AutomationLog {
+  id                      String                        @id @default(uuid())
+  
+  automationType          String                        // auto_assignment, surge_pricing, auto_settlement, recommendation, dynamic_pricing, performance_scoring, cancellation, auto_payout, fraud_detection, payout_risk
+  entityType              String                        // ride, food_order, delivery, shop_order, ticket, rental, driver, restaurant, shop, wallet, zone, customer, batch, admin_action
+  entityId                String                        // ID of the entity being processed
+  
+  status                  String                        // success, error, pending, flagged, processed, blocked, etc.
+  
+  partnerId               String?                       // For assignment logs, the assigned partner ID
+  partnerType             String?                       // driver, restaurant, shop, ticket_operator, rental_operator
+  score                   Float?                        // Score value (assignment score, surge multiplier, performance score, etc.)
+  
+  metadata                Json?                         // Additional data specific to automation type
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([automationType])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([status])
+  @@index([partnerId])
+  @@index([createdAt])
+  @@index([automationType, entityType])
+  @@index([automationType, status])
+  @@map("automation_logs")
+}
