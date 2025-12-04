@@ -429,12 +429,14 @@ router.post("/staff", requireKYCCompletion, requireOwnerRole, async (req: AuthRe
 
     // Audit log
     await logAuditEvent({
+      actorId: req.user!.userId,
+      actorEmail: validatedData.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: ownerProfile.id,
-      action: ActionType.CREATE,
-      details: `Created staff member: ${validatedData.name} (${validatedData.email})`,
+      actionType: ActionType.CREATE,
+      description: `Created staff member: ${validatedData.name} (${validatedData.email})`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.status(201).json({
@@ -442,9 +444,7 @@ router.post("/staff", requireKYCCompletion, requireOwnerRole, async (req: AuthRe
       staff: {
         id: restaurantProfile.id,
         userId: user.id,
-        name: user.name,
         email: user.email,
-        phone: user.phone,
         staffActive: restaurantProfile.staffActive,
         permissions: {
           canEditCategories: restaurantProfile.canEditCategories,
@@ -488,9 +488,7 @@ router.get("/staff", requireKYCCompletion, requireOwnerRole, async (req: AuthReq
     const staffList = staffMembers.map((staff) => ({
       id: staff.id,
       userId: staff.userId,
-      name: staff.user.name,
       email: staff.user.email,
-      phone: staff.user.phone,
       staffActive: staff.staffActive,
       permissions: {
         canEditCategories: staff.canEditCategories,
@@ -566,8 +564,6 @@ router.patch("/staff/:id", requireKYCCompletion, requireOwnerRole, async (req: A
           select: {
             id: true,
             email: true,
-            name: true,
-            phone: true,
           },
         },
       },
@@ -575,12 +571,14 @@ router.patch("/staff/:id", requireKYCCompletion, requireOwnerRole, async (req: A
 
     // Audit log
     await logAuditEvent({
+      actorId: req.user!.userId,
+      actorEmail: updatedStaff.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: ownerProfile.id,
-      action: ActionType.UPDATE,
-      details: `Updated staff permissions: ${updatedStaff.user.name} (${updatedStaff.user.email})`,
+      actionType: ActionType.UPDATE,
+      description: `Updated staff permissions: ${updatedStaff.user.email}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -588,9 +586,7 @@ router.patch("/staff/:id", requireKYCCompletion, requireOwnerRole, async (req: A
       staff: {
         id: updatedStaff.id,
         userId: updatedStaff.userId,
-        name: updatedStaff.user.name,
         email: updatedStaff.user.email,
-        phone: updatedStaff.user.phone,
         staffActive: updatedStaff.staffActive,
         permissions: {
           canEditCategories: updatedStaff.canEditCategories,
@@ -641,7 +637,6 @@ router.delete("/staff/:id", requireKYCCompletion, requireOwnerRole, async (req: 
       include: {
         user: {
           select: {
-            name: true,
             email: true,
           },
         },
@@ -660,12 +655,14 @@ router.delete("/staff/:id", requireKYCCompletion, requireOwnerRole, async (req: 
 
     // Audit log
     await logAuditEvent({
+      actorId: req.user!.userId,
+      actorEmail: staffMember.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: ownerProfile.id,
-      action: ActionType.DELETE,
-      details: `Deactivated staff member: ${staffMember.user.name} (${staffMember.user.email})`,
+      actionType: ActionType.DELETE,
+      description: `Deactivated staff member: ${staffMember.user.email}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -1096,7 +1093,7 @@ router.post("/payouts/request-enhanced", requireKYCCompletion, async (req: AuthR
       where: {
         ownerId_ownerType: {
           ownerId: restaurantProfile.id,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
         },
       },
     });
@@ -1160,7 +1157,7 @@ router.post("/payouts/request-enhanced", requireKYCCompletion, async (req: AuthR
       await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
           countryCode: wallet.countryCode,
           serviceType: "payout",
           direction: "debit",
@@ -1903,7 +1900,7 @@ router.get("/wallet", requireKYCCompletion, async (req: AuthRequest, res) => {
       where: {
         ownerId_ownerType: {
           ownerId: restaurantProfile.id,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
         },
       },
     });
@@ -1913,7 +1910,7 @@ router.get("/wallet", requireKYCCompletion, async (req: AuthRequest, res) => {
       wallet = await prisma.wallet.create({
         data: {
           ownerId: restaurantProfile.id,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
           countryCode: restaurantProfile.countryCode || "US",
           availableBalance: 0,
           negativeBalance: 0,
@@ -2972,12 +2969,12 @@ router.delete("/menu/items/:id", requireKYCCompletion, requireOwnerRole, async (
       prisma.menuOption.deleteMany({
         where: {
           optionGroup: {
-            menuItemId: id,
+            itemId: id,
           },
         },
       }),
       prisma.menuOptionGroup.deleteMany({
-        where: { menuItemId: id },
+        where: { itemId: id },
       }),
       prisma.menuItem.delete({
         where: { id },
@@ -4435,13 +4432,14 @@ router.patch("/branding", requireKYCCompletion, requireOwnerRole, async (req: Au
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: restaurantProfile.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.UPDATE,
-      details: `Updated branding settings`,
+      actionType: ActionType.UPDATE,
+      description: `Updated branding settings`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json(branding);
@@ -4545,13 +4543,14 @@ router.post("/upload-image", requireKYCCompletion, requireOwnerRole, (req: AuthR
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: restaurantProfile.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.CREATE,
-      details: `Uploaded ${imageType} image`,
+      actionType: ActionType.CREATE,
+      description: `Uploaded ${imageType} image`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -4684,13 +4683,14 @@ router.post("/gallery/upload", requireKYCCompletion, async (req: AuthRequest, re
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.CREATE,
-      details: `Uploaded media to gallery (${validatedData.category})`,
+      actionType: ActionType.CREATE,
+      description: `Uploaded media to gallery (${validatedData.category})`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json(media);
@@ -4755,13 +4755,14 @@ router.patch("/gallery/:id", requireKYCCompletion, async (req: AuthRequest, res)
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.UPDATE,
-      details: `Updated gallery media ${id}`,
+      actionType: ActionType.UPDATE,
+      description: `Updated gallery media ${id}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json(updatedMedia);
@@ -4817,13 +4818,14 @@ router.delete("/gallery/:id", requireKYCCompletion, async (req: AuthRequest, res
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.DELETE,
-      details: `Deleted gallery media ${id}`,
+      actionType: ActionType.DELETE,
+      description: `Deleted gallery media ${id}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ success: true, message: "Media deleted successfully" });
@@ -4893,7 +4895,6 @@ router.get("/analytics", requireKYCCompletion, async (req: AuthRequest, res) => 
         restaurantPayout: true,
         safegoCommission: true,
         paymentMethod: true,
-        orderType: true,
         createdAt: true,
         acceptedAt: true,
         preparingAt: true,
@@ -4905,11 +4906,7 @@ router.get("/analytics", requireKYCCompletion, async (req: AuthRequest, res) => 
         cancellationReason: true,
         customer: {
           select: {
-            user: {
-              select: {
-                name: true,
-              },
-            },
+            fullName: true,
           },
         },
       },
@@ -5017,9 +5014,8 @@ router.get("/analytics", requireKYCCompletion, async (req: AuthRequest, res) => 
     const recentOrders = orders.slice(0, 30).map(order => ({
       id: order.id,
       orderCode: order.orderCode,
-      customerName: order.customer?.user?.name || "Customer",
+      customerName: order.customer?.fullName || "Customer",
       amount: Number(order.restaurantPayout || 0),
-      orderType: order.orderType,
       status: order.status,
       paymentMethod: order.paymentMethod,
       createdAt: order.createdAt,
@@ -5027,13 +5023,14 @@ router.get("/analytics", requireKYCCompletion, async (req: AuthRequest, res) => 
 
     // Audit log for analytics access
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: restaurantProfile.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.VIEW,
-      details: `Viewed analytics for range: ${range}`,
+      actionType: ActionType.VIEW_ANALYTICS_DASHBOARD,
+      description: `Viewed analytics for range: ${range}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -5086,13 +5083,14 @@ router.get("/staff", requireOwnerRole, requireKYCCompletion, async (req: AuthReq
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.VIEW,
-      details: `Viewed staff list (${staff.length} members)`,
+      actionType: "VIEW_STAFF_LIST",
+      description: `Viewed staff list (${staff.length} members)`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ staff });
@@ -5146,13 +5144,14 @@ router.post("/staff", requireOwnerRole, requireKYCCompletion, async (req: AuthRe
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.CREATE,
-      details: `Created staff member: ${name} (${email})`,
+      actionType: ActionType.CREATE,
+      description: `Created staff member: ${name} (${email})`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -5161,9 +5160,7 @@ router.post("/staff", requireOwnerRole, requireKYCCompletion, async (req: AuthRe
       staff: {
         id: staffProfile.id,
         userId: user.id,
-        name: user.name,
         email: user.email,
-        phone: user.phone,
         ...staffProfile,
       },
     });
@@ -5210,8 +5207,6 @@ router.patch("/staff/:staffId", requireOwnerRole, async (req: AuthRequest, res) 
           select: {
             id: true,
             email: true,
-            name: true,
-            phone: true,
           },
         },
       },
@@ -5219,13 +5214,14 @@ router.patch("/staff/:staffId", requireOwnerRole, async (req: AuthRequest, res) 
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: updatedStaff.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile!.id,
-      userId,
-      action: ActionType.UPDATE,
-      details: `Updated staff member: ${updatedStaff.user.name} (${staffId})`,
+      actionType: ActionType.UPDATE,
+      description: `Updated staff member: ${updatedStaff.user.email} (${staffId})`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -5265,7 +5261,6 @@ router.delete("/staff/:staffId", requireOwnerRole, async (req: AuthRequest, res)
           select: {
             id: true,
             email: true,
-            name: true,
           },
         },
       },
@@ -5283,13 +5278,14 @@ router.delete("/staff/:staffId", requireOwnerRole, async (req: AuthRequest, res)
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: staffProfile.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile!.id,
-      userId,
-      action: ActionType.DELETE,
-      details: `Removed staff member: ${staffProfile.user.name} (${staffProfile.user.email})`,
+      actionType: ActionType.DELETE,
+      description: `Removed staff member: ${staffProfile.user.email}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -5329,7 +5325,6 @@ router.post("/staff/:staffId/block", requireOwnerRole, async (req: AuthRequest, 
           select: {
             id: true,
             email: true,
-            name: true,
           },
         },
       },
@@ -5348,8 +5343,6 @@ router.post("/staff/:staffId/block", requireOwnerRole, async (req: AuthRequest, 
           select: {
             id: true,
             email: true,
-            name: true,
-            phone: true,
           },
         },
       },
@@ -5358,6 +5351,7 @@ router.post("/staff/:staffId/block", requireOwnerRole, async (req: AuthRequest, 
     // Create notification for staff member
     await prisma.notification.create({
       data: {
+        id: randomUUID(),
         userId: updatedStaff.userId,
         type: "alert",
         title: block ? "Account Suspended" : "Account Activated",
@@ -5369,13 +5363,14 @@ router.post("/staff/:staffId/block", requireOwnerRole, async (req: AuthRequest, 
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: staffProfile.user.email,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile!.id,
-      userId,
-      action: block ? ActionType.DELETE : ActionType.UPDATE,
-      details: `${block ? "Blocked" : "Unblocked"} staff member: ${staffProfile.user.name} (${staffProfile.user.email})${reason ? ` - Reason: ${reason}` : ""}`,
+      actionType: block ? ActionType.BLOCK_STAFF : ActionType.UNBLOCK_STAFF,
+      description: `${block ? "Blocked" : "Unblocked"} staff member: ${staffProfile.user.email}${reason ? ` - Reason: ${reason}` : ""}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -5439,14 +5434,14 @@ router.get("/staff/activity", requireOwnerRole, async (req: AuthRequest, res) =>
     const where = {
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId: Array.isArray(actorIdFilter) ? { in: actorIdFilter } : actorIdFilter,
+      actorId: Array.isArray(actorIdFilter) ? { in: actorIdFilter } : actorIdFilter,
     };
 
     // Get activity logs filtered by staff members only
     const logs = await prisma.auditLog.findMany({
       where,
       orderBy: {
-        timestamp: "desc",
+        createdAt: "desc",
       },
       take: Number(limit),
       skip: Number(offset),
@@ -5456,17 +5451,17 @@ router.get("/staff/activity", requireOwnerRole, async (req: AuthRequest, res) =>
     const total = await prisma.auditLog.count({ where });
 
     // Get user details for each log
-    const userIds = [...new Set(logs.map((log) => log.userId))];
+    const userIds = [...new Set(logs.map((log) => log.actorId).filter(Boolean))] as string[];
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
+      select: { id: true, email: true },
     });
 
     const userMap = new Map(users.map((u) => [u.id, u]));
 
     const logsWithUsers = logs.map((log) => ({
       ...log,
-      user: userMap.get(log.userId),
+      user: log.actorId ? userMap.get(log.actorId) : null,
     }));
 
     res.json({
@@ -5571,13 +5566,14 @@ router.get("/promotions", requireKYCCompletion, async (req: AuthRequest, res) =>
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.VIEW,
-      details: `Viewed promotions list (${promotions.length} promotions)`,
+      actionType: "VIEW_PROMOTIONS",
+      description: `Viewed promotions list (${promotions.length} promotions)`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({
@@ -5722,13 +5718,14 @@ router.post("/promotions", requireKYCCompletion, requirePromotionPermission, asy
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.CREATE,
-      details: `Created promotion: ${title}${coupon ? ` with coupon code: ${coupon.code}` : ""}`,
+      actionType: ActionType.CREATE_PROMOTION,
+      description: `Created promotion: ${title}${coupon ? ` with coupon code: ${coupon.code}` : ""}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.status(201).json({ promotion, coupon });
@@ -5829,13 +5826,14 @@ router.patch("/promotions/:id", requireKYCCompletion, requirePromotionPermission
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.UPDATE,
-      details: `Updated promotion: ${promotion.title}`,
+      actionType: ActionType.UPDATE_PROMOTION,
+      description: `Updated promotion: ${promotion.title}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ promotion });
@@ -5891,13 +5889,14 @@ router.post("/promotions/:id/toggle", requireKYCCompletion, requirePromotionPerm
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.UPDATE,
-      details: `Toggled promotion status: ${existing.title} (${existing.status} → ${newStatus})`,
+      actionType: ActionType.UPDATE_PROMOTION,
+      description: `Toggled promotion status: ${existing.title} (${existing.status} → ${newStatus})`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ promotion });
@@ -5945,13 +5944,14 @@ router.delete("/promotions/:id", requireKYCCompletion, requirePromotionPermissio
 
     // Audit log
     await logAuditEvent({
+      actorId: userId,
+      actorEmail: req.user!.role,
+      actorRole: req.user!.role,
       entityType: EntityType.RESTAURANT,
       entityId: restaurantProfile.id,
-      userId,
-      action: ActionType.DELETE,
-      details: `Archived promotion: ${existing.title}`,
+      actionType: ActionType.DELETE_PROMOTION,
+      description: `Archived promotion: ${existing.title}`,
       ipAddress: getClientIp(req),
-      userAgent: req.headers["user-agent"],
     });
 
     res.json({ success: true, promotion });

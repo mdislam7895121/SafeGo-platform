@@ -975,6 +975,7 @@ model RestaurantProfile {
   userId                String             @unique
   restaurantName        String
   address               String
+  phone                 String?            // Restaurant contact phone number
   cuisineType           String?
   description           String?
   cityCode              String?

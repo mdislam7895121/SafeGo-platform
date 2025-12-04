@@ -9046,7 +9046,7 @@ router.post("/payouts/:payoutId/approve", checkPermission(Permission.MANAGE_PAYO
       return res.status(404).json({ error: "Payout not found" });
     }
 
-    if (payout.ownerType !== "RESTAURANT") {
+    if (payout.ownerType !== "restaurant") {
       return res.status(400).json({ error: "Invalid payout type" });
     }
 
@@ -9133,7 +9133,7 @@ router.post("/payouts/:payoutId/reject", checkPermission(Permission.MANAGE_PAYOU
       return res.status(404).json({ error: "Payout not found" });
     }
 
-    if (payout.ownerType !== "RESTAURANT") {
+    if (payout.ownerType !== "restaurant") {
       return res.status(400).json({ error: "Invalid payout type" });
     }
 
@@ -9165,7 +9165,7 @@ router.post("/payouts/:payoutId/reject", checkPermission(Permission.MANAGE_PAYOU
       await tx.walletTransaction.create({
         data: {
           walletId: payout.wallet.id,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
           countryCode: payout.countryCode,
           serviceType: "payout",
           direction: "credit",
@@ -9244,7 +9244,7 @@ router.post("/payouts/:payoutId/complete", checkPermission(Permission.MANAGE_PAY
       return res.status(404).json({ error: "Payout not found" });
     }
 
-    if (payout.ownerType !== "RESTAURANT") {
+    if (payout.ownerType !== "restaurant") {
       return res.status(400).json({ error: "Invalid payout type" });
     }
 
@@ -9374,7 +9374,7 @@ router.post("/payouts/adjust-balance", checkPermission(Permission.MANAGE_PAYOUTS
       await tx.walletTransaction.create({
         data: {
           walletId: wallet.id,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
           countryCode: wallet.countryCode,
           serviceType: "adjustment",
           direction: adjustmentType === "credit" ? "credit" : "debit",
