@@ -282,6 +282,26 @@ export default function IntelligenceDashboard() {
     queryFn: () => fetch("/api/admin/phase3c/intelligence/incidents", { headers }).then(r => r.json()),
   });
 
+  const { data: earningsIrregularities, isLoading: loadingEarnings } = useQuery({
+    queryKey: ["/api/admin/phase3c/intelligence/earnings-irregularities", period],
+    queryFn: () => fetch(`/api/admin/phase3c/intelligence/earnings-irregularities?period=${period}`, { headers }).then(r => r.json()),
+  });
+
+  const { data: complaintPatterns, isLoading: loadingComplaints } = useQuery({
+    queryKey: ["/api/admin/phase3c/intelligence/complaint-patterns", period],
+    queryFn: () => fetch(`/api/admin/phase3c/intelligence/complaint-patterns?period=${period}`, { headers }).then(r => r.json()),
+  });
+
+  const { data: aiSummary, isLoading: loadingAiSummary } = useQuery({
+    queryKey: ["/api/admin/phase3c/intelligence/ai-summary"],
+    queryFn: () => fetch("/api/admin/phase3c/intelligence/ai-summary", { headers }).then(r => r.json()),
+  });
+
+  const { data: rankings, isLoading: loadingRankings } = useQuery({
+    queryKey: ["/api/admin/phase3c/intelligence/rankings", period],
+    queryFn: () => fetch(`/api/admin/phase3c/intelligence/rankings?period=${period}`, { headers }).then(r => r.json()),
+  });
+
   const actionMutation = useMutation({
     mutationFn: async ({ actionType, targetId, reason }: { actionType: string; targetId: string; reason?: string }) => {
       return apiRequest("POST", `/api/admin/phase3c/intelligence/actions/${actionType}`, { targetId, reason });
@@ -338,6 +358,9 @@ export default function IntelligenceDashboard() {
           <TabsTrigger value="fraud" data-testid="tab-fraud">Fraud</TabsTrigger>
           <TabsTrigger value="health" data-testid="tab-health">Health</TabsTrigger>
           <TabsTrigger value="insights" data-testid="tab-insights">Insights</TabsTrigger>
+          <TabsTrigger value="earnings" data-testid="tab-earnings">Earnings</TabsTrigger>
+          <TabsTrigger value="complaints" data-testid="tab-complaints">Complaints</TabsTrigger>
+          <TabsTrigger value="rankings" data-testid="tab-rankings">Rankings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -1023,6 +1046,336 @@ export default function IntelligenceDashboard() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="earnings" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Earnings Irregularity Monitor</h2>
+              <p className="text-sm text-muted-foreground">
+                {earningsIrregularities?.summary?.flaggedCount || 0} drivers flagged out of {earningsIrregularities?.summary?.totalAnalyzed || 0} analyzed
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Average Earnings</p>
+                    <p className="text-2xl font-bold">${earningsIrregularities?.summary?.avgEarnings?.toFixed(2) || 0}</p>
+                  </div>
+                  <DollarSign className="h-8 w-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">High Earners Flagged</p>
+                    <p className="text-2xl font-bold">{earningsIrregularities?.summary?.highEarners || 0}</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Low Earners Flagged</p>
+                    <p className="text-2xl font-bold">{earningsIrregularities?.summary?.lowEarners || 0}</p>
+                  </div>
+                  <TrendingDown className="h-8 w-8 text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Analyzed</p>
+                    <p className="text-2xl font-bold">{earningsIrregularities?.summary?.totalAnalyzed || 0}</p>
+                  </div>
+                  <Users className="h-8 w-8 text-purple-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Flagged Drivers</CardTitle>
+              <CardDescription>Drivers with unusual earning patterns</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingEarnings ? (
+                <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16" />)}</div>
+              ) : (
+                <ScrollArea className="h-80">
+                  <div className="space-y-2">
+                    {earningsIrregularities?.irregularities?.map((item: any) => (
+                      <div key={item.driverId} className="flex items-center justify-between p-3 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          <SeverityBadge severity={item.severity} />
+                          <div>
+                            <p className="font-medium text-sm">{item.driverName}</p>
+                            <p className="text-xs text-muted-foreground">{item.driverEmail}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-sm">${item.totalEarnings?.toFixed(2)}</p>
+                          <p className={cn(
+                            "text-xs",
+                            item.type === "unusually_high" ? "text-blue-500" : "text-orange-500"
+                          )}>
+                            {item.avgComparison}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="complaints" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Customer Complaint Patterns</h2>
+              <p className="text-sm text-muted-foreground">
+                {complaintPatterns?.summary?.totalComplaints || 0} total complaints | {complaintPatterns?.summary?.resolvedRate || 0}% resolved
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Top Issue</p>
+                    <p className="text-lg font-bold">{complaintPatterns?.summary?.topIssue || "N/A"}</p>
+                  </div>
+                  <AlertTriangle className="h-8 w-8 text-yellow-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Rising Issue</p>
+                    <p className="text-lg font-bold">{complaintPatterns?.summary?.risingIssue || "None"}</p>
+                  </div>
+                  <TrendingUp className="h-8 w-8 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Resolved Rate</p>
+                    <p className="text-2xl font-bold">{complaintPatterns?.summary?.resolvedRate || 0}%</p>
+                  </div>
+                  <CheckCircle className="h-8 w-8 text-green-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Avg Resolution</p>
+                    <p className="text-lg font-bold">{complaintPatterns?.summary?.avgResolutionTime || "N/A"}</p>
+                  </div>
+                  <Clock className="h-8 w-8 text-blue-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Complaint Categories</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingComplaints ? (
+                  <div className="space-y-3">{[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-12" />)}</div>
+                ) : (
+                  <div className="space-y-3">
+                    {complaintPatterns?.categories?.map((cat: any) => (
+                      <div key={cat.category} className="flex items-center justify-between p-3 rounded-lg border">
+                        <div className="flex items-center gap-3">
+                          <SeverityBadge severity={cat.severity} />
+                          <span className="font-medium text-sm">{cat.category}</span>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm">{cat.count} complaints</span>
+                          <span className={cn(
+                            "text-xs",
+                            cat.trend > 0 ? "text-red-500" : "text-green-500"
+                          )}>
+                            {cat.trend > 0 ? "+" : ""}{cat.trend}%
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">AI Summary</CardTitle>
+                <CardDescription>Auto-generated platform insights</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingAiSummary ? (
+                  <Skeleton className="h-40" />
+                ) : (
+                  <div className="space-y-4">
+                    <pre className="text-xs whitespace-pre-wrap p-4 rounded-lg bg-muted/50 font-mono max-h-40 overflow-y-auto">
+                      {aiSummary?.executiveSummary || "Generating insights..."}
+                    </pre>
+                    <div className="space-y-2">
+                      {aiSummary?.insights?.slice(0, 3).map((insight: any, i: number) => (
+                        <div key={i} className={cn(
+                          "p-3 rounded-lg border-l-4",
+                          insight.type === "positive" ? "border-l-green-500 bg-green-50 dark:bg-green-900/10" :
+                          insight.type === "warning" ? "border-l-yellow-500 bg-yellow-50 dark:bg-yellow-900/10" :
+                          insight.type === "critical" ? "border-l-red-500 bg-red-50 dark:bg-red-900/10" :
+                          "border-l-blue-500 bg-blue-50 dark:bg-blue-900/10"
+                        )}>
+                          <p className="font-medium text-sm">{insight.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{insight.recommendation}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="rankings" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Platform Rankings</h2>
+              <p className="text-sm text-muted-foreground">Top performers, high-risk cases, and impactful events</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-500" />
+                  Top Drivers
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingRankings ? (
+                  <div className="space-y-3">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12" />)}</div>
+                ) : (
+                  <ScrollArea className="h-72">
+                    <div className="space-y-2">
+                      {rankings?.topDrivers?.slice(0, 10).map((driver: any, i: number) => (
+                        <div key={driver.id} className="flex items-center justify-between p-2 rounded-lg border">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                              i === 0 ? "bg-yellow-500 text-white" :
+                              i === 1 ? "bg-gray-400 text-white" :
+                              i === 2 ? "bg-orange-600 text-white" :
+                              "bg-muted"
+                            )}>
+                              {i + 1}
+                            </span>
+                            <div>
+                              <p className="text-sm font-medium">{driver.name}</p>
+                              <p className="text-xs text-muted-foreground">{driver.completedRides} rides</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Star className="h-3 w-3 text-yellow-500" />
+                            <span className="text-sm font-medium">{driver.rating}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  High-Risk Cases
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingRankings ? (
+                  <div className="space-y-3">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12" />)}</div>
+                ) : (
+                  <ScrollArea className="h-72">
+                    <div className="space-y-2">
+                      {rankings?.riskyCases?.slice(0, 10).map((item: any) => (
+                        <div key={item.id} className="p-2 rounded-lg border">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium truncate">{item.name}</span>
+                            <SeverityBadge severity={item.severity} />
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{item.risk}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Zap className="h-5 w-5 text-blue-500" />
+                  High-Impact Events
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loadingRankings ? (
+                  <div className="space-y-3">{[1, 2, 3, 4, 5].map(i => <Skeleton key={i} className="h-12" />)}</div>
+                ) : (
+                  <ScrollArea className="h-72">
+                    <div className="space-y-2">
+                      {rankings?.impactfulEvents?.slice(0, 10).map((event: any) => (
+                        <div key={event.id} className="flex items-center justify-between p-2 rounded-lg border">
+                          <div>
+                            <p className="text-sm font-medium">{event.description}</p>
+                            <p className="text-xs text-muted-foreground">{event.user}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-bold">${event.value?.toFixed(2)}</p>
+                            <Badge variant="outline" className="text-xs">{event.type}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
