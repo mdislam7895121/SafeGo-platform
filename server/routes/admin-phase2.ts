@@ -264,11 +264,14 @@ router.delete("/permission-bundles/:bundleId/unassign/:adminProfileId", checkPer
 
 const ActivateLockdownSchema = z.object({
   level: z.enum(["PARTIAL", "FULL", "MAINTENANCE"]),
+  scope: z.enum(["GLOBAL", "COUNTRY", "SERVICE", "COUNTRY_SERVICE"]).default("COUNTRY"),
   reason: z.string().min(10),
   lockedFeatures: z.array(z.string()).optional().default([]),
   excludedAdmins: z.array(z.string()).optional().default([]),
   scheduledEndAt: z.string().datetime().optional(),
-  countryScope: z.string().optional(),
+  estimatedEndTime: z.string().datetime().optional(),
+  countryCode: z.string().optional(),
+  serviceType: z.string().optional(),
 });
 
 /**
@@ -314,31 +317,72 @@ router.get("/emergency/history", checkPermission(Permission.VIEW_EMERGENCY_STATU
 /**
  * POST /api/admin-phase2/emergency/activate
  * Activate emergency lockdown
+ * SUPER_ADMIN can activate GLOBAL lockdowns
+ * Other admins can only activate COUNTRY or SERVICE scoped lockdowns for their region
  */
 router.post("/emergency/activate", checkPermission(Permission.ACTIVATE_EMERGENCY_LOCKDOWN), async (req: AuthRequest, res) => {
   try {
     const data = ActivateLockdownSchema.parse(req.body);
     const adminUser = (req as any).adminUser;
+    const userRole = req.user?.adminRole;
+    const userCountry = req.user?.country;
 
-    // Check for existing active lockdown
+    // Enforce scope restrictions based on admin role
+    if (data.scope === "GLOBAL" && userRole !== "SUPER_ADMIN") {
+      return res.status(403).json({ 
+        error: "Only SUPER_ADMIN can activate GLOBAL lockdowns. Use COUNTRY or SERVICE scope instead." 
+      });
+    }
+
+    // Non-SUPER_ADMIN must specify a country for country-scoped lockdowns
+    if ((data.scope === "COUNTRY" || data.scope === "COUNTRY_SERVICE") && userRole !== "SUPER_ADMIN") {
+      if (!data.countryCode) {
+        data.countryCode = userCountry; // Default to admin's country
+      }
+      // Verify admin can only lock their own country
+      if (data.countryCode !== userCountry) {
+        return res.status(403).json({ 
+          error: "You can only activate lockdowns for your assigned country." 
+        });
+      }
+    }
+
+    // Check for existing active lockdown in the same scope
+    const existingLockdownWhere: any = { isActive: true };
+    if (data.scope === "COUNTRY" || data.scope === "COUNTRY_SERVICE") {
+      existingLockdownWhere.countryCode = data.countryCode;
+    }
+    if (data.scope === "SERVICE" || data.scope === "COUNTRY_SERVICE") {
+      existingLockdownWhere.serviceType = data.serviceType;
+    }
+    if (data.scope === "GLOBAL") {
+      existingLockdownWhere.scope = "GLOBAL";
+    }
+
     const existingLockdown = await prisma.emergencyLockdown.findFirst({
-      where: { isActive: true },
+      where: existingLockdownWhere,
     });
 
     if (existingLockdown) {
-      return res.status(400).json({ error: "An emergency lockdown is already active. Deactivate it first." });
+      return res.status(400).json({ 
+        error: "An emergency lockdown is already active for this scope. Deactivate it first.",
+        existingLockdownId: existingLockdown.id
+      });
     }
 
     const lockdown = await prisma.emergencyLockdown.create({
       data: {
         level: data.level,
+        scope: data.scope as any,
         reason: data.reason,
         lockedFeatures: data.lockedFeatures,
         excludedAdmins: data.excludedAdmins,
         activatedBy: adminUser?.id || "unknown",
         activatedByEmail: adminUser?.email || "unknown",
         scheduledEndAt: data.scheduledEndAt ? new Date(data.scheduledEndAt) : null,
-        countryScope: data.countryScope,
+        estimatedEndTime: data.estimatedEndTime ? new Date(data.estimatedEndTime) : null,
+        countryCode: data.countryCode,
+        serviceType: data.serviceType,
         isActive: true,
       },
     });
@@ -350,9 +394,15 @@ router.post("/emergency/activate", checkPermission(Permission.ACTIVATE_EMERGENCY
       actionType: "EMERGENCY_LOCKDOWN_ACTIVATED",
       entityType: "EMERGENCY_LOCKDOWN",
       entityId: lockdown.id,
-      description: `Activated ${data.level} emergency lockdown: ${data.reason}`,
+      description: `Activated ${data.level} ${data.scope} emergency lockdown: ${data.reason}`,
       ipAddress: getClientIp(req),
-      metadata: { level: data.level, lockedFeatures: data.lockedFeatures, countryScope: data.countryScope },
+      metadata: { 
+        level: data.level, 
+        scope: data.scope,
+        lockedFeatures: data.lockedFeatures, 
+        countryCode: data.countryCode,
+        serviceType: data.serviceType
+      },
     });
 
     res.status(201).json(lockdown);

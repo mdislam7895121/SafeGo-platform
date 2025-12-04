@@ -8966,11 +8966,20 @@ enum EmergencyLockdownLevel {
   MAINTENANCE       // Planned maintenance mode
 }
 
+// Emergency lockdown scope type
+enum LockdownScope {
+  GLOBAL          // Entire platform
+  COUNTRY         // Specific country only
+  SERVICE         // Specific service (rides, food, parcel)
+  COUNTRY_SERVICE // Specific country + service combination
+}
+
 // Emergency lockdown controls
 model EmergencyLockdown {
   id                  String                  @id @default(uuid())
   
   level               EmergencyLockdownLevel  @default(NONE)
+  scope               LockdownScope           @default(COUNTRY)
   reason              String                  // Reason for lockdown
   
   lockedFeatures      String[]                // Features currently locked
@@ -8985,13 +8994,18 @@ model EmergencyLockdown {
   deactivatedAt       DateTime?
   
   scheduledEndAt      DateTime?               // Scheduled end time
+  estimatedEndTime    DateTime?               // Estimated restoration time
   
   isActive            Boolean                 @default(true)
   
-  countryScope        String?                 // BD, US, or null for global
+  countryCode         String?                 // BD, US, or null for global
+  serviceType         String?                 // rides, food, parcel, or null for all
   
   @@index([isActive])
   @@index([level])
+  @@index([scope])
+  @@index([countryCode])
+  @@index([serviceType])
   @@index([activatedAt])
   @@map("emergency_lockdowns")
 }

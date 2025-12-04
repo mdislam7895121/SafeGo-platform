@@ -414,3 +414,108 @@ export function hasAnyPermission(req: AuthenticatedRequest, ...permissions: stri
   }
   return permissions.some(p => req.user!.permissions?.includes(p) ?? false);
 }
+
+/**
+ * Middleware to enforce VIEW_ONLY impersonation mode
+ * Blocks all mutating HTTP methods (POST, PUT, PATCH, DELETE) when admin is impersonating in VIEW_ONLY mode
+ */
+export function enforceImpersonationViewOnly() {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    const impersonationSessionId = req.headers['x-impersonation-session'] as string;
+    
+    if (!impersonationSessionId) {
+      next();
+      return;
+    }
+
+    try {
+      const session = await prisma.adminImpersonationSession.findUnique({
+        where: { id: impersonationSessionId }
+      });
+
+      if (!session) {
+        res.status(403).json({ error: 'Invalid impersonation session' });
+        return;
+      }
+
+      if (!session.isActive) {
+        res.status(403).json({ error: 'Impersonation session has ended' });
+        return;
+      }
+
+      if (new Date() > session.expiresAt) {
+        await prisma.adminImpersonationSession.update({
+          where: { id: impersonationSessionId },
+          data: { isActive: false, endedAt: new Date() }
+        });
+        res.status(403).json({ error: 'Impersonation session has expired' });
+        return;
+      }
+
+      if (session.mode === 'VIEW_ONLY') {
+        const mutatingMethods = ['POST', 'PUT', 'PATCH', 'DELETE'];
+        if (mutatingMethods.includes(req.method.toUpperCase())) {
+          res.status(403).json({ 
+            error: 'Write operations not permitted in VIEW_ONLY impersonation mode',
+            impersonationMode: session.mode,
+            allowedMethods: ['GET', 'HEAD', 'OPTIONS']
+          });
+          return;
+        }
+      }
+
+      (req as any).impersonationSession = session;
+      next();
+    } catch (error) {
+      console.error('Error checking impersonation session:', error);
+      res.status(500).json({ error: 'Failed to validate impersonation session' });
+    }
+  };
+}
+
+/**
+ * Check if emergency lockdown is active for the given scope
+ * Blocks operations when lockdown is active for the user's country/service
+ */
+export function checkEmergencyLockdown(options?: { allowedRoles?: string[] }) {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (options?.allowedRoles && req.user?.adminRole) {
+        if (options.allowedRoles.includes(req.user.adminRole)) {
+          next();
+          return;
+        }
+      }
+
+      const userCountry = req.user?.country || 'GLOBAL';
+      
+      const activeLockdowns = await prisma.emergencyLockdown.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { scope: 'GLOBAL' },
+            { countryCode: userCountry },
+            { countryCode: null }
+          ]
+        }
+      });
+
+      if (activeLockdowns.length > 0) {
+        const lockdown = activeLockdowns[0];
+        res.status(503).json({
+          error: 'System is currently under emergency lockdown',
+          lockdownId: lockdown.id,
+          scope: lockdown.scope,
+          reason: lockdown.reason,
+          estimatedEndTime: lockdown.estimatedEndTime
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      console.error('Error checking emergency lockdown:', error);
+      next();
+    }
+  };
+}
