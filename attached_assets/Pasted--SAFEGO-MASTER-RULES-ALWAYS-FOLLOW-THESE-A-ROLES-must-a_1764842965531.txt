@@ -1,0 +1,126 @@
+# SAFEGO MASTER RULES (ALWAYS FOLLOW THESE)
+
+A) ROLES (must always include all four)
+1. Customer
+2. Driver
+3. Restaurant (Merchant)
+4. Admin
+Each role must have separate signup/verification rules (BD vs US), permissions, dashboards, and flows.
+
+B) SERVICE LOGIC (must include all three)
+— Ride-hailing
+— Food delivery
+— Parcel delivery
+
+C) COUNTRY-SPECIFIC KYC
+Bangladesh (BD):
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- NID number + front/back images
+- emergency_contact
+- verification_status, is_verified
+
+United States (US):
+- date_of_birth
+- home_address
+- emergency_contact
+- government_id_type
+- government_id_last4
+- driver_license + image + expiry (drivers only)
+- ssn_last4 optional
+- verification_status, is_verified
+
+D) ADMIN PANEL
+Admin must be able to:
+- verify customers/drivers/restaurants
+- approve/reject KYC
+- see rejection_reason
+- block/unblock any user
+- edit pricing/fees/commissions
+- settle negative balances
+- manage payouts
+- view driver/restaurant negative balances
+
+E) REQUIRED COLLECTIONS
+1. rides
+2. food_orders
+3. deliveries
+Each must include:
+- identity (customer_id, driver_id, restaurant_id)
+- addresses + geolocation
+- fees + commission
+- payment details
+- timestamps
+- full status flow
+- ratings + feedback
+
+F) COMMISSION RULES (must enforce globally)
+- CASH ride: driver keeps cash, commission becomes driver negative balance
+- CASH food: restaurant keeps cash, commission becomes restaurant negative balance
+- Online payment: commission auto-deducted
+- Admin can settle balances manually
+
+G) SECURITY
+- Customers cannot view driver documents
+- Drivers cannot view customer sensitive data
+- Restaurants cannot view other restaurants
+- Only admin can modify pricing, commission, verification, blocking
+- Users can only edit their own profile
+
+H) STATUS FLOWS
+Ride: requested → searching_driver → accepted → driver_arriving → in_progress → completed/cancelled_x  
+Food: placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered/cancelled_x  
+Parcel: requested → searching_driver → accepted → picked_up → on_the_way → delivered/cancelled_x
+
+I) ONBOARDING (all roles)
+- Basic info → Address → Country-specific KYC → Emergency contact → verification_status=pending
+- Block usage until admin approval
+
+J) NOTIFICATIONS
+- ride alerts  
+- food order updates  
+- parcel updates  
+- verification approval/rejection  
+- admin notifications  
+
+K) GLOBAL COMPANY RULES (Bangladesh auth rule)
+- Only customer signup exists
+- All partners (driver, restaurant, courier, etc.) onboard AFTER login
+- Must NEVER break existing roles/routes/schemas
+- Additive changes only (non-breaking)
+
+---------------------------------------------------------
+# TASK PROMPT: FULL SAFEGO SYSTEM AUDIT & FIX-EVERYTHING
+
+Perform a complete end-to-end audit of the entire SafeGo platform:
+
+1. Customer app (ride, food, parcel)
+2. Driver apps (ride driver, delivery driver)
+3. Restaurant dashboard
+4. Admin panel
+5. Country-specific flows (BD + US)
+6. Onboarding + verification
+7. Status flows for all three services
+8. Payments + commissions (cash/online)
+9. Wallet negative-balance logic
+10. Security permissions
+11. Mobile vs desktop UI issues
+12. All buttons, screens, forms, components
+13. All API routes and data models
+14. All navigation flows
+15. Notifications
+16. All broken or missing features
+17. All logs, errors, and warnings
+18. Performance issues and unstable routes
+
+Then:
+
+A) Fix every error, missing feature, broken UI, incorrect logic  
+B) Complete all unfinished screens or flows  
+C) Ensure compliance with all SafeGo Master Rules  
+D) Make the entire platform publish-ready  
+E) Produce a final verification report confirming every subsystem works
+
+This must be done in ONE continuous implementation without skipping anything.
