@@ -44,6 +44,8 @@ interface ShopPartnerDetails {
   emergencyContactName?: string;
   emergencyContactPhone?: string;
   emergencyContactRelation?: string;
+  bkashNumber?: string;
+  nagadNumber?: string;
   countryCode?: string;
   createdAt: string;
   verifiedAt?: string;

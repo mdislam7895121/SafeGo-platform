@@ -3313,7 +3313,6 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
           select: {
             id: true,
             email: true,
-            fullName: true,
             countryCode: true,
             isBlocked: true,
             createdAt: true,
@@ -3387,7 +3386,7 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
       id: restaurant.id,
       userId: restaurant.user.id,
       email: restaurant.user.email,
-      ownerName: restaurant.user.fullName || 'N/A',
+      ownerName: restaurant.user.email.split('@')[0] || 'N/A',
       restaurantName: restaurant.restaurantName,
       address: restaurant.address,
       cuisineType: restaurant.cuisineType,

@@ -100,7 +100,7 @@ export default function RestaurantDetails() {
     enabled: !!restaurantId,
   });
 
-  const { data: payoutAccounts, isLoading: isLoadingPayouts } = useQuery({
+  const { data: payoutAccounts, isLoading: isLoadingPayouts } = useQuery<any[]>({
     queryKey: [`/api/admin/restaurants/${restaurantId}/payout-accounts`],
     enabled: !!restaurantId,
   });

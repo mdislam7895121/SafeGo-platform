@@ -47,6 +47,9 @@ interface TicketOperatorDetails {
   emergencyContactRelation?: string;
   officeAddress?: string;
   officeEmail?: string;
+  bkashNumber?: string;
+  nagadNumber?: string;
+  tradeLicenseNumber?: string;
   countryCode?: string;
   createdAt: string;
   verifiedAt?: string;
