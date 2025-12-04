@@ -176,12 +176,15 @@ interface AuditLogParams {
   actorEmail: string;
   actorRole: string;
   ipAddress?: string | null;
+  userAgent?: string | null;
+  countryCode?: string | null;
   actionType: string;
   entityType: string;
   entityId?: string | null;
   description: string;
   metadata?: Record<string, any> | null;
   success?: boolean;
+  environment?: string;
 }
 
 /**
@@ -229,30 +232,36 @@ export async function logAuditEvent(params: AuditLogParams): Promise<void> {
       actorEmail,
       actorRole,
       ipAddress = null,
+      userAgent = null,
+      countryCode = null,
       actionType,
       entityType,
       entityId = null,
       description,
       metadata = null,
       success = true,
+      environment = process.env.NODE_ENV || "development",
     } = params;
 
     // Sanitize metadata to remove sensitive information
     const safeMetadata = sanitizeMetadata(metadata);
 
-    // Create audit log entry
+    // Create audit log entry with enhanced fields for multi-admin tracking and region scoping
     await prisma.auditLog.create({
       data: {
         actorId,
         actorEmail,
         actorRole,
         ipAddress,
+        userAgent,
+        countryCode,
         actionType,
         entityType,
         entityId,
         description,
         metadata: safeMetadata || undefined,
         success,
+        environment,
       },
     });
   } catch (error) {
@@ -272,6 +281,31 @@ export function getClientIp(req: any): string | null {
     req.socket?.remoteAddress ||
     null
   );
+}
+
+/**
+ * Helper to extract User-Agent from Express request
+ */
+export function getUserAgent(req: any): string | null {
+  return req.headers?.["user-agent"] || null;
+}
+
+/**
+ * Enhanced audit logging helper with request metadata extraction
+ * Automatically captures IP, User-Agent, and country code from request
+ */
+export async function logAuditEventFromRequest(
+  req: any,
+  params: Omit<AuditLogParams, "ipAddress" | "userAgent">
+): Promise<void> {
+  const ipAddress = getClientIp(req);
+  const userAgent = getUserAgent(req);
+  
+  await logAuditEvent({
+    ...params,
+    ipAddress,
+    userAgent,
+  });
 }
 
 /**

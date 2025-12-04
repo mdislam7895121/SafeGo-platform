@@ -1,17 +1,33 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 
 type Theme = "light" | "dark" | "system";
+type AdminPreset = "default" | "slate" | "ocean" | "forest" | "sunset";
+type AccessibilityMode = "normal" | "high-contrast" | "large-text" | "high-contrast-large";
 
 interface ThemeContextType {
   theme: Theme;
   resolvedTheme: "light" | "dark";
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  adminPreset: AdminPreset;
+  setAdminPreset: (preset: AdminPreset) => void;
+  accessibilityMode: AccessibilityMode;
+  setAccessibilityMode: (mode: AccessibilityMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_STORAGE_KEY = "safego-theme";
+const ADMIN_PRESET_KEY = "safego-admin-preset";
+const ACCESSIBILITY_KEY = "safego-accessibility";
+
+const PRESET_COLORS: Record<AdminPreset, { primary: string; accent: string }> = {
+  default: { primary: "210 92% 45%", accent: "210 15% 90%" },
+  slate: { primary: "215 25% 35%", accent: "215 15% 88%" },
+  ocean: { primary: "200 80% 45%", accent: "200 30% 88%" },
+  forest: { primary: "145 60% 35%", accent: "145 20% 88%" },
+  sunset: { primary: "25 85% 50%", accent: "25 30% 90%" },
+};
 
 function getSystemTheme(): "light" | "dark" {
   if (typeof window !== "undefined" && window.matchMedia) {
@@ -23,12 +39,22 @@ function getSystemTheme(): "light" | "dark" {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("system");
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
+  const [adminPreset, setAdminPresetState] = useState<AdminPreset>("default");
+  const [accessibilityMode, setAccessibilityModeState] = useState<AccessibilityMode>("normal");
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === "light" || stored === "dark" || stored === "system") {
-      setThemeState(stored);
+    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system") {
+      setThemeState(storedTheme);
+    }
+    const storedPreset = localStorage.getItem(ADMIN_PRESET_KEY);
+    if (storedPreset && Object.keys(PRESET_COLORS).includes(storedPreset)) {
+      setAdminPresetState(storedPreset as AdminPreset);
+    }
+    const storedA11y = localStorage.getItem(ACCESSIBILITY_KEY);
+    if (storedA11y && ["normal", "high-contrast", "large-text", "high-contrast-large"].includes(storedA11y)) {
+      setAccessibilityModeState(storedA11y as AccessibilityMode);
     }
     setIsHydrated(true);
   }, []);
@@ -59,10 +85,50 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setTheme(newTheme);
   }, [resolvedTheme, setTheme]);
 
+  const applyPreset = useCallback((preset: AdminPreset) => {
+    if (typeof document === "undefined") return;
+    const colors = PRESET_COLORS[preset];
+    document.documentElement.style.setProperty("--primary", colors.primary);
+    document.documentElement.style.setProperty("--accent", colors.accent);
+    document.documentElement.style.setProperty("--ring", colors.primary);
+    document.documentElement.style.setProperty("--sidebar-primary", colors.primary);
+    document.documentElement.style.setProperty("--sidebar-ring", colors.primary);
+  }, []);
+
+  const applyAccessibility = useCallback((mode: AccessibilityMode) => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.classList.remove("a11y-high-contrast", "a11y-large-text");
+    if (mode === "high-contrast" || mode === "high-contrast-large") {
+      root.classList.add("a11y-high-contrast");
+    }
+    if (mode === "large-text" || mode === "high-contrast-large") {
+      root.classList.add("a11y-large-text");
+    }
+  }, []);
+
+  const setAdminPreset = useCallback((preset: AdminPreset) => {
+    setAdminPresetState(preset);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ADMIN_PRESET_KEY, preset);
+    }
+    applyPreset(preset);
+  }, [applyPreset]);
+
+  const setAccessibilityMode = useCallback((mode: AccessibilityMode) => {
+    setAccessibilityModeState(mode);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(ACCESSIBILITY_KEY, mode);
+    }
+    applyAccessibility(mode);
+  }, [applyAccessibility]);
+
   useEffect(() => {
     if (!isHydrated) return;
     applyTheme(theme);
-  }, [theme, isHydrated, applyTheme]);
+    applyPreset(adminPreset);
+    applyAccessibility(accessibilityMode);
+  }, [theme, adminPreset, accessibilityMode, isHydrated, applyTheme, applyPreset, applyAccessibility]);
 
   useEffect(() => {
     if (theme !== "system" || typeof window === "undefined") return;
@@ -77,7 +143,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [theme, applyTheme]);
 
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ 
+      theme, 
+      resolvedTheme, 
+      setTheme, 
+      toggleTheme,
+      adminPreset,
+      setAdminPreset,
+      accessibilityMode,
+      setAccessibilityMode
+    }}>
       {children}
     </ThemeContext.Provider>
   );

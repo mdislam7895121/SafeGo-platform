@@ -6855,6 +6855,34 @@ router.patch("/notifications/read-all", checkPermission(Permission.VIEW_DASHBOAR
 // Global Settings Endpoints
 // ====================================================
 import { SettingsService, validateSettingsPayload } from "../utils/settings";
+import { getEnvironmentConfig, getEnvironmentIndicator, getEnvironmentConfigSummary } from "../config/environmentConfig";
+
+// ====================================================
+// GET /api/admin/environment
+// Get current environment configuration (for admin UI)
+// ====================================================
+router.get("/environment", checkPermission(Permission.VIEW_DASHBOARD), async (_req: AuthRequest, res) => {
+  try {
+    const config = getEnvironmentConfig();
+    const indicator = getEnvironmentIndicator();
+    const summary = getEnvironmentConfigSummary();
+    
+    res.json({
+      name: config.name,
+      displayName: config.displayName,
+      indicator,
+      isProduction: config.isProduction,
+      isDevelopment: config.isDevelopment,
+      isStaging: config.isStaging,
+      features: config.features,
+      limits: config.limits,
+      summary,
+    });
+  } catch (error) {
+    console.error("Get environment config error:", error);
+    res.status(500).json({ error: "Failed to fetch environment configuration" });
+  }
+});
 
 // ====================================================
 // GET /api/admin/settings

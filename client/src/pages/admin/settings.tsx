@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Settings as SettingsIcon } from "lucide-react";
+import { Loader2, Save, Settings as SettingsIcon, Palette, Sun, Moon, Monitor, Eye, Type } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { useTheme } from "@/contexts/ThemeContext";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 // Types matching the backend
 interface GeneralSettings {
@@ -152,6 +154,150 @@ interface AllSettings {
   security: SecuritySettings;
   support: SupportSettings;
   welcomeMessage: WelcomeMessageSettings;
+}
+
+const PRESET_OPTIONS = [
+  { value: "default", label: "SafeGo Blue", description: "Default brand theme" },
+  { value: "slate", label: "Slate", description: "Professional slate tones" },
+  { value: "ocean", label: "Ocean", description: "Cool ocean blues" },
+  { value: "forest", label: "Forest", description: "Earthy green theme" },
+  { value: "sunset", label: "Sunset", description: "Warm sunset orange" },
+] as const;
+
+const ACCESSIBILITY_OPTIONS = [
+  { value: "normal", label: "Standard", description: "Default text and contrast" },
+  { value: "high-contrast", label: "High Contrast", description: "Enhanced visibility" },
+  { value: "large-text", label: "Large Text", description: "Bigger fonts for readability" },
+  { value: "high-contrast-large", label: "High Contrast + Large Text", description: "Maximum accessibility" },
+] as const;
+
+function ThemeSettingsTab() {
+  const { theme, setTheme, adminPreset, setAdminPreset, accessibilityMode, setAccessibilityMode } = useTheme();
+
+  return (
+    <TabsContent value="theme" className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Theme & Appearance
+          </CardTitle>
+          <CardDescription>
+            Customize the admin dashboard appearance and accessibility settings
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Sun className="h-4 w-4" />
+              Color Mode
+            </h3>
+            <RadioGroup
+              value={theme}
+              onValueChange={(value) => setTheme(value as "light" | "dark" | "system")}
+              className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+            >
+              <Label
+                htmlFor="theme-light"
+                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 cursor-pointer hover-elevate [&:has([data-state=checked])]:border-primary"
+              >
+                <RadioGroupItem value="light" id="theme-light" className="sr-only" />
+                <Sun className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium">Light</span>
+              </Label>
+              <Label
+                htmlFor="theme-dark"
+                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 cursor-pointer hover-elevate [&:has([data-state=checked])]:border-primary"
+              >
+                <RadioGroupItem value="dark" id="theme-dark" className="sr-only" />
+                <Moon className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium">Dark</span>
+              </Label>
+              <Label
+                htmlFor="theme-system"
+                className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 cursor-pointer hover-elevate [&:has([data-state=checked])]:border-primary"
+              >
+                <RadioGroupItem value="system" id="theme-system" className="sr-only" />
+                <Monitor className="h-6 w-6 mb-2" />
+                <span className="text-sm font-medium">System</span>
+              </Label>
+            </RadioGroup>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              Brand Theme
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Choose a color preset for the admin interface
+            </p>
+            <RadioGroup
+              value={adminPreset}
+              onValueChange={(value) => setAdminPreset(value as any)}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
+            >
+              {PRESET_OPTIONS.map((preset) => (
+                <Label
+                  key={preset.value}
+                  htmlFor={`preset-${preset.value}`}
+                  className="flex items-start gap-3 rounded-md border-2 border-muted bg-popover p-3 cursor-pointer hover-elevate [&:has([data-state=checked])]:border-primary"
+                >
+                  <RadioGroupItem value={preset.value} id={`preset-${preset.value}`} className="mt-1" />
+                  <div>
+                    <span className="text-sm font-medium">{preset.label}</span>
+                    <p className="text-xs text-muted-foreground">{preset.description}</p>
+                  </div>
+                </Label>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              Accessibility
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Adjust visual settings for improved readability
+            </p>
+            <RadioGroup
+              value={accessibilityMode}
+              onValueChange={(value) => setAccessibilityMode(value as any)}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+            >
+              {ACCESSIBILITY_OPTIONS.map((option) => (
+                <Label
+                  key={option.value}
+                  htmlFor={`a11y-${option.value}`}
+                  className="flex items-start gap-3 rounded-md border-2 border-muted bg-popover p-3 cursor-pointer hover-elevate [&:has([data-state=checked])]:border-primary"
+                >
+                  <RadioGroupItem value={option.value} id={`a11y-${option.value}`} className="mt-1" />
+                  <div>
+                    <span className="text-sm font-medium flex items-center gap-2">
+                      {option.value.includes("large") && <Type className="h-3 w-3" />}
+                      {option.label}
+                    </span>
+                    <p className="text-xs text-muted-foreground">{option.description}</p>
+                  </div>
+                </Label>
+              ))}
+            </RadioGroup>
+          </div>
+
+          <div className="mt-6 p-4 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              Theme preferences are stored locally and will persist across sessions.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </TabsContent>
+  );
 }
 
 export default function AdminSettings() {
@@ -304,6 +450,7 @@ export default function AdminSettings() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="inline-flex w-full overflow-x-auto overflow-y-hidden gap-1 justify-start">
           <TabsTrigger value="general" data-testid="tab-general" className="whitespace-nowrap flex-shrink-0">General</TabsTrigger>
+          <TabsTrigger value="theme" data-testid="tab-theme" className="whitespace-nowrap flex-shrink-0">Theme</TabsTrigger>
           <TabsTrigger value="kyc" data-testid="tab-kyc" className="whitespace-nowrap flex-shrink-0">KYC Rules</TabsTrigger>
           <TabsTrigger value="commission" data-testid="tab-commission" className="whitespace-nowrap flex-shrink-0">Commission</TabsTrigger>
           <TabsTrigger value="tax" data-testid="tab-tax" className="whitespace-nowrap flex-shrink-0">Tax & Fees</TabsTrigger>
@@ -374,6 +521,9 @@ export default function AdminSettings() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* Theme Tab */}
+        <ThemeSettingsTab />
 
         {/* KYC Tab */}
         <TabsContent value="kyc" className="space-y-4">

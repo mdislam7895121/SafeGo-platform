@@ -276,6 +276,7 @@ import AdminBDExpansionDashboard from "@/pages/admin/bd-expansion-dashboard";
 import AdminPeopleKycCenter from "@/pages/admin/people-kyc";
 import AdminSafetyCenterNew from "@/pages/admin/safety-center";
 import AdminFeatureFlags from "@/pages/admin/feature-flags";
+import AdminAccessGovernance from "@/pages/admin/access-governance";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -2034,6 +2035,11 @@ function Router() {
       <Route path="/admin/feature-flags">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminFeatureFlags />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/access-governance">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminAccessGovernance />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/driver-support">

@@ -683,3 +683,74 @@ html {
 /* Note: Premium admin card glow effects are now applied via Tailwind utility classes
    directly on the StatCard and ManagementCard components in stat-card.tsx.
    This uses before:/after: pseudo-elements for rim-light and under-glow effects. */
+
+/* ========================================
+   ACCESSIBILITY MODES
+   ======================================== */
+
+/* High Contrast Mode */
+.a11y-high-contrast {
+  --foreground: 0 0% 0%;
+  --background: 0 0% 100%;
+  --border: 0 0% 0%;
+  --muted-foreground: 0 0% 20%;
+}
+
+.a11y-high-contrast.dark {
+  --foreground: 0 0% 100%;
+  --background: 0 0% 0%;
+  --border: 0 0% 100%;
+  --muted-foreground: 0 0% 80%;
+}
+
+.a11y-high-contrast button,
+.a11y-high-contrast a,
+.a11y-high-contrast input,
+.a11y-high-contrast select,
+.a11y-high-contrast textarea {
+  border-width: 2px !important;
+}
+
+.a11y-high-contrast *:focus-visible {
+  outline-width: 3px !important;
+  outline-offset: 2px !important;
+}
+
+/* Large Text Mode */
+.a11y-large-text {
+  font-size: 1.125rem !important;
+}
+
+.a11y-large-text h1 {
+  font-size: 2.5rem !important;
+}
+
+.a11y-large-text h2 {
+  font-size: 2rem !important;
+}
+
+.a11y-large-text h3 {
+  font-size: 1.5rem !important;
+}
+
+.a11y-large-text p,
+.a11y-large-text span,
+.a11y-large-text label,
+.a11y-large-text button {
+  font-size: 1.125rem !important;
+}
+
+.a11y-large-text .text-sm {
+  font-size: 1rem !important;
+}
+
+.a11y-large-text .text-xs {
+  font-size: 0.875rem !important;
+}
+
+.a11y-large-text input,
+.a11y-large-text select,
+.a11y-large-text textarea {
+  font-size: 1.125rem !important;
+  min-height: 3rem !important;
+}

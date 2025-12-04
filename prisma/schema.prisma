@@ -1828,18 +1828,23 @@ model AuditLog {
   actorEmail  String
   actorRole   String
   ipAddress   String?
+  userAgent   String?
+  countryCode String?
   actionType  String
   entityType  String
   entityId    String?
   description String
   metadata    Json?
   success     Boolean  @default(true)
+  environment String   @default("development")
 
   @@index([createdAt])
   @@index([actorEmail])
   @@index([actionType])
   @@index([entityType])
   @@index([success])
+  @@index([countryCode])
+  @@index([environment])
   @@map("audit_logs")
 }
 

@@ -5,7 +5,7 @@ import {
   Car, UtensilsCrossed, ShoppingBag, Ticket, Key, Server,
   AlertTriangle, Volume2, VolumeX, ChevronRight, Clock, User,
   MapPin, History, RefreshCw, ExternalLink, Shield, AlertCircle,
-  Info, XCircle, Settings, Activity, Layers, Wifi, WifiOff
+  Info, XCircle, Settings, Activity, Layers, Wifi, WifiOff, Download
 } from "lucide-react";
 import { useAdminNotificationsWs } from "@/hooks/use-admin-notifications-ws";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -577,6 +577,39 @@ export default function AdminNotifications() {
 
   const hasActiveFilters = Object.values(filters).some((v) => v !== "") || searchQuery !== "";
 
+  const exportNotificationsAsCSV = useCallback(() => {
+    if (!data?.notifications?.length) return;
+    
+    const headers = ["ID", "Type", "Severity", "Title", "Message", "Entity Type", "Entity ID", "Country", "Actor", "Read", "Created At"];
+    const rows = data.notifications.map(n => [
+      n.id,
+      n.type,
+      n.severity,
+      `"${n.title.replace(/"/g, '""')}"`,
+      `"${n.message.replace(/"/g, '""')}"`,
+      n.entityType,
+      n.entityId || "",
+      n.countryCode || "",
+      n.actorEmail || "",
+      n.isRead ? "Yes" : "No",
+      format(new Date(n.createdAt), "yyyy-MM-dd HH:mm:ss")
+    ]);
+    
+    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `notifications-export-${format(new Date(), "yyyyMMdd-HHmmss")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Export Complete",
+      description: `Exported ${data.notifications.length} notifications to CSV`,
+    });
+  }, [data?.notifications, toast]);
+
   return (
     <div className="min-h-screen bg-background pb-6">
       <div className="bg-primary text-primary-foreground px-4 sm:px-6 md:px-8 py-5 sm:py-6 rounded-b-2xl sm:rounded-b-3xl shadow-lg">
@@ -675,6 +708,21 @@ export default function AdminNotifications() {
               <CheckCheck className="h-4 w-4 mr-2" />
               Mark All Read
             </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={exportNotificationsAsCSV}
+                  disabled={!data?.notifications?.length}
+                  className="text-primary-foreground hover:bg-primary-foreground/10"
+                  data-testid="button-export-csv"
+                >
+                  <Download className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export to CSV</TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
