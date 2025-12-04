@@ -106,3 +106,56 @@ The platform now implements comprehensive Role-Based Access Control with 8 disti
 
 ### API Endpoints
 - `GET /api/admin-phase1/capabilities` - Returns current admin's role, permissions, navigation access, and action capabilities
+
+## RBAC v3 & Phase-2 Enterprise Features (December 2024)
+
+### Phase-2 Enhancements Overview
+Building on RBAC v2, Phase-2 introduces enterprise-grade admin governance, tamper-proof auditing, and advanced KYC capabilities:
+
+**1. RBAC v3 Enterprise Admin Permission Framework**
+- **Permission Bundles**: Pre-defined permission sets (e.g., "KYC Reviewer", "Finance Analyst") that can be assigned to admins for streamlined role management
+- **Emergency Lockdown Controls**: Scoped lockdown system (GLOBAL, COUNTRY, SERVICE, COUNTRY_SERVICE) with proper authorization - only SUPER_ADMIN can activate GLOBAL lockdowns
+- **Admin Impersonation Mode**: View-only mode for debugging user issues with full audit trail; server-side enforcement blocks all mutating operations
+- **Secure Internal Messaging**: Encrypted admin-to-admin communication with broadcast capability
+
+**2. Global Audit Engine v2**
+- **Audit Event Chain**: Tamper-proof logging with hash chain verification across all admin actions
+- **Evidence Packets**: Bundled documentation for investigations with status tracking
+- **Regulator Export Mode**: PDF/CSV export capability for regulatory compliance with queue-based processing
+
+**3. People & KYC Center Phase-2**
+- **KYC Review Queue**: SLA-tracked queue with assignment, escalation, and priority management
+- **Identity Risk Signals**: Automated and manual risk signal creation with severity scoring
+- **Duplicate Detection**: Account cluster detection with merge/dismiss workflows
+- **Suspicious Activity Flagging**: Multi-type flagging system with resolution tracking
+- **Country-specific Enforcement Rules**: Configurable document requirements, verification levels, and grace periods per country/role
+
+### New Permissions (22 added in Phase-2)
+- **Permission Bundles**: VIEW_PERMISSION_BUNDLES, MANAGE_PERMISSION_BUNDLES, ASSIGN_PERMISSION_BUNDLES
+- **Emergency Controls**: VIEW_EMERGENCY_STATUS, ACTIVATE_EMERGENCY_LOCKDOWN, DEACTIVATE_EMERGENCY_LOCKDOWN
+- **Impersonation**: IMPERSONATE_USER, VIEW_IMPERSONATION_LOGS
+- **Secure Messaging**: SEND_SECURE_MESSAGE, READ_SECURE_MESSAGE, BROADCAST_ADMIN_MESSAGE
+- **Audit Engine**: VIEW_AUDIT_CHAIN, VERIFY_AUDIT_INTEGRITY, CREATE_EVIDENCE_PACKET, EXPORT_REGULATOR_REPORT
+- **Advanced People Center**: VIEW_RISK_SIGNALS, MANAGE_RISK_SIGNALS, VIEW_DUPLICATE_ACCOUNTS, MANAGE_DUPLICATE_ACCOUNTS, VIEW_SUSPICIOUS_ACTIVITY, MANAGE_SUSPICIOUS_ACTIVITY
+
+### Key Files (Phase-2)
+- `server/routes/admin-phase2.ts` - All Phase-2 API endpoints
+- `server/middleware/authz.ts` - Impersonation enforcement (enforceImpersonationViewOnly) and lockdown checking (checkEmergencyLockdown)
+- `prisma/schema.prisma` - 12 new models for Phase-2 features
+
+### API Endpoints (Phase-2)
+- **Permission Bundles**: `/api/admin-phase2/permission-bundles/*`
+- **Emergency Lockdown**: `/api/admin-phase2/emergency/*`
+- **Impersonation**: `/api/admin-phase2/impersonation/*`
+- **Secure Messaging**: `/api/admin-phase2/messaging/*`
+- **Audit Engine**: `/api/admin-phase2/audit/*`
+- **KYC Queue**: `/api/admin-phase2/kyc/queue/*`
+- **Risk Signals**: `/api/admin-phase2/kyc/risk-signals/*`
+- **Duplicates**: `/api/admin-phase2/kyc/duplicates/*`
+- **Suspicious Activity**: `/api/admin-phase2/kyc/suspicious-activity/*`
+- **Enforcement Rules**: `/api/admin-phase2/kyc/enforcement-rules/*`
+
+### Security Enforcement
+- VIEW_ONLY impersonation mode blocks POST/PUT/PATCH/DELETE at middleware level
+- Emergency lockdown scoping prevents regional admins from affecting global operations
+- All mutation endpoints have comprehensive audit logging
