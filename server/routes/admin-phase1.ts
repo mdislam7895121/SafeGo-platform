@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { AuthRequest, loadAdminProfile, checkPermission } from "../middleware/auth";
 import { authenticateToken, requireAdmin } from "../middleware/authz";
@@ -824,18 +824,34 @@ router.get("/feature-flags/:id", checkPermission(Permission.VIEW_FEATURE_FLAGS),
   }
 });
 
+// Enterprise Feature Flags Schema with grouping and environment support
 const CreateFeatureFlagSchema = z.object({
   key: z.string().min(1).regex(/^[a-z0-9_]+$/, "Key must be lowercase alphanumeric with underscores"),
   description: z.string().min(1),
   isEnabled: z.boolean().optional().default(false),
+  category: z.enum(["RIDE", "FOOD", "SHOP", "TICKET", "RENTAL", "SYSTEM"]).optional().default("SYSTEM"),
+  environment: z.enum(["DEVELOPMENT", "STAGING", "PRODUCTION", "ALL"]).optional().default("ALL"),
   countryScope: z.enum(["GLOBAL", "BD", "US"]).optional().default("GLOBAL"),
   roleScope: z.string().optional(),
   serviceScope: z.string().optional(),
+  partnerTypeScope: z.string().optional(),
   rolloutPercentage: z.number().min(0).max(100).optional().default(100),
   metadata: z.record(z.any()).optional(),
 });
 
-router.post("/feature-flags", checkPermission(Permission.MANAGE_FEATURE_FLAGS), async (req: AuthRequest, res) => {
+// Super Admin security check middleware for feature flag modifications
+const requireSuperAdmin = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const adminUser = (req as any).adminUser;
+  if (!adminUser || adminUser.adminRole !== "SUPER_ADMIN") {
+    return res.status(403).json({ 
+      error: "Access denied. Only Super Admins can modify feature flags.",
+      requiredRole: "SUPER_ADMIN"
+    });
+  }
+  next();
+};
+
+router.post("/feature-flags", checkPermission(Permission.MANAGE_FEATURE_FLAGS), requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const data = CreateFeatureFlagSchema.parse(req.body);
 
@@ -859,13 +875,16 @@ router.post("/feature-flags", checkPermission(Permission.MANAGE_FEATURE_FLAGS), 
       actionType: ActionType.FEATURE_FLAG_CREATED,
       entityType: EntityType.FEATURE_FLAG,
       entityId: flag.id,
-      description: `Created feature flag: ${data.key}`,
+      description: `Created feature flag: ${data.key} [Category: ${data.category}, Environment: ${data.environment}]`,
       ipAddress: getClientIp(req),
       metadata: { 
         key: data.key, 
+        category: data.category,
+        environment: data.environment,
         countryScope: data.countryScope,
         isEnabled: data.isEnabled,
-        rolloutPercentage: data.rolloutPercentage 
+        rolloutPercentage: data.rolloutPercentage,
+        partnerTypeScope: data.partnerTypeScope,
       },
     });
 
@@ -879,38 +898,71 @@ router.post("/feature-flags", checkPermission(Permission.MANAGE_FEATURE_FLAGS), 
 const UpdateFeatureFlagSchema = z.object({
   description: z.string().optional(),
   isEnabled: z.boolean().optional(),
+  category: z.enum(["RIDE", "FOOD", "SHOP", "TICKET", "RENTAL", "SYSTEM"]).optional(),
+  environment: z.enum(["DEVELOPMENT", "STAGING", "PRODUCTION", "ALL"]).optional(),
   countryScope: z.enum(["GLOBAL", "BD", "US"]).optional(),
   roleScope: z.string().optional(),
   serviceScope: z.string().optional(),
+  partnerTypeScope: z.string().optional(),
   rolloutPercentage: z.number().min(0).max(100).optional(),
   metadata: z.record(z.any()).optional(),
 });
 
-router.patch("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FLAGS), async (req: AuthRequest, res) => {
+router.patch("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FLAGS), requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const data = UpdateFeatureFlagSchema.parse(req.body);
+
+    // Get previous state for toggle tracking
+    const previousFlag = await prisma.featureFlag.findUnique({ where: { id } });
+    if (!previousFlag) {
+      return res.status(404).json({ error: "Feature flag not found" });
+    }
+
+    // Track toggle changes
+    const isToggleChange = data.isEnabled !== undefined && data.isEnabled !== previousFlag.isEnabled;
 
     const flag = await prisma.featureFlag.update({
       where: { id },
       data: {
         ...data,
         updatedByAdminId: req.user?.userId,
+        ...(isToggleChange && {
+          lastToggleByAdminId: req.user?.userId,
+          lastToggleAt: new Date(),
+        }),
       },
     });
+
+    // Enhanced audit logging with toggle tracking
+    const actionType = isToggleChange 
+      ? (data.isEnabled ? ActionType.FEATURE_FLAG_ENABLED : ActionType.FEATURE_FLAG_DISABLED)
+      : ActionType.FEATURE_FLAG_UPDATED;
 
     await logAuditEvent({
       actorId: req.user?.userId || null,
       actorEmail: (req as any).adminUser?.email || "unknown",
       actorRole: "admin",
-      actionType: ActionType.FEATURE_FLAG_UPDATED,
+      actionType,
       entityType: EntityType.FEATURE_FLAG,
       entityId: id,
-      description: `Updated feature flag: ${flag.key}`,
+      description: isToggleChange 
+        ? `${data.isEnabled ? "Enabled" : "Disabled"} feature flag: ${flag.key}`
+        : `Updated feature flag: ${flag.key}`,
       ipAddress: getClientIp(req),
       metadata: { 
         key: flag.key,
-        changes: data 
+        category: flag.category,
+        environment: flag.environment,
+        changes: data,
+        previousState: {
+          isEnabled: previousFlag.isEnabled,
+          rolloutPercentage: previousFlag.rolloutPercentage,
+        },
+        newState: {
+          isEnabled: flag.isEnabled,
+          rolloutPercentage: flag.rolloutPercentage,
+        },
       },
     });
 
@@ -921,7 +973,7 @@ router.patch("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FLA
   }
 });
 
-router.delete("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FLAGS), async (req: AuthRequest, res) => {
+router.delete("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FLAGS), requireSuperAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -939,11 +991,14 @@ router.delete("/feature-flags/:id", checkPermission(Permission.MANAGE_FEATURE_FL
       actionType: ActionType.FEATURE_FLAG_DELETED,
       entityType: EntityType.FEATURE_FLAG,
       entityId: id,
-      description: `Deleted feature flag: ${flag.key}`,
+      description: `Deleted feature flag: ${flag.key} [Category: ${flag.category}, Environment: ${flag.environment}]`,
       ipAddress: getClientIp(req),
       metadata: { 
         key: flag.key,
-        wasEnabled: flag.isEnabled 
+        category: flag.category,
+        environment: flag.environment,
+        wasEnabled: flag.isEnabled,
+        rolloutPercentage: flag.rolloutPercentage,
       },
     });
 
