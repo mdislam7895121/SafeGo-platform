@@ -73,6 +73,7 @@ import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
 import { setupDispatchWebSocket } from "./websocket/dispatchWs";
+import { setupAdminNotificationsWebSocket } from "./websocket/adminNotificationsWs";
 import { db } from "./db";
 
 // Public Driver Profile Summary Type (D2 Spec)
@@ -505,6 +506,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   setupRideChatWebSocket(httpServer);
   setupFoodOrderNotificationsWebSocket(httpServer);
   setupDispatchWebSocket(httpServer);
+  setupAdminNotificationsWebSocket(httpServer);
 
   return httpServer;
 }
