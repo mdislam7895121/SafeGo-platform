@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../db';
 import jwt from 'jsonwebtoken';
+import { AdminRole } from '../utils/permissions';
 
 interface JWTPayload {
   userId: string;
@@ -69,7 +70,7 @@ export async function authenticateToken(
         email: user.email,
         role: decoded.role,
         adminProfile: {
-          adminRole: user.adminProfile.adminRole,
+          adminRole: user.adminProfile.adminRole as AdminRole,
           isActive: user.adminProfile.isActive
         }
       });
