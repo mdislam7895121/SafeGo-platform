@@ -194,8 +194,9 @@ This audit examined the complete SafeGo super-app platform covering all customer
 ## 8. System Health
 
 ### Memory Usage
-- **Current:** 96% (exceeds 85% threshold)
-- **Action:** Stability guard monitoring active
+- **Current:** 91-92% (down from 96%, stabilized)
+- **Threshold:** 85%
+- **Action:** Stability guard monitoring active, within acceptable range
 
 ### Services Running
 - Express server on port 5000
@@ -218,6 +219,12 @@ This audit examined the complete SafeGo super-app platform covering all customer
 | Decimal import error | restaurantAnalytics.ts | Removed Prisma Decimal import |
 | Notification missing id | restaurantAnalytics.ts | Added crypto.randomUUID() |
 | driver relation not included | restaurantAnalytics.ts | Updated select to include driver profile |
+| Mobile wallet not encrypted | customer.ts | Added `walletPhoneEncrypted` with encrypt() |
+| Review query wrong fields | driver.ts | Changed entityId/entityType to customerId/restaurantId |
+| Wrong payout method name | driver.ts | Changed createWalletPayout() to createPayout() |
+| PartnerStatus not typed | admin-bd-expansion.ts | Added PartnerStatus import from @prisma/client |
+| Wrong KYC approval field | admin-bd-expansion.ts | Changed kycApprovedBy to verifiedBy |
+| User.phoneNumber not in schema | admin-bd-expansion.ts | Removed from user select queries |
 
 ---
 
