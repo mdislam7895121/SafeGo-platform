@@ -11,6 +11,13 @@ import { DynamicPricingService, dynamicPricingService } from './DynamicPricingSe
 import { PerformanceScoringService, performanceScoringService } from './PerformanceScoringService';
 import { AutoCancellationService, autoCancellationService } from './AutoCancellationService';
 import { AutoPayoutService, autoPayoutService } from './AutoPayoutService';
+import { fraudDetectionAutomation } from './FraudDetectionAutomation';
+import { loginSecurityAutomation } from './LoginSecurityAutomation';
+import { autoNegativeBalanceControl } from './AutoNegativeBalanceControl';
+import { inventoryMenuErrorAutomation } from './InventoryMenuErrorAutomation';
+import { systemMonitoringAutomation } from './SystemMonitoringAutomation';
+import { aiCustomerSupportAutomation } from './AICustomerSupportAutomation';
+import { highRiskActivityAutomation } from './HighRiskActivityAutomation';
 
 export {
   AutoAssignmentEngine, autoAssignmentEngine,
@@ -21,6 +28,13 @@ export {
   PerformanceScoringService, performanceScoringService,
   AutoCancellationService, autoCancellationService,
   AutoPayoutService, autoPayoutService,
+  fraudDetectionAutomation,
+  loginSecurityAutomation,
+  autoNegativeBalanceControl,
+  inventoryMenuErrorAutomation,
+  systemMonitoringAutomation,
+  aiCustomerSupportAutomation,
+  highRiskActivityAutomation,
 };
 
 export interface AutomationSystemStatus {
