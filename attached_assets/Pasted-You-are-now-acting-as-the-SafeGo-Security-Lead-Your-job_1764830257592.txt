@@ -1,0 +1,344 @@
+You are now acting as the SafeGo Security Lead.
+
+Your job is to perform a **full cybersecurity audit and hardening pass**
+on the entire SafeGo platform and produce a structured security report.
+You must follow all SafeGo Master Rules and keep every change
+non-breaking and backward-compatible.
+
+=====================================================
+A) SAFEGO MASTER RULES (ALWAYS ENFORCED)
+=====================================================
+1) Roles (4 distinct roles, never mixed):
+   - Customer
+   - Driver
+   - Restaurant (Merchant)
+   - Admin
+
+   Each role must have:
+   - its own onboarding flow
+   - its own dashboard
+   - its own permissions
+   - its own KYC/verification rules
+   - its own status flows
+
+2) Core services:
+   - Ride-hailing
+   - Food delivery
+   - Parcel delivery
+
+3) Country-specific KYC (MUST be enforced):
+
+   Bangladesh (BD):
+   - father_name
+   - date_of_birth
+   - present_address
+   - permanent_address
+   - NID (number + front/back images)
+   - emergency_contact details
+   - verification_status + is_verified
+
+   United States (US):
+   - date_of_birth
+   - home_address
+   - emergency_contact details
+   - government_id_type
+   - government_id_last4
+   - (drivers) driver_license + image + expiry
+   - (drivers) ssn_last4 (optional)
+   - verification_status + is_verified
+
+4) Admin panel must be able to:
+   - verify customers, drivers, restaurants, shops, tickets
+   - approve/reject KYC (with rejection_reason)
+   - update pricing, fees, commissions
+   - block/unblock any user/partner
+   - manage payouts, view negative balances
+
+5) Core collections (must stay intact):
+   - rides
+   - food_orders
+   - deliveries
+
+   Each must include:
+   - identity fields (customer_id, driver_id, restaurant_id/shop_id)
+   - addresses + geolocation
+   - price, fees, commission
+   - payment details
+   - timestamps
+   - full status flow
+   - rating & feedback
+
+6) Commission & payout rules:
+   - Cash ride: driver keeps cash; SafeGo commission → negative driver_wallet_balance.
+   - Cash food: restaurant keeps cash; commission → negative restaurant_wallet.
+   - Cash shop: shop keeps cash; commission → negative shop_wallet.
+   - Online payments: SafeGo keeps commission automatically.
+   - Admin can settle balances and mark paid.
+
+7) Security & access rules:
+   - Customers cannot view driver documents (NID, license, etc.).
+   - Drivers cannot view customer NID or government IDs.
+   - Restaurants/shops/ticket/rental partners cannot view other partners’ internal data.
+   - Only Admin can change pricing, commissions, verification_status, blocking.
+   - Users can update only their own profile.
+   - Sensitive data (KYC, IDs, tokens, passwords, ENCRYPTION_KEY) must never appear in logs or error responses.
+
+8) Status flows (must remain valid):
+
+   Ride:
+     requested → searching_driver → accepted → driver_arriving → in_progress → completed
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+   Food:
+     placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+   Parcel:
+     requested → searching_driver → accepted → picked_up → on_the_way → delivered
+     or cancelled_by_customer / cancelled_by_driver / cancelled_by_admin
+
+9) Onboarding:
+   - Public signup is customer-only.
+   - All partners (drivers, restaurants, shops, tickets, rental) are created via onboarding flows after login.
+   - New partner profiles: verification_status="pending", is_verified=false.
+   - Partner dashboards locked until admin approval.
+
+10) Notifications:
+   - ride alerts for drivers
+   - food / shop / parcel / ticket / rental status updates
+   - verification approval/rejection
+   - important admin notifications
+
+ALL security work must respect these business rules.
+Do NOT change schemas, APIs, or flows in a breaking way.
+
+=====================================================
+B) SECURITY AUDIT OBJECTIVES
+=====================================================
+Your mission is to:
+
+1. Identify and fix critical and high-risk vulnerabilities in:
+   - Authentication & sessions
+   - Authorization & role-based access control
+   - Data protection & encryption
+   - File upload & document handling
+   - Payment, wallet, and commission flows
+   - Multi-tenant isolation (between customers, drivers, merchants)
+   - Logging, error handling, and secrets management
+   - Rate limiting and abuse protection
+   - 3rd-party dependencies
+
+2. Confirm that:
+   - KYC data is protected
+   - Wallet and payout flows are tamper-resistant
+   - Admin panel is secure and correctly locked down
+   - No user can escalate privileges or see data from another tenant
+   - No obvious injection or XSS vectors remain in core flows
+
+3. Produce a **structured security report** with:
+   - Findings
+   - Severity
+   - Impact
+   - Recommended and/or applied fixes
+
+=====================================================
+C) SCOPE – WHAT YOU MUST REVIEW
+=====================================================
+
+1. Authentication & Sessions
+   - Verify login/register flows for customers and all partner logins.
+   - Check session/token handling:
+     - JWT / session secrets
+     - token expiry and refresh
+     - logout implementation
+   - Ensure ENCRYPTION_KEY and any JWT_SECRET are:
+     - strong, correct length
+     - validated at startup
+     - never logged or exposed.
+
+2. Authorization & RBAC
+   - Audit all middleware/guards that enforce roles (customer, driver, restaurant, shop, ticket, rental, admin).
+   - Verify that:
+     - Each API checks the correct role before access.
+     - No admin-only API can be called by non-admin.
+     - Partners can access only their own resources (their own shop/restaurant/tickets/rentals, not others).
+     - Drivers can access only trips/deliveries assigned to them.
+   - Fix any missing checks with centralized, reusable permission utilities.
+
+3. Data Protection & Encryption
+   - Check password hashing (bcrypt/argon2) config and cost factors.
+   - Confirm that:
+     - Passwords are never logged or stored in plaintext.
+     - KYC fields are not exposed in unnecessary responses.
+     - Sensitive fields (NID, gov_id_last4, license_number, ssn_last4) are only exposed where strictly necessary.
+   - Re-check any crypto utilities that use ENCRYPTION_KEY:
+     - correct key length
+     - safe algorithms (AES-GCM or equivalent)
+     - no hard-coded test keys left behind.
+
+4. Input Validation & Injection Defense
+   - Verify input validation on all external-facing endpoints:
+     - Auth
+     - Partner onboarding
+     - Order creation (rides, food, deliveries, shop, ticket, rental)
+     - Wallet and payout operations.
+   - Check for:
+     - SQL/ORM injection (Prisma usage)
+     - No direct string interpolation into queries
+     - Safe query builders.
+   - Ensure centralized validation (e.g., zod/yup/DTOs) for key flows.
+
+5. File Upload Security
+   - Check all upload endpoints:
+     - Driver documents
+     - NID / licenses
+     - Restaurant/shop logos, banners, product images
+     - Ticket/rental images
+   - Ensure:
+     - Upload uses uploadWithAuth everywhere.
+     - File type and size validation.
+     - No arbitrary executable uploads (e.g., .php, .js, .exe).
+     - File paths are not predictable/guessable.
+     - Uploaded files are served from safe locations (no path traversal).
+
+6. Payment, Wallet & Commission Security
+   - Review:
+     - wallet tables (driver, restaurant, shop, ticket, rental, platform)
+     - commission calculations (cash vs online)
+     - payout requests and admin approvals.
+   - Ensure:
+     - Only server-side business logic can change wallet balances.
+     - Client cannot override commission or totals.
+     - No negative balance bypass.
+     - Admin payouts require explicit actions and are logged.
+
+7. Multi-Tenant Isolation
+   - Confirm that:
+     - A user cannot switch to another user’s ID by changing IDs in URLs or payloads.
+     - All reads/writes are scoped:
+       - by authenticated user
+       - by partner_id
+       - by country when relevant.
+   - Add missing where-clauses / filters to prevent cross-tenant access.
+
+8. Logging, Error Handling & Secrets
+   - Ensure:
+     - No logs contain passwords, full NID, license numbers, ENCRYPTION_KEY, JWTs, or tokens.
+     - Errors returned to clients are generic and do not expose stack traces or internals.
+   - Add structured logging for:
+     - security events
+     - admin actions (approve/reject/block)
+     - payout settlements.
+
+9. Rate Limiting & Abuse Protection
+   - Implement or verify rate limiting on:
+     - login, password reset
+     - KYC/ID upload
+     - sensitive APIs (payout, commission changes, admin actions).
+   - Guard against:
+     - brute-force login attempts
+     - spam partner applications
+     - mass file uploads.
+
+10. Dependencies & Supply Chain
+   - Run dependency checks (e.g., npm audit or similar).
+   - Identify high/critical vulnerabilities in packages used.
+   - Upgrade or mitigate any critical dependency issues where safe.
+
+=====================================================
+D) SECURITY TESTING FLOWS (YOU MUST EXECUTE)
+=====================================================
+
+Run realistic security tests for:
+
+1. Customer:
+   - Attempt to view another customer’s data.
+   - Attempt to access KYC fields not meant for them.
+   - Attempt to manipulate ride/food/shop/ticket/rental IDs to see others’ orders.
+
+2. Driver:
+   - Attempt to access trips not assigned to them.
+   - Attempt to see customer KYC documents.
+   - Attempt to bypass verification_status or is_verified.
+
+3. Restaurant/Shop/Ticket/Rental partners:
+   - Attempt to access other partners’ orders, products, tickets, vehicles, or wallet info.
+   - Attempt to call admin APIs.
+   - Attempt to change commission or system pricing.
+
+4. Admin:
+   - Verify admin has full visibility but is fully audited:
+     - admin actions logged
+     - no sensitive secrets in UI or logs.
+
+5. File uploads:
+   - Try to upload disallowed file types.
+   - Try path traversal filenames.
+   - Confirm these are blocked and logged correctly.
+
+6. Auth:
+   - Test expired tokens.
+   - Test missing tokens.
+   - Test using another user’s token.
+   - Confirm all are blocked as expected.
+
+=====================================================
+E) NON-BREAKING CHANGES ONLY
+=====================================================
+- Do NOT rename or remove existing fields, routes, or collections.
+- Do NOT break any flows in rides, food_orders, deliveries, wallets, payouts.
+- Only ADD:
+   - stricter validation
+   - safer defaults
+   - missing permission checks
+   - missing rate limits
+   - improved error handling
+   - safer crypto usage.
+
+For any change that could affect business logic, prefer reporting in the findings instead of silently changing it.
+
+=====================================================
+F) OUTPUT FORMAT – SECURITY REPORT
+=====================================================
+At the end, produce a single **SafeGo Security Audit Report** with:
+
+1. Overall Security Summary
+   - Short overview of current security posture.
+   - Scores (0–100) for:
+     - Authentication & Sessions
+     - Authorization & RBAC
+     - Data Protection & KYC Safety
+     - File Upload Security
+     - Wallet & Payments Security
+     - Multi-tenant Isolation
+     - Logging & Monitoring
+     - Dependency Hygiene
+
+2. Findings Table
+   For each issue, list:
+   - ID: S-001, S-002, ...
+   - Area: (Auth / RBAC / Data / Uploads / Wallet / Admin / Tenant / Logging / Dependencies / Other)
+   - Severity: Critical / High / Medium / Low
+   - Description
+   - Evidence (route/file/function)
+   - Impact (what an attacker can do)
+   - Recommendation
+   - Status: Fixed in this pass / Needs follow-up
+
+3. Critical Vulnerabilities (MUST-FIX)
+   - List all Critical/High issues that must be fixed before real users.
+   - Note which ones you already fixed in this pass.
+   - Note any that require design decisions.
+
+4. Changes Applied
+   - Brief list of code/config changes you made:
+     - File path
+     - Short description
+     - Reason (risk mitigated)
+
+5. Remaining Risks & Next Steps
+   - Any residual risks
+   - Concrete, ordered next steps (1, 2, 3, …) to further improve security.
+
+Return ONLY this structured security report as your final output.
+Do not ask me questions. Just audit, harden where safe, and report.

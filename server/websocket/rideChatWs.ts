@@ -4,7 +4,12 @@ import jwt from "jsonwebtoken";
 import { db } from "../db";
 
 const prisma = db;
-const JWT_SECRET = process.env.JWT_SECRET || "default-secret-key";
+
+// SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
+if (!process.env.JWT_SECRET) {
+  throw new Error("FATAL: JWT_SECRET environment variable is not set. WebSocket authentication cannot function.");
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 interface AuthenticatedWebSocket extends WebSocket {
   userId?: string;

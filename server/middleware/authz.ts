@@ -35,11 +35,11 @@ export async function authenticateToken(
       return;
     }
 
-    // Defense in depth: Fail fast if JWT_SECRET missing in production
-    if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
-      throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
+    // SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
+    if (!process.env.JWT_SECRET) {
+      throw new Error("FATAL: JWT_SECRET environment variable is not set.");
     }
-    const jwtSecret = process.env.JWT_SECRET || "safego-secret-key-change-in-production";
+    const jwtSecret = process.env.JWT_SECRET;
 
     const decoded = jwt.verify(token, jwtSecret) as JWTPayload;
 

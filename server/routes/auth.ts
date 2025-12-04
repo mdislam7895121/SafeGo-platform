@@ -11,11 +11,12 @@ import { isTwoFactorEnabled, verifyTwoFactorToken, getTwoFactorSecret } from "..
 
 const router = Router();
 
-// Defense in depth: Fail fast if JWT_SECRET missing in production
-if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+// SECURITY: Fail fast if JWT_SECRET missing - no fallback allowed
+// This ensures tokens cannot be forged even if environment guard is bypassed
+if (!process.env.JWT_SECRET) {
   throw new Error("FATAL: JWT_SECRET environment variable is not set. Application cannot start without authentication secret.");
 }
-const JWT_SECRET = process.env.JWT_SECRET || "safego-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Separate secret for refresh tokens (derived from JWT_SECRET for simplicity)
 const REFRESH_SECRET = crypto.createHash('sha256').update(JWT_SECRET + '-refresh').digest('hex');
