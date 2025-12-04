@@ -919,6 +919,8 @@ router.patch("/orders/:orderId/status", async (req: AuthRequest, res: Response) 
       accepted: ["packing", "cancelled_by_shop"],
       packing: ["ready_for_pickup", "cancelled_by_shop"],
       ready_for_pickup: ["picked_up"],
+      picked_up: ["on_the_way"],
+      on_the_way: ["delivered"],
     };
 
     if (!validTransitions[order.status]?.includes(status)) {
@@ -932,6 +934,9 @@ router.patch("/orders/:orderId/status", async (req: AuthRequest, res: Response) 
       accepted: { acceptedAt: now },
       packing: { packingAt: now },
       ready_for_pickup: { readyForPickupAt: now },
+      picked_up: { pickedUpAt: now },
+      on_the_way: {},
+      delivered: { deliveredAt: now },
       cancelled_by_shop: { cancelledAt: now, cancelledBy: "shop" },
     };
 
@@ -1532,10 +1537,10 @@ router.post("/payout-request", async (req: AuthRequest, res: Response) => {
           ownerId: shopPartner.id,
           ownerType: "shop",
           countryCode: "BD",
-          currentBalance: walletBalance,
+          currency: "BDT",
+          availableBalance: walletBalance,
           negativeBalance: negativeBalance,
-          totalEarned: shopPartner.totalEarnings || 0,
-          totalPaidOut: 0,
+          holdAmount: 0,
           isDemo: false,
         },
       });

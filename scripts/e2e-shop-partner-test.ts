@@ -102,9 +102,30 @@ async function cleanup() {
         await prisma.productOrder.deleteMany({
           where: { customerId: { in: customerProfileIds } },
         });
+        await prisma.delivery.deleteMany({
+          where: { customerId: { in: customerProfileIds } },
+        });
+      }
+
+      const driverProfiles = await prisma.driverProfile.findMany({
+        where: { userId: { in: userIds } },
+        select: { id: true },
+      });
+      const driverProfileIds = driverProfiles.map((d) => d.id);
+
+      if (driverProfileIds.length > 0) {
+        await prisma.delivery.deleteMany({
+          where: { driverId: { in: driverProfileIds } },
+        });
       }
 
       if (shopPartnerIds.length > 0) {
+        await prisma.productOrderItem.deleteMany({
+          where: { order: { shopPartnerId: { in: shopPartnerIds } } },
+        });
+        await prisma.productOrder.deleteMany({
+          where: { shopPartnerId: { in: shopPartnerIds } },
+        });
         await prisma.shopProduct.deleteMany({
           where: { shopPartnerId: { in: shopPartnerIds } },
         });
@@ -367,14 +388,12 @@ async function testProductUpload() {
   console.log("\n📦 STEP 5: Testing product upload...");
 
   const productData = {
-    productName: "E2E Test Product",
+    name: "E2E Test Product",
     description: "This is a test product for E2E testing",
     price: 250,
     category: "grocery",
     subcategory: "snacks",
     stockQuantity: 100,
-    unit: "piece",
-    isActive: true,
   };
 
   const response = await makeRequest("/api/shop-partner/products", {
@@ -499,6 +518,18 @@ async function testDriverDelivery() {
     log("ORDER_PICKED_UP", "FAIL", "Failed to mark as picked up", pickupResponse.data);
   }
 
+  const onTheWayResponse = await makeRequest(`/api/shop-partner/orders/${testOrderId}/status`, {
+    method: "PATCH",
+    body: { status: "on_the_way" },
+    token: shopPartnerToken,
+  });
+
+  if (onTheWayResponse.ok) {
+    log("ORDER_ON_THE_WAY", "PASS", "Order marked as on the way");
+  } else {
+    log("ORDER_ON_THE_WAY", "FAIL", "Failed to mark as on the way", onTheWayResponse.data);
+  }
+
   const deliverResponse = await makeRequest(`/api/shop-partner/orders/${testOrderId}/status`, {
     method: "PATCH",
     body: { status: "delivered" },
@@ -578,17 +609,17 @@ async function testPayoutRequest() {
     token: shopPartnerToken,
   });
 
-  if (response.ok && response.data.payout) {
+  if (response.ok && (response.data.payoutRequest || response.data.success)) {
     log("PAYOUT_REQUEST", "PASS", `Payout request created: ৳${payoutData.amount}`);
 
     const shopPartner = await prisma.shopPartner.findUnique({
       where: { id: testShopPartnerId },
     });
 
-    if (shopPartner && Number(shopPartner.walletBalance) === 4000) {
-      log("WALLET_DEDUCTED", "PASS", `Wallet balance after payout: ৳${shopPartner.walletBalance}`);
+    if (shopPartner && Number(shopPartner.pendingPayout) === 1000) {
+      log("PENDING_PAYOUT", "PASS", `Pending payout: ৳${shopPartner.pendingPayout}`);
     } else {
-      log("WALLET_DEDUCTED", "FAIL", `Expected ৳4000, got ৳${shopPartner?.walletBalance}`);
+      log("PENDING_PAYOUT", "FAIL", `Expected ৳1000 pending, got ৳${shopPartner?.pendingPayout}`);
     }
 
     return true;

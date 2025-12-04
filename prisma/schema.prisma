@@ -2044,6 +2044,7 @@ enum WalletOwnerType {
   driver
   customer
   restaurant
+  shop
 }
 
 enum WalletTransactionServiceType {
