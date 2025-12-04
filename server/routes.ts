@@ -61,6 +61,8 @@ import securityRoutes from "./routes/securityRoutes"; // Phase 6B: Customer Secu
 import adminSecurityRoutes from "./routes/adminSecurityRoutes"; // Phase 6B: Admin Security Features
 import shopPartnerRoutes from "./routes/shop-partner"; // Bangladesh Expansion: Shop Partners
 import ticketOperatorRoutes from "./routes/ticket-operator"; // Bangladesh Expansion: Ticket & Rental Operators
+import customerTicketRoutes from "./routes/customer-ticket"; // Bangladesh Expansion: Customer ticket booking
+import customerRentalRoutes from "./routes/customer-rental"; // Bangladesh Expansion: Customer rental booking
 import adminBdExpansionRoutes from "./routes/admin-bd-expansion"; // Bangladesh Expansion: Admin management
 import bdCustomerRoutes from "./routes/bd-customer"; // Bangladesh Expansion: Customer BD services
 import partnerRegistrationRoutes from "./routes/partner-registration"; // Partner Registration for drivers & restaurants
@@ -363,6 +365,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)
   app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)
   app.use("/api/ticket-operator", ticketOperatorRoutes); // Ticket & Rental Operator management (BD only)
+  app.use("/api/tickets", customerTicketRoutes); // Customer ticket search & booking (BD only)
+  app.use("/api/rentals", customerRentalRoutes); // Customer rental search & booking (BD only)
   app.use("/api/admin/bd-expansion", authenticateToken, (req: AuthRequest, res, next) => {
     (req as any).userId = req.user?.userId;
     next();

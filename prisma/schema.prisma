@@ -2045,12 +2045,15 @@ enum WalletOwnerType {
   customer
   restaurant
   shop
+  ticket_operator
 }
 
 enum WalletTransactionServiceType {
   ride
   food
   parcel
+  ticket                    // BD Expansion: Ticket booking commission
+  rental                    // BD Expansion: Rental booking commission
   adjustment
   payout
   commission

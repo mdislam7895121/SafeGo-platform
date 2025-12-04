@@ -63,6 +63,34 @@ async function getOwnerDetails(req: AuthRequest): Promise<{
     };
   }
 
+  if (role === "shop_partner") {
+    const shop = await prisma.shopPartner.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+    if (!shop) return null;
+    return {
+      ownerId: shop.id,
+      ownerType: "shop",
+      countryCode: "BD", // Shop partners are BD-only
+      email: shop.user.email,
+    };
+  }
+
+  if (role === "ticket_operator") {
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+      include: { user: true },
+    });
+    if (!operator) return null;
+    return {
+      ownerId: operator.id,
+      ownerType: "ticket_operator",
+      countryCode: "BD", // Ticket operators are BD-only
+      email: operator.user.email,
+    };
+  }
+
   return null;
 }
 

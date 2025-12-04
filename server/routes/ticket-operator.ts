@@ -477,8 +477,13 @@ router.post("/tickets", async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Operator profile not found" });
     }
 
-    if (!operator.isActive) {
-      return res.status(403).json({ error: "Your operator account is not active" });
+    // Allow listing creation once KYC is approved (setup_incomplete, ready_for_review, or live)
+    const allowedStatuses = ["setup_incomplete", "ready_for_review", "live"];
+    if (!allowedStatuses.includes(operator.partnerStatus)) {
+      return res.status(403).json({ 
+        error: "KYC অনুমোদনের পর টিকেট যোগ করতে পারবেন",
+        partnerStatus: operator.partnerStatus,
+      });
     }
 
     if (operator.operatorType === "rental") {
@@ -765,8 +770,13 @@ router.post("/vehicles", async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: "Operator profile not found" });
     }
 
-    if (!operator.isActive) {
-      return res.status(403).json({ error: "Your operator account is not active" });
+    // Allow vehicle creation once KYC is approved (setup_incomplete, ready_for_review, or live)
+    const allowedStatuses = ["setup_incomplete", "ready_for_review", "live"];
+    if (!allowedStatuses.includes(operator.partnerStatus)) {
+      return res.status(403).json({ 
+        error: "KYC অনুমোদনের পর রেন্টাল গাড়ি যোগ করতে পারবেন",
+        partnerStatus: operator.partnerStatus,
+      });
     }
 
     if (operator.operatorType === "ticket") {
@@ -1584,6 +1594,581 @@ router.post("/stages/3", async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("Stage 3 setup error:", error);
     res.status(500).json({ error: "সেটআপ সম্পন্ন করতে সমস্যা হয়েছে" });
+  }
+});
+
+// ===================================================
+// WALLET & EARNINGS ENDPOINTS
+// ===================================================
+
+import { WalletService } from "../services/walletService";
+const walletService = new WalletService();
+
+// Get operator wallet balance
+router.get("/wallet", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    const wallet = await walletService.getWallet(operator.id, "ticket_operator");
+
+    if (!wallet) {
+      return res.json({
+        balance: {
+          available: 0,
+          pending: 0,
+          negative: 0,
+          total: 0,
+        },
+        currency: "BDT",
+        message: "Wallet will be created when you receive your first booking",
+      });
+    }
+
+    res.json({
+      balance: {
+        available: Number(wallet.availableBalance),
+        pending: Number(wallet.holdAmount || 0),
+        negative: Number(wallet.negativeBalance),
+        total: Number(wallet.availableBalance) - Number(wallet.negativeBalance),
+      },
+      currency: wallet.currency,
+      walletId: wallet.id,
+    });
+  } catch (error) {
+    console.error("Get wallet error:", error);
+    res.status(500).json({ error: "ওয়ালেট লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Get wallet transaction history
+router.get("/wallet/transactions", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    const wallet = await walletService.getWallet(operator.id, "ticket_operator");
+    
+    if (!wallet) {
+      return res.json({
+        transactions: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+      });
+    }
+
+    const { page = "1", limit = "20", serviceType, direction } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    const where: any = { walletId: wallet.id };
+    if (serviceType) where.serviceType = serviceType;
+    if (direction) where.direction = direction;
+
+    const [transactions, total] = await Promise.all([
+      prisma.walletTransaction.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: parseInt(limit as string),
+        skip,
+      }),
+      prisma.walletTransaction.count({ where }),
+    ]);
+
+    res.json({
+      transactions: transactions.map((tx) => ({
+        id: tx.id,
+        serviceType: tx.serviceType,
+        direction: tx.direction,
+        amount: Number(tx.amount),
+        balanceSnapshot: Number(tx.balanceSnapshot),
+        description: tx.description,
+        referenceType: tx.referenceType,
+        referenceId: tx.referenceId,
+        createdAt: tx.createdAt,
+      })),
+      total,
+      page: parseInt(page as string),
+      limit: parseInt(limit as string),
+    });
+  } catch (error) {
+    console.error("Get transactions error:", error);
+    res.status(500).json({ error: "লেনদেনের ইতিহাস লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Get earnings summary (by service type and period)
+router.get("/earnings/summary", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    const wallet = await walletService.getWallet(operator.id, "ticket_operator");
+    
+    if (!wallet) {
+      return res.json({
+        ticketEarnings: 0,
+        rentalEarnings: 0,
+        totalEarnings: 0,
+        todayEarnings: 0,
+        weekEarnings: 0,
+        monthEarnings: 0,
+        currency: "BDT",
+      });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    const [ticketEarnings, rentalEarnings, todayEarnings, weekEarnings, monthEarnings] = await Promise.all([
+      prisma.walletTransaction.aggregate({
+        where: { walletId: wallet.id, serviceType: "ticket", direction: "credit" },
+        _sum: { amount: true },
+      }),
+      prisma.walletTransaction.aggregate({
+        where: { walletId: wallet.id, serviceType: "rental", direction: "credit" },
+        _sum: { amount: true },
+      }),
+      prisma.walletTransaction.aggregate({
+        where: { 
+          walletId: wallet.id, 
+          direction: "credit",
+          serviceType: { in: ["ticket", "rental"] },
+          createdAt: { gte: today } 
+        },
+        _sum: { amount: true },
+      }),
+      prisma.walletTransaction.aggregate({
+        where: { 
+          walletId: wallet.id, 
+          direction: "credit",
+          serviceType: { in: ["ticket", "rental"] },
+          createdAt: { gte: weekStart } 
+        },
+        _sum: { amount: true },
+      }),
+      prisma.walletTransaction.aggregate({
+        where: { 
+          walletId: wallet.id, 
+          direction: "credit",
+          serviceType: { in: ["ticket", "rental"] },
+          createdAt: { gte: monthStart } 
+        },
+        _sum: { amount: true },
+      }),
+    ]);
+
+    const ticketTotal = Number(ticketEarnings._sum.amount || 0);
+    const rentalTotal = Number(rentalEarnings._sum.amount || 0);
+
+    res.json({
+      ticketEarnings: ticketTotal,
+      rentalEarnings: rentalTotal,
+      totalEarnings: ticketTotal + rentalTotal,
+      todayEarnings: Number(todayEarnings._sum.amount || 0),
+      weekEarnings: Number(weekEarnings._sum.amount || 0),
+      monthEarnings: Number(monthEarnings._sum.amount || 0),
+      currency: wallet.currency,
+      commissionRate: operator.commissionRate,
+    });
+  } catch (error) {
+    console.error("Get earnings summary error:", error);
+    res.status(500).json({ error: "আয়ের সারাংশ লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Get booking earnings details
+router.get("/earnings/bookings", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    const { type = "all", page = "1", limit = "20", status } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    let ticketBookings: any[] = [];
+    let rentalBookings: any[] = [];
+    let ticketTotal = 0;
+    let rentalTotal = 0;
+
+    const statusFilter = status ? { status: status as any } : { status: { in: ["confirmed", "completed"] } };
+
+    if (type === "all" || type === "ticket") {
+      const listings = await prisma.ticketListing.findMany({
+        where: { operatorId: operator.id },
+        select: { id: true },
+      });
+      const listingIds = listings.map((l) => l.id);
+
+      [ticketBookings, ticketTotal] = await Promise.all([
+        prisma.ticketBooking.findMany({
+          where: { listingId: { in: listingIds }, ...statusFilter },
+          include: {
+            listing: { select: { routeName: true, vehicleType: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: parseInt(limit as string),
+          skip,
+        }),
+        prisma.ticketBooking.count({ where: { listingId: { in: listingIds }, ...statusFilter } }),
+      ]);
+    }
+
+    if (type === "all" || type === "rental") {
+      const vehicles = await prisma.rentalVehicle.findMany({
+        where: { operatorId: operator.id },
+        select: { id: true },
+      });
+      const vehicleIds = vehicles.map((v) => v.id);
+
+      [rentalBookings, rentalTotal] = await Promise.all([
+        prisma.rentalBooking.findMany({
+          where: { vehicleId: { in: vehicleIds }, ...statusFilter },
+          include: {
+            vehicle: { select: { vehicleName: true, vehicleType: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: parseInt(limit as string),
+          skip,
+        }),
+        prisma.rentalBooking.count({ where: { vehicleId: { in: vehicleIds }, ...statusFilter } }),
+      ]);
+    }
+
+    res.json({
+      ticketBookings: ticketBookings.map((b) => ({
+        id: b.id,
+        routeName: b.listing?.routeName,
+        vehicleType: b.listing?.vehicleType,
+        passengerName: b.passengerName,
+        seats: b.seats,
+        totalFare: Number(b.totalFare),
+        operatorEarnings: Number(b.operatorEarnings || 0),
+        platformFee: Number(b.platformFee || 0),
+        status: b.status,
+        travelDate: b.travelDate,
+        createdAt: b.createdAt,
+      })),
+      rentalBookings: rentalBookings.map((b) => ({
+        id: b.id,
+        vehicleName: b.vehicle?.vehicleName,
+        vehicleType: b.vehicle?.vehicleType,
+        customerName: b.customerName,
+        totalPrice: Number(b.totalPrice),
+        operatorEarnings: Number(b.operatorEarnings || 0),
+        platformFee: Number(b.platformFee || 0),
+        status: b.status,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        createdAt: b.createdAt,
+      })),
+      pagination: {
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        ticketTotal,
+        rentalTotal,
+      },
+    });
+  } catch (error) {
+    console.error("Get booking earnings error:", error);
+    res.status(500).json({ error: "বুকিং আয় লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// ===================================================
+// PAYOUT ENDPOINTS
+// ===================================================
+
+import { PayoutService } from "../services/payoutService";
+const payoutService = new PayoutService();
+
+// Get payout history
+router.get("/payouts", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    const { page = "1", limit = "20", status } = req.query;
+
+    const result = await payoutService.getPayoutHistory({
+      ownerId: operator.id,
+      ownerType: "ticket_operator",
+      status: status as any,
+      limit: parseInt(limit as string),
+      offset: (parseInt(page as string) - 1) * parseInt(limit as string),
+    });
+
+    res.json({
+      payouts: result.payouts.map((p) => ({
+        id: p.id,
+        amount: Number(p.amount),
+        status: p.status,
+        method: p.method,
+        currency: p.wallet?.currency || "BDT",
+        createdAt: p.createdAt,
+        processedAt: p.processedAt,
+        failureReason: p.failureReason,
+      })),
+      total: result.total,
+      page: parseInt(page as string),
+      limit: parseInt(limit as string),
+      hasMore: result.hasMore,
+    });
+  } catch (error) {
+    console.error("Get payouts error:", error);
+    res.status(500).json({ error: "পেআউট ইতিহাস লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Request payout
+router.post("/payouts/request", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    if (operator.partnerStatus !== "live") {
+      return res.status(400).json({ error: "শুধুমাত্র লাইভ অপারেটরগণ পেআউট অনুরোধ করতে পারবেন" });
+    }
+
+    const { amount, payoutAccountId } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "বৈধ পরিমাণ প্রদান করুন" });
+    }
+
+    const wallet = await walletService.getWallet(operator.id, "ticket_operator");
+    
+    if (!wallet) {
+      return res.status(400).json({ error: "ওয়ালেট পাওয়া যায়নি। প্রথমে কিছু বুকিং উপার্জন করুন।" });
+    }
+
+    const payout = await payoutService.createPayout({
+      walletId: wallet.id,
+      ownerId: operator.id,
+      ownerType: "ticket_operator",
+      amount,
+      method: "manual_request",
+      countryCode: "BD",
+      payoutAccountId,
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        id: randomUUID(),
+        actorId: userId,
+        actorEmail: "unknown",
+        actorRole: "ticket_operator",
+        actionType: "TICKET_OPERATOR_PAYOUT_REQUESTED",
+        entityType: "payout",
+        entityId: payout.id,
+        description: `Ticket operator ${operator.operatorName} requested payout of BDT ${amount}`,
+        metadata: { operatorId: operator.id, amount },
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "পেআউট অনুরোধ সফলভাবে জমা দেওয়া হয়েছে",
+      payout: {
+        id: payout.id,
+        amount: Number(payout.amount),
+        status: payout.status,
+        createdAt: payout.createdAt,
+      },
+    });
+  } catch (error: any) {
+    console.error("Request payout error:", error);
+    res.status(400).json({ error: error.message || "পেআউট অনুরোধ করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Get payout accounts
+router.get("/payout-accounts", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    const accounts = await prisma.payoutAccount.findMany({
+      where: {
+        ownerId: operator.id,
+        ownerType: "ticket_operator",
+      },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        payoutType: true,
+        provider: true,
+        displayName: true,
+        accountHolderName: true,
+        maskedAccount: true,
+        isDefault: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ accounts });
+  } catch (error) {
+    console.error("Get payout accounts error:", error);
+    res.status(500).json({ error: "পেআউট অ্যাকাউন্ট লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Add payout account (bKash/Nagad)
+router.post("/payout-accounts", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const operator = await prisma.ticketOperator.findUnique({
+      where: { userId },
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: "Ticket operator profile not found" });
+    }
+
+    const { 
+      payoutType, 
+      provider, 
+      accountNumber, 
+      accountHolderName,
+      displayName,
+      isDefault = false 
+    } = req.body;
+
+    if (!payoutType || !provider || !accountNumber || !accountHolderName) {
+      return res.status(400).json({ error: "সব তথ্য প্রদান করুন" });
+    }
+
+    // Validate provider for BD
+    const validProviders = ["bkash", "nagad", "bank"];
+    if (!validProviders.includes(provider.toLowerCase())) {
+      return res.status(400).json({ error: "সমর্থিত প্রদানকারী: bKash, Nagad, Bank" });
+    }
+
+    // Mask account number for display
+    const maskedAccount = accountNumber.slice(-4).padStart(accountNumber.length, "*");
+
+    // If setting as default, unset other defaults
+    if (isDefault) {
+      await prisma.payoutAccount.updateMany({
+        where: { ownerId: operator.id, ownerType: "ticket_operator" },
+        data: { isDefault: false },
+      });
+    }
+
+    const account = await prisma.payoutAccount.create({
+      data: {
+        ownerId: operator.id,
+        ownerType: "ticket_operator",
+        payoutType,
+        provider: provider.toLowerCase(),
+        encryptedDetails: accountNumber, // In production, encrypt this
+        accountHolderName,
+        displayName: displayName || `${provider} - ${maskedAccount}`,
+        maskedAccount,
+        isDefault,
+        status: "active",
+        countryCode: "BD",
+      },
+    });
+
+    res.json({
+      success: true,
+      message: "পেআউট অ্যাকাউন্ট সফলভাবে যোগ করা হয়েছে",
+      account: {
+        id: account.id,
+        payoutType: account.payoutType,
+        provider: account.provider,
+        displayName: account.displayName,
+        maskedAccount: account.maskedAccount,
+        isDefault: account.isDefault,
+        status: account.status,
+      },
+    });
+  } catch (error) {
+    console.error("Add payout account error:", error);
+    res.status(500).json({ error: "পেআউট অ্যাকাউন্ট যোগ করতে সমস্যা হয়েছে" });
   }
 });
 
