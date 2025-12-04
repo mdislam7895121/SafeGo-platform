@@ -273,6 +273,9 @@ import AdminBackgroundChecks from "@/pages/admin/background-checks";
 import AdminPhase5Dashboard from "@/pages/admin/phase5-dashboard";
 import AdminSystemHealth from "@/pages/admin/system-health";
 import AdminBDExpansionDashboard from "@/pages/admin/bd-expansion-dashboard";
+import AdminPeopleKycCenter from "@/pages/admin/people-kyc";
+import AdminSafetyCenterNew from "@/pages/admin/safety-center";
+import AdminFeatureFlags from "@/pages/admin/feature-flags";
 
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
@@ -2016,6 +2019,21 @@ function Router() {
           <AdminLayout pageTitle="BD Expansion">
             <AdminBDExpansionDashboard />
           </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/people-kyc">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminPeopleKycCenter />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/safety">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminSafetyCenterNew />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/feature-flags">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminFeatureFlags />
         </ProtectedRoute>
       </Route>
       <Route path="/admin/driver-support">

@@ -115,12 +115,28 @@ export default function AdminHome() {
       badge: unreadCount?.count ? unreadCount.count : undefined,
     },
     {
+      name: "People & KYC Center",
+      icon: Users,
+      href: "/admin/people-kyc",
+      description: "Unified user management across all roles with KYC status",
+      color: "text-blue-600",
+      bgColor: "bg-blue-50 dark:bg-blue-950",
+    },
+    {
+      name: "Safety & Risk Center",
+      icon: ShieldAlert,
+      href: "/admin/safety",
+      description: "Monitor and manage safety incidents and risk cases",
+      color: "text-red-600",
+      bgColor: "bg-red-50 dark:bg-red-950",
+    },
+    {
       name: "KYC Approvals",
       icon: Shield,
       href: "/admin/kyc",
       description: "Review and approve user verification requests",
-      color: "text-blue-600",
-      bgColor: "bg-blue-50 dark:bg-blue-950",
+      color: "text-sky-600",
+      bgColor: "bg-sky-50 dark:bg-sky-950",
     },
     {
       name: "Document Center",
@@ -318,6 +334,15 @@ export default function AdminHome() {
       description: "Configure platform-wide settings and policies",
       color: "text-amber-600",
       bgColor: "bg-amber-50 dark:bg-amber-950",
+    },
+    {
+      name: "Feature Flags",
+      icon: Cog,
+      href: "/admin/feature-flags",
+      description: "Control feature rollouts and A/B testing",
+      color: "text-gray-600",
+      bgColor: "bg-gray-50 dark:bg-gray-950",
+      permission: "MANAGE_SETTINGS",
     },
   ];
 
