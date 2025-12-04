@@ -39,3 +39,34 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 *   **UI Components**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 *   **Third-party Services**: Twilio (SMS OTP), AgentMail (Email OTP), Stripe (payment gateway), Google Maps Platform (Maps JavaScript API, Places API, Directions API, Geocoding API), bKash, Nagad, Checkr, AWS Rekognition, Persona/Onfido.
+
+## Admin Panel Gap Analysis (December 2024)
+
+**Full analysis document:** `docs/ADMIN_GAP_ANALYSIS.md`
+
+### Current Coverage: ~40% of Uber-Level Capabilities
+
+**What Exists:**
+- Basic user management (drivers, customers, restaurants, BD partners)
+- Basic KYC approval (single document at a time)
+- Wallet view and manual settlement
+- Payout requests and manual processing
+- Analytics and monitoring dashboards
+- Fraud alerts and security center
+- Activity/audit logging
+- Basic settings configuration
+
+**Critical Missing Features:**
+1. **People & KYC Center** - No unified search, bulk operations, queue management, SLA tracking
+2. **Pricing Engine** - No visual surge zone editor, fare builder, promotion/coupon manager
+3. **Safety Center** - No SOS monitoring panel, incident workflow, driver fatigue dashboard
+4. **Support & Refund Center** - No ticket system, refund queue, escalation management
+5. **Policy & Legal Center** - No TOS/PP versioning, consent tracking, compliance checklists
+6. **Feature Flags UI** - No admin interface for toggling features, A/B tests
+7. **Admin RBAC** - No admin user creation, role assignment UI, IP whitelist management
+
+**Implementation Priority:**
+- Phase 1 (Critical): People/KYC Center, Safety Center, Feature Flags
+- Phase 2 (High): Pricing Engine, Support/Refund Center, Admin RBAC
+- Phase 3 (Medium): Wallet Console, Country Config, Policy/Legal
+- Phase 4 (Enhancement): Advanced analytics, Automation Dashboard
