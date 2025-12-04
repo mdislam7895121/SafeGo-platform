@@ -1,8 +1,12 @@
 export enum AdminRole {
   SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
+  COUNTRY_ADMIN = 'COUNTRY_ADMIN',
+  CITY_ADMIN = 'CITY_ADMIN',
   COMPLIANCE_ADMIN = 'COMPLIANCE_ADMIN',
   SUPPORT_ADMIN = 'SUPPORT_ADMIN',
   FINANCE_ADMIN = 'FINANCE_ADMIN',
+  RISK_ADMIN = 'RISK_ADMIN',
   READONLY_ADMIN = 'READONLY_ADMIN',
 }
 
@@ -61,6 +65,35 @@ export enum Permission {
   VIEW_FRAUD_ALERTS = 'VIEW_FRAUD_ALERTS',
   MANAGE_FRAUD_ALERTS = 'MANAGE_FRAUD_ALERTS',
   RESOLVE_FRAUD_ALERTS = 'RESOLVE_FRAUD_ALERTS',
+  
+  // RBAC v2: Risk & Safety Center
+  VIEW_RISK_CENTER = 'VIEW_RISK_CENTER',
+  MANAGE_RISK_CASES = 'MANAGE_RISK_CASES',
+  RESOLVE_RISK_CASES = 'RESOLVE_RISK_CASES',
+  VIEW_SAFETY_EVENTS = 'VIEW_SAFETY_EVENTS',
+  MANAGE_SAFETY_ALERTS = 'MANAGE_SAFETY_ALERTS',
+  BLOCK_USER_SAFETY = 'BLOCK_USER_SAFETY',
+  
+  // RBAC v2: Feature Flags & Config
+  VIEW_FEATURE_FLAGS = 'VIEW_FEATURE_FLAGS',
+  MANAGE_FEATURE_FLAGS = 'MANAGE_FEATURE_FLAGS',
+  VIEW_SYSTEM_CONFIG = 'VIEW_SYSTEM_CONFIG',
+  MANAGE_SYSTEM_CONFIG = 'MANAGE_SYSTEM_CONFIG',
+  
+  // RBAC v2: People & KYC Center
+  VIEW_PEOPLE_CENTER = 'VIEW_PEOPLE_CENTER',
+  MANAGE_PEOPLE_CENTER = 'MANAGE_PEOPLE_CENTER',
+  BULK_KYC_OPERATIONS = 'BULK_KYC_OPERATIONS',
+  
+  // RBAC v2: Disputes & Refunds
+  VIEW_DISPUTES = 'VIEW_DISPUTES',
+  MANAGE_DISPUTES = 'MANAGE_DISPUTES',
+  PROCESS_REFUNDS = 'PROCESS_REFUNDS',
+  ESCALATE_DISPUTES = 'ESCALATE_DISPUTES',
+  
+  // RBAC v2: Broadcasting
+  SEND_BROADCAST = 'SEND_BROADCAST',
+  MANAGE_NOTIFICATIONS = 'MANAGE_NOTIFICATIONS',
 }
 
 type RolePermissions = {
@@ -120,6 +153,127 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_FRAUD_ALERTS,
     Permission.MANAGE_FRAUD_ALERTS,
     Permission.RESOLVE_FRAUD_ALERTS,
+    // RBAC v2: All new permissions for SUPER_ADMIN
+    Permission.VIEW_RISK_CENTER,
+    Permission.MANAGE_RISK_CASES,
+    Permission.RESOLVE_RISK_CASES,
+    Permission.VIEW_SAFETY_EVENTS,
+    Permission.MANAGE_SAFETY_ALERTS,
+    Permission.BLOCK_USER_SAFETY,
+    Permission.VIEW_FEATURE_FLAGS,
+    Permission.MANAGE_FEATURE_FLAGS,
+    Permission.VIEW_SYSTEM_CONFIG,
+    Permission.MANAGE_SYSTEM_CONFIG,
+    Permission.VIEW_PEOPLE_CENTER,
+    Permission.MANAGE_PEOPLE_CENTER,
+    Permission.BULK_KYC_OPERATIONS,
+    Permission.VIEW_DISPUTES,
+    Permission.MANAGE_DISPUTES,
+    Permission.PROCESS_REFUNDS,
+    Permission.ESCALATE_DISPUTES,
+    Permission.SEND_BROADCAST,
+    Permission.MANAGE_NOTIFICATIONS,
+  ]),
+
+  // ADMIN: General management (non-sensitive)
+  [AdminRole.ADMIN]: new Set([
+    Permission.VIEW_DASHBOARD,
+    Permission.VIEW_ACTIVITY_LOG,
+    Permission.VIEW_USER,
+    Permission.MANAGE_USER_STATUS,
+    Permission.VIEW_ALL_DRIVERS,
+    Permission.VIEW_PARCELS,
+    Permission.MANAGE_PARCELS,
+    Permission.MANAGE_PARCELS_STATUS,
+    Permission.VIEW_WALLET_SUMMARY,
+    Permission.VIEW_COMMISSION_ANALYTICS,
+    Permission.VIEW_PAYOUTS,
+    Permission.VIEW_PAYOUT_BATCHES,
+    Permission.VIEW_SETTINGS,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.REPLY_SUPPORT_CONVERSATIONS,
+    Permission.VIEW_EARNINGS_DASHBOARD,
+    Permission.VIEW_ANALYTICS_DASHBOARD,
+    Permission.VIEW_PERFORMANCE_DASHBOARD,
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_LIVE_MAP,
+    Permission.VIEW_FRAUD_ALERTS,
+    Permission.VIEW_RISK_CENTER,
+    Permission.VIEW_SAFETY_EVENTS,
+    Permission.VIEW_PEOPLE_CENTER,
+    Permission.VIEW_DISPUTES,
+  ]),
+
+  // COUNTRY_ADMIN: Regional management
+  [AdminRole.COUNTRY_ADMIN]: new Set([
+    Permission.VIEW_DASHBOARD,
+    Permission.VIEW_ACTIVITY_LOG,
+    Permission.VIEW_AUDIT_LOG,
+    Permission.VIEW_USER,
+    Permission.MANAGE_USER_STATUS,
+    Permission.MANAGE_DRIVERS,
+    Permission.VIEW_ALL_DRIVERS,
+    Permission.MANAGE_CUSTOMERS,
+    Permission.MANAGE_RESTAURANTS,
+    Permission.MANAGE_KYC,
+    Permission.MANAGE_DOCUMENT_REVIEW,
+    Permission.VIEW_WALLET_SUMMARY,
+    Permission.PROCESS_WALLET_SETTLEMENT,
+    Permission.VIEW_COMMISSION_ANALYTICS,
+    Permission.VIEW_PARCELS,
+    Permission.MANAGE_PARCELS,
+    Permission.MANAGE_PARCELS_STATUS,
+    Permission.VIEW_PAYOUTS,
+    Permission.PROCESS_PAYOUTS,
+    Permission.VIEW_PAYOUT_BATCHES,
+    Permission.VIEW_SETTINGS,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.REPLY_SUPPORT_CONVERSATIONS,
+    Permission.ASSIGN_SUPPORT_CONVERSATIONS,
+    Permission.VIEW_EARNINGS_DASHBOARD,
+    Permission.VIEW_ANALYTICS_DASHBOARD,
+    Permission.VIEW_PERFORMANCE_DASHBOARD,
+    Permission.MODERATE_PROMOTIONS,
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_LIVE_MAP,
+    Permission.VIEW_REVENUE_ANALYTICS,
+    Permission.VIEW_FRAUD_ALERTS,
+    Permission.MANAGE_FRAUD_ALERTS,
+    Permission.VIEW_RISK_CENTER,
+    Permission.MANAGE_RISK_CASES,
+    Permission.VIEW_SAFETY_EVENTS,
+    Permission.VIEW_PEOPLE_CENTER,
+    Permission.MANAGE_PEOPLE_CENTER,
+    Permission.VIEW_DISPUTES,
+    Permission.MANAGE_DISPUTES,
+  ]),
+
+  // CITY_ADMIN: City-level management
+  [AdminRole.CITY_ADMIN]: new Set([
+    Permission.VIEW_DASHBOARD,
+    Permission.VIEW_ACTIVITY_LOG,
+    Permission.VIEW_USER,
+    Permission.MANAGE_USER_STATUS,
+    Permission.VIEW_ALL_DRIVERS,
+    Permission.VIEW_PARCELS,
+    Permission.MANAGE_PARCELS,
+    Permission.MANAGE_PARCELS_STATUS,
+    Permission.VIEW_WALLET_SUMMARY,
+    Permission.VIEW_COMMISSION_ANALYTICS,
+    Permission.VIEW_PAYOUTS,
+    Permission.VIEW_PAYOUT_BATCHES,
+    Permission.VIEW_SETTINGS,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.REPLY_SUPPORT_CONVERSATIONS,
+    Permission.VIEW_EARNINGS_DASHBOARD,
+    Permission.VIEW_ANALYTICS_DASHBOARD,
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_LIVE_MAP,
+    Permission.VIEW_FRAUD_ALERTS,
+    Permission.VIEW_RISK_CENTER,
+    Permission.VIEW_SAFETY_EVENTS,
+    Permission.VIEW_PEOPLE_CENTER,
+    Permission.VIEW_DISPUTES,
   ]),
 
   [AdminRole.COMPLIANCE_ADMIN]: new Set([
@@ -153,6 +307,12 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_FRAUD_ALERTS,
     Permission.MANAGE_FRAUD_ALERTS,
     Permission.RESOLVE_FRAUD_ALERTS,
+    // RBAC v2: Compliance gets full KYC/People center access
+    Permission.VIEW_PEOPLE_CENTER,
+    Permission.MANAGE_PEOPLE_CENTER,
+    Permission.BULK_KYC_OPERATIONS,
+    Permission.VIEW_RISK_CENTER,
+    Permission.VIEW_SAFETY_EVENTS,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
@@ -167,6 +327,12 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SUPPORT_CONVERSATIONS,
     Permission.REPLY_SUPPORT_CONVERSATIONS,
     Permission.ASSIGN_SUPPORT_CONVERSATIONS,
+    // RBAC v2: Support gets dispute handling
+    Permission.VIEW_DISPUTES,
+    Permission.MANAGE_DISPUTES,
+    Permission.PROCESS_REFUNDS,
+    Permission.ESCALATE_DISPUTES,
+    Permission.VIEW_PEOPLE_CENTER,
   ]),
 
   [AdminRole.FINANCE_ADMIN]: new Set([
@@ -192,6 +358,38 @@ const rolePermissions: RolePermissions = {
     Permission.EXPORT_ANALYTICS,
   ]),
 
+  // RISK_ADMIN: Safety & Risk Center focused
+  [AdminRole.RISK_ADMIN]: new Set([
+    Permission.VIEW_DASHBOARD,
+    Permission.VIEW_ACTIVITY_LOG,
+    Permission.VIEW_AUDIT_LOG,
+    Permission.VIEW_USER,
+    Permission.MANAGE_USER_STATUS,
+    Permission.VIEW_ALL_DRIVERS,
+    Permission.VIEW_PARCELS,
+    Permission.VIEW_WALLET_SUMMARY,
+    Permission.VIEW_SETTINGS,
+    // Risk & Safety permissions (full access)
+    Permission.VIEW_RISK_CENTER,
+    Permission.MANAGE_RISK_CASES,
+    Permission.RESOLVE_RISK_CASES,
+    Permission.VIEW_SAFETY_EVENTS,
+    Permission.MANAGE_SAFETY_ALERTS,
+    Permission.BLOCK_USER_SAFETY,
+    // Fraud permissions (full access)
+    Permission.VIEW_FRAUD_ALERTS,
+    Permission.MANAGE_FRAUD_ALERTS,
+    Permission.RESOLVE_FRAUD_ALERTS,
+    // Monitoring permissions
+    Permission.VIEW_REALTIME_MONITORING,
+    Permission.VIEW_LIVE_MAP,
+    Permission.VIEW_PERFORMANCE_DASHBOARD,
+    // Read-only access to other areas
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
+    Permission.VIEW_PEOPLE_CENTER,
+    Permission.VIEW_DISPUTES,
+  ]),
+
   [AdminRole.READONLY_ADMIN]: new Set([
     Permission.VIEW_DASHBOARD,
     Permission.VIEW_USER,
@@ -211,6 +409,12 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_REALTIME_MONITORING,
     Permission.VIEW_REVENUE_ANALYTICS,
     Permission.VIEW_FRAUD_ALERTS,
+    // RBAC v2: Read-only access to new features
+    Permission.VIEW_RISK_CENTER,
+    Permission.VIEW_SAFETY_EVENTS,
+    Permission.VIEW_PEOPLE_CENTER,
+    Permission.VIEW_DISPUTES,
+    Permission.VIEW_FEATURE_FLAGS,
   ]),
 };
 
