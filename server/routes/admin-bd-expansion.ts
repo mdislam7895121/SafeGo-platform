@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { prisma } from "../db";
 import { z } from "zod";
+import { PartnerStatus } from "@prisma/client";
 
 const router = Router();
 
@@ -747,7 +748,7 @@ router.get("/partners-by-stage", async (req: Request, res: Response) => {
     let shopTotal = 0;
     let operatorTotal = 0;
 
-    const statusFilter = partnerStatus ? { partnerStatus: partnerStatus as string } : {};
+    const statusFilter = partnerStatus ? { partnerStatus: partnerStatus as PartnerStatus } : {};
 
     if (!partnerType || partnerType === "shop") {
       [shopPartners, shopTotal] = await Promise.all([
@@ -757,7 +758,7 @@ router.get("/partners-by-stage", async (req: Request, res: Response) => {
           skip,
           orderBy: { createdAt: "desc" },
           include: {
-            user: { select: { email: true, phoneNumber: true } },
+            user: { select: { email: true } },
             _count: { select: { products: true } },
           },
         }),
@@ -773,7 +774,7 @@ router.get("/partners-by-stage", async (req: Request, res: Response) => {
           skip,
           orderBy: { createdAt: "desc" },
           include: {
-            user: { select: { email: true, phoneNumber: true } },
+            user: { select: { email: true } },
             _count: { select: { ticketListings: true, rentalVehicles: true } },
           },
         }),
@@ -883,7 +884,7 @@ router.patch("/shop-partners/:id/approve-kyc", async (req: Request, res: Respons
       data: {
         partnerStatus: "setup_incomplete",
         kycApprovedAt: new Date(),
-        kycApprovedBy: userId,
+        verifiedBy: userId,
         updatedAt: new Date(),
       },
     });
@@ -1123,7 +1124,7 @@ router.patch("/ticket-operators/:id/approve-kyc", async (req: Request, res: Resp
       data: {
         partnerStatus: "setup_incomplete",
         kycApprovedAt: new Date(),
-        kycApprovedBy: userId,
+        verifiedBy: userId,
         updatedAt: new Date(),
       },
     });
@@ -1408,7 +1409,7 @@ router.get("/staged-onboarding/partners", async (req: Request, res: Response) =>
     
     if (type !== "operator") {
       const shops = await prisma.shopPartner.findMany({
-        where: status ? { partnerStatus: status as string } : undefined,
+        where: status ? { partnerStatus: status as PartnerStatus } : undefined,
         orderBy: { createdAt: "desc" },
         take: 50,
         include: {
@@ -1426,7 +1427,7 @@ router.get("/staged-onboarding/partners", async (req: Request, res: Response) =>
     
     if (type !== "shop") {
       const operators = await prisma.ticketOperator.findMany({
-        where: status ? { partnerStatus: status as string } : undefined,
+        where: status ? { partnerStatus: status as PartnerStatus } : undefined,
         orderBy: { createdAt: "desc" },
         take: 50,
         include: {

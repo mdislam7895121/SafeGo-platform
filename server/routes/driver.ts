@@ -242,16 +242,19 @@ router.get("/public-profile/:driverProfileId", async (req, res) => {
       },
     });
 
-    // Get average rating from customer reviews
-    const reviews = await prisma.review.findMany({
+    // Get average rating from customer reviews (driver reviews are stored in ride ratings)
+    // The Review model is for restaurant reviews, so use ride ratings instead
+    const rideRatings = await prisma.ride.findMany({
       where: {
-        entityId: driverProfile.id,
-        entityType: 'driver',
+        driverId: driverProfile.id,
+        status: 'completed',
+        customerRating: { not: null },
       },
       select: {
-        rating: true,
+        customerRating: true,
       },
     });
+    const reviews = rideRatings.map(r => ({ rating: r.customerRating }));
 
     const averageRating = reviews.length > 0
       ? reviews.reduce((sum, r) => sum + Number(r.rating), 0) / reviews.length
@@ -4800,11 +4803,12 @@ router.post("/wallet/cash-out", async (req: AuthRequest, res) => {
     // Create manual payout request using PayoutService
     const { payoutService } = await import("../services/payoutService");
 
-    const payout = await payoutService.createWalletPayout({
+    const payout = await payoutService.createPayout({
+      walletId: wallet.id,
       ownerId: driverProfile.id,
       ownerType: "driver",
       amount: availableBalance,
-      method: "manual_request",
+      method: "manual_request" as any,
     });
 
     res.json({

@@ -6,6 +6,7 @@ import crypto from "crypto";
 import { authenticateToken, requireRole, AuthRequest } from "../middleware/auth";
 import { z } from "zod";
 import { validatePromotionForOrder, validateCouponCode } from "../promotions/validationUtils";
+import { encrypt } from "../utils/encryption";
 
 const router = Router();
 
@@ -1216,12 +1217,16 @@ router.post("/mobile-wallets", async (req: AuthRequest, res) => {
 
     // Create masked phone number for storage
     const walletPhoneMasked = walletPhone.slice(0, 3) + "****" + walletPhone.slice(-4);
+    
+    // Encrypt the full phone number for secure storage
+    const walletPhoneEncrypted = encrypt(walletPhone);
 
     const wallet = await prisma.customerMobileWallet.create({
       data: {
         customerId: customerProfile.id,
         brand,
         walletPhoneMasked,
+        walletPhoneEncrypted,
         accountName,
         isDefault: shouldBeDefault,
         isVerified: false, // Requires OTP verification
