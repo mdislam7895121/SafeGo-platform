@@ -1,0 +1,443 @@
+# SAFEGO MASTER RULES (MUST FOLLOW, DO NOT SKIP OR OVERRIDE)
+
+A) CORE ROLES (always 4 distinct roles)
+1) Customer
+2) Driver
+3) Restaurant (Merchant)
+4) Admin
+
+Each role must have its own:
+- signup/onboarding (respecting BD/US rules)
+- KYC/verification data
+- dashboard
+- permissions
+- status flows
+
+Do NOT mix role access or let one role see another’s sensitive data.
+
+B) CORE SERVICES (all 3 must be supported)
+1) Ride-hailing
+2) Food delivery
+3) Parcel delivery
+
+C) COUNTRY-SPECIFIC KYC RULES
+
+Bangladesh (BD) required KYC fields:
+- father_name
+- date_of_birth
+- present_address
+- permanent_address
+- nid_number
+- nid_front_image
+- nid_back_image
+- emergency_contact_name
+- emergency_contact_phone
+- verification_status (pending/approved/rejected)
+- is_verified (boolean)
+
+United States (US) required KYC fields:
+- date_of_birth
+- home_address
+- emergency_contact_name
+- emergency_contact_phone
+- government_id_type
+- government_id_last4
+- driver_license_number (drivers only)
+- driver_license_image (drivers only)
+- driver_license_expiry (drivers only)
+- ssn_last4 (drivers only, optional)
+- verification_status (pending/approved/rejected)
+- is_verified (boolean)
+
+D) ADMIN PANEL REQUIRED POWERS
+
+Admin must be able to:
+- view and verify customers, drivers, restaurants
+- approve/reject KYC with rejection_reason
+- block/unblock any user
+- update pricing, fees, and commissions
+- manage payouts and settlements
+- view driver negative balance
+- view restaurant negative balance
+- manage automation and safety modules
+- manage global settings and policies
+
+E) REQUIRED CORE COLLECTIONS
+
+1) rides
+2) food_orders
+3) deliveries
+
+Each must have:
+- identity fields (customer_id, driver_id, restaurant_id where applicable)
+- all relevant addresses + geolocation (pickup, dropoff, restaurant, delivery)
+- fees + SafeGo commission
+- payment details (method, status, transaction reference if online)
+- timestamps (created_at, updated_at, status-specific timestamps)
+- status field following the full status flow
+- rating and feedback fields for both sides (where relevant)
+- country_code
+
+F) COMMISSION & PAYOUT RULES (MUST BE ENFORCED)
+
+1) If a ride or parcel is paid in CASH:
+   - Customer pays the driver full fare in cash.
+   - SafeGo’s commission amount is recorded as negative driver_wallet_balance.
+   - driver_negative_balance must be visible in admin wallet views.
+   - Driver must settle weekly; admin can mark settlements and adjust balances.
+
+2) If a food order is paid in CASH:
+   - Customer pays the restaurant full amount.
+   - SafeGo’s commission becomes negative restaurant_wallet_balance.
+   - restaurant_negative_balance must be visible to admin.
+
+3) If payment is ONLINE:
+   - SafeGo automatically keeps its commission.
+   - Remaining amount is credited to driver/restaurant wallet.
+   - No negative balance is created from online-only transactions.
+
+4) Admin settlement:
+   - Admin can see all outstanding negative balances.
+   - Admin can mark debts as settled and adjust balances with a reason.
+   - All such changes must be audit-logged.
+
+G) SECURITY & PRIVACY RULES
+
+- Customers cannot view driver documents (NID, license, etc.).
+- Drivers cannot view customer NID, government ID details, or sensitive info.
+- Restaurants cannot view other restaurants’ internal data.
+- Only admin can:
+  - change pricing and commissions
+  - change verification_status or is_verified
+  - block/unblock accounts
+- Users can update only their own profile and non-sensitive fields.
+- All admin routes must be protected with authentication and admin role checks.
+
+H) STATUS FLOWS (MUST MATCH THESE)
+
+Ride status:
+requested → searching_driver → accepted → driver_arriving → in_progress → completed  
+or one of:
+cancelled_by_customer / cancelled_by_driver / cancelled_by_admin / no_driver_found
+
+Food order status:
+placed → accepted → preparing → ready_for_pickup → picked_up → on_the_way → delivered  
+or:
+cancelled_by_customer / cancelled_by_restaurant / cancelled_by_admin
+
+Parcel status:
+requested → searching_driver → accepted → picked_up → on_the_way → delivered  
+or:
+cancelled_by_customer / cancelled_by_driver / cancelled_by_admin / no_driver_found
+
+I) ONBOARDING FLOWS (ALL ROLES)
+
+For Customer, Driver, Restaurant and other partner roles:
+- Step 1: Basic info
+- Step 2: Address
+- Step 3: Country-specific KYC (BD/US rules above)
+- Step 4: Emergency contact
+- Set verification_status = "pending" by default
+- Block access to core operations until admin approves.
+
+J) NOTIFICATIONS
+
+System must support notifications for:
+- new ride/order/parcel alerts to drivers
+- ride/order/parcel status changes to customers
+- verification approved/rejected (all roles)
+- important admin messages (policy updates, safety alerts, fraud actions)
+
+K) SAFEGO BD AUTH RULE (CRITICAL)
+
+- There is a single, simple, secure customer signup.
+- All partners (drivers, restaurants, shop partners, ticket operators, couriers, etc.) are onboarded later through separate flows after login.
+- Do NOT remove or break any existing roles, APIs, or database schemas.
+- All changes must be backward-compatible and additive only.
+
+================================================================
+# PHASE 1 TASK: BUILD PEOPLE & KYC CENTER, SAFETY CENTER, AND FEATURE FLAGS UI
+
+You have already completed an admin gap analysis.  
+Now start building **Phase 1** features ONLY, in a non-breaking way:
+
+1) People & KYC Center
+2) Safety Center (built on existing automation & fraud modules)
+3) Feature Flags UI (under Global Settings)
+
+Do NOT create an interactive tutorial and do NOT start dynamic pricing yet.  
+Those can be future phases. Phase 1 is strictly about control & safety.
+
+All implementations must be:
+- fully wired to existing data models where possible
+- additive (no renames or deletions)
+- integrated into the existing admin dashboard cards that are already visible.
+
+------------------------------------------------
+PART A — PEOPLE & KYC CENTER (ADMIN CONTROL HUB)
+
+Goal: Give admin a single place to manage all people and KYC, across all roles and countries, in a way that respects BD/US rules and four-role separation.
+
+1) ROUTING & NAVIGATION
+
+- Under the existing “Management” / admin dashboard section, add a new entry:
+  - Label: “People & KYC Center”
+- Route example (non-breaking):
+  - `/admin/people-kyc` (main page)
+- Keep existing “Driver Management”, “Customer Management”, “Shop Partners”, “KYC Approvals”, and “Document Center” routes intact.  
+  The new People & KYC Center consolidates them but does not remove them.
+
+2) UI STRUCTURE
+
+Main layout:
+- Top filter bar:
+  - Role: Customer / Driver / Restaurant / Shop Partner / Ticket Operator
+  - Country: All / BD / US
+  - Verification: All / Pending / Approved / Rejected
+  - Status: Active / Suspended / Blocked
+- Tabbed sections for roles OR one combined table with role-specific filters.
+
+For each user row, show at minimum:
+- name, email, phone
+- role
+- country_code (BD/US badge)
+- verification_status + is_verified indicator
+- KYC completeness (e.g. “BD KYC 100% / missing nid_back_image”)
+- safety/risk badges (from Safety Center later)
+- wallet summary (for drivers/restaurants: current balance, negative balance)
+- quick actions: View, Verify, Block/Unblock, Open Safety Profile
+
+3) DETAIL DRAWER / PAGE
+
+Clicking a row opens a detail view with:
+
+- Basic info
+- Country-specific KYC section:
+  - BD: father_name, date_of_birth, present/permanent address, NID fields, images
+  - US: DOB, home_address, gov_id_type, last4, license details, etc.
+- Document previews (reusing Document Center logic)
+- Activity summary:
+  - total rides/orders/deliveries
+  - cancellation count
+  - rating
+  - complaints count
+- Wallet summary (if driver/restaurant):
+  - lifetime earnings
+  - current balance
+  - negative_balance (if any)
+- Safety / risk section:
+  - risk score, flags, automation alerts (later filled by Safety Center)
+
+Actions available:
+- Approve KYC (set verification_status to approved, is_verified true)
+- Reject KYC (set rejected, store rejection_reason)
+- Block / Unblock user
+- Open detailed wallet view (existing wallets section)
+- Open complaints / tickets (link into existing complaints module)
+All actions must obey existing security and audit logging.
+
+4) BACKEND/APIs
+
+- Reuse existing admin APIs for:
+  - listing users/drivers/restaurants
+  - KYC approve/reject
+  - block/unblock
+  - wallet summary
+  - documents
+
+- If needed, add new aggregated read-only endpoints, e.g.:
+  - `GET /api/admin/people-kyc` with filters (role, country, verification, status)
+  - `GET /api/admin/people-kyc/:id` for the detailed view
+
+Do NOT change existing model names or field names.  
+If aggregation needs new indices or computed fields, add them additively.
+
+------------------------------------------------
+PART B — SAFETY CENTER (USING AUTOMATION & FRAUD MODULES)
+
+Goal: Turn existing automation modules (fraud alerts, customer abuse, partner risk, driver fatigue, payment scoring, Security Threat Center, Fraud Alerts, Complaints) into a usable **Safety Center** for admin.
+
+1) NAVIGATION
+
+- Keep existing “Security Threat Center” and “Fraud Alerts” cards visible.
+- Add a new main entry:
+  - Label: “Safety & Risk Center”
+  - Route: `/admin/safety`
+
+2) DATA MODEL (ADD-ONLY)
+
+If not already present, add two new models:
+
+- `RiskEvent`:
+  - id
+  - user_id (could be driver/customer/restaurant)
+  - role
+  - source (automation module name: abuse, fraud, fatigue, payment_score, etc.)
+  - severity (low/medium/high/critical)
+  - category (fraud, safety, abuse, technical, payment_risk)
+  - message (short description)
+  - related_ride_id / order_id / delivery_id (nullable)
+  - created_at
+
+- `RiskCase`:
+  - id
+  - primary_user_id + role
+  - status (open/in_review/resolved/escalated)
+  - severity
+  - assigned_admin_id (nullable)
+  - summary
+  - created_at, updated_at
+  - resolution_notes (nullable)
+  - actions_taken (JSON or structured list: warning, temporary_suspend, permanent_block, refund_adjustment, etc.)
+
+Existing automation modules should create `RiskEvent` records instead of just log entries, but this must be additive: do not remove any existing logging.
+
+3) SAFETY CENTER UI
+
+Main Safety Center page:
+
+- Filters:
+  - Role
+  - Country
+  - Severity
+  - Status (open, in_review, resolved)
+  - Source (fraud, abuse, fatigue, etc.)
+
+- Two main views:
+  1) Risk Cases list (from `RiskCase`)
+     - columns: user + role, severity, status, count of events, last_event_at
+  2) Risk Events stream (latest events from `RiskEvent`)
+
+Clicking a case opens:
+
+- User identity (with link to People & KYC Center profile)
+- Risk summary, timeline of RiskEvents
+- Related rides/orders/deliveries with quick links
+- Complaints, refunds, and ratings relevant to this user
+- Actions:
+  - Add note
+  - Assign to admin
+  - Change status (open/in_review/resolved/escalated)
+  - Trigger decisions:
+    - Add warning flag (no block)
+    - Temporarily suspend account
+    - Permanently block
+    - Link to wallet adjustment/refund if needed (must open the correct module)
+  All blocking/unblocking must go through the same backend logic as other admin tools.
+
+4) INTEGRATION WITH EXISTING CARDS
+
+- “Security Threat Center” card should deep-link into the Safety Center, filtered to technical/security events.
+- “Fraud Alerts” card should deep-link into Safety Center filtered by fraud category.
+- “Complaints” can create or attach RiskCases when severity is high.
+
+------------------------------------------------
+PART C — FEATURE FLAGS UI (UNDER GLOBAL SETTINGS)
+
+Goal: Add a safe feature flag system so new features can be toggled by admin per country/role/service, without breaking existing behaviour.
+
+1) DATA MODEL (ADD ONLY)
+
+Create a `FeatureFlag` model:
+
+- id
+- key (string, unique; e.g. "new_people_kyc_center", "dynamic_pricing", "interactive_tutorial")
+- description
+- is_enabled (boolean)
+- country_scope (e.g. "GLOBAL" or "BD" or "US")
+- role_scope (optional: customer/driver/restaurant/admin/all)
+- service_scope (optional: ride/food/parcel/all)
+- created_at
+- updated_at
+- created_by_admin_id
+
+Existing behaviour must match the current state when all new feature flags are considered enabled by default.  
+For any existing feature we flag, we must initialise the flags to keep behaviour the same.
+
+2) ADMIN UI
+
+Under existing “Global Settings”:
+
+- Add a subsection “Feature Flags & Experiments”
+- Table:
+  - Key
+  - Description
+  - Country scope
+  - Role scope
+  - Service scope
+  - Toggle (On/Off)
+  - Last updated
+
+- Form to create/edit a feature flag:
+  - key (immutable for existing flags)
+  - description
+  - scope fields
+  - is_enabled
+
+Use admin-only routes such as:
+
+- `GET /api/admin/feature-flags`
+- `POST /api/admin/feature-flags`
+- `PUT /api/admin/feature-flags/:id`
+
+3) BACKEND USE
+
+- For now, use feature flags to gate **new** modules, for example:
+  - `new_people_kyc_center`
+  - `safety_center_v1`
+- Implement checks in the admin frontend to hide/show new menu entries based on flags.
+- In backend routes, treat flags as a soft guard only for new routes; do not remove or change behaviour of existing ones.
+
+------------------------------------------------
+PART D — SECURITY, AUDIT & NON-BREAKING GUARANTEES
+
+1) Security:
+- People & KYC Center, Safety Center, and Feature Flags must all be admin-only.
+- Reuse existing admin auth + role guards.
+- Respect all privacy rules when fetching KYC and government ID data.
+
+2) Audit:
+- All critical actions must be logged into the existing Activity Log or an extended audit utility:
+  - KYC approvals/rejections
+  - block/unblock decisions
+  - risk case status changes
+  - feature flag enable/disable
+- Each log entry should link to the acting admin and the affected user/feature.
+
+3) Non-breaking:
+- Do NOT rename or remove any existing models, fields, routes, or components.
+- Only add:
+  - new models (RiskEvent, RiskCase, FeatureFlag if needed)
+  - new aggregated endpoints
+  - new admin pages/components
+- Existing dashboard cards (Driver Management, Wallets, Complaints, etc.) must continue working exactly as before.
+
+------------------------------------------------
+PART E — FINAL PHASE 1 VERIFICATION
+
+After implementing Phase 1, run a self-check and summarise:
+
+1) People & KYC Center:
+   - Admin can filter by role, country, verification, status.
+   - Admin can open any user, see BD/US KYC correctly, and approve/reject with reason.
+   - Admin can block/unblock users.
+   - Links to wallets, complaints, documents, and safety profile work.
+
+2) Safety Center:
+   - Automation modules create RiskEvents.
+   - Safety Center shows cases and events with filters.
+   - Admin can review, assign, change status, and take actions without breaking any other module.
+
+3) Feature Flags:
+   - Admin can see, create, and toggle feature flags.
+   - New modules (People & KYC Center, Safety Center) respect their feature flags.
+   - Existing behaviour of the platform remains unchanged if all flags are set to their default state.
+
+4) Stability:
+   - Application builds and runs without errors.
+   - Existing admin routes and dashboards continue to work.
+
+In your final message, clearly list:
+- Which files/modules you created or updated.
+- Why the changes are guaranteed to be non-breaking.
+- How Phase 1 prepares the system for future phases (dynamic pricing, tutorials, etc.).

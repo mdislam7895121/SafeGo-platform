@@ -8728,3 +8728,170 @@ model MarketingBudgetPlan {
   @@index([status])
   @@map("marketing_budget_plans")
 }
+
+// ====================================================
+// PHASE 1: SAFETY CENTER - Risk Event & Case Models
+// ====================================================
+
+// Risk event severity levels
+enum RiskEventSeverity {
+  low
+  medium
+  high
+  critical
+}
+
+// Risk event categories
+enum RiskEventCategory {
+  fraud
+  safety
+  abuse
+  technical
+  payment_risk
+  compliance
+}
+
+// Risk case status
+enum RiskCaseStatus {
+  open
+  in_review
+  resolved
+  escalated
+}
+
+// Risk events from automation systems
+model RiskEvent {
+  id                  String              @id @default(uuid())
+  
+  userId              String              // User who triggered the risk (driver/customer/restaurant)
+  role                String              // customer, driver, restaurant, shop_partner, ticket_operator
+  
+  source              String              // Automation module: fraud_detection, abuse_detection, fatigue_detection, payment_scoring, etc.
+  severity            RiskEventSeverity   @default(medium)
+  category            RiskEventCategory
+  
+  message             String              // Short description of the risk event
+  details             Json?               // Additional structured data
+  
+  relatedRideId       String?             // FK to rides (nullable)
+  relatedOrderId      String?             // FK to food_orders (nullable)
+  relatedDeliveryId   String?             // FK to deliveries (nullable)
+  
+  isAcknowledged      Boolean             @default(false)
+  acknowledgedBy      String?             // Admin who acknowledged
+  acknowledgedAt      DateTime?
+  
+  riskCaseId          String?             // FK to RiskCase if linked
+  riskCase            RiskCase?           @relation(fields: [riskCaseId], references: [id])
+  
+  createdAt           DateTime            @default(now())
+  
+  @@index([userId])
+  @@index([role])
+  @@index([source])
+  @@index([severity])
+  @@index([category])
+  @@index([createdAt])
+  @@index([riskCaseId])
+  @@map("risk_events")
+}
+
+// Risk cases for tracking and resolution
+model RiskCase {
+  id                  String              @id @default(uuid())
+  
+  primaryUserId       String              // Primary user involved
+  role                String              // customer, driver, restaurant, shop_partner, ticket_operator
+  
+  status              RiskCaseStatus      @default(open)
+  severity            RiskEventSeverity   @default(medium)
+  
+  summary             String              // Case summary
+  description         String?             // Detailed description
+  
+  assignedAdminId     String?             // FK to AdminProfile
+  
+  eventCount          Int                 @default(1) // Number of related events
+  lastEventAt         DateTime            @default(now())
+  
+  resolutionNotes     String?
+  actionsTaken        Json?               // Array of actions: warning, temporary_suspend, permanent_block, refund_adjustment
+  
+  countryCode         String?             // BD or US
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  resolvedAt          DateTime?
+  
+  // Relations
+  riskEvents          RiskEvent[]
+  caseNotes           RiskCaseNote[]
+  
+  @@index([primaryUserId])
+  @@index([role])
+  @@index([status])
+  @@index([severity])
+  @@index([assignedAdminId])
+  @@index([createdAt])
+  @@map("risk_cases")
+}
+
+// Notes and comments on risk cases
+model RiskCaseNote {
+  id                  String              @id @default(uuid())
+  
+  riskCaseId          String
+  riskCase            RiskCase            @relation(fields: [riskCaseId], references: [id], onDelete: Cascade)
+  
+  adminId             String              // Admin who added the note
+  adminEmail          String
+  
+  content             String
+  isInternal          Boolean             @default(true) // Internal admin notes vs. user-visible
+  
+  createdAt           DateTime            @default(now())
+  
+  @@index([riskCaseId])
+  @@index([createdAt])
+  @@map("risk_case_notes")
+}
+
+// ====================================================
+// PHASE 1: FEATURE FLAGS SYSTEM
+// ====================================================
+
+// Feature flag scopes
+enum FeatureFlagScope {
+  GLOBAL
+  BD
+  US
+}
+
+// Feature flags for admin control
+model FeatureFlag {
+  id                  String              @id @default(uuid())
+  
+  key                 String              @unique // e.g., "new_people_kyc_center", "dynamic_pricing"
+  description         String              // Human-readable description
+  
+  isEnabled           Boolean             @default(false)
+  
+  countryScope        FeatureFlagScope    @default(GLOBAL) // GLOBAL, BD, US
+  roleScope           String?             // customer, driver, restaurant, admin, all (null = all)
+  serviceScope        String?             // ride, food, parcel, all (null = all)
+  
+  rolloutPercentage   Int                 @default(100) // 0-100 for gradual rollout
+  
+  metadata            Json?               // Additional configuration
+  
+  createdByAdminId    String?             // FK to AdminProfile
+  updatedByAdminId    String?
+  
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  
+  @@index([key])
+  @@index([isEnabled])
+  @@index([countryScope])
+  @@map("feature_flags")
+}
