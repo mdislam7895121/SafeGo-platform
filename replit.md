@@ -26,9 +26,31 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Role-Based Access Control (RBAC)**: Comprehensive 8-role admin system (SUPER_ADMIN, ADMIN, COUNTRY_ADMIN, etc.) with granular permissions, permission bundles, emergency lockdown controls (GLOBAL, COUNTRY, SERVICE), admin impersonation mode (view-only with audit trail), and secure internal messaging.
 *   **Global Audit Engine**: Tamper-proof logging with hash chain verification, evidence packets, and regulator export mode.
 
+## Recent Changes (Phase 2 - December 4, 2025)
+
+*   **Feature Flags Management**: Enterprise UI with grouped categories, rollout sliders, environment previews
+*   **Real-time Notifications**: WebSocket-based admin notifications with JWT auth, role-scoped broadcasts
+*   **Global Theme System**: Dark/Light/System modes, 5 admin presets, accessibility modes (high-contrast, reduced-motion, large-text)
+*   **Mobile Optimization**: 44px tap targets, responsive typography
+*   **Audit Logging Expansion**: Multi-admin tracking, region scoping (countryCode, userAgent, environment fields), export APIs
+*   **Environment Separation**: Dev/staging/prod configuration with feature gates
+*   **Access Governance**: Role visualization with hierarchy tree, permission matrix, country scope map
+
 ## External Dependencies
 
 *   **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.
 *   **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 *   **UI Components**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 *   **Third-party Services**: Twilio (SMS OTP), AgentMail (Email OTP), Stripe (payment gateway), Google Maps Platform (Maps JavaScript API, Places API, Directions API, Geocoding API), bKash, Nagad, Checkr, AWS Rekognition, Persona/Onfido.
+
+## Key Files & Directories (Phase 2)
+
+*   `server/config/environmentConfig.ts` - Environment separation configuration
+*   `server/services/tamperProofAuditService.ts` - Hash chain audit verification
+*   `server/utils/audit.ts` - Enhanced audit logging with new fields
+*   `client/src/contexts/ThemeContext.tsx` - Global theme provider
+*   `client/src/pages/admin/feature-flags.tsx` - Feature flags management
+*   `client/src/pages/admin/notifications.tsx` - Notification center
+*   `client/src/pages/admin/access-governance.tsx` - Role visualization
+*   `docs/PHASE2_REPORT.md` - Complete Phase 2 documentation
+*   `docs/CHANGELOG_PHASE2.md` - Phase 2 changelog
