@@ -1142,4 +1142,850 @@ router.post("/audit/regulator-exports/request", checkPermission(Permission.EXPOR
   }
 });
 
+// ==============================================================
+// PEOPLE & KYC CENTER PHASE-2 ENDPOINTS
+// ==============================================================
+
+// Validation schemas for KYC Phase-2
+const KycQueueFilterSchema = z.object({
+  status: z.string().optional(),
+  priority: z.string().optional(),
+  countryCode: z.string().optional(),
+  userRole: z.string().optional(),
+  assignedAdminId: z.string().optional(),
+  isOverdue: z.boolean().optional(),
+  minRiskScore: z.number().optional(),
+  maxRiskScore: z.number().optional(),
+  page: z.number().default(1),
+  limit: z.number().default(20),
+});
+
+const AssignKycReviewSchema = z.object({
+  queueItemId: z.string(),
+  adminId: z.string(),
+});
+
+const CompleteKycReviewSchema = z.object({
+  queueItemId: z.string(),
+  status: z.enum(["APPROVED", "REJECTED", "ESCALATED", "ON_HOLD"]),
+  reviewNotes: z.string().optional(),
+  rejectionReason: z.string().optional(),
+});
+
+const EscalateKycReviewSchema = z.object({
+  queueItemId: z.string(),
+  escalateTo: z.string(),
+  reason: z.string(),
+});
+
+const RiskSignalFilterSchema = z.object({
+  userId: z.string().optional(),
+  signalType: z.string().optional(),
+  severity: z.string().optional(),
+  status: z.string().optional(),
+  countryCode: z.string().optional(),
+  page: z.number().default(1),
+  limit: z.number().default(20),
+});
+
+const CreateRiskSignalSchema = z.object({
+  userId: z.string(),
+  userRole: z.string(),
+  signalType: z.string(),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+  description: z.string(),
+  evidence: z.record(z.any()).optional(),
+  countryCode: z.string().optional(),
+});
+
+const ResolveRiskSignalSchema = z.object({
+  signalId: z.string(),
+  resolution: z.string(),
+  notes: z.string().optional(),
+});
+
+const SuspiciousActivityFilterSchema = z.object({
+  userId: z.string().optional(),
+  flagType: z.string().optional(),
+  severity: z.string().optional(),
+  status: z.string().optional(),
+  page: z.number().default(1),
+  limit: z.number().default(20),
+});
+
+const CreateSuspiciousActivitySchema = z.object({
+  userId: z.string(),
+  userRole: z.string(),
+  flagType: z.string(),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
+  description: z.string(),
+  evidence: z.record(z.any()).optional(),
+});
+
+const DuplicateDetectionFilterSchema = z.object({
+  matchType: z.string().optional(),
+  riskLevel: z.string().optional(),
+  status: z.string().optional(),
+  page: z.number().default(1),
+  limit: z.number().default(20),
+});
+
+/**
+ * GET /api/admin-phase2/kyc/queue
+ * Get KYC review queue with advanced filters
+ */
+router.get("/kyc/queue", checkPermission(Permission.VIEW_PEOPLE_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const params = KycQueueFilterSchema.parse(req.query);
+    const { page, limit, ...filters } = params;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.status) where.status = filters.status;
+    if (filters.priority) where.priority = filters.priority;
+    if (filters.countryCode) where.countryCode = filters.countryCode;
+    if (filters.userRole) where.userRole = filters.userRole;
+    if (filters.assignedAdminId) where.assignedAdminId = filters.assignedAdminId;
+    if (filters.isOverdue !== undefined) where.isOverdue = filters.isOverdue;
+    if (filters.minRiskScore !== undefined || filters.maxRiskScore !== undefined) {
+      where.riskScore = {};
+      if (filters.minRiskScore !== undefined) where.riskScore.gte = filters.minRiskScore;
+      if (filters.maxRiskScore !== undefined) where.riskScore.lte = filters.maxRiskScore;
+    }
+
+    const [queue, total] = await Promise.all([
+      prisma.kycReviewQueue.findMany({
+        where,
+        orderBy: [
+          { priority: "desc" },
+          { submittedAt: "asc" },
+        ],
+        skip,
+        take: limit,
+      }),
+      prisma.kycReviewQueue.count({ where }),
+    ]);
+
+    // Calculate queue statistics
+    const stats = await prisma.kycReviewQueue.groupBy({
+      by: ["status"],
+      _count: { status: true },
+    });
+
+    res.json({
+      queue,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+      stats: stats.reduce((acc, s) => {
+        acc[s.status] = s._count.status;
+        return acc;
+      }, {} as Record<string, number>),
+    });
+  } catch (error) {
+    console.error("Error fetching KYC queue:", error);
+    res.status(500).json({ error: "Failed to fetch KYC queue" });
+  }
+});
+
+/**
+ * GET /api/admin-phase2/kyc/queue/:id
+ * Get single KYC queue item details
+ */
+router.get("/kyc/queue/:id", checkPermission(Permission.VIEW_PEOPLE_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const queueItem = await prisma.kycReviewQueue.findUnique({
+      where: { id },
+    });
+
+    if (!queueItem) {
+      return res.status(404).json({ error: "Queue item not found" });
+    }
+
+    // Fetch related risk signals
+    let riskSignals: any[] = [];
+    if (queueItem.riskSignalIds && queueItem.riskSignalIds.length > 0) {
+      riskSignals = await prisma.identityRiskSignal.findMany({
+        where: { id: { in: queueItem.riskSignalIds } },
+      });
+    }
+
+    res.json({ queueItem, riskSignals });
+  } catch (error) {
+    console.error("Error fetching KYC queue item:", error);
+    res.status(500).json({ error: "Failed to fetch KYC queue item" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/queue/assign
+ * Assign a KYC review to an admin
+ */
+router.post("/kyc/queue/assign", checkPermission(Permission.BULK_KYC_OPERATIONS), async (req: AuthRequest, res) => {
+  try {
+    const data = AssignKycReviewSchema.parse(req.body);
+    const adminUser = (req as any).adminUser;
+
+    const updated = await prisma.kycReviewQueue.update({
+      where: { id: data.queueItemId },
+      data: {
+        assignedAdminId: data.adminId,
+        assignedAt: new Date(),
+        status: "IN_PROGRESS",
+        reviewStartedAt: new Date(),
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "KYC_REVIEW_ASSIGNED",
+      entityType: "KYC_QUEUE",
+      entityId: data.queueItemId,
+      description: `Assigned KYC review to admin ${data.adminId}`,
+      ipAddress: getClientIp(req),
+      metadata: { assignedTo: data.adminId },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error assigning KYC review:", error);
+    res.status(500).json({ error: "Failed to assign KYC review" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/queue/complete
+ * Complete a KYC review
+ */
+router.post("/kyc/queue/complete", checkPermission(Permission.MANAGE_PEOPLE_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const data = CompleteKycReviewSchema.parse(req.body);
+    const adminUser = (req as any).adminUser;
+
+    const updated = await prisma.kycReviewQueue.update({
+      where: { id: data.queueItemId },
+      data: {
+        status: data.status,
+        completedAt: new Date(),
+        reviewNotes: data.reviewNotes,
+        rejectionReason: data.rejectionReason,
+        previousReviews: { increment: 1 },
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: `KYC_REVIEW_${data.status}`,
+      entityType: "KYC_QUEUE",
+      entityId: data.queueItemId,
+      description: `KYC review completed with status: ${data.status}`,
+      ipAddress: getClientIp(req),
+      metadata: { 
+        status: data.status, 
+        userId: updated.userId,
+        rejectionReason: data.rejectionReason,
+      },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error completing KYC review:", error);
+    res.status(500).json({ error: "Failed to complete KYC review" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/queue/escalate
+ * Escalate a KYC review
+ */
+router.post("/kyc/queue/escalate", checkPermission(Permission.MANAGE_PEOPLE_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const data = EscalateKycReviewSchema.parse(req.body);
+    const adminUser = (req as any).adminUser;
+
+    const updated = await prisma.kycReviewQueue.update({
+      where: { id: data.queueItemId },
+      data: {
+        status: "ESCALATED",
+        escalatedTo: data.escalateTo,
+        escalatedAt: new Date(),
+        escalationReason: data.reason,
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "KYC_REVIEW_ESCALATED",
+      entityType: "KYC_QUEUE",
+      entityId: data.queueItemId,
+      description: `KYC review escalated to ${data.escalateTo}: ${data.reason}`,
+      ipAddress: getClientIp(req),
+      metadata: { escalatedTo: data.escalateTo, reason: data.reason },
+    });
+
+    res.json(updated);
+  } catch (error) {
+    console.error("Error escalating KYC review:", error);
+    res.status(500).json({ error: "Failed to escalate KYC review" });
+  }
+});
+
+/**
+ * GET /api/admin-phase2/kyc/queue/stats
+ * Get KYC queue statistics and SLA metrics
+ */
+router.get("/kyc/queue/stats", checkPermission(Permission.VIEW_PEOPLE_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const countryCode = req.query.countryCode as string | undefined;
+    const where = countryCode ? { countryCode } : {};
+
+    const [
+      totalPending,
+      totalOverdue,
+      byStatus,
+      byPriority,
+      byCountry,
+      avgReviewTime,
+    ] = await Promise.all([
+      prisma.kycReviewQueue.count({ where: { ...where, status: "PENDING" } }),
+      prisma.kycReviewQueue.count({ where: { ...where, isOverdue: true } }),
+      prisma.kycReviewQueue.groupBy({ by: ["status"], where, _count: true }),
+      prisma.kycReviewQueue.groupBy({ by: ["priority"], where, _count: true }),
+      prisma.kycReviewQueue.groupBy({ by: ["countryCode"], _count: true }),
+      prisma.kycReviewQueue.aggregate({
+        where: { ...where, completedAt: { not: null } },
+        _avg: { riskScore: true },
+      }),
+    ]);
+
+    res.json({
+      totalPending,
+      totalOverdue,
+      byStatus: byStatus.reduce((acc, s) => ({ ...acc, [s.status]: s._count }), {}),
+      byPriority: byPriority.reduce((acc, s) => ({ ...acc, [s.priority]: s._count }), {}),
+      byCountry: byCountry.reduce((acc, s) => ({ ...acc, [s.countryCode]: s._count }), {}),
+      avgRiskScore: avgReviewTime._avg.riskScore || 0,
+    });
+  } catch (error) {
+    console.error("Error fetching KYC queue stats:", error);
+    res.status(500).json({ error: "Failed to fetch KYC queue stats" });
+  }
+});
+
+// ==============================================================
+// RISK SIGNALS ENDPOINTS
+// ==============================================================
+
+/**
+ * GET /api/admin-phase2/kyc/risk-signals
+ * Get identity risk signals with filters
+ */
+router.get("/kyc/risk-signals", checkPermission(Permission.VIEW_RISK_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const params = RiskSignalFilterSchema.parse(req.query);
+    const { page, limit, ...filters } = params;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.userId) where.userId = filters.userId;
+    if (filters.signalType) where.signalType = filters.signalType;
+    if (filters.severity) where.severity = filters.severity;
+    if (filters.status) where.status = filters.status;
+    if (filters.countryCode) where.countryCode = filters.countryCode;
+
+    const [signals, total] = await Promise.all([
+      prisma.identityRiskSignal.findMany({
+        where,
+        orderBy: { detectedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.identityRiskSignal.count({ where }),
+    ]);
+
+    res.json({
+      signals,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching risk signals:", error);
+    res.status(500).json({ error: "Failed to fetch risk signals" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/risk-signals
+ * Create a new risk signal
+ */
+router.post("/kyc/risk-signals", checkPermission(Permission.MANAGE_RISK_CASES), async (req: AuthRequest, res) => {
+  try {
+    const data = CreateRiskSignalSchema.parse(req.body);
+    const adminUser = (req as any).adminUser;
+
+    const signal = await prisma.identityRiskSignal.create({
+      data: {
+        userId: data.userId,
+        userRole: data.userRole,
+        signalType: data.signalType as any,
+        severity: data.severity as any,
+        description: data.description,
+        evidence: data.evidence || {},
+        countryCode: data.countryCode,
+        detectedAt: new Date(),
+        detectedBy: adminUser?.id || "system",
+        status: "ACTIVE",
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "RISK_SIGNAL_CREATED",
+      entityType: "RISK_SIGNAL",
+      entityId: signal.id,
+      description: `Created ${data.severity} risk signal: ${data.signalType}`,
+      ipAddress: getClientIp(req),
+      metadata: { userId: data.userId, signalType: data.signalType, severity: data.severity },
+    });
+
+    res.status(201).json(signal);
+  } catch (error) {
+    console.error("Error creating risk signal:", error);
+    res.status(500).json({ error: "Failed to create risk signal" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/risk-signals/resolve
+ * Resolve a risk signal
+ */
+router.post("/kyc/risk-signals/resolve", checkPermission(Permission.RESOLVE_RISK_CASES), async (req: AuthRequest, res) => {
+  try {
+    const data = ResolveRiskSignalSchema.parse(req.body);
+    const adminUser = (req as any).adminUser;
+
+    const signal = await prisma.identityRiskSignal.update({
+      where: { id: data.signalId },
+      data: {
+        status: "RESOLVED",
+        resolution: data.resolution,
+        resolvedBy: adminUser?.id,
+        resolvedAt: new Date(),
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "RISK_SIGNAL_RESOLVED",
+      entityType: "RISK_SIGNAL",
+      entityId: data.signalId,
+      description: `Resolved risk signal: ${data.resolution}`,
+      ipAddress: getClientIp(req),
+      metadata: { resolution: data.resolution },
+    });
+
+    res.json(signal);
+  } catch (error) {
+    console.error("Error resolving risk signal:", error);
+    res.status(500).json({ error: "Failed to resolve risk signal" });
+  }
+});
+
+/**
+ * GET /api/admin-phase2/kyc/risk-signals/user/:userId
+ * Get all risk signals for a specific user
+ */
+router.get("/kyc/risk-signals/user/:userId", checkPermission(Permission.VIEW_RISK_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const { userId } = req.params;
+
+    const signals = await prisma.identityRiskSignal.findMany({
+      where: { userId },
+      orderBy: { detectedAt: "desc" },
+    });
+
+    // Calculate aggregate risk score
+    const riskScore = signals.reduce((score, signal) => {
+      if (signal.status !== "ACTIVE") return score;
+      const severityWeight = { LOW: 1, MEDIUM: 3, HIGH: 7, CRITICAL: 15 };
+      return score + (severityWeight[signal.severity as keyof typeof severityWeight] || 1);
+    }, 0);
+
+    res.json({ signals, riskScore, signalCount: signals.length });
+  } catch (error) {
+    console.error("Error fetching user risk signals:", error);
+    res.status(500).json({ error: "Failed to fetch user risk signals" });
+  }
+});
+
+// ==============================================================
+// DUPLICATE DETECTION ENDPOINTS
+// ==============================================================
+
+/**
+ * GET /api/admin-phase2/kyc/duplicates
+ * Get duplicate account clusters
+ */
+router.get("/kyc/duplicates", checkPermission(Permission.VIEW_PEOPLE_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const params = DuplicateDetectionFilterSchema.parse(req.query);
+    const { page, limit, ...filters } = params;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.matchType) where.matchType = filters.matchType;
+    if (filters.riskLevel) where.riskLevel = filters.riskLevel;
+    if (filters.status) where.status = filters.status;
+
+    const [clusters, total] = await Promise.all([
+      prisma.duplicateAccountCluster.findMany({
+        where,
+        orderBy: { detectedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.duplicateAccountCluster.count({ where }),
+    ]);
+
+    res.json({
+      clusters,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching duplicate clusters:", error);
+    res.status(500).json({ error: "Failed to fetch duplicate clusters" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/duplicates/merge
+ * Merge duplicate accounts
+ */
+router.post("/kyc/duplicates/merge", checkPermission(Permission.BULK_KYC_OPERATIONS), async (req: AuthRequest, res) => {
+  try {
+    const { clusterId, primaryAccountId } = req.body;
+    const adminUser = (req as any).adminUser;
+
+    if (!clusterId || !primaryAccountId) {
+      return res.status(400).json({ error: "clusterId and primaryAccountId required" });
+    }
+
+    const cluster = await prisma.duplicateAccountCluster.update({
+      where: { id: clusterId },
+      data: {
+        primaryAccountId,
+        status: "MERGED",
+        mergedBy: adminUser?.id,
+        mergedAt: new Date(),
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "DUPLICATE_ACCOUNTS_MERGED",
+      entityType: "DUPLICATE_CLUSTER",
+      entityId: clusterId,
+      description: `Merged duplicate accounts into primary: ${primaryAccountId}`,
+      ipAddress: getClientIp(req),
+      metadata: { primaryAccountId, accountIds: cluster.accountIds },
+    });
+
+    res.json(cluster);
+  } catch (error) {
+    console.error("Error merging duplicate accounts:", error);
+    res.status(500).json({ error: "Failed to merge duplicate accounts" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/duplicates/dismiss
+ * Dismiss a duplicate detection as false positive
+ */
+router.post("/kyc/duplicates/dismiss", checkPermission(Permission.MANAGE_PEOPLE_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const { clusterId, reason } = req.body;
+    const adminUser = (req as any).adminUser;
+
+    if (!clusterId) {
+      return res.status(400).json({ error: "clusterId required" });
+    }
+
+    const cluster = await prisma.duplicateAccountCluster.update({
+      where: { id: clusterId },
+      data: {
+        status: "FALSE_POSITIVE",
+        dismissedBy: adminUser?.id,
+        dismissedAt: new Date(),
+        dismissalReason: reason,
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "DUPLICATE_DETECTION_DISMISSED",
+      entityType: "DUPLICATE_CLUSTER",
+      entityId: clusterId,
+      description: `Dismissed duplicate detection as false positive`,
+      ipAddress: getClientIp(req),
+      metadata: { reason },
+    });
+
+    res.json(cluster);
+  } catch (error) {
+    console.error("Error dismissing duplicate detection:", error);
+    res.status(500).json({ error: "Failed to dismiss duplicate detection" });
+  }
+});
+
+// ==============================================================
+// SUSPICIOUS ACTIVITY ENDPOINTS
+// ==============================================================
+
+/**
+ * GET /api/admin-phase2/kyc/suspicious-activity
+ * Get suspicious activity flags
+ */
+router.get("/kyc/suspicious-activity", checkPermission(Permission.VIEW_RISK_CENTER), async (req: AuthRequest, res) => {
+  try {
+    const params = SuspiciousActivityFilterSchema.parse(req.query);
+    const { page, limit, ...filters } = params;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.userId) where.userId = filters.userId;
+    if (filters.flagType) where.flagType = filters.flagType;
+    if (filters.severity) where.severity = filters.severity;
+    if (filters.status) where.status = filters.status;
+
+    const [flags, total] = await Promise.all([
+      prisma.suspiciousActivityFlag.findMany({
+        where,
+        orderBy: { detectedAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.suspiciousActivityFlag.count({ where }),
+    ]);
+
+    res.json({
+      flags,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching suspicious activity:", error);
+    res.status(500).json({ error: "Failed to fetch suspicious activity" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/suspicious-activity
+ * Create a suspicious activity flag
+ */
+router.post("/kyc/suspicious-activity", checkPermission(Permission.MANAGE_RISK_CASES), async (req: AuthRequest, res) => {
+  try {
+    const data = CreateSuspiciousActivitySchema.parse(req.body);
+    const adminUser = (req as any).adminUser;
+
+    const flag = await prisma.suspiciousActivityFlag.create({
+      data: {
+        userId: data.userId,
+        userRole: data.userRole,
+        flagType: data.flagType,
+        severity: data.severity as any,
+        description: data.description,
+        evidence: data.evidence || {},
+        detectedAt: new Date(),
+        detectedBy: adminUser?.id || "system",
+        status: "OPEN",
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "SUSPICIOUS_ACTIVITY_FLAGGED",
+      entityType: "SUSPICIOUS_ACTIVITY",
+      entityId: flag.id,
+      description: `Flagged suspicious activity: ${data.flagType}`,
+      ipAddress: getClientIp(req),
+      metadata: { userId: data.userId, flagType: data.flagType, severity: data.severity },
+    });
+
+    res.status(201).json(flag);
+  } catch (error) {
+    console.error("Error creating suspicious activity flag:", error);
+    res.status(500).json({ error: "Failed to create suspicious activity flag" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/suspicious-activity/:id/resolve
+ * Resolve a suspicious activity flag
+ */
+router.post("/kyc/suspicious-activity/:id/resolve", checkPermission(Permission.RESOLVE_RISK_CASES), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { resolution, actionTaken } = req.body;
+    const adminUser = (req as any).adminUser;
+
+    const flag = await prisma.suspiciousActivityFlag.update({
+      where: { id },
+      data: {
+        status: "RESOLVED",
+        resolution,
+        actionTaken,
+        resolvedBy: adminUser?.id,
+        resolvedAt: new Date(),
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "SUSPICIOUS_ACTIVITY_RESOLVED",
+      entityType: "SUSPICIOUS_ACTIVITY",
+      entityId: id,
+      description: `Resolved suspicious activity: ${resolution}`,
+      ipAddress: getClientIp(req),
+      metadata: { resolution, actionTaken },
+    });
+
+    res.json(flag);
+  } catch (error) {
+    console.error("Error resolving suspicious activity:", error);
+    res.status(500).json({ error: "Failed to resolve suspicious activity" });
+  }
+});
+
+// ==============================================================
+// KYC ENFORCEMENT RULES ENDPOINTS
+// ==============================================================
+
+/**
+ * GET /api/admin-phase2/kyc/enforcement-rules
+ * Get KYC enforcement rules by country
+ */
+router.get("/kyc/enforcement-rules", checkPermission(Permission.VIEW_SYSTEM_CONFIG), async (req: AuthRequest, res) => {
+  try {
+    const { countryCode, userRole } = req.query;
+    const where: any = { isActive: true };
+    if (countryCode) where.countryCode = countryCode;
+    if (userRole) where.userRole = userRole;
+
+    const rules = await prisma.kycEnforcementRule.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+
+    res.json(rules);
+  } catch (error) {
+    console.error("Error fetching KYC enforcement rules:", error);
+    res.status(500).json({ error: "Failed to fetch KYC enforcement rules" });
+  }
+});
+
+/**
+ * POST /api/admin-phase2/kyc/enforcement-rules
+ * Create or update a KYC enforcement rule
+ */
+router.post("/kyc/enforcement-rules", checkPermission(Permission.MANAGE_SYSTEM_CONFIG), async (req: AuthRequest, res) => {
+  try {
+    const data = req.body;
+    const adminUser = (req as any).adminUser;
+
+    const rule = await prisma.kycEnforcementRule.upsert({
+      where: {
+        countryCode_userRole_ruleName: {
+          countryCode: data.countryCode,
+          userRole: data.userRole,
+          ruleName: data.ruleName,
+        },
+      },
+      create: {
+        countryCode: data.countryCode,
+        userRole: data.userRole,
+        ruleName: data.ruleName,
+        description: data.description,
+        requiredDocuments: data.requiredDocuments || [],
+        optionalDocuments: data.optionalDocuments || [],
+        minVerificationLevel: data.minVerificationLevel || 1,
+        requiresLivenessCheck: data.requiresLivenessCheck || false,
+        requiresFacialMatch: data.requiresFacialMatch || false,
+        requiresBackgroundCheck: data.requiresBackgroundCheck || false,
+        gracePeriodDays: data.gracePeriodDays || 0,
+        expiryWarningDays: data.expiryWarningDays || 30,
+        autoRejectUnverified: data.autoRejectUnverified || false,
+        autoSuspendExpired: data.autoSuspendExpired || true,
+        createdBy: adminUser?.id,
+      },
+      update: {
+        description: data.description,
+        requiredDocuments: data.requiredDocuments || [],
+        optionalDocuments: data.optionalDocuments || [],
+        minVerificationLevel: data.minVerificationLevel,
+        requiresLivenessCheck: data.requiresLivenessCheck,
+        requiresFacialMatch: data.requiresFacialMatch,
+        requiresBackgroundCheck: data.requiresBackgroundCheck,
+        gracePeriodDays: data.gracePeriodDays,
+        expiryWarningDays: data.expiryWarningDays,
+        autoRejectUnverified: data.autoRejectUnverified,
+        autoSuspendExpired: data.autoSuspendExpired,
+        updatedBy: adminUser?.id,
+      },
+    });
+
+    await logAuditEvent({
+      actorId: adminUser?.id,
+      actorEmail: adminUser?.email || "unknown",
+      actorRole: "admin",
+      actionType: "KYC_ENFORCEMENT_RULE_UPDATED",
+      entityType: "KYC_ENFORCEMENT_RULE",
+      entityId: rule.id,
+      description: `Updated KYC enforcement rule: ${data.ruleName}`,
+      ipAddress: getClientIp(req),
+      metadata: { countryCode: data.countryCode, userRole: data.userRole },
+    });
+
+    res.json(rule);
+  } catch (error) {
+    console.error("Error updating KYC enforcement rule:", error);
+    res.status(500).json({ error: "Failed to update KYC enforcement rule" });
+  }
+});
+
 export default router;
