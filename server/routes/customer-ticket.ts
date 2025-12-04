@@ -743,18 +743,11 @@ router.get("/bookings/:bookingId/ticket", async (req: AuthRequest, res: Response
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Get customer profile to check ownership
-    const customer = await prisma.customerProfile.findUnique({
-      where: { userId },
-    });
-
-    if (!customer) {
-      return res.status(404).json({ error: "গ্রাহক প্রোফাইল পাওয়া যায়নি" });
-    }
-
+    // Get booking with customer profile to verify ownership
     const booking = await prisma.ticketBooking.findUnique({
       where: { id: bookingId },
       include: {
+        customer: { select: { userId: true } },
         listing: {
           include: {
             operator: { select: { operatorName: true } },
@@ -767,7 +760,18 @@ router.get("/bookings/:bookingId/ticket", async (req: AuthRequest, res: Response
       return res.status(404).json({ error: "বুকিং পাওয়া যায়নি" });
     }
 
-    if (booking.customerId !== customer.id) {
+    // Verify ownership - try included relation first, fallback to profile lookup
+    let ownerUserId = booking.customer?.userId;
+    if (!ownerUserId && booking.customerId) {
+      // Fallback: lookup customer profile separately if relation didn't load
+      const customerProfile = await prisma.customerProfile.findUnique({
+        where: { id: booking.customerId },
+        select: { userId: true },
+      });
+      ownerUserId = customerProfile?.userId;
+    }
+
+    if (ownerUserId !== userId) {
       return res.status(403).json({ error: "এই টিকেট অ্যাক্সেস করার অনুমতি নেই" });
     }
 
