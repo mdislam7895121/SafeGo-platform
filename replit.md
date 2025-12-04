@@ -22,15 +22,42 @@ The frontend utilizes React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS 3, T
     *   **Parcel Delivery**: Scheduled pickup, Proof-of-Delivery photos, and size/weight-based dynamic pricing.
 *   **Loyalty & Incentives**: SafeGo Points System (gamified), Opportunity Bonus Management System, and Driver Incentive Engine.
 *   **Real-Time & Optimization**: AI Marketplace Balancer, Real-Time Dispatch System (WebSocket-based, proximity matching), and Experience Intelligence with real-time ETA refinement, dynamic routing optimization, and smart personalized push notifications.
-*   **Profit-Focused Automation Systems** (8 services with comprehensive admin visibility):
-    *   **Auto Assignment Engine**: Proximity-based partner assignment with verification status, performance score, and cancellation history weighting
-    *   **Surge Pricing Automation**: Real-time demand/supply analysis with configurable multipliers, peak hours, and weekend/festival bonuses
-    *   **Auto Settlement Service**: Weekly commission settlement with cash recovery, negative balance management, and auto freeze/unfreeze
-    *   **Recommendation Engine**: AI-powered personalized suggestions for rides, restaurants, shops, rentals, and tickets
-    *   **Dynamic Pricing Service**: Time-based, demand-based, and festival/weekend-based price optimization
-    *   **Performance Scoring Service**: Automated driver/partner scoring with tier system (platinum/gold/silver/bronze/warning/suspended)
-    *   **Auto Cancellation Service**: Driver cooldowns, customer penalty windows, and restaurant/shop delay compensation
-    *   **Auto Payout Service**: Risk-based payout processing with auto-approval thresholds, fraud detection, and admin override
+*   **Profit-Focused Automation Systems** (32 services with comprehensive admin visibility):
+    *   **Core Automation (8 modules)**:
+        *   **Auto Assignment Engine**: Proximity-based partner assignment with verification status, performance score, and cancellation history weighting
+        *   **Surge Pricing Automation**: Real-time demand/supply analysis with configurable multipliers, peak hours, and weekend/festival bonuses
+        *   **Auto Settlement Service**: Weekly commission settlement with cash recovery, negative balance management, and auto freeze/unfreeze
+        *   **Recommendation Engine**: AI-powered personalized suggestions for rides, restaurants, shops, rentals, and tickets
+        *   **Dynamic Pricing Service**: Time-based, demand-based, and festival/weekend-based price optimization
+        *   **Performance Scoring Service**: Automated driver/partner scoring with tier system (platinum/gold/silver/bronze/warning/suspended)
+        *   **Auto Cancellation Service**: Driver cooldowns, customer penalty windows, and restaurant/shop delay compensation
+        *   **Auto Payout Service**: Risk-based payout processing with auto-approval thresholds, fraud detection, and admin override
+    *   **Security & Fraud Prevention (7 modules)**:
+        *   **Fraud Detection Automation**: Pattern detection for suspicious transactions and account behavior
+        *   **Login Security Automation**: Brute force protection, device binding, and suspicious login detection
+        *   **High Risk Activity Automation**: Document mismatch, multi-account sharing, and payout anomaly detection
+        *   **Customer Abuse Automation**: Refund abuse, cancellation patterns, and location manipulation detection
+        *   **Partner Fraud Automation**: Fake orders, self-orders, and abnormal cancellation spike detection for restaurants/shops
+        *   **Customer Payment Scoring**: Payment success rate, refunds, risk flags with COD restriction for high-risk customers
+        *   **Partner Risk Monitoring**: Cancellation rate, late completion, and issue tracking with auto-adjusted risk scores
+    *   **Risk Intelligence (4 modules)**:
+        *   **Order Success Prediction**: ML-based cancellation/payment failure/delay probability with dispatch adjustments
+        *   **Driver Fatigue Detection**: Session duration, response delay, hard braking detection with break recommendations
+        *   **Demand Sensing**: Hot zone detection, low-driver areas, high shop-load zones with surge pricing suggestions
+        *   **Traffic ETA Correction**: Historical traffic patterns, weather, time-of-day signals for ETA override
+    *   **Experience Optimization (6 modules)**:
+        *   **Inventory Forecasting**: Trending items, stock-out prediction, and restock alerts for shops/restaurants
+        *   **Repeat Purchase Trigger**: Customer behavior tracking with reminder push notifications
+        *   **Negative Review Recovery**: Auto-detect <=3 star reviews, generate apology + coupon with admin logging
+        *   **Seasonal Intelligence**: Eid, Puja, Winter, Summer, Christmas, Ramadan pattern detection with partner offer suggestions
+        *   **Refund Optimization**: Auto-determine refund type and fault party with confidence scoring
+        *   **Marketing Budget Optimization**: Auto-allocate ad budget by area, time, conversion rate with ROI tracking
+    *   **Platform Operations (4 modules)**:
+        *   **Server Scaling Automation**: CPU/memory/request-based auto-scaling with off-peak cost optimization
+        *   **DevOps Deployment Pipeline**: Build→Test→Deploy automation with rollback support
+        *   **Employee Productivity Dashboard**: Internal team tasks, response times, completion rate tracking
+        *   **System Monitoring Automation**: Real-time health checks, error rate monitoring, and alerting
+    *   **Admin Routes**: Modular route structure (automation-risk.ts, automation-experience.ts, automation-ops.ts) with authenticateToken + requireAdminRole protection
 *   **Regional Expansion (Bangladesh)**: Specific roles (SafeGo Shop Partner, SafeGo Ticket & Rental Operator) with complete KYC, product/order management, wallet, payout systems, and customer-only signup flow with Bangla UX and error messages.
 *   **Regulatory Compliance**: NYC TLC regulatory compliance including minimum pay enforcement, fees, surcharges, tolls, and report generation.
 *   **API Design**: Robust API endpoints with enforcement of KYC, ownership validation, Zod schema validation, atomic transactions, and consistent error handling.
