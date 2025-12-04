@@ -33,3 +33,29 @@ The frontend utilizes React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS 3, T
 *   **Frontend Core**: `react`, `react-dom`, `wouter`, `@tanstack/react-query`, `react-hook-form`, `zod`.
 *   **UI Components**: `@radix-ui/*`, `lucide-react`, `class-variance-authority`, `tailwind-merge`, `clsx`.
 *   **Third-party Services**: Twilio (SMS OTP), AgentMail (Email OTP), Stripe (payment gateway), Google Maps Platform (Maps JavaScript API, Places API, Directions API, Geocoding API), bKash, Nagad, Checkr, AWS Rekognition, Persona/Onfido.
+
+## Security Audit (December 2024)
+
+### Critical Fixes Applied
+- **Hardcoded Secret Fallbacks Removed**: JWT_SECRET and ENCRYPTION_KEY now fail-fast across all modules (auth middleware, routes, WebSocket handlers, encryption utilities) - no default values that could allow token forgery or data decryption
+- **Environment Guard**: Validates all critical secrets at startup with clear error messages; production deployments fail fast if misconfigured
+- **WebSocket Security**: All WebSocket handlers (supportChat, rideChat, dispatch, foodOrderNotifications) require valid JWT_SECRET
+
+### Security Controls Verified
+- **Authentication**: JWT with short-lived access tokens (15m), HTTP-only refresh tokens (30d), bcrypt password hashing (cost 10), account lockout after 5 failed attempts
+- **Authorization**: Role-based access control (RBAC) with granular permissions, admin 2FA support, admin role hierarchy (SUPER_ADMIN, COMPLIANCE_ADMIN, SUPPORT_ADMIN, FINANCE_ADMIN, READONLY_ADMIN)
+- **Encryption**: AES-256-GCM for sensitive data (NID, SSN, bank accounts, 2FA secrets), proper IV/auth tag validation, legacy CBC migration path
+- **Rate Limiting**: Admin login (5 attempts/15min), analytics (60 req/min), auth (10 req/min), payout (20 req/min), support (30 req/min)
+- **Security Headers**: CSP, HSTS (production), X-Frame-Options DENY, X-Content-Type-Options nosniff, strict CORS
+- **File Uploads**: Path traversal protection via sanitizeFilename, MIME type whitelist, size limits (5-10MB)
+- **Audit Logging**: Tamper-proof with hash chaining, excludes sensitive fields (passwords, tokens, secrets)
+
+### Known Dependency CVEs (Lower Priority)
+- `lodash.pick` (via @react-three/drei): Prototype pollution - not exploited in current code
+- `glob` 10.2.0-10.4.5: CLI command injection - not applicable (library usage only)
+- `esbuild` <=0.24.2: Dev server cross-origin bypass - development only
+
+### Recommended Future Improvements
+1. Consolidate duplicate `authenticateToken` implementations (auth.ts vs authz.ts) into single shared module
+2. Schedule dependency upgrades for CVE remediation
+3. Add refresh token revocation on logout
