@@ -22,6 +22,19 @@ import { customerAbuseAutomation } from './CustomerAbuseAutomation';
 import { partnerFraudAutomation } from './PartnerFraudAutomation';
 import { customerPaymentScoringAutomation } from './CustomerPaymentScoringAutomation';
 import { partnerRiskMonitoringAutomation } from './PartnerRiskMonitoringAutomation';
+import { orderSuccessPredictionAutomation } from './OrderSuccessPredictionAutomation';
+import { driverFatigueAutomation } from './DriverFatigueAutomation';
+import { demandSensingAutomation } from './DemandSensingAutomation';
+import { trafficETACorrectionAutomation } from './TrafficETACorrectionAutomation';
+import { inventoryForecastingAutomation } from './InventoryForecastingAutomation';
+import { RepeatPurchaseTriggerAutomation, repeatPurchaseTriggerAutomation } from './RepeatPurchaseTriggerAutomation';
+import { NegativeReviewRecoveryAutomation, negativeReviewRecoveryAutomation } from './NegativeReviewRecoveryAutomation';
+import { SeasonalIntelligenceAutomation, seasonalIntelligenceAutomation } from './SeasonalIntelligenceAutomation';
+import { ServerScalingAutomation, serverScalingAutomation } from './ServerScalingAutomation';
+import { DevOpsDeploymentAutomation, devOpsDeploymentAutomation } from './DevOpsDeploymentAutomation';
+import { EmployeeProductivityAutomation, employeeProductivityAutomation } from './EmployeeProductivityAutomation';
+import { RefundOptimizationAutomation, refundOptimizationAutomation } from './RefundOptimizationAutomation';
+import { MarketingBudgetAutomation, marketingBudgetAutomation } from './MarketingBudgetAutomation';
 
 export {
   AutoAssignmentEngine, autoAssignmentEngine,
@@ -43,6 +56,19 @@ export {
   partnerFraudAutomation,
   customerPaymentScoringAutomation,
   partnerRiskMonitoringAutomation,
+  orderSuccessPredictionAutomation,
+  driverFatigueAutomation,
+  demandSensingAutomation,
+  trafficETACorrectionAutomation,
+  inventoryForecastingAutomation,
+  RepeatPurchaseTriggerAutomation, repeatPurchaseTriggerAutomation,
+  NegativeReviewRecoveryAutomation, negativeReviewRecoveryAutomation,
+  SeasonalIntelligenceAutomation, seasonalIntelligenceAutomation,
+  ServerScalingAutomation, serverScalingAutomation,
+  DevOpsDeploymentAutomation, devOpsDeploymentAutomation,
+  EmployeeProductivityAutomation, employeeProductivityAutomation,
+  RefundOptimizationAutomation, refundOptimizationAutomation,
+  MarketingBudgetAutomation, marketingBudgetAutomation,
 };
 
 export interface AutomationSystemStatus {
@@ -71,6 +97,19 @@ export async function initializeAutomationSystems(): Promise<void> {
   partnerFraudAutomation.start();
   customerPaymentScoringAutomation.start();
   partnerRiskMonitoringAutomation.start();
+  orderSuccessPredictionAutomation.start();
+  driverFatigueAutomation.start();
+  demandSensingAutomation.start();
+  trafficETACorrectionAutomation.start();
+  inventoryForecastingAutomation.start();
+  repeatPurchaseTriggerAutomation.start();
+  negativeReviewRecoveryAutomation.start();
+  seasonalIntelligenceAutomation.start();
+  serverScalingAutomation.start();
+  devOpsDeploymentAutomation.start();
+  employeeProductivityAutomation.start();
+  refundOptimizationAutomation.start();
+  marketingBudgetAutomation.start();
 
   console.log('[Automation] All automation systems initialized');
 }
@@ -93,6 +132,19 @@ export async function shutdownAutomationSystems(): Promise<void> {
   partnerFraudAutomation.stop();
   customerPaymentScoringAutomation.stop();
   partnerRiskMonitoringAutomation.stop();
+  orderSuccessPredictionAutomation.stop();
+  driverFatigueAutomation.stop();
+  demandSensingAutomation.stop();
+  trafficETACorrectionAutomation.stop();
+  inventoryForecastingAutomation.stop();
+  repeatPurchaseTriggerAutomation.stop();
+  negativeReviewRecoveryAutomation.stop();
+  seasonalIntelligenceAutomation.stop();
+  serverScalingAutomation.stop();
+  devOpsDeploymentAutomation.stop();
+  employeeProductivityAutomation.stop();
+  refundOptimizationAutomation.stop();
+  marketingBudgetAutomation.stop();
 
   console.log('[Automation] All automation systems stopped');
 }
@@ -196,6 +248,71 @@ export function getAutomationSystemsStatus(): AutomationSystemStatus[] {
       name: 'Partner Risk Monitoring Automation',
       isActive: partnerRiskMonitoringAutomation.getStatus().isRunning,
       config: partnerRiskMonitoringAutomation.getConfig(),
+    },
+    {
+      name: 'Order Success Prediction Automation',
+      isActive: orderSuccessPredictionAutomation.getStatus().isRunning,
+      config: orderSuccessPredictionAutomation.getConfig(),
+    },
+    {
+      name: 'Driver Fatigue Automation',
+      isActive: driverFatigueAutomation.getStatus().isRunning,
+      config: driverFatigueAutomation.getConfig(),
+    },
+    {
+      name: 'Demand Sensing Automation',
+      isActive: demandSensingAutomation.getStatus().isRunning,
+      config: demandSensingAutomation.getConfig(),
+    },
+    {
+      name: 'Traffic ETA Correction Automation',
+      isActive: trafficETACorrectionAutomation.getStatus().isRunning,
+      config: trafficETACorrectionAutomation.getConfig(),
+    },
+    {
+      name: 'Inventory Forecasting Automation',
+      isActive: inventoryForecastingAutomation.getStatus().isRunning,
+      config: inventoryForecastingAutomation.getConfig(),
+    },
+    {
+      name: 'Repeat Purchase Trigger Automation',
+      isActive: repeatPurchaseTriggerAutomation.getStatus().isRunning,
+      config: repeatPurchaseTriggerAutomation.getConfig(),
+    },
+    {
+      name: 'Negative Review Recovery Automation',
+      isActive: negativeReviewRecoveryAutomation.getStatus().isRunning,
+      config: negativeReviewRecoveryAutomation.getConfig(),
+    },
+    {
+      name: 'Seasonal Intelligence Automation',
+      isActive: seasonalIntelligenceAutomation.getStatus().isRunning,
+      config: seasonalIntelligenceAutomation.getConfig(),
+    },
+    {
+      name: 'Server Scaling Automation',
+      isActive: serverScalingAutomation.getStatus().isRunning,
+      config: serverScalingAutomation.getConfig(),
+    },
+    {
+      name: 'DevOps Deployment Automation',
+      isActive: devOpsDeploymentAutomation.getStatus().isRunning,
+      config: devOpsDeploymentAutomation.getConfig(),
+    },
+    {
+      name: 'Employee Productivity Automation',
+      isActive: employeeProductivityAutomation.getStatus().isRunning,
+      config: employeeProductivityAutomation.getConfig(),
+    },
+    {
+      name: 'Refund Optimization Automation',
+      isActive: refundOptimizationAutomation.getStatus().isRunning,
+      config: refundOptimizationAutomation.getConfig(),
+    },
+    {
+      name: 'Marketing Budget Automation',
+      isActive: marketingBudgetAutomation.getStatus().isRunning,
+      config: marketingBudgetAutomation.getConfig(),
     },
   ];
 }
