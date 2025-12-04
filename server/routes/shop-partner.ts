@@ -231,6 +231,15 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
     });
 
     const isUpdate = user.shopPartner !== null;
+    
+    // If this is a new registration and user is a customer, upgrade role to pending_shop_partner
+    if (!isUpdate && user.role === "customer") {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { role: "pending_shop_partner" },
+      });
+    }
+    
     res.status(isUpdate ? 200 : 201).json({
       message: isUpdate 
         ? "Shop Partner registration updated successfully" 
@@ -240,6 +249,7 @@ router.post("/register", async (req: AuthRequest, res: Response) => {
         shopName: shopPartner.shopName,
         verificationStatus: shopPartner.verificationStatus,
       },
+      roleUpdated: !isUpdate && user.role === "customer",
     });
   } catch (error) {
     console.error("Shop Partner registration error:", error);
@@ -630,7 +640,7 @@ router.get("/products", async (req: AuthRequest, res: Response) => {
 
     const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
 
-    const [products, total] = await Promise.all([
+    const [rawProducts, total] = await Promise.all([
       prisma.shopProduct.findMany({
         where,
         take: parseInt(limit as string),
@@ -639,6 +649,13 @@ router.get("/products", async (req: AuthRequest, res: Response) => {
       }),
       prisma.shopProduct.count({ where }),
     ]);
+
+    // Map products with productName alias for frontend compatibility
+    const products = rawProducts.map(p => ({
+      ...p,
+      productName: p.name,
+      imageUrl: p.images?.[0] || null,
+    }));
 
     res.json({
       products,
@@ -652,6 +669,49 @@ router.get("/products", async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("Get products error:", error);
     res.status(500).json({ error: "Failed to fetch products" });
+  }
+});
+
+router.get("/products/:productId", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const { productId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    const product = await prisma.shopProduct.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    if (product.shopPartnerId !== shopPartner.id) {
+      return res.status(403).json({ error: "You do not own this product" });
+    }
+
+    // Map product with productName alias for frontend compatibility
+    const mappedProduct = {
+      ...product,
+      productName: product.name,
+      imageUrl: product.images?.[0] || null,
+    };
+
+    res.json({ product: mappedProduct });
+  } catch (error) {
+    console.error("Get product error:", error);
+    res.status(500).json({ error: "Failed to fetch product" });
   }
 });
 
@@ -1405,6 +1465,577 @@ router.post("/stages/3", async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("Stage 3 setup error:", error);
     res.status(500).json({ error: "সেটআপ সম্পন্ন করতে সমস্যা হয়েছে" });
+  }
+});
+
+// ===================================================
+// PAYOUT REQUEST SYSTEM (PHASE 5)
+// Using existing Wallet/Payout infrastructure
+// ===================================================
+
+// Request payout from wallet balance
+router.post("/payout-request", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    if (!shopPartner.isActive || shopPartner.partnerStatus !== "live") {
+      return res.status(403).json({ error: "Shop must be active to request payout" });
+    }
+
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({ error: "অবৈধ টাকার পরিমাণ" });
+    }
+
+    const walletBalance = Number(shopPartner.walletBalance || 0);
+    const negativeBalance = Number(shopPartner.negativeBalance || 0);
+    const availableBalance = walletBalance - negativeBalance;
+
+    if (amount > availableBalance) {
+      return res.status(400).json({ 
+        error: "পর্যাপ্ত ব্যালেন্স নেই",
+        availableBalance,
+        requestedAmount: amount,
+      });
+    }
+
+    // Minimum payout amount (100 BDT)
+    const MIN_PAYOUT = 100;
+    if (amount < MIN_PAYOUT) {
+      return res.status(400).json({ 
+        error: `সর্বনিম্ন পেআউট পরিমাণ ৳${MIN_PAYOUT}`,
+        minimumAmount: MIN_PAYOUT,
+      });
+    }
+
+    // Find or create wallet for shop partner
+    let wallet = await prisma.wallet.findFirst({
+      where: { ownerId: shopPartner.id, ownerType: "shop" },
+    });
+
+    if (!wallet) {
+      wallet = await prisma.wallet.create({
+        data: {
+          id: randomUUID(),
+          ownerId: shopPartner.id,
+          ownerType: "shop",
+          countryCode: "BD",
+          currentBalance: walletBalance,
+          negativeBalance: negativeBalance,
+          totalEarned: shopPartner.totalEarnings || 0,
+          totalPaidOut: 0,
+          isDemo: false,
+        },
+      });
+    }
+
+    // Create payout request using existing Payout model
+    const payoutRequest = await prisma.payout.create({
+      data: {
+        id: randomUUID(),
+        walletId: wallet.id,
+        countryCode: "BD",
+        ownerType: "shop",
+        ownerId: shopPartner.id,
+        amount,
+        feeAmount: 0,
+        netAmount: amount,
+        method: "manual_request",
+        status: "pending",
+        isDemo: false,
+      },
+    });
+
+    // Update pending payout amount
+    await prisma.shopPartner.update({
+      where: { id: shopPartner.id },
+      data: {
+        pendingPayout: { increment: amount },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "পেআউট অনুরোধ সফলভাবে জমা হয়েছে",
+      payoutRequest: {
+        id: payoutRequest.id,
+        amount: Number(payoutRequest.amount),
+        status: payoutRequest.status,
+        method: payoutRequest.method,
+      },
+    });
+  } catch (error) {
+    console.error("Payout request error:", error);
+    res.status(500).json({ error: "পেআউট অনুরোধ জমা দিতে সমস্যা হয়েছে" });
+  }
+});
+
+// Get payout history
+router.get("/payout-history", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    // Get payouts from Payout model
+    const payouts = await prisma.payout.findMany({
+      where: { ownerId: shopPartner.id, ownerType: "shop" },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    res.json({
+      payouts: payouts.map(p => ({
+        id: p.id,
+        amount: Number(p.amount),
+        netAmount: Number(p.netAmount),
+        status: p.status,
+        method: p.method,
+        createdAt: p.createdAt,
+        processedAt: p.processedAt,
+      })),
+      summary: {
+        walletBalance: shopPartner.walletBalance,
+        pendingPayout: shopPartner.pendingPayout,
+        negativeBalance: shopPartner.negativeBalance,
+        totalEarnings: shopPartner.totalEarnings,
+      },
+    });
+  } catch (error) {
+    console.error("Get payout history error:", error);
+    res.status(500).json({ error: "পেআউট ইতিহাস লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// ===================================================
+// REVIEWS SYSTEM (PHASE 6)
+// ===================================================
+
+// Get shop reviews
+router.get("/reviews", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    const { page = "1", limit = "20" } = req.query;
+    const skip = (parseInt(page as string) - 1) * parseInt(limit as string);
+
+    const [reviews, total] = await Promise.all([
+      prisma.productOrder.findMany({
+        where: {
+          shopPartnerId: shopPartner.id,
+          customerRating: { not: null },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          customerRating: true,
+          customerFeedback: true,
+          deliveredAt: true,
+          customer: {
+            select: {
+              fullName: true,
+            },
+          },
+        },
+        orderBy: { deliveredAt: "desc" },
+        take: parseInt(limit as string),
+        skip,
+      }),
+      prisma.productOrder.count({
+        where: {
+          shopPartnerId: shopPartner.id,
+          customerRating: { not: null },
+        },
+      }),
+    ]);
+
+    // Calculate rating distribution
+    const ratingDistribution = await prisma.productOrder.groupBy({
+      by: ["customerRating"],
+      where: {
+        shopPartnerId: shopPartner.id,
+        customerRating: { not: null },
+      },
+      _count: true,
+    });
+
+    res.json({
+      reviews: reviews.map((r) => ({
+        id: r.id,
+        orderNumber: r.orderNumber,
+        rating: r.customerRating,
+        feedback: r.customerFeedback,
+        customerName: r.customer?.fullName || "গ্রাহক",
+        date: r.deliveredAt,
+      })),
+      stats: {
+        averageRating: shopPartner.averageRating,
+        totalReviews: total,
+        ratingDistribution: ratingDistribution.reduce((acc, item) => {
+          acc[item.customerRating!] = item._count;
+          return acc;
+        }, {} as Record<number, number>),
+      },
+      pagination: {
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit as string)),
+      },
+    });
+  } catch (error) {
+    console.error("Get reviews error:", error);
+    res.status(500).json({ error: "রিভিউ লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// ===================================================
+// NOTIFICATIONS SYSTEM (PHASE 6)
+// ===================================================
+
+// Get shop notifications
+router.get("/notifications", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    // Query notifications using correct 'type' field
+    const notifications = await prisma.notification.findMany({
+      where: {
+        userId,
+        OR: [
+          { type: { startsWith: "shop_" } },
+          { type: { startsWith: "order_" } },
+          { type: { startsWith: "payout_" } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+
+    const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+    res.json({
+      notifications,
+      unreadCount,
+    });
+  } catch (error) {
+    console.error("Get notifications error:", error);
+    res.status(500).json({ error: "নোটিফিকেশন লোড করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Mark notification as read
+router.patch("/notifications/:notificationId/read", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const { notificationId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    await prisma.notification.updateMany({
+      where: {
+        id: notificationId,
+        userId,
+      },
+      data: { isRead: true },
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Mark notification read error:", error);
+    res.status(500).json({ error: "Failed to mark notification as read" });
+  }
+});
+
+// ===================================================
+// PRODUCT BULK OPERATIONS (PHASE 2)
+// ===================================================
+
+// Bulk update product stock
+router.post("/products/bulk-stock-update", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    const { updates } = req.body;
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: "Invalid updates array" });
+    }
+
+    const results = await Promise.all(
+      updates.map(async (update: { productId: string; stockQuantity: number; isInStock?: boolean }) => {
+        try {
+          const product = await prisma.shopProduct.findFirst({
+            where: { id: update.productId, shopPartnerId: shopPartner.id },
+          });
+          
+          if (!product) {
+            return { productId: update.productId, success: false, error: "Product not found" };
+          }
+
+          await prisma.shopProduct.update({
+            where: { id: update.productId },
+            data: {
+              stockQuantity: update.stockQuantity,
+              isInStock: update.isInStock ?? (update.stockQuantity > 0),
+              updatedAt: new Date(),
+            },
+          });
+
+          return { productId: update.productId, success: true };
+        } catch (err) {
+          return { productId: update.productId, success: false, error: "Update failed" };
+        }
+      })
+    );
+
+    const successCount = results.filter((r) => r.success).length;
+    const failedCount = results.filter((r) => !r.success).length;
+
+    res.json({
+      success: true,
+      message: `${successCount} products updated, ${failedCount} failed`,
+      results,
+    });
+  } catch (error) {
+    console.error("Bulk stock update error:", error);
+    res.status(500).json({ error: "স্টক আপডেট করতে সমস্যা হয়েছে" });
+  }
+});
+
+// Toggle product active status
+router.patch("/products/:productId/toggle-active", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    const { productId } = req.params;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    const product = await prisma.shopProduct.findFirst({
+      where: { id: productId, shopPartnerId: shopPartner.id },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    const updated = await prisma.shopProduct.update({
+      where: { id: productId },
+      data: {
+        isActive: !product.isActive,
+        updatedAt: new Date(),
+      },
+    });
+
+    res.json({
+      success: true,
+      message: updated.isActive ? "পণ্য সক্রিয় করা হয়েছে" : "পণ্য নিষ্ক্রিয় করা হয়েছে",
+      isActive: updated.isActive,
+    });
+  } catch (error) {
+    console.error("Toggle product active error:", error);
+    res.status(500).json({ error: "Failed to toggle product status" });
+  }
+});
+
+// ===================================================
+// ANALYTICS ENDPOINTS (DASHBOARD ENHANCEMENT)
+// ===================================================
+
+// Get sales analytics
+router.get("/analytics", async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const shopPartner = await prisma.shopPartner.findUnique({
+      where: { userId },
+    });
+
+    if (!shopPartner) {
+      return res.status(404).json({ error: "Shop Partner profile not found" });
+    }
+
+    const { period = "7d" } = req.query;
+
+    // Calculate date range
+    const now = new Date();
+    let startDate = new Date();
+    switch (period) {
+      case "24h":
+        startDate.setHours(startDate.getHours() - 24);
+        break;
+      case "7d":
+        startDate.setDate(startDate.getDate() - 7);
+        break;
+      case "30d":
+        startDate.setDate(startDate.getDate() - 30);
+        break;
+      case "90d":
+        startDate.setDate(startDate.getDate() - 90);
+        break;
+      default:
+        startDate.setDate(startDate.getDate() - 7);
+    }
+
+    // Get order stats
+    const [totalOrders, deliveredOrders, cancelledOrders, topProducts] = await Promise.all([
+      prisma.productOrder.count({
+        where: {
+          shopPartnerId: shopPartner.id,
+          placedAt: { gte: startDate },
+        },
+      }),
+      prisma.productOrder.findMany({
+        where: {
+          shopPartnerId: shopPartner.id,
+          status: "delivered",
+          deliveredAt: { gte: startDate },
+        },
+        select: {
+          totalAmount: true,
+          shopPayout: true,
+          safegoCommission: true,
+        },
+      }),
+      prisma.productOrder.count({
+        where: {
+          shopPartnerId: shopPartner.id,
+          status: { in: ["cancelled_by_shop", "cancelled_by_customer", "cancelled_by_driver"] },
+          placedAt: { gte: startDate },
+        },
+      }),
+      prisma.productOrderItem.groupBy({
+        by: ["productId"],
+        where: {
+          order: {
+            shopPartnerId: shopPartner.id,
+            status: "delivered",
+            deliveredAt: { gte: startDate },
+          },
+        },
+        _sum: {
+          quantity: true,
+          subtotal: true,
+        },
+        orderBy: {
+          _sum: { quantity: "desc" },
+        },
+        take: 5,
+      }),
+    ]);
+
+    // Calculate revenue totals
+    const revenue = deliveredOrders.reduce(
+      (acc, order) => ({
+        total: acc.total + Number(order.totalAmount),
+        payout: acc.payout + Number(order.shopPayout),
+        commission: acc.commission + Number(order.safegoCommission),
+      }),
+      { total: 0, payout: 0, commission: 0 }
+    );
+
+    // Get product names for top products
+    const productIds = topProducts.map((p) => p.productId);
+    const products = await prisma.shopProduct.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true },
+    });
+
+    const productNameMap = products.reduce((acc, p) => {
+      acc[p.id] = p.name;
+      return acc;
+    }, {} as Record<string, string>);
+
+    res.json({
+      period,
+      stats: {
+        totalOrders,
+        deliveredOrders: deliveredOrders.length,
+        cancelledOrders,
+        cancellationRate: totalOrders > 0 ? ((cancelledOrders / totalOrders) * 100).toFixed(1) : "0",
+        totalRevenue: revenue.total,
+        netPayout: revenue.payout,
+        totalCommission: revenue.commission,
+        averageOrderValue: deliveredOrders.length > 0 ? (revenue.total / deliveredOrders.length).toFixed(2) : "0",
+      },
+      topProducts: topProducts.map((p) => ({
+        productId: p.productId,
+        productName: productNameMap[p.productId] || "Unknown",
+        totalQuantity: p._sum?.quantity || 0,
+        totalRevenue: Number(p._sum?.subtotal || 0),
+      })),
+    });
+  } catch (error) {
+    console.error("Get analytics error:", error);
+    res.status(500).json({ error: "এনালিটিক্স লোড করতে সমস্যা হয়েছে" });
   }
 });
 

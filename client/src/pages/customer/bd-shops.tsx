@@ -17,6 +17,7 @@ import {
   Clock,
   Star,
   ShoppingBag,
+  Package,
 } from "lucide-react";
 
 interface Shop {
@@ -268,6 +269,12 @@ export default function BDShops() {
               আপনার কাছের দোকান থেকে কিনুন
             </p>
           </div>
+          <Link href="/customer/bd-shop-orders">
+            <Button variant="outline" size="sm" data-testid="button-my-orders">
+              <Package className="h-4 w-4 mr-1" />
+              আমার অর্ডার
+            </Button>
+          </Link>
         </div>
 
         <div className="px-4 pb-4">

@@ -30,6 +30,7 @@ import {
   Bell,
   HelpCircle,
   User,
+  Star,
 } from "lucide-react";
 
 interface ShopPartnerLayoutProps {
@@ -60,6 +61,18 @@ const menuItems = [
     url: "/shop-partner/wallet",
     icon: Wallet,
     label: "wallet",
+  },
+  {
+    title: "রিভিউ",
+    url: "/shop-partner/reviews",
+    icon: Star,
+    label: "reviews",
+  },
+  {
+    title: "নোটিফিকেশন",
+    url: "/shop-partner/notifications",
+    icon: Bell,
+    label: "notifications",
   },
   {
     title: "প্রোফাইল",
@@ -205,9 +218,11 @@ export function ShopPartnerLayout({ children }: ShopPartnerLayoutProps) {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" data-testid="button-notifications">
-                <Bell className="h-5 w-5" />
-              </Button>
+              <Link href="/shop-partner/notifications">
+                <Button variant="ghost" size="icon" data-testid="button-notifications">
+                  <Bell className="h-5 w-5" />
+                </Button>
+              </Link>
             </div>
           </header>
 

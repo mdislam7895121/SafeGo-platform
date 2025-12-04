@@ -290,10 +290,13 @@ import ShopPartnerOrders from "@/pages/shop-partner/orders";
 import ShopPartnerWallet from "@/pages/shop-partner/wallet";
 import ShopPartnerSettings from "@/pages/shop-partner/settings";
 import ShopPartnerProfile from "@/pages/shop-partner/profile";
+import ShopPartnerReviews from "@/pages/shop-partner/reviews";
+import ShopPartnerNotifications from "@/pages/shop-partner/notifications";
 
 // Customer BD Shop pages
 import BDShops from "@/pages/customer/bd-shops";
 import BDShopDetails from "@/pages/customer/bd-shop-details";
+import BDShopOrders from "@/pages/customer/bd-shop-orders";
 import BDProductDetails from "@/pages/customer/bd-product-details";
 
 // Ticket Operator pages (BD only)
@@ -429,7 +432,7 @@ function Router() {
       {/* Legacy /customer/eats routes - redirect to primary /customer/food
           Auth is enforced at destination (/customer/food is protected) */}
       <Route path="/customer/eats/:id">
-        {({ params }) => <Redirect to={`/customer/food/${params?.id || ''}`} />}
+        {(params) => <Redirect to={`/customer/food/${(params as Record<string, string>).id || ''}`} />}
       </Route>
       <Route path="/customer/eats">
         <Redirect to="/customer/food" />
@@ -2143,6 +2146,20 @@ function Router() {
           </ShopPartnerLayout>
         </ShopPartnerGuard>
       </Route>
+      <Route path="/shop-partner/reviews">
+        <ShopPartnerGuard>
+          <ShopPartnerLayout>
+            <ShopPartnerReviews />
+          </ShopPartnerLayout>
+        </ShopPartnerGuard>
+      </Route>
+      <Route path="/shop-partner/notifications">
+        <ShopPartnerGuard>
+          <ShopPartnerLayout>
+            <ShopPartnerNotifications />
+          </ShopPartnerLayout>
+        </ShopPartnerGuard>
+      </Route>
       <Route path="/shop-partner/settings">
         <ShopPartnerGuard>
           <ShopPartnerLayout>
@@ -2184,6 +2201,11 @@ function Router() {
       <Route path="/customer/bd-shops">
         <ProtectedRoute allowedRoles={["customer"]}>
           <BDShops />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/customer/bd-shop-orders">
+        <ProtectedRoute allowedRoles={["customer"]}>
+          <BDShopOrders />
         </ProtectedRoute>
       </Route>
 

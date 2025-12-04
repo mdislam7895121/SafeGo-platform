@@ -61,12 +61,18 @@ The backend uses Node.js 20+, TypeScript, Express.js 4, and Prisma Client 6 with
     - **API Routes**: Customer-facing at /api/security/*, admin-only at /api/admin/security/*
     - **Critical Deployment Note**: ENCRYPTION_KEY environment variable (64-character hex string) MUST be set before production deployment
 *   **Bangladesh Expansion (BD-Only Roles)**: Two new BD-exclusive partner roles with complete KYC onboarding and commerce workflows:
-    - **SafeGo Shop Partner**: Product sales platform enabling local shops to list products and receive orders via SafeGo
+    - **SafeGo Shop Partner (Enhanced December 2025)**: Complete e-commerce platform for local shops
       - Full KYC onboarding with NID, trade license, MFS accounts (bKash, Nagad)
-      - Product catalog management (CRUD, inventory, categories)
-      - Order lifecycle: requested → confirmed → preparing → ready → picked_up → delivered
-      - Commission tracking with cash/online payment handling
+      - Product catalog management (CRUD, inventory, categories, bulk stock updates)
+      - Order lifecycle: placed → accepted → packing → ready_for_pickup → picked_up → on_the_way → delivered (or cancelled variants)
+      - Commission tracking with cash/online payment handling (BD: 15%, USA: 12%)
       - Wallet system with negative balance management for COD orders
+      - Payout request system integrated with unified Wallet/Payout infrastructure
+      - Reviews & ratings system with shop average rating calculation
+      - Notifications system for order/shop/payout alerts
+      - Sales analytics dashboard with period filters (24h, 7d, 30d, 90d)
+      - Customer shop orders page (client/src/pages/customer/bd-shop-orders.tsx) with order history, status tracking, and rating submission
+      - Navigation from BD shops page to orders page ("আমার অর্ডার" button)
     - **SafeGo Ticket & Rental Operator**: Transportation and rental services
       - Operator types: bus_company, ferry_company, train_operator, rental_service
       - Ticket listings with seat capacity, route management, and booking workflow

@@ -148,6 +148,12 @@ router.patch("/shop-partners/:id/verify", async (req: Request, res: Response) =>
       if (commissionRate !== undefined) {
         updateData.commissionRate = commissionRate;
       }
+      
+      // CRITICAL: Also update the user role to shop_partner
+      await prisma.user.update({
+        where: { id: shopPartner.userId },
+        data: { role: "shop_partner" },
+      });
     } else if (action === "reject") {
       if (!rejectionReason) {
         return res.status(400).json({ error: "Rejection reason is required" });
