@@ -1,0 +1,96 @@
+You must now implement the full Phase-3 Enterprise Admin Dashboard Upgrade for SafeGo.
+
+Follow all company rules, security constraints, RBAC policies, UI/UX standards, mobile optimization rules, audit logging standards, and null-safe rendering rules.
+
+Complete the following 3 sub-phases in strict serial order without asking questions:
+
+────────────────────────────────────────
+PHASE 3A — ENTERPRISE ADMIN TOOLS (x14)
+────────────────────────────────────────
+
+1. Add Enterprise Tools section in AdminSidebar with icons.
+2. Add Scheduled Reports (daily/weekly/monthly CSV/JSON export).
+3. Add Live Admin Presence indicator (online/offline).
+4. Add Organization-wide System Status panel.
+5. Add Admin Productivity logs (actions/minute, resolved items).
+6. Add Failed Login Monitor with IP, UA, time.
+7. Add Admin Activity Heatmap.
+8. Add Data Quality Monitor (missing fields / invalid KYC).
+9. Add Quarantine Vault (flagged or suspicious items).
+10. Add Admin Notes system with timestamps.
+11. Add Real-time Configuration Preview for feature flags.
+12. Add API Usage Graphs.
+13. Add Country Compliance settings (read-only for non-country-admins).
+14. Add full documentation + route registration.
+
+All implementations must include:
+- Full RBAC permission protection
+- Null-safe rendering
+- Database queries with indexes
+- Realtime updates via WebSocket
+- Mobile-responsive layout
+- Dark/Light theme compatibility
+- Audit logging for every admin action
+
+When 3A is finished, continue immediately to 3B.
+
+
+────────────────────────────────────────
+PHASE 3B — UI/UX POLISH + REAL-TIME ANALYTICS
+────────────────────────────────────────
+
+1. Add Real-Time Analytics Dashboard using WebSocket.
+2. Add fallback polling mechanism when WebSocket unavailable.
+3. Add Quick-Action Panel (Suspend, Approve, Verify, Flag).
+4. Improve admin table components (virtual scrolling, filters).
+5. Make charts responsive and optimized.
+6. Add realtime counters: active trips, active drivers, current load.
+7. Add mobile layout optimization.
+8. Add live error panel for backend exceptions.
+9. Add consolidated notification timeline.
+10. Add route documentation + replit.md updates.
+
+Make sure:
+- No console errors
+- All analytics update without reload
+- WebSocket works for admin-scoped notifications
+
+
+────────────────────────────────────────
+PHASE 3C — INTELLIGENCE LAYER (AI + FRAUD + INSIGHTS)
+────────────────────────────────────────
+
+1. Add /admin/intelligence route and sidebar entry.
+2. Add Service Analytics (rides, eats, delivery).
+3. Add Driver Performance Score (completion rate, acceptance rate, cancellations).
+4. Add Fraud Detection Indicators:
+   - duplicate phone
+   - multiple accounts same device
+   - abnormal KYC patterns
+   - sudden trip cancellation clusters
+5. Add Earnings Irregularity Monitor.
+6. Add Customer Complaint patterns.
+7. Add Predictive Analytics (simple trend visualization).
+8. Add automated business insights panel.
+9. Add Ranking widgets: Top Drivers, High-Risk Drivers, High-Impact Cases.
+10. Add Drill-down navigation to user profile.
+11. Add AI Summary (text-based auto insight generator).
+12. Update changelog + full Phase-3 documentation.
+
+All 3C features must:
+- Follow RBAC
+- Use safe database queries
+- Never expose sensitive PII
+- Render error-free even when datasets empty
+
+────────────────────────────────────────
+
+When all 3 phases (3A + 3B + 3C) are complete:
+- Run regression tests on all admin routes
+- Fix all lint / TypeScript / runtime errors
+- Update replit.md and docs/PHASE3_REPORT.md
+- Confirm dashboard loads correctly on mobile and desktop
+- Ensure no feature breaks Phase 1 or Phase 2 logic
+
+Do not ask questions.  
+Execute everything step-by-step until Phase-3 finalization is complete.

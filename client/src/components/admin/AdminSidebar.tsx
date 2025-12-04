@@ -29,6 +29,7 @@ import {
   CreditCard,
   FileText,
   BrainCircuit,
+  Gauge,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -260,6 +261,12 @@ const phase3aNavItems: NavItem[] = [
 ];
 
 const phase3cNavItems: NavItem[] = [
+  {
+    title: "Operations Center",
+    href: "/admin/operations-center",
+    icon: Gauge,
+    navKey: "dashboard",
+  },
   {
     title: "Intelligence",
     href: "/admin/intelligence",
