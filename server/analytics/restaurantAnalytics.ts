@@ -1,4 +1,3 @@
-import { Decimal } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 export interface DateRangeFilter {
@@ -45,7 +44,7 @@ export interface DriverAnalytics {
   }[];
 }
 
-function decimalToNumber(value: Decimal | null | undefined): number {
+function decimalToNumber(value: any | null | undefined): number {
   if (!value) return 0;
   return parseFloat(value.toString());
 }
@@ -376,11 +375,10 @@ export async function getDriverAnalytics(
       whoCancelled: true,
       driver: {
         select: {
-          user: {
-            select: {
-              fullName: true,
-            },
-          },
+          id: true,
+          fullName: true,
+          firstName: true,
+          lastName: true,
         },
       },
     },
@@ -402,7 +400,7 @@ export async function getDriverAnalytics(
 
     if (!driverMap.has(order.driverId)) {
       driverMap.set(order.driverId, {
-        driverName: order.driver?.user?.fullName || "Unknown Driver",
+        driverName: order.driver?.fullName || `${order.driver?.firstName || ''} ${order.driver?.lastName || ''}`.trim() || "Unknown Driver",
         pickupTimes: [],
         deliveryTimes: [],
         cancellations: 0,
@@ -502,7 +500,7 @@ export async function getAdminRestaurantAnalytics(
       restaurant: {
         select: {
           id: true,
-          businessName: true,
+          restaurantName: true,
         },
       },
     },
@@ -536,7 +534,7 @@ export async function getAdminRestaurantAnalytics(
   orders.forEach((order) => {
     if (!restaurantMap.has(order.restaurantId)) {
       restaurantMap.set(order.restaurantId, {
-        restaurantName: order.restaurant?.businessName || "Unknown Restaurant",
+        restaurantName: order.restaurant?.restaurantName || "Unknown Restaurant",
         revenue: 0,
         orderCount: 0,
       });
@@ -647,10 +645,10 @@ export async function getRestaurantPerformanceInsights(
   // Get restaurant name
   const restaurant = await prisma.restaurantProfile.findUnique({
     where: { id: restaurantId },
-    select: { businessName: true },
+    select: { restaurantName: true },
   });
 
-  const restaurantName = restaurant?.businessName || "Restaurant";
+  const restaurantName = restaurant?.restaurantName || "Restaurant";
 
   // Current period: last 7 days
   const now = new Date();
@@ -872,7 +870,6 @@ export async function sendPerformanceNotification(
         select: {
           id: true,
           email: true,
-          fullName: true,
         },
       },
     },
@@ -949,6 +946,7 @@ export async function sendPerformanceNotification(
   // Create notification for restaurant owner
   await prisma.notification.create({
     data: {
+      id: crypto.randomUUID(),
       userId: restaurantProfile.user.id,
       type: notificationType,
       title: notificationTitle,
