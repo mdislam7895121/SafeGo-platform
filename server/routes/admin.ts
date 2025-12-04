@@ -10404,7 +10404,6 @@ router.get("/staff/:id", checkPermission(Permission.VIEW_RESTAURANT_PROFILES), a
             select: {
               id: true,
               email: true,
-              name: true,
             },
           },
         },
@@ -10434,7 +10433,6 @@ router.post(
           user: {
             select: {
               id: true,
-              name: true,
               email: true,
             },
           },
@@ -10448,6 +10446,9 @@ router.post(
       if (staff.ownerRole !== "STAFF") {
         return res.status(400).json({ error: "User is not a staff member" });
       }
+
+      // Use ownerName from profile or email as fallback for staff name
+      const staffName = staff.ownerName || staff.user.email.split("@")[0];
 
       // Update staff status
       const updatedStaff = await prisma.restaurantProfile.update({
@@ -10472,14 +10473,14 @@ router.post(
 
       // Log admin action
       await logAudit({
-        action: `${block ? "Blocked" : "Unblocked"} staff member ${staff.user.name} (${staff.user.email})${reason ? `. Reason: ${reason}` : ""}`,
+        action: `${block ? "Blocked" : "Unblocked"} staff member ${staffName} (${staff.user.email})${reason ? `. Reason: ${reason}` : ""}`,
         actionType: block ? ActionType.BLOCK_STAFF : ActionType.UNBLOCK_STAFF,
         actorId: adminId,
         targetId: staffId,
         targetType: "staff",
         metadata: {
           staffId,
-          staffName: staff.user.name,
+          staffName,
           staffEmail: staff.user.email,
           block,
           reason,
