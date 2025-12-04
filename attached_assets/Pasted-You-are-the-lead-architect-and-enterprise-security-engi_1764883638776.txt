@@ -1,0 +1,174 @@
+You are the lead architect and enterprise security engineer for the SafeGo platform.
+
+GOAL
+Complete a FULL enterprise-grade ADMIN SYSTEM PASS for Phase-1 and Phase-2 in one run:
+- Verify all admin features are working
+- Fix hidden problems you can detect from code, tests, and logs
+- Harden security and audit logging
+- Polish the admin UI/UX for production
+- Produce final documentation files
+
+IMPORTANT WORKING RULES
+1. Do NOT ask the user any questions. Make safe, reasonable assumptions and continue.
+2. Treat the current codebase and existing features as the main source of truth; only change what is necessary.
+3. Never break existing working flows for:
+   - Customers
+   - Drivers (ride + delivery)
+   - Restaurants
+   - Shop Partners
+   - Ticket & Rental Operators
+   - Admin roles (all 8 roles in RBAC v2)
+4. Keep Bangladesh (BD) and USA (US) rules separate wherever country-specific logic exists.
+5. Never introduce any test/demo backdoor, default passwords, or hard-coded secrets.
+6. Every change must be:
+   - Type-safe (TypeScript clean)
+   - Security-safe
+   - Backwards compatible with existing data if possible
+
+TECH STACK ASSUMPTIONS
+- Node/TypeScript backend (Prisma, Express/Router or similar)
+- React/Next-style admin frontend with Tailwind or similar utility CSS
+- JWT-based authentication middleware: authenticateToken / admin auth routes
+- WebSocket / real-time notifications already wired for admin Notification Center
+- RBAC v2 already implemented with 8 admin roles and granular permissions
+- Existing docs: docs/PHASE1_REPORT.md, docs/PHASE2_REPORT.md, docs/CHANGELOG_PHASE2.md, replit.md, and any audit-related markdown files
+
+PHASE-1 + PHASE-2 ADMIN FEATURE LIST (ALREADY IMPLEMENTED BUT MUST BE VERIFIED)
+You must verify, fix if needed, and document the following features end-to-end:
+
+1. People & KYC Center
+   - Unified listing of all roles (customers, drivers, restaurants, shop partners, ticket & rental operators, admins)
+   - Search by name / email / phone
+   - KYC status indicators and progress bar
+   - KYC detail view, including country-specific ID rules (BD vs US)
+   - Correct permission checks so only allowed admin roles can view or edit sensitive data
+
+2. Safety & Risk Center
+   - Dashboard cards (Open Cases, Critical, Today’s Events, Unresolved) with correct counts
+   - Risk Cases and Risk Events tabs with filters, search, and detail view
+   - Case lifecycle: open → in progress → resolved, with timestamps and responsible admin
+   - Links from safety events to the correct user/ride/order/ticket records
+   - All actions fully logged in audit logs
+
+3. Feature Flags Management
+   - Enterprise UI for grouped flags (e.g., Rides, Food, Shop, Tickets, Rentals, Automation, Experiments)
+   - Rollout sliders / toggles (0–100% or on/off)
+   - Environment-aware flags (dev/staging/prod) and country-aware flags (BD/US)
+   - Safe defaults when flags are missing or misconfigured
+   - No dead or unused flags left in code without reasoned comment
+
+4. Real-time Notification Center (Admin)
+   - WebSocket notifications with JWT auth and role-scoped channels
+   - Authorization-protected mark-as-read (no cross-region or cross-role tampering)
+   - Severity filters, category filters, search, and detail panel with activity logs
+   - Optional sound alert (AudioContext) that respects user/system mute settings
+   - Connection status indicator (Live/Offline + reconnect) that actually works
+   - CSV export of notifications for a selected time range
+
+5. Global Theme System
+   - Dark / Light / System modes
+   - Admin presets (default, ocean, forest, sunset, midnight)
+   - Accessibility modes (high-contrast, reduced-motion, large-text)
+   - Safe defaults that never render the admin UI unreadable
+   - All admin screens respect the global theme tokens (colors, typography, spacing)
+
+6. Mobile Optimization (Admin)
+   - All admin pages critical for daily work (dashboard, People & KYC, Safety Center,
+     Feature Flags, Notifications, Access Governance) must be usable on a phone screen
+   - Minimum tap target ~44px, no overlapping buttons
+   - Important actions not hidden off-screen without scroll or clear affordance
+   - Null-safe rendering for all optional fields (no blank white screens or runtime errors)
+
+7. Regression Tests & Admin Route Validation
+   - Re-run and, if needed, repair regression tests for:
+     - Admin authentication and RBAC
+     - People & KYC listing and detail endpoints
+     - Safety & Risk Center data APIs
+     - Feature Flags APIs
+     - Notification APIs and WebSocket handshake
+   - Ensure test coverage at least covers happy-path and basic error cases
+
+8. Audit Logging Expansion
+   - Multi-admin tracking with:
+     - adminId / email
+     - role(s)
+     - IP / userAgent where available
+     - countryCode and environment (dev/staging/prod)
+   - Hash-chain or similar tamper-evidence for critical logs (e.g., KYC changes, payouts, safety decisions)
+   - Export endpoints (CSV/JSON) for audits that still respect permissions
+
+9. Performance & Database Cleanup
+   - Add or verify indexes on heavy query tables (users, rides, orders, tickets, wallets, audit logs)
+   - Remove or refactor obviously unused queries and dead code paths that can hurt performance
+   - Confirm that pagination is used for all large admin lists (no unbounded queries)
+   - Schema maintenance: ensure enum and relation names match actual usage (no stale types)
+
+10. Environment Separation & Safety
+    - Confirm that dev/staging/prod configs are separated and correctly loaded
+    - No dev keys, test secrets, or sandbox tokens committed in code
+    - Safe handling of Stripe/Payment sync warnings (no crash, clear logs)
+    - All cartographer / beacon tool warnings treated as non-blocking dev tools only
+
+11. Access Governance (RBAC Visualization)
+    - Live RBAC visualization page that shows:
+      - role hierarchy tree
+      - permission matrix (roles x capabilities)
+      - country scope map (which admin roles see BD vs US data)
+    - Ensure the visualization matches the actual permission checks in code
+    - Add helpful tooltips / descriptions so a non-technical compliance officer can understand it
+
+12. Security Hardening (Admin Side)
+    - Confirm all admin routes use authenticateToken and explicit admin role checks
+    - Remove any remaining hardcoded secret fallbacks or unsafe debug flags
+    - Strict input validation on admin filters, searches, and exports
+    - Make sure file downloads (CSV/JSON) cannot leak data outside the allowed scope
+    - Verify CORS / CSRF protections remain correct for admin usage
+
+WORK PLAN
+Execute this high-level plan internally, without asking the user:
+
+1. SCAN & INVENTORY
+   - Discover relevant server and client files (routes, controllers, services, React pages/components, hooks).
+   - Map each file to the feature list above.
+
+2. VERIFY IMPLEMENTATION
+   - For each feature (1–12 above), verify:
+     - API layer is secure and correct
+     - UI renders without runtime errors in normal and edge cases
+     - Role and country rules are respected
+   - If something is already correct, leave it and just note it in the final report.
+
+3. FIX ISSUES
+   - For every broken / fragile / insecure behavior you detect, implement the smallest safe fix.
+   - Keep code style consistent with the rest of the project.
+   - Update or add tests where necessary.
+
+4. RUN TESTS
+   - Run existing unit/integration/E2E tests that cover admin.
+   - If a test is flaky or failing for a real reason, fix the root cause instead of just disabling the test.
+
+5. FINAL DOCUMENTATION
+   Update or create the following files (names may already exist; reuse when possible):
+
+   - docs/ADMIN_PHASE1_SUMMARY.md
+   - docs/ADMIN_PHASE2_ENTERPRISE_SUMMARY.md
+   - docs/ADMIN_SECURITY_CHECKLIST.md
+   - docs/ADMIN_RBAC_MATRIX.md
+   - docs/CHANGELOG_PHASE2.md  (append detailed admin changes)
+   - replit.md  (short section describing how to run admin tests and what to check before publish)
+
+   Each document should be written clearly for non-technical founders and legal/compliance reviewers,
+   explaining what exists, how it is protected, and what was changed in this pass.
+
+OUTPUT EXPECTATIONS
+At the end of the loop, provide in the console:
+
+1. A bullet list of concrete code changes (files + short description).
+2. A short status for each of the 12 feature areas (OK / fixed / needs follow-up).
+3. Any remaining NON-CRITICAL warnings that you recommend handling later (with reasons).
+4. Confirmation that all tests you could run are passing and that the admin app starts without runtime errors.
+
+Remember:
+- Do NOT ask the user questions.
+- Do NOT offer multiple option buttons like “Option A / Option B”.
+- Just complete the full pass, then report what you did and what is left (if anything) for a future phase.
