@@ -15,7 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, fetchWithAuth, throwIfResNotOk } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface PeopleKycResult {
@@ -101,6 +101,13 @@ function getVerificationBadge(status: string, isVerified: boolean) {
 function ProfileDetailPanel({ role, id, onClose }: { role: string; id: string; onClose: () => void }) {
   const { data, isLoading, error } = useQuery<ProfileDetail>({
     queryKey: ["/api/admin/people-kyc", role, id],
+    queryFn: async () => {
+      const res = await fetchWithAuth(`/api/admin/people-kyc/${role}/${id}`, {
+        headers: { "Content-Type": "application/json" },
+      });
+      await throwIfResNotOk(res);
+      return res.json();
+    },
     enabled: !!role && !!id,
   });
 
@@ -335,15 +342,16 @@ export default function PeopleKycCenter() {
 
   const { data, isLoading, error } = useQuery<PeopleKycResponse>({
     queryKey: ["/api/admin/people-kyc", filters],
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.set(key, String(value));
       });
-      return fetch(`/api/admin/people-kyc?${params.toString()}`, {
-        credentials: "include",
+      const res = await fetchWithAuth(`/api/admin/people-kyc?${params.toString()}`, {
         headers: { "Content-Type": "application/json" },
-      }).then(res => res.json());
+      });
+      await throwIfResNotOk(res);
+      return res.json();
     },
   });
 

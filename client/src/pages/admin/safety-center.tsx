@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, fetchWithAuth, throwIfResNotOk } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface RiskCase {
@@ -369,30 +369,32 @@ export default function SafetyCenter() {
 
   const { data: casesData, isLoading: isLoadingCases, refetch: refetchCases } = useQuery({
     queryKey: ["/api/admin/safety/cases", filters],
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.set(key, String(value));
       });
-      return fetch(`/api/admin/safety/cases?${params.toString()}`, {
-        credentials: "include",
+      const res = await fetchWithAuth(`/api/admin/safety/cases?${params.toString()}`, {
         headers: { "Content-Type": "application/json" },
-      }).then(res => res.json());
+      });
+      await throwIfResNotOk(res);
+      return res.json();
     },
     enabled: activeTab === "cases",
   });
 
   const { data: eventsData, isLoading: isLoadingEvents } = useQuery({
     queryKey: ["/api/admin/safety/events", filters],
-    queryFn: () => {
+    queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.set(key, String(value));
       });
-      return fetch(`/api/admin/safety/events?${params.toString()}`, {
-        credentials: "include",
+      const res = await fetchWithAuth(`/api/admin/safety/events?${params.toString()}`, {
         headers: { "Content-Type": "application/json" },
-      }).then(res => res.json());
+      });
+      await throwIfResNotOk(res);
+      return res.json();
     },
     enabled: activeTab === "events",
   });

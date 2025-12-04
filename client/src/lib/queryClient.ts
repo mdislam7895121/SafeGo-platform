@@ -59,7 +59,7 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
-async function throwIfResNotOk(res: Response) {
+export async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     
@@ -82,7 +82,7 @@ async function throwIfResNotOk(res: Response) {
 }
 
 // Core fetch function with automatic token refresh
-async function fetchWithAuth(
+export async function fetchWithAuth(
   url: string,
   options?: RequestInit,
   retryOnUnauthorized = true
