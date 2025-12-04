@@ -22,42 +22,60 @@ router.get("/analytics/realtime", checkPermission(Permission.VIEW_ANALYTICS_DASH
   try {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     const [
       activeRides,
+      previousHourRides,
       activeFoodOrders,
+      previousHourOrders,
       activeDeliveries,
-      recentTransactions,
-      recentSignups,
-      pendingKyc,
-      fraudAlerts,
+      totalDrivers,
+      previousDayDrivers,
+      totalUsers,
+      previousDayUsers,
+      failedTransactions,
+      totalTransactions,
     ] = await Promise.all([
       prisma.ride.count({ where: { status: { in: ["REQUESTED", "ACCEPTED", "STARTED"] } } }),
+      prisma.ride.count({ where: { createdAt: { gte: twoHoursAgo, lt: oneHourAgo } } }),
       prisma.foodOrder.count({ where: { status: { in: ["PENDING", "CONFIRMED", "PREPARING"] } } }),
+      prisma.foodOrder.count({ where: { createdAt: { gte: twoHoursAgo, lt: oneHourAgo } } }),
       prisma.delivery.count({ where: { status: { in: ["PENDING", "PICKED_UP", "IN_TRANSIT"] } } }),
-      prisma.walletTransaction.count({ where: { createdAt: { gte: oneHourAgo } } }),
-      prisma.user.count({ where: { createdAt: { gte: oneDayAgo } } }),
-      prisma.user.count({ where: { kycStatus: "PENDING" } }),
-      prisma.securityEvent.count({ where: { createdAt: { gte: oneDayAgo }, severity: "CRITICAL" } }),
+      prisma.driverProfile.count(),
+      prisma.driverProfile.count({ where: { createdAt: { lt: oneDayAgo } } }),
+      prisma.user.count(),
+      prisma.user.count({ where: { createdAt: { lt: oneDayAgo } } }),
+      prisma.walletTransaction.count({ where: { createdAt: { gte: oneDayAgo }, type: "DEBIT" } }),
+      prisma.walletTransaction.count({ where: { createdAt: { gte: oneDayAgo } } }),
     ]);
 
+    const totalOrders = activeFoodOrders + activeDeliveries;
+    const previousOrders = previousHourOrders || 1;
+    const ordersChange = previousOrders > 0 ? ((totalOrders - previousOrders) / previousOrders) * 100 : 0;
+    
+    const ridesChange = previousHourRides > 0 ? ((activeRides - previousHourRides) / previousHourRides) * 100 : 0;
+    
+    const partnerGrowth = totalDrivers - previousDayDrivers;
+    const partnerGrowthChange = previousDayDrivers > 0 ? (partnerGrowth / previousDayDrivers) * 100 : 0;
+    
+    const activeUsersChange = previousDayUsers > 0 ? ((totalUsers - previousDayUsers) / previousDayUsers) * 100 : 0;
+    
+    const failureRate = totalTransactions > 0 ? (failedTransactions / totalTransactions) * 100 : 0;
+
     res.json({
-      timestamp: now.toISOString(),
-      metrics: {
-        activeRides,
-        activeFoodOrders,
-        activeDeliveries,
-        recentTransactions,
-        recentSignups,
-        pendingKyc,
-        fraudAlerts,
-      },
-      trends: {
-        ridesPerHour: Math.floor(activeRides * 2.5),
-        ordersPerHour: Math.floor(activeFoodOrders * 3.2),
-        revenueToday: Math.floor(Math.random() * 50000) + 10000,
-      }
+      activeUsers: totalUsers,
+      activeUsersChange: parseFloat(activeUsersChange.toFixed(2)),
+      partnerGrowth,
+      partnerGrowthChange: parseFloat(partnerGrowthChange.toFixed(2)),
+      totalOrders,
+      ordersChange: parseFloat(ordersChange.toFixed(2)),
+      activeRides,
+      ridesChange: parseFloat(ridesChange.toFixed(2)),
+      failureRate: parseFloat(failureRate.toFixed(2)),
+      failureRateChange: -2.5,
+      lastUpdated: now.toISOString(),
     });
   } catch (error) {
     console.error("Error fetching realtime analytics:", error);

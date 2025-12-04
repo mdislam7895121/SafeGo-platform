@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 
 type Theme = "light" | "dark" | "system";
 type AdminPreset = "default" | "slate" | "ocean" | "forest" | "sunset";
-type AccessibilityMode = "normal" | "high-contrast" | "large-text" | "high-contrast-large";
+type AccessibilityMode = "normal" | "high-contrast" | "large-text" | "high-contrast-large" | "reduced-motion";
 
 interface ThemeContextType {
   theme: Theme;
@@ -13,6 +13,8 @@ interface ThemeContextType {
   setAdminPreset: (preset: AdminPreset) => void;
   accessibilityMode: AccessibilityMode;
   setAccessibilityMode: (mode: AccessibilityMode) => void;
+  reducedMotion: boolean;
+  setReducedMotion: (enabled: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -20,6 +22,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 const THEME_STORAGE_KEY = "safego-theme";
 const ADMIN_PRESET_KEY = "safego-admin-preset";
 const ACCESSIBILITY_KEY = "safego-accessibility";
+const REDUCED_MOTION_KEY = "safego-reduced-motion";
 
 const PRESET_COLORS: Record<AdminPreset, { primary: string; accent: string }> = {
   default: { primary: "210 92% 45%", accent: "210 15% 90%" },
@@ -41,6 +44,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">("light");
   const [adminPreset, setAdminPresetState] = useState<AdminPreset>("default");
   const [accessibilityMode, setAccessibilityModeState] = useState<AccessibilityMode>("normal");
+  const [reducedMotion, setReducedMotionState] = useState<boolean>(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
@@ -53,8 +57,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setAdminPresetState(storedPreset as AdminPreset);
     }
     const storedA11y = localStorage.getItem(ACCESSIBILITY_KEY);
-    if (storedA11y && ["normal", "high-contrast", "large-text", "high-contrast-large"].includes(storedA11y)) {
+    if (storedA11y && ["normal", "high-contrast", "large-text", "high-contrast-large", "reduced-motion"].includes(storedA11y)) {
       setAccessibilityModeState(storedA11y as AccessibilityMode);
+    }
+    const storedMotion = localStorage.getItem(REDUCED_MOTION_KEY);
+    if (storedMotion === "true") {
+      setReducedMotionState(true);
     }
     setIsHydrated(true);
   }, []);
@@ -98,12 +106,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const applyAccessibility = useCallback((mode: AccessibilityMode) => {
     if (typeof document === "undefined") return;
     const root = document.documentElement;
-    root.classList.remove("a11y-high-contrast", "a11y-large-text");
+    root.classList.remove("a11y-high-contrast", "a11y-large-text", "a11y-reduced-motion");
     if (mode === "high-contrast" || mode === "high-contrast-large") {
       root.classList.add("a11y-high-contrast");
     }
     if (mode === "large-text" || mode === "high-contrast-large") {
       root.classList.add("a11y-large-text");
+    }
+    if (mode === "reduced-motion") {
+      root.classList.add("a11y-reduced-motion");
+    }
+  }, []);
+
+  const applyReducedMotion = useCallback((enabled: boolean) => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (enabled) {
+      root.classList.add("a11y-reduced-motion");
+    } else {
+      root.classList.remove("a11y-reduced-motion");
     }
   }, []);
 
@@ -123,12 +144,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyAccessibility(mode);
   }, [applyAccessibility]);
 
+  const setReducedMotion = useCallback((enabled: boolean) => {
+    setReducedMotionState(enabled);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(REDUCED_MOTION_KEY, String(enabled));
+    }
+    applyReducedMotion(enabled);
+  }, [applyReducedMotion]);
+
   useEffect(() => {
     if (!isHydrated) return;
     applyTheme(theme);
     applyPreset(adminPreset);
     applyAccessibility(accessibilityMode);
-  }, [theme, adminPreset, accessibilityMode, isHydrated, applyTheme, applyPreset, applyAccessibility]);
+    applyReducedMotion(reducedMotion);
+  }, [theme, adminPreset, accessibilityMode, reducedMotion, isHydrated, applyTheme, applyPreset, applyAccessibility, applyReducedMotion]);
 
   useEffect(() => {
     if (theme !== "system" || typeof window === "undefined") return;
@@ -151,7 +181,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       adminPreset,
       setAdminPreset,
       accessibilityMode,
-      setAccessibilityMode
+      setAccessibilityMode,
+      reducedMotion,
+      setReducedMotion
     }}>
       {children}
     </ThemeContext.Provider>

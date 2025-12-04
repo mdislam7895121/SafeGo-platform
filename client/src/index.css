@@ -685,22 +685,59 @@ html {
    This uses before:/after: pseudo-elements for rim-light and under-glow effects. */
 
 /* ========================================
-   ACCESSIBILITY MODES
+   WCAG 2.1 AA ACCESSIBILITY COMPLIANCE
    ======================================== */
 
-/* High Contrast Mode */
+/* ---- FOCUS RINGS (WCAG 2.4.7 Focus Visible) ---- */
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+/* Skip to main content link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding: 8px 16px;
+  z-index: 9999;
+  font-weight: 600;
+  border-radius: 0 0 8px 0;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}
+
+/* ---- HIGH CONTRAST MODE (WCAG 1.4.11 Non-text Contrast) ---- */
 .a11y-high-contrast {
   --foreground: 0 0% 0%;
   --background: 0 0% 100%;
   --border: 0 0% 0%;
-  --muted-foreground: 0 0% 20%;
+  --muted-foreground: 0 0% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 0%;
+  --primary: 210 100% 35%;
+  --primary-foreground: 0 0% 100%;
+  --destructive: 0 100% 35%;
+  --destructive-foreground: 0 0% 100%;
 }
 
 .a11y-high-contrast.dark {
   --foreground: 0 0% 100%;
   --background: 0 0% 0%;
   --border: 0 0% 100%;
-  --muted-foreground: 0 0% 80%;
+  --muted-foreground: 0 0% 85%;
+  --card: 0 0% 5%;
+  --card-foreground: 0 0% 100%;
+  --primary: 210 100% 65%;
+  --primary-foreground: 0 0% 0%;
+  --destructive: 0 100% 65%;
+  --destructive-foreground: 0 0% 0%;
 }
 
 .a11y-high-contrast button,
@@ -709,48 +746,411 @@ html {
 .a11y-high-contrast select,
 .a11y-high-contrast textarea {
   border-width: 2px !important;
+  border-color: currentColor !important;
 }
 
 .a11y-high-contrast *:focus-visible {
   outline-width: 3px !important;
-  outline-offset: 2px !important;
+  outline-offset: 3px !important;
+  outline-style: solid !important;
 }
 
-/* Large Text Mode */
+.a11y-high-contrast [role="button"],
+.a11y-high-contrast [role="link"] {
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+
+/* ---- LARGE TEXT MODE (WCAG 1.4.4 Resize Text) ---- */
 .a11y-large-text {
-  font-size: 1.125rem !important;
+  --base-font-size: 1.25rem;
+  font-size: var(--base-font-size) !important;
+  line-height: 1.6 !important;
 }
 
 .a11y-large-text h1 {
-  font-size: 2.5rem !important;
+  font-size: 3rem !important;
+  line-height: 1.2 !important;
 }
 
 .a11y-large-text h2 {
-  font-size: 2rem !important;
+  font-size: 2.5rem !important;
+  line-height: 1.25 !important;
 }
 
 .a11y-large-text h3 {
-  font-size: 1.5rem !important;
+  font-size: 2rem !important;
+  line-height: 1.3 !important;
+}
+
+.a11y-large-text h4 {
+  font-size: 1.75rem !important;
+  line-height: 1.35 !important;
 }
 
 .a11y-large-text p,
 .a11y-large-text span,
 .a11y-large-text label,
-.a11y-large-text button {
-  font-size: 1.125rem !important;
+.a11y-large-text button,
+.a11y-large-text td,
+.a11y-large-text th {
+  font-size: var(--base-font-size) !important;
+  line-height: 1.6 !important;
 }
 
 .a11y-large-text .text-sm {
-  font-size: 1rem !important;
+  font-size: 1.125rem !important;
 }
 
 .a11y-large-text .text-xs {
-  font-size: 0.875rem !important;
+  font-size: 1rem !important;
+}
+
+.a11y-large-text .text-muted-foreground {
+  font-size: 1.125rem !important;
 }
 
 .a11y-large-text input,
 .a11y-large-text select,
 .a11y-large-text textarea {
-  font-size: 1.125rem !important;
-  min-height: 3rem !important;
+  font-size: var(--base-font-size) !important;
+  min-height: 3.5rem !important;
+  padding: 0.75rem 1rem !important;
+}
+
+/* ---- REDUCED MOTION (WCAG 2.3.3 Animation) ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.a11y-reduced-motion *,
+.a11y-reduced-motion *::before,
+.a11y-reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ---- MINIMUM TAP TARGETS (WCAG 2.5.5 Target Size) ---- */
+.a11y-touch-targets button:not(.icon-btn-sm),
+.a11y-touch-targets a:not(.inline-link),
+.a11y-touch-targets [role="button"],
+.a11y-touch-targets input[type="checkbox"],
+.a11y-touch-targets input[type="radio"] {
+  min-height: 44px !important;
+  min-width: 44px !important;
+}
+
+/* ---- SCREEN READER UTILITIES ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.sr-only-focusable:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* ---- FOCUS TRAP INDICATOR ---- */
+[data-focus-trap="true"] {
+  position: relative;
+}
+
+[data-focus-trap="true"]::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px dashed hsl(var(--ring) / 0.5);
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+[data-focus-trap="true"]:focus-within::before {
+  opacity: 1;
+}
+
+/* ---- MOBILE TOUCH IMPROVEMENTS ---- */
+@media (max-width: 768px) {
+  button,
+  [role="button"],
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+  
+  .touch-action-manipulation {
+    touch-action: manipulation;
+  }
+}
+
+/* ---- ENTERPRISE ADMIN TYPOGRAPHY SCALE ---- */
+.admin-typography {
+  --admin-h1: clamp(1.5rem, 2vw + 1rem, 2.25rem);
+  --admin-h2: clamp(1.25rem, 1.5vw + 0.75rem, 1.75rem);
+  --admin-h3: clamp(1.125rem, 1vw + 0.75rem, 1.5rem);
+  --admin-body: clamp(0.875rem, 0.5vw + 0.75rem, 1rem);
+  --admin-small: clamp(0.75rem, 0.25vw + 0.625rem, 0.875rem);
+}
+
+.admin-typography h1 { font-size: var(--admin-h1); }
+.admin-typography h2 { font-size: var(--admin-h2); }
+.admin-typography h3 { font-size: var(--admin-h3); }
+.admin-typography p,
+.admin-typography span,
+.admin-typography label { font-size: var(--admin-body); }
+.admin-typography .text-sm { font-size: var(--admin-small); }
+
+/* ========================================
+   MOBILE-RESPONSIVE ADMIN LAYOUT (Phase 3B)
+   ======================================== */
+
+/* ---- BREAKPOINT: 360px (Small phones) ---- */
+@media (max-width: 360px) {
+  .admin-container {
+    padding: 0.75rem;
+  }
+  
+  .admin-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+  
+  .admin-card-header {
+    padding: 0.75rem;
+  }
+  
+  .admin-card-content {
+    padding: 0.75rem;
+  }
+  
+  .admin-table th,
+  .admin-table td {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+  
+  .admin-button-group {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .admin-button-group > button {
+    width: 100%;
+  }
+}
+
+/* ---- BREAKPOINT: 768px (Tablets) ---- */
+@media (max-width: 768px) {
+  .admin-sidebar {
+    position: fixed;
+    left: -100%;
+    z-index: 50;
+    width: 280px;
+    transition: left 0.3s ease;
+  }
+  
+  .admin-sidebar.open {
+    left: 0;
+  }
+  
+  .admin-main {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .admin-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .admin-header-search {
+    display: none;
+  }
+  
+  .admin-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  
+  .admin-page-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .admin-page-actions > button {
+    flex: 1;
+    min-width: 120px;
+  }
+  
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .admin-table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .admin-table {
+    min-width: 600px;
+  }
+  
+  .admin-modal {
+    width: calc(100% - 2rem);
+    max-height: calc(100vh - 4rem);
+    margin: 1rem;
+  }
+  
+  .admin-modal-fullscreen {
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+}
+
+/* ---- BREAKPOINT: 1024px (Small laptops) ---- */
+@media (max-width: 1024px) {
+  .admin-sidebar-collapsed {
+    width: 4rem;
+  }
+  
+  .admin-sidebar-collapsed .sidebar-label {
+    display: none;
+  }
+  
+  .admin-main-expanded {
+    margin-left: 4rem;
+  }
+  
+  .admin-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .admin-charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- RESPONSIVE UTILITIES ---- */
+.hide-on-mobile {
+  display: block;
+}
+
+.show-on-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none;
+  }
+  
+  .show-on-mobile {
+    display: block;
+  }
+}
+
+/* ---- TOUCH-FRIENDLY IMPROVEMENTS ---- */
+@media (hover: none) and (pointer: coarse) {
+  .admin-row-action {
+    opacity: 1;
+  }
+  
+  .admin-dropdown-trigger {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .admin-icon-button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px;
+  }
+}
+
+/* ---- SAFE AREA INSETS (iPhone notch/home indicator) ---- */
+@supports (padding: max(0px)) {
+  .admin-header {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+  
+  .admin-bottom-nav {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  
+  .admin-sidebar {
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+}
+
+/* ---- HORIZONTAL SCROLL PREVENTION ---- */
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+.admin-content {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* ---- RESPONSIVE CARD GRID ---- */
+.admin-responsive-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 480px) {
+  .admin-responsive-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .admin-responsive-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .admin-responsive-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (min-width: 1280px) {
+  .admin-responsive-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }

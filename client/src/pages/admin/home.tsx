@@ -12,6 +12,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { fetchAdminCapabilities } from "@/lib/queryClient";
+import { RealTimeAnalytics } from "@/components/admin/RealTimeAnalytics";
 
 interface AdminStats {
   totalUsers: number;
@@ -454,6 +455,11 @@ export default function AdminHome() {
           variant="gradient"
           storageKey="admin_dashboard"
         />
+      </div>
+
+      {/* Real-Time Analytics Dashboard */}
+      <div className="px-4 sm:px-6 md:px-8 pt-4 sm:pt-6">
+        <RealTimeAnalytics />
       </div>
 
       {/* Quick Actions */}

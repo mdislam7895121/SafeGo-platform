@@ -41,6 +41,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { QuickActionsPanel } from "./QuickActionsPanel";
+import { GlobalSearch } from "./GlobalSearch";
 
 interface Notification {
   id: string;
@@ -108,20 +110,14 @@ export function AdminHeader() {
       <div className="flex items-center gap-4">
         <SidebarTrigger className="-ml-1" data-testid="button-sidebar-toggle" />
         
-        <div className="hidden md:flex relative w-64 lg:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search users, drivers, orders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 h-9 bg-muted/50"
-            data-testid="input-global-search"
-          />
+        <div className="hidden md:flex">
+          <GlobalSearch />
         </div>
       </div>
 
       <div className="flex items-center gap-2">
+        <QuickActionsPanel />
+        
         <Button
           variant="ghost"
           size="icon"
