@@ -18,6 +18,10 @@ import { inventoryMenuErrorAutomation } from './InventoryMenuErrorAutomation';
 import { systemMonitoringAutomation } from './SystemMonitoringAutomation';
 import { aiCustomerSupportAutomation } from './AICustomerSupportAutomation';
 import { highRiskActivityAutomation } from './HighRiskActivityAutomation';
+import { customerAbuseAutomation } from './CustomerAbuseAutomation';
+import { partnerFraudAutomation } from './PartnerFraudAutomation';
+import { customerPaymentScoringAutomation } from './CustomerPaymentScoringAutomation';
+import { partnerRiskMonitoringAutomation } from './PartnerRiskMonitoringAutomation';
 
 export {
   AutoAssignmentEngine, autoAssignmentEngine,
@@ -35,6 +39,10 @@ export {
   systemMonitoringAutomation,
   aiCustomerSupportAutomation,
   highRiskActivityAutomation,
+  customerAbuseAutomation,
+  partnerFraudAutomation,
+  customerPaymentScoringAutomation,
+  partnerRiskMonitoringAutomation,
 };
 
 export interface AutomationSystemStatus {
@@ -59,6 +67,10 @@ export async function initializeAutomationSystems(): Promise<void> {
   systemMonitoringAutomation.start();
   aiCustomerSupportAutomation.start();
   highRiskActivityAutomation.start();
+  customerAbuseAutomation.start();
+  partnerFraudAutomation.start();
+  customerPaymentScoringAutomation.start();
+  partnerRiskMonitoringAutomation.start();
 
   console.log('[Automation] All automation systems initialized');
 }
@@ -77,6 +89,10 @@ export async function shutdownAutomationSystems(): Promise<void> {
   systemMonitoringAutomation.stop();
   aiCustomerSupportAutomation.stop();
   highRiskActivityAutomation.stop();
+  customerAbuseAutomation.stop();
+  partnerFraudAutomation.stop();
+  customerPaymentScoringAutomation.stop();
+  partnerRiskMonitoringAutomation.stop();
 
   console.log('[Automation] All automation systems stopped');
 }
@@ -160,6 +176,26 @@ export function getAutomationSystemsStatus(): AutomationSystemStatus[] {
       name: 'High Risk Activity Automation',
       isActive: highRiskActivityAutomation.getStatus().isRunning,
       config: highRiskActivityAutomation.getConfig(),
+    },
+    {
+      name: 'Customer Abuse Automation',
+      isActive: customerAbuseAutomation.getStatus().isRunning,
+      config: customerAbuseAutomation.getConfig(),
+    },
+    {
+      name: 'Partner Fraud Automation',
+      isActive: partnerFraudAutomation.getStatus().isRunning,
+      config: partnerFraudAutomation.getConfig(),
+    },
+    {
+      name: 'Customer Payment Scoring Automation',
+      isActive: customerPaymentScoringAutomation.getStatus().isRunning,
+      config: customerPaymentScoringAutomation.getConfig(),
+    },
+    {
+      name: 'Partner Risk Monitoring Automation',
+      isActive: partnerRiskMonitoringAutomation.getStatus().isRunning,
+      config: partnerRiskMonitoringAutomation.getConfig(),
     },
   ];
 }
