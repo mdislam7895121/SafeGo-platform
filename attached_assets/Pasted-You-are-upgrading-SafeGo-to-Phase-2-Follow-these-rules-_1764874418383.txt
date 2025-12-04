@@ -1,0 +1,128 @@
+You are upgrading SafeGo to Phase-2.
+
+Follow these rules:
+• Do not break anything from Phase-1.
+• Do not modify Ride, Delivery, Shop, Ticket, Rental core logic.
+• Apply granular admin controls, enterprise security, global audit, and advanced settings.
+• Every feature must be fully functional with end-to-end tests, UI + API + DB consistency.
+• Never create new roles beyond the existing 8 admin roles.
+• Maintain compatibility with Bangladesh + USA policy differences.
+
+Begin Phase-2 and complete ALL tasks in exact serial order:
+
+-------------------------------------------------------
+1. RBAC v3 – Enterprise Admin Permission Framework
+-------------------------------------------------------
+1.1 Add Super Admin Governance Layer  
+1.2 Add Permission Bundles (Ops, Finance, Safety, Legal, Engineering)  
+1.3 Add Emergency Lockdown Controls  
+1.4 Add Admin Impersonation Mode (View-only + Full Audit Log)  
+1.5 Add Admin Secure Internal Messaging
+
+-------------------------------------------------------
+2. Global Audit Engine v2
+-------------------------------------------------------
+2.1 Tamper-proof logging (hashed + timestamped)  
+2.2 Cross-system tracing for all events  
+2.3 Customer-Partner-Admin event chain mapping  
+2.4 Automatic incident evidence packet generator  
+2.5 Regulator Export Mode (PDF/CSV)
+
+-------------------------------------------------------
+3. People & KYC Center – Phase-2 Upgrade
+-------------------------------------------------------
+3.1 Add advanced filters  
+3.2 Add identity risk scoring  
+3.3 Add duplicate-account detection  
+3.4 Add suspicious-activity flagging  
+3.5 Add KYC enforcement rules per country
+
+-------------------------------------------------------
+4. Safety & Risk Center – Phase-2 Expansion
+-------------------------------------------------------
+4.1 Add incident escalation levels  
+4.2 Add cross-partner investigation workflow  
+4.3 Add automated risk classifier  
+4.4 Add case assignment for Admin roles  
+4.5 Add public-safety authority export mode
+
+-------------------------------------------------------
+5. Feature Flags – Enterprise System
+-------------------------------------------------------
+5.1 Create global feature toggle system  
+5.2 Add role-based visibility rules  
+5.3 Add environment-specific flags  
+5.4 Add country-specific rollout control  
+5.5 Add instant rollback system
+
+-------------------------------------------------------
+6. System Settings – Phase-2 Central Console
+-------------------------------------------------------
+6.1 Add currency rules (USD/BDT auto handling)  
+6.2 Add payout rules per country  
+6.3 Add tax/VAT/merchant-fee config  
+6.4 Add notification template manager  
+6.5 Add automatic backup configuration
+
+-------------------------------------------------------
+7. Partner Compliance Module
+-------------------------------------------------------
+7.1 Add driver compliance checks  
+7.2 Add shop/restaurant compliance status  
+7.3 Add ticket/rental operator compliance rules  
+7.4 Add partner-level audit trail  
+7.5 Add account freeze/unfreeze workflow
+
+-------------------------------------------------------
+8. Fraud & Abuse Prevention Engine
+-------------------------------------------------------
+8.1 Add device fingerprinting  
+8.2 Add login anomaly detection  
+8.3 Add payment risk scoring  
+8.4 Add promo/discount abuse detection  
+8.5 Add partner-collusion detection
+
+-------------------------------------------------------
+9. Multi-Country Policy Engine (BD + USA)
+-------------------------------------------------------
+9.1 Apply region-specific KYC rules  
+9.2 Apply region-specific payout regulations  
+9.3 Apply region-specific tax rules  
+9.4 Apply legal compliance differences  
+9.5 Add policy-change auto-update mechanism
+
+-------------------------------------------------------
+10. Admin Dashboard UX/UI Upgrade – Phase-2
+-------------------------------------------------------
+10.1 Add global search console  
+10.2 Add admin activity feed  
+10.3 Add dark + light mode  
+10.4 Add collapsible navigation  
+10.5 Add performance analytics widgets
+
+-------------------------------------------------------
+11. Automation Systems Phase-2 (Upgrade All 15 Bots)
+-------------------------------------------------------
+11.1 Expand KYC Automation Bot  
+11.2 Expand Safety Automation Bot  
+11.3 Expand Payment Automation Bot  
+11.4 Expand Fraud Automation Bot  
+11.5 Expand Partner-Lifecycle Bot
+
+-------------------------------------------------------
+12. End-to-End Testing & Validation
+-------------------------------------------------------
+12.1 Full regression tests  
+12.2 Cross-module stress tests  
+12.3 Role-based permission tests  
+12.4 Audit integrity tests  
+12.5 Country-wise compliance tests
+
+-------------------------------------------------------
+13. Deployment Phase-2
+-------------------------------------------------------
+13.1 Optimize backend performance  
+13.2 Clean up unused code  
+13.3 Apply final security hardening  
+13.4 Generate final documentation  
+13.5 Mark Phase-2 as fully complete

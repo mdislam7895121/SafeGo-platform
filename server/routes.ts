@@ -24,6 +24,7 @@ import restaurantRoutes from "./routes/restaurant";
 import restaurantSupportRoutes from "./routes/restaurant-support"; // Phase 12
 import adminRoutes from "./routes/admin";
 import adminPhase1Routes from "./routes/admin-phase1"; // Phase 1: People & KYC Center, Safety Center, Feature Flags
+import adminPhase2Routes from "./routes/admin-phase2"; // Phase 2: RBAC v3, Global Audit v2, People & KYC v2
 import adminSupportRoutes from "./routes/admin-support"; // Phase 12
 import rideRoutes from "./routes/rides";
 import foodOrderRoutes from "./routes/food-orders";
@@ -335,6 +336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/payout", rateLimitPayout, payoutRoutes); // Unified Payout System for all roles - rate limited
   app.use("/api/admin", adminRoutes);
   app.use("/api/admin", adminPhase1Routes); // Phase 1: People & KYC Center, Safety Center, Feature Flags
+  app.use("/api/admin-phase2", adminPhase2Routes); // Phase 2: RBAC v3, Global Audit v2, People & KYC v2
   app.use("/api/admin", adminSupportRoutes); // Phase 12
   app.use("/api/admin", adminRestaurantSettingsRoutes); // Phase 10
   app.use("/api/admin", adminPhase2aRoutes); // Phase 2A: Financial Integrity & Wallet System

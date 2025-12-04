@@ -94,6 +94,45 @@ export enum Permission {
   // RBAC v2: Broadcasting
   SEND_BROADCAST = 'SEND_BROADCAST',
   MANAGE_NOTIFICATIONS = 'MANAGE_NOTIFICATIONS',
+  
+  // RBAC v3: Enterprise Admin Framework
+  MANAGE_PERMISSION_BUNDLES = 'MANAGE_PERMISSION_BUNDLES',
+  VIEW_PERMISSION_BUNDLES = 'VIEW_PERMISSION_BUNDLES',
+  ASSIGN_PERMISSION_BUNDLES = 'ASSIGN_PERMISSION_BUNDLES',
+  
+  // RBAC v3: Emergency Lockdown
+  ACTIVATE_EMERGENCY_LOCKDOWN = 'ACTIVATE_EMERGENCY_LOCKDOWN',
+  DEACTIVATE_EMERGENCY_LOCKDOWN = 'DEACTIVATE_EMERGENCY_LOCKDOWN',
+  VIEW_EMERGENCY_STATUS = 'VIEW_EMERGENCY_STATUS',
+  
+  // RBAC v3: Admin Impersonation
+  IMPERSONATE_ADMIN = 'IMPERSONATE_ADMIN',
+  VIEW_IMPERSONATION_LOGS = 'VIEW_IMPERSONATION_LOGS',
+  REVOKE_IMPERSONATION = 'REVOKE_IMPERSONATION',
+  
+  // RBAC v3: Secure Messaging
+  SEND_ADMIN_MESSAGE = 'SEND_ADMIN_MESSAGE',
+  VIEW_ADMIN_MESSAGES = 'VIEW_ADMIN_MESSAGES',
+  BROADCAST_ADMIN_MESSAGE = 'BROADCAST_ADMIN_MESSAGE',
+  
+  // Global Audit v2
+  VIEW_AUDIT_CHAIN = 'VIEW_AUDIT_CHAIN',
+  VERIFY_AUDIT_INTEGRITY = 'VERIFY_AUDIT_INTEGRITY',
+  GENERATE_EVIDENCE_PACKET = 'GENERATE_EVIDENCE_PACKET',
+  VIEW_EVIDENCE_PACKETS = 'VIEW_EVIDENCE_PACKETS',
+  EXPORT_REGULATOR_REPORT = 'EXPORT_REGULATOR_REPORT',
+  MANAGE_REGULATOR_EXPORTS = 'MANAGE_REGULATOR_EXPORTS',
+  
+  // People & KYC Center v2
+  VIEW_IDENTITY_RISK_SCORES = 'VIEW_IDENTITY_RISK_SCORES',
+  MANAGE_IDENTITY_RISK_SIGNALS = 'MANAGE_IDENTITY_RISK_SIGNALS',
+  VIEW_DUPLICATE_ACCOUNTS = 'VIEW_DUPLICATE_ACCOUNTS',
+  MANAGE_DUPLICATE_ACCOUNTS = 'MANAGE_DUPLICATE_ACCOUNTS',
+  VIEW_SUSPICIOUS_ACTIVITY = 'VIEW_SUSPICIOUS_ACTIVITY',
+  MANAGE_SUSPICIOUS_ACTIVITY = 'MANAGE_SUSPICIOUS_ACTIVITY',
+  MANAGE_KYC_ENFORCEMENT_RULES = 'MANAGE_KYC_ENFORCEMENT_RULES',
+  VIEW_KYC_REVIEW_QUEUE = 'VIEW_KYC_REVIEW_QUEUE',
+  PROCESS_KYC_QUEUE = 'PROCESS_KYC_QUEUE',
 }
 
 type RolePermissions = {
@@ -173,6 +212,36 @@ const rolePermissions: RolePermissions = {
     Permission.ESCALATE_DISPUTES,
     Permission.SEND_BROADCAST,
     Permission.MANAGE_NOTIFICATIONS,
+    // RBAC v3: Enterprise Admin Framework
+    Permission.MANAGE_PERMISSION_BUNDLES,
+    Permission.VIEW_PERMISSION_BUNDLES,
+    Permission.ASSIGN_PERMISSION_BUNDLES,
+    Permission.ACTIVATE_EMERGENCY_LOCKDOWN,
+    Permission.DEACTIVATE_EMERGENCY_LOCKDOWN,
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.IMPERSONATE_ADMIN,
+    Permission.VIEW_IMPERSONATION_LOGS,
+    Permission.REVOKE_IMPERSONATION,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    Permission.BROADCAST_ADMIN_MESSAGE,
+    // Global Audit v2
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.VERIFY_AUDIT_INTEGRITY,
+    Permission.GENERATE_EVIDENCE_PACKET,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    Permission.EXPORT_REGULATOR_REPORT,
+    Permission.MANAGE_REGULATOR_EXPORTS,
+    // People & KYC Center v2
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.MANAGE_IDENTITY_RISK_SIGNALS,
+    Permission.VIEW_DUPLICATE_ACCOUNTS,
+    Permission.MANAGE_DUPLICATE_ACCOUNTS,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.MANAGE_SUSPICIOUS_ACTIVITY,
+    Permission.MANAGE_KYC_ENFORCEMENT_RULES,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
+    Permission.PROCESS_KYC_QUEUE,
   ]),
 
   // ADMIN: General management (non-sensitive)
@@ -202,6 +271,19 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SAFETY_EVENTS,
     Permission.VIEW_PEOPLE_CENTER,
     Permission.VIEW_DISPUTES,
+    // RBAC v3: Limited admin framework access
+    Permission.VIEW_PERMISSION_BUNDLES,
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // Audit v2: View only
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    // People v2: View only
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.VIEW_DUPLICATE_ACCOUNTS,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
   ]),
 
   // COUNTRY_ADMIN: Regional management
@@ -246,6 +328,26 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_PEOPLE_CENTER,
     Permission.VIEW_DISPUTES,
     Permission.MANAGE_DISPUTES,
+    // RBAC v3: Country admin has enhanced access
+    Permission.VIEW_PERMISSION_BUNDLES,
+    Permission.ACTIVATE_EMERGENCY_LOCKDOWN,
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // Audit v2: Can generate reports
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.GENERATE_EVIDENCE_PACKET,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    Permission.EXPORT_REGULATOR_REPORT,
+    // People v2: Full access
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.MANAGE_IDENTITY_RISK_SIGNALS,
+    Permission.VIEW_DUPLICATE_ACCOUNTS,
+    Permission.MANAGE_DUPLICATE_ACCOUNTS,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.MANAGE_SUSPICIOUS_ACTIVITY,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
+    Permission.PROCESS_KYC_QUEUE,
   ]),
 
   // CITY_ADMIN: City-level management
@@ -274,6 +376,18 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SAFETY_EVENTS,
     Permission.VIEW_PEOPLE_CENTER,
     Permission.VIEW_DISPUTES,
+    // RBAC v3: City admin limited access
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // Audit v2: View only
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    // People v2: View only
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.VIEW_DUPLICATE_ACCOUNTS,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
   ]),
 
   [AdminRole.COMPLIANCE_ADMIN]: new Set([
@@ -313,6 +427,28 @@ const rolePermissions: RolePermissions = {
     Permission.BULK_KYC_OPERATIONS,
     Permission.VIEW_RISK_CENTER,
     Permission.VIEW_SAFETY_EVENTS,
+    // RBAC v3: Compliance has audit and KYC enforcement
+    Permission.VIEW_PERMISSION_BUNDLES,
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // Audit v2: Full compliance audit access
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.VERIFY_AUDIT_INTEGRITY,
+    Permission.GENERATE_EVIDENCE_PACKET,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    Permission.EXPORT_REGULATOR_REPORT,
+    Permission.MANAGE_REGULATOR_EXPORTS,
+    // People v2: Full compliance access
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.MANAGE_IDENTITY_RISK_SIGNALS,
+    Permission.VIEW_DUPLICATE_ACCOUNTS,
+    Permission.MANAGE_DUPLICATE_ACCOUNTS,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.MANAGE_SUSPICIOUS_ACTIVITY,
+    Permission.MANAGE_KYC_ENFORCEMENT_RULES,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
+    Permission.PROCESS_KYC_QUEUE,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
@@ -333,6 +469,14 @@ const rolePermissions: RolePermissions = {
     Permission.PROCESS_REFUNDS,
     Permission.ESCALATE_DISPUTES,
     Permission.VIEW_PEOPLE_CENTER,
+    // RBAC v3: Support messaging
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // People v2: View only for support context
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
   ]),
 
   [AdminRole.FINANCE_ADMIN]: new Set([
@@ -356,6 +500,15 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_REALTIME_MONITORING,
     Permission.VIEW_REVENUE_ANALYTICS,
     Permission.EXPORT_ANALYTICS,
+    // RBAC v3: Finance messaging
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // Audit v2: Financial audit access
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.GENERATE_EVIDENCE_PACKET,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    Permission.EXPORT_REGULATOR_REPORT,
   ]),
 
   // RISK_ADMIN: Safety & Risk Center focused
@@ -388,6 +541,26 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SUPPORT_CONVERSATIONS,
     Permission.VIEW_PEOPLE_CENTER,
     Permission.VIEW_DISPUTES,
+    // RBAC v3: Risk admin gets enhanced access
+    Permission.VIEW_PERMISSION_BUNDLES,
+    Permission.ACTIVATE_EMERGENCY_LOCKDOWN,
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.SEND_ADMIN_MESSAGE,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // Audit v2: Full risk audit access
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.VERIFY_AUDIT_INTEGRITY,
+    Permission.GENERATE_EVIDENCE_PACKET,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    Permission.EXPORT_REGULATOR_REPORT,
+    // People v2: Full risk access
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.MANAGE_IDENTITY_RISK_SIGNALS,
+    Permission.VIEW_DUPLICATE_ACCOUNTS,
+    Permission.MANAGE_DUPLICATE_ACCOUNTS,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.MANAGE_SUSPICIOUS_ACTIVITY,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
   ]),
 
   [AdminRole.READONLY_ADMIN]: new Set([
@@ -415,6 +588,18 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_PEOPLE_CENTER,
     Permission.VIEW_DISPUTES,
     Permission.VIEW_FEATURE_FLAGS,
+    // RBAC v3: Read-only view
+    Permission.VIEW_PERMISSION_BUNDLES,
+    Permission.VIEW_EMERGENCY_STATUS,
+    Permission.VIEW_ADMIN_MESSAGES,
+    // Audit v2: Read-only
+    Permission.VIEW_AUDIT_CHAIN,
+    Permission.VIEW_EVIDENCE_PACKETS,
+    // People v2: Read-only
+    Permission.VIEW_IDENTITY_RISK_SCORES,
+    Permission.VIEW_DUPLICATE_ACCOUNTS,
+    Permission.VIEW_SUSPICIOUS_ACTIVITY,
+    Permission.VIEW_KYC_REVIEW_QUEUE,
   ]),
 };
 

@@ -8897,3 +8897,668 @@ model FeatureFlag {
   @@index([countryScope])
   @@map("feature_flags")
 }
+
+// ====================================================
+// PHASE 2: RBAC V3 - ENTERPRISE ADMIN PERMISSION FRAMEWORK
+// ====================================================
+
+// Permission bundle types for grouped permissions
+enum PermissionBundleType {
+  OPS           // Operations bundle
+  FINANCE       // Finance bundle
+  SAFETY        // Safety & Risk bundle
+  LEGAL         // Legal & Compliance bundle
+  ENGINEERING   // Engineering/Dev bundle
+  CUSTOM        // Custom admin-defined bundle
+}
+
+// Permission bundles for easier role management
+model AdminPermissionBundle {
+  id                  String                @id @default(uuid())
+  
+  name                String                @unique // e.g., "Ops Bundle", "Finance Bundle"
+  type                PermissionBundleType
+  description         String?
+  
+  permissions         String[]              // Array of Permission enum values
+  
+  isActive            Boolean               @default(true)
+  isSystemBundle      Boolean               @default(false) // System bundles can't be deleted
+  
+  createdByAdminId    String?
+  updatedByAdminId    String?
+  
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  
+  // Relations
+  assignments         AdminBundleAssignment[]
+  
+  @@index([type])
+  @@index([isActive])
+  @@map("admin_permission_bundles")
+}
+
+// Bundle assignments to admin profiles
+model AdminBundleAssignment {
+  id                  String                @id @default(uuid())
+  
+  adminProfileId      String
+  bundleId            String
+  bundle              AdminPermissionBundle @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  
+  assignedByAdminId   String?
+  assignedAt          DateTime              @default(now())
+  
+  expiresAt           DateTime?             // Optional expiration
+  
+  @@unique([adminProfileId, bundleId])
+  @@index([adminProfileId])
+  @@index([bundleId])
+  @@map("admin_bundle_assignments")
+}
+
+// Emergency lockdown status
+enum EmergencyLockdownLevel {
+  NONE              // Normal operations
+  PARTIAL           // Some features locked
+  FULL              // Complete lockdown
+  MAINTENANCE       // Planned maintenance mode
+}
+
+// Emergency lockdown controls
+model EmergencyLockdown {
+  id                  String                  @id @default(uuid())
+  
+  level               EmergencyLockdownLevel  @default(NONE)
+  reason              String                  // Reason for lockdown
+  
+  lockedFeatures      String[]                // Features currently locked
+  excludedAdmins      String[]                // Admin IDs exempt from lockdown
+  
+  activatedBy         String                  // Admin ID who activated
+  activatedByEmail    String
+  activatedAt         DateTime                @default(now())
+  
+  deactivatedBy       String?                 // Admin ID who deactivated
+  deactivatedByEmail  String?
+  deactivatedAt       DateTime?
+  
+  scheduledEndAt      DateTime?               // Scheduled end time
+  
+  isActive            Boolean                 @default(true)
+  
+  countryScope        String?                 // BD, US, or null for global
+  
+  @@index([isActive])
+  @@index([level])
+  @@index([activatedAt])
+  @@map("emergency_lockdowns")
+}
+
+// Admin impersonation session status
+enum ImpersonationStatus {
+  ACTIVE
+  ENDED
+  EXPIRED
+  REVOKED
+}
+
+// Admin impersonation sessions for view-only access
+model AdminImpersonationSession {
+  id                  String                @id @default(uuid())
+  
+  impersonatorId      String                // Super admin performing impersonation
+  impersonatorEmail   String
+  impersonatorRole    AdminRole
+  
+  targetAdminId       String                // Admin being impersonated
+  targetAdminEmail    String
+  targetAdminRole     AdminRole
+  
+  status              ImpersonationStatus   @default(ACTIVE)
+  
+  isViewOnly          Boolean               @default(true) // View-only mode (safer)
+  allowActions        Boolean               @default(false) // Can perform actions
+  
+  reason              String                // Justification for impersonation
+  
+  startedAt           DateTime              @default(now())
+  endedAt             DateTime?
+  expiresAt           DateTime              // Session expiration
+  
+  actionsPerformed    Int                   @default(0) // Count of actions taken
+  lastActionAt        DateTime?
+  
+  ipAddress           String?               // IP where session was initiated
+  userAgent           String?               // Browser/client info
+  
+  @@index([impersonatorId])
+  @@index([targetAdminId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("admin_impersonation_sessions")
+}
+
+// Admin secure messaging status
+enum AdminMessageStatus {
+  SENT
+  DELIVERED
+  READ
+  DELETED
+}
+
+// Admin secure messaging priority
+enum AdminMessagePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Admin secure internal messaging
+model AdminSecureMessage {
+  id                  String                @id @default(uuid())
+  
+  senderId            String                // Admin who sent
+  senderEmail         String
+  senderRole          AdminRole
+  
+  recipientId         String?               // Specific admin (null for broadcast)
+  recipientEmail      String?
+  recipientRole       AdminRole?            // For role-based broadcast
+  
+  subject             String
+  content             String                // Encrypted content
+  contentHash         String?               // Hash for integrity verification
+  
+  priority            AdminMessagePriority  @default(NORMAL)
+  status              AdminMessageStatus    @default(SENT)
+  
+  isEncrypted         Boolean               @default(true)
+  isConfidential      Boolean               @default(false) // Extra security
+  
+  expiresAt           DateTime?             // Optional message expiration
+  
+  readAt              DateTime?
+  deletedAt           DateTime?
+  
+  attachments         Json?                 // Array of attachment metadata
+  
+  threadId            String?               // For threaded conversations
+  replyToId           String?               // Parent message for replies
+  
+  createdAt           DateTime              @default(now())
+  
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([recipientRole])
+  @@index([status])
+  @@index([priority])
+  @@index([threadId])
+  @@index([createdAt])
+  @@map("admin_secure_messages")
+}
+
+// Admin session activity log
+model AdminSessionLog {
+  id                  String                @id @default(uuid())
+  
+  adminId             String
+  adminEmail          String
+  adminRole           AdminRole
+  
+  sessionId           String                // JWT session identifier
+  
+  action              String                // login, logout, timeout, revoked
+  
+  ipAddress           String?
+  userAgent           String?
+  deviceFingerprint   String?
+  
+  geoLocation         Json?                 // {country, city, region}
+  
+  isSuccess           Boolean               @default(true)
+  failureReason       String?
+  
+  createdAt           DateTime              @default(now())
+  
+  @@index([adminId])
+  @@index([sessionId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("admin_session_logs")
+}
+
+// ====================================================
+// PHASE 2: GLOBAL AUDIT ENGINE V2
+// ====================================================
+
+// Audit chain for tamper-proof logging
+model AuditEventChain {
+  id                  String                @id @default(uuid())
+  
+  sequenceNumber      Int                   // Monotonically increasing
+  
+  auditLogId          String                // FK to AuditLog
+  
+  previousHash        String?               // Hash of previous event in chain
+  currentHash         String                // SHA-256 hash of this event
+  
+  timestamp           DateTime              @default(now())
+  
+  traceId             String?               // Cross-system trace ID
+  spanId              String?               // Span within trace
+  parentSpanId        String?               // Parent span for hierarchy
+  
+  systemId            String                @default("safego-main") // Source system
+  
+  isVerified          Boolean               @default(true) // Chain integrity verified
+  
+  @@unique([sequenceNumber])
+  @@index([auditLogId])
+  @@index([traceId])
+  @@index([spanId])
+  @@index([timestamp])
+  @@map("audit_event_chains")
+}
+
+// Evidence packet status
+enum EvidencePacketStatus {
+  GENERATING
+  READY
+  DOWNLOADED
+  EXPIRED
+  FAILED
+}
+
+// Automatic incident evidence packets
+model AuditEvidencePacket {
+  id                  String                  @id @default(uuid())
+  
+  incidentId          String                  // Related incident/case ID
+  incidentType        String                  // risk_case, safety_event, fraud_case, etc.
+  
+  status              EvidencePacketStatus    @default(GENERATING)
+  
+  title               String
+  description         String?
+  
+  // Event collection
+  eventIds            String[]                // Related audit event IDs
+  eventCount          Int                     @default(0)
+  eventStartDate      DateTime?
+  eventEndDate        DateTime?
+  
+  // Users involved
+  userIds             String[]                // User IDs involved
+  userRoles           String[]                // Roles of involved users
+  
+  // Evidence files
+  fileUrl             String?                 // Generated evidence file URL
+  fileSize            Int?                    // File size in bytes
+  fileHash            String?                 // SHA-256 hash of file
+  
+  format              String                  @default("PDF") // PDF, JSON, CSV
+  
+  generatedBy         String?                 // Admin who triggered generation
+  generatedAt         DateTime?
+  
+  expiresAt           DateTime?               // File expiration
+  
+  downloadCount       Int                     @default(0)
+  lastDownloadedAt    DateTime?
+  lastDownloadedBy    String?
+  
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+  
+  @@index([incidentId])
+  @@index([incidentType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("audit_evidence_packets")
+}
+
+// Regulator export status
+enum RegulatorExportStatus {
+  QUEUED
+  PROCESSING
+  READY
+  DOWNLOADED
+  EXPIRED
+  FAILED
+}
+
+// Regulator export type
+enum RegulatorExportType {
+  COMPLIANCE_REPORT
+  INCIDENT_REPORT
+  FINANCIAL_AUDIT
+  USER_DATA_EXPORT
+  TRANSACTION_HISTORY
+  SAFETY_REPORT
+  CUSTOM
+}
+
+// Regulator export queue
+model RegulatorExportQueue {
+  id                  String                  @id @default(uuid())
+  
+  exportType          RegulatorExportType
+  format              String                  @default("PDF") // PDF, CSV, JSON
+  
+  status              RegulatorExportStatus   @default(QUEUED)
+  
+  title               String
+  description         String?
+  
+  // Filter criteria
+  startDate           DateTime?
+  endDate             DateTime?
+  countryCode         String?                 // BD, US, or null for all
+  userTypes           String[]                // customer, driver, restaurant, etc.
+  eventTypes          String[]                // Specific event types to include
+  
+  // Generated file
+  fileUrl             String?
+  fileSize            Int?
+  fileHash            String?                 // SHA-256 for integrity
+  
+  // Metadata
+  recordCount         Int?                    // Number of records
+  pageCount           Int?                    // Number of pages (for PDF)
+  
+  requestedBy         String                  // Admin ID
+  requestedByEmail    String
+  requestedAt         DateTime                @default(now())
+  
+  processedAt         DateTime?
+  completedAt         DateTime?
+  
+  expiresAt           DateTime?               // File expiration
+  
+  downloadCount       Int                     @default(0)
+  lastDownloadedAt    DateTime?
+  
+  errorMessage        String?                 // Error if failed
+  
+  @@index([exportType])
+  @@index([status])
+  @@index([requestedBy])
+  @@index([requestedAt])
+  @@map("regulator_export_queue")
+}
+
+// ====================================================
+// PHASE 2: PEOPLE & KYC CENTER - ADVANCED FEATURES
+// ====================================================
+
+// Risk signal types for identity scoring
+enum RiskSignalType {
+  DEVICE_ANOMALY          // Unusual device patterns
+  LOCATION_ANOMALY        // Suspicious location patterns
+  VELOCITY_CHECK          // Too many actions too fast
+  DOCUMENT_MISMATCH       // Document inconsistencies
+  DUPLICATE_IDENTITY      // Matching another account
+  FRAUD_HISTORY           // Prior fraud association
+  SUSPICIOUS_PAYMENT      // Payment anomalies
+  BEHAVIORAL_ANOMALY      // Unusual behavior patterns
+  BLACKLIST_MATCH         // On known bad-actor list
+  EXTERNAL_SIGNAL         // Third-party fraud signal
+}
+
+// Risk signal severity
+enum RiskSignalSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// Identity risk signals for users
+model IdentityRiskSignal {
+  id                  String                @id @default(uuid())
+  
+  userId              String                // User this signal is about
+  userRole            String                // customer, driver, restaurant, etc.
+  
+  signalType          RiskSignalType
+  severity            RiskSignalSeverity    @default(MEDIUM)
+  
+  score               Int                   @default(0) // 0-100 risk score contribution
+  
+  title               String
+  description         String?
+  
+  evidence            Json?                 // Supporting evidence data
+  
+  isActive            Boolean               @default(true)
+  isAcknowledged      Boolean               @default(false)
+  acknowledgedBy      String?
+  acknowledgedAt      DateTime?
+  
+  resolvedBy          String?
+  resolvedAt          DateTime?
+  resolutionNotes     String?
+  
+  source              String                @default("system") // system, manual, external
+  externalId          String?               // External system reference
+  
+  expiresAt           DateTime?             // Signal expiration
+  
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  
+  @@index([userId])
+  @@index([userRole])
+  @@index([signalType])
+  @@index([severity])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("identity_risk_signals")
+}
+
+// Duplicate cluster status
+enum DuplicateClusterStatus {
+  DETECTED            // Just detected
+  UNDER_REVIEW        // Being reviewed
+  CONFIRMED           // Confirmed duplicates
+  FALSE_POSITIVE      // Not actually duplicates
+  RESOLVED            // Action taken
+}
+
+// Duplicate account detection clusters
+model DuplicateAccountCluster {
+  id                  String                  @id @default(uuid())
+  
+  status              DuplicateClusterStatus  @default(DETECTED)
+  
+  primaryAccountId    String?                 // Main account (if determined)
+  primaryAccountRole  String?
+  
+  accountIds          String[]                // All accounts in cluster
+  accountRoles        String[]                // Corresponding roles
+  accountCount        Int                     @default(2)
+  
+  matchType           String                  // phone, email, device, document, name
+  matchScore          Int                     @default(0) // 0-100 confidence
+  matchDetails        Json?                   // Details of what matched
+  
+  riskLevel           RiskSignalSeverity      @default(MEDIUM)
+  
+  detectedAt          DateTime                @default(now())
+  detectedBy          String                  @default("system") // system or admin ID
+  
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  reviewNotes         String?
+  
+  resolvedBy          String?
+  resolvedAt          DateTime?
+  resolutionAction    String?                 // merge, block_secondary, no_action, etc.
+  
+  countryCode         String?                 // BD, US
+  
+  @@index([status])
+  @@index([primaryAccountId])
+  @@index([matchType])
+  @@index([riskLevel])
+  @@index([detectedAt])
+  @@map("duplicate_account_clusters")
+}
+
+// KYC review queue status
+enum KycQueueStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  ESCALATED
+  ON_HOLD
+}
+
+// KYC review queue priority
+enum KycQueuePriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// KYC review queue for workflow management
+model KycReviewQueue {
+  id                  String                @id @default(uuid())
+  
+  userId              String                // User awaiting review
+  userRole            String                // customer, driver, restaurant, etc.
+  
+  documentId          String?               // Specific document if applicable
+  documentType        String?
+  
+  status              KycQueueStatus        @default(PENDING)
+  priority            KycQueuePriority      @default(NORMAL)
+  
+  countryCode         String                // BD, US - determines rules
+  
+  riskScore           Int                   @default(0) // Calculated risk score
+  riskSignalIds       String[]              // Related risk signals
+  
+  assignedAdminId     String?
+  assignedAt          DateTime?
+  
+  submittedAt         DateTime              @default(now())
+  reviewStartedAt     DateTime?
+  completedAt         DateTime?
+  
+  slaDeadline         DateTime?             // SLA deadline for review
+  isOverdue           Boolean               @default(false)
+  
+  reviewNotes         String?
+  rejectionReason     String?
+  
+  // Escalation tracking
+  escalatedTo         String?
+  escalatedAt         DateTime?
+  escalationReason    String?
+  
+  previousReviews     Int                   @default(0) // Number of prior reviews
+  
+  @@index([userId])
+  @@index([userRole])
+  @@index([status])
+  @@index([priority])
+  @@index([countryCode])
+  @@index([assignedAdminId])
+  @@index([submittedAt])
+  @@index([slaDeadline])
+  @@map("kyc_review_queue")
+}
+
+// Country-specific KYC enforcement rules
+model KycEnforcementRule {
+  id                  String                @id @default(uuid())
+  
+  countryCode         String                // BD, US
+  userRole            String                // customer, driver, restaurant, etc.
+  
+  ruleName            String
+  description         String?
+  
+  // Document requirements
+  requiredDocuments   String[]              // Array of required document types
+  optionalDocuments   String[]              // Array of optional document types
+  
+  // Verification levels
+  minVerificationLevel Int                   @default(1) // 1-5 verification level
+  requiresLivenessCheck Boolean              @default(false)
+  requiresFacialMatch   Boolean              @default(false)
+  requiresBackgroundCheck Boolean            @default(false)
+  
+  // Timing rules
+  gracePeriodDays     Int                   @default(0) // Days before enforcement
+  expiryWarningDays   Int                   @default(30) // Days before expiry warning
+  
+  // Auto-enforcement
+  autoRejectUnverified Boolean               @default(false)
+  autoSuspendExpired   Boolean               @default(true)
+  
+  isActive            Boolean               @default(true)
+  
+  effectiveFrom       DateTime              @default(now())
+  effectiveUntil      DateTime?
+  
+  createdBy           String?
+  updatedBy           String?
+  
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  
+  @@unique([countryCode, userRole, ruleName])
+  @@index([countryCode])
+  @@index([userRole])
+  @@index([isActive])
+  @@map("kyc_enforcement_rules")
+}
+
+// Suspicious activity flags
+model SuspiciousActivityFlag {
+  id                  String                @id @default(uuid())
+  
+  userId              String
+  userRole            String
+  
+  flagType            String                // fraud_attempt, abuse, collusion, policy_violation
+  severity            RiskSignalSeverity    @default(MEDIUM)
+  
+  title               String
+  description         String?
+  evidence            Json?
+  
+  status              String                @default("active") // active, investigating, resolved, dismissed
+  
+  flaggedBy           String                @default("system") // system or admin ID
+  flaggedAt           DateTime              @default(now())
+  
+  assignedTo          String?
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  reviewNotes         String?
+  
+  actionTaken         String?               // warning, temporary_ban, permanent_ban, no_action
+  actionTakenBy       String?
+  actionTakenAt       DateTime?
+  
+  relatedCaseId       String?               // Link to RiskCase if escalated
+  
+  countryCode         String?
+  
+  @@index([userId])
+  @@index([userRole])
+  @@index([flagType])
+  @@index([status])
+  @@index([severity])
+  @@index([flaggedAt])
+  @@map("suspicious_activity_flags")
+}
