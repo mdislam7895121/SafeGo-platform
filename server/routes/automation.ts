@@ -23,6 +23,18 @@ const router = Router();
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'SUPER_ADMIN', 'FINANCE_ADMIN', 'COMPLIANCE_ADMIN'];
 
+/**
+ * Security: Get authenticated admin ID or throw error
+ * NEVER falls back to 'system' - ensures complete audit trail integrity
+ */
+function getRequiredAdminId(req: AuthRequest): string {
+  const adminId = req.user?.userId;
+  if (!adminId) {
+    throw new Error('SECURITY_VIOLATION: Admin ID missing after authentication');
+  }
+  return adminId;
+}
+
 const requireAdminRole = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.user?.userId;
@@ -125,11 +137,14 @@ router.get('/surge/all', async (req: Request, res: Response) => {
 
 router.post('/surge/override', async (req: AuthRequest, res: Response) => {
   try {
+    const adminId = getRequiredAdminId(req);
     const { zoneId, multiplier, reason } = req.body;
-    const adminId = req.user?.userId || 'system';
     await surgePricingAutomation.adminOverride(zoneId, multiplier, adminId, reason);
     res.json({ success: true, message: 'Override applied' });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
     res.status(500).json({ success: false, error: 'Failed to apply override' });
   }
 });
@@ -172,12 +187,15 @@ router.post('/settlement/run', async (req: Request, res: Response) => {
 
 router.post('/settlement/manual/:walletId', async (req: AuthRequest, res: Response) => {
   try {
+    const adminId = getRequiredAdminId(req);
     const { walletId } = req.params;
     const { amount } = req.body;
-    const adminId = req.user?.userId || 'system';
     const result = await autoSettlementService.manualSettle(walletId, adminId, amount);
     res.json({ success: true, result });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
     res.status(500).json({ success: false, error: 'Manual settlement failed' });
   }
 });
@@ -384,11 +402,14 @@ router.get('/cancellation/cooldown/:actorType/:actorId', async (req: Request, re
 
 router.post('/cancellation/clear-cooldown/:actorType/:actorId', async (req: AuthRequest, res: Response) => {
   try {
+    const adminId = getRequiredAdminId(req);
     const { actorType, actorId } = req.params;
-    const adminId = req.user?.userId || 'system';
     await autoCancellationService.adminClearCooldown(actorId, actorType, adminId);
     res.json({ success: true, message: 'Cooldown cleared' });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
     res.status(500).json({ success: false, error: 'Failed to clear cooldown' });
   }
 });
@@ -444,24 +465,30 @@ router.get('/payout/flagged', async (req: Request, res: Response) => {
 
 router.post('/payout/approve/:payoutId', async (req: AuthRequest, res: Response) => {
   try {
+    const adminId = getRequiredAdminId(req);
     const { payoutId } = req.params;
     const { notes } = req.body;
-    const adminId = req.user?.userId || 'system';
     await autoPayoutService.adminApprove(payoutId, adminId, notes);
     res.json({ success: true, message: 'Payout approved' });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
     res.status(500).json({ success: false, error: 'Approval failed' });
   }
 });
 
 router.post('/payout/reject/:payoutId', async (req: AuthRequest, res: Response) => {
   try {
+    const adminId = getRequiredAdminId(req);
     const { payoutId } = req.params;
     const { reason } = req.body;
-    const adminId = req.user?.userId || 'system';
     await autoPayoutService.adminReject(payoutId, adminId, reason);
     res.json({ success: true, message: 'Payout rejected' });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
     res.status(500).json({ success: false, error: 'Rejection failed' });
   }
 });

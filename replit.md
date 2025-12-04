@@ -49,6 +49,7 @@ The frontend utilizes React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS 3, T
 - **Hardcoded Secret Fallbacks Removed**: JWT_SECRET and ENCRYPTION_KEY now fail-fast across all modules (auth middleware, routes, WebSocket handlers, encryption utilities) - no default values that could allow token forgery or data decryption
 - **Environment Guard**: Validates all critical secrets at startup with clear error messages; production deployments fail fast if misconfigured
 - **WebSocket Security**: All WebSocket handlers (supportChat, rideChat, dispatch, foodOrderNotifications) require valid JWT_SECRET
+- **Automation Admin Routes Secured**: All `/api/admin/automation/*` endpoints protected with `authenticateToken` + `requireAdminRole` middleware, `getRequiredAdminId()` helper prevents any mutation without verified admin identity (no fallback to 'system')
 
 ### Security Controls Verified
 - **Authentication**: JWT with short-lived access tokens (15m), HTTP-only refresh tokens (30d), bcrypt password hashing (cost 10), account lockout after 5 failed attempts
