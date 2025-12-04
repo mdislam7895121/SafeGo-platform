@@ -32,9 +32,13 @@ interface RestaurantDetails {
   id: string;
   userId: string;
   email: string;
+  ownerName: string;
   restaurantName: string;
   address: string;
+  cuisineType?: string;
+  description?: string;
   country: string;
+  countryCode?: string;
   verificationStatus: string;
   isVerified: boolean;
   rejectionReason: string | null;
@@ -51,8 +55,32 @@ interface RestaurantDetails {
   recentOrders: any[];
   reviews: any[];
   menuStats?: MenuStats;
+  // Branding
+  logoUrl?: string;
+  bannerUrl?: string;
+  // KYC fields (Bangladesh)
+  fatherName?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
+  nidNumber?: string;
+  nidFrontImageUrl?: string;
+  nidBackImageUrl?: string;
+  // KYC fields (US)
+  homeAddress?: string;
+  governmentIdType?: string;
+  governmentIdLast4?: string;
+  // Common KYC
+  dateOfBirth?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  // Business documents
+  businessLicenseNumber?: string;
+  businessLicenseUrl?: string;
+  healthCertificateUrl?: string;
+  ownerRole?: string;
   createdAt: string;
   accountCreated: string;
+  user?: { id: string; email: string; fullName?: string; countryCode?: string; isBlocked: boolean; createdAt: string };
 }
 
 export default function RestaurantDetails() {

@@ -3313,12 +3313,14 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
           select: {
             id: true,
             email: true,
+            fullName: true,
             countryCode: true,
             isBlocked: true,
             createdAt: true,
           },
         },
         restaurantWallet: true,
+        branding: true,
         foodOrders: {
           select: {
             id: true,
@@ -3385,9 +3387,13 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
       id: restaurant.id,
       userId: restaurant.user.id,
       email: restaurant.user.email,
+      ownerName: restaurant.user.fullName || 'N/A',
       restaurantName: restaurant.restaurantName,
       address: restaurant.address,
+      cuisineType: restaurant.cuisineType,
+      description: restaurant.description,
       country: restaurant.user.countryCode,
+      countryCode: restaurant.countryCode,
       verificationStatus: restaurant.verificationStatus,
       isVerified: restaurant.isVerified,
       rejectionReason: restaurant.rejectionReason,
@@ -3395,8 +3401,8 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
       suspensionReason: restaurant.suspensionReason,
       suspendedAt: restaurant.suspendedAt,
       isBlocked: restaurant.user.isBlocked,
-      balance: restaurant.restaurantWallet?.balance || 0,
-      negativeBalance: restaurant.restaurantWallet?.negativeBalance || 0,
+      balance: restaurant.restaurantWallet?.balance ? Number(restaurant.restaurantWallet.balance) : 0,
+      negativeBalance: restaurant.restaurantWallet?.negativeBalance ? Number(restaurant.restaurantWallet.negativeBalance) : 0,
       totalOrders: restaurant.foodOrders.length,
       completedOrders: completedOrders.length,
       totalRevenue,
@@ -3404,8 +3410,32 @@ router.get("/restaurants/:id", checkPermission(Permission.VIEW_USER), async (req
       recentOrders: restaurant.foodOrders,
       reviews: restaurant.reviews,
       menuStats,
+      // Branding
+      logoUrl: restaurant.branding?.logoUrl || null,
+      bannerUrl: restaurant.branding?.coverPhotoUrl || null,
+      // KYC fields (Bangladesh)
+      fatherName: restaurant.fatherName,
+      presentAddress: restaurant.presentAddress,
+      permanentAddress: restaurant.permanentAddress,
+      nidNumber: restaurant.nidNumber,
+      nidFrontImageUrl: restaurant.nidFrontImageUrl,
+      nidBackImageUrl: restaurant.nidBackImageUrl,
+      // KYC fields (US)
+      homeAddress: restaurant.homeAddress,
+      governmentIdType: restaurant.governmentIdType,
+      governmentIdLast4: restaurant.governmentIdLast4,
+      // Common KYC
+      dateOfBirth: restaurant.dateOfBirth,
+      emergencyContactName: restaurant.emergencyContactName,
+      emergencyContactPhone: restaurant.emergencyContactPhone,
+      // Business documents
+      businessLicenseNumber: restaurant.businessLicenseNumber,
+      businessLicenseUrl: restaurant.businessLicenseUrl,
+      healthCertificateUrl: restaurant.healthCertificateUrl,
+      ownerRole: restaurant.ownerRole,
       createdAt: restaurant.createdAt,
       accountCreated: restaurant.user.createdAt,
+      user: restaurant.user,
     };
 
     res.json(formattedRestaurant);

@@ -31,15 +31,25 @@ interface ShopPartnerDetails {
   bannerUrl?: string;
   category?: string;
   address?: string;
+  // KYC fields
   nidNumber?: string;
+  nidFrontImage?: string;
+  nidBackImage?: string;
   tradeLicenseNumber?: string;
-  bkashNumber?: string;
-  nagadNumber?: string;
+  tradeLicenseImage?: string;
+  fatherName?: string;
+  dateOfBirth?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  countryCode?: string;
   createdAt: string;
   verifiedAt?: string;
-  user: { id: string; email: string; fullName?: string; isBlocked: boolean; createdAt: string };
+  user: { id: string; email: string; fullName?: string; isBlocked: boolean; createdAt: string; countryCode?: string };
   products: Array<{ id: string; name: string; price: number; imageUrl?: string; isAvailable: boolean; createdAt: string }>;
-  orders: Array<{ id: string; status: string; totalAmount: number; createdAt: string }>;
+  orders: Array<{ id: string; orderNumber?: string; status: string; totalAmount: number; createdAt: string }>;
 }
 
 const STATUS_CONFIG: Record<string, { color: string; icon: any; label: string }> = {

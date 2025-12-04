@@ -30,17 +30,31 @@ interface TicketOperatorDetails {
   negativeBalance: number;
   logoUrl?: string;
   bannerUrl?: string;
+  // KYC fields
   nidNumber?: string;
-  tradeLicenseNumber?: string;
-  bkashNumber?: string;
-  nagadNumber?: string;
+  nidFrontImage?: string;
+  nidBackImage?: string;
+  ownerName?: string;
+  fatherName?: string;
+  dateOfBirth?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
+  routePermitNumber?: string;
+  routePermitImage?: string;
+  routePermitExpiry?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  officeAddress?: string;
+  officeEmail?: string;
+  countryCode?: string;
   createdAt: string;
   verifiedAt?: string;
-  user: { id: string; email: string; fullName?: string; isBlocked: boolean; createdAt: string };
-  routes: Array<{ id: string; origin: string; destination: string; price: number; departureTime: string; isActive: boolean }>;
-  vehicles: Array<{ id: string; vehicleType: string; registrationNumber: string; seatCapacity?: number; dailyRate?: number; isAvailable: boolean }>;
-  ticketBookings: Array<{ id: string; status: string; totalAmount: number; createdAt: string }>;
-  rentalBookings: Array<{ id: string; status: string; totalAmount: number; createdAt: string }>;
+  user: { id: string; email: string; fullName?: string; isBlocked: boolean; createdAt: string; countryCode?: string };
+  routes: Array<{ id: string; origin: string; destination: string; price: number; departureTime?: string; isActive: boolean; createdAt?: string }>;
+  vehicles: Array<{ id: string; vehicleType: string; registrationNumber: string; seatCapacity?: number; dailyRate?: number; isAvailable: boolean; createdAt?: string }>;
+  ticketBookings: Array<{ id: string; bookingNumber?: string; status: string; totalAmount: number; createdAt: string }>;
+  rentalBookings: Array<{ id: string; bookingNumber?: string; status: string; totalAmount: number; createdAt: string }>;
 }
 
 const STATUS_CONFIG: Record<string, { color: string; icon: any; label: string }> = {
