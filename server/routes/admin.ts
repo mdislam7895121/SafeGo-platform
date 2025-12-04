@@ -8851,7 +8851,7 @@ router.post("/restaurant-analytics/generate-insights", checkPermission(Permissio
       },
       select: {
         id: true,
-        businessName: true,
+        restaurantName: true,
         userId: true,
       },
     });
@@ -8967,7 +8967,7 @@ router.get("/payouts/pending", checkPermission(Permission.MANAGE_PAYOUTS), async
   try {
     const pendingPayouts = await prisma.payout.findMany({
       where: {
-        ownerType: "RESTAURANT",
+        ownerType: "restaurant",
         status: "pending",
       },
       include: {
@@ -8989,7 +8989,7 @@ router.get("/payouts/pending", checkPermission(Permission.MANAGE_PAYOUTS), async
         const restaurant = await prisma.restaurantProfile.findUnique({
           where: { id: payout.wallet.ownerId },
           select: {
-            businessName: true,
+            restaurantName: true,
             user: {
               select: {
                 email: true,
@@ -9000,7 +9000,7 @@ router.get("/payouts/pending", checkPermission(Permission.MANAGE_PAYOUTS), async
 
         return {
           ...payout,
-          restaurantName: restaurant?.businessName || "Unknown",
+          restaurantName: restaurant?.restaurantName || "Unknown",
           restaurantEmail: restaurant?.user.email || "Unknown",
         };
       })
@@ -9335,7 +9335,7 @@ router.post("/payouts/adjust-balance", checkPermission(Permission.MANAGE_PAYOUTS
       where: { id: restaurantId },
       select: {
         id: true,
-        businessName: true,
+        restaurantName: true,
         countryCode: true,
       },
     });
@@ -9349,7 +9349,7 @@ router.post("/payouts/adjust-balance", checkPermission(Permission.MANAGE_PAYOUTS
       where: {
         ownerId_ownerType: {
           ownerId: restaurantId,
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
         },
       },
     });
@@ -9400,7 +9400,7 @@ router.post("/payouts/adjust-balance", checkPermission(Permission.MANAGE_PAYOUTS
       description: `Adjusted restaurant wallet balance: ${adjustmentType} ${amountDecimal} ${wallet.currency}`,
       metadata: {
         restaurantId,
-        restaurantName: restaurant.businessName,
+        restaurantName: restaurant.restaurantName,
         adjustmentType,
         amount: amountDecimal.toString(),
         reason,
@@ -10526,7 +10526,7 @@ router.get(
             restaurant: {
               select: {
                 id: true,
-                businessName: true,
+                restaurantName: true,
                 user: { select: { email: true } },
               },
             },
@@ -10600,12 +10600,12 @@ router.post(
         actionType: ActionType.FLAG_PROMOTION,
         entityType: EntityType.PROMOTION,
         entityId: id,
-        description: `Flagged promotion "${promotion.title}" from restaurant ${promotion.restaurant.businessName}. Reason: ${reason}`,
+        description: `Flagged promotion "${promotion.title}" from restaurant ${promotion.restaurant.restaurantName}. Reason: ${reason}`,
         metadata: {
           promotion_id: id,
           promotion_title: promotion.title,
           restaurant_id: promotion.restaurantId,
-          restaurant_name: promotion.restaurant.businessName,
+          restaurant_name: promotion.restaurant.restaurantName,
           reason,
         },
       });
@@ -10671,12 +10671,12 @@ router.post(
         actionType: ActionType.DISABLE_PROMOTION,
         entityType: EntityType.PROMOTION,
         entityId: id,
-        description: `Disabled promotion "${promotion.title}" from restaurant ${promotion.restaurant.businessName}. Reason: ${reason}`,
+        description: `Disabled promotion "${promotion.title}" from restaurant ${promotion.restaurant.restaurantName}. Reason: ${reason}`,
         metadata: {
           promotion_id: id,
           promotion_title: promotion.title,
           restaurant_id: promotion.restaurantId,
-          restaurant_name: promotion.restaurant.businessName,
+          restaurant_name: promotion.restaurant.restaurantName,
           reason,
         },
       });
@@ -10726,7 +10726,7 @@ router.get(
             restaurant: {
               select: {
                 id: true,
-                businessName: true,
+                restaurantName: true,
                 user: { select: { email: true } },
               },
             },
@@ -10800,12 +10800,12 @@ router.post(
         actionType: ActionType.FLAG_COUPON,
         entityType: EntityType.COUPON,
         entityId: id,
-        description: `Flagged coupon "${coupon.code}" from restaurant ${coupon.restaurant.businessName}. Reason: ${reason}`,
+        description: `Flagged coupon "${coupon.code}" from restaurant ${coupon.restaurant.restaurantName}. Reason: ${reason}`,
         metadata: {
           coupon_id: id,
           coupon_code: coupon.code,
           restaurant_id: coupon.restaurantId,
-          restaurant_name: coupon.restaurant.businessName,
+          restaurant_name: coupon.restaurant.restaurantName,
           reason,
         },
       });

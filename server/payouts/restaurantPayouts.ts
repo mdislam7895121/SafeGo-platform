@@ -55,7 +55,7 @@ export async function getRestaurantPayoutOverview(
     where: { id: restaurantId },
     select: {
       id: true,
-      businessName: true,
+      restaurantName: true,
       isVerified: true,
       isDemo: true,
       countryCode: true,
@@ -71,7 +71,7 @@ export async function getRestaurantPayoutOverview(
     where: {
       ownerId_ownerType: {
         ownerId: restaurantId,
-        ownerType: "RESTAURANT",
+        ownerType: "restaurant",
       },
     },
   });
@@ -80,7 +80,7 @@ export async function getRestaurantPayoutOverview(
     wallet = await prisma.wallet.create({
       data: {
         ownerId: restaurantId,
-        ownerType: "RESTAURANT",
+        ownerType: "restaurant",
         countryCode: restaurantProfile.countryCode || "US",
         availableBalance: 0,
         negativeBalance: 0,
@@ -93,7 +93,7 @@ export async function getRestaurantPayoutOverview(
   // Get pending payout amount
   const pendingPayouts = await prisma.payout.aggregate({
     where: {
-      ownerType: "RESTAURANT",
+      ownerType: "restaurant",
       ownerId: restaurantId,
       status: "pending",
     },
@@ -105,7 +105,7 @@ export async function getRestaurantPayoutOverview(
   // Get last payout date
   const lastPayout = await prisma.payout.findFirst({
     where: {
-      ownerType: "RESTAURANT",
+      ownerType: "restaurant",
       ownerId: restaurantId,
       status: "completed",
     },
@@ -140,7 +140,7 @@ export async function getRestaurantPayoutOverview(
   // Get total payouts
   const payoutStats = await prisma.payout.aggregate({
     where: {
-      ownerType: "RESTAURANT",
+      ownerType: "restaurant",
       ownerId: restaurantId,
       status: {
         in: ["completed", "processing"],
@@ -151,13 +151,13 @@ export async function getRestaurantPayoutOverview(
     },
   });
 
-  const totalEarnings = orderStats._sum.restaurantPayout
+  const totalEarnings = orderStats._sum?.restaurantPayout
     ? parseFloat(orderStats._sum.restaurantPayout.toString())
     : 0;
-  const totalCommissions = orderStats._sum.safegoCommission
+  const totalCommissions = orderStats._sum?.safegoCommission
     ? parseFloat(orderStats._sum.safegoCommission.toString())
     : 0;
-  const totalPayouts = payoutStats._sum.amount
+  const totalPayouts = payoutStats._sum?.amount
     ? parseFloat(payoutStats._sum.amount.toString())
     : 0;
 
@@ -183,10 +183,10 @@ export async function getRestaurantPayoutOverview(
 
   return {
     restaurantId: restaurantProfile.id,
-    restaurantName: restaurantProfile.businessName || "Unknown Restaurant",
+    restaurantName: restaurantProfile.restaurantName || "Unknown Restaurant",
     walletBalance: parseFloat(wallet.availableBalance.toString()),
     negativeBalance: parseFloat(wallet.negativeBalance.toString()),
-    pendingPayoutAmount: pendingPayouts._sum.amount
+    pendingPayoutAmount: pendingPayouts._sum?.amount
       ? parseFloat(pendingPayouts._sum.amount.toString())
       : 0,
     lastPayoutDate: lastPayout?.processedAt || null,
@@ -215,7 +215,7 @@ export async function getRestaurantLedger(
     where: {
       ownerId_ownerType: {
         ownerId: restaurantId,
-        ownerType: "RESTAURANT",
+        ownerType: "restaurant",
       },
     },
   });
@@ -279,7 +279,7 @@ export async function getRestaurantSettlements(
   // Get all payout batches that include this restaurant's payouts
   const payouts = await prisma.payout.findMany({
     where: {
-      ownerType: "RESTAURANT",
+      ownerType: "restaurant",
       ownerId: restaurantId,
       batchId: {
         not: null,
@@ -349,7 +349,7 @@ export async function getAllRestaurantPayouts(filters?: {
     },
     select: {
       id: true,
-      businessName: true,
+      restaurantName: true,
       countryCode: true,
       user: {
         select: {
@@ -365,14 +365,14 @@ export async function getAllRestaurantPayouts(filters?: {
         where: {
           ownerId_ownerType: {
             ownerId: restaurant.id,
-            ownerType: "RESTAURANT",
+            ownerType: "restaurant",
           },
         },
       });
 
       const pendingPayouts = await prisma.payout.aggregate({
         where: {
-          ownerType: "RESTAURANT",
+          ownerType: "restaurant",
           ownerId: restaurant.id,
           status: "pending",
         },
@@ -384,7 +384,7 @@ export async function getAllRestaurantPayouts(filters?: {
 
       return {
         restaurantId: restaurant.id,
-        restaurantName: restaurant.businessName || "Unknown",
+        restaurantName: restaurant.restaurantName || "Unknown",
         email: restaurant.user.email,
         countryCode: restaurant.countryCode || "US",
         walletBalance: wallet
@@ -393,8 +393,8 @@ export async function getAllRestaurantPayouts(filters?: {
         negativeBalance: wallet
           ? parseFloat(wallet.negativeBalance.toString())
           : 0,
-        pendingPayoutCount: pendingPayouts._count,
-        pendingPayoutAmount: pendingPayouts._sum.amount
+        pendingPayoutCount: typeof pendingPayouts._count === 'number' ? pendingPayouts._count : 0,
+        pendingPayoutAmount: pendingPayouts._sum?.amount
           ? parseFloat(pendingPayouts._sum.amount.toString())
           : 0,
         currency: wallet?.currency || "USD",
