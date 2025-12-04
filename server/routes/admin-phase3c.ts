@@ -187,15 +187,16 @@ router.get("/analytics/parcel", checkPermission(Permission.VIEW_ANALYTICS_DASHBO
 
 router.get("/intelligence/drivers", checkPermission(Permission.VIEW_ANALYTICS_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const { limit = 20, sortBy = "rating" } = req.query;
+    const { limit = 20 } = req.query;
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const drivers = await prisma.driverProfile.findMany({
       take: Number(limit),
       include: {
         user: { select: { firstName: true, lastName: true, email: true, phone: true } },
+        driverStats: { select: { rating: true, totalRides: true, completedRides: true } },
       },
-      orderBy: sortBy === "rating" ? { rating: "desc" } : { createdAt: "desc" },
+      orderBy: { createdAt: "desc" },
     });
 
     const driverStats = await Promise.all(
@@ -215,8 +216,8 @@ router.get("/intelligence/drivers", checkPermission(Permission.VIEW_ANALYTICS_DA
           name: `${driver.user.firstName} ${driver.user.lastName}`,
           email: driver.user.email,
           phone: driver.user.phone,
-          status: driver.status,
-          rating: avgRating._avg.rating || driver.rating || 4.5,
+          status: driver.verificationStatus,
+          rating: avgRating._avg.rating || driver.driverStats?.rating || 4.5,
           totalRides,
           completedRides,
           cancelledRides,
@@ -313,12 +314,7 @@ router.get("/intelligence/fraud", checkPermission(Permission.VIEW_FRAUD_ALERTS),
   try {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [securityEvents, suspiciousRides, multiAccountAlerts] = await Promise.all([
-      prisma.securityEvent.findMany({
-        where: { createdAt: { gte: sevenDaysAgo } },
-        orderBy: { createdAt: "desc" },
-        take: 50,
-      }),
+    const [suspiciousRides, multiAccountAlerts] = await Promise.all([
       detectSuspiciousRides(sevenDaysAgo),
       detectMultiAccountFraud(),
     ]);
@@ -326,17 +322,6 @@ router.get("/intelligence/fraud", checkPermission(Permission.VIEW_FRAUD_ALERTS),
     const anomalies = await detectAnomalies();
 
     const fraudAlerts = [
-      ...securityEvents.map(e => ({
-        id: e.id,
-        type: "security_event",
-        subtype: e.type,
-        severity: e.severity,
-        description: e.details || "Security event detected",
-        sourceIp: e.sourceIp,
-        userId: e.userId,
-        createdAt: e.createdAt,
-        status: "pending",
-      })),
       ...suspiciousRides.map(r => ({
         id: r.id,
         type: "suspicious_trip",

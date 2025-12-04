@@ -27,6 +27,67 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Global Audit Engine**: Tamper-proof logging with hash chain verification, evidence packets, and regulator export mode, with an expanded full audit console.
 *   **Enterprise Administration**: Features such as Feature Flags Management, Enterprise Search Engine, Data Export Center, Incident Response Playbook, Customer Support Panel, Partner Compliance Center, System Health Monitor, Push Notifications, Policy Manager, Backup & Recovery, and an Intelligence Dashboard with service analytics, driver performance, customer satisfaction, and automated insights.
 
+## Phase 3: Enterprise Admin Dashboard Upgrade (December 2025)
+
+### Phase 3A - Enterprise Admin Tools (Completed)
+All 14 Enterprise Admin tools implemented in Operations Center (`/admin/operations-center`):
+- **Scheduled Reports**: Daily/weekly/monthly CSV/JSON exports with scheduling
+- **Live Admin Presence**: Real-time online/offline status with heartbeat tracking
+- **Admin Productivity Logs**: Actions per minute, resolved items, efficiency metrics
+- **Failed Login Monitor**: IP addresses, user agents, timestamps, lockout tracking
+- **Admin Activity Heatmap**: Visual representation of admin activity over time
+- **Data Quality Monitor**: Missing fields, invalid KYC, orphaned records detection
+- **Quarantine Vault**: Flagged or suspicious items management with bulk actions
+- **Admin Notes System**: Timestamped notes on entities with admin attribution
+- **Configuration Preview**: Real-time feature flag preview before deployment
+- **API Usage Graphs**: Endpoint analytics, latency tracking, error rates
+- **Country Compliance Settings**: Read-only for non-country-admins, compliance metrics
+
+### Phase 3B - UI/UX Polish + Real-Time Analytics (Completed)
+- **WCAG 2.1 AA Compliance**: Full accessibility with proper ARIA labels, keyboard navigation, color contrast
+- **Live Error Panel**: Real-time backend exception monitoring with severity levels
+- **Consolidated Notification Timeline**: Unified view of all platform events and notifications
+- **Virtual Scrolling**: Optimized rendering for large admin tables using ScrollArea
+- **Real-Time Analytics Component**: WebSocket-based metrics with REST polling fallback (10s intervals)
+
+### Phase 3C - Intelligence Layer (Completed)
+Enhanced Intelligence Dashboard (`/admin/intelligence`) with advanced analytics:
+- **Service Analytics**: Rides, Eats, Parcel deep analytics with period filtering (7d/30d/90d)
+- **Driver Performance Intelligence**: Rankings, performance scores, needs attention alerts
+- **Customer Satisfaction**: NPS scoring, CSAT, rating distribution, low-rating alerts
+- **Fraud Detection Dashboard**: Suspicious trips, multi-account detection, platform risk scoring
+- **Platform Health Monitor**: CPU, memory, database latency, service health, queue statistics
+- **Automated Insights**: AI-generated recommendations with actionable items
+- **Earnings Irregularity Monitor**: Flagged drivers with unusual earning patterns
+- **Customer Complaint Patterns**: Category analysis, trending issues, resolution metrics
+- **AI Summary**: Text-based auto insight generator for executive summaries
+- **Platform Rankings**: Top drivers, high-risk cases, high-impact events
+
+### Phase 3 API Routes
+```
+Phase 3A Routes (/api/admin/phase3a/):
+- GET /reports/schedule, POST /reports/schedule, GET /reports/generate
+- GET /presence/heartbeat, POST /presence/heartbeat, GET /presence/online-admins
+- GET /productivity/stats
+- GET /logins/failed
+- GET /activity/heatmap
+- GET /data-quality/issues
+- GET /quarantine, POST /quarantine/:id/action
+- GET /notes/:entityType/:entityId, POST /notes
+- GET /config/preview
+- GET /api-usage/stats
+- GET /compliance/:countryCode
+
+Phase 3C Routes (/api/admin/phase3c/):
+- GET /analytics/rides, /analytics/eats, /analytics/parcel
+- GET /intelligence/drivers, /intelligence/satisfaction, /intelligence/fraud
+- GET /intelligence/health, /intelligence/insights, /intelligence/incidents
+- GET /intelligence/earnings-irregularities, /intelligence/complaint-patterns
+- GET /intelligence/ai-summary, /intelligence/rankings
+- GET /errors/live, /notifications/timeline
+- POST /intelligence/actions/:actionType
+```
+
 ## External Dependencies
 
 *   **Backend Core**: `@prisma/client`, `express`, `bcrypt`, `jsonwebtoken`, `@neondatabase/serverless`.
