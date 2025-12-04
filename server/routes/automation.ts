@@ -26,6 +26,10 @@ import {
   highRiskActivityAutomation,
 } from '../services/automation';
 
+import automationRiskRoutes from './automation-risk';
+import automationExperienceRoutes from './automation-experience';
+import automationOpsRoutes from './automation-ops';
+
 const router = Router();
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'SUPER_ADMIN', 'FINANCE_ADMIN', 'COMPLIANCE_ADMIN'];
@@ -1049,5 +1053,9 @@ router.post('/high-risk/stop', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: 'Failed to stop' });
   }
 });
+
+router.use('/risk', automationRiskRoutes);
+router.use('/experience', automationExperienceRoutes);
+router.use('/ops', automationOpsRoutes);
 
 export default router;
