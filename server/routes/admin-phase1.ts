@@ -5,7 +5,6 @@ import { authenticateToken, requireAdmin } from "../middleware/authz";
 import { Permission } from "../utils/permissions";
 import { z } from "zod";
 import { logAuditEvent, ActionType, EntityType, getClientIp } from "../utils/audit";
-import { walletService } from "../services/walletService";
 
 const router = Router();
 
@@ -27,6 +26,25 @@ const PeopleKycQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).optional().default(20),
 });
 
+// Helper to calculate KYC completeness
+function calculateCustomerKycCompleteness(c: any): number {
+  const fields = [c.firstName, c.lastName, c.phoneNumber, c.nidNumber, c.dateOfBirth, c.homeAddress];
+  const filled = fields.filter(f => f !== null && f !== undefined && f !== "").length;
+  return Math.round((filled / fields.length) * 100);
+}
+
+function calculateDriverKycCompleteness(d: any): number {
+  const fields = [d.firstName, d.lastName, d.phoneNumber, d.nidNumber, d.driverLicenseNumber, d.dateOfBirth, d.profilePhotoUrl];
+  const filled = fields.filter(f => f !== null && f !== undefined && f !== "").length;
+  return Math.round((filled / fields.length) * 100);
+}
+
+function calculateRestaurantKycCompleteness(r: any): number {
+  const fields = [r.restaurantName, r.phone, r.address, r.cuisineType, r.businessLicenseNumber];
+  const filled = fields.filter(f => f !== null && f !== undefined && f !== "").length;
+  return Math.round((filled / fields.length) * 100);
+}
+
 router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
   try {
     const query = PeopleKycQuerySchema.parse(req.query);
@@ -38,18 +56,18 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
 
     const shouldIncludeRole = (targetRole: string) => role === "all" || role === targetRole;
 
+    // Customers
     if (shouldIncludeRole("customer")) {
       const customerWhere: any = {};
-      if (country !== "all") customerWhere.countryCode = country;
       if (verification !== "all") customerWhere.verificationStatus = verification;
-      if (status === "blocked") customerWhere.isBlocked = true;
-      if (status === "active") customerWhere.isBlocked = false;
+      if (status === "suspended") customerWhere.isSuspended = true;
+      if (status === "active") customerWhere.isSuspended = false;
       if (search) {
         customerWhere.OR = [
           { firstName: { contains: search, mode: "insensitive" } },
           { lastName: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
-          { phone: { contains: search, mode: "insensitive" } },
+          { fullName: { contains: search, mode: "insensitive" } },
+          { phoneNumber: { contains: search, mode: "insensitive" } },
         ];
       }
 
@@ -67,16 +85,16 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
       customers.forEach((c) => {
         results.push({
           id: c.id,
-          userId: c.userId,
+          oderId: c.userId,
           role: "customer",
-          name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || "N/A",
-          email: c.user?.email || c.email || "N/A",
-          phone: c.phone || "N/A",
-          countryCode: c.countryCode || "N/A",
+          name: `${c.firstName || ""} ${c.lastName || ""}`.trim() || c.fullName || "N/A",
+          email: c.user?.email || "N/A",
+          phone: c.phoneNumber || "N/A",
+          countryCode: "N/A",
           verificationStatus: c.verificationStatus || "pending",
           isVerified: c.isVerified || false,
-          isBlocked: c.isBlocked || false,
-          isSuspended: false,
+          isBlocked: false,
+          isSuspended: c.isSuspended || false,
           kycCompleteness: calculateCustomerKycCompleteness(c),
           walletBalance: null,
           negativeBalance: null,
@@ -87,22 +105,18 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
       else total += customerCount;
     }
 
+    // Drivers
     if (shouldIncludeRole("driver")) {
       const driverWhere: any = {};
-      if (country !== "all") driverWhere.countryCode = country;
       if (verification !== "all") driverWhere.verificationStatus = verification;
-      if (status === "blocked") driverWhere.isBlocked = true;
       if (status === "suspended") driverWhere.isSuspended = true;
-      if (status === "active") {
-        driverWhere.isBlocked = false;
-        driverWhere.isSuspended = false;
-      }
+      if (status === "active") driverWhere.isSuspended = false;
       if (search) {
         driverWhere.OR = [
           { firstName: { contains: search, mode: "insensitive" } },
           { lastName: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
-          { phone: { contains: search, mode: "insensitive" } },
+          { fullName: { contains: search, mode: "insensitive" } },
+          { phoneNumber: { contains: search, mode: "insensitive" } },
         ];
       }
 
@@ -111,7 +125,6 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
           where: driverWhere,
           include: { 
             user: { select: { email: true } },
-            wallet: { select: { balance: true, negativeBalance: true } },
           },
           take: role === "all" ? Math.ceil(limit / 5) : limit,
           skip: role === "driver" ? skip : 0,
@@ -120,22 +133,31 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
         prisma.driverProfile.count({ where: driverWhere }),
       ]);
 
+      // Get wallet balances separately
+      const driverIds = drivers.map(d => d.id);
+      const wallets = await prisma.driverWallet.findMany({
+        where: { driverId: { in: driverIds } },
+        select: { driverId: true, balance: true, negativeBalance: true },
+      });
+      const walletMap = new Map(wallets.map(w => [w.driverId, w]));
+
       drivers.forEach((d) => {
+        const wallet = walletMap.get(d.id);
         results.push({
           id: d.id,
-          userId: d.userId,
+          oderId: d.userId,
           role: "driver",
-          name: `${d.firstName || ""} ${d.lastName || ""}`.trim() || "N/A",
-          email: d.user?.email || d.email || "N/A",
-          phone: d.phone || "N/A",
-          countryCode: d.countryCode || "N/A",
+          name: `${d.firstName || ""} ${d.lastName || ""}`.trim() || d.fullName || "N/A",
+          email: d.user?.email || "N/A",
+          phone: d.phoneNumber || "N/A",
+          countryCode: "N/A",
           verificationStatus: d.verificationStatus || "pending",
           isVerified: d.isVerified || false,
-          isBlocked: d.isBlocked || false,
+          isBlocked: false,
           isSuspended: d.isSuspended || false,
           kycCompleteness: calculateDriverKycCompleteness(d),
-          walletBalance: d.wallet?.balance ? Number(d.wallet.balance) : 0,
-          negativeBalance: d.wallet?.negativeBalance ? Number(d.wallet.negativeBalance) : 0,
+          walletBalance: wallet ? Number(wallet.balance) : 0,
+          negativeBalance: wallet ? Number(wallet.negativeBalance) : 0,
           createdAt: d.createdAt,
         });
       });
@@ -143,21 +165,16 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
       else total += driverCount;
     }
 
+    // Restaurants
     if (shouldIncludeRole("restaurant")) {
       const restaurantWhere: any = {};
       if (country !== "all") restaurantWhere.countryCode = country;
       if (verification !== "all") restaurantWhere.verificationStatus = verification;
-      if (status === "blocked") restaurantWhere.isBlocked = true;
       if (status === "suspended") restaurantWhere.isSuspended = true;
-      if (status === "active") {
-        restaurantWhere.isBlocked = false;
-        restaurantWhere.isSuspended = false;
-      }
+      if (status === "active") restaurantWhere.isSuspended = false;
       if (search) {
         restaurantWhere.OR = [
-          { name: { contains: search, mode: "insensitive" } },
-          { ownerName: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
+          { restaurantName: { contains: search, mode: "insensitive" } },
           { phone: { contains: search, mode: "insensitive" } },
         ];
       }
@@ -165,10 +182,7 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
       const [restaurants, restaurantCount] = await Promise.all([
         prisma.restaurantProfile.findMany({
           where: restaurantWhere,
-          include: { 
-            user: { select: { email: true } },
-            wallet: { select: { balance: true, negativeBalance: true } },
-          },
+          include: { user: { select: { email: true } } },
           take: role === "all" ? Math.ceil(limit / 5) : limit,
           skip: role === "restaurant" ? skip : 0,
           orderBy: { createdAt: "desc" },
@@ -176,22 +190,31 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
         prisma.restaurantProfile.count({ where: restaurantWhere }),
       ]);
 
+      // Get wallet balances separately
+      const restaurantIds = restaurants.map(r => r.id);
+      const wallets = await prisma.restaurantWallet.findMany({
+        where: { restaurantId: { in: restaurantIds } },
+        select: { restaurantId: true, balance: true, negativeBalance: true },
+      });
+      const walletMap = new Map(wallets.map(w => [w.restaurantId, w]));
+
       restaurants.forEach((r) => {
+        const wallet = walletMap.get(r.id);
         results.push({
           id: r.id,
           userId: r.userId,
           role: "restaurant",
-          name: r.name || r.ownerName || "N/A",
-          email: r.user?.email || r.email || "N/A",
+          name: r.restaurantName || "N/A",
+          email: r.user?.email || "N/A",
           phone: r.phone || "N/A",
           countryCode: r.countryCode || "N/A",
           verificationStatus: r.verificationStatus || "pending",
           isVerified: r.isVerified || false,
-          isBlocked: r.isBlocked || false,
+          isBlocked: false,
           isSuspended: r.isSuspended || false,
           kycCompleteness: calculateRestaurantKycCompleteness(r),
-          walletBalance: r.wallet?.balance ? Number(r.wallet.balance) : 0,
-          negativeBalance: r.wallet?.negativeBalance ? Number(r.wallet.negativeBalance) : 0,
+          walletBalance: wallet ? Number(wallet.balance) : 0,
+          negativeBalance: wallet ? Number(wallet.negativeBalance) : 0,
           createdAt: r.createdAt,
         });
       });
@@ -199,112 +222,107 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
       else total += restaurantCount;
     }
 
+    // Shop Partners (BD only)
     if (shouldIncludeRole("shop_partner")) {
       const shopWhere: any = {};
-      if (country !== "all") shopWhere.countryCode = country;
-      if (verification !== "all") shopWhere.verificationStatus = verification;
-      if (status === "blocked") shopWhere.isBlocked = true;
-      if (status === "suspended") shopWhere.isSuspended = true;
-      if (status === "active") {
-        shopWhere.isBlocked = false;
-        shopWhere.isSuspended = false;
-      }
-      if (search) {
-        shopWhere.OR = [
-          { shopName: { contains: search, mode: "insensitive" } },
-          { ownerName: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
-          { phone: { contains: search, mode: "insensitive" } },
-        ];
-      }
+      if (country !== "all" && country !== "BD") {
+        // Shop partners are BD only, skip if other country selected
+      } else {
+        if (verification !== "all") shopWhere.verificationStatus = verification;
+        if (search) {
+          shopWhere.OR = [
+            { shopName: { contains: search, mode: "insensitive" } },
+            { ownerName: { contains: search, mode: "insensitive" } },
+            { contactPhone: { contains: search, mode: "insensitive" } },
+          ];
+        }
 
-      const [shops, shopCount] = await Promise.all([
-        prisma.shopPartnerProfile.findMany({
-          where: shopWhere,
-          include: { user: { select: { email: true } } },
-          take: role === "all" ? Math.ceil(limit / 5) : limit,
-          skip: role === "shop_partner" ? skip : 0,
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.shopPartnerProfile.count({ where: shopWhere }),
-      ]);
+        const [shops, shopCount] = await Promise.all([
+          prisma.shopPartner.findMany({
+            where: shopWhere,
+            include: { user: { select: { email: true } } },
+            take: role === "all" ? Math.ceil(limit / 5) : limit,
+            skip: role === "shop_partner" ? skip : 0,
+            orderBy: { createdAt: "desc" },
+          }),
+          prisma.shopPartner.count({ where: shopWhere }),
+        ]);
 
-      shops.forEach((s) => {
-        results.push({
-          id: s.id,
-          userId: s.userId,
-          role: "shop_partner",
-          name: s.shopName || s.ownerName || "N/A",
-          email: s.user?.email || s.email || "N/A",
-          phone: s.phone || "N/A",
-          countryCode: s.countryCode || "BD",
-          verificationStatus: s.verificationStatus || "pending",
-          isVerified: s.isVerified || false,
-          isBlocked: s.isBlocked || false,
-          isSuspended: s.isSuspended || false,
-          kycCompleteness: 100,
-          walletBalance: null,
-          negativeBalance: null,
-          createdAt: s.createdAt,
+        shops.forEach((s) => {
+          results.push({
+            id: s.id,
+            userId: s.userId,
+            role: "shop_partner",
+            name: s.shopName || s.ownerName || "N/A",
+            email: s.user?.email || "N/A",
+            phone: s.contactPhone || "N/A",
+            countryCode: s.countryCode || "BD",
+            verificationStatus: s.verificationStatus || "pending",
+            isVerified: s.verificationStatus === "approved",
+            isBlocked: false,
+            isSuspended: false,
+            kycCompleteness: 100,
+            walletBalance: Number(s.walletBalance) || 0,
+            negativeBalance: Number(s.negativeBalance) || 0,
+            createdAt: s.createdAt,
+          });
         });
-      });
-      if (role === "shop_partner") total = shopCount;
-      else total += shopCount;
+        if (role === "shop_partner") total = shopCount;
+        else total += shopCount;
+      }
     }
 
+    // Ticket Operators (BD only)
     if (shouldIncludeRole("ticket_operator")) {
       const operatorWhere: any = {};
-      if (country !== "all") operatorWhere.countryCode = country;
-      if (verification !== "all") operatorWhere.verificationStatus = verification;
-      if (status === "blocked") operatorWhere.isBlocked = true;
-      if (status === "suspended") operatorWhere.isSuspended = true;
-      if (status === "active") {
-        operatorWhere.isBlocked = false;
-        operatorWhere.isSuspended = false;
-      }
-      if (search) {
-        operatorWhere.OR = [
-          { businessName: { contains: search, mode: "insensitive" } },
-          { ownerName: { contains: search, mode: "insensitive" } },
-          { email: { contains: search, mode: "insensitive" } },
-          { phone: { contains: search, mode: "insensitive" } },
-        ];
-      }
+      if (country !== "all" && country !== "BD") {
+        // Ticket operators are BD only, skip if other country selected
+      } else {
+        if (verification !== "all") operatorWhere.verificationStatus = verification;
+        if (search) {
+          operatorWhere.OR = [
+            { operatorName: { contains: search, mode: "insensitive" } },
+            { ownerName: { contains: search, mode: "insensitive" } },
+            { officePhone: { contains: search, mode: "insensitive" } },
+          ];
+        }
 
-      const [operators, operatorCount] = await Promise.all([
-        prisma.ticketOperatorProfile.findMany({
-          where: operatorWhere,
-          include: { user: { select: { email: true } } },
-          take: role === "all" ? Math.ceil(limit / 5) : limit,
-          skip: role === "ticket_operator" ? skip : 0,
-          orderBy: { createdAt: "desc" },
-        }),
-        prisma.ticketOperatorProfile.count({ where: operatorWhere }),
-      ]);
+        const [operators, operatorCount] = await Promise.all([
+          prisma.ticketOperator.findMany({
+            where: operatorWhere,
+            include: { user: { select: { email: true } } },
+            take: role === "all" ? Math.ceil(limit / 5) : limit,
+            skip: role === "ticket_operator" ? skip : 0,
+            orderBy: { createdAt: "desc" },
+          }),
+          prisma.ticketOperator.count({ where: operatorWhere }),
+        ]);
 
-      operators.forEach((o) => {
-        results.push({
-          id: o.id,
-          userId: o.userId,
-          role: "ticket_operator",
-          name: o.businessName || o.ownerName || "N/A",
-          email: o.user?.email || o.email || "N/A",
-          phone: o.phone || "N/A",
-          countryCode: o.countryCode || "BD",
-          verificationStatus: o.verificationStatus || "pending",
-          isVerified: o.isVerified || false,
-          isBlocked: o.isBlocked || false,
-          isSuspended: o.isSuspended || false,
-          kycCompleteness: 100,
-          walletBalance: null,
-          negativeBalance: null,
-          createdAt: o.createdAt,
+        operators.forEach((o) => {
+          results.push({
+            id: o.id,
+            userId: o.userId,
+            role: "ticket_operator",
+            name: o.operatorName || o.ownerName || "N/A",
+            email: o.user?.email || o.officeEmail || "N/A",
+            phone: o.officePhone || "N/A",
+            countryCode: o.countryCode || "BD",
+            verificationStatus: o.verificationStatus || "pending",
+            isVerified: o.verificationStatus === "approved",
+            isBlocked: false,
+            isSuspended: false,
+            kycCompleteness: 100,
+            walletBalance: Number(o.walletBalance) || 0,
+            negativeBalance: Number(o.negativeBalance) || 0,
+            createdAt: o.createdAt,
+          });
         });
-      });
-      if (role === "ticket_operator") total = operatorCount;
-      else total += operatorCount;
+        if (role === "ticket_operator") total = operatorCount;
+        else total += operatorCount;
+      }
     }
 
+    // Sort by most recent
     results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     res.json({
@@ -320,6 +338,7 @@ router.get("/people-kyc", checkPermission(Permission.VIEW_DASHBOARD), async (req
   }
 });
 
+// Get profile details
 router.get("/people-kyc/:role/:id", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
   try {
     const { role, id } = req.params;
@@ -338,13 +357,11 @@ router.get("/people-kyc/:role/:id", checkPermission(Permission.VIEW_DASHBOARD), 
           },
         });
         if (profile) {
-          const [ridesCount, ordersCount, parcelsCount, complaintsCount] = await Promise.all([
+          const [ridesCount, ordersCount] = await Promise.all([
             prisma.ride.count({ where: { customerId: profile.userId } }),
             prisma.foodOrder.count({ where: { customerId: profile.userId } }),
-            prisma.parcelDelivery.count({ where: { customerId: profile.userId } }),
-            prisma.complaint.count({ where: { complainantUserId: profile.userId } }),
           ]);
-          activitySummary = { ridesCount, ordersCount, parcelsCount, complaintsCount };
+          activitySummary = { ridesCount, ordersCount };
         }
         break;
       }
@@ -353,31 +370,22 @@ router.get("/people-kyc/:role/:id", checkPermission(Permission.VIEW_DASHBOARD), 
           where: { id },
           include: {
             user: { select: { email: true, createdAt: true } },
-            wallet: true,
-            vehicles: true,
           },
         });
         if (profile) {
-          const [ridesCount, deliveriesCount, parcelsCount, complaintsCount, avgRating] = await Promise.all([
+          const [wallet, ridesCount, deliveriesCount] = await Promise.all([
+            prisma.driverWallet.findUnique({ where: { driverId: profile.id } }),
             prisma.ride.count({ where: { driverId: profile.userId } }),
             prisma.foodOrder.count({ where: { driverId: profile.userId } }),
-            prisma.parcelDelivery.count({ where: { driverId: profile.userId } }),
-            prisma.complaint.count({ where: { complainantUserId: profile.userId } }),
-            prisma.driverRating.aggregate({ where: { driverId: profile.id }, _avg: { rating: true } }),
           ]);
           activitySummary = { 
             ridesCount, 
-            deliveriesCount, 
-            parcelsCount, 
-            complaintsCount,
-            avgRating: avgRating._avg.rating || 0,
+            deliveriesCount,
           };
-          if (profile.wallet) {
+          if (wallet) {
             walletSummary = {
-              balance: Number(profile.wallet.balance),
-              negativeBalance: Number(profile.wallet.negativeBalance),
-              lifetimeEarnings: Number(profile.wallet.lifetimeEarnings),
-              pendingBalance: Number(profile.wallet.pendingBalance),
+              balance: Number(wallet.balance),
+              negativeBalance: Number(wallet.negativeBalance),
             };
           }
         }
@@ -388,81 +396,73 @@ router.get("/people-kyc/:role/:id", checkPermission(Permission.VIEW_DASHBOARD), 
           where: { id },
           include: {
             user: { select: { email: true, createdAt: true } },
-            wallet: true,
           },
         });
         if (profile) {
-          const [ordersCount, complaintsCount, avgRating] = await Promise.all([
+          const [wallet, ordersCount] = await Promise.all([
+            prisma.restaurantWallet.findUnique({ where: { restaurantId: profile.id } }),
             prisma.foodOrder.count({ where: { restaurantId: profile.id } }),
-            prisma.complaint.count({ where: { complainantUserId: profile.userId } }),
-            prisma.restaurantRating.aggregate({ where: { restaurantId: profile.id }, _avg: { rating: true } }),
           ]);
           activitySummary = { 
-            ordersCount, 
-            complaintsCount,
-            avgRating: avgRating._avg.rating || 0,
+            ordersCount,
+            avgRating: profile.averageRating || 0,
           };
-          if (profile.wallet) {
+          if (wallet) {
             walletSummary = {
-              balance: Number(profile.wallet.balance),
-              negativeBalance: Number(profile.wallet.negativeBalance),
-              lifetimeEarnings: Number(profile.wallet.lifetimeEarnings),
-              pendingBalance: Number(profile.wallet.pendingBalance),
+              balance: Number(wallet.balance),
+              negativeBalance: Number(wallet.negativeBalance),
             };
           }
         }
         break;
       }
       case "shop_partner": {
-        profile = await prisma.shopPartnerProfile.findUnique({
+        profile = await prisma.shopPartner.findUnique({
           where: { id },
           include: { user: { select: { email: true, createdAt: true } } },
         });
+        if (profile) {
+          activitySummary = { totalOrders: profile.totalOrders };
+          walletSummary = {
+            balance: Number(profile.walletBalance),
+            negativeBalance: Number(profile.negativeBalance),
+          };
+        }
         break;
       }
       case "ticket_operator": {
-        profile = await prisma.ticketOperatorProfile.findUnique({
+        profile = await prisma.ticketOperator.findUnique({
           where: { id },
           include: { user: { select: { email: true, createdAt: true } } },
         });
+        if (profile) {
+          activitySummary = { totalBookings: profile.totalBookings };
+          walletSummary = {
+            balance: Number(profile.walletBalance),
+            negativeBalance: Number(profile.negativeBalance),
+          };
+        }
         break;
       }
-      default:
-        return res.status(400).json({ error: "Invalid role" });
     }
 
     if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    const riskEvents = await prisma.riskEvent.findMany({
+    // Get risk summary
+    const riskEvents = await prisma.riskEvent.count({
       where: { userId: profile.userId },
-      orderBy: { createdAt: "desc" },
-      take: 10,
     });
-
-    const openRiskCases = await prisma.riskCase.count({
-      where: { 
-        primaryUserId: profile.userId,
-        status: { in: ["open", "in_review"] },
-      },
+    const openCases = await prisma.riskCase.count({
+      where: { primaryUserId: profile.userId, status: { in: ["open", "in_review"] } },
     });
+    riskSummary = { eventCount: riskEvents, openCases };
 
-    riskSummary = {
-      recentEvents: riskEvents.length,
-      openCases: openRiskCases,
-      events: riskEvents,
-    };
-
-    res.json({
-      profile,
-      activitySummary,
-      walletSummary,
-      riskSummary,
-    });
+    res.json({ profile, activitySummary, walletSummary, riskSummary });
   } catch (error) {
-    console.error("Error fetching profile detail:", error);
-    res.status(500).json({ error: "Failed to fetch profile detail" });
+    console.error("Error fetching profile details:", error);
+    res.status(500).json({ error: "Failed to fetch profile details" });
   }
 });
 
@@ -470,72 +470,33 @@ router.get("/people-kyc/:role/:id", checkPermission(Permission.VIEW_DASHBOARD), 
 // SAFETY CENTER ROUTES
 // ====================================================
 
-const SafetyQuerySchema = z.object({
-  role: z.enum(["all", "customer", "driver", "restaurant", "shop_partner", "ticket_operator"]).optional().default("all"),
-  country: z.enum(["all", "BD", "US"]).optional().default("all"),
+const RiskEventQuerySchema = z.object({
   severity: z.enum(["all", "low", "medium", "high", "critical"]).optional().default("all"),
   category: z.enum(["all", "fraud", "safety", "abuse", "technical", "payment_risk", "compliance"]).optional().default("all"),
-  status: z.enum(["all", "open", "in_review", "resolved", "escalated"]).optional().default("all"),
+  source: z.string().optional(),
+  acknowledged: z.enum(["all", "true", "false"]).optional().default("all"),
   page: z.coerce.number().min(1).optional().default(1),
   limit: z.coerce.number().min(1).max(100).optional().default(20),
 });
 
-router.get("/safety/cases", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/risk-events", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
   try {
-    const query = SafetyQuerySchema.parse(req.query);
-    const { role, country, severity, status, page, limit } = query;
+    const query = RiskEventQuerySchema.parse(req.query);
+    const { severity, category, source, acknowledged, page, limit } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    if (role !== "all") where.role = role;
-    if (country !== "all") where.countryCode = country;
-    if (severity !== "all") where.severity = severity;
-    if (status !== "all") where.status = status;
-
-    const [cases, total] = await Promise.all([
-      prisma.riskCase.findMany({
-        where,
-        include: {
-          riskEvents: { orderBy: { createdAt: "desc" }, take: 5 },
-          _count: { select: { riskEvents: true, caseNotes: true } },
-        },
-        orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
-        skip,
-        take: limit,
-      }),
-      prisma.riskCase.count({ where }),
-    ]);
-
-    res.json({
-      cases,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    });
-  } catch (error) {
-    console.error("Error fetching risk cases:", error);
-    res.status(500).json({ error: "Failed to fetch risk cases" });
-  }
-});
-
-router.get("/safety/events", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
-  try {
-    const query = SafetyQuerySchema.parse(req.query);
-    const { role, severity, category, page, limit } = query;
-    const skip = (page - 1) * limit;
-
-    const where: any = {};
-    if (role !== "all") where.role = role;
     if (severity !== "all") where.severity = severity;
     if (category !== "all") where.category = category;
+    if (source) where.source = source;
+    if (acknowledged !== "all") where.isAcknowledged = acknowledged === "true";
 
     const [events, total] = await Promise.all([
       prisma.riskEvent.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        skip,
         take: limit,
+        skip,
       }),
       prisma.riskEvent.count({ where }),
     ]);
@@ -553,10 +514,54 @@ router.get("/safety/events", checkPermission(Permission.VIEW_DASHBOARD), async (
   }
 });
 
-router.get("/safety/cases/:id", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+const RiskCaseQuerySchema = z.object({
+  status: z.enum(["all", "open", "in_review", "resolved", "escalated"]).optional().default("all"),
+  severity: z.enum(["all", "low", "medium", "high", "critical"]).optional().default("all"),
+  page: z.coerce.number().min(1).optional().default(1),
+  limit: z.coerce.number().min(1).max(100).optional().default(20),
+});
+
+router.get("/risk-cases", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+  try {
+    const query = RiskCaseQuerySchema.parse(req.query);
+    const { status, severity, page, limit } = query;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (status !== "all") where.status = status;
+    if (severity !== "all") where.severity = severity;
+
+    const [cases, total] = await Promise.all([
+      prisma.riskCase.findMany({
+        where,
+        include: {
+          riskEvents: { take: 5, orderBy: { createdAt: "desc" } },
+          caseNotes: { take: 3, orderBy: { createdAt: "desc" } },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+        skip,
+      }),
+      prisma.riskCase.count({ where }),
+    ]);
+
+    res.json({
+      cases,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    });
+  } catch (error) {
+    console.error("Error fetching risk cases:", error);
+    res.status(500).json({ error: "Failed to fetch risk cases" });
+  }
+});
+
+router.get("/risk-cases/:id", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-
+    
     const riskCase = await prisma.riskCase.findUnique({
       where: { id },
       include: {
@@ -569,52 +574,45 @@ router.get("/safety/cases/:id", checkPermission(Permission.VIEW_DASHBOARD), asyn
       return res.status(404).json({ error: "Risk case not found" });
     }
 
-    let userProfile: any = null;
-    switch (riskCase.role) {
-      case "driver":
-        userProfile = await prisma.driverProfile.findFirst({
-          where: { userId: riskCase.primaryUserId },
-          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-        });
-        break;
-      case "customer":
-        userProfile = await prisma.customerProfile.findFirst({
-          where: { userId: riskCase.primaryUserId },
-          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
-        });
-        break;
-      case "restaurant":
-        userProfile = await prisma.restaurantProfile.findFirst({
-          where: { userId: riskCase.primaryUserId },
-          select: { id: true, name: true, ownerName: true, email: true, phone: true },
-        });
-        break;
+    // Get user profile based on role
+    let userProfile = null;
+    if (riskCase.role === "driver") {
+      userProfile = await prisma.driverProfile.findFirst({
+        where: { userId: riskCase.primaryUserId },
+        select: { id: true, firstName: true, lastName: true, phoneNumber: true },
+      });
+    } else if (riskCase.role === "customer") {
+      userProfile = await prisma.customerProfile.findFirst({
+        where: { userId: riskCase.primaryUserId },
+        select: { id: true, firstName: true, lastName: true, phoneNumber: true },
+      });
+    } else if (riskCase.role === "restaurant") {
+      userProfile = await prisma.restaurantProfile.findFirst({
+        where: { userId: riskCase.primaryUserId },
+        select: { id: true, restaurantName: true, phone: true },
+      });
     }
 
-    res.json({
-      ...riskCase,
-      userProfile,
-    });
+    res.json({ ...riskCase, userProfile });
   } catch (error) {
     console.error("Error fetching risk case:", error);
     res.status(500).json({ error: "Failed to fetch risk case" });
   }
 });
 
-const UpdateCaseSchema = z.object({
+const UpdateRiskCaseSchema = z.object({
   status: z.enum(["open", "in_review", "resolved", "escalated"]).optional(),
-  severity: z.enum(["low", "medium", "high", "critical"]).optional(),
   resolutionNotes: z.string().optional(),
   actionsTaken: z.array(z.string()).optional(),
 });
 
-router.patch("/safety/cases/:id", checkPermission(Permission.MANAGE_USERS), async (req: AuthRequest, res) => {
+router.patch("/risk-cases/:id", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const updates = UpdateCaseSchema.parse(req.body);
+    const data = UpdateRiskCaseSchema.parse(req.body);
 
-    const updateData: any = { ...updates };
-    if (updates.status === "resolved") {
+    const updateData: any = { ...data };
+    if (data.status === "resolved") {
       updateData.resolvedAt = new Date();
     }
 
@@ -623,17 +621,16 @@ router.patch("/safety/cases/:id", checkPermission(Permission.MANAGE_USERS), asyn
       data: updateData,
     });
 
+    // Log audit event
     await logAuditEvent({
-      actorId: req.user?.id,
-      actorEmail: req.user?.email || "admin",
+      actorId: req.user?.userId || null,
+      actorEmail: req.adminProfile?.email || "unknown",
       actorRole: "admin",
-      ipAddress: getClientIp(req),
       actionType: ActionType.UPDATE,
-      entityType: EntityType.OTHER,
+      entityType: EntityType.SETTINGS,
       entityId: id,
-      description: `Updated risk case status to ${updates.status || "updated"}`,
-      metadata: updates,
-      success: true,
+      description: `Updated risk case status to ${data.status}`,
+      ipAddress: getClientIp(req),
     });
 
     res.json(riskCase);
@@ -643,58 +640,57 @@ router.patch("/safety/cases/:id", checkPermission(Permission.MANAGE_USERS), asyn
   }
 });
 
-const AddNoteSchema = z.object({
-  content: z.string().min(1).max(2000),
+const AddCaseNoteSchema = z.object({
+  content: z.string().min(1),
   isInternal: z.boolean().optional().default(true),
 });
 
-router.post("/safety/cases/:id/notes", checkPermission(Permission.MANAGE_USERS), async (req: AuthRequest, res) => {
+router.post("/risk-cases/:id/notes", checkPermission(Permission.MANAGE_USER_STATUS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { content, isInternal } = AddNoteSchema.parse(req.body);
+    const data = AddCaseNoteSchema.parse(req.body);
 
     const note = await prisma.riskCaseNote.create({
       data: {
         riskCaseId: id,
-        adminId: req.adminUser?.id || "",
-        adminEmail: req.user?.email || "admin",
-        content,
-        isInternal,
+        adminId: req.user?.userId || "unknown",
+        adminEmail: req.adminProfile?.email || "unknown",
+        content: data.content,
+        isInternal: data.isInternal,
       },
     });
 
-    res.status(201).json(note);
+    res.json(note);
   } catch (error) {
     console.error("Error adding case note:", error);
     res.status(500).json({ error: "Failed to add case note" });
   }
 });
 
-router.get("/safety/stats", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+// Safety stats for dashboard
+router.get("/safety-stats", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
   try {
     const [
+      totalEvents,
       openCases,
-      criticalCases,
-      todayEvents,
-      unresolvedByCategory,
+      criticalEvents,
+      recentEvents,
     ] = await Promise.all([
+      prisma.riskEvent.count(),
       prisma.riskCase.count({ where: { status: { in: ["open", "in_review"] } } }),
-      prisma.riskCase.count({ where: { severity: "critical", status: { in: ["open", "in_review"] } } }),
-      prisma.riskEvent.count({
-        where: { createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
-      }),
-      prisma.riskEvent.groupBy({
-        by: ["category"],
-        where: { isAcknowledged: false },
-        _count: true,
+      prisma.riskEvent.count({ where: { severity: "critical", isAcknowledged: false } }),
+      prisma.riskEvent.count({ 
+        where: { 
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } 
+        } 
       }),
     ]);
 
     res.json({
+      totalEvents,
       openCases,
-      criticalCases,
-      todayEvents,
-      unresolvedByCategory,
+      criticalEvents,
+      recentEvents,
     });
   } catch (error) {
     console.error("Error fetching safety stats:", error);
@@ -706,7 +702,7 @@ router.get("/safety/stats", checkPermission(Permission.VIEW_DASHBOARD), async (r
 // FEATURE FLAGS ROUTES
 // ====================================================
 
-router.get("/feature-flags", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/feature-flags", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRequest, res) => {
   try {
     const flags = await prisma.featureFlag.findMany({
       orderBy: { createdAt: "desc" },
@@ -718,13 +714,15 @@ router.get("/feature-flags", checkPermission(Permission.VIEW_DASHBOARD), async (
   }
 });
 
-router.get("/feature-flags/:id", checkPermission(Permission.VIEW_DASHBOARD), async (req: AuthRequest, res) => {
+router.get("/feature-flags/:id", checkPermission(Permission.VIEW_SETTINGS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const flag = await prisma.featureFlag.findUnique({ where: { id } });
+    
     if (!flag) {
       return res.status(404).json({ error: "Feature flag not found" });
     }
+    
     res.json(flag);
   } catch (error) {
     console.error("Error fetching feature flag:", error);
@@ -732,20 +730,22 @@ router.get("/feature-flags/:id", checkPermission(Permission.VIEW_DASHBOARD), asy
   }
 });
 
-const CreateFlagSchema = z.object({
-  key: z.string().min(1).max(100).regex(/^[a-z0-9_]+$/),
-  description: z.string().min(1).max(500),
+const CreateFeatureFlagSchema = z.object({
+  key: z.string().min(1).regex(/^[a-z0-9_]+$/, "Key must be lowercase alphanumeric with underscores"),
+  description: z.string().min(1),
   isEnabled: z.boolean().optional().default(false),
   countryScope: z.enum(["GLOBAL", "BD", "US"]).optional().default("GLOBAL"),
-  roleScope: z.string().optional().nullable(),
-  serviceScope: z.string().optional().nullable(),
+  roleScope: z.string().optional(),
+  serviceScope: z.string().optional(),
   rolloutPercentage: z.number().min(0).max(100).optional().default(100),
+  metadata: z.record(z.any()).optional(),
 });
 
-router.post("/feature-flags", checkPermission(Permission.MANAGE_SETTINGS), async (req: AuthRequest, res) => {
+router.post("/feature-flags", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
   try {
-    const data = CreateFlagSchema.parse(req.body);
+    const data = CreateFeatureFlagSchema.parse(req.body);
 
+    // Check if key already exists
     const existing = await prisma.featureFlag.findUnique({ where: { key: data.key } });
     if (existing) {
       return res.status(400).json({ error: "Feature flag with this key already exists" });
@@ -754,21 +754,19 @@ router.post("/feature-flags", checkPermission(Permission.MANAGE_SETTINGS), async
     const flag = await prisma.featureFlag.create({
       data: {
         ...data,
-        createdByAdminId: req.adminUser?.id,
+        createdByAdminId: req.user?.userId,
       },
     });
 
     await logAuditEvent({
-      actorId: req.user?.id,
-      actorEmail: req.user?.email || "admin",
+      actorId: req.user?.userId || null,
+      actorEmail: req.adminProfile?.email || "unknown",
       actorRole: "admin",
-      ipAddress: getClientIp(req),
       actionType: ActionType.CREATE,
-      entityType: EntityType.OTHER,
+      entityType: EntityType.SETTINGS,
       entityId: flag.id,
       description: `Created feature flag: ${data.key}`,
-      metadata: data,
-      success: true,
+      ipAddress: getClientIp(req),
     });
 
     res.status(201).json(flag);
@@ -778,39 +776,38 @@ router.post("/feature-flags", checkPermission(Permission.MANAGE_SETTINGS), async
   }
 });
 
-const UpdateFlagSchema = z.object({
-  description: z.string().min(1).max(500).optional(),
+const UpdateFeatureFlagSchema = z.object({
+  description: z.string().optional(),
   isEnabled: z.boolean().optional(),
   countryScope: z.enum(["GLOBAL", "BD", "US"]).optional(),
-  roleScope: z.string().optional().nullable(),
-  serviceScope: z.string().optional().nullable(),
+  roleScope: z.string().optional(),
+  serviceScope: z.string().optional(),
   rolloutPercentage: z.number().min(0).max(100).optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
-router.patch("/feature-flags/:id", checkPermission(Permission.MANAGE_SETTINGS), async (req: AuthRequest, res) => {
+router.patch("/feature-flags/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const data = UpdateFlagSchema.parse(req.body);
+    const data = UpdateFeatureFlagSchema.parse(req.body);
 
     const flag = await prisma.featureFlag.update({
       where: { id },
       data: {
         ...data,
-        updatedByAdminId: req.adminUser?.id,
+        updatedByAdminId: req.user?.userId,
       },
     });
 
     await logAuditEvent({
-      actorId: req.user?.id,
-      actorEmail: req.user?.email || "admin",
+      actorId: req.user?.userId || null,
+      actorEmail: req.adminProfile?.email || "unknown",
       actorRole: "admin",
-      ipAddress: getClientIp(req),
       actionType: ActionType.UPDATE,
-      entityType: EntityType.OTHER,
-      entityId: flag.id,
+      entityType: EntityType.SETTINGS,
+      entityId: id,
       description: `Updated feature flag: ${flag.key}`,
-      metadata: data,
-      success: true,
+      ipAddress: getClientIp(req),
     });
 
     res.json(flag);
@@ -820,7 +817,7 @@ router.patch("/feature-flags/:id", checkPermission(Permission.MANAGE_SETTINGS), 
   }
 });
 
-router.delete("/feature-flags/:id", checkPermission(Permission.MANAGE_SETTINGS), async (req: AuthRequest, res) => {
+router.delete("/feature-flags/:id", checkPermission(Permission.EDIT_SETTINGS), async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -832,15 +829,14 @@ router.delete("/feature-flags/:id", checkPermission(Permission.MANAGE_SETTINGS),
     await prisma.featureFlag.delete({ where: { id } });
 
     await logAuditEvent({
-      actorId: req.user?.id,
-      actorEmail: req.user?.email || "admin",
+      actorId: req.user?.userId || null,
+      actorEmail: req.adminProfile?.email || "unknown",
       actorRole: "admin",
-      ipAddress: getClientIp(req),
       actionType: ActionType.DELETE,
-      entityType: EntityType.OTHER,
+      entityType: EntityType.SETTINGS,
       entityId: id,
       description: `Deleted feature flag: ${flag.key}`,
-      success: true,
+      ipAddress: getClientIp(req),
     });
 
     res.json({ success: true });
@@ -849,73 +845,5 @@ router.delete("/feature-flags/:id", checkPermission(Permission.MANAGE_SETTINGS),
     res.status(500).json({ error: "Failed to delete feature flag" });
   }
 });
-
-// ====================================================
-// HELPER FUNCTIONS
-// ====================================================
-
-function calculateCustomerKycCompleteness(customer: any): number {
-  const countryCode = customer.countryCode || "BD";
-  let total = 0;
-  let completed = 0;
-
-  if (countryCode === "BD") {
-    total = 6;
-    if (customer.fatherName) completed++;
-    if (customer.dateOfBirth) completed++;
-    if (customer.presentAddress) completed++;
-    if (customer.permanentAddress) completed++;
-    if (customer.nidEncrypted || customer.nidNumber) completed++;
-    if (customer.emergencyContactName && customer.emergencyContactPhone) completed++;
-  } else {
-    total = 4;
-    if (customer.dateOfBirth) completed++;
-    if (customer.homeAddress) completed++;
-    if (customer.governmentIdType && customer.governmentIdLast4Encrypted) completed++;
-    if (customer.emergencyContactName && customer.emergencyContactPhone) completed++;
-  }
-
-  return Math.round((completed / total) * 100);
-}
-
-function calculateDriverKycCompleteness(driver: any): number {
-  const countryCode = driver.countryCode || "BD";
-  let total = 0;
-  let completed = 0;
-
-  if (countryCode === "BD") {
-    total = 6;
-    if (driver.profilePhotoUrl) completed++;
-    if (driver.fatherName) completed++;
-    if (driver.dateOfBirth) completed++;
-    if (driver.presentAddress) completed++;
-    if (driver.nidEncrypted || driver.nidNumber) completed++;
-    if (driver.emergencyContactName && driver.emergencyContactPhone) completed++;
-  } else {
-    total = 7;
-    if (driver.profilePhotoUrl) completed++;
-    if (driver.firstName && driver.lastName) completed++;
-    if (driver.dateOfBirth) completed++;
-    if (driver.homeAddress) completed++;
-    if (driver.dmvLicenseFrontUrl && driver.dmvLicenseBackUrl) completed++;
-    if (driver.dmvLicenseExpiry) completed++;
-    if (driver.emergencyContactName && driver.emergencyContactPhone) completed++;
-  }
-
-  return Math.round((completed / total) * 100);
-}
-
-function calculateRestaurantKycCompleteness(restaurant: any): number {
-  let total = 5;
-  let completed = 0;
-
-  if (restaurant.name) completed++;
-  if (restaurant.address) completed++;
-  if (restaurant.phone) completed++;
-  if (restaurant.businessLicenseNumber || restaurant.businessLicenseUrl) completed++;
-  if (restaurant.ownerName) completed++;
-
-  return Math.round((completed / total) * 100);
-}
 
 export default router;
