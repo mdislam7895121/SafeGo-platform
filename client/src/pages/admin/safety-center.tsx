@@ -160,13 +160,13 @@ function CaseDetailPanel({
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["/api/admin/safety/cases", caseId],
+    queryKey: ["/api/admin/risk-cases", caseId],
     enabled: !!caseId,
   });
 
   const updateCaseMutation = useMutation({
     mutationFn: async (updates: any) => {
-      const response = await apiRequest(`/api/admin/safety/cases/${caseId}`, {
+      const response = await apiRequest(`/api/admin/risk-cases/${caseId}`, {
         method: "PATCH",
         body: JSON.stringify(updates),
         headers: { "Content-Type": "application/json" },
@@ -185,7 +185,7 @@ function CaseDetailPanel({
 
   const addNoteMutation = useMutation({
     mutationFn: async (data: { content: string; isInternal: boolean }) => {
-      const response = await apiRequest(`/api/admin/safety/cases/${caseId}/notes`, {
+      const response = await apiRequest(`/api/admin/risk-cases/${caseId}/notes`, {
         method: "POST",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
@@ -421,7 +421,7 @@ export default function SafetyCenter() {
   const [quickFilter, setQuickFilter] = useState("all");
 
   const { data: stats, isLoading: isLoadingStats, refetch: refetchStats } = useQuery<SafetyStats>({
-    queryKey: ["/api/admin/safety/stats"],
+    queryKey: ["/api/admin/safety-stats"],
     refetchInterval: 30000,
   });
 
@@ -430,13 +430,13 @@ export default function SafetyCenter() {
     isLoading: isLoadingCases,
     refetch: refetchCases,
   } = useQuery({
-    queryKey: ["/api/admin/safety/cases", filters],
+    queryKey: ["/api/admin/risk-cases", filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value && value !== "all") params.set(key, String(value));
       });
-      const res = await fetchWithAuth(`/api/admin/safety/cases?${params.toString()}`, {
+      const res = await fetchWithAuth(`/api/admin/risk-cases?${params.toString()}`, {
         headers: { "Content-Type": "application/json" },
       });
       await throwIfResNotOk(res);
@@ -446,13 +446,13 @@ export default function SafetyCenter() {
   });
 
   const { data: eventsData, isLoading: isLoadingEvents } = useQuery({
-    queryKey: ["/api/admin/safety/events", filters],
+    queryKey: ["/api/admin/risk-events", filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value && value !== "all") params.set(key, String(value));
       });
-      const res = await fetchWithAuth(`/api/admin/safety/events?${params.toString()}`, {
+      const res = await fetchWithAuth(`/api/admin/risk-events?${params.toString()}`, {
         headers: { "Content-Type": "application/json" },
       });
       await throwIfResNotOk(res);

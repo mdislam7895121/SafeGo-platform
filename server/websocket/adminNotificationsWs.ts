@@ -65,13 +65,15 @@ export function setupAdminNotificationsWebSocket(server: HTTPServer) {
     try {
       const decoded = jwt.verify(token, JWT_SECRET) as { id: string; role: string };
       
-      const admin = await prisma.adminAccount.findUnique({
+      const admin = await prisma.adminProfile.findUnique({
         where: { userId: decoded.id },
         select: { 
           id: true, 
-          email: true, 
           adminRole: true,
           countryCode: true,
+          user: {
+            select: { email: true }
+          }
         },
       });
 
@@ -82,7 +84,7 @@ export function setupAdminNotificationsWebSocket(server: HTTPServer) {
       }
 
       ws.adminId = admin.id;
-      ws.adminEmail = admin.email;
+      ws.adminEmail = admin.user.email;
       ws.adminRole = admin.adminRole;
       ws.countryCode = admin.countryCode || undefined;
 
@@ -183,7 +185,7 @@ async function handleAdminMessage(ws: AuthenticatedAdminSocket, message: { type:
           payload: { notificationId: message.payload.notificationId, success: true },
         });
 
-        for (const [adminId, adminWs] of adminConnections.entries()) {
+        for (const [adminId, adminWs] of Array.from(adminConnections.entries())) {
           if (adminWs.readyState === WebSocket.OPEN) {
             const adminCountFilter = getScopedCountFilter(adminWs);
             const adminCount = await prisma.adminNotification.count({
@@ -246,7 +248,7 @@ export async function notifyAdmins(notification: {
     payload: notification,
   }, notification.countryCode || undefined);
 
-  for (const [adminId, ws] of adminConnections.entries()) {
+  for (const [adminId, ws] of Array.from(adminConnections.entries())) {
     if (ws.readyState === WebSocket.OPEN) {
       const countFilter = getScopedCountFilter(ws);
       const count = await prisma.adminNotification.count({

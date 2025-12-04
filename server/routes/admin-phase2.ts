@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { AuthRequest, loadAdminProfile, checkPermission } from "../middleware/auth";
 import { authenticateToken, requireAdmin } from "../middleware/authz";
@@ -9,9 +9,23 @@ import crypto from "crypto";
 
 const router = Router();
 
+const PHASE2_FEATURES_ENABLED = process.env.PHASE2_FEATURES_ENABLED === 'true';
+
+const phase2FeatureGuard = (req: Request, res: Response, next: NextFunction) => {
+  if (!PHASE2_FEATURES_ENABLED) {
+    return res.status(503).json({
+      error: "Feature not yet available",
+      message: "Phase 2 admin features are in development.",
+      phase: 2
+    });
+  }
+  next();
+};
+
 router.use(authenticateToken);
 router.use(requireAdmin());
 router.use(loadAdminProfile);
+router.use(phase2FeatureGuard);
 
 // ====================================================
 // RBAC V3: PERMISSION BUNDLES API
