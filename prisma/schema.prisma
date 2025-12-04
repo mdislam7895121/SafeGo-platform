@@ -8054,3 +8054,677 @@ model AutomationLog {
   @@index([automationType, status])
   @@map("automation_logs")
 }
+
+// ===================================================
+// AUTOMATION MODULE 1, 2, 14, 15: RISK SCORING SYSTEM
+// ===================================================
+enum RiskScoreType {
+  customer_abuse
+  partner_fraud
+  payment_risk
+  partner_risk_monitor
+  order_risk
+  driver_fatigue
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+  critical
+}
+
+model RiskScore {
+  id                      String                        @id @default(uuid())
+  
+  entityType              String                        // customer, restaurant, shop, driver, order
+  entityId                String                        // ID of the scored entity
+  scoreType               RiskScoreType                 // Type of risk being scored
+  
+  score                   Float                         // 0-100 risk score
+  riskLevel               RiskLevel                     @default(low)
+  
+  factors                 Json?                         // Detailed breakdown of risk factors
+  trend                   String?                       // improving, stable, worsening
+  
+  abuseMetrics            Json?                         // For customer abuse: refund_count, cancel_count, location_manipulation_count
+  fraudMetrics            Json?                         // For partner fraud: fake_orders, self_orders, cancellation_spikes
+  paymentMetrics          Json?                         // For payment risk: success_rate, refund_ratio, chargeback_count
+  
+  restricted              Boolean                       @default(false)
+  restrictedAt            DateTime?
+  restrictionReason       String?
+  codRestricted           Boolean                       @default(false) // For payment scoring - restrict COD
+  
+  calculatedAt            DateTime                      @default(now())
+  expiresAt               DateTime?
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@unique([entityType, entityId, scoreType])
+  @@index([entityType, entityId])
+  @@index([scoreType])
+  @@index([riskLevel])
+  @@index([restricted])
+  @@map("risk_scores")
+}
+
+// ===================================================
+// AUTOMATION MODULE 3: ORDER SUCCESS PREDICTION
+// ===================================================
+model OrderRiskPrediction {
+  id                      String                        @id @default(uuid())
+  
+  orderType               String                        // ride, food, parcel, shop, ticket, rental
+  orderId                 String                        // Reference to the order
+  
+  cancellationProbability Float                         // 0-1 probability of cancellation
+  paymentFailureProbability Float                       // 0-1 probability of payment failure
+  delayProbability        Float                         // 0-1 probability of delay
+  
+  overallRiskLevel        RiskLevel                     @default(low)
+  riskScore               Float                         // 0-100 combined risk score
+  
+  riskFactors             Json?                         // Detailed factors contributing to risk
+  recommendations         Json?                         // Suggested actions (e.g., require prepayment)
+  
+  dispatchAdjustment      Json?                         // Adjustments made to dispatch logic
+  dispatchPriorityBoost   Float?                        // Priority adjustment for low-risk orders
+  
+  predictedAt             DateTime                      @default(now())
+  actualOutcome           String?                       // completed, cancelled, payment_failed, delayed
+  outcomeRecordedAt       DateTime?
+  
+  predictionAccuracy      Float?                        // For ML feedback loop
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([orderType, orderId])
+  @@index([overallRiskLevel])
+  @@index([predictedAt])
+  @@map("order_risk_predictions")
+}
+
+// ===================================================
+// AUTOMATION MODULE 4: DRIVER FATIGUE DETECTION
+// ===================================================
+model DriverFatigueLog {
+  id                      String                        @id @default(uuid())
+  
+  driverId                String
+  
+  sessionStartTime        DateTime                      // When driver started working
+  sessionDuration         Int                           // Minutes of continuous work
+  tripCount               Int                           // Number of trips in session
+  
+  fatigueIndex            Float                         // 0-100 fatigue score
+  fatigueLevel            String                        @default("normal") // normal, mild, moderate, severe, critical
+  
+  indicators              Json?                         // Response delays, speed changes, etc.
+  avgResponseDelay        Float?                        // Average delay in accepting orders (seconds)
+  speedVariance           Float?                        // Variance in driving speed
+  hardBrakingCount        Int?                          // Number of hard braking events
+  
+  breakRecommended        Boolean                       @default(false)
+  breakRecommendedAt      DateTime?
+  breakNotificationSent   Boolean                       @default(false)
+  breakTaken              Boolean                       @default(false)
+  breakTakenAt            DateTime?
+  
+  forcedOfflineAt         DateTime?                     // If system forced driver offline
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([driverId])
+  @@index([fatigueLevel])
+  @@index([breakRecommended])
+  @@index([createdAt])
+  @@map("driver_fatigue_logs")
+}
+
+// ===================================================
+// AUTOMATION MODULE 5: DEMAND SENSING
+// ===================================================
+model DemandSignal {
+  id                      String                        @id @default(uuid())
+  
+  areaId                  String                        // Zone/area identifier
+  areaName                String?
+  cityCode                String?
+  
+  latitude                Float?
+  longitude               Float?
+  radiusKm                Float                         @default(5)
+  
+  serviceType             String                        // ride, food, parcel, shop
+  
+  demandLevel             Float                         // 0-100 demand intensity
+  supplyLevel             Float                         // 0-100 supply (driver/partner availability)
+  imbalanceScore          Float                         // Demand-supply gap (-100 to +100)
+  
+  activeOrders            Int                           @default(0)
+  activeDrivers           Int                           @default(0)
+  activeRestaurants       Int                           @default(0)
+  activeShops             Int                           @default(0)
+  
+  predictedDemand15Min    Float?                        // Predicted demand in 15 minutes
+  predictedDemand30Min    Float?                        // Predicted demand in 30 minutes
+  predictedDemand60Min    Float?                        // Predicted demand in 60 minutes
+  
+  surgeRecommended        Boolean                       @default(false)
+  suggestedSurgeMultiplier Float?
+  
+  isHotZone               Boolean                       @default(false)
+  isLowDriverZone         Boolean                       @default(false)
+  isHighShopLoad          Boolean                       @default(false)
+  
+  generatedAt             DateTime                      @default(now())
+  expiresAt               DateTime
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([areaId])
+  @@index([serviceType])
+  @@index([isHotZone])
+  @@index([generatedAt])
+  @@map("demand_signals")
+}
+
+// ===================================================
+// AUTOMATION MODULE 6: TRAFFIC & ETA CORRECTION
+// ===================================================
+model TrafficSnapshot {
+  id                      String                        @id @default(uuid())
+  
+  areaId                  String
+  areaName                String?
+  
+  latitude                Float?
+  longitude               Float?
+  
+  avgSpeedKmh             Float?                        // Average traffic speed
+  congestionLevel         String                        @default("normal") // free_flow, light, moderate, heavy, severe
+  congestionScore         Float                         // 0-100, higher = more congested
+  
+  weatherCondition        String?                       // clear, rain, fog, storm
+  weatherImpactScore      Float?                        // 0-100, weather impact on travel time
+  
+  timeOfDay               String                        // morning_rush, midday, evening_rush, night
+  dayOfWeek               String                        // monday-sunday
+  isHoliday               Boolean                       @default(false)
+  isWeekend               Boolean                       @default(false)
+  
+  historicalAvgSpeed      Float?                        // Average speed for this time/day historically
+  currentVsHistorical     Float?                        // Ratio of current vs historical speed
+  
+  etaMultiplier           Float                         @default(1.0) // Factor to adjust base ETA
+  etaAdjustmentMinutes    Int                           @default(0)   // Fixed minutes to add/subtract
+  
+  source                  String                        @default("internal") // internal, google_maps, historical
+  confidence              Float                         @default(0.8) // 0-1 confidence in the snapshot
+  
+  observedAt              DateTime                      @default(now())
+  expiresAt               DateTime
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([areaId])
+  @@index([congestionLevel])
+  @@index([observedAt])
+  @@map("traffic_snapshots")
+}
+
+// ===================================================
+// AUTOMATION MODULE 7: INVENTORY FORECASTING
+// ===================================================
+model InventoryForecast {
+  id                      String                        @id @default(uuid())
+  
+  shopId                  String?                       // For shop products
+  restaurantId            String?                       // For restaurant menu items
+  
+  itemId                  String                        // Product/menu item ID
+  itemName                String?
+  itemType                String                        // product, menu_item
+  
+  currentStock            Int?
+  avgDailySales           Float?                        // Average daily sales
+  salesTrend              String                        @default("stable") // trending_up, stable, trending_down
+  trendPercentage         Float?                        // Percentage change in sales trend
+  
+  forecastHorizon         Int                           @default(7) // Days to forecast
+  expectedDepletion       DateTime?                     // When stock will run out
+  expectedDemand          Float?                        // Expected demand in forecast period
+  
+  stockoutRisk            RiskLevel                     @default(low)
+  stockoutProbability     Float?                        // 0-1 probability of stockout
+  
+  restockRecommendation   Int?                          // Recommended restock quantity
+  restockUrgency          String                        @default("normal") // normal, soon, urgent, critical
+  
+  alertSent               Boolean                       @default(false)
+  alertSentAt             DateTime?
+  
+  isTrendingItem          Boolean                       @default(false)
+  
+  generatedAt             DateTime                      @default(now())
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([shopId])
+  @@index([restaurantId])
+  @@index([itemId])
+  @@index([stockoutRisk])
+  @@map("inventory_forecasts")
+}
+
+// ===================================================
+// AUTOMATION MODULE 8: REPEAT PURCHASE TRIGGER
+// ===================================================
+model RepeatPurchaseTrigger {
+  id                      String                        @id @default(uuid())
+  
+  customerId              String
+  
+  segmentKey              String                        // food_regular, grocery_weekly, accessories_monthly
+  category                String                        // food, grocery, accessories, ride, etc.
+  
+  lastOrderId             String?
+  lastOrderAt             DateTime?
+  lastOrderItems          Json?                         // Items from last order
+  
+  avgOrderFrequencyDays   Float?                        // Average days between orders
+  predictedNextOrderDate  DateTime?
+  
+  nextBestAction          String?                       // remind_reorder, suggest_similar, offer_discount
+  triggerType             String                        @default("reminder") // reminder, suggestion, promotion
+  
+  triggerScheduledAt      DateTime?
+  triggeredAt             DateTime?
+  notificationSent        Boolean                       @default(false)
+  notificationId          String?
+  
+  status                  String                        @default("pending") // pending, triggered, completed, expired
+  responseAction          String?                       // ordered, dismissed, ignored
+  responseAt              DateTime?
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([customerId])
+  @@index([segmentKey])
+  @@index([status])
+  @@index([triggerScheduledAt])
+  @@map("repeat_purchase_triggers")
+}
+
+// ===================================================
+// AUTOMATION MODULE 9: NEGATIVE REVIEW RECOVERY
+// ===================================================
+model ReviewRecoveryPlan {
+  id                      String                        @id @default(uuid())
+  
+  reviewId                String                        @unique
+  reviewType              String                        // ride, food_order, shop_order, rental
+  
+  entityType              String                        // driver, restaurant, shop, rental_operator
+  entityId                String
+  customerId              String
+  
+  rating                  Int                           // 1-5 star rating
+  reviewText              String?
+  
+  severity                String                        @default("moderate") // mild (3 stars), moderate (2 stars), severe (1 star)
+  issueCategories         Json?                         // Categories of issues identified
+  
+  recommendedAction       String                        @default("apology") // apology, coupon, refund, escalate
+  couponCode              String?
+  couponValue             Decimal?                      @db.Decimal(10, 2)
+  couponType              String?                       // percentage, fixed_amount
+  
+  apologyMessage          String?
+  apologyMessageGenerated Boolean                       @default(false)
+  
+  notificationSent        Boolean                       @default(false)
+  notificationSentAt      DateTime?
+  
+  status                  String                        @default("pending") // pending, action_taken, resolved, escalated
+  ownerRole               String?                       // admin, partner, support
+  
+  partnerNotified         Boolean                       @default(false)
+  partnerNotifiedAt       DateTime?
+  
+  followUpAt              DateTime?
+  resolvedAt              DateTime?
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([entityType, entityId])
+  @@index([customerId])
+  @@index([severity])
+  @@index([status])
+  @@map("review_recovery_plans")
+}
+
+// ===================================================
+// AUTOMATION MODULE 10: SEASONAL BUSINESS INTELLIGENCE
+// ===================================================
+model SeasonalInsight {
+  id                      String                        @id @default(uuid())
+  
+  seasonKey               String                        // eid, puja, winter, summer, christmas, new_year, ramadan
+  seasonName              String
+  seasonType              String                        // religious, weather, holiday, cultural
+  
+  countryCode             String?
+  cityCode                String?
+  
+  startDate               DateTime
+  endDate                 DateTime
+  isActive                Boolean                       @default(false)
+  
+  serviceType             String?                       // ride, food, parcel, shop, all
+  
+  metrics                 Json?                         // Historical metrics for this season
+  demandMultiplier        Float                         @default(1.0)
+  expectedDemandChange    Float?                        // Percentage change from baseline
+  
+  popularCategories       Json?                         // Popular product/service categories
+  trendingItems           Json?                         // Trending items during this season
+  
+  recommendedOffers       Json?                         // Suggested partner offers
+  suggestedPricing        Json?                         // Suggested pricing adjustments
+  
+  partnerInsights         Json?                         // Insights for partners
+  customerInsights        Json?                         // Insights for marketing
+  
+  generatedAt             DateTime                      @default(now())
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@unique([seasonKey, countryCode, cityCode])
+  @@index([seasonKey])
+  @@index([isActive])
+  @@index([startDate])
+  @@map("seasonal_insights")
+}
+
+// ===================================================
+// AUTOMATION MODULE 11 & 12: SERVER SCALING & DEVOPS
+// ===================================================
+enum ScalingPolicyType {
+  server_auto_scaling
+  deployment_pipeline
+  cost_optimization
+}
+
+model ScalingPolicy {
+  id                      String                        @id @default(uuid())
+  
+  policyType              ScalingPolicyType
+  policyName              String
+  description             String?
+  
+  isActive                Boolean                       @default(true)
+  
+  minInstances            Int                           @default(1)
+  maxInstances            Int                           @default(10)
+  desiredInstances        Int                           @default(2)
+  currentInstances        Int                           @default(1)
+  
+  scaleMetric             String                        // cpu, memory, requests_per_second, queue_depth
+  scaleUpThreshold        Float                         // e.g., 80% CPU
+  scaleDownThreshold      Float                         // e.g., 30% CPU
+  cooldownSeconds         Int                           @default(300)
+  
+  thresholds              Json?                         // Complex threshold rules
+  costOptimization        Json?                         // Off-peak scaling rules
+  
+  peakHoursConfig         Json?                         // Peak hours configuration
+  offPeakConfig           Json?                         // Off-peak configuration
+  
+  lastEvaluatedAt         DateTime?
+  lastScaledAt            DateTime?
+  lastScaleAction         String?                       // scale_up, scale_down, no_change
+  
+  deploymentRuns          DeploymentRun[]
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([policyType])
+  @@index([isActive])
+  @@map("scaling_policies")
+}
+
+model DeploymentRun {
+  id                      String                        @id @default(uuid())
+  
+  policyId                String
+  policy                  ScalingPolicy                 @relation(fields: [policyId], references: [id])
+  
+  runNumber               Int
+  
+  triggerType             String                        // manual, scheduled, commit, tag
+  triggeredBy             String?                       // User ID or system
+  
+  stages                  Json?                         // Build, Test, Deploy stages
+  currentStage            String?                       // Current stage being executed
+  
+  buildStatus             String                        @default("pending") // pending, running, success, failed
+  testStatus              String                        @default("pending")
+  deployStatus            String                        @default("pending")
+  
+  status                  String                        @default("pending") // pending, running, success, failed, rolled_back
+  
+  commitHash              String?
+  branch                  String?
+  version                 String?
+  
+  startedAt               DateTime?
+  buildCompletedAt        DateTime?
+  testsCompletedAt        DateTime?
+  deployCompletedAt       DateTime?
+  completedAt             DateTime?
+  
+  duration                Int?                          // Total duration in seconds
+  
+  result                  Json?                         // Detailed results
+  logs                    Json?                         // Deployment logs
+  errors                  Json?                         // Any errors encountered
+  
+  rollbackAvailable       Boolean                       @default(false)
+  rolledBackAt            DateTime?
+  rolledBackBy            String?
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([policyId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("deployment_runs")
+}
+
+// ===================================================
+// AUTOMATION MODULE 13: EMPLOYEE PRODUCTIVITY
+// ===================================================
+model EmployeeProductivityMetric {
+  id                      String                        @id @default(uuid())
+  
+  teamId                  String?
+  teamName                String?
+  
+  memberId                String                        // User ID of employee
+  memberName              String?
+  memberRole              String?                       // support, finance, compliance, etc.
+  
+  metricKey               String                        // tickets_resolved, avg_response_time, completion_rate
+  metricName              String?
+  
+  value                   Float
+  unit                    String?                       // count, minutes, percentage
+  
+  period                  String                        // daily, weekly, monthly
+  periodStart             DateTime
+  periodEnd               DateTime
+  
+  target                  Float?                        // Target value for this metric
+  targetMet               Boolean                       @default(false)
+  performance             String                        @default("average") // below_average, average, above_average, excellent
+  
+  tasksAssigned           Int?
+  tasksCompleted          Int?
+  avgResponseTimeMinutes  Float?
+  avgResolutionTimeMinutes Float?
+  
+  breakdown               Json?                         // Detailed breakdown of work
+  
+  capturedAt              DateTime                      @default(now())
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([memberId])
+  @@index([teamId])
+  @@index([metricKey])
+  @@index([period])
+  @@index([periodStart])
+  @@map("employee_productivity_metrics")
+}
+
+// ===================================================
+// AUTOMATION MODULE 16: REFUND OPTIMIZATION
+// ===================================================
+enum RefundDecisionType {
+  no_refund
+  partial_refund
+  full_refund
+  credit_only
+  replacement
+}
+
+enum RefundFaultParty {
+  customer
+  driver
+  restaurant
+  shop
+  system
+  unknown
+}
+
+model RefundDecision {
+  id                      String                        @id @default(uuid())
+  
+  orderType               String                        // ride, food, parcel, shop, ticket, rental
+  orderId                 String
+  
+  complaintId             String?
+  issueType               String                        // late_delivery, wrong_item, damaged, not_received, quality_issue
+  issueDescription        String?
+  
+  originalAmount          Decimal                       @db.Decimal(10, 2)
+  recommendedRefund       Decimal                       @db.Decimal(10, 2)
+  actualRefund            Decimal?                      @db.Decimal(10, 2)
+  
+  decisionType            RefundDecisionType            @default(no_refund)
+  faultParty              RefundFaultParty              @default(unknown)
+  faultConfidence         Float?                        // 0-1 confidence in fault determination
+  
+  decisionFactors         Json?                         // Factors that led to decision
+  customerHistory         Json?                         // Customer's refund history
+  partnerHistory          Json?                         // Partner's issue history
+  
+  autoApproved            Boolean                       @default(false)
+  autoApprovedReason      String?
+  requiresManualReview    Boolean                       @default(false)
+  
+  adminReviewedBy         String?
+  adminReviewedAt         DateTime?
+  adminDecision           String?                       // approved, modified, rejected
+  adminNotes              String?
+  
+  customerNotified        Boolean                       @default(false)
+  partnerNotified         Boolean                       @default(false)
+  
+  processingStatus        String                        @default("pending") // pending, processing, completed, failed
+  refundProcessedAt       DateTime?
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([orderType, orderId])
+  @@index([decisionType])
+  @@index([faultParty])
+  @@index([processingStatus])
+  @@map("refund_decisions")
+}
+
+// ===================================================
+// AUTOMATION MODULE 17: MARKETING BUDGET OPTIMIZATION
+// ===================================================
+model MarketingBudgetPlan {
+  id                      String                        @id @default(uuid())
+  
+  planName                String
+  planPeriod              String                        // daily, weekly, monthly, campaign
+  
+  countryCode             String?
+  cityCode                String?
+  areaId                  String?
+  
+  segmentId               String?                       // Target customer segment
+  segmentName             String?
+  
+  serviceType             String?                       // ride, food, parcel, shop, all
+  campaignType            String?                       // acquisition, retention, reactivation
+  
+  totalBudget             Decimal                       @db.Decimal(12, 2)
+  allocatedBudget         Decimal                       @db.Decimal(12, 2)
+  spentBudget             Decimal                       @db.Decimal(12, 2) @default(0)
+  remainingBudget         Decimal                       @db.Decimal(12, 2)
+  
+  spendCap                Decimal?                      @db.Decimal(12, 2) // Daily spend cap
+  
+  allocationByChannel     Json?                         // Budget split by channel (push, email, sms, ads)
+  allocationByTime        Json?                         // Budget split by time slots
+  allocationByArea        Json?                         // Budget split by areas
+  
+  predictedROI            Float?                        // Predicted return on investment
+  actualROI               Float?                        // Actual ROI achieved
+  
+  conversionRate          Float?                        // Current conversion rate
+  targetConversionRate    Float?                        // Target conversion rate
+  
+  impressions             Int                           @default(0)
+  clicks                  Int                           @default(0)
+  conversions             Int                           @default(0)
+  
+  activeCampaigns         Json?                         // Active campaign details
+  
+  optimizationRecommendations Json?                     // AI-suggested optimizations
+  budgetReallocationSuggestion Json?                    // Suggested budget reallocation
+  
+  evaluationWindow        Int                           @default(7) // Days for evaluation
+  lastEvaluatedAt         DateTime?
+  nextEvaluationAt        DateTime?
+  
+  status                  String                        @default("draft") // draft, active, paused, completed
+  
+  createdAt               DateTime                      @default(now())
+  updatedAt               DateTime                      @updatedAt
+  
+  @@index([planPeriod])
+  @@index([countryCode])
+  @@index([serviceType])
+  @@index([status])
+  @@map("marketing_budget_plans")
+}

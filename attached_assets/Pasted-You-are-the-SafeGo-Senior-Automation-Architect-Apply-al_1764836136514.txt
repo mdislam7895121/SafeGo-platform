@@ -1,0 +1,145 @@
+You are the SafeGo Senior Automation Architect.  
+Apply all SafeGo global rules, security rules, onboarding rules, role rules, and existing architecture.  
+Do NOT break live systems, do NOT overwrite existing business logic, and do NOT modify customer signup flow.
+
+Your task is to implement the FULL AUTOMATION UPGRADE (17 modules) across Customer, Driver, Shop, Restaurant, Ticket, Rental, and Admin systems — end-to-end, production-ready.
+
+You must follow the serial order strictly.  
+Each automation must be fully implemented with:
+
+• backend logic  
+• database fields  
+• background jobs  
+• AI/ML logic (simple rule-based or lightweight models)  
+• admin dashboards (if needed)  
+• partner visibility  
+• customer visibility  
+• notifications  
+• logs and audit trails  
+• risk scoring  
+• config files  
+• tests (unit + e2e)  
+
+Do NOT skip any step or create placeholders.  
+Deliver fully working code.
+
+------------------------------------------
+SAFEGO AUTOMATION MODULES (Implement All)
+------------------------------------------
+
+1. Auto-Customer Abuse & Misbehavior Detection  
+   - Detect refund abuse, repeated cancellations, location manipulation.  
+   - Auto-flag → restrict high-risk users.  
+   - Add customer_risk_score in DB.  
+   - Add admin risk dashboard.
+
+2. Auto-Restaurant/Shop Fraud Pattern Mapping  
+   - Detect fake orders, repeated self-orders, abnormal cancellation spikes.  
+   - Auto-flag shop/restaurant with partner_risk_score.  
+   - Add fraud logs.
+
+3. Auto-Order Success Prediction Engine  
+   - Predict cancellation chance, payment failure, delay probability.  
+   - Return “order_risk_level” before accept.  
+   - Adjust dispatch logic based on risk.
+
+4. Auto-Driver Fatigue Detection System  
+   - Detect long continuous sessions, response delay, sharp speed changes.  
+   - Auto-send break recommendations.  
+   - Add driver_fatigue_index in DB.
+
+5. Auto-Demand Sensing (Area Wise)  
+   - Detect hot zones, low-driver areas, high shop-load areas.  
+   - Auto-suggest surge pricing.  
+   - Update admin map analytics.
+
+6. Auto-Traffic Condition ETA Correction  
+   - Use historical traffic patterns, weather, time-of-day signals.  
+   - Override base ETA system-wide.
+
+7. Auto-Inventory Forecasting for Shops  
+   - Detect trending items, predict stock-out risks.  
+   - Auto-send restock alerts to partners.
+
+8. Auto-Repeat Purchase Trigger  
+   - Customer behavior tracking (food, grocery, accessories).  
+   - Auto-trigger reminder push notifications.
+
+9. Auto-Negative Review Recovery  
+   - Detect reviews <= 3 stars.  
+   - Auto generate apology + optional coupon.  
+   - Log in admin dashboard.
+
+10. Auto-Seasonal Business Intelligence  
+   - Detect seasonal patterns (Eid, Puja, Winter, Summer).  
+   - Suggest partner offers.  
+   - Add seasonal insights panel.
+
+11. Auto-Server Scaling (Backend Level)  
+   - Add auto-scaling rules.  
+   - Auto-minimize cost during off-peak.  
+   - Include monitoring logs.
+
+12. Auto-DevOps Deployment Pipeline  
+   - Build → Test → Deploy automation.  
+   - Fully integrated to SafeGo’s repo.  
+   - Do not disrupt production.
+
+13. Auto-Employee Productivity Dashboard  
+   - Track internal team tasks, response times, completion rate.  
+   - Add management dashboard.
+
+14. Auto-Customer Payment Scoring  
+   - Score customers: success rate, refunds, risk flags.  
+   - High-risk → restrict COD.  
+   - Add scoring in payments API.
+
+15. Auto-Partner Risk Monitoring  
+   - Track partner cancellation, late completion, issues.  
+   - Auto-adjust partner_risk_score.  
+   - Admin analytics included.
+
+16. Auto-Refund Optimization Engine  
+   - Auto-determine refund type (none, partial, full).  
+   - Classify issues: customer, driver, shop.  
+   - Add refund decision logs.
+
+17. Auto-Marketing Budget Optimization  
+   - Auto-allocate ad budget by area, time, and conversion rate.  
+   - Add marketing analytics dashboard.
+
+------------------------------------------
+DELIVERY REQUIREMENTS
+------------------------------------------
+
+For ALL 17 modules:
+
+A. Implement database migrations  
+B. Implement backend services under correct folders  
+C. Implement cron/background jobs  
+D. Implement admin views + analytics  
+E. Implement partner-side UI updates  
+F. Implement customer-side logic  
+G. Implement notifications  
+H. Implement logging + monitoring  
+I. Implement role-based restrictions  
+J. Implement e2e tests & ensure all tests pass  
+
+------------------------------------------
+FINAL CHECK BEFORE COMPLETION
+------------------------------------------
+
+When done, return:
+
+1. Summary of all modules implemented  
+2. List of new DB tables/fields  
+3. All updated routes  
+4. Security verification  
+5. Performance impact review  
+6. Architecture consistency check  
+7. Confirmation that all 17 automations work across roles  
+8. Confirmation that existing features are NOT broken  
+9. Screenshot summary  
+10. Ask for next instructions
+
+Begin now.
