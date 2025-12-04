@@ -363,7 +363,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)
   app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)
   app.use("/api/ticket-operator", ticketOperatorRoutes); // Ticket & Rental Operator management (BD only)
-  app.use("/api/admin/bd-expansion", adminBdExpansionRoutes); // Admin management for BD expansion
+  app.use("/api/admin/bd-expansion", authenticateToken, (req: AuthRequest, res, next) => {
+    (req as any).userId = req.user?.userId;
+    next();
+  }, adminBdExpansionRoutes); // Admin management for BD expansion
   app.use("/api/bd", bdCustomerRoutes); // Customer BD services (rentals, shops)
   app.use("/api", partnerRegistrationRoutes); // Partner Registration for drivers & restaurants
 

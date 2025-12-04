@@ -289,15 +289,18 @@ async function testShopRegistration() {
   const registrationData = {
     shopName: "E2E Test Shop",
     shopType: "grocery",
-    shopAddress: "123 Test Street, Dhaka",
-    shopDescription: "Automated E2E test shop",
+    shopAddress: "123 Test Street, Mirpur, Dhaka",
+    shopDescription: "Automated E2E test shop for groceries",
+    ownerName: "E2E Test Owner",
+    fatherName: "E2E Test Father",
+    dateOfBirth: "1990-01-15",
+    presentAddress: "456 Present Street, Mirpur, Dhaka",
+    permanentAddress: "789 Permanent Street, Dhaka",
     nidNumber: "1234567890123",
+    emergencyContactName: "E2E Emergency Contact",
+    emergencyContactPhone: "+8801912345678",
+    emergencyContactRelation: "brother",
     tradeLicenseNumber: "TL-2024-TEST",
-    bkashNumber: "+8801712345678",
-    nagadNumber: "+8801812345678",
-    bankAccountNumber: "1234567890",
-    bankName: "Test Bank",
-    bankBranch: "Dhaka Main",
   };
 
   const response = await makeRequest("/api/shop-partner/register", {
@@ -328,8 +331,8 @@ async function testAdminApproval() {
   console.log("\n✅ STEP 4: Testing admin approval...");
 
   const response = await makeRequest(`/api/admin/bd-expansion/shop-partners/${testShopPartnerId}/verify`, {
-    method: "POST",
-    body: { status: "approved" },
+    method: "PATCH",
+    body: { action: "approve" },
     token: adminToken,
   });
 
