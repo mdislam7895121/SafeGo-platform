@@ -278,6 +278,22 @@ import AdminSafetyCenterNew from "@/pages/admin/safety-center";
 import AdminFeatureFlags from "@/pages/admin/feature-flags";
 import AdminAccessGovernance from "@/pages/admin/access-governance";
 
+// Phase 3A: Enterprise Admin Features
+import EnterpriseSearch from "@/pages/admin/enterprise-search";
+import ExportCenter from "@/pages/admin/export-center";
+import FraudDetection from "@/pages/admin/fraud-detection";
+import SessionSecurity from "@/pages/admin/session-security";
+import EmergencyControls from "@/pages/admin/emergency-controls";
+import IncidentResponse from "@/pages/admin/incident-response";
+import CustomerSupportPanel from "@/pages/admin/customer-support-panel";
+import ComplianceCenter from "@/pages/admin/compliance-center";
+import HealthMonitor from "@/pages/admin/health-monitor";
+import PushNotifications from "@/pages/admin/push-notifications";
+import PaymentVerification from "@/pages/admin/payment-verification";
+import PolicyManager from "@/pages/admin/policy-manager";
+import BackupRecovery from "@/pages/admin/backup-recovery";
+import AuditConsole from "@/pages/admin/audit-console";
+
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
 
@@ -2042,6 +2058,107 @@ function Router() {
           <AdminAccessGovernance />
         </ProtectedRoute>
       </Route>
+      
+      {/* Phase 3A: Enterprise Admin Features */}
+      <Route path="/admin/enterprise-search">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Enterprise Search">
+            <EnterpriseSearch />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/export-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Export Center">
+            <ExportCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/fraud-detection">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Fraud Detection">
+            <FraudDetection />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/session-security">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Session Security">
+            <SessionSecurity />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/emergency-controls">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Emergency Controls">
+            <EmergencyControls />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/incident-response">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Incident Response">
+            <IncidentResponse />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/customer-support-panel">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Customer Support Panel">
+            <CustomerSupportPanel />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/compliance-center">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Compliance Center">
+            <ComplianceCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/health-monitor">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Health Monitor">
+            <HealthMonitor />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/push-notifications">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Push Notifications">
+            <PushNotifications />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/payment-verification">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Payment Verification">
+            <PaymentVerification />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/policy-manager">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Policy Manager">
+            <PolicyManager />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/backup-recovery">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Backup & Recovery">
+            <BackupRecovery />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/audit-console">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Audit Console">
+            <AuditConsole />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/admin/driver-support">
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Driver Support">

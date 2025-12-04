@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useEffect } from "react";
 import { getPostLoginPath } from "@/lib/roleRedirect";
 
-type AllowedRole = "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner";
+type AllowedRole = "customer" | "driver" | "restaurant" | "admin" | "ticket_operator" | "shop_partner" | "pending_ticket_operator" | "pending_shop_partner";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;

@@ -17,6 +17,17 @@ import {
   UserCog,
   Flag,
   Scale,
+  Search,
+  Download,
+  Fingerprint,
+  Monitor,
+  Power,
+  FileWarning,
+  Activity,
+  Database,
+  Bell,
+  CreditCard,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -157,6 +168,93 @@ const regionalNavItems: NavItem[] = [
     href: "/admin/bd-expansion",
     icon: Globe,
     navKey: "dashboard",
+  },
+];
+
+const phase3aNavItems: NavItem[] = [
+  {
+    title: "Enterprise Search",
+    href: "/admin/enterprise-search",
+    icon: Search,
+    navKey: "dashboard",
+  },
+  {
+    title: "Export Center",
+    href: "/admin/export-center",
+    icon: Download,
+    navKey: "dashboard",
+  },
+  {
+    title: "Fraud Detection",
+    href: "/admin/fraud-detection",
+    icon: Fingerprint,
+    navKey: "fraudAlerts",
+  },
+  {
+    title: "Session Security",
+    href: "/admin/session-security",
+    icon: Monitor,
+    navKey: "safetyCenter",
+  },
+  {
+    title: "Emergency Controls",
+    href: "/admin/emergency-controls",
+    icon: Power,
+    navKey: "safetyCenter",
+  },
+  {
+    title: "Incident Response",
+    href: "/admin/incident-response",
+    icon: AlertTriangle,
+    navKey: "safetyCenter",
+  },
+  {
+    title: "Support Panel",
+    href: "/admin/customer-support-panel",
+    icon: UserCog,
+    navKey: "dashboard",
+  },
+  {
+    title: "Compliance Center",
+    href: "/admin/compliance-center",
+    icon: FileWarning,
+    navKey: "peopleKyc",
+  },
+  {
+    title: "Health Monitor",
+    href: "/admin/health-monitor",
+    icon: Activity,
+    navKey: "dashboard",
+  },
+  {
+    title: "Push Notifications",
+    href: "/admin/push-notifications",
+    icon: Bell,
+    navKey: "dashboard",
+  },
+  {
+    title: "Payment Verification",
+    href: "/admin/payment-verification",
+    icon: CreditCard,
+    navKey: "payouts",
+  },
+  {
+    title: "Policy Manager",
+    href: "/admin/policy-manager",
+    icon: FileText,
+    navKey: "settings",
+  },
+  {
+    title: "Backup & Recovery",
+    href: "/admin/backup-recovery",
+    icon: Database,
+    navKey: "settings",
+  },
+  {
+    title: "Audit Console",
+    href: "/admin/audit-console",
+    icon: ScrollText,
+    navKey: "auditLog",
   },
 ];
 
@@ -330,6 +428,19 @@ export function AdminSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {renderNavGroup(regionalNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {renderNavGroup(phase3aNavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Enterprise Tools
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(phase3aNavItems)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

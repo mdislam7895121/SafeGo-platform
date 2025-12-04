@@ -36,6 +36,33 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Environment Separation**: Dev/staging/prod configuration with feature gates
 *   **Access Governance**: Role visualization with hierarchy tree, permission matrix, country scope map
 
+## Phase 3A Enterprise Admin Features (December 4, 2025)
+
+*   **Enterprise Search Engine**: Global fuzzy search across users, drivers, restaurants with type-ahead suggestions
+*   **Data Export Center**: CSV/PDF/JSON exports with history tracking and scheduled exports
+*   **Fraud Detection Dashboard**: Suspicious logins, device fingerprints, multi-account detection
+*   **Session Security**: Active session management, IP blocking, suspicious IP detection
+*   **Emergency Controls**: Platform pause, payment freeze, emergency resume capabilities
+*   **Incident Response Playbook**: Incident management with timeline tracking and status workflow
+*   **Customer Support Panel**: View-only impersonation with full audit logging
+*   **Partner Compliance Center**: Document expiry tracking, missing docs, KYC revalidation requests
+*   **System Health Monitor**: CPU, memory, database, and queue monitoring
+*   **Push Notifications**: Geo and role targeted notifications
+*   **Payment Verification Console**: Failed payments, disputes, and reconciliation
+*   **Policy Manager**: Version-controlled policies with acceptance tracking
+*   **Backup & Recovery**: Database snapshots, verification, and restore
+*   **Full Audit Console**: Hash-chain verified audit logs with export capabilities
+
+### Phase 3A RBAC Configuration:
+*   **ADMIN**: View-only access (EXPORT_DATA, VIEW_INCIDENTS, VIEW_COMPLIANCE, VIEW_SYSTEM_HEALTH, VIEW_PAYMENT_ISSUES, VIEW_POLICIES, VIEW_FULL_AUDIT)
+*   **COUNTRY_ADMIN**: Full access including emergency controls, impersonation, and manage permissions
+*   **COMPLIANCE_ADMIN**: Compliance-focused access with incident and policy management
+*   **SUPPORT_ADMIN**: Impersonation access with VIEW_SUPPORT_CONVERSATIONS
+*   **FINANCE_ADMIN**: Payment-focused access with export capabilities
+*   **RISK_ADMIN**: Security-focused access including session and emergency control management
+*   **READONLY_ADMIN**: Limited view access (excludes sensitive audit data)
+*   **SUPER_ADMIN**: Full access to all Phase 3A features
+
 ## Admin System Verification (December 4, 2025)
 
 *   **WebSocket Fix**: Fixed `adminNotificationsWs.ts` to use `prisma.adminProfile` with user relation instead of non-existent `adminAccount` model
@@ -61,3 +88,23 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   `client/src/pages/admin/access-governance.tsx` - Role visualization
 *   `docs/PHASE2_REPORT.md` - Complete Phase 2 documentation
 *   `docs/CHANGELOG_PHASE2.md` - Phase 2 changelog
+
+## Key Files & Directories (Phase 3A)
+
+*   `server/routes/admin-phase3a.ts` - All Phase 3A backend endpoints
+*   `server/utils/permissions.ts` - Updated RBAC permissions for all admin roles
+*   `client/src/components/admin/AdminSidebar.tsx` - Phase 3A navigation section
+*   `client/src/pages/admin/enterprise-search.tsx` - Enterprise search engine
+*   `client/src/pages/admin/export-center.tsx` - Data export center
+*   `client/src/pages/admin/fraud-detection.tsx` - Fraud detection dashboard
+*   `client/src/pages/admin/session-security.tsx` - Session security management
+*   `client/src/pages/admin/emergency-controls.tsx` - Emergency controls
+*   `client/src/pages/admin/incident-response.tsx` - Incident response playbook
+*   `client/src/pages/admin/customer-support-panel.tsx` - Customer support panel
+*   `client/src/pages/admin/compliance-center.tsx` - Partner compliance center
+*   `client/src/pages/admin/health-monitor.tsx` - System health monitor
+*   `client/src/pages/admin/push-notifications.tsx` - Push notifications
+*   `client/src/pages/admin/payment-verification.tsx` - Payment verification console
+*   `client/src/pages/admin/policy-manager.tsx` - Policy manager
+*   `client/src/pages/admin/backup-recovery.tsx` - Backup and recovery
+*   `client/src/pages/admin/audit-console.tsx` - Full audit console

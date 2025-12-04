@@ -133,6 +133,24 @@ export enum Permission {
   MANAGE_KYC_ENFORCEMENT_RULES = 'MANAGE_KYC_ENFORCEMENT_RULES',
   VIEW_KYC_REVIEW_QUEUE = 'VIEW_KYC_REVIEW_QUEUE',
   PROCESS_KYC_QUEUE = 'PROCESS_KYC_QUEUE',
+  
+  // Phase 3A: Enterprise Admin Features
+  EXPORT_DATA = 'EXPORT_DATA',
+  MANAGE_ADMIN_SESSIONS = 'MANAGE_ADMIN_SESSIONS',
+  MANAGE_EMERGENCY_CONTROLS = 'MANAGE_EMERGENCY_CONTROLS',
+  VIEW_INCIDENTS = 'VIEW_INCIDENTS',
+  MANAGE_INCIDENTS = 'MANAGE_INCIDENTS',
+  IMPERSONATE_USER = 'IMPERSONATE_USER',
+  VIEW_COMPLIANCE = 'VIEW_COMPLIANCE',
+  MANAGE_COMPLIANCE = 'MANAGE_COMPLIANCE',
+  VIEW_SYSTEM_HEALTH = 'VIEW_SYSTEM_HEALTH',
+  SEND_NOTIFICATIONS = 'SEND_NOTIFICATIONS',
+  VIEW_PAYMENT_ISSUES = 'VIEW_PAYMENT_ISSUES',
+  MANAGE_PAYMENT_ISSUES = 'MANAGE_PAYMENT_ISSUES',
+  VIEW_POLICIES = 'VIEW_POLICIES',
+  MANAGE_POLICIES = 'MANAGE_POLICIES',
+  MANAGE_BACKUPS = 'MANAGE_BACKUPS',
+  VIEW_FULL_AUDIT = 'VIEW_FULL_AUDIT',
 }
 
 type RolePermissions = {
@@ -242,6 +260,23 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_KYC_ENFORCEMENT_RULES,
     Permission.VIEW_KYC_REVIEW_QUEUE,
     Permission.PROCESS_KYC_QUEUE,
+    // Phase 3A: Enterprise Admin Features
+    Permission.EXPORT_DATA,
+    Permission.MANAGE_ADMIN_SESSIONS,
+    Permission.MANAGE_EMERGENCY_CONTROLS,
+    Permission.VIEW_INCIDENTS,
+    Permission.MANAGE_INCIDENTS,
+    Permission.IMPERSONATE_USER,
+    Permission.VIEW_COMPLIANCE,
+    Permission.MANAGE_COMPLIANCE,
+    Permission.VIEW_SYSTEM_HEALTH,
+    Permission.SEND_NOTIFICATIONS,
+    Permission.VIEW_PAYMENT_ISSUES,
+    Permission.MANAGE_PAYMENT_ISSUES,
+    Permission.VIEW_POLICIES,
+    Permission.MANAGE_POLICIES,
+    Permission.MANAGE_BACKUPS,
+    Permission.VIEW_FULL_AUDIT,
   ]),
 
   // ADMIN: General management (non-sensitive)
@@ -284,6 +319,14 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_DUPLICATE_ACCOUNTS,
     Permission.VIEW_SUSPICIOUS_ACTIVITY,
     Permission.VIEW_KYC_REVIEW_QUEUE,
+    // Phase 3A: Enterprise Admin Features (View-only for general ADMIN)
+    Permission.EXPORT_DATA,
+    Permission.VIEW_INCIDENTS,
+    Permission.VIEW_COMPLIANCE,
+    Permission.VIEW_SYSTEM_HEALTH,
+    Permission.VIEW_PAYMENT_ISSUES,
+    Permission.VIEW_POLICIES,
+    Permission.VIEW_FULL_AUDIT,
   ]),
 
   // COUNTRY_ADMIN: Regional management
@@ -348,6 +391,22 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_SUSPICIOUS_ACTIVITY,
     Permission.VIEW_KYC_REVIEW_QUEUE,
     Permission.PROCESS_KYC_QUEUE,
+    // Phase 3A: Country Admin has enhanced enterprise access
+    Permission.EXPORT_DATA,
+    Permission.MANAGE_ADMIN_SESSIONS,
+    Permission.MANAGE_EMERGENCY_CONTROLS,
+    Permission.VIEW_INCIDENTS,
+    Permission.MANAGE_INCIDENTS,
+    Permission.IMPERSONATE_USER,
+    Permission.VIEW_COMPLIANCE,
+    Permission.MANAGE_COMPLIANCE,
+    Permission.VIEW_SYSTEM_HEALTH,
+    Permission.SEND_NOTIFICATIONS,
+    Permission.VIEW_PAYMENT_ISSUES,
+    Permission.MANAGE_PAYMENT_ISSUES,
+    Permission.VIEW_POLICIES,
+    Permission.MANAGE_POLICIES,
+    Permission.VIEW_FULL_AUDIT,
   ]),
 
   // CITY_ADMIN: City-level management
@@ -449,6 +508,15 @@ const rolePermissions: RolePermissions = {
     Permission.MANAGE_KYC_ENFORCEMENT_RULES,
     Permission.VIEW_KYC_REVIEW_QUEUE,
     Permission.PROCESS_KYC_QUEUE,
+    // Phase 3A: Compliance Admin has full compliance access
+    Permission.EXPORT_DATA,
+    Permission.VIEW_INCIDENTS,
+    Permission.MANAGE_INCIDENTS,
+    Permission.VIEW_COMPLIANCE,
+    Permission.MANAGE_COMPLIANCE,
+    Permission.VIEW_POLICIES,
+    Permission.MANAGE_POLICIES,
+    Permission.VIEW_FULL_AUDIT,
   ]),
 
   [AdminRole.SUPPORT_ADMIN]: new Set([
@@ -477,6 +545,10 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_IDENTITY_RISK_SCORES,
     Permission.VIEW_SUSPICIOUS_ACTIVITY,
     Permission.VIEW_KYC_REVIEW_QUEUE,
+    // Phase 3A: Support Admin has impersonation and incident view access
+    Permission.IMPERSONATE_USER,
+    Permission.VIEW_INCIDENTS,
+    Permission.VIEW_SUPPORT_CONVERSATIONS,
   ]),
 
   [AdminRole.FINANCE_ADMIN]: new Set([
@@ -509,6 +581,11 @@ const rolePermissions: RolePermissions = {
     Permission.GENERATE_EVIDENCE_PACKET,
     Permission.VIEW_EVIDENCE_PACKETS,
     Permission.EXPORT_REGULATOR_REPORT,
+    // Phase 3A: Finance Admin has payment and export access
+    Permission.EXPORT_DATA,
+    Permission.VIEW_PAYMENT_ISSUES,
+    Permission.MANAGE_PAYMENT_ISSUES,
+    Permission.VIEW_FULL_AUDIT,
   ]),
 
   // RISK_ADMIN: Safety & Risk Center focused
@@ -561,6 +638,13 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_SUSPICIOUS_ACTIVITY,
     Permission.MANAGE_SUSPICIOUS_ACTIVITY,
     Permission.VIEW_KYC_REVIEW_QUEUE,
+    // Phase 3A: Risk Admin has security and fraud access
+    Permission.MANAGE_ADMIN_SESSIONS,
+    Permission.MANAGE_EMERGENCY_CONTROLS,
+    Permission.VIEW_INCIDENTS,
+    Permission.MANAGE_INCIDENTS,
+    Permission.VIEW_SYSTEM_HEALTH,
+    Permission.VIEW_FULL_AUDIT,
   ]),
 
   [AdminRole.READONLY_ADMIN]: new Set([
@@ -600,6 +684,12 @@ const rolePermissions: RolePermissions = {
     Permission.VIEW_DUPLICATE_ACCOUNTS,
     Permission.VIEW_SUSPICIOUS_ACTIVITY,
     Permission.VIEW_KYC_REVIEW_QUEUE,
+    // Phase 3A: Limited read-only view access (excludes sensitive audit data)
+    Permission.VIEW_INCIDENTS,
+    Permission.VIEW_COMPLIANCE,
+    Permission.VIEW_SYSTEM_HEALTH,
+    Permission.VIEW_PAYMENT_ISSUES,
+    Permission.VIEW_POLICIES,
   ]),
 };
 
