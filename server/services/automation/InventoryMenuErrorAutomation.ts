@@ -580,7 +580,7 @@ class InventoryMenuErrorAutomation {
           entityType: 'inventory',
           entityId,
           status,
-          details,
+          metadata: details,
         },
       });
     } catch (error) {

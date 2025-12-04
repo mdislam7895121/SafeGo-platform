@@ -17,6 +17,13 @@ import {
   autoCancellationService,
   autoPayoutService,
   getAutomationSystemsStatus,
+  fraudDetectionAutomation,
+  loginSecurityAutomation,
+  autoNegativeBalanceControl,
+  inventoryMenuErrorAutomation,
+  systemMonitoringAutomation,
+  aiCustomerSupportAutomation,
+  highRiskActivityAutomation,
 } from '../services/automation';
 
 const router = Router();
@@ -499,6 +506,547 @@ router.put('/payout/config', async (req: Request, res: Response) => {
     res.json({ success: true, config: autoPayoutService.getConfig() });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
+router.get('/fraud/status', async (req: Request, res: Response) => {
+  try {
+    const status = fraudDetectionAutomation.getStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get fraud detection status' });
+  }
+});
+
+router.put('/fraud/config', async (req: Request, res: Response) => {
+  try {
+    fraudDetectionAutomation.updateConfig(req.body);
+    res.json({ success: true, config: fraudDetectionAutomation.getConfig() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update fraud config' });
+  }
+});
+
+router.get('/fraud/alerts', async (req: Request, res: Response) => {
+  try {
+    const { limit = 50 } = req.query;
+    const alerts = await fraudDetectionAutomation.getActiveAlerts(Number(limit));
+    res.json({ success: true, alerts });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get fraud alerts' });
+  }
+});
+
+router.post('/fraud/resolve/:alertId', async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = getRequiredAdminId(req);
+    const { alertId } = req.params;
+    const { resolution } = req.body;
+    await fraudDetectionAutomation.resolveAlert(alertId, adminId, resolution);
+    res.json({ success: true, message: 'Alert resolved' });
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to resolve alert' });
+  }
+});
+
+router.get('/fraud/stats', async (req: Request, res: Response) => {
+  try {
+    const { days = 30 } = req.query;
+    const stats = await fraudDetectionAutomation.getFraudStats(Number(days));
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get fraud stats' });
+  }
+});
+
+router.post('/fraud/start', async (req: Request, res: Response) => {
+  try {
+    await fraudDetectionAutomation.start();
+    res.json({ success: true, message: 'Fraud detection started' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to start fraud detection' });
+  }
+});
+
+router.post('/fraud/stop', async (req: Request, res: Response) => {
+  try {
+    fraudDetectionAutomation.stop();
+    res.json({ success: true, message: 'Fraud detection stopped' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to stop fraud detection' });
+  }
+});
+
+router.get('/login-security/status', async (req: Request, res: Response) => {
+  try {
+    const status = loginSecurityAutomation.getStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get login security status' });
+  }
+});
+
+router.put('/login-security/config', async (req: Request, res: Response) => {
+  try {
+    loginSecurityAutomation.updateConfig(req.body);
+    res.json({ success: true, config: loginSecurityAutomation.getConfig() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update login security config' });
+  }
+});
+
+router.get('/login-security/locked-accounts', async (req: Request, res: Response) => {
+  try {
+    const locked = await loginSecurityAutomation.getLockedAccounts();
+    res.json({ success: true, lockedAccounts: locked });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get locked accounts' });
+  }
+});
+
+router.post('/login-security/unlock/:email', async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = getRequiredAdminId(req);
+    const { email } = req.params;
+    await loginSecurityAutomation.unlockAccount(email, adminId);
+    res.json({ success: true, message: 'Account unlocked' });
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to unlock account' });
+  }
+});
+
+router.post('/login-security/trust-device', async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = getRequiredAdminId(req);
+    const { userId, deviceId } = req.body;
+    await loginSecurityAutomation.trustDevice(userId, deviceId, adminId);
+    res.json({ success: true, message: 'Device trusted' });
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to trust device' });
+  }
+});
+
+router.get('/login-security/stats', async (req: Request, res: Response) => {
+  try {
+    const { days = 30 } = req.query;
+    const stats = await loginSecurityAutomation.getSecurityStats(Number(days));
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get security stats' });
+  }
+});
+
+router.post('/login-security/start', async (req: Request, res: Response) => {
+  try {
+    await loginSecurityAutomation.start();
+    res.json({ success: true, message: 'Login security started' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to start login security' });
+  }
+});
+
+router.post('/login-security/stop', async (req: Request, res: Response) => {
+  try {
+    loginSecurityAutomation.stop();
+    res.json({ success: true, message: 'Login security stopped' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to stop login security' });
+  }
+});
+
+router.get('/negative-balance/status', async (req: Request, res: Response) => {
+  try {
+    const status = autoNegativeBalanceControl.getStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get negative balance status' });
+  }
+});
+
+router.put('/negative-balance/config', async (req: Request, res: Response) => {
+  try {
+    autoNegativeBalanceControl.updateConfig(req.body);
+    res.json({ success: true, config: autoNegativeBalanceControl.getConfig() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
+router.get('/negative-balance/wallets', async (req: Request, res: Response) => {
+  try {
+    const wallets = await autoNegativeBalanceControl.getNegativeBalanceWallets();
+    res.json({ success: true, wallets });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get negative balance wallets' });
+  }
+});
+
+router.get('/negative-balance/overdue', async (req: Request, res: Response) => {
+  try {
+    const overdue = await autoNegativeBalanceControl.getOverdueWallets();
+    res.json({ success: true, wallets: overdue });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get overdue wallets' });
+  }
+});
+
+router.post('/negative-balance/run-check', async (req: Request, res: Response) => {
+  try {
+    const result = await autoNegativeBalanceControl.runDailyCheck();
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to run daily check' });
+  }
+});
+
+router.get('/negative-balance/stats', async (req: Request, res: Response) => {
+  try {
+    const stats = await autoNegativeBalanceControl.getStats();
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
+  }
+});
+
+router.post('/negative-balance/start', async (req: Request, res: Response) => {
+  try {
+    await autoNegativeBalanceControl.start();
+    res.json({ success: true, message: 'Negative balance control started' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to start' });
+  }
+});
+
+router.post('/negative-balance/stop', async (req: Request, res: Response) => {
+  try {
+    autoNegativeBalanceControl.stop();
+    res.json({ success: true, message: 'Negative balance control stopped' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to stop' });
+  }
+});
+
+router.get('/inventory-menu/status', async (req: Request, res: Response) => {
+  try {
+    const status = inventoryMenuErrorAutomation.getStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get status' });
+  }
+});
+
+router.put('/inventory-menu/config', async (req: Request, res: Response) => {
+  try {
+    inventoryMenuErrorAutomation.updateConfig(req.body);
+    res.json({ success: true, config: inventoryMenuErrorAutomation.getConfig() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
+router.post('/inventory-menu/scan', async (req: Request, res: Response) => {
+  try {
+    const result = await inventoryMenuErrorAutomation.runFullScan();
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to run scan' });
+  }
+});
+
+router.get('/inventory-menu/errors', async (req: Request, res: Response) => {
+  try {
+    const { limit = 50 } = req.query;
+    const errors = await inventoryMenuErrorAutomation.getActiveErrors(Number(limit));
+    res.json({ success: true, errors });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get errors' });
+  }
+});
+
+router.post('/inventory-menu/resolve/:errorId', async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = getRequiredAdminId(req);
+    const { errorId } = req.params;
+    const { resolution } = req.body;
+    await inventoryMenuErrorAutomation.resolveError(errorId, adminId, resolution);
+    res.json({ success: true, message: 'Error resolved' });
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to resolve error' });
+  }
+});
+
+router.get('/inventory-menu/stats', async (req: Request, res: Response) => {
+  try {
+    const { days = 30 } = req.query;
+    const stats = await inventoryMenuErrorAutomation.getStats(Number(days));
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
+  }
+});
+
+router.post('/inventory-menu/start', async (req: Request, res: Response) => {
+  try {
+    await inventoryMenuErrorAutomation.start();
+    res.json({ success: true, message: 'Inventory menu error detection started' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to start' });
+  }
+});
+
+router.post('/inventory-menu/stop', async (req: Request, res: Response) => {
+  try {
+    inventoryMenuErrorAutomation.stop();
+    res.json({ success: true, message: 'Inventory menu error detection stopped' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to stop' });
+  }
+});
+
+router.get('/system-monitoring/status', async (req: Request, res: Response) => {
+  try {
+    const status = systemMonitoringAutomation.getStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get system monitoring status' });
+  }
+});
+
+router.put('/system-monitoring/config', async (req: Request, res: Response) => {
+  try {
+    systemMonitoringAutomation.updateConfig(req.body);
+    res.json({ success: true, config: systemMonitoringAutomation.getConfig() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
+router.get('/system-monitoring/health', async (req: Request, res: Response) => {
+  try {
+    const health = systemMonitoringAutomation.getHealthSummary();
+    res.json({ success: true, health });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get health summary' });
+  }
+});
+
+router.get('/system-monitoring/metrics', async (req: Request, res: Response) => {
+  try {
+    const metrics = systemMonitoringAutomation.getMetrics();
+    res.json({ success: true, metrics });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get metrics' });
+  }
+});
+
+router.get('/system-monitoring/stats', async (req: Request, res: Response) => {
+  try {
+    const { hours = 24 } = req.query;
+    const stats = await systemMonitoringAutomation.getStats(Number(hours));
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
+  }
+});
+
+router.post('/system-monitoring/check', async (req: Request, res: Response) => {
+  try {
+    await systemMonitoringAutomation.runHealthChecks();
+    res.json({ success: true, message: 'Health checks completed' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to run health checks' });
+  }
+});
+
+router.post('/system-monitoring/start', async (req: Request, res: Response) => {
+  try {
+    await systemMonitoringAutomation.start();
+    res.json({ success: true, message: 'System monitoring started' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to start' });
+  }
+});
+
+router.post('/system-monitoring/stop', async (req: Request, res: Response) => {
+  try {
+    systemMonitoringAutomation.stop();
+    res.json({ success: true, message: 'System monitoring stopped' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to stop' });
+  }
+});
+
+router.get('/ai-support/status', async (req: Request, res: Response) => {
+  try {
+    const status = aiCustomerSupportAutomation.getStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get AI support status' });
+  }
+});
+
+router.put('/ai-support/config', async (req: Request, res: Response) => {
+  try {
+    aiCustomerSupportAutomation.updateConfig(req.body);
+    res.json({ success: true, config: aiCustomerSupportAutomation.getConfig() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
+router.post('/ai-support/classify', async (req: Request, res: Response) => {
+  try {
+    const { description } = req.body;
+    const classification = await aiCustomerSupportAutomation.classifyIssue(description);
+    res.json({ success: true, classification });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to classify issue' });
+  }
+});
+
+router.get('/ai-support/stats', async (req: Request, res: Response) => {
+  try {
+    const { days = 30 } = req.query;
+    const stats = await aiCustomerSupportAutomation.getStats(Number(days));
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
+  }
+});
+
+router.post('/ai-support/start', async (req: Request, res: Response) => {
+  try {
+    await aiCustomerSupportAutomation.start();
+    res.json({ success: true, message: 'AI customer support started' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to start' });
+  }
+});
+
+router.post('/ai-support/stop', async (req: Request, res: Response) => {
+  try {
+    aiCustomerSupportAutomation.stop();
+    res.json({ success: true, message: 'AI customer support stopped' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to stop' });
+  }
+});
+
+router.get('/high-risk/status', async (req: Request, res: Response) => {
+  try {
+    const status = highRiskActivityAutomation.getStatus();
+    res.json({ success: true, status });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get high-risk status' });
+  }
+});
+
+router.put('/high-risk/config', async (req: Request, res: Response) => {
+  try {
+    highRiskActivityAutomation.updateConfig(req.body);
+    res.json({ success: true, config: highRiskActivityAutomation.getConfig() });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to update config' });
+  }
+});
+
+router.get('/high-risk/alerts', async (req: Request, res: Response) => {
+  try {
+    const { limit = 50 } = req.query;
+    const alerts = await highRiskActivityAutomation.getActiveAlerts(Number(limit));
+    res.json({ success: true, alerts });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get high-risk alerts' });
+  }
+});
+
+router.post('/high-risk/review/:alertId', async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = getRequiredAdminId(req);
+    const { alertId } = req.params;
+    const { decision, notes } = req.body;
+    await highRiskActivityAutomation.reviewAlert(alertId, adminId, decision, notes);
+    res.json({ success: true, message: 'Alert reviewed' });
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to review alert' });
+  }
+});
+
+router.post('/high-risk/unfreeze/:userId', async (req: AuthRequest, res: Response) => {
+  try {
+    const adminId = getRequiredAdminId(req);
+    const { userId } = req.params;
+    await highRiskActivityAutomation.unfreezeAccount(userId);
+    
+    await prisma.automationLog.create({
+      data: {
+        automationType: 'HIGH_RISK',
+        entityType: 'user',
+        entityId: userId,
+        status: 'admin_unfreeze',
+        metadata: { adminId, unfrozenAt: new Date().toISOString() },
+      },
+    });
+    
+    res.json({ success: true, message: 'Account unfrozen' });
+  } catch (error: any) {
+    if (error.message?.includes('SECURITY_VIOLATION')) {
+      return res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    res.status(500).json({ success: false, error: 'Failed to unfreeze account' });
+  }
+});
+
+router.get('/high-risk/stats', async (req: Request, res: Response) => {
+  try {
+    const { days = 30 } = req.query;
+    const stats = await highRiskActivityAutomation.getStats(Number(days));
+    res.json({ success: true, stats });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get stats' });
+  }
+});
+
+router.get('/high-risk/user-risk/:userId', async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const riskScore = highRiskActivityAutomation.getUserRiskScore(userId);
+    res.json({ success: true, userId, riskScore });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to get user risk score' });
+  }
+});
+
+router.post('/high-risk/start', async (req: Request, res: Response) => {
+  try {
+    await highRiskActivityAutomation.start();
+    res.json({ success: true, message: 'High-risk detection started' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to start' });
+  }
+});
+
+router.post('/high-risk/stop', async (req: Request, res: Response) => {
+  try {
+    highRiskActivityAutomation.stop();
+    res.json({ success: true, message: 'High-risk detection stopped' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to stop' });
   }
 });
 

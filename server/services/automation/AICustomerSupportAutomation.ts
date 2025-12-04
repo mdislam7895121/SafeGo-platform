@@ -607,7 +607,7 @@ class AICustomerSupportAutomation {
           entityType: 'support',
           entityId,
           status,
-          details,
+          metadata: details,
         },
       });
     } catch (error) {

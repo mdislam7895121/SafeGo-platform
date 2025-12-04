@@ -52,6 +52,13 @@ export async function initializeAutomationSystems(): Promise<void> {
   autoSettlementService.start();
   performanceScoringService.start();
   autoPayoutService.start();
+  fraudDetectionAutomation.start();
+  loginSecurityAutomation.start();
+  autoNegativeBalanceControl.start();
+  inventoryMenuErrorAutomation.start();
+  systemMonitoringAutomation.start();
+  aiCustomerSupportAutomation.start();
+  highRiskActivityAutomation.start();
 
   console.log('[Automation] All automation systems initialized');
 }
@@ -63,6 +70,13 @@ export async function shutdownAutomationSystems(): Promise<void> {
   autoSettlementService.stop();
   performanceScoringService.stop();
   autoPayoutService.stop();
+  fraudDetectionAutomation.stop();
+  loginSecurityAutomation.stop();
+  autoNegativeBalanceControl.stop();
+  inventoryMenuErrorAutomation.stop();
+  systemMonitoringAutomation.stop();
+  aiCustomerSupportAutomation.stop();
+  highRiskActivityAutomation.stop();
 
   console.log('[Automation] All automation systems stopped');
 }
@@ -111,6 +125,41 @@ export function getAutomationSystemsStatus(): AutomationSystemStatus[] {
       name: 'Auto Payout Service',
       isActive: true,
       config: autoPayoutService.getConfig(),
+    },
+    {
+      name: 'Fraud Detection Automation',
+      isActive: fraudDetectionAutomation.getStatus().isRunning,
+      config: fraudDetectionAutomation.getConfig(),
+    },
+    {
+      name: 'Login Security Automation',
+      isActive: loginSecurityAutomation.getStatus().isRunning,
+      config: loginSecurityAutomation.getConfig(),
+    },
+    {
+      name: 'Auto Negative Balance Control',
+      isActive: autoNegativeBalanceControl.getStatus().isRunning,
+      config: autoNegativeBalanceControl.getConfig(),
+    },
+    {
+      name: 'Inventory Menu Error Automation',
+      isActive: inventoryMenuErrorAutomation.getStatus().isRunning,
+      config: inventoryMenuErrorAutomation.getConfig(),
+    },
+    {
+      name: 'System Monitoring Automation',
+      isActive: systemMonitoringAutomation.getStatus().isRunning,
+      config: systemMonitoringAutomation.getConfig(),
+    },
+    {
+      name: 'AI Customer Support Automation',
+      isActive: aiCustomerSupportAutomation.getStatus().isRunning,
+      config: aiCustomerSupportAutomation.getConfig(),
+    },
+    {
+      name: 'High Risk Activity Automation',
+      isActive: highRiskActivityAutomation.getStatus().isRunning,
+      config: highRiskActivityAutomation.getConfig(),
     },
   ];
 }

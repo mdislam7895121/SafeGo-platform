@@ -635,7 +635,7 @@ class FraudDetectionAutomation {
           entityType: 'user',
           entityId,
           status,
-          details,
+          metadata: details,
         },
       });
     } catch (error) {

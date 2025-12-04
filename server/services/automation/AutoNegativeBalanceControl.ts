@@ -406,7 +406,7 @@ class AutoNegativeBalanceControl {
           entityType: 'wallet',
           entityId,
           status,
-          details,
+          metadata: details,
         },
       });
     } catch (error) {

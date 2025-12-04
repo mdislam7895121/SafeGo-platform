@@ -621,7 +621,7 @@ class HighRiskActivityAutomation {
           entityType: 'risk',
           entityId,
           status,
-          details,
+          metadata: details,
         },
       });
     } catch (error) {

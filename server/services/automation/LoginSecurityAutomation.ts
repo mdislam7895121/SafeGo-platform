@@ -529,7 +529,7 @@ class LoginSecurityAutomation {
           entityType: 'login',
           entityId,
           status,
-          details,
+          metadata: details,
         },
       });
     } catch (error) {

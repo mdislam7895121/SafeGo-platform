@@ -458,7 +458,7 @@ class SystemMonitoringAutomation {
           entityType: 'system',
           entityId,
           status,
-          details,
+          metadata: details,
         },
       });
     } catch (error) {
