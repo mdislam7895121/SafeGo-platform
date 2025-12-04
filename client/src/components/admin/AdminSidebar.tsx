@@ -28,6 +28,7 @@ import {
   Bell,
   CreditCard,
   FileText,
+  BrainCircuit,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -258,6 +259,15 @@ const phase3aNavItems: NavItem[] = [
   },
 ];
 
+const phase3cNavItems: NavItem[] = [
+  {
+    title: "Intelligence",
+    href: "/admin/intelligence",
+    icon: BrainCircuit,
+    navKey: "dashboard",
+  },
+];
+
 export function AdminSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
@@ -441,6 +451,19 @@ export function AdminSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 {renderNavGroup(phase3aNavItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
+        {renderNavGroup(phase3cNavItems) && (
+          <SidebarGroup className="mt-6">
+            <SidebarGroupLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2">
+              Intelligence Layer
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {renderNavGroup(phase3cNavItems)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

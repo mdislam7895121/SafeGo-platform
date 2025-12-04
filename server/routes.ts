@@ -70,6 +70,7 @@ import bdCustomerRoutes from "./routes/bd-customer"; // Bangladesh Expansion: Cu
 import partnerRegistrationRoutes from "./routes/partner-registration"; // Partner Registration for drivers & restaurants
 import automationRoutes from "./routes/automation"; // Automation Systems API (Profit Automation)
 import adminPhase3aRoutes from "./routes/admin-phase3a"; // Phase 3A: Enterprise Admin Features
+import adminPhase3cRoutes from "./routes/admin-phase3c"; // Phase 3C: Enterprise Admin Intelligence Layer
 import { setupSupportChatWebSocket } from "./websocket/supportChatWs";
 import { setupRideChatWebSocket } from "./websocket/rideChatWs";
 import { setupFoodOrderNotificationsWebSocket } from "./websocket/foodOrderNotificationsWs";
@@ -370,6 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin/security", adminSecurityRoutes); // Phase 6B: Admin Security Features (2FA, IP whitelist, breach response)
   app.use("/api/admin/automation", automationRoutes); // Automation Systems API (Profit Automation)
   app.use("/api/admin/phase3a", adminPhase3aRoutes); // Phase 3A: Enterprise Admin Features
+  app.use("/api/admin/phase3c", adminPhase3cRoutes); // Phase 3C: Enterprise Admin Intelligence Layer
 
   // Bangladesh Expansion: BD-only roles (Shop Partners, Ticket/Rental Operators)
   app.use("/api/shop-partner", shopPartnerRoutes); // Shop Partner management (BD only)

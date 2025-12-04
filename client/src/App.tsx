@@ -294,6 +294,9 @@ import PolicyManager from "@/pages/admin/policy-manager";
 import BackupRecovery from "@/pages/admin/backup-recovery";
 import AuditConsole from "@/pages/admin/audit-console";
 
+// Phase 3C: Enterprise Admin Intelligence Layer
+import IntelligenceDashboard from "@/pages/admin/intelligence-dashboard";
+
 // Test pages
 import TestDriverPublicCard from "@/pages/test/driver-public-card";
 
@@ -2155,6 +2158,15 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Audit Console">
             <AuditConsole />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Phase 3C: Enterprise Admin Intelligence Layer */}
+      <Route path="/admin/intelligence">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Intelligence Dashboard">
+            <IntelligenceDashboard />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
