@@ -83,7 +83,7 @@ router.get('/snapshots/:id', checkBackupAccess(Permission.VIEW_BACKUPS), async (
 });
 
 const triggerBackupSchema = z.object({
-  environment: z.enum(['dev', 'staging']),
+  environment: z.enum(['dev', 'staging', 'prod']),
   type: z.enum(['FULL_DB', 'PARTIAL_ANALYTICS', 'FILES_ONLY', 'CONFIG_ONLY']),
 });
 

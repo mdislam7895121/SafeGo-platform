@@ -403,7 +403,7 @@ export default function BackupsDRPage() {
                     <DialogHeader>
                       <DialogTitle>Trigger New Backup</DialogTitle>
                       <DialogDescription>
-                        Create a new backup snapshot. Production backups can only be triggered by automated systems.
+                        Create a new backup snapshot. Use caution when triggering production backups.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
@@ -414,10 +414,19 @@ export default function BackupsDRPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="dev">Development</SelectItem>
-                            <SelectItem value="staging">Staging</SelectItem>
+                            <SelectItem value="dev" data-testid="option-env-dev">Development</SelectItem>
+                            <SelectItem value="staging" data-testid="option-env-staging">Staging</SelectItem>
+                            <SelectItem value="prod" data-testid="option-env-prod">Production</SelectItem>
                           </SelectContent>
                         </Select>
+                        {triggerEnv === 'prod' && (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                              Production backups affect live systems. Proceed with caution.
+                            </AlertDescription>
+                          </Alert>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Backup Type</Label>
@@ -426,10 +435,10 @@ export default function BackupsDRPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="FULL_DB">Full Database</SelectItem>
-                            <SelectItem value="PARTIAL_ANALYTICS">Analytics Data</SelectItem>
-                            <SelectItem value="FILES_ONLY">Files Only</SelectItem>
-                            <SelectItem value="CONFIG_ONLY">Configuration Only</SelectItem>
+                            <SelectItem value="FULL_DB" data-testid="option-type-full-db">Full Database</SelectItem>
+                            <SelectItem value="PARTIAL_ANALYTICS" data-testid="option-type-analytics">Analytics Data</SelectItem>
+                            <SelectItem value="FILES_ONLY" data-testid="option-type-files">Files Only</SelectItem>
+                            <SelectItem value="CONFIG_ONLY" data-testid="option-type-config">Configuration Only</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -456,10 +465,10 @@ export default function BackupsDRPage() {
                     <SelectValue placeholder="Environment" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Environments</SelectItem>
-                    <SelectItem value="dev">Development</SelectItem>
-                    <SelectItem value="staging">Staging</SelectItem>
-                    <SelectItem value="prod">Production</SelectItem>
+                    <SelectItem value="all" data-testid="filter-env-all">All Environments</SelectItem>
+                    <SelectItem value="dev" data-testid="filter-env-dev">Development</SelectItem>
+                    <SelectItem value="staging" data-testid="filter-env-staging">Staging</SelectItem>
+                    <SelectItem value="prod" data-testid="filter-env-prod">Production</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -467,11 +476,11 @@ export default function BackupsDRPage() {
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="FULL_DB">Full Database</SelectItem>
-                    <SelectItem value="PARTIAL_ANALYTICS">Analytics</SelectItem>
-                    <SelectItem value="FILES_ONLY">Files Only</SelectItem>
-                    <SelectItem value="CONFIG_ONLY">Config Only</SelectItem>
+                    <SelectItem value="all" data-testid="filter-type-all">All Types</SelectItem>
+                    <SelectItem value="FULL_DB" data-testid="filter-type-full-db">Full Database</SelectItem>
+                    <SelectItem value="PARTIAL_ANALYTICS" data-testid="filter-type-analytics">Analytics</SelectItem>
+                    <SelectItem value="FILES_ONLY" data-testid="filter-type-files">Files Only</SelectItem>
+                    <SelectItem value="CONFIG_ONLY" data-testid="filter-type-config">Config Only</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -479,11 +488,11 @@ export default function BackupsDRPage() {
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="CREATED">Created</SelectItem>
-                    <SelectItem value="VERIFIED">Verified</SelectItem>
-                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                    <SelectItem value="FAILED">Failed</SelectItem>
+                    <SelectItem value="all" data-testid="filter-status-all">All Statuses</SelectItem>
+                    <SelectItem value="CREATED" data-testid="filter-status-created">Created</SelectItem>
+                    <SelectItem value="VERIFIED" data-testid="filter-status-verified">Verified</SelectItem>
+                    <SelectItem value="IN_PROGRESS" data-testid="filter-status-in-progress">In Progress</SelectItem>
+                    <SelectItem value="FAILED" data-testid="filter-status-failed">Failed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -908,8 +917,8 @@ export default function BackupsDRPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="dev">Development</SelectItem>
-                    <SelectItem value="staging">Staging</SelectItem>
+                    <SelectItem value="dev" data-testid="restore-target-dev">Development</SelectItem>
+                    <SelectItem value="staging" data-testid="restore-target-staging">Staging</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
