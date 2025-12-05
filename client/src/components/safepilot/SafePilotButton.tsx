@@ -15,7 +15,15 @@ import {
   BarChart3,
   MessageSquare,
   Lightbulb,
-  ArrowRight
+  ArrowRight,
+  Brain,
+  Users,
+  Heart,
+  Megaphone,
+  PieChart,
+  Scale,
+  ExternalLink,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -179,7 +187,7 @@ export function SafePilotButton() {
   const [question, setQuestion] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [queryResponse, setQueryResponse] = useState<SafePilotQueryResponse | null>(null);
-  const [activeTab, setActiveTab] = useState('context');
+  const [activeTab, setActiveTab] = useState('intelligence');
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -355,7 +363,11 @@ export function SafePilotButton() {
           </SheetHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-            <TabsList className="grid grid-cols-3 mx-6 mt-4">
+            <TabsList className="grid grid-cols-4 mx-6 mt-4">
+              <TabsTrigger value="intelligence" className="text-xs" data-testid="tab-safepilot-intelligence">
+                <Brain className="h-3.5 w-3.5 mr-1.5" />
+                Intel
+              </TabsTrigger>
               <TabsTrigger value="context" className="text-xs" data-testid="tab-safepilot-context">
                 <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
                 Context
@@ -369,6 +381,206 @@ export function SafePilotButton() {
                 History
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="intelligence" className="flex-1 flex flex-col mt-0">
+              <ScrollArea className="flex-1 p-6">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Intelligence Modules</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence');
+                      }}
+                      data-testid="button-open-dashboard"
+                    >
+                      Full Dashboard
+                      <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=growth');
+                      }}
+                      data-testid="card-module-growth"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-green-500/10 flex items-center justify-center">
+                          <TrendingUp className="h-4 w-4 text-green-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Growth Engine</div>
+                          <div className="text-xs text-muted-foreground">Demand-supply AI, expansion zones</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=operations');
+                      }}
+                      data-testid="card-module-cost"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                          <DollarSign className="h-4 w-4 text-blue-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Cost Reduction</div>
+                          <div className="text-xs text-muted-foreground">Expense killer, savings finder</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=security');
+                      }}
+                      data-testid="card-module-fraud"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-red-500/10 flex items-center justify-center">
+                          <Shield className="h-4 w-4 text-red-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Fraud Shield</div>
+                          <div className="text-xs text-muted-foreground">Ghost trips, coupon abuse detection</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=operations');
+                      }}
+                      data-testid="card-module-partner"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-orange-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Partner Success</div>
+                          <div className="text-xs text-muted-foreground">Performance coaching, training plans</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=marketing');
+                      }}
+                      data-testid="card-module-retention"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-pink-500/10 flex items-center justify-center">
+                          <Heart className="h-4 w-4 text-pink-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Customer Retention</div>
+                          <div className="text-xs text-muted-foreground">Win-back AI, churn prediction</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=marketing');
+                      }}
+                      data-testid="card-module-marketing"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                          <Megaphone className="h-4 w-4 text-purple-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Marketing AI</div>
+                          <div className="text-xs text-muted-foreground">Zero-budget marketing, captions</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=overview');
+                      }}
+                      data-testid="card-module-financial"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-cyan-500/10 flex items-center justify-center">
+                          <PieChart className="h-4 w-4 text-cyan-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Financial Intel</div>
+                          <div className="text-xs text-muted-foreground">Revenue forecasting, payout risks</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+
+                    <Card 
+                      className="p-3 cursor-pointer hover-elevate"
+                      onClick={() => {
+                        setIsOpen(false);
+                        setLocation('/admin/safepilot-intelligence?tab=security');
+                      }}
+                      data-testid="card-module-compliance"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-slate-500/10 flex items-center justify-center">
+                          <Scale className="h-4 w-4 text-slate-500" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-medium text-sm">Compliance Guard</div>
+                          <div className="text-xs text-muted-foreground">BD NID, US privacy compliance</div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </Card>
+                  </div>
+
+                  <div className="pt-2">
+                    <Card className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Zap className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-sm">Business Automation Engine</div>
+                          <div className="text-xs text-muted-foreground">
+                            8 AI modules analyzing your business 24/7
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+              </ScrollArea>
+            </TabsContent>
 
             <TabsContent value="context" className="flex-1 flex flex-col mt-0">
               <ScrollArea className="flex-1 p-6">

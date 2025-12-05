@@ -74,6 +74,7 @@ export const costReductionEngine = {
       where: {
         createdAt: { gte: since },
         status: 'approved',
+        ...(countryCode ? { customer: { user: { countryCode } } } : {}),
       },
       include: {
         customer: {
@@ -105,19 +106,39 @@ export const costReductionEngine = {
       customerRefunds.set(customerId, existing);
     }
 
-    const totalOrders = await prisma.foodOrder.count({
-      where: { createdAt: { gte: since } },
-    }) + await prisma.ride.count({
-      where: { createdAt: { gte: since } },
-    });
+    const customerIds = Array.from(customerRefunds.keys());
+    
+    const [foodOrders, rides] = await Promise.all([
+      prisma.foodOrder.groupBy({
+        by: ['customerId'],
+        where: { 
+          customerId: { in: customerIds },
+          createdAt: { gte: since },
+          ...(countryCode ? { customer: { user: { countryCode } } } : {}),
+        },
+        _count: { id: true },
+      }),
+      prisma.ride.groupBy({
+        by: ['customerId'],
+        where: { 
+          customerId: { in: customerIds },
+          createdAt: { gte: since },
+          ...(countryCode ? { customer: { user: { countryCode } } } : {}),
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    const orderCounts = new Map<string, number>();
+    for (const o of foodOrders) {
+      orderCounts.set(o.customerId, (orderCounts.get(o.customerId) || 0) + o._count.id);
+    }
+    for (const r of rides) {
+      orderCounts.set(r.customerId, (orderCounts.get(r.customerId) || 0) + r._count.id);
+    }
 
     for (const [customerId, data] of customerRefunds) {
-      const customerOrders = await prisma.foodOrder.count({
-        where: { customerId, createdAt: { gte: since } },
-      }) + await prisma.ride.count({
-        where: { customerId, createdAt: { gte: since } },
-      });
-
+      const customerOrders = orderCounts.get(customerId) || 0;
       const refundRate = customerOrders > 0 ? data.count / customerOrders : 0;
 
       if (data.count >= 3 || refundRate > 0.2 || data.total > 100) {
@@ -167,6 +188,7 @@ export const costReductionEngine = {
     const couponUsages = await prisma.couponUsage.findMany({
       where: {
         usedAt: { gte: since },
+        ...(countryCode ? { customer: { user: { countryCode } } } : {}),
       },
       include: {
         customer: {
@@ -245,6 +267,7 @@ export const costReductionEngine = {
       where: {
         createdAt: { gte: thisMonth },
         status: 'completed',
+        ...(countryCode ? { driver: { user: { countryCode } } } : {}),
       },
     });
 
@@ -273,6 +296,7 @@ export const costReductionEngine = {
       where: {
         createdAt: { gte: thisMonth },
         status: 'paid',
+        ...(countryCode ? { referrer: { countryCode } } : {}),
       },
     });
 
@@ -310,6 +334,7 @@ export const costReductionEngine = {
       where: {
         createdAt: { gte: since },
         status: 'completed',
+        ...(countryCode ? { driver: { user: { countryCode } } } : {}),
       },
       include: {
         driver: {
