@@ -444,7 +444,12 @@ export const safePilotService = {
       todayOrders,
     ] = await Promise.all([
       prisma.driverProfile.count({ where }),
-      prisma.driverProfile.count({ where: { ...where, isOnline: true } }),
+      prisma.driverRealtimeState.count({ 
+        where: { 
+          isOnline: true,
+          ...(countryCode ? { driver: { user: { countryCode } } } : {}),
+        } 
+      }),
       prisma.driverProfile.count({ where: { ...where, verificationStatus: 'pending' } }),
       prisma.customerProfile.count({ where: countryCode ? { user: { countryCode } } : {} }),
       prisma.ride.count({
