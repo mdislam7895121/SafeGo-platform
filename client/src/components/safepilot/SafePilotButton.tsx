@@ -39,7 +39,7 @@ import {
   SheetTitle,
   SheetDescription 
 } from '@/components/ui/sheet';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+import { apiRequest, queryClient, fetchWithAuth } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface SafePilotSuggestion {
@@ -221,26 +221,37 @@ export function SafePilotButton() {
   const { data: contextData, isLoading: contextLoading, error: contextError, refetch: refetchContext } = useQuery<SafePilotContextResponse>({
     queryKey: ['/api/admin/safepilot/context', pageKey],
     queryFn: async () => {
-      const params = new URLSearchParams({ pageKey });
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/admin/safepilot/context?${params}`, {
-        credentials: 'include',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!res.ok) {
-        console.error('[SafePilot] Context fetch failed:', res.status);
+      try {
+        const params = new URLSearchParams({ pageKey });
+        const res = await fetchWithAuth(`/api/admin/safepilot/context?${params}`);
+        
+        if (!res.ok) {
+          console.error('[SafePilot] Context fetch failed:', res.status);
+          return {
+            pageKey,
+            summary: { 
+              title: pageKey.replace('admin.', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), 
+              description: 'Page-specific insights and actions' 
+            },
+            metrics: {},
+            alerts: [],
+            quickActions: [],
+          };
+        }
+        return res.json();
+      } catch (err) {
+        console.error('[SafePilot] Context fetch error:', err);
         return {
           pageKey,
-          summary: { title: pageKey.replace('admin.', '').replace(/-/g, ' '), description: 'Context unavailable' },
+          summary: { 
+            title: pageKey.replace('admin.', '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), 
+            description: 'Page-specific insights and actions' 
+          },
           metrics: {},
           alerts: [],
           quickActions: [],
         };
       }
-      return res.json();
     },
     enabled: isOpen && location.startsWith('/admin'),
     staleTime: 30 * 1000,
