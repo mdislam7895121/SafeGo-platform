@@ -223,6 +223,11 @@ export enum Permission {
   UPDATE_CHECKLIST = 'UPDATE_CHECKLIST',
   VIEW_RELEASE_AUDIT = 'VIEW_RELEASE_AUDIT',
   DELETE_RELEASE = 'DELETE_RELEASE',
+  
+  // SafePilot: AI Admin Assistant
+  USE_SAFEPILOT = 'USE_SAFEPILOT',
+  MANAGE_SAFEPILOT_CONFIG = 'MANAGE_SAFEPILOT_CONFIG',
+  VIEW_SAFEPILOT_ANALYTICS = 'VIEW_SAFEPILOT_ANALYTICS',
 }
 
 type RolePermissions = {
@@ -414,6 +419,11 @@ const rolePermissions: RolePermissions = {
     Permission.UPDATE_CHECKLIST,
     Permission.VIEW_RELEASE_AUDIT,
     Permission.DELETE_RELEASE,
+    
+    // SafePilot: AI Admin Assistant
+    Permission.USE_SAFEPILOT,
+    Permission.MANAGE_SAFEPILOT_CONFIG,
+    Permission.VIEW_SAFEPILOT_ANALYTICS,
   ]),
 
   // ADMIN: General management (non-sensitive)

@@ -1585,6 +1585,10 @@ model User {
   shopPartner    ShopPartner?
   ticketOperator TicketOperator?
 
+  // SafePilot: AI Admin Assistant
+  safePilotInteractions SafePilotInteraction[] @relation("SafePilotInteractions")
+  safePilotConfigUpdates SafePilotConfig[] @relation("SafePilotConfigUpdates")
+
   @@index([isDemo])
   @@index([isAccountLocked])
   @@map("users")
@@ -11177,4 +11181,167 @@ model MetricThresholdAlert {
   @@index([isEnabled])
   @@index([alertSeverity])
   @@map("metric_threshold_alerts")
+}
+
+// ============================================
+// SafePilot: AI-Powered Admin Assistant
+// ============================================
+
+enum SafePilotRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SafePilotActionType {
+  NAVIGATE
+  FILTER
+  OPEN_PANEL
+  RUN_REPORT
+  BULK_ACTION
+  SUGGEST_POLICY
+}
+
+// SafePilot Interaction - Tracks all admin interactions with SafePilot
+model SafePilotInteraction {
+  id String @id @default(uuid())
+
+  adminId   String
+  admin     User   @relation("SafePilotInteractions", fields: [adminId], references: [id])
+
+  timestamp DateTime @default(now())
+
+  pageKey           String   // e.g., "admin.drivers.list", "admin.rides.details"
+  contextEntityType String?  // e.g., "driver", "customer", "ride", "order", "payout"
+  contextEntityId   String?
+
+  question        String?  @db.Text
+  responseSummary String   @db.Text
+  suggestionsJson Json     // Array of suggestions with actionType, label, payload
+
+  selectedActionKey String?  // Which action the admin selected (if any)
+
+  countryCode String?  // BD, US
+
+  riskLevel SafePilotRiskLevel @default(LOW)
+
+  // Performance tracking
+  responseTimeMs   Int?
+  insightsCount    Int      @default(0)
+  suggestionsCount Int      @default(0)
+
+  // Session tracking
+  sessionId String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([pageKey])
+  @@index([contextEntityType])
+  @@index([countryCode])
+  @@index([riskLevel])
+  @@index([timestamp])
+  @@index([sessionId])
+  @@map("safepilot_interactions")
+}
+
+// SafePilot Config - Configuration for SafePilot rules and thresholds
+model SafePilotConfig {
+  id String @id @default(uuid())
+
+  key         String  @unique // e.g., "risk_threshold.driver.low_rating", "fraud_pattern.refund_abuse"
+  valueJson   Json    // Configuration value (thresholds, rules, etc.)
+  description String? @db.Text
+
+  isEnabled Boolean @default(true)
+
+  category   String? // e.g., "risk_scoring", "fraud_detection", "cost_reduction", "safety"
+  subcategory String? // e.g., "driver", "customer", "restaurant", "order"
+
+  countryCode String? // BD, US, or null for global
+
+  updatedByAdminId String?
+  updatedByAdmin   User?   @relation("SafePilotConfigUpdates", fields: [updatedByAdminId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([category])
+  @@index([isEnabled])
+  @@index([countryCode])
+  @@map("safepilot_configs")
+}
+
+// SafePilot Risk Score - Cached risk scores for entities
+model SafePilotRiskScore {
+  id String @id @default(uuid())
+
+  entityType String // driver, customer, restaurant, ride, order
+  entityId   String
+
+  riskScore      Decimal @db.Decimal(5, 4) // 0.0000 to 1.0000
+  riskLevel      SafePilotRiskLevel
+  riskFactors    Json    // Array of { factor, weight, value, description }
+
+  lastCalculated DateTime @default(now())
+  expiresAt      DateTime?
+
+  countryCode String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([riskLevel])
+  @@index([riskScore])
+  @@index([countryCode])
+  @@index([lastCalculated])
+  @@map("safepilot_risk_scores")
+}
+
+// SafePilot Insight - Generated insights for admin review
+model SafePilotInsight {
+  id String @id @default(uuid())
+
+  insightType String // risk, performance, cost, safety, compliance, fraud
+  title       String
+  detail      String @db.Text
+  metrics     Json?  // Key-value metrics
+
+  severity   SafePilotRiskLevel @default(LOW)
+  priority   Int                @default(0) // Higher = more important
+
+  entityType String?
+  entityId   String?
+
+  countryCode String?
+
+  isActive    Boolean   @default(true)
+  isDismissed Boolean   @default(false)
+  dismissedBy String?
+  dismissedAt DateTime?
+
+  suggestedActions Json? // Array of actions to take
+
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([insightType])
+  @@index([severity])
+  @@index([priority])
+  @@index([isActive])
+  @@index([countryCode])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("safepilot_insights")
 }
