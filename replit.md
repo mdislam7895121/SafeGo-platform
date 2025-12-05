@@ -44,6 +44,17 @@ The frontend is built with React 18, TypeScript, Vite 5, shadcn/ui, Tailwind CSS
 *   **Global Admin Search**: Multi-entity search, type filters, debounced search, result grouping, and quick navigation.
 *   **Operations Console**: System job monitoring with status tracking (RUNNING, SUCCESS, FAILED, PARTIAL, CANCELLED), service health checks (database, Stripe, Google Maps, Twilio, email, Redis, WebSocket, file storage), error logging with severity levels (DEBUG, INFO, WARNING, ERROR, CRITICAL), and resolution workflow. Includes auto-refresh, filtering, and trend visualization.
 *   **Backup & Disaster Recovery**: Comprehensive backup management system with BackupSnapshot model tracking metadata, size, type, status, storage location, retention settings, and verification. Features INFRA_ADMIN role with specialized permissions (VIEW_BACKUPS, CREATE_BACKUP, RESTORE_BACKUP, DELETE_BACKUP, MANAGE_DR_CONFIG, VIEW_DR_STATUS), restore operations with two-step confirmation tokens, DR status dashboard with RPO/RTO targets, cross-region replication status, and environment-specific backup statistics.
+*   **SafePilot Intelligence Engine**: Upgraded SafePilot from a basic admin assistant into a world-class business automation engine with 8 intelligence modules:
+    - **Growth Engine**: Revenue optimization, market expansion opportunities, market share projection, and growth actions
+    - **Cost Reduction Engine**: Refund abuse detection, discount abuse patterns, incentive overspend analysis, payout leakage detection with country-scoped bulk queries
+    - **Fraud & Safety Shield**: Real-time fraud alerts, suspicious driver monitoring, coordinated fraud rings, safety incident patterns
+    - **Partner Success Coach**: Partner performance metrics, personalized coaching recommendations, success predictions
+    - **Customer Retention AI**: Unhappy customer detection, apology message generation, win-back strategies, churn prediction using optimized bulk queries
+    - **Marketing AI**: Campaign optimization, customer segmentation, A/B testing insights, personalized promotions
+    - **Financial Intelligence**: Revenue forecasting, expense analysis, profitability metrics, cash flow projections
+    - **Legal & Compliance Guard**: Regulatory monitoring, compliance alerts, document expiration tracking, audit preparation
+    
+    Features include a dedicated Intelligence dashboard page (/admin/safepilot-intelligence), enhanced SafePilot drawer with Intelligence tab, 60+ API endpoints with RBAC (USE_SAFEPILOT permission), and production-safe queries with country-scoping and bulk aggregations.
 
 ## External Dependencies
 
