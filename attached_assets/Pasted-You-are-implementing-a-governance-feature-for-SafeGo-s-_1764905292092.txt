@@ -1,0 +1,48 @@
+You are implementing a governance feature for SafeGo’s admin console.
+
+Follow existing RBAC and audit logging rules:
+- Multiple admin roles exist (SUPER_ADMIN, SUPPORT_ADMIN, FINANCE_ADMIN, RISK_ADMIN, etc.).
+- All role changes are logged with who/when/what.
+
+TASK GOAL  
+Build a **Periodic Access Review** feature so security or compliance admins can regularly review who has which admin roles and certify or revoke access.
+
+REQUIREMENTS  
+
+1. Review Cycles
+   - Introduce a `AccessReviewCycle` model with:
+     - id, createdAt, createdByAdminId
+     - period (e.g. “Q1 2026” or date range)
+     - status (OPEN, IN_PROGRESS, COMPLETED)
+   - Create `AccessReviewItem` entries for each admin user and role combination:
+     - id, reviewCycleId, adminId, role, justificationText, decision (KEEP, REVOKE, CHANGE_ROLE), decidedByAdminId, decidedAt.
+
+2. Admin UI – Access Review
+   - New sidebar entry under “Security”: “Access Reviews”.
+   - List of past cycles with filters and status.
+   - When opening a cycle:
+     - Show a table grouping users by team/role (Support, Finance, Risk, Infra, etc.).
+     - Provide actions to:
+       - Mark as “Keep” (with optional note).
+       - Mark as “Revoke role”.
+       - Change to a lower-privilege role.
+   - Provide a global filter for country scope (BD/US/global) so reviewers see relevant admins first.
+
+3. Enforcement
+   - When a review item is marked “Revoke role” and the cycle is completed:
+     - Apply the role change in the real RBAC system.
+     - Log an audit event with old roles and new roles.
+   - Optionally support a “two-person rule” where certain role changes require a second admin’s confirmation (at least design the data model to support this).
+
+4. Notifications
+   - When a new cycle is created:
+     - Notify relevant security/compliance admins via the existing notification system.
+   - On cycle completion:
+     - Log a summary record (how many roles kept, revoked, changed).
+
+5. Exports & Evidence
+   - Allow exporting a cycle summary as CSV or PDF:
+     - who reviewed, decisions per admin, timestamps.
+   - This can later be used as evidence for audits (e.g. SOC 2 / ISO 27001).
+
+Implement the full backend models, endpoints, and admin UI so that SafeGo can perform regular formal access reviews with minimal manual work.

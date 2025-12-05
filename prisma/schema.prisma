@@ -10648,3 +10648,169 @@ model DRConfiguration {
 
   @@map("dr_configurations")
 }
+
+// ===========================================
+// GOVERNANCE: Periodic Access Review System
+// ===========================================
+
+// Review Cycle Status
+enum ReviewCycleStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Review Decision Types
+enum ReviewDecision {
+  PENDING
+  KEEP
+  REVOKE
+  CHANGE_ROLE
+}
+
+// Access Review Cycle - Periodic review of admin access
+model AccessReviewCycle {
+  id String @id @default(uuid())
+
+  name        String   // e.g., "Q1 2026 Access Review"
+  description String?  @db.Text
+  period      String   // e.g., "Q1 2026" or "2026-01-01 to 2026-03-31"
+  
+  status      ReviewCycleStatus @default(OPEN)
+  
+  // Scope filters
+  countryScope String?  // BD, US, or null for global
+  roleScope    String[] @default([]) // Specific roles to review, empty = all
+  
+  // Dates
+  startDate   DateTime?
+  dueDate     DateTime?
+  completedAt DateTime?
+  
+  // Creator
+  createdByAdminId   String
+  createdByAdminName String?
+  
+  // Completion stats
+  totalItems        Int @default(0)
+  reviewedItems     Int @default(0)
+  keptCount         Int @default(0)
+  revokedCount      Int @default(0)
+  changedRoleCount  Int @default(0)
+  
+  // Settings
+  requiresTwoPersonRule Boolean @default(false)
+  notifyOnComplete      Boolean @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  reviewItems AccessReviewItem[]
+
+  @@index([status])
+  @@index([countryScope])
+  @@index([createdByAdminId])
+  @@index([createdAt])
+  @@index([dueDate])
+  @@map("access_review_cycles")
+}
+
+// Access Review Item - Individual admin/role combination to review
+model AccessReviewItem {
+  id String @id @default(uuid())
+
+  reviewCycleId String
+  reviewCycle   AccessReviewCycle @relation(fields: [reviewCycleId], references: [id], onDelete: Cascade)
+  
+  // Admin being reviewed
+  adminId       String
+  adminEmail    String
+  adminName     String?
+  
+  // Role being reviewed
+  currentRole   String   // AdminRole at time of review
+  newRole       String?  // If decision is CHANGE_ROLE
+  
+  // Team/Department classification
+  team          String?  // Support, Finance, Risk, Infra, etc.
+  country       String?  // Country code for filtering
+  
+  // Review decision
+  decision        ReviewDecision @default(PENDING)
+  justificationText String?      @db.Text
+  
+  // First reviewer
+  decidedByAdminId   String?
+  decidedByAdminName String?
+  decidedAt          DateTime?
+  
+  // Two-person rule: second approval
+  requiresSecondApproval Boolean @default(false)
+  secondApprovalBy       String?
+  secondApprovalByName   String?
+  secondApprovalAt       DateTime?
+  secondApprovalDecision ReviewDecision?
+  
+  // Enforcement
+  isEnforced     Boolean   @default(false)
+  enforcedAt     DateTime?
+  enforcedBy     String?
+  enforcementError String? @db.Text
+  
+  // Audit trail
+  previousRoles  String[]  @default([]) // Roles before any change
+  auditLogId     String?   // Link to detailed audit log
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([reviewCycleId, adminId, currentRole])
+  @@index([reviewCycleId])
+  @@index([adminId])
+  @@index([decision])
+  @@index([team])
+  @@index([country])
+  @@index([isEnforced])
+  @@map("access_review_items")
+}
+
+// Access Review Summary - Audit record of completed cycles
+model AccessReviewSummary {
+  id String @id @default(uuid())
+
+  reviewCycleId String @unique
+  cycleName     String
+  period        String
+  
+  // Stats
+  totalAdminsReviewed Int
+  totalRolesReviewed  Int
+  keptCount           Int
+  revokedCount        Int
+  changedRoleCount    Int
+  
+  // Reviewers who participated
+  reviewerIds   String[]
+  reviewerNames String[]
+  
+  // Timing
+  cycleStartedAt   DateTime
+  cycleCompletedAt DateTime
+  durationDays     Int
+  
+  // Export info
+  exportedAt DateTime?
+  exportPath String?
+  exportType String?  // CSV, PDF
+  
+  // Compliance fields
+  complianceNotes String? @db.Text
+  
+  createdAt DateTime @default(now())
+
+  @@index([reviewCycleId])
+  @@index([cycleCompletedAt])
+  @@map("access_review_summaries")
+}
