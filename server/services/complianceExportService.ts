@@ -1,4 +1,4 @@
-import { prisma } from "../storage";
+import { prisma } from "../lib/prisma";
 import { z } from "zod";
 import crypto from "crypto";
 

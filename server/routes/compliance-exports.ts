@@ -1,22 +1,25 @@
-import { Router, Response } from "express";
-import { Permission, checkPermission } from "../utils/permissions";
+import { Router, Request, Response } from "express";
+import { Permission, canPerform, AdminRole } from "../utils/permissions";
 import {
   ComplianceExportService,
   ComplianceExportCategory,
   ComplianceExportStatus,
 } from "../services/complianceExportService";
 
-interface AuthenticatedRequest {
+interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email: string;
     role: string;
-    permissions?: string[];
+    adminProfile?: {
+      adminRole: AdminRole;
+      isActive: boolean;
+    } | null;
   };
-  headers: any;
-  body: any;
-  params: any;
-  query: any;
+}
+
+function checkPermission(req: AuthenticatedRequest, permission: Permission): boolean {
+  return canPerform(req.user, permission);
 }
 
 function getClientIp(req: any): string | null {
