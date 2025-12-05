@@ -163,9 +163,26 @@ export default function ObservabilityCenter() {
 
   const getToken = () => localStorage.getItem("token");
 
-  const { data: dashboardData, isLoading: isDashboardLoading, refetch: refetchDashboard } = useQuery({
+  const [accessDenied, setAccessDenied] = useState(false);
+
+  const { data: dashboardData, isLoading: isDashboardLoading, error: dashboardError, refetch: refetchDashboard } = useQuery({
     queryKey: ["/api/admin/observability/dashboard"],
+    queryFn: async () => {
+      const response = await fetch("/api/admin/observability/dashboard", {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (response.status === 403) {
+        setAccessDenied(true);
+        throw new Error("Access denied");
+      }
+      if (!response.ok) throw new Error("Failed to fetch");
+      return response.json();
+    },
     refetchInterval: isLiveTail ? 5000 : 30000,
+    retry: (failureCount, error) => {
+      if (error?.message === "Access denied") return false;
+      return failureCount < 2;
+    },
   });
 
   const { data: logsData, isLoading: isLogsLoading, refetch: refetchLogs } = useQuery({
@@ -333,8 +350,40 @@ export default function ObservabilityCenter() {
     ? Object.entries(logStatsData.bySeverity).map(([name, value]) => ({ name, value }))
     : [];
 
+  if (accessDenied) {
+    return (
+      <div className="container mx-auto p-4 md:p-6 flex items-center justify-center min-h-[60vh]" data-testid="page-observability-access-denied">
+        <Card className="max-w-md w-full">
+          <CardContent className="pt-6 text-center space-y-4">
+            <div className="mx-auto w-12 h-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+            <h2 className="text-xl font-semibold">Access Restricted</h2>
+            <p className="text-muted-foreground">
+              The Observability Center requires elevated privileges. Only Super Admins and Infrastructure Admins can access this feature.
+            </p>
+            <Button variant="outline" onClick={() => window.history.back()} data-testid="button-go-back">
+              Go Back
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isDashboardLoading && !dashboardData) {
+    return (
+      <div className="container mx-auto p-4 md:p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+          <p className="text-muted-foreground">Loading observability data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto p-4 md:p-6 space-y-6" data-testid="page-observability-center">
+    <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6" data-testid="page-observability-center">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
@@ -394,7 +443,7 @@ export default function ObservabilityCenter() {
         </TabsList>
 
         <TabsContent value="dashboard" className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
             <Card data-testid="card-metric-cpu">
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-center justify-between">
@@ -455,7 +504,7 @@ export default function ObservabilityCenter() {
               </CardContent>
             </Card>
 
-            <Card className="col-span-2 md:col-span-1" data-testid="card-metric-websocket">
+            <Card className="col-span-1 sm:col-span-1" data-testid="card-metric-websocket">
               <CardContent className="pt-4 pb-3">
                 <div className="flex items-center justify-between">
                   <Wifi className="w-5 h-5 text-cyan-500" />
@@ -713,10 +762,13 @@ export default function ObservabilityCenter() {
                 </div>
               </div>
 
-              <ScrollArea className="h-[400px] md:h-[500px] border rounded-md">
+              <ScrollArea className="h-[300px] md:h-[400px] border rounded-md">
                 <div className="p-2 space-y-1 font-mono text-xs">
                   {isLogsLoading ? (
-                    <p className="text-center text-muted-foreground py-8">Loading logs...</p>
+                    <div className="flex items-center justify-center py-12">
+                      <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-muted-foreground">Loading logs...</span>
+                    </div>
                   ) : logs?.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">No logs found</p>
                   ) : (
@@ -771,10 +823,13 @@ export default function ObservabilityCenter() {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[500px]">
+              <ScrollArea className="h-[400px]">
                 <div className="space-y-3">
                   {isCorrelationsLoading ? (
-                    <p className="text-center text-muted-foreground py-8">Loading correlations...</p>
+                    <div className="flex items-center justify-center py-12">
+                      <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
+                      <span className="ml-2 text-muted-foreground">Loading correlations...</span>
+                    </div>
                   ) : correlations?.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">No event correlations found</p>
                   ) : (

@@ -292,6 +292,12 @@ const phase3cNavItems: NavItem[] = [
     navKey: "dashboard",
   },
   {
+    title: "Observability",
+    href: "/admin/observability",
+    icon: Activity,
+    navKey: "dashboard",
+  },
+  {
     title: "Intelligence",
     href: "/admin/intelligence",
     icon: BrainCircuit,

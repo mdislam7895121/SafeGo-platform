@@ -304,6 +304,9 @@ import AuditConsole from "@/pages/admin/audit-console";
 import IntelligenceDashboard from "@/pages/admin/intelligence-dashboard";
 import OperationsCenter from "@/pages/admin/operations-center";
 
+// Phase 5A: Admin Observability Center
+import ObservabilityCenter from "@/pages/admin/observability-center";
+
 // Phase 4: Enterprise Admin Features
 import ComplaintResolution from "@/pages/admin/complaint-resolution";
 import RefundCenter from "@/pages/admin/refund-center";
@@ -2236,6 +2239,15 @@ function Router() {
         <ProtectedRoute allowedRoles={["admin"]}>
           <AdminLayout pageTitle="Operations Center">
             <OperationsCenter />
+          </AdminLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Observability Center - Backend enforces SUPER_ADMIN/INFRA_ADMIN role check */}
+      <Route path="/admin/observability">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <AdminLayout pageTitle="Observability Center">
+            <ObservabilityCenter />
           </AdminLayout>
         </ProtectedRoute>
       </Route>
