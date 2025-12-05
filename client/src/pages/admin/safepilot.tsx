@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { 
   Sparkles, 
@@ -9,6 +9,8 @@ import {
   Shield, 
   DollarSign,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   History,
   BarChart3,
   MessageSquare,
@@ -33,35 +35,55 @@ import {
   Ban,
   FileCheck,
   CreditCard,
+  Eye,
+  Radio,
+  ShieldCheck,
+  Gauge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Link } from 'wouter';
 
+type SafePilotMode = 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE';
+type RiskLevel = 'SAFE' | 'CAUTION' | 'HIGH_RISK';
+
+interface SafePilotAction {
+  label: string;
+  risk: RiskLevel;
+  actionType?: string;
+  payload?: Record<string, unknown>;
+}
+
 interface SafePilotQueryResponse {
-  answerText: string;
-  insights: Array<{
+  mode: SafePilotMode;
+  summary: string[];
+  keySignals: string[];
+  actions: SafePilotAction[];
+  monitor: string[];
+  answerText?: string;
+  insights?: Array<{
     type: string;
     title: string;
     detail: string;
     severity: string;
   }>;
-  suggestions: Array<{
+  suggestions?: Array<{
     key: string;
     label: string;
     actionType: string;
-    payload: Record<string, any>;
+    payload: Record<string, unknown>;
   }>;
-  riskLevel: string;
+  riskLevel?: string;
+  error?: string;
 }
 
 interface SafePilotHistoryItem {
@@ -149,9 +171,37 @@ const intelligenceModules = [
   },
 ];
 
+const getModeConfig = (mode: SafePilotMode) => {
+  switch (mode) {
+    case 'WATCH':
+      return { icon: Eye, color: 'bg-blue-500', label: 'WATCH MODE', description: 'Monitoring & Alerts' };
+    case 'GUARD':
+      return { icon: ShieldCheck, color: 'bg-red-500', label: 'GUARD MODE', description: 'Security & Fraud' };
+    case 'OPTIMIZE':
+      return { icon: Gauge, color: 'bg-green-500', label: 'OPTIMIZE MODE', description: 'Performance & Revenue' };
+    default:
+      return { icon: MessageSquare, color: 'bg-purple-500', label: 'ASK MODE', description: 'General Queries' };
+  }
+};
+
+const getRiskBadge = (risk: RiskLevel) => {
+  switch (risk) {
+    case 'HIGH_RISK':
+      return <Badge variant="destructive" className="text-[10px] sm:text-xs">[HIGH RISK]</Badge>;
+    case 'CAUTION':
+      return <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 text-[10px] sm:text-xs">[CAUTION]</Badge>;
+    default:
+      return <Badge variant="secondary" className="bg-green-500/20 text-green-700 dark:text-green-400 text-[10px] sm:text-xs">[SAFE]</Badge>;
+  }
+};
+
 export default function SafePilotPage() {
   const [question, setQuestion] = useState('');
   const [response, setResponse] = useState<SafePilotQueryResponse | null>(null);
+  const [summaryExpanded, setSummaryExpanded] = useState(true);
+  const [signalsExpanded, setSignalsExpanded] = useState(false);
+  const [actionsExpanded, setActionsExpanded] = useState(true);
+  const [monitorExpanded, setMonitorExpanded] = useState(false);
   const { toast } = useToast();
 
   const { data: contextData, isLoading: contextLoading } = useQuery({
@@ -175,15 +225,18 @@ export default function SafePilotPage() {
       });
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: SafePilotQueryResponse) => {
       setResponse(data);
       queryClient.invalidateQueries({ queryKey: ['/api/admin/safepilot/history'] });
     },
     onError: () => {
-      toast({
-        title: 'Error',
-        description: 'Failed to process your question. Please try again.',
-        variant: 'destructive',
+      setResponse({
+        mode: 'ASK',
+        summary: ['Unable to process your question. Please try again.'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+        error: 'Failed to process query',
       });
     },
   });
@@ -191,6 +244,13 @@ export default function SafePilotPage() {
   const handleSubmit = () => {
     if (!question.trim()) return;
     queryMutation.mutate(question);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
   const handleQuickAction = (actionId: string) => {
@@ -212,107 +272,168 @@ export default function SafePilotPage() {
 
   return (
     <AdminLayout>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-              <Sparkles className="h-6 w-6 text-white" />
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-full overflow-x-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shrink-0">
+              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </div>
-            <div>
-              <h1 className="text-2xl font-bold" data-testid="text-safepilot-title">SafePilot AI Assistant</h1>
-              <p className="text-muted-foreground">Your intelligent admin copilot for SafeGo operations</p>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold truncate" data-testid="text-safepilot-title">SafePilot AI</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">Your intelligent admin copilot</p>
             </div>
           </div>
-          <Badge variant="secondary" className="gap-1">
+          <Badge variant="secondary" className="gap-1 self-start sm:self-auto">
             <Activity className="h-3 w-3" />
             Online
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5" />
                   Ask SafePilot
                 </CardTitle>
-                <CardDescription>
-                  Ask any question about your platform operations, metrics, or get recommendations
+                <CardDescription className="text-xs sm:text-sm">
+                  Ask about operations, metrics, or get recommendations
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex gap-2">
+              <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0 space-y-3 sm:space-y-4">
+                <div className="flex flex-col gap-2 sm:gap-3">
                   <Textarea
-                    placeholder="e.g., What are the top fraud patterns this week? How can we reduce refund abuse?"
+                    placeholder="e.g., What are the top 3 risks right now? How can we reduce refund abuse?"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
-                    className="min-h-[80px]"
+                    onKeyDown={handleKeyDown}
+                    className="min-h-[60px] sm:min-h-[80px] text-sm sm:text-base resize-none"
                     data-testid="input-safepilot-question"
                   />
+                  <Button 
+                    onClick={handleSubmit}
+                    disabled={queryMutation.isPending || !question.trim()}
+                    className="w-full min-h-[44px] sm:min-h-9 touch-manipulation"
+                    data-testid="button-safepilot-submit"
+                  >
+                    {queryMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4 mr-2" />
+                        Ask SafePilot
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <Button 
-                  onClick={handleSubmit}
-                  disabled={queryMutation.isPending || !question.trim()}
-                  className="w-full"
-                  data-testid="button-safepilot-submit"
-                >
-                  {queryMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Ask SafePilot
-                    </>
-                  )}
-                </Button>
 
-                {response && (
-                  <div className="mt-4 space-y-4">
+                {response && !response.error && (
+                  <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4">
                     <Separator />
-                    <div className="flex items-start gap-3">
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shrink-0">
-                        <Brain className="h-4 w-4 text-white" />
+                    
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <div className={`h-7 sm:h-8 px-2 sm:px-3 rounded-full ${getModeConfig(response.mode).color} flex items-center gap-1.5`}>
+                        {(() => {
+                          const ModeIcon = getModeConfig(response.mode).icon;
+                          return <ModeIcon className="h-3.5 w-3.5 text-white" />;
+                        })()}
+                        <span className="text-[10px] sm:text-xs font-medium text-white">{getModeConfig(response.mode).label}</span>
                       </div>
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">SafePilot Response</span>
-                          <Badge className={getSeverityColor(response.riskLevel)}>
-                            {response.riskLevel} Risk
-                          </Badge>
-                        </div>
-                        <p className="text-muted-foreground" data-testid="text-safepilot-response">
-                          {response.answerText}
-                        </p>
-                        
-                        {response.insights && response.insights.length > 0 && (
-                          <div className="space-y-2">
-                            <span className="text-sm font-medium">Key Insights:</span>
-                            {response.insights.map((insight, idx) => (
-                              <div key={idx} className="flex items-start gap-2 text-sm bg-muted/50 p-2 rounded-lg">
-                                <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
-                                <div>
-                                  <span className="font-medium">{insight.title}:</span>{' '}
-                                  <span className="text-muted-foreground">{insight.detail}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <span className="text-[10px] sm:text-xs text-muted-foreground">{getModeConfig(response.mode).description}</span>
+                    </div>
 
-                        {response.suggestions && response.suggestions.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {response.suggestions.map((suggestion, idx) => (
-                              <Button key={idx} variant="outline" size="sm" className="gap-1">
-                                {suggestion.label}
+                    <Collapsible open={summaryExpanded} onOpenChange={setSummaryExpanded}>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-auto">
+                          <span className="font-medium text-sm">Summary</span>
+                          {summaryExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-2 pt-2">
+                        {response.summary.map((item, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-xs sm:text-sm bg-muted/50 p-2 sm:p-3 rounded-lg">
+                            <CheckCircle className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                            <span className="break-words">{item}</span>
+                          </div>
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
+
+                    {response.keySignals.length > 0 && (
+                      <Collapsible open={signalsExpanded} onOpenChange={setSignalsExpanded}>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-auto">
+                            <span className="font-medium text-sm">Key Signals</span>
+                            {signalsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-2 pt-2">
+                          {response.keySignals.map((signal, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-muted-foreground">
+                              <Radio className="h-3 w-3 shrink-0 mt-1" />
+                              <span className="break-words">{signal}</span>
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+
+                    {response.actions.length > 0 && (
+                      <Collapsible open={actionsExpanded} onOpenChange={setActionsExpanded}>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-auto">
+                            <span className="font-medium text-sm">Recommended Actions</span>
+                            {actionsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-2 pt-2">
+                          {response.actions.map((action, idx) => (
+                            <div key={idx} className="flex items-center gap-2 flex-wrap p-2 sm:p-3 border rounded-lg bg-card">
+                              {getRiskBadge(action.risk)}
+                              <span className="text-xs sm:text-sm flex-1 min-w-0 break-words">{action.label}</span>
+                              <Button variant="ghost" size="sm" className="shrink-0 h-7 px-2">
                                 <ChevronRight className="h-3 w-3" />
                               </Button>
-                            ))}
-                          </div>
-                        )}
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+
+                    {response.monitor.length > 0 && (
+                      <Collapsible open={monitorExpanded} onOpenChange={setMonitorExpanded}>
+                        <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="w-full justify-between p-2 h-auto">
+                            <span className="font-medium text-sm">What to Monitor</span>
+                            {monitorExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="space-y-2 pt-2">
+                          {response.monitor.map((item, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-xs sm:text-sm text-muted-foreground">
+                              <Eye className="h-3 w-3 shrink-0 mt-1" />
+                              <span className="break-words">{item}</span>
+                            </div>
+                          ))}
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )}
+                  </div>
+                )}
+
+                {response?.error && (
+                  <div className="mt-4 p-3 sm:p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-destructive">Error Processing Query</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {response.summary[0] || 'Please try again or rephrase your question.'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -321,27 +442,59 @@ export default function SafePilotPage() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  Quick Actions
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Brain className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Intelligence Modules
                 </CardTitle>
-                <CardDescription>
-                  Common administrative actions at your fingertips
+                <CardDescription className="text-xs sm:text-sm">
+                  Access specialized AI engines for different operations
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  {intelligenceModules.map((module) => (
+                    <Link key={module.id} href={module.href}>
+                      <Card className="p-2.5 sm:p-3 cursor-pointer hover-elevate transition-all">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg ${module.color} flex items-center justify-center shrink-0`}>
+                            <module.icon className="h-4 w-4 sm:h-4 sm:w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-xs sm:text-sm truncate">{module.name}</div>
+                            <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{module.description}</div>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 hidden sm:block" />
+                        </div>
+                      </Card>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-4 sm:space-y-6">
+            <Card>
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Zap className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+                <div className="grid grid-cols-2 sm:grid-cols-1 gap-2">
                   {quickActions.map((action) => (
                     <Button
                       key={action.id}
                       variant="outline"
-                      className="h-auto py-4 flex flex-col items-center gap-2 hover-elevate"
+                      size="sm"
+                      className="justify-start gap-2 h-auto py-2 sm:py-2.5 px-2 sm:px-3 text-xs sm:text-sm"
                       onClick={() => handleQuickAction(action.id)}
-                      data-testid={`button-action-${action.id}`}
+                      data-testid={`button-quick-${action.id}`}
                     >
-                      <action.icon className={`h-5 w-5 ${action.color}`} />
-                      <span className="text-xs text-center">{action.label}</span>
+                      <action.icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${action.color}`} />
+                      <span className="truncate">{action.label}</span>
                     </Button>
                   ))}
                 </div>
@@ -349,180 +502,75 @@ export default function SafePilotPage() {
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="h-5 w-5" />
-                  Intelligence Modules
-                </CardTitle>
-                <CardDescription>
-                  8 specialized AI modules for business automation
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {intelligenceModules.map((module) => (
-                    <Link key={module.id} href={module.href}>
-                      <Card className="hover-elevate cursor-pointer h-full">
-                        <CardContent className="p-4 flex flex-col items-center text-center gap-2">
-                          <div className={`h-10 w-10 rounded-lg ${module.color} flex items-center justify-center`}>
-                            <module.icon className="h-5 w-5" />
-                          </div>
-                          <span className="font-medium text-sm">{module.name}</span>
-                          <span className="text-xs text-muted-foreground">{module.description}</span>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  ))}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Link href="/admin/safepilot-intelligence" className="w-full">
-                  <Button variant="outline" className="w-full gap-2">
-                    Open Full Intelligence Dashboard
-                    <ExternalLink className="h-4 w-4" />
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Live Metrics
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <History className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Recent Queries
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {metricsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
+                {historyLoading ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
+                ) : historyData && historyData.length > 0 ? (
+                  <ScrollArea className="h-[200px] sm:h-[250px]">
+                    <div className="space-y-2">
+                      {historyData.slice(0, 5).map((item) => (
+                        <div key={item.id} className="p-2 sm:p-3 bg-muted/50 rounded-lg">
+                          <p className="text-xs sm:text-sm font-medium truncate">{item.question}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {item.responseSummary}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              {item.riskLevel}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground">
+                              {new Date(item.timestamp).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Active Users</span>
-                      <span className="font-bold text-lg" data-testid="metric-active-users">
-                        {(metricsData as any)?.activeUsers ?? '1,247'}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Today's Revenue</span>
-                      <span className="font-bold text-lg text-green-600" data-testid="metric-revenue">
-                        ${((metricsData as any)?.todayRevenue ?? 45230).toLocaleString()}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Pending KYC</span>
-                      <span className="font-bold text-lg text-orange-600" data-testid="metric-pending-kyc">
-                        {(metricsData as any)?.pendingKyc ?? 23}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Fraud Alerts</span>
-                      <span className="font-bold text-lg text-red-600" data-testid="metric-fraud-alerts">
-                        {(metricsData as any)?.fraudAlerts ?? 5}
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Driver Issues</span>
-                      <span className="font-bold text-lg text-yellow-600" data-testid="metric-driver-issues">
-                        {(metricsData as any)?.driverIssues ?? 12}
-                      </span>
-                    </div>
-                  </>
+                  <div className="text-center py-4 text-sm text-muted-foreground">
+                    No recent queries
+                  </div>
                 )}
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  Active Alerts
+              <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Platform Health
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
                 <div className="space-y-3">
-                  {(contextData as any)?.alerts?.length > 0 ? (
-                    (contextData as any).alerts.slice(0, 5).map((alert: any, idx: number) => (
-                      <div key={idx} className="flex items-start gap-2 text-sm">
-                        <div className={`h-2 w-2 rounded-full mt-1.5 ${getSeverityColor(alert.severity)}`} />
-                        <div>
-                          <span className="font-medium">{alert.type}</span>
-                          <p className="text-xs text-muted-foreground">{alert.message}</p>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <>
-                      <div className="flex items-start gap-2 text-sm">
-                        <div className="h-2 w-2 rounded-full mt-1.5 bg-red-500" />
-                        <div>
-                          <span className="font-medium">High Refund Rate</span>
-                          <p className="text-xs text-muted-foreground">3 customers flagged for review</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 text-sm">
-                        <div className="h-2 w-2 rounded-full mt-1.5 bg-orange-500" />
-                        <div>
-                          <span className="font-medium">Driver Complaints</span>
-                          <p className="text-xs text-muted-foreground">2 drivers with multiple complaints</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 text-sm">
-                        <div className="h-2 w-2 rounded-full mt-1.5 bg-yellow-500" />
-                        <div>
-                          <span className="font-medium">KYC Backlog</span>
-                          <p className="text-xs text-muted-foreground">15 documents pending review</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5" />
-                  Recent Questions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[200px]">
-                  <div className="space-y-3">
-                    {historyLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : historyData && historyData.length > 0 ? (
-                      historyData.slice(0, 10).map((item) => (
-                        <div key={item.id} className="text-sm border-b pb-2 last:border-0">
-                          <p className="font-medium truncate">{item.question}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {item.pageKey}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(item.timestamp).toLocaleDateString()}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-muted-foreground text-sm">
-                        No recent questions. Ask SafePilot something!
-                      </div>
-                    )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm text-muted-foreground">System Status</span>
+                    <Badge className="bg-green-500 text-[10px] sm:text-xs">Healthy</Badge>
                   </div>
-                </ScrollArea>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Active Drivers</span>
+                    <span className="text-xs sm:text-sm font-medium">Loading...</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm text-muted-foreground">Open Alerts</span>
+                    <span className="text-xs sm:text-sm font-medium">Loading...</span>
+                  </div>
+                  <Separator />
+                  <Link href="/admin/safepilot-intelligence">
+                    <Button variant="outline" size="sm" className="w-full text-xs sm:text-sm">
+                      View Full Dashboard
+                      <ExternalLink className="h-3 w-3 sm:h-3.5 sm:w-3.5 ml-2" />
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           </div>

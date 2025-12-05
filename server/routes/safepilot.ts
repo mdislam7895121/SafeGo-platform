@@ -55,6 +55,13 @@ const queryRequestSchema = z.object({
   question: z.string().min(1).max(500),
   countryCode: z.string().optional(),
   context: z.record(z.string()).optional(),
+  mode: z.enum(['ASK', 'WATCH', 'GUARD', 'OPTIMIZE']).optional(),
+  filters: z.object({
+    dateRange: z.string().optional(),
+    entityType: z.string().optional(),
+    severity: z.string().optional(),
+  }).optional(),
+  timeRange: z.string().optional(),
 });
 
 const suggestActionsSchema = z.object({
@@ -139,6 +146,7 @@ router.get(
 /**
  * POST /api/admin/safepilot/query
  * Process natural language query from admin
+ * Vision 2030: Returns structured response with mode, summary, keySignals, actions, monitor
  */
 router.post(
   '/query',
@@ -161,17 +169,132 @@ router.post(
         body.context
       );
 
-      res.json(response);
+      // Parse the Vision 2030 structured response
+      const mode = safePilotService.detectMode(body.question);
+      
+      // Extract structured sections from answerText
+      const sections = parseVision2030Response(response.answerText);
+      
+      // Return Vision 2030 format
+      res.json({
+        mode,
+        summary: sections.summary,
+        keySignals: sections.keySignals,
+        actions: sections.actions.map(action => ({
+          label: action.label,
+          risk: action.risk,
+          actionType: 'NAVIGATE' as const,
+          payload: {},
+        })),
+        monitor: sections.monitoring,
+        // Legacy fields for backward compatibility
+        answerText: response.answerText,
+        insights: response.insights,
+        suggestions: response.suggestions,
+        riskLevel: response.riskLevel,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        res.status(400).json({ error: 'Invalid request body', details: error.errors });
+        res.status(400).json({ 
+          error: 'Invalid request body', 
+          details: error.errors,
+          mode: 'ASK',
+          summary: ['Unable to process your question. Please check your input.'],
+          keySignals: [],
+          actions: [],
+          monitor: [],
+        });
         return;
       }
       console.error('[SafePilot] Query error:', error);
-      res.status(500).json({ error: 'Failed to process query' });
+      res.status(500).json({ 
+        error: 'Failed to process query',
+        mode: 'ASK',
+        summary: ['An error occurred while processing your question. Please try again.'],
+        keySignals: [],
+        actions: [],
+        monitor: [],
+      });
     }
   }
 );
+
+/**
+ * Parse Vision 2030 formatted response text into structured sections
+ */
+function parseVision2030Response(text: string): {
+  summary: string[];
+  keySignals: string[];
+  actions: Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' }>;
+  monitoring: string[];
+} {
+  const result = {
+    summary: [] as string[],
+    keySignals: [] as string[],
+    actions: [] as Array<{ label: string; risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' }>,
+    monitoring: [] as string[],
+  };
+
+  // Split by sections
+  const sections = text.split(/\*\*([^*]+)\*\*/);
+  let currentSection = '';
+  
+  for (let i = 0; i < sections.length; i++) {
+    const part = sections[i].trim();
+    
+    if (part.includes('Summary:') || part === 'Summary:') {
+      currentSection = 'summary';
+      continue;
+    } else if (part.includes('Key signals') || part === 'Key signals I used:') {
+      currentSection = 'keySignals';
+      continue;
+    } else if (part.includes('Recommended actions') || part === 'Recommended actions:') {
+      currentSection = 'actions';
+      continue;
+    } else if (part.includes('What to monitor') || part === 'What to monitor next:') {
+      currentSection = 'monitoring';
+      continue;
+    }
+    
+    // Extract bullet points
+    const bullets = part.split('•').filter(b => b.trim()).map(b => b.trim());
+    
+    if (currentSection === 'summary') {
+      result.summary.push(...bullets);
+    } else if (currentSection === 'keySignals') {
+      result.keySignals.push(...bullets);
+    } else if (currentSection === 'actions') {
+      bullets.forEach(bullet => {
+        let risk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 'SAFE';
+        let label = bullet;
+        
+        if (bullet.includes('[HIGH RISK')) {
+          risk = 'HIGH_RISK';
+          label = bullet.replace(/\[HIGH RISK[^\]]*\]\s*/, '');
+        } else if (bullet.includes('[CAUTION]')) {
+          risk = 'CAUTION';
+          label = bullet.replace('[CAUTION]', '').trim();
+        } else if (bullet.includes('[SAFE]')) {
+          risk = 'SAFE';
+          label = bullet.replace('[SAFE]', '').trim();
+        }
+        
+        if (label) {
+          result.actions.push({ label, risk });
+        }
+      });
+    } else if (currentSection === 'monitoring') {
+      result.monitoring.push(...bullets);
+    }
+  }
+
+  // Ensure we have at least some data
+  if (result.summary.length === 0) {
+    result.summary = [text.slice(0, 200)];
+  }
+
+  return result;
+}
 
 /**
  * POST /api/admin/safepilot/suggest-actions
