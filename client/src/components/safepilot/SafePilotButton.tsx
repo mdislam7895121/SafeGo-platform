@@ -339,7 +339,7 @@ export function SafePilotButton() {
 
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent 
-          className="w-full sm:max-w-lg p-0 flex flex-col h-[100dvh] sm:h-full" 
+          className="w-full sm:max-w-lg p-0 flex flex-col h-[100dvh] max-h-[100dvh] sm:h-auto sm:max-h-[90vh]" 
           data-testid="panel-safepilot"
           side="right"
         >

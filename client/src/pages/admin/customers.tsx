@@ -86,20 +86,21 @@ export default function AdminCustomers() {
   };
 
   return (
-    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      <div className="flex items-center justify-between space-y-2">
+    <div className="flex-1 space-y-4 p-4 md:p-6 lg:p-8 pt-4 sm:pt-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight" data-testid="heading-customer-management">Customer Management</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight" data-testid="heading-customer-management">Customer Management</h2>
+          <p className="text-sm text-muted-foreground">
             Manage all customer accounts, KYC status, and usage statistics
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setLocation("/admin")}
             data-testid="button-back-dashboard"
+            className="min-h-[44px] sm:min-h-9"
           >
             Back to Dashboard
           </Button>
@@ -116,14 +117,14 @@ export default function AdminCustomers() {
           <CardDescription>Search and filter customer accounts</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Search by Email</label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-3 sm:top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Enter customer email..."
-                  className="pl-8"
+                  className="pl-8 min-h-[44px] sm:min-h-9"
                   value={searchEmail}
                   onChange={(e) => setSearchEmail(e.target.value)}
                   data-testid="input-search-email"
@@ -133,7 +134,7 @@ export default function AdminCustomers() {
             <div className="space-y-2">
               <label className="text-sm font-medium">Account Status</label>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger data-testid="select-status-filter">
+                <SelectTrigger data-testid="select-status-filter" className="min-h-[44px] sm:min-h-9">
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -161,70 +162,120 @@ export default function AdminCustomers() {
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
+                <Skeleton key={i} className="h-24 sm:h-12 w-full" />
               ))}
             </div>
           ) : customers && customers.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Country</TableHead>
-                    <TableHead>KYC Status</TableHead>
-                    <TableHead>Account Status</TableHead>
-                    <TableHead className="text-center">Usage Stats</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {customers.map((customer) => (
-                    <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-email-${customer.id}`}>
-                        {customer.email}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" data-testid={`badge-country-${customer.id}`}>{customer.country}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {getKycStatusBadge(customer.verificationStatus, customer.isVerified)}
-                      </TableCell>
-                      <TableCell>
-                        {getAccountStatusBadge(customer)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1 text-sm">
-                          <div className="flex items-center gap-2" data-testid={`text-rides-${customer.id}`}>
-                            <Car className="h-3 w-3" />
-                            <span>{customer.completedRides}/{customer.totalRides} rides</span>
+            <>
+              {/* Desktop Table */}
+              <div className="hidden md:block rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Country</TableHead>
+                      <TableHead>KYC Status</TableHead>
+                      <TableHead>Account Status</TableHead>
+                      <TableHead className="text-center">Usage Stats</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {customers.map((customer) => (
+                      <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-email-${customer.id}`}>
+                          {customer.email}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" data-testid={`badge-country-${customer.id}`}>{customer.country}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getKycStatusBadge(customer.verificationStatus, customer.isVerified)}
+                        </TableCell>
+                        <TableCell>
+                          {getAccountStatusBadge(customer)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1 text-sm">
+                            <div className="flex items-center gap-2" data-testid={`text-rides-${customer.id}`}>
+                              <Car className="h-3 w-3" />
+                              <span>{customer.completedRides}/{customer.totalRides} rides</span>
+                            </div>
+                            <div className="flex items-center gap-2" data-testid={`text-food-${customer.id}`}>
+                              <ShoppingBag className="h-3 w-3" />
+                              <span>{customer.completedFoodOrders}/{customer.totalFoodOrders} food orders</span>
+                            </div>
+                            <div className="flex items-center gap-2" data-testid={`text-parcels-${customer.id}`}>
+                              <Package className="h-3 w-3" />
+                              <span>{customer.completedParcels}/{customer.totalParcels} parcels</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2" data-testid={`text-food-${customer.id}`}>
-                            <ShoppingBag className="h-3 w-3" />
-                            <span>{customer.completedFoodOrders}/{customer.totalFoodOrders} food orders</span>
-                          </div>
-                          <div className="flex items-center gap-2" data-testid={`text-parcels-${customer.id}`}>
-                            <Package className="h-3 w-3" />
-                            <span>{customer.completedParcels}/{customer.totalParcels} parcels</span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setLocation(`/admin/customers/${customer.id}`)}
+                            data-testid={`button-manage-${customer.id}`}
+                          >
+                            Manage
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile Cards */}
+              <div className="md:hidden space-y-3">
+                {customers.map((customer) => (
+                  <Card key={customer.id} className="hover-elevate" data-testid={`card-customer-${customer.id}`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate" data-testid={`text-email-${customer.id}`}>
+                            {customer.email}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            <Badge variant="outline" data-testid={`badge-country-${customer.id}`} className="text-xs">
+                              {customer.country}
+                            </Badge>
+                            {getKycStatusBadge(customer.verificationStatus, customer.isVerified)}
+                            {getAccountStatusBadge(customer)}
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setLocation(`/admin/customers/${customer.id}`)}
                           data-testid={`button-manage-${customer.id}`}
+                          className="min-h-[40px] min-w-[40px] shrink-0"
                         >
                           Manage
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs border-t pt-3">
+                        <div className="flex items-center gap-1.5" data-testid={`text-rides-${customer.id}`}>
+                          <Car className="h-3 w-3 text-muted-foreground" />
+                          <span>{customer.completedRides}/{customer.totalRides}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5" data-testid={`text-food-${customer.id}`}>
+                          <ShoppingBag className="h-3 w-3 text-muted-foreground" />
+                          <span>{customer.completedFoodOrders}/{customer.totalFoodOrders}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5" data-testid={`text-parcels-${customer.id}`}>
+                          <Package className="h-3 w-3 text-muted-foreground" />
+                          <span>{customer.completedParcels}/{customer.totalParcels}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground" data-testid="text-no-customers">
               No customers found matching your filters.

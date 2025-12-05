@@ -115,16 +115,16 @@ export default function AdminDrivers() {
   return (
     <div className="min-h-screen bg-background pb-6">
       {/* Header */}
-      <div className="bg-primary text-primary-foreground p-6 rounded-b-3xl shadow-lg">
-        <div className="flex items-center gap-4 mb-4">
+      <div className="bg-primary text-primary-foreground p-4 sm:p-6 rounded-b-3xl shadow-lg">
+        <div className="flex items-center gap-3 sm:gap-4 mb-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate("/admin")}
-            className="text-primary-foreground hover:bg-primary-foreground/10"
+            className="text-primary-foreground hover:bg-primary-foreground/10 min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-9"
             data-testid="button-back"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 sm:h-4 sm:w-4" />
           </Button>
           <div>
             <h1 className="text-2xl font-bold">Driver Management</h1>
@@ -133,11 +133,11 @@ export default function AdminDrivers() {
         </div>
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
         {/* Search and Filters */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5" />
               Search & Filters
             </CardTitle>
@@ -153,13 +153,13 @@ export default function AdminDrivers() {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
-                  className="pl-10"
+                  className="pl-10 min-h-[44px] sm:min-h-9"
                   data-testid="input-search"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               <Select 
                 value={countryFilter} 
                 onValueChange={(value) => { 
@@ -168,7 +168,7 @@ export default function AdminDrivers() {
                   setCurrentPage(1);
                 }}
               >
-                <SelectTrigger data-testid="select-country">
+                <SelectTrigger data-testid="select-country" className="min-h-[44px] sm:min-h-9">
                   <SelectValue placeholder="All Countries" />
                 </SelectTrigger>
                 <SelectContent>
@@ -179,7 +179,7 @@ export default function AdminDrivers() {
               </Select>
 
               <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}>
-                <SelectTrigger data-testid="select-status">
+                <SelectTrigger data-testid="select-status" className="min-h-[44px] sm:min-h-9">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -192,7 +192,7 @@ export default function AdminDrivers() {
               </Select>
 
               <Select value={verificationFilter} onValueChange={(value) => { setVerificationFilter(value); setCurrentPage(1); }}>
-                <SelectTrigger data-testid="select-verification">
+                <SelectTrigger data-testid="select-verification" className="min-h-[44px] sm:min-h-9">
                   <SelectValue placeholder="All Verification" />
                 </SelectTrigger>
                 <SelectContent>
@@ -208,7 +208,7 @@ export default function AdminDrivers() {
             {countryFilter === "US" && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <Select value={stateFilter} onValueChange={(value) => { setStateFilter(value); setCurrentPage(1); }}>
-                  <SelectTrigger data-testid="select-state">
+                  <SelectTrigger data-testid="select-state" className="min-h-[44px] sm:min-h-9">
                     <SelectValue placeholder="All States" />
                   </SelectTrigger>
                   <SelectContent>
@@ -354,9 +354,10 @@ export default function AdminDrivers() {
                           variant="outline"
                           onClick={() => navigate(`/admin/drivers/${driver.id}`)}
                           data-testid={`button-view-${driver.id}`}
+                          className="min-h-[44px] min-w-[44px] sm:min-h-9 sm:min-w-fit shrink-0"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
+                          <Eye className="h-4 w-4 sm:mr-1" />
+                          <span className="hidden sm:inline">View</span>
                         </Button>
                       </div>
                     </CardContent>
