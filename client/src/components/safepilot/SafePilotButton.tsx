@@ -238,13 +238,11 @@ export function SafePilotButton() {
 
     setIsSubmitting(true);
     try {
-      const response = await apiRequest<SafePilotQueryResponse>('/api/admin/safepilot/query', {
-        method: 'POST',
-        body: JSON.stringify({
-          pageKey,
-          question: question.trim(),
-        }),
+      const res = await apiRequest('POST', '/api/admin/safepilot/query', {
+        pageKey,
+        question: question.trim(),
       });
+      const response = await res.json() as SafePilotQueryResponse;
 
       setQueryResponse(response);
       setActiveTab('response');
@@ -264,14 +262,12 @@ export function SafePilotButton() {
 
   const handleActionClick = async (suggestion: SafePilotSuggestion) => {
     try {
-      const response = await apiRequest<{ success: boolean; route?: string; filter?: string }>('/api/admin/safepilot/run-action', {
-        method: 'POST',
-        body: JSON.stringify({
-          actionKey: suggestion.key,
-          actionType: suggestion.actionType,
-          payload: suggestion.payload,
-        }),
+      const res = await apiRequest('POST', '/api/admin/safepilot/run-action', {
+        actionKey: suggestion.key,
+        actionType: suggestion.actionType,
+        payload: suggestion.payload,
       });
+      const response = await res.json() as { success: boolean; route?: string; filter?: string };
 
       if (response.success) {
         switch (suggestion.actionType) {
@@ -666,41 +662,100 @@ export function SafePilotButton() {
             <TabsContent value="response" className="flex-1 flex flex-col mt-0 min-h-0">
               <ScrollArea className="flex-1 p-4 sm:p-6">
                 {queryResponse ? (
-                  <div className="space-y-6">
-                    <Card>
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">Answer</CardTitle>
-                          <Badge className={getSeverityColor(queryResponse.riskLevel)}>
-                            {queryResponse.riskLevel} Risk
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm">{queryResponse.answerText}</p>
-                      </CardContent>
-                    </Card>
+                  <div className="space-y-4">
+                    {(queryResponse as any).mode && (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge 
+                          className={
+                            (queryResponse as any).mode === 'WATCH' ? 'bg-blue-500 text-white' :
+                            (queryResponse as any).mode === 'GUARD' ? 'bg-red-500 text-white' :
+                            (queryResponse as any).mode === 'OPTIMIZE' ? 'bg-green-500 text-white' :
+                            'bg-purple-500 text-white'
+                          }
+                        >
+                          {(queryResponse as any).mode} MODE
+                        </Badge>
+                        <Badge className={getSeverityColor(queryResponse.riskLevel)}>
+                          {queryResponse.riskLevel} Risk
+                        </Badge>
+                      </div>
+                    )}
 
-                    {queryResponse.insights.length > 0 && (
+                    {(queryResponse as any).summary?.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm mb-3">Insights</h4>
+                        <h4 className="font-medium text-sm mb-2">Summary</h4>
+                        <div className="space-y-2">
+                          {(queryResponse as any).summary.map((item: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm bg-muted/50 p-2 rounded-lg">
+                              <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                              <span className="break-words">{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(queryResponse as any).keySignals?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Key Signals</h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(queryResponse as any).keySignals.map((signal: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {signal}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(queryResponse as any).actions?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Recommended Actions</h4>
+                        <div className="space-y-2">
+                          {(queryResponse as any).actions.map((action: any, idx: number) => (
+                            <div key={idx} className="flex items-center gap-2 p-2 border rounded-lg bg-card">
+                              <Badge 
+                                variant={action.risk === 'HIGH_RISK' ? 'destructive' : 'secondary'}
+                                className={
+                                  action.risk === 'CAUTION' ? 'bg-yellow-500/20 text-yellow-700' :
+                                  action.risk === 'SAFE' ? 'bg-green-500/20 text-green-700' : ''
+                                }
+                              >
+                                {action.risk === 'HIGH_RISK' ? '[HIGH RISK]' : action.risk === 'CAUTION' ? '[CAUTION]' : '[SAFE]'}
+                              </Badge>
+                              <span className="text-sm flex-1">{action.label}</span>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(queryResponse as any).monitor?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">What to Monitor</h4>
+                        <div className="space-y-1">
+                          {(queryResponse as any).monitor.map((item: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-2 text-xs text-muted-foreground">
+                              <span className="shrink-0">👁</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {queryResponse.insights?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-sm mb-2">Insights</h4>
                         <div className="space-y-2">
                           {queryResponse.insights.map((insight, idx) => (
-                            <Card key={idx} className={`p-3 border ${getSeverityColor(insight.severity)}`}>
+                            <Card key={idx} className={`p-2 border ${getSeverityColor(insight.severity)}`}>
                               <div className="flex items-start gap-2">
                                 {getInsightIcon(insight.type)}
-                                <div className="flex-1">
+                                <div className="flex-1 min-w-0">
                                   <div className="text-sm font-medium">{insight.title}</div>
-                                  <div className="text-xs text-muted-foreground mt-1">{insight.detail}</div>
-                                  {insight.metrics && (
-                                    <div className="flex flex-wrap gap-2 mt-2">
-                                      {Object.entries(insight.metrics).map(([key, value]) => (
-                                        <Badge key={key} variant="secondary" className="text-xs">
-                                          {key}: {String(value)}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
+                                  <div className="text-xs text-muted-foreground mt-0.5">{insight.detail}</div>
                                 </div>
                               </div>
                             </Card>
@@ -709,20 +764,21 @@ export function SafePilotButton() {
                       </div>
                     )}
 
-                    {queryResponse.suggestions.length > 0 && (
+                    {queryResponse.suggestions?.length > 0 && (
                       <div>
-                        <h4 className="font-medium text-sm mb-3">Suggested Actions</h4>
-                        <div className="space-y-2">
+                        <h4 className="font-medium text-sm mb-2">Quick Actions</h4>
+                        <div className="flex flex-wrap gap-2">
                           {queryResponse.suggestions.map((suggestion) => (
                             <Button
                               key={suggestion.key}
                               variant="outline"
-                              className="w-full justify-between"
+                              size="sm"
+                              className="text-xs"
                               onClick={() => handleActionClick(suggestion)}
                               data-testid={`button-suggestion-${suggestion.key}`}
                             >
-                              <span>{suggestion.label}</span>
-                              <ArrowRight className="h-4 w-4" />
+                              {suggestion.label}
+                              <ChevronRight className="h-3 w-3 ml-1" />
                             </Button>
                           ))}
                         </div>
