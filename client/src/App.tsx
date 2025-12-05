@@ -280,6 +280,7 @@ import AdminGlobalSettings from "@/pages/admin/global-settings";
 import AdminAccessGovernance from "@/pages/admin/access-governance";
 import ComplianceExportCenter from "@/pages/admin/compliance-export-center";
 import OperationsConsole from "@/pages/admin/operations-console";
+import BackupsDRPage from "@/pages/admin/backups-dr";
 
 // Phase 3A: Enterprise Admin Features
 import EnterpriseSearch from "@/pages/admin/enterprise-search";
@@ -2100,6 +2101,11 @@ function Router() {
       <Route path="/admin/operations-console">
         <ProtectedRoute allowedRoles={["admin"]}>
           <OperationsConsole />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/admin/backups-dr">
+        <ProtectedRoute allowedRoles={["admin"]}>
+          <BackupsDRPage />
         </ProtectedRoute>
       </Route>
       
