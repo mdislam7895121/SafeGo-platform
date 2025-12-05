@@ -135,6 +135,45 @@ export const safePilotService = {
       case 'admin.complaints':
         return this.getComplaintsContext(countryCode);
       
+      case 'admin.payment-integrity':
+        return this.getPaymentIntegrityContext(countryCode);
+      
+      case 'admin.earnings-disputes':
+        return this.getEarningsDisputesContext(countryCode);
+      
+      case 'admin.driver-violations':
+        return this.getDriverViolationsContext(countryCode);
+      
+      case 'admin.operations-console':
+        return this.getOperationsContext(countryCode);
+      
+      case 'admin.trust-safety':
+        return this.getTrustSafetyContext(countryCode);
+      
+      case 'admin.policy-engine':
+        return this.getPolicyEngineContext(countryCode);
+      
+      case 'admin.export-center':
+        return this.getExportCenterContext(countryCode);
+      
+      case 'admin.activity-monitor':
+        return this.getActivityMonitorContext(countryCode);
+      
+      case 'admin.ride-timeline':
+        return this.getRideTimelineContext(countryCode);
+      
+      case 'admin.notification-rules':
+        return this.getNotificationRulesContext(countryCode);
+      
+      case 'admin.global-search':
+        return this.getGlobalSearchContext(countryCode);
+      
+      case 'admin.backup-recovery':
+        return this.getBackupRecoveryContext(countryCode);
+      
+      case 'admin.commissions':
+        return this.getCommissionsContext(countryCode);
+      
       case 'admin.dashboard':
       default:
         return this.getDashboardContext(countryCode);
@@ -858,7 +897,7 @@ export const safePilotService = {
       recentSosAlerts,
       unresolvedIncidents,
     ] = await Promise.all([
-      prisma.sOSAlert.count({ where: { triggeredAt: { gte: last7d } } }),
+      prisma.sOSAlert.count({ where: { createdAt: { gte: last7d } } }),
       prisma.sOSAlert.count({ where: { status: { not: 'resolved' } } }),
     ]);
 
@@ -1269,6 +1308,433 @@ export const safePilotService = {
     };
   },
 
+  async getPaymentIntegrityContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const last7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    const [
+      failedPayments,
+      totalPayments24h,
+      pendingPayouts,
+      chargebacks,
+      disputedPayments,
+    ] = await Promise.all([
+      prisma.payment.count({ where: { status: 'failed', createdAt: { gte: last24h } } }),
+      prisma.payment.count({ where: { createdAt: { gte: last24h } } }),
+      prisma.payout.count({ where: { status: 'pending' } }),
+      prisma.payment.count({ where: { status: 'refunded', createdAt: { gte: last7d } } }),
+      prisma.payment.count({ where: { status: 'disputed', createdAt: { gte: last7d } } }),
+    ]);
+
+    // Calculate actual suspicious transactions: chargebacks + disputes
+    const suspiciousTransactions = chargebacks + disputedPayments;
+    
+    // Calculate failure rate as percentage
+    const failureRate = totalPayments24h > 0 ? (failedPayments / totalPayments24h) * 100 : 0;
+
+    const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
+
+    if (failureRate > 5) {
+      alerts.push({
+        type: 'payment_failures',
+        message: `${failureRate.toFixed(1)}% payment failure rate in last 24 hours`,
+        severity: failureRate > 15 ? 'CRITICAL' : 'HIGH',
+      });
+    }
+
+    if (suspiciousTransactions > 5) {
+      alerts.push({
+        type: 'suspicious_activity',
+        message: `${suspiciousTransactions} chargebacks/disputes in last 7 days`,
+        severity: suspiciousTransactions > 20 ? 'CRITICAL' : 'HIGH',
+      });
+    }
+
+    // Calculate integrity score based on rates
+    const integrityScore = failureRate < 2 && suspiciousTransactions < 3 ? 'Good' 
+      : failureRate < 5 && suspiciousTransactions < 10 ? 'Fair' 
+      : 'Poor';
+
+    return {
+      pageKey: 'admin.payment-integrity',
+      summary: {
+        title: 'Payment Integrity Dashboard',
+        description: `${failureRate.toFixed(1)}% failure rate, ${suspiciousTransactions} suspicious transactions`,
+      },
+      metrics: {
+        failedPayments,
+        failureRate: `${failureRate.toFixed(1)}%`,
+        pendingPayouts,
+        suspiciousTransactions,
+        chargebacks,
+        integrityScore,
+      },
+      alerts,
+      quickActions: [
+        {
+          key: 'review_failures',
+          label: 'Review Failed Payments',
+          actionType: 'FILTER',
+          payload: { filter: 'failed' },
+        },
+        {
+          key: 'review_disputes',
+          label: 'Review Disputes',
+          actionType: 'FILTER',
+          payload: { filter: 'disputed' },
+        },
+        {
+          key: 'sync_stripe',
+          label: 'Sync with Stripe',
+          actionType: 'BULK_ACTION',
+          payload: { action: 'stripe_sync' },
+        },
+      ],
+    };
+  },
+
+  async getEarningsDisputesContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [
+      openDisputes,
+      pendingReview,
+    ] = await Promise.all([
+      prisma.earningsDispute.count({ where: { status: 'open' } }),
+      prisma.earningsDispute.count({ where: { status: 'pending_review' } }),
+    ]);
+
+    const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
+
+    if (openDisputes > 20) {
+      alerts.push({
+        type: 'dispute_backlog',
+        message: `${openDisputes} open disputes need resolution`,
+        severity: 'HIGH',
+      });
+    }
+
+    return {
+      pageKey: 'admin.earnings-disputes',
+      summary: {
+        title: 'Earnings Dispute Resolution',
+        description: `${openDisputes} open disputes`,
+      },
+      metrics: {
+        openDisputes,
+        pendingReview,
+      },
+      alerts,
+      quickActions: [
+        {
+          key: 'review_disputes',
+          label: 'Review Open Disputes',
+          actionType: 'FILTER',
+          payload: { filter: 'open' },
+        },
+      ],
+    };
+  },
+
+  async getDriverViolationsContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const last7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    const [
+      activeViolations,
+      pendingAppeal,
+    ] = await Promise.all([
+      prisma.driverViolation.count({ where: { status: { in: ['active', 'pending'] } } }),
+      prisma.driverViolation.count({ where: { appealStatus: 'pending' } }),
+    ]);
+
+    const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
+
+    if (pendingAppeal > 10) {
+      alerts.push({
+        type: 'appeal_backlog',
+        message: `${pendingAppeal} appeals awaiting review`,
+        severity: 'MEDIUM',
+      });
+    }
+
+    return {
+      pageKey: 'admin.driver-violations',
+      summary: {
+        title: 'Driver Violations Center',
+        description: `${activeViolations} active violations`,
+      },
+      metrics: {
+        activeViolations,
+        pendingAppeal,
+      },
+      alerts,
+      quickActions: [
+        {
+          key: 'review_appeals',
+          label: 'Review Pending Appeals',
+          actionType: 'FILTER',
+          payload: { filter: 'pending_appeal' },
+        },
+      ],
+    };
+  },
+
+  async getOperationsContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    return {
+      pageKey: 'admin.operations-console',
+      summary: {
+        title: 'Operations Console',
+        description: 'System health and job monitoring',
+      },
+      metrics: {
+        systemStatus: 'Healthy',
+        activeJobs: 0,
+        failedJobs: 0,
+      },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'view_jobs',
+          label: 'View Active Jobs',
+          actionType: 'FILTER',
+          payload: { filter: 'active' },
+        },
+        {
+          key: 'health_check',
+          label: 'Run Health Check',
+          actionType: 'RUN_REPORT',
+          payload: { reportType: 'health_check' },
+        },
+      ],
+    };
+  },
+
+  async getTrustSafetyContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [pendingCases, criticalCases] = await Promise.all([
+      prisma.trustSafetyCase.count({ where: { status: { in: ['open', 'pending_review'] } } }),
+      prisma.trustSafetyCase.count({ where: { priority: 'critical', status: { not: 'closed' } } }),
+    ]);
+
+    const alerts: Array<{ type: string; message: string; severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }> = [];
+    if (criticalCases > 0) {
+      alerts.push({
+        type: 'critical_cases',
+        message: `${criticalCases} critical trust & safety cases need immediate review`,
+        severity: 'CRITICAL',
+      });
+    }
+
+    return {
+      pageKey: 'admin.trust-safety',
+      summary: {
+        title: 'Trust & Safety Review Board',
+        description: `${pendingCases} cases pending review`,
+      },
+      metrics: { pendingCases, criticalCases },
+      alerts,
+      quickActions: [
+        {
+          key: 'review_critical',
+          label: 'Review Critical Cases',
+          actionType: 'FILTER',
+          payload: { filter: 'critical' },
+        },
+      ],
+    };
+  },
+
+  async getPolicyEngineContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [activePolicies, draftPolicies] = await Promise.all([
+      prisma.policy.count({ where: { status: 'active' } }),
+      prisma.policy.count({ where: { status: 'draft' } }),
+    ]);
+
+    return {
+      pageKey: 'admin.policy-engine',
+      summary: {
+        title: 'Policy Enforcement Engine',
+        description: `${activePolicies} active policies`,
+      },
+      metrics: { activePolicies, draftPolicies },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'create_policy',
+          label: 'Create New Policy',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/policy-engine/new' },
+        },
+      ],
+    };
+  },
+
+  async getExportCenterContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const pendingExports = await prisma.dataExport.count({ where: { status: 'processing' } });
+
+    return {
+      pageKey: 'admin.export-center',
+      summary: {
+        title: 'Global Export Center',
+        description: `${pendingExports} exports in progress`,
+      },
+      metrics: { pendingExports },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'new_export',
+          label: 'Create New Export',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/export-center/new' },
+        },
+      ],
+    };
+  },
+
+  async getActivityMonitorContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const recentActivities = await prisma.adminActivity.count({ where: { timestamp: { gte: last24h } } });
+
+    return {
+      pageKey: 'admin.activity-monitor',
+      summary: {
+        title: 'Admin Activity Monitor',
+        description: `${recentActivities} activities in last 24 hours`,
+      },
+      metrics: { recentActivities },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'view_suspicious',
+          label: 'View Suspicious Activity',
+          actionType: 'FILTER',
+          payload: { filter: 'high_risk' },
+        },
+      ],
+    };
+  },
+
+  async getRideTimelineContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    return {
+      pageKey: 'admin.ride-timeline',
+      summary: {
+        title: 'Ride Timeline Viewer',
+        description: 'Detailed event timeline for ride investigation',
+      },
+      metrics: {},
+      alerts: [],
+      quickActions: [
+        {
+          key: 'search_ride',
+          label: 'Search Ride by ID',
+          actionType: 'OPEN_PANEL',
+          payload: { panel: 'ride_search' },
+        },
+      ],
+    };
+  },
+
+  async getNotificationRulesContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [activeRules, triggersFired] = await Promise.all([
+      prisma.notificationRule.count({ where: { isActive: true } }),
+      0, // Placeholder - would need notification logs
+    ]);
+
+    return {
+      pageKey: 'admin.notification-rules',
+      summary: {
+        title: 'Notification Rules Engine',
+        description: `${activeRules} active notification rules`,
+      },
+      metrics: { activeRules },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'create_rule',
+          label: 'Create New Rule',
+          actionType: 'NAVIGATE',
+          payload: { route: '/admin/notification-rules/new' },
+        },
+      ],
+    };
+  },
+
+  async getGlobalSearchContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    return {
+      pageKey: 'admin.global-search',
+      summary: {
+        title: 'Global Admin Search',
+        description: 'Search across all entities',
+      },
+      metrics: {},
+      alerts: [],
+      quickActions: [
+        {
+          key: 'recent_searches',
+          label: 'View Recent Searches',
+          actionType: 'OPEN_PANEL',
+          payload: { panel: 'recent_searches' },
+        },
+      ],
+    };
+  },
+
+  async getBackupRecoveryContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [recentBackups, lastBackup] = await Promise.all([
+      prisma.backupSnapshot.count({ where: { createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } } }),
+      prisma.backupSnapshot.findFirst({ orderBy: { createdAt: 'desc' } }),
+    ]);
+
+    return {
+      pageKey: 'admin.backup-recovery',
+      summary: {
+        title: 'Backup & Disaster Recovery',
+        description: `${recentBackups} backups in last 7 days`,
+      },
+      metrics: {
+        recentBackups,
+        lastBackupAge: lastBackup 
+          ? `${Math.round((Date.now() - lastBackup.createdAt.getTime()) / 1000 / 60 / 60)}h ago`
+          : 'Never',
+      },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'create_backup',
+          label: 'Create New Backup',
+          actionType: 'BULK_ACTION',
+          payload: { action: 'create_backup' },
+          permission: 'CREATE_BACKUP',
+        },
+      ],
+    };
+  },
+
+  async getCommissionsContext(countryCode?: string): Promise<SafePilotContextResponse> {
+    const [pendingCommissions, totalCollected] = await Promise.all([
+      prisma.commission.count({ where: { status: 'pending' } }),
+      prisma.commission.aggregate({ where: { status: 'collected' }, _sum: { amount: true } }),
+    ]);
+
+    return {
+      pageKey: 'admin.commissions',
+      summary: {
+        title: 'Commission Management',
+        description: `${pendingCommissions} pending commissions`,
+      },
+      metrics: {
+        pendingCommissions,
+        totalCollected: totalCollected._sum.amount?.toNumber() || 0,
+      },
+      alerts: [],
+      quickActions: [
+        {
+          key: 'collect_pending',
+          label: 'Collect Pending Commissions',
+          actionType: 'BULK_ACTION',
+          payload: { action: 'collect_commissions' },
+        },
+      ],
+    };
+  },
+
   // ============================================
   // Query Handlers
   // ============================================
@@ -1436,8 +1902,33 @@ export const safePilotService = {
     const totalProcessed = approvedRefunds + rejectedRefunds;
     const approvalRate = totalProcessed > 0 ? ((approvedRefunds / totalProcessed) * 100).toFixed(1) : 0;
 
+    const answerText = this.formatVision2030Response(
+      [
+        `${pendingRefunds} refunds pending review`,
+        `Approval rate: ${approvalRate}% over last 30 days`,
+        `${totalProcessed} total refunds processed recently`,
+      ],
+      [
+        'Customer order history',
+        'Refund reason patterns',
+        'Driver/Restaurant fault indicators',
+        'Previous refund requests per customer',
+      ],
+      [
+        { label: 'Process pending refunds', risk: pendingRefunds > 30 ? 'CAUTION' : 'SAFE' },
+        { label: 'Review high-frequency refunders', risk: 'CAUTION' },
+        { label: 'Generate refund abuse report', risk: 'SAFE' },
+      ],
+      [
+        'Customers with >3 refunds this month',
+        'Refund spikes by time/location',
+        'Restaurant-specific refund patterns',
+      ],
+      mode
+    );
+
     return {
-      answerText: `${pendingRefunds} refunds pending. Approval rate: ${approvalRate}% over last 30 days.`,
+      answerText,
       insights: [
         {
           type: 'cost',
@@ -1466,28 +1957,70 @@ export const safePilotService = {
   },
 
   async handlePayoutQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
-    const [pendingPayouts, failedPayouts, negativeBalances] = await Promise.all([
+    const [pendingPayouts, failedPayouts, negativeBalances, totalDrivers] = await Promise.all([
       prisma.payout.count({ where: { status: 'pending' } }),
       prisma.payout.count({ where: { status: 'failed' } }),
       prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
+      prisma.driverWallet.count(),
     ]);
 
+    // Use normalized percentage-based risk thresholds
+    const failureRate = (pendingPayouts + failedPayouts) > 0 
+      ? (failedPayouts / (pendingPayouts + failedPayouts)) * 100 
+      : 0;
+    const negativeBalanceRate = totalDrivers > 0 
+      ? (negativeBalances / totalDrivers) * 100 
+      : 0;
+
+    // Risk based on rates, not absolute counts
+    const processRisk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 
+      pendingPayouts > 100 ? 'CAUTION' : 'SAFE';
+    const retryRisk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 
+      failureRate > 15 ? 'HIGH_RISK' : failureRate > 5 ? 'CAUTION' : 'SAFE';
+    const settleRisk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 
+      negativeBalanceRate > 10 ? 'HIGH_RISK' : negativeBalanceRate > 3 ? 'CAUTION' : 'SAFE';
+
+    const answerText = this.formatVision2030Response(
+      [
+        `${pendingPayouts} payouts pending processing`,
+        `${failedPayouts} failed payouts (${failureRate.toFixed(1)}% failure rate)`,
+        `${negativeBalances} drivers have negative balance (${negativeBalanceRate.toFixed(1)}% of total)`,
+      ],
+      [
+        'Bank account verification status',
+        'Daily payout limits by region',
+        'Failed transaction error codes',
+        'Commission deduction patterns',
+      ],
+      [
+        { label: 'Process pending payouts batch', risk: processRisk },
+        { label: 'Retry failed payouts', risk: retryRisk },
+        { label: 'Settle negative balances', risk: settleRisk },
+      ],
+      [
+        'Payout failure rate trends',
+        'Commission collection efficiency',
+        'Bank API response times',
+      ],
+      mode
+    );
+
     return {
-      answerText: `${pendingPayouts} payouts pending, ${failedPayouts} failed. ${negativeBalances} drivers have negative balance.`,
+      answerText,
       insights: [
         {
           type: 'cost',
-          title: 'Payout Status',
-          detail: `${failedPayouts} failed payouts need attention`,
-          metrics: { pending: pendingPayouts, failed: failedPayouts },
-          severity: failedPayouts > 5 ? 'HIGH' : 'MEDIUM',
+          title: 'Payout Failure Rate',
+          detail: `${failureRate.toFixed(1)}% failure rate (${failedPayouts} failed of ${pendingPayouts + failedPayouts} total)`,
+          metrics: { pending: pendingPayouts, failed: failedPayouts, failureRate: `${failureRate.toFixed(1)}%` },
+          severity: failureRate > 15 ? 'HIGH' : failureRate > 5 ? 'MEDIUM' : 'LOW',
         },
         {
           type: 'cost',
-          title: 'Negative Balances',
-          detail: `${negativeBalances} drivers have negative wallet balance (commission owed)`,
-          metrics: { count: negativeBalances },
-          severity: negativeBalances > 20 ? 'HIGH' : 'MEDIUM',
+          title: 'Negative Balance Rate',
+          detail: `${negativeBalanceRate.toFixed(1)}% of drivers have negative balance (${negativeBalances} of ${totalDrivers})`,
+          metrics: { count: negativeBalances, rate: `${negativeBalanceRate.toFixed(1)}%` },
+          severity: negativeBalanceRate > 10 ? 'HIGH' : negativeBalanceRate > 3 ? 'MEDIUM' : 'LOW',
         },
       ],
       suggestions: [
@@ -1504,7 +2037,7 @@ export const safePilotService = {
           payload: { route: '/admin/wallets?filter=negative' },
         },
       ],
-      riskLevel: failedPayouts > 10 ? 'HIGH' : 'MEDIUM',
+      riskLevel: failureRate > 15 || negativeBalanceRate > 10 ? 'HIGH' : failureRate > 5 || negativeBalanceRate > 3 ? 'MEDIUM' : 'LOW',
     };
   },
 
@@ -1518,8 +2051,44 @@ export const safePilotService = {
       prisma.driverProfile.count({ where: { ...where, verificationStatus: 'pending' } }),
     ]);
 
+    // Calculate percentage-based rates for accurate risk assessment
+    const onlineRate = totalDrivers > 0 ? ((onlineDrivers / totalDrivers) * 100).toFixed(1) : 0;
+    const lowRatingRate = totalDrivers > 0 ? (lowRatingDrivers / totalDrivers) * 100 : 0;
+    const pendingKycRate = totalDrivers > 0 ? (pendingKyc / totalDrivers) * 100 : 0;
+
+    // Risk based on percentage rates, not absolute counts
+    const lowRatingRisk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 
+      lowRatingRate > 10 ? 'HIGH_RISK' : lowRatingRate > 5 ? 'CAUTION' : 'SAFE';
+    const kycRisk: 'SAFE' | 'CAUTION' | 'HIGH_RISK' = 
+      pendingKycRate > 15 ? 'CAUTION' : 'SAFE';
+
+    const answerText = this.formatVision2030Response(
+      [
+        `${totalDrivers} total drivers registered`,
+        `${onlineDrivers} currently online (${onlineRate}%)`,
+        `${lowRatingDrivers} with low ratings (${lowRatingRate.toFixed(1)}%), ${pendingKyc} pending KYC`,
+      ],
+      [
+        'Driver verification status',
+        'Rating and performance history',
+        'Cancellation rate patterns',
+        'Trip completion rate',
+      ],
+      [
+        { label: 'Review low-rating drivers', risk: lowRatingRisk },
+        { label: 'Process pending KYC applications', risk: kycRisk },
+        { label: 'Generate driver performance report', risk: 'SAFE' },
+      ],
+      [
+        'Drivers falling below rating threshold',
+        'KYC backlog trends',
+        'Online driver coverage by zone',
+      ],
+      mode
+    );
+
     return {
-      answerText: `${totalDrivers} total drivers. ${onlineDrivers} currently online. ${lowRatingDrivers} have low ratings. ${pendingKyc} pending KYC.`,
+      answerText,
       insights: [
         {
           type: 'performance',
@@ -1555,8 +2124,35 @@ export const safePilotService = {
       prisma.customerProfile.count({ where: { ...where, user: { ...where.user, isBlocked: true } } }),
     ]);
 
+    const blockRate = totalCustomers > 0 ? ((blockedCustomers / totalCustomers) * 100).toFixed(2) : 0;
+
+    const answerText = this.formatVision2030Response(
+      [
+        `${totalCustomers} total customers registered`,
+        `${blockedCustomers} currently blocked (${blockRate}%)`,
+        'Customer base analysis complete',
+      ],
+      [
+        'Order and trip history',
+        'Refund request patterns',
+        'Payment method diversity',
+        'App usage frequency',
+      ],
+      [
+        { label: 'Review blocked customers', risk: blockedCustomers > 50 ? 'CAUTION' : 'SAFE' },
+        { label: 'Analyze customer segments', risk: 'SAFE' },
+        { label: 'Generate customer report', risk: 'SAFE' },
+      ],
+      [
+        'Customer churn indicators',
+        'High-value customer activity',
+        'Complaint pattern trends',
+      ],
+      mode
+    );
+
     return {
-      answerText: `${totalCustomers} total customers. ${blockedCustomers} are currently blocked.`,
+      answerText,
       insights: [
         {
           type: 'performance',
@@ -1593,8 +2189,33 @@ export const safePilotService = {
       prisma.restaurantProfile.count({ where: { ...where, rating: { lt: RISK_THRESHOLDS.restaurant.lowRating } } }),
     ]);
 
+    const answerText = this.formatVision2030Response(
+      [
+        `${totalRestaurants} restaurant partners active`,
+        `${pendingKyc} pending verification`,
+        `${lowRating} restaurants with low ratings`,
+      ],
+      [
+        'Partner verification status',
+        'Order completion rate',
+        'Customer satisfaction scores',
+        'Menu and pricing compliance',
+      ],
+      [
+        { label: 'Review low-rating restaurants', risk: lowRating > 10 ? 'HIGH_RISK' : lowRating > 3 ? 'CAUTION' : 'SAFE' },
+        { label: 'Approve pending verifications', risk: pendingKyc > 20 ? 'CAUTION' : 'SAFE' },
+        { label: 'Generate restaurant performance report', risk: 'SAFE' },
+      ],
+      [
+        'Restaurant churn indicators',
+        'Order volume trends',
+        'Customer feedback patterns',
+      ],
+      mode
+    );
+
     return {
-      answerText: `${totalRestaurants} restaurants. ${pendingKyc} pending verification. ${lowRating} with low ratings.`,
+      answerText,
       insights: [
         {
           type: 'performance',
@@ -1618,9 +2239,37 @@ export const safePilotService = {
 
   async handleKycQuery(question: string, countryCode?: string, mode: 'ASK' | 'WATCH' | 'GUARD' | 'OPTIMIZE' = 'ASK'): Promise<SafePilotQueryResponse> {
     const context = await this.getKycContext(countryCode);
+    const totalPending = context.metrics.totalPending as number;
+    const pendingDrivers = context.metrics.pendingDriverKyc as number;
+    const pendingRestaurants = context.metrics.pendingRestaurantKyc as number;
+
+    const answerText = this.formatVision2030Response(
+      [
+        `${totalPending} total pending KYC verifications`,
+        `${pendingDrivers} drivers awaiting review`,
+        `${pendingRestaurants} restaurants awaiting review`,
+      ],
+      [
+        'ID document verification status',
+        'Background check completeness',
+        'Facial recognition match scores',
+        'Document expiry dates',
+      ],
+      [
+        { label: 'Process driver KYC queue', risk: pendingDrivers > 30 ? 'CAUTION' : 'SAFE' },
+        { label: 'Process restaurant KYC queue', risk: pendingRestaurants > 20 ? 'CAUTION' : 'SAFE' },
+        { label: 'Enable bulk verification', risk: totalPending > 100 ? 'HIGH_RISK' : 'SAFE' },
+      ],
+      [
+        'KYC queue aging by days',
+        'Rejection rate trends',
+        'Document quality issues',
+      ],
+      mode
+    );
     
     return {
-      answerText: `${context.metrics.totalPending} total pending KYC verifications (${context.metrics.pendingDriverKyc} drivers, ${context.metrics.pendingRestaurantKyc} restaurants).`,
+      answerText,
       insights: [
         {
           type: 'compliance',
@@ -1643,8 +2292,35 @@ export const safePilotService = {
       prisma.foodOrder.count({ where: { status: 'delivered', deliveredAt: { gte: last24h } } }),
     ]);
 
+    const totalTrips = completedRides + completedOrders;
+
+    const answerText = this.formatVision2030Response(
+      [
+        `${totalTrips} total trips/orders in last 24 hours`,
+        `${completedRides} rides completed`,
+        `${completedOrders} food orders delivered`,
+      ],
+      [
+        'Completion rate by service',
+        'Average trip time',
+        'Peak demand hours',
+        'Driver utilization rate',
+      ],
+      [
+        { label: 'View performance dashboard', risk: 'SAFE' },
+        { label: 'Generate performance report', risk: 'SAFE' },
+        { label: 'Analyze demand patterns', risk: 'SAFE' },
+      ],
+      [
+        'Hour-by-hour volume trends',
+        'Service completion rates',
+        'Geographic performance distribution',
+      ],
+      mode
+    );
+
     return {
-      answerText: `Last 24 hours: ${completedRides} rides completed, ${completedOrders} orders delivered.`,
+      answerText,
       insights: [
         {
           type: 'performance',
@@ -1674,8 +2350,33 @@ export const safePilotService = {
       prisma.driverWallet.count({ where: { balance: { lt: 0 } } }),
     ]);
 
+    const answerText = this.formatVision2030Response(
+      [
+        `${refundCount} refunds approved in last 30 days`,
+        `${negativeBalances} drivers owe commission (negative balance)`,
+        'Cost optimization analysis complete',
+      ],
+      [
+        'Refund approval rate trends',
+        'Commission collection efficiency',
+        'Incentive spend by category',
+        'Discount utilization patterns',
+      ],
+      [
+        { label: 'Review high refund categories', risk: refundCount > 100 ? 'HIGH_RISK' : refundCount > 50 ? 'CAUTION' : 'SAFE' },
+        { label: 'Collect negative balances', risk: negativeBalances > 30 ? 'CAUTION' : 'SAFE' },
+        { label: 'Optimize incentive programs', risk: 'SAFE' },
+      ],
+      [
+        'Refund amount trends',
+        'Commission leakage indicators',
+        'Incentive ROI by program',
+      ],
+      'OPTIMIZE'
+    );
+
     return {
-      answerText: `Cost reduction opportunities: ${refundCount} refunds approved last 30 days. ${negativeBalances} drivers owe commission.`,
+      answerText,
       insights: [
         {
           type: 'cost',

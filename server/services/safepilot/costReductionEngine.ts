@@ -81,6 +81,7 @@ export const costReductionEngine = {
           include: { user: true },
         },
       },
+      take: 500, // Limit for memory optimization
     });
 
     const customerRefunds = new Map<string, { 
@@ -196,6 +197,7 @@ export const costReductionEngine = {
         },
         coupon: true,
       },
+      take: 500, // Limit for memory optimization
     });
 
     const customerCoupons = new Map<string, {
@@ -342,6 +344,7 @@ export const costReductionEngine = {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: 500, // Limit for memory optimization
     });
 
     const driverPayouts = new Map<string, typeof payouts>();

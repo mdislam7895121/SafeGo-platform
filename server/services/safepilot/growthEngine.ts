@@ -57,6 +57,7 @@ export const growthEngine = {
   async detectDemandZones(countryCode?: string, days: number = 7): Promise<DemandZone[]> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     
+    // Memory-optimized: limit queries to reduce memory footprint
     const [rides, foodOrders, parcels] = await Promise.all([
       prisma.ride.findMany({
         where: {
@@ -69,6 +70,7 @@ export const growthEngine = {
           pickupLng: true,
           createdAt: true,
         },
+        take: 1000, // Limit for memory optimization
       }),
       prisma.foodOrder.findMany({
         where: {
@@ -81,6 +83,7 @@ export const growthEngine = {
           deliveryLng: true,
           createdAt: true,
         },
+        take: 1000, // Limit for memory optimization
       }),
       prisma.parcelDelivery.findMany({
         where: {
@@ -93,6 +96,7 @@ export const growthEngine = {
           pickupLng: true,
           createdAt: true,
         },
+        take: 500, // Limit for memory optimization
       }),
     ]);
 

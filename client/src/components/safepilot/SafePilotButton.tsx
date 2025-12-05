@@ -150,6 +150,22 @@ const getPageKeyFromPath = (pathname: string): string => {
     'complaints': 'admin.complaints',
     'media': 'admin.media',
     'notifications': 'admin.notifications',
+    'payment-integrity': 'admin.payment-integrity',
+    'earnings-disputes': 'admin.earnings-disputes',
+    'driver-violations': 'admin.driver-violations',
+    'trust-safety': 'admin.trust-safety',
+    'policy-engine': 'admin.policy-engine',
+    'export-center': 'admin.export-center',
+    'activity-monitor': 'admin.activity-monitor',
+    'ride-timeline': 'admin.ride-timeline',
+    'notification-rules': 'admin.notification-rules',
+    'global-search': 'admin.global-search',
+    'operations-console': 'admin.operations-console',
+    'backup-recovery': 'admin.backup-recovery',
+    'safepilot-intelligence': 'admin.safepilot',
+    'commissions': 'admin.commissions',
+    'incentives': 'admin.incentives',
+    'promotions': 'admin.promotions',
   };
   
   const filteredSegments = segments.filter(s => !isUuid(s) && !isNumericId(s));

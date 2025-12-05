@@ -78,6 +78,7 @@ interface FraudAlert {
 export const fraudShield = {
   /**
    * Detect ghost trips (fake completed rides)
+   * Memory-optimized: uses bulk aggregation to avoid per-ride DB calls
    */
   async detectGhostTrips(countryCode?: string, days: number = 7): Promise<GhostTripAlert[]> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -97,7 +98,30 @@ export const fraudShield = {
           include: { user: true },
         },
       },
+      orderBy: { fare: 'desc' },
+      take: 200,
     });
+
+    // Prefetch driver-customer pair counts in a single aggregation query
+    const driverCustomerPairs = rides
+      .filter(r => r.driverId && r.customerId)
+      .map(r => ({ driverId: r.driverId!, customerId: r.customerId }));
+    
+    const pairCounts = await prisma.ride.groupBy({
+      by: ['driverId', 'customerId'],
+      where: {
+        createdAt: { gte: since },
+        driverId: { in: [...new Set(driverCustomerPairs.map(p => p.driverId))] },
+        customerId: { in: [...new Set(driverCustomerPairs.map(p => p.customerId))] },
+      },
+      _count: { id: true },
+    });
+
+    // Build lookup map for driver-customer pair counts
+    const pairCountMap = new Map<string, number>();
+    for (const pc of pairCounts) {
+      pairCountMap.set(`${pc.driverId}-${pc.customerId}`, pc._count.id);
+    }
 
     for (const ride of rides) {
       const indicators: string[] = [];
@@ -135,13 +159,8 @@ export const fraudShield = {
         suspicionScore += 10;
       }
 
-      const recentDriverRides = await prisma.ride.count({
-        where: {
-          driverId: ride.driverId,
-          customerId: ride.customerId,
-          createdAt: { gte: since },
-        },
-      });
+      // Use prefetched count instead of per-ride query
+      const recentDriverRides = pairCountMap.get(`${ride.driverId}-${ride.customerId}`) || 0;
 
       if (recentDriverRides > 5) {
         indicators.push(`${recentDriverRides} rides with same customer recently`);
@@ -170,6 +189,7 @@ export const fraudShield = {
 
   /**
    * Detect ghost deliveries (fake food deliveries)
+   * Memory-optimized: uses bulk aggregation to avoid per-order DB calls
    */
   async detectGhostDeliveries(countryCode?: string, days: number = 7): Promise<GhostDeliveryAlert[]> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -189,7 +209,31 @@ export const fraudShield = {
           include: { user: true },
         },
       },
+      orderBy: { total: 'desc' },
+      take: 200,
     });
+
+    // Prefetch driver-restaurant pair counts in a single aggregation query
+    const driverRestaurantPairs = orders
+      .filter(o => o.driverId && o.restaurantId)
+      .map(o => ({ driverId: o.driverId!, restaurantId: o.restaurantId }));
+    
+    const pairCounts = await prisma.foodOrder.groupBy({
+      by: ['driverId', 'restaurantId'],
+      where: {
+        createdAt: { gte: since },
+        status: 'delivered',
+        driverId: { in: [...new Set(driverRestaurantPairs.map(p => p.driverId))] },
+        restaurantId: { in: [...new Set(driverRestaurantPairs.map(p => p.restaurantId))] },
+      },
+      _count: { id: true },
+    });
+
+    // Build lookup map for driver-restaurant pair counts
+    const pairCountMap = new Map<string, number>();
+    for (const pc of pairCounts) {
+      pairCountMap.set(`${pc.driverId}-${pc.restaurantId}`, pc._count.id);
+    }
 
     for (const order of orders) {
       const indicators: string[] = [];
@@ -217,14 +261,8 @@ export const fraudShield = {
         suspicionScore += 10;
       }
 
-      const driverRestaurantOrders = await prisma.foodOrder.count({
-        where: {
-          driverId: order.driverId,
-          restaurantId: order.restaurantId,
-          createdAt: { gte: since },
-          status: 'delivered',
-        },
-      });
+      // Use prefetched count instead of per-order query
+      const driverRestaurantOrders = pairCountMap.get(`${order.driverId}-${order.restaurantId}`) || 0;
 
       if (driverRestaurantOrders > 20) {
         indicators.push(`Driver has ${driverRestaurantOrders} deliveries from same restaurant`);
@@ -250,7 +288,7 @@ export const fraudShield = {
   },
 
   /**
-   * Detect coupon fraud patterns
+   * Detect coupon fraud patterns - Memory-optimized
    */
   async detectCouponFraud(countryCode?: string, days: number = 30): Promise<CouponFraudAlert[]> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -266,6 +304,7 @@ export const fraudShield = {
         },
         coupon: true,
       },
+      take: 500, // Limit to reduce memory usage
     });
 
     const customerUsages = new Map<string, typeof usages>();
@@ -322,11 +361,13 @@ export const fraudShield = {
 
   /**
    * Detect driver-customer collusion
+   * Memory-optimized: uses aggregation-first approach
    */
   async detectCollusion(countryCode?: string, days: number = 30): Promise<CollusionAlert[]> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const alerts: CollusionAlert[] = [];
 
+    // Use aggregation to find suspicious pairs first
     const rides = await prisma.ride.findMany({
       where: {
         createdAt: { gte: since },
@@ -336,6 +377,7 @@ export const fraudShield = {
         driver: { include: { user: true } },
         customer: { include: { user: true } },
       },
+      take: 500, // Limit to reduce memory usage
     });
 
     const pairCounts = new Map<string, {
@@ -399,6 +441,7 @@ export const fraudShield = {
 
   /**
    * Detect repeated safety incidents
+   * Memory-optimized: limits SOS alerts
    */
   async detectSafetyIncidents(countryCode?: string, days: number = 30): Promise<SafetyIncident[]> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -416,6 +459,8 @@ export const fraudShield = {
           },
         },
       },
+      orderBy: { createdAt: 'desc' },
+      take: 100, // Limit to most recent alerts
     });
 
     const driverIncidents = new Map<string, number>();
